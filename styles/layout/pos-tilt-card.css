@@ -1,0 +1,487 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   POS TILT CARD — Creative, Glassy 3D interactive menu item card
+   Enhanced depth with multi-layer translateZ, premium glassmorphism, theme-aware.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pos-tilt-card {
+    --rx: 0deg;
+    --ry: 0deg;
+    --gx: 50%;
+    --gy: 50%;
+    --card-radius: 24px;
+
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--card-radius);
+    
+    /* Glassmorphism base */
+    background: rgba(var(--bg-card), 0.7);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    
+    /* Default theme-aware text */
+    color: rgb(var(--text-main));
+    border: 1px solid rgba(120, 120, 120, 0.15);
+
+    box-shadow: 
+        0 10px 30px -10px rgba(0, 0, 0, 0.08),
+        0 2px 5px rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+
+    transform: 
+        perspective(1200px) 
+        rotateX(var(--rx)) 
+        rotateY(var(--ry)) 
+        translateZ(0);
+    transform-style: preserve-3d;
+    will-change: transform;
+
+    /* Base transition when not hovered */
+    transition: 
+        transform 400ms cubic-bezier(0.23, 1, 0.32, 1),
+        box-shadow 400ms ease,
+        border-color 400ms ease,
+        background 400ms ease;
+    
+    overflow: hidden;
+}
+
+/* ─── Hover lift & Glow (Smooth Tilt) ─── */
+.pos-tilt-card:hover {
+    /* During hover, transform transitions quickly so it follows the mouse instantly */
+    transition: 
+        transform 50ms linear,
+        box-shadow 400ms ease,
+        border-color 400ms ease,
+        background 400ms ease;
+    
+    background: rgba(var(--bg-card), 0.85);
+    border-color: rgba(var(--primary), 0.6);
+    box-shadow: 
+        0 35px 65px -12px rgba(0, 0, 0, 0.2),
+        0 15px 30px -8px rgba(var(--primary), 0.3),
+        inset 0 0 0 1px rgba(var(--primary), 0.5),
+        inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    z-index: 10;
+}
+
+.pos-tilt-card:active {
+    transform: 
+        perspective(1200px) 
+        rotateX(var(--rx)) 
+        rotateY(var(--ry)) 
+        translateZ(-30px) scale(0.92);
+    transition: transform 50ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Lightning flash feedback on click */
+.pos-tilt-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--gx) var(--gy), rgba(255,255,255,0.8) 0%, transparent 70%);
+    opacity: 0;
+    z-index: 105;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    transition: opacity 400ms ease;
+}
+
+.pos-tilt-card:active::after {
+    opacity: 1;
+    transition: opacity 50ms ease;
+}
+
+/* ─── Dynamic glare (follows cursor) ─── */
+.pos-tilt-glare {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    border-radius: inherit;
+    background: 
+        radial-gradient(circle at var(--gx) var(--gy), 
+            rgba(255, 255, 255, 0.6) 0%, 
+            rgba(255, 255, 255, 0.1) 40%, 
+            transparent 70%);
+    mix-blend-mode: overlay;
+    opacity: 0;
+    transition: opacity 400ms ease;
+}
+
+.pos-tilt-card:hover .pos-tilt-glare {
+    opacity: 0.8;
+}
+
+/* ─── Background Layer (.pos-tilt-bg) ─── */
+.pos-tilt-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    transform: translateZ(5px);
+    transition: transform 600ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* Forces a dark overlay so white text is always readable over images */
+.pos-tilt-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.1) 0%,
+        rgba(0, 0, 0, 0.35) 40%,
+        rgba(0, 0, 0, 0.85) 100%
+    );
+    z-index: 1;
+}
+
+.pos-tilt-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+    transition: transform 800ms ease, opacity 400ms ease;
+}
+
+.pos-tilt-card:hover .pos-tilt-bg img {
+    transform: scale(1.15);
+    opacity: 1;
+}
+
+/* ─── Content layer ─── */
+.pos-tilt-content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 24px 20px 20px;
+    transform: translateZ(60px);
+    text-align: center;
+}
+
+/* ─── Typography & Theme Variables ─── */
+.pos-tilt-title {
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 8px;
+    color: rgb(var(--text-main));
+    letter-spacing: -0.02em;
+}
+
+.pos-tilt-desc {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(var(--text-main), 0.7);
+    line-height: 1.4;
+    margin-bottom: 16px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.pos-tilt-price {
+    font-size: 22px;
+    font-weight: 950;
+    color: rgb(var(--text-main));
+    font-variant-numeric: tabular-nums;
+    transform: translateZ(80px);
+}
+
+.pos-tilt-price span {
+    font-size: 12px;
+    font-weight: 800;
+    color: rgba(var(--text-main), 0.6);
+    margin-left: 3px;
+    text-transform: uppercase;
+}
+
+/* Image Variant Overrides - Force white text due to dark gradient */
+.pos-tilt-card--image .pos-tilt-title,
+.pos-tilt-card--image .pos-tilt-price {
+    color: white;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.pos-tilt-card--image .pos-tilt-desc {
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.pos-tilt-card--image .pos-tilt-price span {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* ─── Quantity badge ─── */
+.pos-tilt-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 110;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 14px;
+    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    color: white;
+    box-shadow: 0 8px 20px rgba(var(--primary), 0.4);
+    transform: translateZ(100px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[dir="rtl"] .pos-tilt-badge {
+    left: auto;
+    right: 16px;
+}
+
+/* ─── Popular tag ─── */
+.pos-tilt-popular {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 110;
+    display: inline-flex;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffd700;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transform: translateZ(100px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+[dir="rtl"] .pos-tilt-popular {
+    right: auto;
+    left: 16px;
+}
+
+/* ─── Stepper & Add Button ─── */
+.pos-tilt-stepper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    padding: 6px;
+    border-radius: 16px;
+    background: rgba(var(--text-main), 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(var(--text-main), 0.1);
+    transform: translateZ(70px);
+    gap: 8px;
+}
+.pos-tilt-card--image .pos-tilt-stepper {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.pos-tilt-qty-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    color: rgb(var(--text-main));
+    background: rgba(var(--text-main), 0.05);
+    transition: all 200ms ease;
+    border: 1px solid rgba(var(--text-main), 0.05);
+}
+.pos-tilt-card--image .pos-tilt-qty-btn {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pos-tilt-qty-btn:hover { 
+    background: rgba(var(--text-main), 0.1); 
+    transform: scale(1.05);
+}
+.pos-tilt-card--image .pos-tilt-qty-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+.pos-tilt-qty-btn:active { 
+    transform: scale(0.9); 
+}
+
+.pos-tilt-qty-btn--add {
+    background: rgb(var(--primary)) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(var(--primary), 0.3);
+    border: none !important;
+}
+.pos-tilt-qty-btn--add:hover { 
+    background: rgb(var(--primary-hover)) !important;
+    box-shadow: 0 6px 16px rgba(var(--primary), 0.4);
+}
+
+.pos-tilt-qty-val {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 900;
+    color: rgb(var(--text-main));
+    font-variant-numeric: tabular-nums;
+}
+.pos-tilt-card--image .pos-tilt-qty-val {
+    color: white;
+}
+
+.pos-tilt-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    padding: 10px 24px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 900;
+    color: white;
+    background: rgba(var(--primary), 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(5px);
+    transform: translateZ(70px);
+    transition: all 300ms cubic-bezier(0.2, 0, 0, 1);
+    box-shadow: 0 8px 20px -5px rgba(var(--primary), 0.4);
+}
+
+.pos-tilt-add-btn:hover {
+    background: rgb(var(--primary));
+    transform: translateZ(80px) scale(1.05);
+    box-shadow: 0 12px 25px -5px rgba(var(--primary), 0.5);
+}
+
+.pos-tilt-add-btn:active { 
+    transform: translateZ(70px) scale(0.95); 
+}
+
+/* ─── Compact Variant ─── */
+.pos-tilt-card--compact .pos-tilt-content {
+    padding: 16px 12px 12px;
+}
+.pos-tilt-card--compact .pos-tilt-title {
+    font-size: 16px;
+}
+.pos-tilt-card--compact .pos-tilt-price {
+    font-size: 18px;
+}
+
+/* ─── Selected / Highlighted ─── */
+.pos-tilt-card[data-selected='true'] {
+    background: rgba(var(--primary), 0.08);
+    border-color: rgba(var(--primary), 0.5);
+    box-shadow: 
+        0 0 0 1px rgba(var(--primary), 0.3),
+        0 20px 40px -10px rgba(var(--primary), 0.15);
+}
+.pos-tilt-card--image[data-selected='true'] {
+    /* Don't tint the card background if it has an image overlay */
+    background: rgba(var(--bg-card), 0.65);
+}
+
+.pos-tilt-card[data-highlighted='true'] {
+    animation: pos-tilt-pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes pos-tilt-pulse {
+    0% { border-color: rgba(var(--primary), 0.4); box-shadow: 0 0 0 0 rgba(var(--primary), 0.3); }
+    50% { border-color: rgb(var(--primary)); box-shadow: 0 0 0 10px rgba(var(--primary), 0); }
+    100% { border-color: rgba(var(--primary), 0.4); box-shadow: 0 0 0 0 rgba(var(--primary), 0); }
+}
+
+/* ═══ List Variant ═══ */
+.pos-tilt-card--list {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px;
+    border-radius: 20px;
+}
+.pos-tilt-card--list .pos-tilt-bg {
+    display: none;
+}
+.pos-tilt-media {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    overflow: hidden;
+    flex-shrink: 0;
+    margin-right: 16px;
+    transform: translateZ(30px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+[dir="rtl"] .pos-tilt-card--list .pos-tilt-media {
+    margin-right: 0;
+    margin-left: 16px;
+}
+.pos-tilt-card--list .pos-tilt-content {
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    transform: translateZ(40px);
+    text-align: left;
+}
+[dir="rtl"] .pos-tilt-card--list .pos-tilt-content {
+    text-align: right;
+}
+
+/* ─── Empty Media State ─── */
+.pos-menu-item-empty-media {
+    background: rgba(120, 120, 120, 0.1);
+    color: rgba(var(--text-main), 0.4);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.pos-tilt-card--image .pos-menu-item-empty-media {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.pos-tilt-card--button .pos-tilt-bg {
+    display: none;
+}
+.pos-tilt-card--button .pos-tilt-title {
+    font-size: 14px;
+    margin-bottom: 8px;
+    text-align: start;
+}
+
+/* ═══ Dark Theme Enhancements ═══ */
+.dark .pos-tilt-card {
+    background: rgba(15, 23, 42, 0.65);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 
+        0 10px 30px -10px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.dark .pos-tilt-card:hover {
+    background: rgba(15, 23, 42, 0.85);
+    border-color: rgba(var(--primary), 0.5);
+    box-shadow: 
+        0 35px 65px -12px rgba(0, 0, 0, 0.5),
+        0 15px 30px -8px rgba(var(--primary), 0.2),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+.dark .pos-tilt-card--image[data-selected='true'] {
+    background: rgba(15, 23, 42, 0.65);
+}

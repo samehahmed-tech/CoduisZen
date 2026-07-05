@@ -1,0 +1,15 @@
+User-agent: *
+Disallow: /admin-dashboard
+Disallow: /pos
+Disallow: /call-center
+Disallow: /kds
+Disallow: /finance
+Disallow: /reports
+Disallow: /settings
+Disallow: /security
+Disallow: /people
+Disallow: /inventory
+Disallow: /orders
+Allow: /
+
+Sitemap: /sitemap.xml

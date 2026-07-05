@@ -1,0 +1,175 @@
+import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+import { db } from '../db';
+import { shiftPlanEntries, shiftPlans, shiftTemplates } from '../../src/db/schema';
+
+const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
+
+const parseTimeToMinutes = (value?: string | null) => {
+    if (!value) return null;
+    const [h, m] = value.split(':').map((v) => Number(v));
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return (h * 60) + m;
+};
+
+const hasOverlap = (aStart?: string | null, aEnd?: string | null, bStart?: string | null, bEnd?: string | null) => {
+    const aS = parseTimeToMinutes(aStart);
+    const aE = parseTimeToMinutes(aEnd);
+    const bS = parseTimeToMinutes(bStart);
+    const bE = parseTimeToMinutes(bEnd);
+    if (aS === null || aE === null || bS === null || bE === null) return false;
+    return aS < bE && bS < aE;
+};
+
+export const schedulingService = {
+    async listPlans(branchId?: string) {
+        return db.select().from(shiftPlans)
+            .where(branchId ? eq(shiftPlans.branchId, branchId) : undefined)
+            .orderBy(desc(shiftPlans.weekStart));
+    },
+
+    async createPlan(input: { branchId: string; name: string; weekStart: string; weekEnd?: string; createdBy?: string }) {
+        const start = new Date(input.weekStart);
+        const end = input.weekEnd ? new Date(input.weekEnd) : new Date(start.getTime() + (6 * 24 * 60 * 60 * 1000));
+
+        const [created] = await db.insert(shiftPlans).values({
+            id: makeId('SPL'),
+            branchId: input.branchId,
+            name: input.name,
+            weekStart: start.toISOString().slice(0, 10),
+            weekEnd: end.toISOString().slice(0, 10),
+            createdBy: input.createdBy,
+            status: 'DRAFT',
+        }).returning();
+        return created;
+    },
+
+    async updatePlan(input: { id: string; name?: string; status?: string; approvedBy?: string }) {
+        const updates: Record<string, any> = { updatedAt: new Date() };
+        if (input.name) updates.name = input.name;
+        if (input.status) {
+            updates.status = input.status;
+            if (input.status === 'PUBLISHED') {
+                updates.postedAt = new Date();
+                updates.approvedBy = input.approvedBy;
+            }
+            if (input.status === 'ARCHIVED') {
+                updates.frozenAt = new Date();
+            }
+        }
+        const [updated] = await db.update(shiftPlans)
+            .set(updates)
+            .where(eq(shiftPlans.id, input.id))
+            .returning();
+        return updated;
+    },
+
+    async listEntries(filters?: { planId?: string; branchId?: string; employeeId?: string; dateFrom?: string; dateTo?: string }) {
+        return db.select().from(shiftPlanEntries)
+            .where(and(
+                filters?.planId ? eq(shiftPlanEntries.planId, filters.planId) : undefined,
+                filters?.branchId ? eq(shiftPlanEntries.branchId, filters.branchId) : undefined,
+                filters?.employeeId ? eq(shiftPlanEntries.employeeId, filters.employeeId) : undefined,
+                filters?.dateFrom ? gte(shiftPlanEntries.date, filters.dateFrom) : undefined,
+                filters?.dateTo ? lte(shiftPlanEntries.date, filters.dateTo) : undefined,
+            ))
+            .orderBy(desc(shiftPlanEntries.date));
+    },
+
+    async createEntry(input: {
+        planId: string;
+        branchId: string;
+        employeeId: string;
+        shiftTemplateId?: string;
+        date: string;
+        startTime?: string;
+        endTime?: string;
+        status?: string;
+        notes?: string;
+    }) {
+        let startTime = input.startTime;
+        let endTime = input.endTime;
+        if ((!startTime || !endTime) && input.shiftTemplateId) {
+            const [template] = await db.select().from(shiftTemplates)
+                .where(eq(shiftTemplates.id, input.shiftTemplateId))
+                .limit(1);
+            startTime = startTime || template?.startTime;
+            endTime = endTime || template?.endTime;
+        }
+
+        const sameDay = await db.select().from(shiftPlanEntries)
+            .where(and(
+                eq(shiftPlanEntries.employeeId, input.employeeId),
+                eq(shiftPlanEntries.date, input.date),
+            ));
+
+        const conflict = sameDay.find((entry) => hasOverlap(startTime, endTime, entry.startTime, entry.endTime));
+        if (conflict) {
+            throw new Error(`SHIFT_CONFLICT_WITH_ENTRY_${conflict.id}`);
+        }
+
+        const [created] = await db.insert(shiftPlanEntries).values({
+            planId: input.planId,
+            branchId: input.branchId,
+            employeeId: input.employeeId,
+            shiftTemplateId: input.shiftTemplateId,
+            date: input.date,
+            startTime,
+            endTime,
+            status: input.status || 'PLANNED',
+            notes: input.notes,
+        }).returning();
+        return created;
+    },
+
+    async updateEntry(input: {
+        id: number;
+        shiftTemplateId?: string;
+        startTime?: string;
+        endTime?: string;
+        status?: string;
+        notes?: string;
+    }) {
+        const [current] = await db.select().from(shiftPlanEntries).where(eq(shiftPlanEntries.id, input.id)).limit(1);
+        if (!current) throw new Error('SHIFT_ENTRY_NOT_FOUND');
+
+        let startTime = input.startTime ?? current.startTime;
+        let endTime = input.endTime ?? current.endTime;
+        const shiftTemplateId = input.shiftTemplateId ?? current.shiftTemplateId;
+
+        if ((!startTime || !endTime) && shiftTemplateId) {
+            const [template] = await db.select().from(shiftTemplates)
+                .where(eq(shiftTemplates.id, shiftTemplateId))
+                .limit(1);
+            startTime = startTime || template?.startTime;
+            endTime = endTime || template?.endTime;
+        }
+
+        const sameDay = await db.select().from(shiftPlanEntries)
+            .where(and(
+                eq(shiftPlanEntries.employeeId, current.employeeId),
+                eq(shiftPlanEntries.date, current.date),
+                ne(shiftPlanEntries.id, input.id),
+            ));
+
+        const conflict = sameDay.find((entry) => hasOverlap(startTime, endTime, entry.startTime, entry.endTime));
+        if (conflict) {
+            throw new Error(`SHIFT_CONFLICT_WITH_ENTRY_${conflict.id}`);
+        }
+
+        const [updated] = await db.update(shiftPlanEntries)
+            .set({
+                shiftTemplateId,
+                startTime,
+                endTime,
+                status: input.status ?? current.status,
+                notes: input.notes ?? current.notes,
+                updatedAt: new Date(),
+            })
+            .where(eq(shiftPlanEntries.id, input.id))
+            .returning();
+        return updated;
+    },
+};
+
+export default schedulingService;

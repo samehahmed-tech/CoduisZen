@@ -1,0 +1,33 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DENSITY CLASSES — Applied to .workspace-shell
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.density-compact {
+    --density-scale: 0.85;
+    --density-gap: 0.5rem;
+    --density-section-gap: 1rem;
+    --density-container-pad: 1rem;
+    --density-btn-h: 2.25rem;
+    --density-input-h: 2.25rem;
+    --density-row-h: 2.5rem;
+}
+
+.density-normal {
+    --density-scale: 1;
+    --density-gap: 0.75rem;
+    --density-section-gap: 1.5rem;
+    --density-container-pad: 1.5rem;
+    --density-btn-h: 2.5rem;
+    --density-input-h: 2.5rem;
+    --density-row-h: 3rem;
+}
+
+.density-spacious {
+    --density-scale: 1.2;
+    --density-gap: 1rem;
+    --density-section-gap: 2rem;
+    --density-container-pad: 2rem;
+    --density-btn-h: 3.25rem;
+    --density-input-h: 3rem;
+    --density-row-h: 3.5rem;
+}

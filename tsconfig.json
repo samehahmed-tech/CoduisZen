@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "exclude": [
+    "manual-seed.ts",
+    "Ashraf System",
+    "node_modules",
+    "node_modules_old",
+    "dist",
+    "dist-server",
+    "coverage",
+    "drizzle",
+    "artifacts",
+    "client-release",
+    "client-delivery/openwa-gateway",
+    "attendance-bridge",
+    "CoduisZenAttendanceBridge-Branches",
+    "scratch",
+    ".wwebjs_auth",
+    ".wwebjs_cache",
+    "vite.config.ts.timestamp-*.mjs"
+  ]
+}

@@ -1,0 +1,372 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM MICRO-INTERACTIONS — iOS-Grade Motion System
+   Smooth, delightful, and purposeful micro-animations.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. NUMBER COUNTER ANIMATION
+   Usage: <span class="animate-count-up" style="--count-to: 1234">0</span>
+   Best used with JS to update the text content on mount.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@property --num {
+    syntax: '<integer>';
+    inherits: false;
+    initial-value: 0;
+}
+
+.animate-count-up {
+    animation: countUp 1.2s var(--theme-ease, ease) forwards;
+    counter-reset: num var(--num);
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes countUp {
+    from { --num: 0; }
+    to { --num: var(--count-to, 100); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. CARD HOVER TILT — Subtle 3D perspective
+   Usage: <div class="glass-tilt"> … </div>
+   Apply with JS: onMouseMove → set --tilt-x and --tilt-y
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-tilt {
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+    transform: perspective(800px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    transition: transform 200ms var(--theme-ease, ease);
+    transform-style: preserve-3d;
+    will-change: transform;
+}
+
+.glass-tilt:hover {
+    box-shadow:
+        0 12px 32px rgba(var(--primary), 0.08),
+        0 0 0 1px rgba(var(--primary), 0.04);
+}
+
+/* Tilt inner glow follows cursor */
+.glass-tilt::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+        300px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+        rgba(var(--primary), 0.06),
+        transparent 60%
+    );
+    opacity: 0;
+    transition: opacity 300ms ease;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.glass-tilt:hover::after {
+    opacity: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. PAGE TRANSITION — Smooth fade + slide between routes
+   Using CSS View Transitions API fallback
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes pageEnter {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.995);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+@keyframes pageExit {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.995);
+    }
+}
+
+.page-enter {
+    animation: pageEnter 0.35s var(--theme-ease, ease) forwards;
+}
+
+.page-exit {
+    animation: pageExit 0.2s ease forwards;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. STAGGER ENTRANCE — Cards appear in sequence
+   Usage: <div class="stagger-appear" style="--i: 0"> …
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes staggerAppear {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+        filter: blur(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+.stagger-appear {
+    opacity: 0;
+    animation: staggerAppear 0.4s var(--theme-ease, ease) forwards;
+    animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. SPRING BUTTON — iOS-grade bounce on press
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.spring-press {
+    transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform;
+}
+
+.spring-press:active {
+    transform: scale(0.97);
+}
+
+.spring-press:hover {
+    transform: scale(1.02);
+}
+
+/* Combined: hover lift + active press */
+.spring-card {
+    transition:
+        transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 220ms var(--theme-ease, ease);
+    will-change: transform;
+}
+
+.spring-card:hover {
+    transform: translateY(-3px) scale(1.005);
+}
+
+.spring-card:active {
+    transform: translateY(0) scale(0.97);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. TOAST ANIMATION — Slide in from top-right with spring
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes toastSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateX(24px) translateY(-8px) scale(0.92);
+    }
+    60% {
+        opacity: 1;
+        transform: translateX(-3px) translateY(0) scale(1.02);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0) translateY(0) scale(1);
+    }
+}
+
+@keyframes toastSlideOut {
+    0% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(48px) scale(0.9);
+    }
+}
+
+.toast-enter {
+    animation: toastSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.toast-exit {
+    animation: toastSlideOut 0.3s ease forwards;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. SKELETON → CONTENT MORPH
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes skeletonReveal {
+    0% {
+        opacity: 0;
+        filter: blur(8px) saturate(0);
+        transform: scale(0.98);
+    }
+    50% {
+        opacity: 0.7;
+        filter: blur(2px) saturate(0.8);
+    }
+    100% {
+        opacity: 1;
+        filter: blur(0) saturate(1);
+        transform: scale(1);
+    }
+}
+
+.skeleton-reveal {
+    animation: skeletonReveal 0.5s var(--theme-ease, ease) forwards;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. SCROLL-TRIGGERED FADE (IntersectionObserver applies .in-view)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.scroll-reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition:
+        opacity 0.5s var(--theme-ease, ease),
+        transform 0.5s var(--theme-ease, ease);
+    will-change: opacity, transform;
+}
+
+.scroll-reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. GLASS SHIMMER SWEEP — Light sweep on hover (enhanced)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes glassLightSweep {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(250%) skewX(-15deg); }
+}
+
+.glass-shine {
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-shine::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.08) 46%,
+        rgba(255, 255, 255, 0.14) 50%,
+        rgba(255, 255, 255, 0.08) 54%,
+        transparent 70%
+    );
+    transform: translateX(-100%) skewX(-15deg);
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 2;
+}
+
+.glass-shine:hover::after {
+    animation: glassLightSweep 0.8s var(--theme-ease, ease);
+}
+
+.dark .glass-shine::after {
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.04) 46%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 54%,
+        transparent 70%
+    );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   10. MODAL ENTRANCE — Scale + Blur + Backdrop
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes modalEnter {
+    0% {
+        opacity: 0;
+        transform: scale(0.9) translateY(16px);
+        filter: blur(8px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes modalBackdropEnter {
+    from { opacity: 0; backdrop-filter: blur(0); }
+    to { opacity: 1; backdrop-filter: blur(12px); }
+}
+
+.modal-glass-enter {
+    animation: modalEnter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.modal-backdrop-enter {
+    animation: modalBackdropEnter 0.3s ease forwards;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   11. BREATHING GLOW — For active/online indicators
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes glowBreathe {
+    0%, 100% {
+        box-shadow:
+            0 0 0 0 rgba(var(--primary), 0.08),
+            0 0 12px rgba(var(--primary), 0.04);
+    }
+    50% {
+        box-shadow:
+            0 0 0 4px rgba(var(--primary), 0.06),
+            0 0 24px rgba(var(--primary), 0.08);
+    }
+}
+
+.glow-breathe {
+    animation: glowBreathe 3s ease-in-out infinite;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   12. TAB SLIDING INDICATOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sliding-indicator {
+    position: absolute;
+    background: rgba(var(--primary), 0.1);
+    border: 1px solid rgba(var(--primary), 0.08);
+    border-radius: calc(var(--theme-radius, 14px) - 3px);
+    transition:
+        left 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        width 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 0;
+    box-shadow: 0 2px 8px rgba(var(--primary), 0.06);
+}

@@ -1,0 +1,162 @@
+/* 
+ * ═══════════════════════════════════════════════════════════════
+ *  KIOSK PREMIUM DESIGN SYSTEM
+ *  Focus: Glassmorphism, Large Touch Targets, Depth & Fluidity
+ * ═══════════════════════════════════════════════════════════════
+ */
+
+:root {
+  --kiosk-radius: 2.5rem; /* 40px */
+  --kiosk-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --kiosk-glass: rgba(255, 255, 255, 0.03);
+  --kiosk-glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ─── 1. Kiosk Base Containers ─── */
+.kiosk-screen {
+  position: fixed;
+  inset: 0;
+  background-color: #050507;
+  color: white;
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--font-body, 'Tajawal', system-ui, sans-serif);
+}
+.kiosk-screen ::selection {
+  background-color: rgba(99, 102, 241, 0.3);
+}
+
+.glass-panel {
+  background: var(--kiosk-glass);
+  backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--kiosk-glass-border);
+  box-shadow: var(--kiosk-shadow);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ─── 2. Interactive States ─── */
+.kiosk-btn-primary {
+  background-color: rgb(79, 70, 229);
+  color: white;
+  font-weight: 900;
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+  box-shadow: 0 20px 40px rgba(79, 70, 229, 0.3);
+}
+
+.kiosk-btn-primary:active {
+  background-color: rgb(99, 102, 241);
+  transform: scale(.95);
+  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2);
+}
+
+.kiosk-category-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition-property: all;
+  transition-duration: 300ms;
+}
+
+.kiosk-category-card.active {
+  background-color: rgb(79, 70, 229);
+  border-color: rgb(129, 140, 248);
+  transform: scale(1.05);
+  box-shadow: 0 15px 35px rgba(79, 70, 229, 0.4);
+}
+
+/* ─── 3. Typography ─── */
+.kiosk-title {
+  font-size: 3rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+.kiosk-shell {
+  width: min(100% - 1.5rem, 96rem);
+  margin-inline: auto;
+}
+
+.kiosk-brand {
+  font-size: clamp(3.25rem, 10vw, 7.5rem);
+  line-height: 0.95;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.kiosk-heading {
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+@media (min-width: 768px) {
+  .kiosk-title {
+    font-size: 4.5rem;
+  }
+}
+
+.kiosk-subtitle {
+  font-size: clamp(1.05rem, 2.8vw, 1.5rem);
+  line-height: 1.45;
+  color: rgb(148, 163, 184);
+  font-weight: 500;
+}
+
+/* ─── 4. Layout Helpers ─── */
+.kiosk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.kiosk-cart-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* ─── 5. Animations ─── */
+@keyframes kiosk-fade-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-kiosk-entry {
+  animation: kiosk-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ─── 6. Custom Background Accents ─── */
+.kiosk-bg-glow {
+  position: absolute;
+  pointer-events: none;
+  width: 50vw;
+  height: 50vw;
+  filter: blur(120px);
+  opacity: 0.15;
+  border-radius: 9999px;
+}
+
+@media (max-width: 1023px) {
+  .kiosk-screen {
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .kiosk-shell {
+    width: min(100% - 1rem, 96rem);
+  }
+
+  .kiosk-grid {
+    grid-template-columns: 1fr;
+  }
+}

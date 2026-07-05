@@ -1,0 +1,231 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME-ADAPTIVE COMPONENTS
+   .theme-card, .theme-btn-*, .theme-input, .theme-table-row, .theme-modal-*
+   All properties are driven by CSS variables from the active theme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Button ── */
+.theme-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: var(--theme-button-height, var(--density-btn-h, 2.5rem));
+    padding: var(--theme-button-padding, 0.625rem 1.25rem);
+    border-radius: var(--theme-radius, 14px);
+    font-weight: var(--theme-font-weight, 500);
+    letter-spacing: var(--theme-letter-spacing, -0.01em);
+    transition: background var(--theme-duration, 200ms) var(--theme-ease, ease), box-shadow var(--theme-duration, 200ms) var(--theme-ease, ease), border-color var(--theme-duration, 200ms) var(--theme-ease, ease), transform var(--theme-duration, 200ms) var(--theme-ease, ease), color var(--theme-duration, 200ms) var(--theme-ease, ease);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-btn-primary {
+    background: var(--theme-button-bg, linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--primary-hover)) 100%));
+    color: var(--theme-button-text, white);
+    box-shadow: var(--theme-button-shadow, var(--theme-shadow-card));
+    border: 1px solid var(--theme-button-border, transparent);
+}
+
+.theme-btn-primary:hover {
+    background: var(--theme-button-bg-hover, linear-gradient(135deg, rgb(var(--primary-hover)) 0%, rgb(var(--primary)) 100%));
+    box-shadow: var(--theme-button-shadow-hover, var(--theme-shadow-hover));
+    transform: translateY(-1px) scale(1.01);
+}
+
+/* Shimmer sweep on hover */
+.theme-btn-primary::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.15) 45%,
+            rgba(255, 255, 255, 0.25) 50%,
+            rgba(255, 255, 255, 0.15) 55%,
+            transparent 100%);
+    transform: skewX(-20deg);
+    transition: left 0.6s var(--theme-ease, ease);
+    pointer-events: none;
+}
+
+.theme-btn-primary:hover::after {
+    left: 130%;
+}
+
+.theme-btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.theme-btn-secondary {
+    background: var(--theme-button-secondary-bg, rgba(var(--bg-elevated), var(--theme-surface-opacity, 0.95)));
+    color: var(--theme-button-secondary-text, rgb(var(--text-main)));
+    border: var(--theme-border-width, 1px) solid var(--theme-button-secondary-border, rgba(var(--border-color), var(--theme-border-opacity, 0.12)));
+    backdrop-filter: blur(var(--theme-blur, 0));
+}
+
+.theme-btn-secondary:hover {
+    background: var(--theme-button-secondary-hover-bg, rgba(var(--primary), 0.1));
+    border-color: var(--theme-button-secondary-hover-border, rgba(var(--primary), 0.3));
+    color: var(--theme-button-secondary-hover-text, rgb(var(--primary)));
+}
+
+.theme-btn-ghost {
+    background: transparent;
+    color: rgb(var(--text-muted));
+}
+
+.theme-btn-ghost:hover {
+    background: rgba(var(--text-main), 0.06);
+    color: rgb(var(--text-main));
+}
+
+/* ── Card ── */
+.theme-card {
+    background: var(--theme-card-bg, rgba(var(--bg-card), var(--theme-surface-opacity, 0.95)));
+    backdrop-filter: blur(var(--theme-blur, 0)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--theme-blur, 0)) saturate(180%);
+    border: var(--theme-border-width, 1px) solid rgba(var(--border-color), var(--theme-border-opacity, 0.12));
+    border-radius: clamp(12px, 1.3vw, var(--theme-radius-lg, 20px));
+    box-shadow: var(--theme-shadow-card), var(--theme-card-inner-shadow, 0 0 0 transparent);
+    transition:
+        box-shadow var(--theme-duration, 200ms) var(--theme-ease, ease),
+        border-color var(--theme-duration, 200ms) var(--theme-ease, ease),
+        transform var(--theme-duration, 200ms) var(--theme-ease, ease),
+        background var(--theme-duration-slow, 350ms) var(--theme-ease, ease);
+    transform: translateZ(0);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--theme-card-overlay, linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 60%));
+    pointer-events: none;
+    border-radius: inherit;
+    transition: opacity var(--theme-duration, 200ms) var(--theme-ease, ease), background var(--theme-duration-slow, 350ms) var(--theme-ease, ease);
+}
+
+.theme-card::after {
+    content: var(--theme-card-accent-visible, none);
+    position: absolute;
+    inset: var(--theme-card-accent-inset, 0 auto 0 0);
+    width: var(--theme-card-accent-width, 0px);
+    height: var(--theme-card-accent-height, 100%);
+    background: var(--theme-card-accent, transparent);
+    border-radius: var(--theme-card-accent-radius, 0);
+    pointer-events: none;
+    transition: opacity 200ms var(--theme-ease, ease), transform 200ms var(--theme-ease, ease);
+}
+
+.theme-card:hover {
+    background: var(--theme-card-hover-bg, var(--theme-card-bg, rgba(var(--bg-card), var(--theme-surface-opacity, 0.95))));
+    box-shadow: var(--theme-card-hover-glow, var(--theme-shadow-hover));
+    border-color: var(--theme-card-hover-border, rgba(var(--primary), 0.2));
+    transform: var(--theme-card-hover-transform, translateY(-2px));
+}
+
+.theme-card:hover::before {
+    opacity: var(--theme-card-hover-overlay-opacity, 1);
+}
+
+.dark .theme-card {
+    background: var(--theme-card-bg-dark, rgba(var(--bg-card), calc(var(--theme-surface-opacity, 0.95) - 0.12)));
+    box-shadow: var(--theme-shadow-card), var(--theme-card-inner-shadow, 0 0 0 transparent);
+}
+
+/* ── Input ── */
+.theme-input {
+    background: rgba(var(--bg-elevated), 0.5);
+    border: var(--theme-border-width, 1px) solid rgba(var(--border-color), var(--theme-border-opacity, 0.12));
+    border-radius: var(--theme-radius, 14px);
+    min-height: var(--theme-input-height, var(--density-input-h, 2.5rem));
+    padding: 0.5rem 1rem;
+    color: rgb(var(--text-main));
+    transition: border-color var(--theme-duration, 200ms) var(--theme-ease, ease), box-shadow var(--theme-duration, 200ms) var(--theme-ease, ease);
+}
+
+.theme-input:focus {
+    border-color: rgb(var(--primary));
+    box-shadow: 0 0 0 3px rgba(var(--primary), 0.12);
+    background: rgba(var(--bg-card), 1);
+}
+
+.theme-input::placeholder {
+    color: rgb(var(--text-muted));
+}
+
+/* ── Table Row ── */
+.theme-table-row {
+    border-bottom: 1px solid rgba(var(--border-color), 0.08);
+    transition: background var(--theme-duration, 200ms) var(--theme-ease, ease);
+}
+
+.theme-table-row:hover {
+    background-color: rgba(var(--primary), 0.04);
+}
+
+/* ── Modal ── */
+.theme-modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.theme-modal-content {
+    background: rgba(var(--bg-card), var(--theme-surface-opacity, 0.95));
+    backdrop-filter: blur(var(--theme-blur, 0)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--theme-blur, 0)) saturate(180%);
+    border: var(--theme-border-width, 1px) solid rgba(var(--border-color), var(--theme-border-opacity, 0.12));
+    border-radius: var(--theme-radius-xl, 28px);
+    box-shadow: var(--theme-shadow-elevated);
+}
+
+/* ── Spacing Utilities ── */
+.theme-container {
+    padding: var(--density-container-pad, 1.5rem);
+}
+
+.theme-gap {
+    gap: var(--density-gap, 0.75rem);
+}
+
+.theme-gap-section {
+    gap: var(--density-section-gap, 1.5rem);
+}
+
+/* ?? Table Rules (Density & Precision) ?? */
+.theme-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14px;
+}
+
+.theme-table th, .theme-table td {
+    height: 48px;
+    padding: 0 1rem;
+    text-align: left;
+}
+[dir="rtl"] .theme-table th, [dir="rtl"] .theme-table td {
+    text-align: right;
+}
+
+.theme-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--theme-card-bg, rgba(var(--bg-card), 0.95));
+    backdrop-filter: blur(var(--theme-blur, 8px));
+    font-weight: var(--theme-heading-weight, 700);
+    color: rgb(var(--text-muted));
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid rgba(var(--border-color), 0.1);
+}

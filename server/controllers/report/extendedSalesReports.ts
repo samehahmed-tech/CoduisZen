@@ -1,0 +1,399 @@
+import { Request, Response } from 'express';
+import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
+import { db } from '../../db';
+import { orders, orderItems, menuItems, menuCategories } from '../../../src/db/schema';
+import { parseLocalDateRange, orderBusinessDateFilter } from './reportUtils';
+
+export const getSalesByOrderType = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const rows = await db.select({
+            orderType: orders.type,
+            orderCount: sql<number>`count(*)`,
+            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            netRevenue: sql<number>`coalesce(sum(${orders.subtotal} - ${orders.discount}), 0)`,
+            avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+            totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
+            totalDeliveryFee: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
+            totalTax: sql<number>`coalesce(sum(${orders.tax}), 0)`,
+        }).from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.type)
+            .orderBy(sql`sum(${orders.total}) desc`);
+
+        const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
+        res.json(rows.map(r => ({
+            ...r,
+            orderCount: Number(r.orderCount),
+            revenue: Number(Number(r.revenue).toFixed(2)),
+            netRevenue: Number(Number(r.netRevenue).toFixed(2)),
+            avgTicket: Number(Number(r.avgTicket).toFixed(2)),
+            totalDiscount: Number(Number(r.totalDiscount).toFixed(2)),
+            totalDeliveryFee: Number(Number(r.totalDeliveryFee).toFixed(2)),
+            totalTax: Number(Number(r.totalTax).toFixed(2)),
+            percentage: totalRevenue > 0 ? Number(((Number(r.revenue) / totalRevenue) * 100).toFixed(1)) : 0,
+        })));
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getSalesByItem = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const rows = await db.select({
+            menuItemId: orderItems.menuItemId,
+            itemName: orderItems.name,
+            qtySold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
+            revenue: sql<number>`coalesce(sum(${orderItems.price} * ${orderItems.quantity}), 0)`,
+            cost: sql<number>`coalesce(sum(coalesce(${orderItems.cost}, 0) * ${orderItems.quantity}), 0)`,
+        }).from(orderItems)
+            .innerJoin(orders, eq(orderItems.orderId, orders.id))
+            .where(and(...conditions))
+            .groupBy(orderItems.menuItemId, orderItems.name)
+            .orderBy(sql`sum(${orderItems.price} * ${orderItems.quantity}) desc`)
+            .limit(100);
+
+        res.json(rows.map(r => ({
+            menuItemId: r.menuItemId,
+            itemName: r.itemName,
+            qtySold: Number(r.qtySold),
+            revenue: Number(Number(r.revenue).toFixed(2)),
+            cost: Number(Number(r.cost).toFixed(2)),
+            profit: Number((Number(r.revenue) - Number(r.cost)).toFixed(2)),
+            marginPercent: Number(r.revenue) > 0 ? Number(((Number(r.revenue) - Number(r.cost)) / Number(r.revenue) * 100).toFixed(1)) : 0,
+        })));
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getSalesByCategory = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const rows = await db.select({
+            categoryId: menuItems.categoryId,
+            categoryName: menuCategories.name,
+            qtySold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
+            revenue: sql<number>`coalesce(sum(${orderItems.price} * ${orderItems.quantity}), 0)`,
+            cost: sql<number>`coalesce(sum(coalesce(${orderItems.cost}, 0) * ${orderItems.quantity}), 0)`,
+            itemCount: sql<number>`count(distinct ${orderItems.menuItemId})`,
+        }).from(orderItems)
+            .innerJoin(orders, eq(orderItems.orderId, orders.id))
+            .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+            .leftJoin(menuCategories, eq(menuItems.categoryId, menuCategories.id))
+            .where(and(...conditions))
+            .groupBy(menuItems.categoryId, menuCategories.name)
+            .orderBy(sql`sum(${orderItems.price} * ${orderItems.quantity}) desc`);
+
+        const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
+        res.json(rows.map(r => ({
+            categoryId: r.categoryId,
+            categoryName: r.categoryName || 'Uncategorized',
+            qtySold: Number(r.qtySold),
+            revenue: Number(Number(r.revenue).toFixed(2)),
+            cost: Number(Number(r.cost).toFixed(2)),
+            profit: Number((Number(r.revenue) - Number(r.cost)).toFixed(2)),
+            itemCount: Number(r.itemCount),
+            percentage: totalRevenue > 0 ? Number(((Number(r.revenue) / totalRevenue) * 100).toFixed(1)) : 0,
+        })));
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getDiscountAnalysis = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [
+            businessDateFilter,
+            inArray(orders.status, deliveredStatuses),
+            sql`${orders.discount} > 0`
+        ];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        // By reason
+        const byReason = await db.select({
+            reason: sql<string>`coalesce(${orders.discountReason}, 'No Reason')`,
+            orderCount: sql<number>`count(*)`,
+            totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
+            avgDiscount: sql<number>`coalesce(avg(${orders.discount}), 0)`,
+        }).from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.discountReason)
+            .orderBy(sql`sum(${orders.discount}) desc`);
+
+        // By type
+        const byType = await db.select({
+            discountType: sql<string>`coalesce(${orders.discountType}, 'unknown')`,
+            orderCount: sql<number>`count(*)`,
+            totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
+        }).from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.discountType);
+
+        // Summary
+        const [summary] = await db.select({
+            totalOrders: sql<number>`count(*)`,
+            totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
+            avgDiscount: sql<number>`coalesce(avg(${orders.discount}), 0)`,
+            maxDiscount: sql<number>`coalesce(max(${orders.discount}), 0)`,
+        }).from(orders).where(and(...conditions));
+
+        // Total orders to get discount rate
+        const allConditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        if (branchId && branchId !== 'undefined') allConditions.push(eq(orders.branchId, branchId as string));
+        const [allOrders] = await db.select({
+            totalOrders: sql<number>`count(*)`,
+        }).from(orders).where(and(...allConditions));
+
+        res.json({
+            summary: {
+                totalDiscountedOrders: Number(summary?.totalOrders || 0),
+                totalOrders: Number(allOrders?.totalOrders || 0),
+                discountRate: Number(allOrders?.totalOrders || 0) > 0
+                    ? Number(((Number(summary?.totalOrders || 0) / Number(allOrders?.totalOrders || 1)) * 100).toFixed(1))
+                    : 0,
+                totalDiscount: Number(Number(summary?.totalDiscount || 0).toFixed(2)),
+                avgDiscount: Number(Number(summary?.avgDiscount || 0).toFixed(2)),
+                maxDiscount: Number(Number(summary?.maxDiscount || 0).toFixed(2)),
+            },
+            byReason: byReason.map(r => ({
+                reason: r.reason,
+                orderCount: Number(r.orderCount),
+                totalDiscount: Number(Number(r.totalDiscount).toFixed(2)),
+                avgDiscount: Number(Number(r.avgDiscount).toFixed(2)),
+            })),
+            byType: byType.map(r => ({
+                discountType: r.discountType,
+                orderCount: Number(r.orderCount),
+                totalDiscount: Number(Number(r.totalDiscount).toFixed(2)),
+            })),
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getCancelledOrders = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [
+            businessDateFilter,
+            eq(orders.status, 'CANCELLED'),
+        ];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const rows = await db.select({
+            id: orders.id,
+            orderNumber: orders.orderNumber,
+            type: orders.type,
+            total: orders.total,
+            cancelReason: orders.cancelReason,
+            cancelledAt: orders.cancelledAt,
+            createdAt: orders.createdAt,
+            customerName: orders.customerName,
+        }).from(orders)
+            .where(and(...conditions))
+            .orderBy(desc(orders.cancelledAt))
+            .limit(200);
+
+        // Summary
+        const [summary] = await db.select({
+            cancelledCount: sql<number>`count(*)`,
+            cancelledTotal: sql<number>`coalesce(sum(${orders.total}), 0)`,
+        }).from(orders).where(and(...conditions));
+
+        const allConditions: any[] = [businessDateFilter];
+        if (branchId && branchId !== 'undefined') allConditions.push(eq(orders.branchId, branchId as string));
+        const [allOrders] = await db.select({
+            totalOrders: sql<number>`count(*)`,
+        }).from(orders).where(and(...allConditions));
+
+        // By reason
+        const byReason = await db.select({
+            reason: sql<string>`coalesce(${orders.cancelReason}, 'No Reason')`,
+            count: sql<number>`count(*)`,
+            total: sql<number>`coalesce(sum(${orders.total}), 0)`,
+        }).from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.cancelReason)
+            .orderBy(sql`count(*) desc`);
+
+        res.json({
+            summary: {
+                cancelledCount: Number(summary?.cancelledCount || 0),
+                cancelledTotal: Number(Number(summary?.cancelledTotal || 0).toFixed(2)),
+                totalOrders: Number(allOrders?.totalOrders || 0),
+                cancelRate: Number(allOrders?.totalOrders || 0) > 0
+                    ? Number(((Number(summary?.cancelledCount || 0) / Number(allOrders?.totalOrders || 1)) * 100).toFixed(1))
+                    : 0,
+            },
+            byReason: byReason.map(r => ({
+                reason: r.reason,
+                count: Number(r.count),
+                total: Number(Number(r.total).toFixed(2)),
+            })),
+            orders: rows.map(r => ({
+                ...r,
+                total: Number(Number(r.total).toFixed(2)),
+            })),
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getDeliveryPerformance = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [
+            businessDateFilter,
+            inArray(orders.status, deliveredStatuses),
+            eq(orders.type, 'DELIVERY'),
+        ];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const [summary] = await db.select({
+            orderCount: sql<number>`count(*)`,
+            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+            totalDeliveryFees: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
+            freeDeliveryCount: sql<number>`count(*) filter (where ${orders.freeDelivery} = true)`,
+            avgDeliveryMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.actualDeliveryTime} - ${orders.createdAt})) / 60), 0)`,
+        }).from(orders).where(and(...conditions));
+
+        // By driver
+        const byDriver = await db.select({
+            driverId: orders.driverId,
+            orderCount: sql<number>`count(*)`,
+            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            avgDeliveryMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.actualDeliveryTime} - ${orders.createdAt})) / 60), 0)`,
+        }).from(orders)
+            .where(and(...conditions, sql`${orders.driverId} is not null`))
+            .groupBy(orders.driverId)
+            .orderBy(sql`count(*) desc`);
+
+        res.json({
+            summary: {
+                orderCount: Number(summary?.orderCount || 0),
+                revenue: Number(Number(summary?.revenue || 0).toFixed(2)),
+                avgTicket: Number(Number(summary?.avgTicket || 0).toFixed(2)),
+                totalDeliveryFees: Number(Number(summary?.totalDeliveryFees || 0).toFixed(2)),
+                freeDeliveryCount: Number(summary?.freeDeliveryCount || 0),
+                avgDeliveryMinutes: Number(Number(summary?.avgDeliveryMinutes || 0).toFixed(1)),
+            },
+            byDriver: byDriver.map(d => ({
+                driverId: d.driverId,
+                orderCount: Number(d.orderCount),
+                revenue: Number(Number(d.revenue).toFixed(2)),
+                avgDeliveryMinutes: Number(Number(d.avgDeliveryMinutes).toFixed(1)),
+            })),
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getSalesBySource = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const rows = await db.select({
+            source: sql<string>`coalesce(${orders.source}, 'pos')`,
+            orderCount: sql<number>`count(*)`,
+            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+        }).from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.source)
+            .orderBy(sql`sum(${orders.total}) desc`);
+
+        const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
+        res.json(rows.map(r => ({
+            source: r.source,
+            orderCount: Number(r.orderCount),
+            revenue: Number(Number(r.revenue).toFixed(2)),
+            avgTicket: Number(Number(r.avgTicket).toFixed(2)),
+            percentage: totalRevenue > 0 ? Number(((Number(r.revenue) / totalRevenue) * 100).toFixed(1)) : 0,
+        })));
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
+export const getDineInTableAnalysis = async (req: Request, res: Response) => {
+    try {
+        const { startDate, endDate, branchId } = req.query;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
+        const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const conditions: any[] = [
+            businessDateFilter,
+            inArray(orders.status, deliveredStatuses),
+            eq(orders.type, 'DINE_IN'),
+            sql`${orders.tableId} is not null`,
+        ];
+        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+
+        const rows = await db.select({
+            tableId: orders.tableId,
+            orderCount: sql<number>`count(*)`,
+            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+            avgDurationMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+        }).from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.tableId)
+            .orderBy(sql`sum(${orders.total}) desc`);
+
+        res.json(rows.map(r => ({
+            tableId: r.tableId,
+            orderCount: Number(r.orderCount),
+            revenue: Number(Number(r.revenue).toFixed(2)),
+            avgTicket: Number(Number(r.avgTicket).toFixed(2)),
+            avgDurationMinutes: Number(Number(r.avgDurationMinutes).toFixed(1)),
+        })));
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+};

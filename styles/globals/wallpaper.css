@@ -1,0 +1,71 @@
+/* Wallpaper engine.
+   wallpaperOpacity means visibility: lower = quieter image, higher = clearer image.
+   Surfaces become more glass-like as wallpaper visibility increases. */
+
+.workspace-shell[data-wallpaper='aurora'] { --wp-img: url('/wallpapers/aurora.png'); }
+.workspace-shell[data-wallpaper='nebula'] { --wp-img: url('/wallpapers/nebula.png'); }
+.workspace-shell[data-wallpaper='mesh'] { --wp-img: url('/wallpapers/mesh.png'); }
+.workspace-shell[data-wallpaper='mountain'] { --wp-img: url('/wallpapers/mountain.png'); }
+.workspace-shell[data-wallpaper='ocean'] { --wp-img: url('/wallpapers/ocean.png'); }
+.workspace-shell[data-wallpaper='abstract'] { --wp-img: url('/wallpapers/abstract.png'); }
+.workspace-shell[data-wallpaper='glass'] { --wp-img: url('/wallpapers/glass.png'); }
+.workspace-shell[data-wallpaper='forest'] { --wp-img: url('/wallpapers/forest.png'); }
+.workspace-shell[data-wallpaper='marble'] { --wp-img: url('/wallpapers/marble.png'); }
+
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) {
+    --wallpaper-strength: var(--wallpaper-opacity, 0.15);
+    --wallpaper-overlay: max(calc(0.92 - (var(--wallpaper-strength) * 1.25)), 0.22);
+    background:
+        linear-gradient(
+            rgba(var(--bg-app), var(--wallpaper-overlay)),
+            rgba(var(--bg-app), var(--wallpaper-overlay))
+        ),
+        var(--wp-img, none) center / cover fixed no-repeat !important;
+}
+
+.dark .workspace-shell[data-wallpaper]:not([data-wallpaper='none']) {
+    --wallpaper-overlay: max(calc(0.86 - (var(--wallpaper-strength) * 1.05)), 0.28);
+}
+
+.workspace-shell[data-wallpaper='none'] {
+    --wallpaper-opacity: 0;
+}
+
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .glass-card,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .stat-card-premium,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .card-primary,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .theme-card:not(.pos-menu-item-card) {
+    background: rgba(var(--bg-card), calc(0.94 - (var(--wallpaper-strength, 0.15) * 0.55))) !important;
+    backdrop-filter: blur(calc(16px + (var(--wallpaper-strength, 0.15) * 34px))) saturate(1.35) !important;
+    -webkit-backdrop-filter: blur(calc(16px + (var(--wallpaper-strength, 0.15) * 34px))) saturate(1.35) !important;
+    border-color: rgba(var(--border-color), calc(0.10 + (var(--wallpaper-strength, 0.15) * 0.20))) !important;
+}
+
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .bg-card {
+    background: rgba(var(--bg-card), calc(0.92 - (var(--wallpaper-strength, 0.15) * 0.48))) !important;
+    backdrop-filter: blur(calc(14px + (var(--wallpaper-strength, 0.15) * 28px))) saturate(1.24);
+    -webkit-backdrop-filter: blur(calc(14px + (var(--wallpaper-strength, 0.15) * 28px))) saturate(1.24);
+}
+
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .workspace-rail,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .context-rail {
+    background: rgba(var(--bg-sidebar), calc(0.88 - (var(--wallpaper-strength, 0.15) * 0.45))) !important;
+    backdrop-filter: blur(calc(22px + (var(--wallpaper-strength, 0.15) * 34px))) saturate(1.35) !important;
+    -webkit-backdrop-filter: blur(calc(22px + (var(--wallpaper-strength, 0.15) * 34px))) saturate(1.35) !important;
+}
+
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .workspace-breadcrumbs,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .workspace-topbar,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) .topbar {
+    background: rgba(var(--bg-card), calc(0.86 - (var(--wallpaper-strength, 0.15) * 0.35))) !important;
+    backdrop-filter: blur(calc(16px + (var(--wallpaper-strength, 0.15) * 28px))) saturate(1.24) !important;
+    -webkit-backdrop-filter: blur(calc(16px + (var(--wallpaper-strength, 0.15) * 28px))) saturate(1.24) !important;
+}
+
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) input,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) select,
+.workspace-shell[data-wallpaper]:not([data-wallpaper='none']) textarea {
+    background: rgba(var(--bg-card), calc(0.78 - (var(--wallpaper-strength, 0.15) * 0.28))) !important;
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}

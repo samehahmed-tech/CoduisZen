@@ -1,0 +1,70 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build output
+node_modules
+node_modules_old
+dist
+dist-ssr
+coverage
+*.local
+
+# Runtime/cache folders
+.wwebjs_auth/
+.wwebjs_cache/
+artifacts/load/
+
+# Scratch/debug workspace
+.agent/
+.codex/
+scratch/
+
+# Build output
+dist-server/
+client-delivery/
+
+# Artifacts (generated/reports)
+artifacts/*
+!artifacts/evidence/
+!artifacts/evidence/**
+!artifacts/gates/
+!artifacts/gates/**
+!artifacts/pilot/
+!artifacts/pilot/**
+!artifacts/rollback/
+!artifacts/rollback/**
+!artifacts/uat/
+!artifacts/uat/**
+
+# Drizzle meta snapshots (generated)
+drizzle/meta/
+
+# Attendance bridge data
+attendance-bridge/
+CoduisZenAttendanceBridge-Branches/
+CoduisZenBridgeBranches.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test data
+stream-test.xlsx

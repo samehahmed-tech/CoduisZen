@@ -1,0 +1,68 @@
+[data-theme='warm-beige'] {
+    /* Warm Ledger - approachable hospitality/accounting warmth */
+    --primary: 146, 64, 14;
+    --primary-hover: 120, 53, 15;
+    --secondary: 101, 83, 68;
+    --accent: 13, 148, 136;
+
+    --bg-app: 248, 245, 239;
+    --bg-card: 255, 252, 247;
+    --bg-sidebar: 252, 248, 242;
+    --bg-elevated: 243, 235, 224;
+
+    --text-main: 47, 35, 28;
+    --text-muted: 120, 96, 77;
+
+    --border-color: 226, 214, 199;
+    --border-subtle: 226 214 199 / 0.54;
+    --glass-bg: 255 252 247 / 0.9;
+
+    --success: 22, 101, 52;
+    --warning: 180, 83, 9;
+    --danger: 185, 28, 28;
+    --info: 14, 116, 144;
+
+    --theme-page-bg: linear-gradient(135deg, #f8f2e8 0%, #fffaf3 46%, #f4eadb 100%);
+    --theme-card-bg: #fffaf3;
+    --theme-card-hover-bg: #fffdfa;
+    --theme-rail-bg: linear-gradient(180deg, #fff8ef, #f3e7d6);
+    --theme-topbar-bg: rgba(255, 250, 243, 0.92);
+    --theme-table-head-bg: #f3e7d6;
+    --theme-row-hover-bg: rgba(146, 64, 14, 0.07);
+    --theme-input-bg: #fff8ef;
+    --theme-button-bg: linear-gradient(135deg, #92400e, #0d9488);
+    --theme-active-bg: linear-gradient(135deg, rgba(146, 64, 14, 0.13), rgba(13, 148, 136, 0.08));
+    --theme-focus-ring: rgba(146, 64, 14, 0.18);
+}
+
+.dark [data-theme='warm-beige'],
+[data-theme='warm-beige'].dark {
+    --primary: 251, 146, 60;
+    --primary-hover: 249, 115, 22;
+    --secondary: 190, 175, 159;
+    --accent: 45, 212, 191;
+
+    --bg-app: 27, 22, 18;
+    --bg-card: 38, 31, 26;
+    --bg-sidebar: 32, 26, 22;
+    --bg-elevated: 55, 45, 37;
+
+    --text-main: 255, 247, 237;
+    --text-muted: 202, 184, 166;
+
+    --border-color: 82, 68, 56;
+    --border-subtle: 251 146 60 / 0.10;
+    --glass-bg: 38 31 26 / 0.9;
+
+    --theme-page-bg: linear-gradient(135deg, #1b1612 0%, #2b211a 48%, #191f1c 100%);
+    --theme-card-bg: #261f1a;
+    --theme-card-hover-bg: #372d25;
+    --theme-rail-bg: linear-gradient(180deg, #201a16, #30261f);
+    --theme-topbar-bg: rgba(38, 31, 26, 0.92);
+    --theme-table-head-bg: #201a16;
+    --theme-row-hover-bg: rgba(251, 146, 60, 0.105);
+    --theme-input-bg: #372d25;
+    --theme-button-bg: linear-gradient(135deg, #fb923c, #2dd4bf);
+    --theme-active-bg: linear-gradient(135deg, rgba(251, 146, 60, 0.16), rgba(45, 212, 191, 0.08));
+    --theme-focus-ring: rgba(251, 146, 60, 0.24);
+}

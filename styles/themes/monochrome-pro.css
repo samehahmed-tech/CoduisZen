@@ -1,0 +1,68 @@
+[data-theme='monochrome-pro'] {
+    /* Graphite Pro - editorial black/white operational UI */
+    --primary: 39, 39, 42;
+    --primary-hover: 24, 24, 27;
+    --secondary: 82, 82, 91;
+    --accent: 14, 116, 144;
+
+    --bg-app: 247, 247, 248;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 252, 252, 253;
+    --bg-elevated: 241, 241, 243;
+
+    --text-main: 24, 24, 27;
+    --text-muted: 82, 82, 91;
+
+    --border-color: 212, 212, 216;
+    --border-subtle: 212 212 216 / 0.62;
+    --glass-bg: 255 255 255 / 0.98;
+
+    --success: 22, 101, 52;
+    --warning: 146, 64, 14;
+    --danger: 153, 27, 27;
+    --info: 14, 116, 144;
+
+    --theme-page-bg: #f7f7f8;
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #f1f1f3;
+    --theme-rail-bg: #fcfcfd;
+    --theme-topbar-bg: #ffffff;
+    --theme-table-head-bg: #ededf0;
+    --theme-row-hover-bg: rgba(39, 39, 42, 0.055);
+    --theme-input-bg: #ffffff;
+    --theme-button-bg: #27272a;
+    --theme-active-bg: #e8e8eb;
+    --theme-focus-ring: rgba(39, 39, 42, 0.18);
+}
+
+.dark [data-theme='monochrome-pro'],
+[data-theme='monochrome-pro'].dark {
+    --primary: 244, 244, 245;
+    --primary-hover: 212, 212, 216;
+    --secondary: 161, 161, 170;
+    --accent: 103, 232, 249;
+
+    --bg-app: 9, 9, 11;
+    --bg-card: 18, 18, 20;
+    --bg-sidebar: 14, 14, 16;
+    --bg-elevated: 39, 39, 42;
+
+    --text-main: 250, 250, 250;
+    --text-muted: 161, 161, 170;
+
+    --border-color: 63, 63, 70;
+    --border-subtle: 244 244 245 / 0.10;
+    --glass-bg: 18 18 20 / 0.96;
+
+    --theme-page-bg: #09090b;
+    --theme-card-bg: #121214;
+    --theme-card-hover-bg: #1f1f23;
+    --theme-rail-bg: #0e0e10;
+    --theme-topbar-bg: #121214;
+    --theme-table-head-bg: #0e0e10;
+    --theme-row-hover-bg: rgba(244, 244, 245, 0.06);
+    --theme-input-bg: #09090b;
+    --theme-button-bg: #f4f4f5;
+    --theme-active-bg: rgba(244, 244, 245, 0.11);
+    --theme-focus-ring: rgba(244, 244, 245, 0.18);
+}

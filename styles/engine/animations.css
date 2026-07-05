@@ -1,0 +1,248 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME ANIMATIONS & TRANSITIONS — Global Motion System
+   Enhanced with premium micro-interactions and POS-specific animations
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Enter animations ── */
+.theme-animate-enter {
+    animation: themeEnter var(--theme-duration-slow, 350ms) var(--theme-ease, ease) forwards;
+}
+
+.theme-animate-scale-in {
+    animation: themeScaleIn var(--theme-duration-slow, 350ms) var(--theme-ease, ease) forwards;
+}
+
+@keyframes themeEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes themeScaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* ── Ambient floating orbs ── */
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(15px, -20px) scale(1.05); }
+    66% { transform: translate(-10px, 10px) scale(0.98); }
+}
+
+@keyframes floatDrift {
+    0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+    25% { transform: translate(20px, -15px) rotate(2deg) scale(1.03); }
+    50% { transform: translate(-5px, -25px) rotate(-1deg) scale(0.97); }
+    75% { transform: translate(-15px, 5px) rotate(1deg) scale(1.02); }
+}
+
+@keyframes floatPulse {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+    50% { transform: translate(10px, -12px) scale(1.1); opacity: 1; }
+}
+
+.ambient-orb {
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: float 12s ease-in-out infinite;
+    will-change: transform;
+    contain: strict;
+    transform: translateZ(0);
+}
+
+.ambient-orb-primary { background: rgba(var(--primary), 0.08); }
+.ambient-orb-accent { background: rgba(var(--accent), 0.06); animation: floatDrift 16s ease-in-out infinite; }
+.ambient-orb-secondary { background: rgba(var(--secondary), 0.04); animation: floatPulse 10s ease-in-out infinite; }
+.ambient-orb-glow {
+    background: radial-gradient(circle, rgba(var(--primary), 0.12) 0%, rgba(var(--accent), 0.04) 60%, transparent 70%);
+    animation: floatDrift 20s ease-in-out infinite reverse;
+}
+
+.dark .ambient-orb-primary { background: rgba(var(--primary), 0.18); }
+.dark .ambient-orb-accent { background: rgba(var(--accent), 0.12); }
+.dark .ambient-orb-secondary { background: rgba(var(--secondary), 0.08); }
+.dark .ambient-orb-glow {
+    background: radial-gradient(circle, rgba(var(--primary), 0.22) 0%, rgba(var(--accent), 0.08) 60%, transparent 70%);
+}
+
+/* ── Micro-animation keyframes ── */
+
+/* Breath pulse for badges/indicators */
+@keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+}
+
+.animate-breathe { animation: breathe 2.5s ease-in-out infinite; }
+
+/* Pulsing colored border glow for active states */
+@keyframes borderGlow {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(var(--primary), 0.15), 0 0 8px rgba(var(--primary), 0.05); }
+    50% { box-shadow: 0 0 0 3px rgba(var(--primary), 0.25), 0 0 16px rgba(var(--primary), 0.1); }
+}
+
+.animate-border-glow { animation: borderGlow 2s ease-in-out infinite; }
+
+/* Stagger entrance for lists and grids */
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.theme-animate-stagger {
+    animation: fadeSlideUp 0.35s var(--theme-ease, ease) forwards;
+    animation-delay: calc(var(--stagger-index, 0) * 50ms);
+    opacity: 0;
+}
+
+/* Diagonal light sweep for buttons and loadings */
+@keyframes shimmerSweep {
+    0% { transform: translateX(-100%) rotate(25deg); }
+    100% { transform: translateX(200%) rotate(25deg); }
+}
+
+/* Smooth ambient color pulse */
+@keyframes ambientPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
+
+/* ── POS-Specific Micro-Interactions ── */
+
+/* Cart item added pulse */
+@keyframes cartItemPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.03); }
+    100% { transform: scale(1); }
+}
+
+.animate-cart-pop {
+    animation: cartItemPop 0.25s var(--theme-ease, ease);
+}
+
+/* Price counter animation */
+@keyframes priceFlash {
+    0% { color: rgb(var(--text-main)); }
+    30% { color: rgb(var(--primary)); }
+    100% { color: rgb(var(--text-main)); }
+}
+
+.animate-price-flash {
+    animation: priceFlash 0.6s var(--theme-ease, ease);
+}
+
+/* Subtle scale-in for dropdown menus */
+@keyframes scaleDropdown {
+    from { opacity: 0; transform: scale(0.92) translateY(-4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-scale-in {
+    animation: scaleDropdown 0.18s var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+/* Active order type indicator glow */
+@keyframes modeGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(var(--primary), 0); }
+    50% { box-shadow: 0 0 0 4px rgba(var(--primary), 0.08); }
+}
+
+.animate-mode-glow {
+    animation: modeGlow 2s ease-in-out infinite;
+}
+
+/* Skeleton loading — enhanced */
+@keyframes skeletonPulse {
+    0% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+    100% { opacity: 0.4; }
+}
+
+.animate-skeleton {
+    animation: skeletonPulse 1.8s ease-in-out infinite;
+}
+
+/* Success checkmark pop */
+@keyframes successPop {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-success-pop {
+    animation: successPop 0.4s var(--theme-ease, ease) forwards;
+}
+
+/* Smooth slide-in from right (cart sidebar mobile) */
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.animate-slide-in-right {
+    animation: slideInRight 0.25s var(--theme-ease, ease) forwards;
+}
+
+/* ── CSS noise texture overlay for depth ── */
+.ambient-noise::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.015;
+    z-index: 9999;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+}
+
+.dark .ambient-noise::after {
+    opacity: 0.025;
+}
+
+/* ── Premium transition utilities ── */
+
+/* Snappy hover lift for interactive cards */
+.hover-lift {
+    transition: transform 0.15s var(--theme-ease, ease), box-shadow 0.15s var(--theme-ease, ease);
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--theme-shadow-hover, 0 8px 24px rgba(0, 0, 0, 0.08));
+}
+
+.hover-lift:active {
+    transform: translateY(0);
+}
+
+/* Soft glow on focus */
+.focus-glow:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--primary), 0.15), 0 0 12px rgba(var(--primary), 0.05);
+}
+
+/* Glass surface shimmer on hover */
+@keyframes glassShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.glass-shimmer:hover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        105deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.08) 45%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.08) 55%,
+        transparent 80%
+    );
+    background-size: 200% 100%;
+    animation: glassShimmer 1.5s ease-in-out;
+    border-radius: inherit;
+    pointer-events: none;
+}

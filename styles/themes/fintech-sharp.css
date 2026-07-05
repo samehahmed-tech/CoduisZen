@@ -1,0 +1,68 @@
+[data-theme='fintech-sharp'] {
+    /* Ledger Sharp - dense finance-grade precision */
+    --primary: 2, 132, 199;
+    --primary-hover: 3, 105, 161;
+    --secondary: 71, 85, 105;
+    --accent: 13, 148, 136;
+
+    --bg-app: 246, 248, 251;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 250, 252, 255;
+    --bg-elevated: 241, 245, 249;
+
+    --text-main: 15, 23, 42;
+    --text-muted: 100, 116, 139;
+
+    --border-color: 203, 213, 225;
+    --border-subtle: 203 213 225 / 0.56;
+    --glass-bg: 255 255 255 / 0.96;
+
+    --success: 4, 120, 87;
+    --warning: 180, 83, 9;
+    --danger: 185, 28, 28;
+    --info: 2, 132, 199;
+
+    --theme-page-bg: linear-gradient(180deg, #f6f8fb 0%, #eef3f7 100%);
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #f9fbfd;
+    --theme-rail-bg: linear-gradient(180deg, #fbfdff, #eef4f8);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.96);
+    --theme-table-head-bg: #edf4f8;
+    --theme-row-hover-bg: rgba(2, 132, 199, 0.06);
+    --theme-input-bg: #f8fafc;
+    --theme-button-bg: linear-gradient(135deg, #0284c7, #0d9488);
+    --theme-active-bg: linear-gradient(90deg, rgba(2, 132, 199, 0.13), rgba(13, 148, 136, 0.09));
+    --theme-focus-ring: rgba(2, 132, 199, 0.18);
+}
+
+.dark [data-theme='fintech-sharp'],
+[data-theme='fintech-sharp'].dark {
+    --primary: 56, 189, 248;
+    --primary-hover: 14, 165, 233;
+    --secondary: 148, 163, 184;
+    --accent: 45, 212, 191;
+
+    --bg-app: 8, 13, 23;
+    --bg-card: 15, 23, 42;
+    --bg-sidebar: 11, 18, 32;
+    --bg-elevated: 30, 41, 59;
+
+    --text-main: 241, 245, 249;
+    --text-muted: 148, 163, 184;
+
+    --border-color: 51, 65, 85;
+    --border-subtle: 56 189 248 / 0.10;
+    --glass-bg: 15 23 42 / 0.94;
+
+    --theme-page-bg: linear-gradient(180deg, #080d17 0%, #101b2e 100%);
+    --theme-card-bg: #0f172a;
+    --theme-card-hover-bg: #1e293b;
+    --theme-rail-bg: linear-gradient(180deg, #0b1220, #111d31);
+    --theme-topbar-bg: rgba(15, 23, 42, 0.96);
+    --theme-table-head-bg: #0b1220;
+    --theme-row-hover-bg: rgba(56, 189, 248, 0.10);
+    --theme-input-bg: #1e293b;
+    --theme-button-bg: linear-gradient(135deg, #38bdf8, #2dd4bf);
+    --theme-active-bg: linear-gradient(90deg, rgba(56, 189, 248, 0.16), rgba(45, 212, 191, 0.09));
+    --theme-focus-ring: rgba(56, 189, 248, 0.24);
+}

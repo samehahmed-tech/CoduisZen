@@ -1,0 +1,68 @@
+[data-theme='fluent-clean'] {
+    /* Fluent Eleven - Windows 11 inspired professional UI */
+    --primary: 0, 103, 192;
+    --primary-hover: 0, 84, 153;
+    --secondary: 90, 100, 116;
+    --accent: 16, 124, 216;
+
+    --bg-app: 243, 246, 250;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 250, 251, 253;
+    --bg-elevated: 255, 255, 255;
+
+    --text-main: 25, 31, 40;
+    --text-muted: 96, 108, 124;
+
+    --border-color: 218, 224, 232;
+    --border-subtle: 218 224 232 / 0.58;
+    --glass-bg: 255 255 255 / 0.88;
+
+    --success: 16, 124, 65;
+    --warning: 180, 103, 0;
+    --danger: 196, 43, 28;
+    --info: 0, 103, 192;
+
+    --theme-page-bg: linear-gradient(180deg, #f3f7fb 0%, #eef3f8 100%);
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #fbfdff;
+    --theme-rail-bg: linear-gradient(180deg, #ffffff, #f5f8fb);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.92);
+    --theme-table-head-bg: #eef4fa;
+    --theme-row-hover-bg: rgba(0, 103, 192, 0.055);
+    --theme-input-bg: #f3f7fb;
+    --theme-button-bg: #0067c0;
+    --theme-active-bg: #e8f2ff;
+    --theme-focus-ring: rgba(0, 103, 192, 0.18);
+}
+
+.dark [data-theme='fluent-clean'],
+[data-theme='fluent-clean'].dark {
+    --primary: 96, 194, 255;
+    --primary-hover: 56, 160, 224;
+    --secondary: 156, 169, 188;
+    --accent: 125, 211, 252;
+
+    --bg-app: 17, 24, 34;
+    --bg-card: 25, 34, 48;
+    --bg-sidebar: 20, 29, 42;
+    --bg-elevated: 34, 45, 62;
+
+    --text-main: 245, 247, 250;
+    --text-muted: 162, 174, 193;
+
+    --border-color: 55, 68, 86;
+    --border-subtle: 96 194 255 / 0.10;
+    --glass-bg: 25 34 48 / 0.9;
+
+    --theme-page-bg: linear-gradient(180deg, #111822 0%, #172131 100%);
+    --theme-card-bg: #192230;
+    --theme-card-hover-bg: #202d40;
+    --theme-rail-bg: linear-gradient(180deg, #141d2a, #192230);
+    --theme-topbar-bg: rgba(25, 34, 48, 0.94);
+    --theme-table-head-bg: #141d2a;
+    --theme-row-hover-bg: rgba(96, 194, 255, 0.095);
+    --theme-input-bg: #202d40;
+    --theme-button-bg: #60c2ff;
+    --theme-active-bg: rgba(96, 194, 255, 0.16);
+    --theme-focus-ring: rgba(96, 194, 255, 0.22);
+}

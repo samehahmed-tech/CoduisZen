@@ -1,0 +1,188 @@
+﻿import {
+   Activity, Box, DollarSign, Megaphone, Scale, Users,
+} from 'lucide-react';
+import type { ReportCategory } from './useReportsState';
+
+export const REPORT_CATEGORIES: ReportCategory[] = [
+   { id: 'SALES', label: 'Sales & Revenue', color: '#10b981', icon: DollarSign, subReports: ['Daily Sales', 'Hourly Trends', 'Payment Mix', 'Cashier Summary', 'Refunds', 'Sales by Order Type', 'Sales by Item', 'Sales by Category', 'Discounts', 'Cancelled Orders', 'Sales by Source', 'Peak Hours Heatmap', 'Modifier Sales', 'Avg Ticket Trend', 'Sales Comparison', 'Slow-Moving Items', 'Revenue by Weekday', 'Void Items Log', 'Menu Engineering', 'Daypart Analysis', 'Basket Analysis', 'Seasonality', 'Online vs Offline', 'Menu Cannibalization', 'Menu Item Lifecycle', 'Category Contribution', 'Time-to-First-Order'] },
+   { id: 'FINANCE', label: 'Financials & VAT', color: '#f59e0b', icon: Scale, subReports: ['Z-Report / Fiscal', 'Profit & Loss (P&L)', 'Trial Balance', 'Expense Report', 'Top Expenses', 'Tips Report', 'Service Charge', 'Shift Summary', 'Food Cost % Trend', 'Cash Flow Forecast', 'Tax Compliance', 'Audit Trail', 'Break-Even Analysis', 'Payment Reconciliation', 'Shift Profitability'] },
+   { id: 'INVENTORY', label: 'Inventory & Supply', color: '#06b6d4', icon: Box, subReports: ['COGS & Margin', 'Stock Movement', 'Waste/Loss Log', 'Reorder Alerts', 'Expiring Batches', 'Actual vs Theoretical', 'Purchase History', 'Inventory Valuation', 'Supplier Price Tracking', 'Recipe Cost Alerts', 'ABC Classification', 'Optimal Pricing'] },
+   { id: 'HR', label: 'HR & Payroll', color: '#0f766e', icon: Users, subReports: ['HR Executive Summary', 'Payroll Summary', 'Payroll Ledger', 'Attendance & Delays', 'Attendance Exceptions', 'Overtime Report', 'Staff Cost %', 'Sales per Labor Hour', 'Employee Productivity'] },
+   { id: 'CRM', label: 'Customers & CRM', color: '#ec4899', icon: Megaphone, subReports: ['Customer LTV', 'Campaign ROI', 'Customer Retention', 'New vs Returning', 'Customer Frequency', 'Customer Churn', 'Loyalty Points', 'Promotion Impact', 'Customer Journey Funnel'] },
+   { id: 'OPS', label: 'Operations', color: '#3b82f6', icon: Activity, subReports: ['Branch Performance', 'Order Preparation Time', 'Delivery Performance', 'Dine-in Tables', 'Kitchen Performance', 'Table Turnover', 'Wait Time', 'Driver Utilization', 'Branch Comparison', 'Delivery Zone Analytics', 'Delivery Cost vs Revenue', '3rd Party vs In-House'] },
+   { id: 'AI', label: 'AI & Predictive', color: '#6366f1', icon: Activity, subReports: ['Daily Flash Report', 'Demand Forecasting', 'Price Elasticity Simulator', 'Anomaly Detection', 'Channel Mix Trend'] },
+];
+
+export const REPORT_DISPLAY_LABELS: Record<string, string> = {
+   'Sales & Revenue': 'المبيعات والإيرادات',
+   'Financials & VAT': 'المالية والضرائب',
+   'Inventory & Supply': 'المخزون والتوريد',
+   'HR & Payroll': 'الموارد البشرية والرواتب',
+   'Customers & CRM': 'العملاء والتسويق',
+   Operations: 'التشغيل',
+   'AI & Predictive': 'الذكاء والتحليلات التنبؤية',
+   'Daily Sales': 'المبيعات اليومية',
+   'Hourly Trends': 'اتجاهات المبيعات بالساعة',
+   'Payment Mix': 'توزيع طرق الدفع',
+   'Cashier Summary': 'ملخص الكاشير',
+   Refunds: 'المرتجعات',
+   'Sales by Order Type': 'المبيعات حسب نوع الطلب',
+   'Sales by Item': 'المبيعات حسب الصنف',
+   'Sales by Category': 'المبيعات حسب التصنيف',
+   Discounts: 'الخصومات',
+   'Cancelled Orders': 'الطلبات الملغاة',
+   'Sales by Source': 'المبيعات حسب المصدر',
+   'Peak Hours Heatmap': 'خريطة ساعات الذروة',
+   'Modifier Sales': 'مبيعات الإضافات',
+   'Avg Ticket Trend': 'اتجاه متوسط الفاتورة',
+   'Sales Comparison': 'مقارنة المبيعات',
+   'Slow-Moving Items': 'الأصناف بطيئة الحركة',
+   'Revenue by Weekday': 'الإيراد حسب أيام الأسبوع',
+   'Void Items Log': 'سجل الأصناف المحذوفة',
+   'Menu Engineering': 'هندسة المنيو',
+   'Daypart Analysis': 'تحليل فترات اليوم',
+   'Basket Analysis': 'تحليل سلة الشراء',
+   Seasonality: 'الموسمية',
+   'Online vs Offline': 'أونلاين مقابل داخل الفرع',
+   'Menu Cannibalization': 'تداخل مبيعات أصناف المنيو',
+   'Menu Item Lifecycle': 'دورة حياة صنف المنيو',
+   'Category Contribution': 'مساهمة التصنيفات',
+   'Time-to-First-Order': 'وقت أول طلب',
+   'Z-Report / Fiscal': 'تقرير Z والضريبة',
+   'Profit & Loss (P&L)': 'الأرباح والخسائر',
+   'Trial Balance': 'ميزان المراجعة',
+   'Expense Report': 'تقرير المصروفات',
+   'Top Expenses': 'أعلى المصروفات',
+   'Tips Report': 'تقرير البقشيش',
+   'Service Charge': 'رسوم الخدمة',
+   'Shift Summary': 'ملخص الورديات',
+   'Food Cost % Trend': 'اتجاه تكلفة الطعام',
+   'Cash Flow Forecast': 'توقع التدفق النقدي',
+   'Tax Compliance': 'الالتزام الضريبي',
+   'Audit Trail': 'سجل التدقيق',
+   'Break-Even Analysis': 'تحليل نقطة التعادل',
+   'Payment Reconciliation': 'مطابقة المدفوعات',
+   'Shift Profitability': 'ربحية الورديات',
+   'COGS & Margin': 'تكلفة البضاعة والهامش',
+   'Stock Movement': 'حركة المخزون',
+   'Waste/Loss Log': 'سجل الهدر والعجز',
+   'Reorder Alerts': 'تنبيهات إعادة الطلب',
+   'Expiring Batches': 'تشغيلات قرب الانتهاء',
+   'Actual vs Theoretical': 'الفعلي مقابل النظري',
+   'Purchase History': 'سجل المشتريات',
+   'Inventory Valuation': 'تقييم المخزون',
+   'Supplier Price Tracking': 'متابعة أسعار الموردين',
+   'Recipe Cost Alerts': 'تنبيهات تكلفة الوصفات',
+   'ABC Classification': 'تصنيف ABC للمخزون',
+   'Optimal Pricing': 'التسعير الأمثل',
+   'HR Executive Summary': 'الملخص التنفيذي للموارد البشرية',
+   'Payroll Summary': 'ملخص الرواتب',
+   'Payroll Ledger': 'كشف استحقاقات الموظفين',
+   'Attendance & Delays': 'الحضور والتأخير',
+   'Attendance Exceptions': 'استثناءات الحضور والغياب',
+   'Overtime Report': 'تقرير الساعات الإضافية',
+   'Staff Cost %': 'تكلفة العمالة',
+   'Sales per Labor Hour': 'الإيراد لكل ساعة عمل',
+   'Employee Productivity': 'إنتاجية الموظفين',
+   'Customer LTV': 'القيمة العمرية للعميل',
+   'Campaign ROI': 'عائد الحملات',
+   'Customer Retention': 'احتفاظ العملاء',
+   'New vs Returning': 'عملاء جدد مقابل عائدين',
+   'Customer Frequency': 'تكرار زيارات العملاء',
+   'Customer Churn': 'تسرب العملاء',
+   'Loyalty Points': 'نقاط الولاء',
+   'Promotion Impact': 'أثر العروض',
+   'Customer Journey Funnel': 'مسار رحلة العميل',
+   'Branch Performance': 'أداء الفروع',
+   'Order Preparation Time': 'وقت تجهيز الطلب',
+   'Delivery Performance': 'أداء التوصيل',
+   'Dine-in Tables': 'ترابيزات الصالة',
+   'Kitchen Performance': 'أداء المطبخ',
+   'Table Turnover': 'دوران الترابيزات',
+   'Wait Time': 'وقت الانتظار',
+   'Driver Utilization': 'استغلال السائقين',
+   'Branch Comparison': 'مقارنة الفروع',
+   'Delivery Zone Analytics': 'تحليل مناطق التوصيل',
+   'Delivery Cost vs Revenue': 'تكلفة التوصيل مقابل الإيراد',
+   '3rd Party vs In-House': 'طرف ثالث مقابل توصيل داخلي',
+   'Daily Flash Report': 'التقرير اليومي السريع',
+   'Demand Forecasting': 'توقع الطلب',
+   'Price Elasticity Simulator': 'محاكي مرونة الأسعار',
+   'Anomaly Detection': 'كشف الشذوذ',
+   'Channel Mix Trend': 'اتجاه قنوات البيع',
+};
+
+export const getReportDisplayLabel = (label: string) => REPORT_DISPLAY_LABELS[label] || label;
+
+export const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+export const getExportReportType = (sub: string): string => {
+   const map: Record<string, string> = {
+      'Trial Balance': 'TRIAL_BALANCE', 'Expense Report': 'EXPENSE_REPORT', 'Top Expenses': 'TOP_EXPENSES', 'Profit & Loss (P&L)': 'PROFIT_LOSS',
+      'Stock Movement': 'STOCK_MOVEMENTS', 'Waste/Loss Log': 'WASTE_LOSS', 'Reorder Alerts': 'REORDER_ALERTS',
+      'Expiring Batches': 'EXPIRING_BATCHES', 'HR Executive Summary': 'PAYROLL', 'Payroll Summary': 'PAYROLL', 'Payroll Ledger': 'PAYROLL', 'Attendance & Delays': 'ATTENDANCE',
+      'Attendance Exceptions': 'ATTENDANCE', 'Overtime Report': 'OVERTIME', 'Customer LTV': 'CUSTOMER_LTV', 'Campaign ROI': 'CAMPAIGN_ROI',
+      'Branch Performance': 'BRANCH_PERFORMANCE', 'Order Preparation Time': 'ORDER_PREP_TIME',
+      'Sales by Order Type': 'SALES_BY_ORDER_TYPE', 'Sales by Item': 'SALES_BY_ITEM', 'Sales by Category': 'SALES_BY_CATEGORY',
+      'Discounts': 'DISCOUNT_ANALYSIS', 'Cancelled Orders': 'CANCELLED_ORDERS', 'Delivery Performance': 'DELIVERY_PERFORMANCE',
+      'Sales by Source': 'SALES_BY_SOURCE', 'Dine-in Tables': 'DINE_IN_TABLES',
+      'Peak Hours Heatmap': 'PEAK_HOURS_HEATMAP', 'Modifier Sales': 'MODIFIER_SALES', 'Avg Ticket Trend': 'AVG_TICKET_TREND',
+      'Sales Comparison': 'SALES_COMPARISON', 'Slow-Moving Items': 'SLOW_MOVING_ITEMS', 'Revenue by Weekday': 'REVENUE_BY_WEEKDAY',
+      'Void Items Log': 'VOID_ITEMS', 'Tips Report': 'TIPS_REPORT', 'Service Charge': 'SERVICE_CHARGE',
+      'Shift Summary': 'SHIFT_SUMMARY', 'Actual vs Theoretical': 'ACTUAL_VS_THEORETICAL', 'Purchase History': 'PURCHASE_HISTORY',
+      'Inventory Valuation': 'INVENTORY_VALUATION', 'Staff Cost %': 'STAFF_COST_VS_REVENUE', 'Sales per Labor Hour': 'SALES_PER_LABOR_HOUR',
+      'Customer Retention': 'CUSTOMER_RETENTION', 'New vs Returning': 'NEW_VS_RETURNING', 'Customer Frequency': 'CUSTOMER_FREQUENCY',
+      'Kitchen Performance': 'KITCHEN_PERFORMANCE', 'Menu Engineering': 'MENU_ENGINEERING', 'Daypart Analysis': 'DAYPART_ANALYSIS',
+      'Basket Analysis': 'BASKET_ANALYSIS', 'Seasonality': 'SEASONALITY', 'Online vs Offline': 'ONLINE_VS_OFFLINE',
+      'Food Cost % Trend': 'FOOD_COST_TREND', 'Tax Compliance': 'TAX_COMPLIANCE', 'Audit Trail': 'AUDIT_TRAIL',
+      'Cash Flow Forecast': 'CASH_FLOW_FORECAST', 'Supplier Price Tracking': 'SUPPLIER_PRICE_TRACKING',
+      'Recipe Cost Alerts': 'RECIPE_COST_ALERTS', 'ABC Classification': 'ABC_CLASSIFICATION',
+      'Employee Productivity': 'EMPLOYEE_PRODUCTIVITY', 'Customer Churn': 'CUSTOMER_CHURN',
+      'Loyalty Points': 'LOYALTY_POINTS', 'Promotion Impact': 'PROMOTION_IMPACT',
+      'Table Turnover': 'TABLE_TURNOVER', 'Wait Time': 'WAIT_TIME',
+      'Driver Utilization': 'DRIVER_UTILIZATION', 'Branch Comparison': 'BRANCH_COMPARISON',
+      'Demand Forecasting': 'DEMAND_FORECAST', 'Price Elasticity Simulator': 'PRICE_ELASTICITY',
+      'Menu Cannibalization': 'MENU_CANNIBALIZATION', 'Anomaly Detection': 'ANOMALY_DETECTION',
+      'Break-Even Analysis': 'BREAK_EVEN', 'Payment Reconciliation': 'PAYMENT_RECONCILIATION',
+      'Daily Flash Report': 'DAILY_FLASH', 'Menu Item Lifecycle': 'MENU_LIFECYCLE',
+      'Category Contribution': 'CATEGORY_CONTRIBUTION', 'Shift Profitability': 'SHIFT_PROFITABILITY',
+      'Delivery Zone Analytics': 'DELIVERY_ZONE', 'Delivery Cost vs Revenue': 'DELIVERY_COST_REVENUE',
+      'Customer Journey Funnel': 'CUSTOMER_JOURNEY', 'Channel Mix Trend': 'CHANNEL_MIX',
+      'Optimal Pricing': 'OPTIMAL_PRICING', '3rd Party vs In-House': 'THIRD_PARTY_VS_INHOUSE',
+      'Time-to-First-Order': 'TIME_TO_FIRST_ORDER',
+   };
+   return map[sub] || sub.toUpperCase().replace(/\s+/g, '_');
+};
+
+export const SUPPORTED_TABULAR_EXPORT_TYPES = new Set([
+   'DAILY_SALES',
+   'TRIAL_BALANCE',
+   'TOP_EXPENSES',
+   'EXPENSE_REPORT',
+   'STOCK_MOVEMENTS',
+   'WASTE_LOSS',
+   'REORDER_ALERTS',
+   'EXPIRING_BATCHES',
+   'PAYROLL',
+   'ATTENDANCE',
+   'OVERTIME',
+   'CUSTOMER_LTV',
+   'CAMPAIGN_ROI',
+   'BRANCH_PERFORMANCE',
+   'ORDER_PREP_TIME',
+]);
+
+export const isTabularExportSupported = (sub: string) =>
+   SUPPORTED_TABULAR_EXPORT_TYPES.has(getExportReportType(sub));
+
+export const downloadBlob = (blob: Blob, filename: string) => {
+   const url = URL.createObjectURL(blob);
+   const anchor = document.createElement('a');
+   anchor.href = url;
+   anchor.download = filename;
+   document.body.appendChild(anchor);
+   anchor.click();
+   anchor.remove();
+   URL.revokeObjectURL(url);
+};

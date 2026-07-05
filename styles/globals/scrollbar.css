@@ -1,0 +1,155 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCROLLBAR — Modern floating pill, always-visible, smooth
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Keep root anchors smooth, but do not force every scroll container ── */
+html {
+    scroll-behavior: smooth;
+}
+
+body,
+.workspace-shell,
+.sidebar-nav,
+.pos-scroll,
+[class*='overflow-y-auto'],
+[class*='overflow-x-auto'] {
+    scroll-behavior: auto;
+}
+
+/* ── Firefox ── */
+html,
+html *:not(.sidebar-nav) {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--primary), 0.3) rgba(var(--primary), 0.06);
+}
+
+.dark,
+.dark *:not(.sidebar-nav) {
+    scrollbar-color: rgba(var(--primary), 0.35) rgba(255, 255, 255, 0.04);
+}
+
+/* ── Webkit — Scrollbar size ── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+/* Sidebar nav keeps its own ultra-thin scrollbar */
+.sidebar-nav::-webkit-scrollbar {
+    width: 3px !important;
+}
+
+/* ── Webkit — Track (subtle lane) ── */
+::-webkit-scrollbar-track {
+    background: rgba(var(--primary), 0.04);
+    border-radius: 10px;
+    margin: 4px;
+}
+
+.dark ::-webkit-scrollbar-track,
+.dark::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Webkit — Thumb (floating pill) ── */
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg,
+            rgba(var(--primary), 0.2) 0%,
+            rgba(var(--primary), 0.3) 100%);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    min-height: 36px;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+.dark::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg,
+            rgba(var(--primary), 0.25) 0%,
+            rgba(var(--primary), 0.4) 100%);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+}
+
+/* ── Hover — richer color ── */
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg,
+            rgba(var(--primary), 0.35) 0%,
+            rgba(var(--primary), 0.5) 100%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+.dark::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg,
+            rgba(var(--primary), 0.45) 0%,
+            rgba(var(--primary), 0.6) 100%);
+}
+
+/* ── Active drag — solid feel ── */
+::-webkit-scrollbar-thumb:active {
+    background: rgba(var(--primary), 0.55);
+}
+
+.dark ::-webkit-scrollbar-thumb:active,
+.dark::-webkit-scrollbar-thumb:active {
+    background: rgba(var(--primary), 0.7);
+}
+
+/* ── Corner ── */
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* ── Fix workspace scroll overflow ── */
+.workspace-shell {
+    overflow: hidden;
+    height: 100dvh;
+    overscroll-behavior: none;
+}
+
+/* Main already has flex-1 + flex-col + overflow-hidden from Tailwind.
+   The scroll div inside has overflow-y-auto from Tailwind.
+   Do NOT add height:100% or overflow rules here — they conflict. */
+
+/* POS — lock grid inside viewport */
+.pos-ui>main {
+    overflow: hidden !important;
+}
+
+.pos-ui>main>div {
+    overflow: hidden;
+    height: 100%;
+}
+
+/* POS needs full width — hide sidebar rail at ALL viewports */
+.pos-ui .workspace-rail {
+    width: 0 !important;
+    min-width: 0 !important;
+    border: none !important;
+    transform: translateX(-100%) !important;
+    pointer-events: none;
+    opacity: 0;
+}
+
+[dir='rtl'] .pos-ui .workspace-rail {
+    transform: translateX(100%) !important;
+}
+
+.pos-ui>main {
+    margin-inline-start: 0 !important;
+}
+
+/* ── Focus-visible ── */
+*:focus-visible {
+    outline: 2px solid rgba(var(--primary), 0.5);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(var(--primary), 0.12);
+}
+
+/* ── Card hover lift ── */
+.card-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--theme-shadow-hover);
+    border-color: rgba(var(--primary), 0.2);
+}

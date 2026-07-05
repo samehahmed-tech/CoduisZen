@@ -1,0 +1,1679 @@
+/**
+ * ═══════════════════════════════════════════════════════════════
+ *  POS Responsive Layout Engine v2 — "Obsidian Terminal"
+ *  Full-viewport POS optimized for 1024×768 → 2560×1440+
+ *  With dedicated tablet & mobile slide-over modes
+ * ═══════════════════════════════════════════════════════════════
+ */
+
+/* ─── 1. Design Tokens ─── */
+:root {
+    --pos-sidebar-w: clamp(340px, 26vw, 420px);
+    --pos-header-h: 48px;
+    --pos-toolbar-h: 42px;
+    --pos-radius: 16px;
+    --pos-radius-sm: 10px;
+    --pos-radius-xs: 6px;
+    --pos-gap: 12px;
+    --pos-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── 2. Shell — fills viewport exactly ─── */
+.pos-shell {
+    display: flex;
+    flex-direction: row;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    width: 100vw;
+    max-width: 100vw;
+    background: rgb(var(--bg-app));
+}
+
+/* ─── 3. Workspace Grid ─── */
+.pos-workspace-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    align-items: stretch;
+    gap: 0;
+    min-height: 0;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+}
+
+.pos-main-workspace,
+.pos-cart-sidebar {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Desktop: 2-column when cart is open */
+@media (min-width: 1024px) {
+    .pos-workspace-grid.has-cart {
+        grid-template-columns: minmax(0, 1fr) var(--pos-sidebar-w);
+    }
+    .pos-workspace-grid.has-cart > .pos-main-workspace { grid-column: 1; }
+    .pos-workspace-grid.has-cart > .pos-cart-sidebar { grid-column: 2; }
+}
+
+/* Tablet landscape: narrower cart */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .pos-workspace-grid.has-cart {
+        grid-template-columns: minmax(0, 1fr) 320px;
+    }
+    .pos-workspace-grid.has-cart > .pos-main-workspace { grid-column: 1; }
+    .pos-workspace-grid.has-cart > .pos-cart-sidebar { grid-column: 2; }
+}
+
+/* ─── 4. Header ─── */
+.pos-header-slim {
+    height: var(--pos-header-h);
+    min-height: var(--pos-header-h);
+}
+
+/* ─── 5. Toolbar ─── */
+.pos-toolbar-slim {
+    height: var(--pos-toolbar-h);
+    min-height: var(--pos-toolbar-h);
+}
+
+/* ─── 6. Cart Sidebar ─── */
+.pos-cart-sidebar {
+    background: rgb(var(--bg-card));
+    border-inline-start: 1px solid rgba(var(--border-color), 0.42);
+    box-shadow: -10px 0 24px -22px rgba(15, 23, 42, 0.42);
+    z-index: 20;
+    position: relative;
+}
+
+.pos-mobile-fab {
+    display: none;
+}
+
+/* Mobile: slide-over panel */
+@property --pos-tile-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+}
+
+@keyframes pos-tile-border-spin {
+    to { --pos-tile-angle: 360deg; }
+}
+
+@keyframes pos-tile-sheen {
+    0% { transform: translateX(-130%) skewX(-14deg); }
+    100% { transform: translateX(130%) skewX(-14deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pos-menu-item-card.pos-menu-item-hero-card,
+    .pos-menu-item-card.pos-menu-item-hero-card:hover,
+    .pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-artwork,
+    .pos-menu-item-smart-peek,
+    .pos-menu-item-kinetic-bg,
+    .pos-menu-item-sheen {
+        animation: none !important;
+        transition-duration: 1ms !important;
+        transform: none !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .pos-mobile-fab {
+        display: block;
+    }
+
+    .pos-cart-sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 92%;
+        max-width: 420px;
+        z-index: 60;
+        box-shadow: -20px 0 60px rgba(0, 0, 0, 0.25);
+        transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+        transform: translateX(100%);
+        border-radius: var(--pos-radius) 0 0 var(--pos-radius);
+    }
+    [dir='rtl'] .pos-cart-sidebar {
+        right: 0;
+        left: auto;
+        transform: translateX(100%);
+        border-radius: var(--pos-radius) 0 0 var(--pos-radius);
+        box-shadow: -20px 0 60px rgba(0, 0, 0, 0.25);
+    }
+    .pos-cart-sidebar.cart-open {
+        transform: translateX(0);
+    }
+}
+
+/* ─── 7. Small Height Optimizations ─── */
+@media (max-height: 750px) {
+    :root {
+        --pos-header-h: 40px;
+        --pos-toolbar-h: 36px;
+        --pos-gap: 8px;
+    }
+}
+
+/* Cashier terminals around 1024x768 keep the POS design, but tighten vertical controls. */
+@media (max-width: 1100px), (max-height: 780px) {
+    .pos-payment-summary {
+        gap: 0.5rem;
+    }
+
+    .pos-payment-method-option {
+        min-height: 50px;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .pos-tip-option {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .pos-cash-drawer {
+        max-height: min(48vh, 345px);
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+
+    .pos-cash-display {
+        height: 2.5rem;
+    }
+
+    .pos-cash-display span:first-child {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+    }
+
+    .pos-quick-cash,
+    .pos-numpad {
+        gap: 0.375rem;
+    }
+
+    .pos-quick-cash button {
+        height: 1.75rem;
+        font-size: 11px;
+    }
+
+    .pos-numpad-key,
+    .pos-exact-cash {
+        height: 2rem;
+        font-size: 0.875rem;
+    }
+
+    .pos-exact-cash span:first-child {
+        font-size: 9px;
+    }
+
+    .pos-change-box {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .pos-change-box span:last-child {
+        font-size: 1.125rem;
+        line-height: 1.75rem;
+    }
+
+    .pos-send-kitchen-btn,
+    .pos-submit-payment-btn {
+        height: 2.75rem;
+    }
+
+    .pos-send-kitchen-btn {
+        width: 2.75rem;
+    }
+
+    .pos-submit-payment-btn span:first-child {
+        font-size: 14px;
+    }
+
+    .pos-submit-payment-btn .tabular-nums {
+        font-size: 1.125rem;
+        line-height: 1.75rem;
+    }
+}
+
+/* ─── 8. Items Toolbar ─── */
+.pos-items-toolbar {
+    padding: clamp(8px, 1vh, 12px) clamp(10px, 1.5vw, 18px);
+}
+
+/* ─── 9. Scrollbar ─── */
+.pos-scroll::-webkit-scrollbar {
+    width: 3px;
+}
+.pos-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.pos-scroll::-webkit-scrollbar-thumb {
+    background: rgba(var(--primary-rgb), 0.08);
+    border-radius: 99px;
+}
+.pos-scroll:hover::-webkit-scrollbar-thumb {
+    background: rgba(var(--primary-rgb), 0.18);
+}
+
+/* ─── 10. Theme-aware menu cards ─── */
+.pos-menu-item-card {
+    --pos-card-bg: rgba(var(--bg-card), 0.72);
+    --pos-card-hero-bg: radial-gradient(circle at 72% 22%, rgba(255, 255, 255, 0.12), transparent 30%),
+                        radial-gradient(circle at 92% 92%, rgba(var(--primary), 0.2), transparent 45%),
+                        linear-gradient(145deg, #1a242f, #2c3e50);
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+    --glare-x: 50%;
+    --glare-y: 0%;
+    background: var(--pos-card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 22px;
+    box-shadow: 
+        0 10px 30px -15px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    color: rgb(var(--text-main));
+    isolation: isolate;
+    transform-style: preserve-3d;
+    transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) translateZ(0);
+    will-change: transform;
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    transition:
+        background 300ms ease,
+        border-color 300ms ease,
+        box-shadow 300ms ease,
+        transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pos-menu-item-hero-card {
+    background: var(--pos-card-hero-bg) !important;
+    border-color: rgba(var(--primary), 0.18);
+    border-radius: var(--pos-card-hero-radius, clamp(14px, var(--theme-radius-lg, 16px), 20px));
+    color: rgb(var(--pos-card-hero-text)) !important;
+    box-shadow:
+        0 18px 34px -24px rgba(15, 23, 42, 0.7),
+        var(--theme-shadow-card);
+}
+
+.pos-menu-item-card .pos-menu-item-artwork {
+    transform: translateZ(32px);
+    transition: transform 220ms var(--theme-ease, ease);
+}
+
+.pos-menu-item-card:hover .pos-menu-item-artwork {
+    transform: translateZ(48px) scale(1.05);
+}
+
+.pos-menu-item-card .pos-menu-item-price {
+    transform: translateZ(24px);
+    transition: transform 220ms var(--theme-ease, ease);
+}
+
+.pos-menu-item-card:hover .pos-menu-item-price {
+    transform: translateZ(36px);
+}
+
+.pos-menu-item-card .pos-menu-item-count {
+    transform: translateZ(42px);
+}
+
+.pos-menu-item-card.pos-menu-item-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at var(--glare-x) var(--glare-y), rgba(255, 255, 255, 0.25), transparent 40%),
+        radial-gradient(circle at 20% 20%, rgba(var(--primary), 0.15), transparent 40%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 60%);
+    opacity: 0.8;
+    transform: translateZ(1px);
+    border-radius: inherit;
+}
+
+.pos-menu-item-card::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 36%);
+    opacity: 0.62;
+}
+
+.pos-menu-item-hero-card::before {
+    background:
+        radial-gradient(circle at 12% 14%, rgba(255, 255, 255, 0.12), transparent 30%),
+        radial-gradient(circle at 86% 88%, rgba(255, 255, 255, 0.08), transparent 42%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 58%);
+    opacity: 1;
+}
+
+.pos-menu-item-hero-card::after {
+    background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 50% 50%;
+    opacity: var(--pos-card-pattern-opacity);
+}
+
+.pos-menu-item-card:hover {
+    border-color: var(--theme-card-hover-border, var(--pos-card-hover-border));
+    box-shadow: var(--theme-card-hover-glow, var(--theme-shadow-hover));
+    transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) translateZ(12px);
+}
+
+.pos-menu-item-card[data-selected='true'] {
+    background:
+        linear-gradient(135deg, var(--pos-card-selected-bg), transparent 70%),
+        var(--theme-card-bg, var(--pos-card-bg));
+    border-color: var(--pos-card-selected-border);
+    box-shadow:
+        0 0 0 1px rgba(var(--primary), 0.12),
+        var(--theme-shadow-hover);
+}
+
+.pos-menu-item-hero-card[data-selected='true'] {
+    background: var(--pos-card-hero-bg) !important;
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow:
+        0 0 0 1px rgba(var(--primary), 0.2),
+        0 20px 36px -24px rgba(15, 23, 42, 0.75),
+        var(--theme-shadow-hover);
+}
+
+.pos-menu-item-card[data-selected='true'] .pos-menu-item-glow {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.pos-menu-item-card[data-selected='true'] .pos-menu-item-artwork {
+    border-color: rgba(var(--primary), 0.32);
+}
+
+.pos-menu-item-card[data-highlighted='true'] {
+    animation: pos-item-confirm 520ms var(--theme-ease, ease) both;
+}
+
+.pos-menu-item-card[data-available='false'] {
+    box-shadow: none;
+}
+
+.pos-menu-item-card[data-available='false']::before {
+    opacity: 0.18;
+}
+
+.pos-menu-item-artwork {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent),
+        radial-gradient(circle at 24% 18%, rgba(var(--primary), 0.16), transparent 44%),
+        var(--pos-card-media-bg);
+    color: rgba(var(--primary), 0.55);
+    border: 1px solid rgba(var(--border-color), 0.16);
+    border-radius: 18px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 10px 18px -16px rgba(15, 23, 42, 0.45);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-artwork {
+    border-radius: 14px;
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow:
+        0 12px 20px -14px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-artwork::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 999px;
+    border: 3px solid var(--pos-card-art-ring);
+    pointer-events: none;
+    transform: translate(18%, -18%);
+    opacity: 0.9;
+}
+
+[dir='rtl'] .pos-menu-item-hero-card .pos-menu-item-artwork::after {
+    transform: translate(-18%, -18%);
+}
+
+.pos-menu-item-artwork img {
+    border-radius: inherit;
+}
+
+.pos-menu-item-empty-media {
+    background:
+        linear-gradient(145deg, rgba(var(--primary), 0.08), rgba(var(--accent), 0.05)),
+        rgba(var(--bg-elevated), 0.4);
+}
+
+.pos-menu-item-image-scrim {
+    background:
+        linear-gradient(to top, rgba(var(--bg-card), 0.16), transparent 56%),
+        linear-gradient(135deg, transparent, rgba(var(--primary), 0.1));
+}
+
+.pos-menu-item-body {
+    background: transparent;
+}
+
+.pos-menu-item-glow {
+    position: absolute;
+    inset: auto 10px 10px 10px;
+    z-index: 1;
+    height: 42%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(var(--primary), 0.18), rgba(var(--accent), 0.1), transparent);
+    filter: blur(18px);
+    opacity: 0.22;
+    transform: scale(0.82);
+    transition:
+        opacity var(--theme-duration, 200ms) var(--theme-ease, ease),
+        transform var(--theme-duration, 200ms) var(--theme-ease, ease);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-glow {
+    inset: auto -18% -22% 28%;
+    height: 64%;
+    background:
+        radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 58%),
+        radial-gradient(circle, rgba(var(--primary), 0.24), transparent 64%);
+    opacity: 0.8;
+}
+
+.pos-menu-item-price {
+    color: rgb(var(--text-main));
+    letter-spacing: 0;
+}
+
+.pos-menu-item-add-btn,
+.pos-menu-item-add-wide,
+.pos-menu-item-count {
+    background: rgb(var(--primary));
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 6px 14px rgba(var(--primary), 0.22);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-count {
+    background: var(--pos-card-badge-bg);
+    color: rgb(var(--pos-card-badge-text));
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-stepper {
+    background: var(--pos-card-control-bg);
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-icon-btn {
+    color: rgba(var(--pos-card-hero-text), 0.86);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-add-btn,
+.pos-menu-item-hero-card .pos-menu-item-add-wide {
+    background: var(--pos-card-action-bg);
+    color: rgb(var(--pos-card-action-text));
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.75);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-add-btn:hover,
+.pos-menu-item-hero-card .pos-menu-item-add-wide:hover {
+    background: white;
+    color: rgb(var(--primary-hover));
+}
+
+.pos-menu-item-add-btn:hover,
+.pos-menu-item-add-wide:hover {
+    background: rgb(var(--primary-hover));
+    box-shadow: 0 8px 18px rgba(var(--primary), 0.3);
+}
+
+.pos-menu-item-add-wide {
+    box-shadow: 0 8px 18px rgba(var(--primary), 0.2);
+}
+
+.pos-menu-item-stepper {
+    background: var(--pos-card-control-bg);
+    border: 1px solid var(--pos-card-control-border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.pos-menu-item-icon-btn {
+    color: rgb(var(--primary));
+}
+
+.pos-menu-item-icon-btn:hover {
+    background: rgba(var(--primary), 0.1);
+}
+
+.pos-menu-item-popular {
+    background: rgba(var(--warning), 0.12);
+    color: rgb(var(--warning));
+    border: 1px solid rgba(var(--warning), 0.2);
+}
+
+.pos-menu-item-hero-card .pos-menu-item-popular {
+    background: rgba(255, 255, 255, 0.14);
+    color: rgba(var(--pos-card-hero-text), 0.86);
+    border-color: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(8px);
+}
+
+.pos-menu-item-unavailable {
+    background: rgba(var(--danger), 0.12);
+    color: rgb(var(--danger));
+    border: 1px solid rgba(var(--danger), 0.22);
+    backdrop-filter: blur(8px);
+}
+
+[data-theme='mica-glass'] .pos-menu-item-card,
+[data-theme='cupertino-light'] .pos-menu-item-card {
+    --pos-card-bg: rgba(var(--bg-card), 0.68);
+    --pos-card-media-bg: rgba(var(--bg-elevated), 0.44);
+    backdrop-filter: blur(var(--theme-blur, 20px)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(150%);
+}
+
+[data-theme='mica-glass'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 76% 20%, rgba(var(--primary), 0.2), transparent 25%),
+        linear-gradient(135deg, rgba(var(--bg-card), 0.72), rgba(var(--primary), 0.16)),
+        rgba(var(--bg-card), 0.54);
+    --pos-theme-card-hero-text: var(--text-main);
+    --pos-theme-card-hero-muted: var(--text-muted);
+    --pos-theme-card-action-bg: rgba(var(--primary), 0.95);
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(var(--bg-card), 0.42);
+    --pos-theme-card-badge-bg: rgba(var(--primary), 0.88);
+    --pos-theme-card-pattern-opacity: 0.18;
+    --pos-theme-card-art-ring: rgba(var(--primary), 0.34);
+    backdrop-filter: blur(var(--theme-blur, 20px)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(160%);
+}
+
+[data-theme='cupertino-light'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 76% 18%, rgba(var(--primary), 0.14), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(var(--primary), 0.055)),
+        rgb(var(--bg-card));
+    --pos-theme-card-hero-text: var(--text-main);
+    --pos-theme-card-hero-muted: var(--text-muted);
+    --pos-theme-card-action-bg: rgb(var(--primary));
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(var(--bg-elevated), 0.76);
+    --pos-theme-card-badge-bg: linear-gradient(180deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    --pos-theme-card-pattern-opacity: 0.08;
+    --pos-theme-card-art-ring: rgba(var(--primary), 0.36);
+}
+
+[data-theme='fluent-clean'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.14), transparent 24%),
+        linear-gradient(135deg, #182230, rgb(var(--primary))),
+        rgb(var(--primary));
+    --pos-theme-card-hero-text: 255 255 255;
+    --pos-theme-card-hero-muted: 219 234 254;
+    --pos-theme-card-action-bg: #ffffff;
+    --pos-theme-card-action-text: var(--primary);
+    --pos-theme-card-control-bg: rgba(15, 23, 42, 0.28);
+    --pos-theme-card-badge-bg: rgba(15, 23, 42, 0.78);
+    --pos-theme-card-pattern-opacity: 0.28;
+    --pos-theme-card-art-ring: rgba(255, 255, 255, 0.36);
+}
+
+[data-theme='material-soft'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.18), transparent 24%),
+        linear-gradient(145deg, rgb(var(--primary)), rgba(var(--accent), 0.76)),
+        rgb(var(--primary));
+    --pos-theme-card-hero-text: 255 255 255;
+    --pos-theme-card-hero-muted: 237 233 254;
+    --pos-theme-card-action-bg: rgba(255, 255, 255, 0.94);
+    --pos-theme-card-action-text: var(--primary);
+    --pos-theme-card-control-bg: rgba(255, 255, 255, 0.16);
+    --pos-theme-card-badge-bg: rgba(var(--accent), 0.86);
+    --pos-theme-card-pattern-opacity: 0.2;
+    --pos-theme-card-art-ring: rgba(255, 255, 255, 0.38);
+}
+
+[data-theme='flat-minimal'] .pos-menu-item-hero-card,
+[data-theme='monochrome-pro'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg: rgb(var(--bg-card));
+    --pos-theme-card-hero-text: var(--text-main);
+    --pos-theme-card-hero-muted: var(--text-muted);
+    --pos-theme-card-action-bg: rgb(var(--primary));
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(var(--bg-elevated), 0.72);
+    --pos-theme-card-badge-bg: rgb(var(--primary));
+    border-color: rgba(var(--border-color), 0.2);
+    box-shadow: none;
+    --pos-theme-card-pattern-opacity: 0;
+    --pos-theme-card-art-ring: rgba(var(--border-color), 0.55);
+}
+
+[data-theme='flat-minimal'] .pos-menu-item-hero-card .pos-menu-item-add-btn,
+[data-theme='flat-minimal'] .pos-menu-item-hero-card .pos-menu-item-add-wide,
+[data-theme='monochrome-pro'] .pos-menu-item-hero-card .pos-menu-item-add-btn,
+[data-theme='monochrome-pro'] .pos-menu-item-hero-card .pos-menu-item-add-wide {
+    background: rgb(var(--primary));
+    color: white;
+}
+
+[data-theme='warm-beige'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 78% 18%, rgba(245, 203, 140, 0.2), transparent 24%),
+        linear-gradient(135deg, #463424, rgb(var(--primary))),
+        rgb(var(--primary));
+    --pos-theme-card-hero-text: 255 255 255;
+    --pos-theme-card-hero-muted: 254 243 199;
+    --pos-theme-card-action-bg: rgba(255, 247, 237, 0.96);
+    --pos-theme-card-action-text: var(--primary);
+    --pos-theme-card-control-bg: rgba(63, 45, 32, 0.26);
+    --pos-theme-card-badge-bg: rgba(245, 158, 11, 0.86);
+    --pos-theme-card-pattern-opacity: 0.18;
+    --pos-theme-card-art-ring: rgba(245, 203, 140, 0.56);
+}
+
+[data-theme='fintech-sharp'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.1), transparent 24%),
+        linear-gradient(135deg, #061326, rgb(var(--primary))),
+        rgb(var(--primary));
+    --pos-theme-card-hero-text: 255 255 255;
+    --pos-theme-card-hero-muted: 219 234 254;
+    --pos-theme-card-action-bg: #ffffff;
+    --pos-theme-card-action-text: var(--primary);
+    --pos-theme-card-control-bg: rgba(2, 6, 23, 0.32);
+    --pos-theme-card-badge-bg: rgba(2, 6, 23, 0.78);
+    --pos-theme-card-pattern-opacity: 0.3;
+    --pos-theme-card-art-ring: rgba(var(--primary), 0.52);
+}
+
+[data-theme='dark-elegant'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 78% 18%, rgba(var(--primary), 0.2), transparent 24%),
+        linear-gradient(135deg, #101827, #1e293b),
+        #101827;
+    --pos-theme-card-hero-text: 248 250 252;
+    --pos-theme-card-hero-muted: 203 213 225;
+    --pos-theme-card-action-bg: rgb(var(--primary));
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(15, 23, 42, 0.55);
+    --pos-theme-card-badge-bg: rgba(var(--primary), 0.86);
+    --pos-theme-card-pattern-opacity: 0.2;
+    --pos-theme-card-art-ring: rgba(var(--primary), 0.48);
+}
+
+[data-theme='neumorphism-soft'] .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        radial-gradient(circle at 78% 18%, rgba(var(--primary), 0.12), transparent 24%),
+        linear-gradient(135deg, rgba(var(--bg-card), 0.98), rgba(var(--primary), 0.1)),
+        rgb(var(--bg-card));
+    --pos-theme-card-hero-text: var(--text-main);
+    --pos-theme-card-hero-muted: var(--text-muted);
+    --pos-theme-card-action-bg: rgb(var(--primary));
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(var(--bg-card), 0.82);
+    --pos-theme-card-badge-bg: rgb(var(--primary));
+    --pos-theme-card-pattern-opacity: 0;
+    --pos-theme-card-art-ring: rgba(var(--primary), 0.26);
+}
+
+.dark [data-theme='mica-glass'] .pos-menu-item-hero-card,
+[data-theme='mica-glass'].dark .pos-menu-item-hero-card,
+.dark [data-theme='cupertino-light'] .pos-menu-item-hero-card,
+[data-theme='cupertino-light'].dark .pos-menu-item-hero-card,
+.dark [data-theme='neumorphism-soft'] .pos-menu-item-hero-card,
+[data-theme='neumorphism-soft'].dark .pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg:
+        linear-gradient(135deg, rgba(var(--bg-card), 0.78), rgba(var(--primary), 0.24)),
+        rgba(var(--bg-card), 0.78);
+    --pos-theme-card-hero-text: var(--text-main);
+}
+
+[data-theme='mica-glass'] .pos-menu-item-artwork,
+[data-theme='cupertino-light'] .pos-menu-item-artwork {
+    background: rgba(var(--bg-card), 0.38);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+[data-theme='fluent-clean'] .pos-menu-item-card,
+[data-theme='flat-minimal'] .pos-menu-item-card,
+[data-theme='monochrome-pro'] .pos-menu-item-card {
+    --pos-card-selected-bg: rgba(var(--primary), 0.06);
+    box-shadow: none;
+}
+
+[data-theme='flat-minimal'] .pos-menu-item-card {
+    border-radius: var(--theme-radius-sm, 4px);
+}
+
+[data-theme='flat-minimal'] .pos-menu-item-card::after,
+[data-theme='monochrome-pro'] .pos-menu-item-card::after {
+    display: none;
+}
+
+[data-theme='flat-minimal'] .pos-menu-item-hero-card::before,
+[data-theme='monochrome-pro'] .pos-menu-item-hero-card::before {
+    opacity: 0.35;
+}
+
+[data-theme='flat-minimal'] .pos-menu-item-glow,
+[data-theme='monochrome-pro'] .pos-menu-item-glow {
+    display: none;
+}
+
+[data-theme='material-soft'] .pos-menu-item-card {
+    border: 0;
+    border-radius: var(--theme-radius-xl, 20px);
+}
+
+[data-theme='neumorphism-soft'] .pos-menu-item-card {
+    --pos-theme-card-control-bg: rgba(var(--bg-card), 0.85);
+    border: 0;
+}
+
+[data-theme='neumorphism-soft'] .pos-menu-item-stepper,
+[data-theme='neumorphism-soft'] .pos-menu-item-artwork {
+    box-shadow:
+        inset 3px 3px 7px var(--dark-shadow),
+        inset -3px -3px 7px var(--light-shadow);
+}
+
+[data-theme='fintech-sharp'] .pos-menu-item-card {
+    border-radius: 8px;
+}
+
+[data-theme='dark-elegant'] .pos-menu-item-card[data-selected='true'] {
+    box-shadow:
+        0 0 0 1px rgba(var(--primary), 0.22),
+        0 12px 26px rgba(15, 23, 42, 0.16);
+}
+
+.dark [data-theme='monochrome-pro'] .pos-menu-item-add-btn,
+.dark [data-theme='monochrome-pro'] .pos-menu-item-qty {
+    color: rgb(var(--bg-card));
+}
+
+.dark .pos-menu-item-card {
+    --pos-card-bg: rgba(var(--bg-card), 0.82);
+    --pos-theme-card-control-bg: rgba(var(--bg-elevated), 0.82);
+    --pos-card-media-bg: rgba(var(--bg-elevated), 0.5);
+}
+
+.dark .pos-menu-item-card::after {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 36%);
+}
+
+/* Cleaner POS item cards: no heavy gradients, closer to the system surface language. */
+.pos-menu-item-card.pos-menu-item-hero-card {
+    --pos-theme-card-hero-bg: rgb(var(--bg-card));
+    --pos-theme-card-hero-text: var(--text-main);
+    --pos-theme-card-hero-muted: var(--text-muted);
+    --pos-theme-card-action-bg: rgb(var(--primary));
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(var(--bg-elevated), 0.76);
+    --pos-theme-card-badge-bg: rgb(var(--primary));
+    --pos-theme-card-badge-text: 255 255 255;
+    --pos-theme-card-pattern-opacity: 0;
+    --pos-theme-card-art-ring: transparent;
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.92), rgba(var(--bg-card), 0.78)),
+        rgba(var(--bg-card), 0.82) !important;
+    border-color: rgba(var(--border-color), 0.16);
+    color: rgb(var(--text-main)) !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.45) inset,
+        0 12px 26px -22px rgba(15, 23, 42, 0.46);
+    transform-style: preserve-3d;
+    will-change: transform, box-shadow, border-color;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover {
+    transform: perspective(900px) rotateX(4deg) rotateY(-3deg) translateY(-5px);
+    border-color: rgba(var(--primary), 0.28);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.5) inset,
+        0 20px 42px -28px rgba(var(--primary), 0.46);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card::before {
+    inset-inline-start: 0;
+    inset-block: 0;
+    width: 4px;
+    background: rgb(var(--primary));
+    opacity: 0.84;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card::after {
+    display: block;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background:
+        conic-gradient(
+            from var(--pos-tile-angle, 0deg),
+            rgba(var(--primary), 0),
+            rgba(var(--primary), 0.42),
+            rgba(var(--accent), 0.26),
+            rgba(var(--primary), 0)
+        );
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 180ms var(--theme-ease, ease);
+    animation: pos-tile-border-spin 3.8s linear infinite paused;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover::after,
+.pos-menu-item-card.pos-menu-item-hero-card[data-selected='true']::after {
+    opacity: 1;
+    animation-play-state: running;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-glow {
+    display: none;
+}
+
+.pos-menu-item-kinetic-bg,
+.pos-menu-item-sheen {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+.pos-menu-item-kinetic-bg {
+    background:
+        radial-gradient(circle at 24% 18%, rgba(var(--primary), 0.18), transparent 30%),
+        radial-gradient(circle at 78% 82%, rgba(var(--accent), 0.12), transparent 32%),
+        linear-gradient(135deg, rgba(var(--primary), 0.06), transparent 52%);
+    opacity: 0.42;
+    transform: scale(1.08);
+    transition:
+        opacity 220ms var(--theme-ease, ease),
+        transform 420ms var(--theme-ease, ease);
+}
+
+.pos-menu-item-sheen {
+    background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.34) 46%, transparent 64%);
+    mix-blend-mode: soft-light;
+    opacity: 0;
+    transform: translateX(-130%) skewX(-14deg);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-kinetic-bg {
+    opacity: 0.86;
+    transform: scale(1);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-sheen {
+    opacity: 0.9;
+    animation: pos-tile-sheen 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-artwork {
+    background: rgba(var(--bg-elevated), 0.68);
+    border-color: rgba(var(--border-color), 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition:
+        transform 240ms var(--theme-ease, ease),
+        box-shadow 240ms var(--theme-ease, ease),
+        border-color 240ms var(--theme-ease, ease);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-artwork {
+    transform: translateZ(24px) scale(1.04);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-price {
+    transform: translateZ(18px);
+}
+
+.pos-menu-item-watermark {
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 12px;
+    z-index: 1;
+    width: min(58%, 9rem);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    color: rgb(var(--primary));
+    opacity: 0.08;
+    transform: translateX(-50%) translateY(4px) scale(1);
+    transition:
+        opacity 360ms var(--theme-ease, ease),
+        transform 520ms var(--theme-ease, ease),
+        filter 360ms var(--theme-ease, ease);
+}
+
+[dir='rtl'] .pos-menu-item-watermark {
+    transform: translateX(-50%) translateY(4px) scale(1);
+}
+
+.pos-menu-item-watermark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 999px;
+    filter: saturate(1.18) contrast(1.04);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-watermark {
+    opacity: 0.2;
+    filter: blur(0.2px);
+    transform: translateX(-50%) translateY(-5px) scale(1.12) rotate(-4deg);
+}
+
+[dir='rtl'] .pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-watermark {
+    transform: translateX(-50%) translateY(-5px) scale(1.12) rotate(4deg);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-artwork::after {
+    display: none;
+}
+
+.pos-menu-item-smart-status {
+    background: rgba(var(--bg-card), 0.88);
+    color: rgb(var(--text-muted));
+    border-color: rgba(var(--border-color), 0.14);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 18px -16px rgba(15, 23, 42, 0.4);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card[data-selected='true'] .pos-menu-item-smart-status {
+    background: rgba(var(--primary), 0.1);
+    color: rgb(var(--primary));
+    border-color: rgba(var(--primary), 0.2);
+}
+
+.pos-menu-item-smart-peek {
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.72), rgba(var(--bg-card), 0.94)),
+        rgba(var(--bg-card), 0.84);
+    border-color: rgba(255, 255, 255, 0.32);
+    opacity: 0;
+    transform: translateY(72px) scale(0.96);
+    transition:
+        opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    backdrop-filter: blur(18px) saturate(150%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.32) inset,
+        0 18px 42px -28px rgba(15, 23, 42, 0.72);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-smart-peek,
+.pos-menu-item-card.pos-menu-item-hero-card:focus-within .pos-menu-item-smart-peek {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card > .relative.z-10 {
+    transition:
+        opacity 260ms var(--theme-ease, ease),
+        transform 360ms var(--theme-ease, ease),
+        filter 260ms var(--theme-ease, ease);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-title-wrap,
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-artwork,
+.pos-menu-item-card.pos-menu-item-hero-card:hover > .relative.z-10 > div:last-child {
+    opacity: 0.16;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover > .relative.z-10 {
+    transform: translateY(-8px) scale(0.98);
+    filter: saturate(0.86);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-title {
+    padding-inline-end: 0;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card[data-long-name='true'] .pos-menu-item-title {
+    padding-inline-end: 1.65rem;
+}
+
+[dir='rtl'] .pos-menu-item-card.pos-menu-item-hero-card[data-long-name='true'] .pos-menu-item-title {
+    padding-inline-end: 0;
+    padding-inline-start: 1.65rem;
+}
+
+.pos-menu-item-name-trigger {
+    background: rgba(var(--primary), 0.1);
+    color: rgb(var(--primary));
+    border: 1px solid rgba(var(--primary), 0.16);
+    backdrop-filter: blur(8px);
+}
+
+.pos-menu-item-name-trigger:hover,
+.pos-menu-item-name-trigger:focus-visible {
+    background: rgb(var(--primary));
+    color: white;
+    outline: none;
+}
+
+.pos-menu-item-name-peek {
+    background: rgba(var(--bg-card), 0.96);
+    border-color: rgba(var(--primary), 0.18);
+    color: rgb(var(--text-main));
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    transition:
+        opacity 160ms var(--theme-ease, ease),
+        transform 160ms var(--theme-ease, ease);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-name-peek,
+.pos-menu-item-card.pos-menu-item-hero-card:focus-within .pos-menu-item-name-peek,
+.pos-menu-item-card.pos-menu-item-hero-card[data-name-peek='true'] .pos-menu-item-name-peek {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-stepper {
+    background: rgba(var(--bg-elevated), 0.72);
+    border-color: rgba(var(--border-color), 0.14);
+    backdrop-filter: none;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-icon-btn {
+    color: rgb(var(--text-muted));
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-icon-btn:hover {
+    background: rgba(var(--primary), 0.08);
+    color: rgb(var(--primary));
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card .pos-menu-item-popular {
+    background: rgba(var(--primary), 0.08);
+    color: rgb(var(--primary));
+    border-color: rgba(var(--primary), 0.16);
+    backdrop-filter: none;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card[data-selected='true'] {
+    background: rgba(var(--bg-card), 0.78) !important;
+    border-color: rgba(var(--primary), 0.32);
+    box-shadow:
+        0 0 0 1px rgba(var(--primary), 0.12),
+        0 18px 42px -30px rgba(var(--primary), 0.4);
+}
+
+/* CodePen-inspired clean glass reveal tile */
+.pos-menu-item-card.pos-menu-item-hero-card {
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.54), rgba(var(--bg-card), 0.76)),
+        rgba(var(--bg-card), 0.58) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(10px) saturate(145%);
+    -webkit-backdrop-filter: blur(10px) saturate(145%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.34) inset,
+        0 18px 34px -28px rgba(15, 23, 42, 0.64);
+    transform-style: preserve-3d;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover {
+    transform: perspective(900px) rotateX(4deg) rotateY(-3deg) translateY(-5px);
+    border-color: rgba(255, 255, 255, 0.34);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.48) inset,
+        0 26px 56px -34px rgba(15, 23, 42, 0.8);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card::before {
+    display: none;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card::after {
+    content: "";
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 18%, rgba(255, 255, 255, 0.38) 46%, transparent 64%);
+    opacity: 0;
+    transform: translateX(-140%) skewX(-14deg);
+    transition: opacity 220ms var(--theme-ease, ease);
+    animation: none;
+    mask: none;
+    -webkit-mask: none;
+    padding: 0;
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover::after {
+    opacity: 0.88;
+    animation: pos-tile-sheen 780ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pos-menu-item-card-face {
+    transition:
+        opacity 360ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-card-face {
+    opacity: 0.2;
+    transform: translateY(-22px) scale(0.96);
+    filter: blur(0.3px) saturate(0.8);
+}
+
+.pos-menu-item-reveal {
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.68), rgba(var(--bg-card), 0.9)),
+        rgba(var(--bg-card), 0.78);
+    border-color: rgba(255, 255, 255, 0.26);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.34) inset,
+        0 22px 44px -32px rgba(15, 23, 42, 0.78);
+    opacity: 0;
+    transform: translateY(96px);
+    transition:
+        opacity 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-reveal,
+.pos-menu-item-card.pos-menu-item-hero-card:focus-within .pos-menu-item-reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.pos-menu-item-watermark {
+    top: 0.65rem;
+    width: min(64%, 9.5rem);
+    opacity: 0.12;
+    transform: translateX(-50%) translateY(8px) scale(1);
+    filter: saturate(1.1);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-watermark {
+    opacity: 0.26;
+    transform: translateX(-50%) translateY(-12px) scale(1.18) rotate(-5deg);
+}
+
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-title-wrap,
+.pos-menu-item-card.pos-menu-item-hero-card:hover .pos-menu-item-artwork,
+.pos-menu-item-card.pos-menu-item-hero-card:hover > .relative.z-10 > div:last-child {
+    opacity: 1;
+}
+
+.dark .pos-menu-item-card.pos-menu-item-hero-card {
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.52), rgba(var(--bg-card), 0.72)),
+        rgba(var(--bg-card), 0.66) !important;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        0 18px 44px -32px rgba(0, 0, 0, 0.8);
+}
+
+/* ─── 10. Mobile Layout ─── */
+@media (max-width: 767px) {
+    .pos-shell { flex-direction: column; }
+    .pos-workspace-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ─── 11. RTL Fixes ─── */
+[dir='rtl'] .pos-items-toolbar input {
+    text-align: right;
+}
+
+/* ─── 12. Print ─── */
+@media print {
+    .pos-shell { display: none !important; }
+}
+
+/* ─── 13. Animations ─── */
+@keyframes pos-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pos-scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+@keyframes pos-item-confirm {
+    0% { transform: scale(1); }
+    38% { transform: scale(0.985); box-shadow: 0 0 0 3px rgba(var(--primary), 0.16), var(--theme-shadow-hover); }
+    100% { transform: scale(1); }
+}
+.pos-animate-in {
+    animation: pos-fade-in 0.2s ease-out both;
+}
+.pos-scale-in {
+    animation: pos-scale-in 0.15s ease-out both;
+}
+
+/* Premium glass tilt POS tile. */
+.pos-codepen-card {
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+    --glare-x: 50%;
+    --glare-y: 0%;
+    position: relative;
+    isolation: isolate;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.35), transparent 35%),
+        linear-gradient(145deg, rgba(var(--primary), 0.88), rgba(24, 112, 214, 0.78) 48%, rgba(15, 23, 42, 0.85)),
+        rgba(18, 24, 34, 0.45);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        0 22px 60px -25px rgba(0, 0, 0, 0.75),
+        0 10px 25px -15px rgba(var(--primary), 0.8);
+    transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) translateZ(0);
+    transform-style: preserve-3d;
+    will-change: transform;
+    backdrop-filter: blur(16px) saturate(170%);
+    -webkit-backdrop-filter: blur(16px) saturate(170%);
+    transition:
+        transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        box-shadow 300ms ease,
+        border-color 250ms ease;
+}
+
+.pos-codepen-card:hover {
+    transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) translateZ(40px) scale(1.04);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        0 35px 80px -30px rgba(0, 0, 0, 0.9),
+        0 15px 35px -15px rgba(var(--primary), 0.95);
+}
+
+.pos-codepen-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at var(--glare-x) var(--glare-y), rgba(255, 255, 255, 0.3), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04) 38%, rgba(0, 0, 0, 0.18));
+    opacity: 0.88;
+    transform: translateZ(1px);
+}
+
+.pos-codepen-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.28) 48%, transparent 66%);
+    opacity: 0;
+    transform: translateX(-140%) skewX(-14deg);
+}
+
+.pos-codepen-card:hover {
+    border-color: rgba(255, 255, 255, 0.42);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.46),
+        0 28px 70px -38px rgba(15, 23, 42, 0.92),
+        0 12px 26px -20px rgba(var(--primary), 0.8);
+}
+
+.pos-codepen-card:active {
+    transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) translateZ(0) scale(0.985);
+}
+
+.pos-codepen-card:hover::after {
+    opacity: 1;
+    animation: pos-codepen-card-glare 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pos-codepen-card-media {
+    position: absolute;
+    z-index: 1;
+    top: 14px;
+    left: 50%;
+    width: min(62%, 146px);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    color: rgb(var(--primary));
+    opacity: 0.34;
+    transform: translateX(-50%) translateZ(52px);
+    transition:
+        opacity 220ms ease,
+        filter 220ms ease;
+}
+
+.pos-codepen-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 999px;
+    filter: saturate(1.22) contrast(1.06) drop-shadow(0 18px 24px rgba(0, 0, 0, 0.26));
+}
+
+.pos-codepen-card:hover .pos-codepen-card-media {
+    opacity: 0.42;
+    filter: saturate(1.05);
+}
+
+.pos-codepen-card-content {
+    position: relative;
+    isolation: isolate;
+    border-radius: 20px;
+    color: #ccc;
+    transform: translateZ(36px);
+    opacity: 1;
+    text-shadow: 0 1px 18px rgba(0, 0, 0, 0.24);
+}
+
+.pos-codepen-card-content::before {
+    content: "";
+    position: absolute;
+    inset: 0.35rem 0.55rem;
+    z-index: -1;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06)),
+        rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 18px 38px -32px rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+.pos-codepen-card-stepper,
+.pos-codepen-card-action {
+    transform: translateZ(62px);
+    transition:
+        transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        box-shadow 220ms ease,
+        background-color 220ms ease,
+        border-color 220ms ease;
+}
+
+.pos-codepen-card:hover .pos-codepen-card-stepper,
+.pos-codepen-card:hover .pos-codepen-card-action {
+    transform: translateZ(82px);
+}
+
+.pos-codepen-card-action:hover {
+    box-shadow:
+        0 0 0 5px rgba(255, 255, 255, 0.12),
+        0 14px 34px -20px rgba(var(--primary), 0.9);
+}
+
+.pos-codepen-card-qty {
+    transform: translateZ(12px);
+}
+
+.pos-codepen-card-count {
+    background: rgba(var(--primary), 0.92);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+    transform: translateZ(60px);
+}
+
+.pos-codepen-card[data-selected='true'] {
+    border-color: rgba(var(--primary), 0.48);
+    box-shadow:
+        0 0 0 1px rgba(var(--primary), 0.18),
+        24px 24px 58px rgba(15, 23, 42, 0.34);
+}
+
+@keyframes pos-codepen-card-glare {
+    0% { transform: translateX(-140%) skewX(-14deg); }
+    100% { transform: translateX(140%) skewX(-14deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pos-codepen-card,
+    .pos-codepen-card::after,
+    .pos-codepen-card-content {
+        animation: none !important;
+        transition-duration: 1ms !important;
+        transform: none !important;
+    }
+
+    .pos-codepen-card-media {
+        animation: none !important;
+        transition-duration: 1ms !important;
+        transform: translateX(-50%) !important;
+    }
+
+    .pos-codepen-card-content {
+        opacity: 1;
+    }
+}
+
+/* 2026 POS Food Glass Card - rebuilt from scratch, inspired by glass reveal hover cards. */
+.pos-food-card {
+    position: relative;
+    isolation: isolate;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.56), rgba(var(--bg-card), 0.78)),
+        rgba(var(--bg-card), 0.62);
+    color: rgb(var(--text-main));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.36),
+        0 18px 44px -34px rgba(15, 23, 42, 0.76);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    transform-style: preserve-3d;
+    transition:
+        transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        border-color 260ms ease,
+        box-shadow 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        background 260ms ease;
+}
+
+.pos-food-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+        radial-gradient(circle at 24% 18%, rgba(var(--primary), 0.18), transparent 34%),
+        radial-gradient(circle at 78% 86%, rgba(var(--accent), 0.12), transparent 32%);
+    opacity: 0.42;
+    transition: opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pos-food-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(115deg, transparent 22%, rgba(255, 255, 255, 0.42) 48%, transparent 68%);
+    opacity: 0;
+    transform: translateX(-140%) skewX(-14deg);
+}
+
+.pos-card-sheen {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 20%, rgba(255, 255, 255, 0.45) 50%, transparent 80%);
+    opacity: 0;
+    transform: translateX(-150%) skewX(-15deg);
+    transition: opacity 300ms ease;
+}
+
+.pos-codepen-card:hover .pos-card-sheen,
+.pos-menu-item-card:hover .pos-card-sheen {
+    opacity: 1;
+    animation: pos-card-sheen-sweep 850ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes pos-card-sheen-sweep {
+    0% { transform: translateX(-150%) skewX(-15deg); }
+    100% { transform: translateX(150%) skewX(-15deg); }
+}
+
+
+.pos-food-card:hover::before {
+    opacity: 0.74;
+}
+
+.pos-food-card:hover::after {
+    opacity: 0.9;
+    animation: pos-food-card-sheen 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pos-food-card-watermark {
+    position: absolute;
+    top: 0.35rem;
+    inset-inline-start: 50%;
+    z-index: 1;
+    width: min(66%, 9.75rem);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    color: rgb(var(--primary));
+    opacity: 0.11;
+    transform: translateX(-50%) translateY(8px) scale(1);
+    transition:
+        opacity 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 640ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 420ms ease;
+}
+
+.pos-food-card-watermark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 999px;
+    filter: saturate(1.12) contrast(1.04);
+}
+
+.pos-food-card:hover .pos-food-card-watermark {
+    opacity: 0.28;
+    filter: blur(0.2px);
+    transform: translateX(-50%) translateY(-14px) scale(1.2) rotate(-5deg);
+}
+
+[dir='rtl'] .pos-food-card:hover .pos-food-card-watermark {
+    transform: translateX(-50%) translateY(-14px) scale(1.2) rotate(5deg);
+}
+
+.pos-food-card-face {
+    transition:
+        opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 560ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        filter 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pos-food-card:hover .pos-food-card-face {
+    opacity: 0.18;
+    transform: translateY(-24px) scale(0.96);
+    filter: blur(0.2px) saturate(0.82);
+}
+
+.pos-food-card-reveal {
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.72), rgba(var(--bg-card), 0.92)),
+        rgba(var(--bg-card), 0.86);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        0 24px 52px -34px rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(18px) saturate(155%);
+    -webkit-backdrop-filter: blur(18px) saturate(155%);
+    opacity: 0;
+    transform: translateY(112px);
+    transition:
+        opacity 540ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 540ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pos-food-card:hover .pos-food-card-reveal,
+.pos-food-card:focus-within .pos-food-card-reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.pos-food-card-count {
+    background: rgb(var(--primary));
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: 0 10px 24px -16px rgba(var(--primary), 0.8);
+}
+
+.pos-food-card[data-selected='true'] {
+    border-color: rgba(var(--primary), 0.36);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        0 0 0 1px rgba(var(--primary), 0.12),
+        0 22px 54px -40px rgba(var(--primary), 0.62);
+}
+
+.dark .pos-food-card {
+    background:
+        linear-gradient(180deg, rgba(var(--bg-card), 0.48), rgba(var(--bg-card), 0.72)),
+        rgba(var(--bg-card), 0.66);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 20px 50px -36px rgba(0, 0, 0, 0.9);
+}
+
+@keyframes pos-food-card-sheen {
+    0% { transform: translateX(-140%) skewX(-14deg); }
+    100% { transform: translateX(140%) skewX(-14deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pos-food-card,
+    .pos-food-card::after,
+    .pos-food-card-watermark,
+    .pos-food-card-face,
+    .pos-food-card-reveal {
+        animation: none !important;
+        transition-duration: 1ms !important;
+        transform: none !important;
+    }
+}
+
+

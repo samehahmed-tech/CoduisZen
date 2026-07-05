@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RestoFlow Operator Screen</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; background: #eef6f3; color: #102036; font-family: Tahoma, Arial, sans-serif; }
+        body { overflow-x: hidden; }
+        .topbar { height: 70px; padding: 12px 18px; background: #ffffff; border-bottom: 1px solid #d9e6ef; box-shadow: 0 4px 16px rgba(13, 35, 61, .08); }
+        .brand { float: right; }
+        .brand h1 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 900; }
+        .brand p { margin: 3px 0 0; color: #65758a; font-size: 13px; font-weight: 700; }
+        .meta { float: left; text-align: left; font-weight: 900; color: #0aa979; padding-top: 7px; }
+        .meta small { display: block; color: #6c7b8e; margin-top: 3px; }
+        .toolbar { clear: both; padding: 10px 18px; background: #f8fbfd; border-bottom: 1px solid #dfeaf1; }
+        .chip { display: inline-block; margin: 4px 0 4px 8px; padding: 8px 12px; border-radius: 10px; background: #fff; border: 1px solid #d7e2eb; color: #304256; font-weight: 900; font-size: 13px; }
+        .chip.green { color: #008d65; background: #e7fff6; border-color: #9ae9cf; }
+        .status { padding: 10px 18px; color: #52657b; font-size: 13px; font-weight: 800; }
+        .grid { padding: 10px 10px 28px; direction: rtl; }
+        .card { display: inline-block; vertical-align: top; width: 31.5%; min-width: 290px; margin: 8px; background: #fff; border: 1px solid #bee7d8; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 30px rgba(12, 49, 81, .09); }
+        .card.ready { border-color: #7ce0bd; }
+        .card.warn { border-color: #ffd391; }
+        .head { padding: 14px 16px; background: #effcf8; border-bottom: 1px solid #d4efe6; min-height: 80px; }
+        .order { float: right; font-size: 44px; line-height: 1; color: #00a870; font-weight: 900; direction: ltr; }
+        .station { float: left; text-align: left; font-size: 12px; color: #0b7a60; font-weight: 900; letter-spacing: .5px; }
+        .station b { display: block; color: #122238; font-size: 15px; margin-top: 5px; letter-spacing: 0; }
+        .info { clear: both; padding-top: 12px; color: #52657b; font-size: 12px; font-weight: 800; }
+        .body { padding: 14px 16px; min-height: 150px; }
+        .item { padding: 9px 0; border-bottom: 1px dashed #d7e0e8; }
+        .item:last-child { border-bottom: 0; }
+        .qty { display: inline-block; min-width: 36px; color: #0aa979; font-size: 20px; font-weight: 900; direction: ltr; }
+        .name { font-size: 19px; font-weight: 900; color: #13233a; }
+        .mods { display: block; color: #66778a; font-size: 13px; font-weight: 700; margin: 5px 38px 0 0; line-height: 1.4; }
+        .notes { margin-top: 12px; padding: 10px; border-radius: 12px; background: #fff8e6; color: #7b4d00; font-weight: 900; font-size: 14px; line-height: 1.5; }
+        .foot { padding: 12px 16px 16px; background: #f4f8fb; border-top: 1px solid #e3edf3; }
+        .btn { width: 100%; border: 0; border-radius: 14px; padding: 15px 12px; color: #fff; background: #06a36f; font-size: 18px; font-weight: 900; box-shadow: 0 10px 20px rgba(6, 163, 111, .22); cursor: pointer; font-family: Tahoma, Arial, sans-serif; }
+        .btn:active { transform: scale(.98); }
+        .btn.orange { background: #f59f00; box-shadow: 0 10px 20px rgba(245, 159, 0, .18); }
+        .empty { margin: 80px auto; text-align: center; color: #60728a; font-weight: 900; font-size: 22px; }
+        .empty span { display: block; font-size: 13px; color: #8a9aab; margin-top: 10px; }
+        .error { background: #fff2f2; color: #b42318; border: 1px solid #ffc9c9; border-radius: 12px; padding: 12px; margin: 12px 18px; font-weight: 900; }
+        @media (max-width: 980px) {
+            .topbar { height: 64px; padding: 10px 12px; }
+            .brand h1 { font-size: 21px; }
+            .grid { padding: 8px 6px 22px; }
+            .card { width: 48%; min-width: 250px; margin: 6px; border-radius: 14px; }
+            .order { font-size: 38px; }
+            .name { font-size: 18px; }
+            .btn { padding: 13px 10px; font-size: 17px; }
+        }
+        @media (max-width: 620px) {
+            .card { width: 96%; }
+            .meta { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">
+            <h1 id="title">RestoFlow</h1>
+            <p id="subtitle"></p>
+        </div>
+        <div class="meta">
+            <span id="clock">--:--</span>
+            <small id="counter"></small>
+        </div>
+    </div>
+    <div class="toolbar">
+        <span class="chip green" id="modeChip"></span>
+        <span class="chip" id="branchChip"></span>
+        <span class="chip" id="stationChip"></span>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="grid" id="grid"></div>
+
+    <script>
+    (function () {
+        var labels = {
+            kdsTitle: '\u0634\u0627\u0634\u0629 \u0627\u0644\u0645\u0637\u0628\u062e',
+            packingTitle: '\u0634\u0627\u0634\u0629 \u0627\u0644\u062a\u063a\u0644\u064a\u0641',
+            kdsSubtitle: '\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u062c\u0627\u0631\u064a \u062a\u062d\u0636\u064a\u0631\u0647\u0627',
+            packingSubtitle: '\u0627\u0644\u0637\u0644\u0628\u0627\u062a \u0627\u0644\u062c\u0627\u0647\u0632\u0629 \u0644\u0644\u062a\u0633\u0644\u064a\u0645',
+            mode: '\u0627\u0644\u0648\u0636\u0639',
+            branch: '\u0627\u0644\u0641\u0631\u0639',
+            station: '\u0627\u0644\u0642\u0633\u0645',
+            allStations: '\u0643\u0644 \u0627\u0644\u0623\u0642\u0633\u0627\u0645',
+            loading: '\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a...',
+            emptyKds: '\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u062a\u062d\u062a \u0627\u0644\u062a\u062d\u0636\u064a\u0631',
+            emptyPacking: '\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u062c\u0627\u0647\u0632\u0629 \u0644\u0644\u062a\u0633\u0644\u064a\u0645',
+            refreshed: '\u0622\u062e\u0631 \u062a\u062d\u062f\u064a\u062b',
+            ready: '\u062c\u0627\u0647\u0632',
+            handover: '\u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0637\u0644\u0628',
+            table: '\u0637\u0627\u0648\u0644\u0629',
+            customer: '\u0639\u0645\u064a\u0644',
+            items: '\u0639\u0646\u0627\u0635\u0631',
+            notes: '\u0645\u0644\u0627\u062d\u0638\u0627\u062a',
+            error: '\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644',
+            keyMissing: '\u0645\u0641\u062a\u0627\u062d \u0627\u0644\u0634\u0627\u0634\u0629 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f \u0641\u064a \u0627\u0644\u0644\u064a\u0646\u0643'
+        };
+
+        var qs = {};
+        var parts = window.location.search.replace(/^\?/, '').split('&');
+        for (var i = 0; i < parts.length; i++) {
+            if (!parts[i]) continue;
+            var kv = parts[i].split('=');
+            qs[decodeURIComponent(kv[0])] = decodeURIComponent((kv[1] || '').replace(/\+/g, ' '));
+        }
+
+        var mode = (qs.mode || 'kds').toLowerCase();
+        var branchId = qs.branchId || 'b1';
+        var station = (qs.station || '').toUpperCase();
+        var key = qs.key || '';
+        var grid = document.getElementById('grid');
+        var status = document.getElementById('status');
+        var counter = document.getElementById('counter');
+
+        function text(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function api(method, url, body, cb) {
+            var xhr = new XMLHttpRequest();
+            xhr.open(method, url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                var data = null;
+                try { data = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
+                if (xhr.status >= 200 && xhr.status < 300) cb(null, data || {});
+                else cb(data || { message: xhr.statusText || labels.error });
+            };
+            xhr.onerror = function () { cb({ message: labels.error }); };
+            xhr.send(body ? JSON.stringify(body) : null);
+        }
+
+        function nowText() {
+            var d = new Date();
+            var h = String(d.getHours());
+            var m = String(d.getMinutes());
+            if (h.length < 2) h = '0' + h;
+            if (m.length < 2) m = '0' + m;
+            return h + ':' + m;
+        }
+
+        function age(createdAt) {
+            if (!createdAt) return '';
+            var diff = Math.max(0, Math.floor((new Date().getTime() - new Date(createdAt).getTime()) / 60000));
+            return diff + 'm';
+        }
+
+        function setupHeader() {
+            document.getElementById('title').innerHTML = mode === 'packing' ? labels.packingTitle : labels.kdsTitle;
+            document.getElementById('subtitle').innerHTML = mode === 'packing' ? labels.packingSubtitle : labels.kdsSubtitle;
+            document.getElementById('modeChip').innerHTML = labels.mode + ': ' + text(mode.toUpperCase());
+            document.getElementById('branchChip').innerHTML = labels.branch + ': ' + text(branchId);
+            document.getElementById('stationChip').innerHTML = labels.station + ': ' + text(station || labels.allStations);
+            document.getElementById('clock').innerHTML = nowText();
+        }
+
+        function ticketNumber(ticket) {
+            return ticket.orderNumber || ticket.orderId || ticket.id;
+        }
+
+        function itemsHtml(items) {
+            var out = '';
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i] || {};
+                out += '<div class="item"><span class="qty">' + text(item.quantity || 1) + 'x</span>';
+                out += '<span class="name">' + text(item.nameAr || item.name || item.itemName || 'Item') + '</span>';
+                if (item.modifiersText) out += '<span class="mods">' + text(item.modifiersText) + '</span>';
+                out += '</div>';
+            }
+            return out;
+        }
+
+        function ticketCard(ticket) {
+            var note = ticket.kitchenNotes || ticket.notes || '';
+            var html = '<div class="card' + (ticket.status === 'READY' ? ' ready' : '') + '">';
+            html += '<div class="head"><div class="order">#' + text(ticketNumber(ticket)) + '</div>';
+            html += '<div class="station">' + text(ticket.routingStation || 'KITCHEN') + '<b>' + text(ticket.type || '') + '</b></div>';
+            html += '<div class="info">' + labels.items + ': ' + (ticket.items ? ticket.items.length : 0) + ' | ' + age(ticket.createdAt || ticket.orderCreatedAt);
+            if (ticket.tableId) html += ' | ' + labels.table + ': ' + text(ticket.tableId);
+            html += '</div></div>';
+            html += '<div class="body">' + itemsHtml(ticket.items || []);
+            if (note) html += '<div class="notes">' + labels.notes + ': ' + text(note) + '</div>';
+            html += '</div><div class="foot">';
+            html += '<button class="btn" onclick="screenActionReady(\'' + text(ticket.id) + '\')">' + labels.ready + '</button>';
+            html += '</div></div>';
+            return html;
+        }
+
+        function groupPacking(tickets) {
+            var map = {};
+            for (var i = 0; i < tickets.length; i++) {
+                var t = tickets[i];
+                var id = t.orderId || t.id;
+                if (!map[id]) {
+                    map[id] = {
+                        orderId: id,
+                        orderNumber: t.orderNumber,
+                        type: t.type,
+                        tableId: t.tableId,
+                        customerName: t.customerName,
+                        customerPhone: t.customerPhone,
+                        createdAt: t.createdAt || t.orderCreatedAt,
+                        items: [],
+                        stations: []
+                    };
+                }
+                map[id].stations.push(t.routingStation || 'KITCHEN');
+                for (var j = 0; j < (t.items || []).length; j++) map[id].items.push(t.items[j]);
+            }
+            var rows = [];
+            for (var keyName in map) if (map.hasOwnProperty(keyName)) rows.push(map[keyName]);
+            return rows;
+        }
+
+        function packingCard(order) {
+            var html = '<div class="card ready"><div class="head">';
+            html += '<div class="order">#' + text(order.orderNumber || order.orderId) + '</div>';
+            html += '<div class="station">' + text((order.stations || []).join(' / ')) + '<b>' + text(order.type || '') + '</b></div>';
+            html += '<div class="info">' + labels.items + ': ' + (order.items ? order.items.length : 0) + ' | ' + age(order.createdAt);
+            if (order.customerName) html += ' | ' + labels.customer + ': ' + text(order.customerName);
+            html += '</div></div>';
+            html += '<div class="body">' + itemsHtml(order.items || []) + '</div>';
+            html += '<div class="foot"><button class="btn orange" onclick="screenActionHandover(\'' + text(order.orderId) + '\')">' + labels.handover + '</button></div></div>';
+            return html;
+        }
+
+        function render(tickets) {
+            document.getElementById('clock').innerHTML = nowText();
+            counter.innerHTML = String(tickets.length) + ' ' + labels.items;
+            status.innerHTML = labels.refreshed + ': ' + nowText();
+            if (!tickets.length) {
+                grid.innerHTML = '<div class="empty">' + (mode === 'packing' ? labels.emptyPacking : labels.emptyKds) + '<span>RestoFlow</span></div>';
+                return;
+            }
+            var html = '';
+            if (mode === 'packing') {
+                var orders = groupPacking(tickets);
+                counter.innerHTML = String(orders.length) + ' ' + labels.items;
+                for (var i = 0; i < orders.length; i++) html += packingCard(orders[i]);
+            } else {
+                for (var j = 0; j < tickets.length; j++) html += ticketCard(tickets[j]);
+            }
+            grid.innerHTML = html;
+        }
+
+        function load() {
+            if (!key) {
+                grid.innerHTML = '<div class="error">' + labels.keyMissing + '</div>';
+                return;
+            }
+            status.innerHTML = labels.loading;
+            var url = '/api/public-screens/tickets?mode=' + encodeURIComponent(mode)
+                + '&branchId=' + encodeURIComponent(branchId)
+                + '&key=' + encodeURIComponent(key);
+            if (station) url += '&station=' + encodeURIComponent(station);
+            api('GET', url, null, function (err, data) {
+                if (err) {
+                    grid.innerHTML = '<div class="error">' + text(err.message || err.code || labels.error) + '</div>';
+                    return;
+                }
+                render(data.tickets || []);
+            });
+        }
+
+        window.screenActionReady = function (id) {
+            api('POST', '/api/public-screens/tickets/' + encodeURIComponent(id) + '/bump?key=' + encodeURIComponent(key), null, function () {
+                load();
+            });
+        };
+
+        window.screenActionHandover = function (orderId) {
+            api('POST', '/api/public-screens/orders/' + encodeURIComponent(orderId) + '/handover?key=' + encodeURIComponent(key), null, function () {
+                load();
+            });
+        };
+
+        setupHeader();
+        load();
+        setInterval(function () { document.getElementById('clock').innerHTML = nowText(); }, 30000);
+        setInterval(load, 5000);
+    })();
+    </script>
+</body>
+</html>

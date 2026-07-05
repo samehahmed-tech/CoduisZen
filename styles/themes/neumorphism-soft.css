@@ -1,0 +1,72 @@
+[data-theme='neumorphism-soft'] {
+    /* Soft Touch - tactile, friendly operations theme */
+    --primary: 14, 116, 144;
+    --primary-hover: 21, 94, 117;
+    --secondary: 86, 104, 112;
+    --accent: 5, 150, 105;
+
+    --bg-app: 232, 239, 241;
+    --bg-card: 238, 244, 246;
+    --bg-sidebar: 235, 242, 244;
+    --bg-elevated: 246, 250, 251;
+
+    --text-main: 30, 41, 45;
+    --text-muted: 91, 110, 118;
+
+    --border-color: 205, 218, 222;
+    --border-subtle: 205 218 222 / 0.36;
+    --glass-bg: 238 244 246 / 0.92;
+    --light-shadow: #ffffff;
+    --dark-shadow: #c4d0d5;
+
+    --success: 5, 150, 105;
+    --warning: 180, 83, 9;
+    --danger: 190, 18, 60;
+    --info: 14, 116, 144;
+
+    --theme-page-bg: #e8eff1;
+    --theme-card-bg: #eef4f6;
+    --theme-card-hover-bg: #f6fafb;
+    --theme-rail-bg: linear-gradient(180deg, #eef4f6, #e4ecef);
+    --theme-topbar-bg: rgba(238, 244, 246, 0.94);
+    --theme-table-head-bg: #e2ebee;
+    --theme-row-hover-bg: rgba(14, 116, 144, 0.075);
+    --theme-input-bg: #eef4f6;
+    --theme-button-bg: linear-gradient(145deg, #0e7490, #059669);
+    --theme-active-bg: rgba(14, 116, 144, 0.13);
+    --theme-focus-ring: rgba(14, 116, 144, 0.20);
+}
+
+.dark [data-theme='neumorphism-soft'],
+[data-theme='neumorphism-soft'].dark {
+    --primary: 45, 212, 191;
+    --primary-hover: 20, 184, 166;
+    --secondary: 148, 163, 172;
+    --accent: 52, 211, 153;
+
+    --bg-app: 20, 29, 33;
+    --bg-card: 28, 39, 44;
+    --bg-sidebar: 24, 34, 39;
+    --bg-elevated: 37, 51, 57;
+
+    --text-main: 236, 253, 245;
+    --text-muted: 151, 171, 177;
+
+    --border-color: 55, 75, 82;
+    --border-subtle: 45 212 191 / 0.10;
+    --glass-bg: 28 39 44 / 0.9;
+    --light-shadow: #34464d;
+    --dark-shadow: #111b20;
+
+    --theme-page-bg: #141d21;
+    --theme-card-bg: #1c272c;
+    --theme-card-hover-bg: #253339;
+    --theme-rail-bg: linear-gradient(180deg, #182227, #202d33);
+    --theme-topbar-bg: rgba(28, 39, 44, 0.94);
+    --theme-table-head-bg: #182227;
+    --theme-row-hover-bg: rgba(45, 212, 191, 0.11);
+    --theme-input-bg: #1c272c;
+    --theme-button-bg: linear-gradient(145deg, #2dd4bf, #34d399);
+    --theme-active-bg: rgba(45, 212, 191, 0.15);
+    --theme-focus-ring: rgba(45, 212, 191, 0.24);
+}

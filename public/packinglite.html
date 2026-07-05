@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RestoFlow Packing Lite</title>
+</head>
+<body>
+    <script>
+    (function () {
+        var query = window.location.search || '';
+        var clean = query.replace(/^\?/, '');
+        var parts = clean ? clean.split('&') : [];
+        var next = [];
+        var hasMode = false;
+        for (var i = 0; i < parts.length; i++) {
+            if (!parts[i]) continue;
+            if (parts[i].split('=')[0] === 'mode') {
+                next.push('mode=packing');
+                hasMode = true;
+            } else {
+                next.push(parts[i]);
+            }
+        }
+        if (!hasMode) next.push('mode=packing');
+        window.location.replace('/kdslite.html?' + next.join('&'));
+    })();
+    </script>
+    <p style="font-family:Tahoma,Arial,sans-serif;text-align:center;margin-top:40px;font-weight:900">
+        جاري فتح شاشة التغليف...
+    </p>
+</body>
+</html>
