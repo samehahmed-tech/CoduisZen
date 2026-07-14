@@ -65,12 +65,20 @@ const FranchiseManager: React.FC = () => {
 
     const loadPerf = async () => {
         setIsLoading(true);
-        try { setPerfData(await analyticsApi.getBranchPerformance()); } catch { }
+        try {
+            setPerfData(await analyticsApi.getBranchPerformance());
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load branch performance', 'تعذر تحميل أداء الفروع'));
+        }
         finally { setIsLoading(false); }
     };
 
     const loadBranches = async () => {
-        try { setBranches(await branchesApi.getAll()); } catch { }
+        try {
+            setBranches(await branchesApi.getAll());
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load branches', 'تعذر تحميل الفروع'));
+        }
     };
 
     useEffect(() => { loadPerf(); loadBranches(); }, []);
@@ -117,13 +125,13 @@ const FranchiseManager: React.FC = () => {
 
     const handleDeleteBranch = async (id: string) => {
         const ok = await confirm({
-            title: tr('Delete Branch', 'حذف الفرع'),
-            message: tr('Delete this branch? This action cannot be undone.', 'هل تريد حذف هذا الفرع؟ لا يمكن التراجع عن الإجراء.'),
-            confirmText: tr('Delete', 'حذف'),
-            variant: 'danger'
+            title: tr('Archive Branch', 'أرشفة الفرع'),
+            message: tr('Archive this branch? Historical orders, shifts, printers, and stock stay linked.', 'هل تريد أرشفة هذا الفرع؟ الطلبات والشيفتات والطابعات والمخزون ستظل محفوظة ومرتبطة.'),
+            confirmText: tr('Archive', 'أرشفة'),
+            variant: 'warning'
         });
         if (!ok) return;
-        try { await branchesApi.delete(id); await loadBranches(); success(tr('Branch deleted successfully', 'تم حذف الفرع')); } catch (e: any) { showError(e.message); }
+        try { await branchesApi.delete(id); await loadBranches(); success(tr('Branch archived successfully', 'تمت أرشفة الفرع')); } catch (e: any) { showError(e.message); }
     };
 
     const getHealthColor = (score: number) => {

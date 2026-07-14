@@ -81,10 +81,10 @@ const MenuToolbar: React.FC<Props> = ({
     return (
         <div className="bg-white dark:bg-card border-b border-gray-200 dark:border-white/[0.05]">
             {/* Top Row */}
-            <div className="flex items-center justify-between px-5 py-3 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-5 py-3 gap-3 sm:gap-4">
 
                 {/* Left: Search */}
-                <div className="relative flex-1 max-w-md">
+                <div className="relative w-full sm:flex-1 sm:max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-muted/50 w-4 h-4 pointer-events-none" />
                     <input
                         id="menu-search-input"
@@ -97,7 +97,7 @@ const MenuToolbar: React.FC<Props> = ({
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex w-full sm:w-auto items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
                     {/* Category Filter Dropdown */}
                     <div className="relative">
                         <button
@@ -148,7 +148,7 @@ const MenuToolbar: React.FC<Props> = ({
                                 }`}
                         >
                             <Filter size={13} />
-                            {lang === 'ar' ? 'تصفية' : 'Filter'}
+                            <span className="hidden sm:inline">{lang === 'ar' ? 'تصفية' : 'Filter'}</span>
                         </button>
                         {showFilters && (
                             <>
@@ -176,7 +176,7 @@ const MenuToolbar: React.FC<Props> = ({
                             className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-main transition-colors"
                         >
                             <ArrowUpDown size={13} />
-                            {lang === 'ar' ? 'ترتيب' : 'Sort'}
+                            <span className="hidden sm:inline">{lang === 'ar' ? 'ترتيب' : 'Sort'}</span>
                         </button>
                         {showSort && (
                             <>
@@ -223,7 +223,7 @@ const MenuToolbar: React.FC<Props> = ({
                             }`}
                     >
                         {multiSelectMode ? <CheckSquare size={13} /> : <Square size={13} />}
-                        {multiSelectMode ? `${selectedCount}` : (lang === 'ar' ? 'تحديد' : 'Select')}
+                        <span className="hidden sm:inline">{multiSelectMode ? `${selectedCount}` : (lang === 'ar' ? 'تحديد' : 'Select')}</span>
                     </button>
 
                     {/* Branch Selector */}
@@ -242,7 +242,7 @@ const MenuToolbar: React.FC<Props> = ({
                     {onExport && (
                         <button onClick={onExport} className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-500/30 transition-colors" title={lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}>
                             <Download size={13} />
-                            {lang === 'ar' ? 'تصدير' : 'Export'}
+                            <span className="hidden sm:inline">{lang === 'ar' ? 'تصدير' : 'Export'}</span>
                         </button>
                     )}
 
@@ -250,7 +250,7 @@ const MenuToolbar: React.FC<Props> = ({
                     {onImport && (
                         <button onClick={onImport} className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/30 transition-colors" title={lang === 'ar' ? 'استيراد Excel' : 'Import Excel'}>
                             <Upload size={13} />
-                            {lang === 'ar' ? 'استيراد' : 'Import'}
+                            <span className="hidden sm:inline">{lang === 'ar' ? 'استيراد' : 'Import'}</span>
                         </button>
                     )}
 

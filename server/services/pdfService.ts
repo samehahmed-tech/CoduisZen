@@ -1,6 +1,7 @@
 ﻿// @ts-ignore
 import PDFDocument from 'pdfkit';
 import fs from 'node:fs';
+import ExcelJS from 'exceljs';
 
 const registerReadableFonts = (doc: any) => {
     const candidates = [
@@ -15,94 +16,106 @@ const registerReadableFonts = (doc: any) => {
     return { regular: 'ReportRegular', bold: 'ReportBold' };
 };
 
-// Use same type as in dayCloseService
-export const generateDayClosePDF = async (report: any): Promise<Buffer> => {
-    return new Promise((resolve, reject) => {
-        try {
-            const doc = new PDFDocument({ margin: 50, size: 'A4' });
-            const buffers: Buffer[] = [];
+const htmlEscape = (value: unknown) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const safeNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-            doc.on('data', (chunk) => buffers.push(chunk));
-            doc.on('end', () => resolve(Buffer.concat(buffers)));
-            doc.on('error', (err) => reject(err));
+export const generateDayClosePDF = async (report: any, lang: 'ar' | 'en' = 'ar'): Promise<Buffer> => {
+    const rtl = lang === 'ar';
+    const locale = rtl ? 'ar-EG' : 'en-US';
+    const sales = report.salesSummary || {};
+    const finance = report.financeSummary || {};
+    const currency = report.currency || 'EGP';
+    const money = (value: unknown) => `${safeNumber(value).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    const t = rtl ? {
+        title: 'تقرير إغلاق اليوم', subtitle: 'ملخص تشغيلي ومالي كامل', branch: 'الفرع', date: 'تاريخ التشغيل', generated: 'تاريخ التقرير', closedBy: 'أغلق بواسطة',
+        orders: 'الطلبات', gross: 'إجمالي الإيراد', discounts: 'الخصومات', tax: 'الضريبة', netSales: 'صافي المبيعات', expenses: 'المصروفات', profit: 'صافي الربح', avgOrder: 'متوسط الطلب',
+        sectionSales: 'تفاصيل المبيعات', sectionPayments: 'طرق الدفع', sectionExpenses: 'المصروفات', sectionExpenseRows: 'تفاصيل المصروفات', sectionAudit: 'المراجعة والرقابة', sectionHealth: 'سلامة التشغيل',
+        type: 'النوع', count: 'العدد', total: 'الإجمالي', method: 'طريقة الدفع', account: 'الحساب', description: 'الوصف', reference: 'المرجع', amount: 'القيمة',
+        pendingExpenses: 'مصروفات معلقة', events: 'أحداث المراجعة', voids: 'إلغاءات', refunds: 'مرتجعات', managerDiscounts: 'خصومات مدير', fiscalPending: 'فواتير معلقة', fiscalFailed: 'فواتير فاشلة',
+        financeExceptions: 'استثناءات مالية', sideEffects: 'أخطاء تشغيل', noData: 'لا توجد بيانات'
+    } : {
+        title: 'End of Day Report', subtitle: 'Complete operational and financial summary', branch: 'Branch', date: 'Business Date', generated: 'Generated', closedBy: 'Closed By',
+        orders: 'Orders', gross: 'Gross Revenue', discounts: 'Discounts', tax: 'Tax', netSales: 'Net Sales', expenses: 'Expenses', profit: 'Net Profit', avgOrder: 'Average Order',
+        sectionSales: 'Sales Details', sectionPayments: 'Payments', sectionExpenses: 'Expenses', sectionExpenseRows: 'Expense Details', sectionAudit: 'Audit & Controls', sectionHealth: 'Operational Health',
+        type: 'Type', count: 'Count', total: 'Total', method: 'Method', account: 'Account', description: 'Description', reference: 'Reference', amount: 'Amount',
+        pendingExpenses: 'Pending Expenses', events: 'Audit Events', voids: 'Voids', refunds: 'Refunds', managerDiscounts: 'Manager Discounts', fiscalPending: 'Fiscal Pending', fiscalFailed: 'Fiscal Failed',
+        financeExceptions: 'Finance Exceptions', sideEffects: 'Side Effect Errors', noData: 'No data'
+    };
+    const logoFile = 'public/logo.png';
+    const logoData = fs.existsSync(logoFile) ? `data:image/png;base64,${fs.readFileSync(logoFile).toString('base64')}` : '';
+    const table = (headers: string[], rows: any[], cells: (row: any) => unknown[]) => `
+        <table><thead><tr>${headers.map(h => `<th>${htmlEscape(h)}</th>`).join('')}</tr></thead><tbody>${
+            rows.length ? rows.map(row => `<tr>${cells(row).map(cell => `<td>${htmlEscape(cell)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${headers.length}" class="empty">${t.noData}</td></tr>`
+        }</tbody></table>`;
+    const cards = [
+        [t.orders, sales.totalOrders || 0, '#0f172a'], [t.gross, money(sales.totalRevenue), '#2563eb'], [t.discounts, money(sales.totalDiscount), '#f97316'], [t.tax, money(sales.totalTax), '#7c3aed'],
+        [t.netSales, money(sales.netSales), '#059669'], [t.expenses, money(finance.expenses), '#dc2626'], [t.profit, money(finance.netProfit), safeNumber(finance.netProfit) >= 0 ? '#059669' : '#dc2626'], [t.avgOrder, money(sales.averageOrderValue), '#0f172a'],
+    ].map(([label, value, color]) => `<div class="card"><div class="label">${htmlEscape(label)}</div><div class="value" style="color:${color}">${htmlEscape(value)}</div></div>`).join('');
+    const html = `<!doctype html><html lang="${lang}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8" /><style>
+@page { size:A4 landscape; margin:9mm; } *{box-sizing:border-box} body{margin:0;background:#eef3f8;color:#102033;direction:${rtl ? 'rtl' : 'ltr'};font-family:Tahoma,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.hero{background:linear-gradient(135deg,#0b172a,#123c69 55%,#0f766e);color:#fff;border-radius:22px;padding:18px 22px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:18px;box-shadow:0 14px 34px rgba(15,23,42,.16)}
+.logo{width:72px;height:72px;object-fit:contain;background:#fff;border-radius:18px;padding:8px}.hero h1{margin:0 0 6px;font-size:30px;font-weight:900}.hero p{margin:0;color:#dbeafe;font-size:12px;font-weight:800}.meta{margin-top:9px;font-size:11px;color:#ecfeff;font-weight:800}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}.card{background:#fff;border:1px solid #d7e3f0;border-radius:16px;padding:11px 13px;min-height:70px;box-shadow:0 8px 22px rgba(15,23,42,.06)}.label{font-size:10px;color:#64748b;font-weight:900}.value{direction:ltr;text-align:${rtl ? 'right' : 'left'};font-size:20px;line-height:1.18;margin-top:6px;font-weight:900}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.section{background:#fff;border:1px solid #d7e3f0;border-radius:16px;padding:12px;margin-bottom:12px;break-inside:avoid}.section h2{margin:0 0 9px;color:#123c69;font-size:15px;font-weight:900}
+table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:#e7f0fb;color:#123c69;font-size:9px;font-weight:900;padding:7px 6px;border:1px solid #d4e2f0;text-align:${rtl ? 'right' : 'left'}}td{font-size:9px;padding:7px 6px;border:1px solid #e2ebf5;vertical-align:middle;overflow-wrap:anywhere}tbody tr:nth-child(even) td{background:#f8fbff}.empty{text-align:center;color:#64748b;font-weight:900;padding:18px}.health{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.chip{background:#f8fafc;border:1px solid #dbe5f1;border-radius:12px;padding:10px}.chip b{display:block;font-size:17px;direction:ltr}.chip span{font-size:9px;font-weight:900;color:#64748b}
+</style></head><body>
+<section class="hero"><div><h1>${t.title}</h1><p>${t.subtitle}</p><div class="meta">${t.branch}: ${htmlEscape(report.branchName || report.branchId)} · ${t.date}: ${htmlEscape(report.date)} · ${t.generated}: ${htmlEscape(new Date().toLocaleString(locale))}${report.closedBy ? ` · ${t.closedBy}: ${htmlEscape(report.closedBy)}` : ''}</div></div>${logoData ? `<img class="logo" src="${logoData}" />` : ''}</section>
+<section class="cards">${cards}</section>
+<div class="grid">
+<section class="section"><h2>${t.sectionSales}</h2>${table([t.type, t.count, t.total], report.orderTypeBreakdown || [], row => [row.type, row.count, money(row.total)])}</section>
+<section class="section"><h2>${t.sectionPayments}</h2>${table([t.method, t.count, t.total], report.paymentBreakdown || [], row => [row.method, row.count, money(row.total)])}</section>
+</div>
+<section class="section"><h2>${t.sectionExpenses}</h2>${table([t.account, t.total], finance.topExpenses || [], row => [row.name, money(row.total)])}<div class="meta" style="color:#64748b">${t.pendingExpenses}: ${money(finance.pendingExpenses)}</div></section>
+<section class="section"><h2>${t.sectionExpenseRows}</h2>${table([t.date, t.account, t.description, t.reference, t.amount], finance.expenseRows || [], row => [row.date ? new Date(row.date).toLocaleDateString(locale) : '-', row.name, row.description || '-', row.reference || '-', money(row.total)])}</section>
+<div class="grid">
+<section class="section"><h2>${t.sectionAudit}</h2><div class="health"><div class="chip"><span>${t.events}</span><b>${report.auditSummary?.totalEvents || 0}</b></div><div class="chip"><span>${t.voids}</span><b>${report.auditSummary?.voidCount || 0}</b></div><div class="chip"><span>${t.refunds}</span><b>${report.auditSummary?.refundCount || 0}</b></div><div class="chip"><span>${t.managerDiscounts}</span><b>${report.auditSummary?.discountCount || 0}</b></div></div></section>
+<section class="section"><h2>${t.sectionHealth}</h2><div class="health"><div class="chip"><span>${t.fiscalPending}</span><b>${report.fiscalHealth?.pending || 0}</b></div><div class="chip"><span>${t.fiscalFailed}</span><b>${report.fiscalHealth?.failed || 0}</b></div><div class="chip"><span>${t.financeExceptions}</span><b>${report.financeHealth?.pendingExceptions || 0}</b></div><div class="chip"><span>${t.sideEffects}</span><b>${report.sideEffectHealth?.failedTotal || 0}</b></div></div></section>
+</div>
+</body></html>`;
+    const puppeteer = await import('puppeteer');
+    const browserExecutable = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(candidate => fs.existsSync(candidate));
+    const browser = await puppeteer.default.launch({ headless: true, executablePath: browserExecutable, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+        return Buffer.from(await page.pdf({ format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true }));
+    } finally {
+        await browser.close();
+    }
+};
 
-            // Setup Fonts & Header
-            doc.font('Helvetica-Bold').fontSize(24).fillColor('#2563eb').text('Coduis Zen', { align: 'center' });
-            doc.moveDown(0.2);
-            doc.font('Helvetica').fontSize(12).fillColor('#64748b').text('End of Day Report', { align: 'center' });
-            doc.moveDown(2);
-
-            // Report Meta Info
-            doc.font('Helvetica-Bold').fillColor('#0f172a').fontSize(14).text('General Information');
-            doc.font('Helvetica').fontSize(10).fillColor('#334155');
-            doc.moveDown(0.5);
-            doc.text(`Branch Name: ${report.branchName || report.branchId}`);
-            doc.text(`Date: ${report.date}`);
-            doc.text(`Closed At: ${report.closedAt ? new Date(report.closedAt).toLocaleString() : new Date().toLocaleString()}`);
-            if (report.closedBy) {
-                doc.text(`Closed By (User ID): ${report.closedBy}`);
-            }
-            doc.moveDown(2);
-
-            // Sales Summary
-            doc.font('Helvetica-Bold').fillColor('#0f172a').fontSize(14).text('Sales Summary');
-            doc.font('Helvetica').fontSize(10).fillColor('#334155');
-            doc.moveDown(0.5);
-            doc.text(`Total Orders: ${report.salesSummary?.totalOrders || 0}`);
-            doc.text(`Gross Revenue: ${(report.salesSummary?.totalRevenue || 0).toFixed(2)} EGP`);
-            doc.text(`Total Tax: ${(report.salesSummary?.totalTax || 0).toFixed(2)} EGP`);
-            doc.text(`Total Discount: ${(report.salesSummary?.totalDiscount || 0).toFixed(2)} EGP`);
-            doc.font('Helvetica-Bold').text(`Net Sales: ${(report.salesSummary?.netSales || 0).toFixed(2)} EGP`);
-            doc.font('Helvetica').text(`Average Order Value: ${(report.salesSummary?.averageOrderValue || 0).toFixed(2)} EGP`);
-            doc.moveDown(2);
-
-            // Payment Breakdown
-            if (report.paymentBreakdown && report.paymentBreakdown.length > 0) {
-                doc.font('Helvetica-Bold').fillColor('#0f172a').fontSize(14).text('Payment Operations');
-                doc.font('Helvetica').fontSize(10).fillColor('#334155');
-                doc.moveDown(0.5);
-                report.paymentBreakdown.forEach((p: any) => {
-                    doc.text(`- ${p.method}: ${p.count} transactions, Total: ${p.total.toFixed(2)} EGP`);
-                });
-                doc.moveDown(1.5);
-            }
-
-            // Audit & Voids
-            if (report.auditSummary) {
-                doc.font('Helvetica-Bold').fillColor('#0f172a').fontSize(14).text('Audit & Integrity Summary');
-                doc.font('Helvetica').fontSize(10).fillColor('#334155');
-                doc.moveDown(0.5);
-                doc.text(`Total Security Events: ${report.auditSummary.totalEvents || 0}`);
-                doc.text(`Voided Operations: ${report.auditSummary.voidCount || 0}`);
-                doc.text(`Refunds: ${report.auditSummary.refundCount || 0}`);
-                doc.text(`Manager Discounts: ${report.auditSummary.discountCount || 0}`);
-                doc.moveDown(1.5);
-            }
-
-            // Fiscal Sync Snapshot
-            if (report.fiscalHealth) {
-                doc.font('Helvetica-Bold').fillColor('#0f172a').fontSize(14).text('Fiscal Database Sync');
-                doc.font('Helvetica').fontSize(10).fillColor('#334155');
-                doc.moveDown(0.5);
-                doc.text(`Submitted Invoices: ${report.fiscalHealth.submitted || 0}`);
-                doc.text(`Pending Dispatch: ${report.fiscalHealth.pending || 0}`);
-                doc.text(`Failed Dispatch: ${report.fiscalHealth.failed || 0}`);
-                doc.text(`Dead Letters: ${report.fiscalHealth.deadLettersPending || 0}`);
-                doc.moveDown(1.5);
-            }
-
-            // Footer
-            const pageHeight = doc.page.height;
-            doc.fontSize(8).fillColor('#94a3b8').text(
-                'Automatically generated by Coduis Zen. Do not reply to this email.', 
-                50, pageHeight - 50, { align: 'center' }
-            );
-
-            doc.end();
-        } catch (e) {
-            reject(e);
-        }
-    });
+export const generateDayCloseXlsx = async (report: any, lang: 'ar' | 'en' = 'ar'): Promise<Buffer> => {
+    const rtl = lang === 'ar';
+    const t = rtl ? { summary: 'الملخص', sales: 'المبيعات', payments: 'الدفع', expenses: 'المصروفات', details: 'تفاصيل المصروفات', health: 'الصحة التشغيلية', metric: 'البند', value: 'القيمة' } : { summary: 'Summary', sales: 'Sales', payments: 'Payments', expenses: 'Expenses', details: 'Expense Details', health: 'Health', metric: 'Metric', value: 'Value' };
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Coduis Zen';
+    const currency = report.currency || 'EGP';
+    const money = (value: unknown) => safeNumber(value);
+    const addSheet = (name: string, rows: any[][]) => {
+        const ws = workbook.addWorksheet(name, { views: [{ rightToLeft: rtl }] });
+        ws.addRows(rows);
+        ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF123C69' } };
+        ws.columns.forEach(col => { col.width = 22; });
+        return ws;
+    };
+    addSheet(t.summary, [
+        [t.metric, t.value],
+        [rtl ? 'الفرع' : 'Branch', report.branchName || report.branchId],
+        [rtl ? 'تاريخ التشغيل' : 'Business Date', report.date],
+        [rtl ? 'عدد الطلبات' : 'Orders', report.salesSummary?.totalOrders || 0],
+        [rtl ? 'إجمالي الإيراد' : 'Gross Revenue', money(report.salesSummary?.totalRevenue)],
+        [rtl ? 'صافي المبيعات' : 'Net Sales', money(report.salesSummary?.netSales)],
+        [rtl ? 'المصروفات' : 'Expenses', money(report.financeSummary?.expenses)],
+        [rtl ? 'صافي الربح' : 'Net Profit', money(report.financeSummary?.netProfit)],
+        [rtl ? 'العملة' : 'Currency', currency],
+    ]);
+    addSheet(t.sales, [[rtl ? 'النوع' : 'Type', rtl ? 'العدد' : 'Count', rtl ? 'الإجمالي' : 'Total'], ...(report.orderTypeBreakdown || []).map((r: any) => [r.type, r.count, money(r.total)])]);
+    addSheet(t.payments, [[rtl ? 'طريقة الدفع' : 'Method', rtl ? 'العدد' : 'Count', rtl ? 'الإجمالي' : 'Total'], ...(report.paymentBreakdown || []).map((r: any) => [r.method, r.count, money(r.total)])]);
+    addSheet(t.expenses, [[rtl ? 'الحساب' : 'Account', rtl ? 'الإجمالي' : 'Total'], ...(report.financeSummary?.topExpenses || []).map((r: any) => [r.name, money(r.total)])]);
+    addSheet(t.details, [[rtl ? 'التاريخ' : 'Date', rtl ? 'الحساب' : 'Account', rtl ? 'الوصف' : 'Description', rtl ? 'المرجع' : 'Reference', rtl ? 'القيمة' : 'Amount'], ...(report.financeSummary?.expenseRows || []).map((r: any) => [r.date ? new Date(r.date).toLocaleDateString(rtl ? 'ar-EG' : 'en-US') : '-', r.name, r.description || '-', r.reference || '-', money(r.total)])]);
+    addSheet(t.health, [[t.metric, t.value], ['Fiscal Pending', report.fiscalHealth?.pending || 0], ['Fiscal Failed', report.fiscalHealth?.failed || 0], ['Finance Exceptions', report.financeHealth?.pendingExceptions || 0], ['Side Effect Errors', report.sideEffectHealth?.failedTotal || 0]]);
+    return Buffer.from(await workbook.xlsx.writeBuffer());
 };
 
 export const generatePayslipPDF = async (payslip: any): Promise<Buffer> => {

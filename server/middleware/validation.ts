@@ -225,7 +225,7 @@ const menuItemBaseSchema = z.object({
     price: z.number().min(0),
     cost: z.number().min(0).optional(),
     image: z.string().max(MAX_IMAGE_REFERENCE_LENGTH, 'Image reference is too large').optional().nullable(),
-    status: z.enum(['draft', 'pending_approval', 'approved', 'published']).optional(),
+    status: z.enum(['draft', 'pending_approval', 'approved', 'published', 'archived']).optional(),
     isAvailable: z.boolean().optional(),
     is_available: z.boolean().optional(),
     availableFrom: z.string().max(20).optional().nullable(),
@@ -245,15 +245,18 @@ const menuItemBaseSchema = z.object({
     sku: z.string().max(200).optional().nullable(),
     isTaxExempt: z.boolean().optional(),
     recipe: menuRecipeSchema,
-}).passthrough();
+}).strip();
 
-const normalizeMenuItemPayload = (value: z.infer<typeof menuItemBaseSchema>) => ({
-    ...value,
-    categoryId: value.categoryId ?? value.category_id ?? undefined,
-    nameAr: value.nameAr ?? value.name_ar ?? undefined,
-    descriptionAr: value.descriptionAr ?? value.description_ar ?? undefined,
-    isAvailable: value.isAvailable ?? value.is_available ?? undefined,
-});
+const normalizeMenuItemPayload = (value: z.infer<typeof menuItemBaseSchema>) => {
+    const { category_id, name_ar, description_ar, is_available, ...normalized } = value;
+    return {
+        ...normalized,
+        categoryId: value.categoryId ?? category_id ?? undefined,
+        nameAr: value.nameAr ?? name_ar ?? undefined,
+        descriptionAr: value.descriptionAr ?? description_ar ?? undefined,
+        isAvailable: value.isAvailable ?? is_available ?? undefined,
+    };
+};
 
 export const createMenuItemSchema = menuItemBaseSchema.transform(normalizeMenuItemPayload);
 

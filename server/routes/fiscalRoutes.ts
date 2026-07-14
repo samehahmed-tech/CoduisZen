@@ -9,8 +9,10 @@ import {
     retryDeadLetter,
     dismissDeadLetter,
 } from '../controllers/fiscalController';
+import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
+router.use(enforceBranch);
 
 router.post('/submit', submitReceipt);
 router.get('/logs', getFiscalLogs);

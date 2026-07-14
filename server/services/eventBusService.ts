@@ -13,14 +13,14 @@ export const eventBusService = {
         branchId?: string;
         payload?: Record<string, any>;
     }) {
-        const [created] = await db.insert(domainEvents).values({
+        const [created] = await db.insert(domainEvents).output().values({
             id: makeId('EVT'),
             type: input.type,
             entityType: input.entityType,
             entityId: input.entityId,
             branchId: input.branchId,
             payload: input.payload || {},
-        }).returning();
+        });
         return created;
     },
 
@@ -33,14 +33,14 @@ export const eventBusService = {
                 filters?.type ? eq(domainEvents.type, filters.type) : undefined,
             ))
             .orderBy(desc(domainEvents.createdAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
     },
 
     async markProcessed(id: string) {
         const [updated] = await db.update(domainEvents)
             .set({ status: 'PROCESSED', processedAt: new Date() })
-            .where(eq(domainEvents.id, id))
-            .returning();
+            .output()
+            .where(eq(domainEvents.id, id));
         return updated;
     },
 };

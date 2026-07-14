@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import * as reportController from '../controllers/reportController';
-import { reportRateLimit } from '../middleware/security';
 import { scopeBranchQuery } from '../middleware/branchIsolation';
 
 const router = Router();
@@ -41,7 +40,6 @@ const restrictHrReportScope = (req: Request, res: Response, next: NextFunction) 
     });
 };
 
-router.use(reportRateLimit);
 router.use(scopeBranchQuery);
 router.use(restrictHrReportScope);
 

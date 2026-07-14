@@ -11,13 +11,13 @@ export const getSeasonalityReport = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            month: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM')`,
+            month: sql<string>`format(${orders.createdAt}, 'yyyy-MM')`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`)
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM')`)
             .limit(24);
 
         res.json(rows.map(r => ({ month: r.month, orderCount: Number(r.orderCount), revenue: Number(Number(r.revenue).toFixed(2)), avgTicket: Number(Number(r.avgTicket).toFixed(2)) })));
@@ -36,13 +36,13 @@ export const getOnlineVsOfflineTrend = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             source: orders.source,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`, orders.source)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`, orders.source)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         const online = ['online', 'app', 'website'];
         const dailyMap = new Map<string, { online: number; offline: number; onlineOrders: number; offlineOrders: number }>();
@@ -73,15 +73,15 @@ export const getFoodCostTrend = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             revenue: sql<number>`coalesce(sum(${orderItems.price} * ${orderItems.quantity}), 0)`,
             cost: sql<number>`coalesce(sum(coalesce(${menuItems.cost}, 0) * ${orderItems.quantity}), 0)`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
             .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
             .where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json(rows.map(r => {
             const rev = Number(r.revenue); const cost = Number(r.cost);
@@ -164,12 +164,12 @@ export const getCashFlowForecast = async (req: Request, res: Response) => {
 
         // Last 12 weeks of daily revenue
         const rows = await db.select({
-            week: sql<string>`to_char(${orders.createdAt}, 'IYYY-IW')`,
+            week: sql<string>`format(${orders.createdAt}, 'yyyy-IW')`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             orderCount: sql<number>`count(*)`,
-        }).from(orders).where(and(...conditions, sql`${orders.createdAt} > now() - interval '12 weeks'`))
-            .groupBy(sql`to_char(${orders.createdAt}, 'IYYY-IW')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'IYYY-IW')`);
+        }).from(orders).where(and(...conditions, sql`${orders.createdAt} > dateadd(week, -12, getdate())`))
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-IW')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-IW')`);
 
         const weeklyRevenues = rows.map(r => Number(r.revenue));
         const avgWeekly = weeklyRevenues.length > 0 ? weeklyRevenues.reduce((s, v) => s + v, 0) / weeklyRevenues.length : 0;

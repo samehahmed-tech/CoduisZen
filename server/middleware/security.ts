@@ -4,7 +4,6 @@
  */
 
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 
 // =============================================================================
@@ -20,7 +19,7 @@ export const helmetMiddleware = helmet({
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
             mediaSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "wss:", "ws:"],
+            connectSrc: ["'self'", "wss:", "ws:", "http://localhost:3002", "http://127.0.0.1:3002"],
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
@@ -32,48 +31,6 @@ export const helmetMiddleware = helmet({
     originAgentCluster: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     hsts: false,
-});
-
-// =============================================================================
-// Rate Limiting
-// =============================================================================
-
-const isDev = process.env.NODE_ENV !== 'production';
-
-/** General API rate limit: 300 requests per minute per IP (disabled in dev) */
-export const generalRateLimit = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: isDev ? 10000 : 300,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        code: 'RATE_LIMIT_EXCEEDED',
-        message: 'Too many requests. Please slow down.',
-    },
-});
-
-/** Auth endpoints: 20 requests per 15 minutes per IP (disabled in dev) */
-export const authRateLimit = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isDev ? 10000 : 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        code: 'TOO_MANY_LOGIN_ATTEMPTS',
-        message: 'Too many login attempts. Please try again later.',
-    },
-});
-
-/** Report/export endpoints: 10 requests per minute */
-export const reportRateLimit = rateLimit({
-    windowMs: 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        code: 'RATE_LIMIT_EXCEEDED',
-        message: 'Too many report requests. Please wait.',
-    },
 });
 
 // =============================================================================
@@ -137,7 +94,11 @@ const CSRF_BYPASS_PREFIXES = [
     '/api/auth/mfa',
     '/api/auth/pin-login',
     '/api/auth/refresh',
+    // Initial bootstrap is intentionally unauthenticated and the controller
+    // permanently closes it as soon as the first user exists.
+    '/api/setup/bootstrap',
     '/api/print-gateway/gateway',
+    '/api/print-gateway/bridge',
     '/api/attendance-bridge',
     '/api/whatsapp',
     '/api/public-screens',

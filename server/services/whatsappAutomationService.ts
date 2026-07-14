@@ -30,7 +30,7 @@ const clean = (value: unknown) => String(value || '').trim();
 
 const loadAutomationConfig = async (): Promise<WhatsAppAutomationConfig> => {
     try {
-        const [row] = await db.select().from(settings).where(eq(settings.key, WHATSAPP_AUTOMATION_CONFIG_KEY)).limit(1);
+        const [row] = await db.select().top(1).from(settings).where(eq(settings.key, WHATSAPP_AUTOMATION_CONFIG_KEY));
         return (row?.value && typeof row.value === 'object' ? row.value : {}) as WhatsAppAutomationConfig;
     } catch {
         return {};
@@ -151,7 +151,7 @@ export const whatsappAutomationService = {
                 .from(orders)
                 .where(inArray(orders.customerPhone, phoneCandidates))
                 .orderBy(desc(orders.createdAt))
-                .limit(1);
+                .offset(0).fetch(1);
             if (latestOrder) {
                 await sendWhatsAppText({
                     to: from,

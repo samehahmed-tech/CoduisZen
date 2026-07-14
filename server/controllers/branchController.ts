@@ -3,6 +3,7 @@ import { db } from '../db';
 import { branches } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
+import { isForeignKeyDeleteError, writeForeignKeyDeleteConflict } from '../utils/dbErrors';
 
 export const getAllBranches = async (req: Request, res: Response) => {
     try {
@@ -28,7 +29,7 @@ export const getAllBranches = async (req: Request, res: Response) => {
 export const createBranch = async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const newBranch = await db.insert(branches).values({
+        const newBranch = await db.insert(branches).output().values({
             id: body.id,
             name: body.name,
             nameAr: body.name_ar || body.nameAr,
@@ -45,7 +46,7 @@ export const createBranch = async (req: Request, res: Response) => {
             serviceCharge: body.service_charge ?? body.serviceCharge,
             createdAt: new Date(),
             updatedAt: new Date(),
-        }).returning();
+        });
         res.status(201).json(newBranch[0]);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -74,8 +75,8 @@ export const updateBranch = async (req: Request, res: Response) => {
                 serviceCharge: body.service_charge ?? body.serviceCharge,
                 updatedAt: new Date()
             })
-            .where(eq(branches.id, id))
-            .returning();
+            .output()
+            .where(eq(branches.id, id));
         res.json(updatedBranch[0]);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -97,8 +98,8 @@ export const deleteBranch = async (req: Request, res: Response) => {
             res.json({ message: 'Branch deactivated successfully' });
         }
     } catch (error: any) {
-        if (error?.code === '23503' || error?.message?.includes('foreign key constraint') || error?.message?.includes('violates foreign key constraint')) {
-            return res.status(409).json({ error: 'Cannot physically delete this branch because it contains active linked data (users, orders, printers, etc.). Please click [Archive] instead.' });
+        if (isForeignKeyDeleteError(error)) {
+            return writeForeignKeyDeleteConflict(res, 'branch', ['shifts', 'orders', 'printers', 'warehouses', 'print_jobs']);
         }
         res.status(500).json({ error: error.message });
     }

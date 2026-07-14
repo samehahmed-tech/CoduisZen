@@ -1,14 +1,13 @@
-import { apiRequest } from './core';
+import { apiRequest, apiRequestBlob } from './core';
 
 export const dayCloseApi = {
     getReport: (branchId: string, date: string) => apiRequest<any>(`/day-close/${branchId}/${date}`),
+    getPdf: (branchId: string, date: string, lang: 'ar' | 'en' = 'ar') => apiRequestBlob(`/day-close/${branchId}/${date}/pdf?lang=${lang}`),
+    getXlsx: (branchId: string, date: string, lang: 'ar' | 'en' = 'ar') => apiRequestBlob(`/day-close/${branchId}/${date}/xlsx?lang=${lang}`),
     getHistory: (branchId: string, limit = 30) => apiRequest<any[]>(`/day-close/${branchId}/history?limit=${limit}`),
     close: (branchId: string, date: string, payload?: {
         notes?: string;
-        enforceFiscalClean?: boolean;
-        enforceFinanceClean?: boolean;
         enforceShiftsClosed?: boolean;
-        enforceAllPaid?: boolean;
         overrideReason?: string;
         emailConfig?: any;
     }) =>

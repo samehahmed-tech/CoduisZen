@@ -10,8 +10,11 @@ export const kdsApi = {
         return apiRequest<any>(`/kds${suffix}`);
     },
 
-    dispatchOrder: (orderId: string, branchId: string) =>
-        apiRequest<any>('/kds/dispatch', { method: 'POST', body: JSON.stringify({ orderId, branchId }) }),
+    dispatchOrder: (orderId: string, branchId: string, clientHandlesPrinting = false) =>
+        apiRequest<any>('/kds/dispatch', {
+            method: 'POST',
+            body: JSON.stringify({ orderId, branchId, clientHandlesPrinting }),
+        }),
     
     bumpTicket: (id: string) => 
         apiRequest<any>(`/kds/${id}/bump`, { method: 'POST' }),

@@ -19,7 +19,7 @@ export const parseLocalDateRange = (startDate: string, endDate: string) => {
 };
 
 export const orderBusinessDayExpression = () =>
-    sql<string>`coalesce(${orders.businessDate}, to_char(${orders.createdAt}, 'YYYY-MM-DD'))`;
+    sql<string>`coalesce(${orders.businessDate}, FORMAT(${orders.createdAt}, 'yyyy-MM-dd'))`;
 
 export const orderBusinessDateFilter = (startDate: string, endDate: string, start: Date, end: Date) =>
     sql`(

@@ -22,17 +22,16 @@ import {
     adminRevokeSession,
 } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-import { authRateLimit } from '../middleware/security';
 import { validate } from '../middleware/validate';
 import { loginSchema, pinLoginSchema, mfaVerifySchema, setupPinSchema } from '../middleware/validation';
 
 const router = Router();
 
 // Standard login (with Zod validation)
-router.post('/login', authRateLimit, validate(loginSchema), login);
-router.post('/pin-login', authRateLimit, validate(pinLoginSchema), loginWithPin);
-router.post('/mfa/verify', authRateLimit, validate(mfaVerifySchema), verifyMfaChallenge);
-router.post('/refresh', authRateLimit, refreshAccessToken);
+router.post('/login', validate(loginSchema), login);
+router.post('/pin-login', validate(pinLoginSchema), loginWithPin);
+router.post('/mfa/verify', validate(mfaVerifySchema), verifyMfaChallenge);
+router.post('/refresh', refreshAccessToken);
 
 // Protected routes
 router.get('/me', authenticateToken, me);

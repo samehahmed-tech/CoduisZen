@@ -7,33 +7,35 @@ import { getStringParam } from '../utils/request';
 
 const ensureProductionTables = async () => {
     await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS production_orders (
-            id text PRIMARY KEY,
-            branch_id text,
-            target_item_id text NOT NULL,
-            recipe_id text,
-            batch_number text NOT NULL,
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'production_orders')
+        CREATE TABLE production_orders (
+            id nvarchar(255) PRIMARY KEY,
+            branch_id nvarchar(max),
+            target_item_id nvarchar(max) NOT NULL,
+            recipe_id nvarchar(max),
+            batch_number nvarchar(max) NOT NULL,
             batch_size real DEFAULT 1 NOT NULL,
             expected_yield real NOT NULL,
             actual_yield real,
-            status text DEFAULT 'PLANNED' NOT NULL,
-            started_at timestamp,
-            completed_at timestamp,
-            warehouse_id text NOT NULL,
-            notes text,
-            created_by text,
-            created_at timestamp DEFAULT now(),
-            updated_at timestamp DEFAULT now()
+            status nvarchar(max) DEFAULT 'PLANNED' NOT NULL,
+            started_at datetime2,
+            completed_at datetime2,
+            warehouse_id nvarchar(max) NOT NULL,
+            notes nvarchar(max),
+            created_by nvarchar(max),
+            created_at datetime2 DEFAULT GETDATE(),
+            updated_at datetime2 DEFAULT GETDATE()
         )
     `);
     await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS production_order_items (
-            id serial PRIMARY KEY,
-            production_order_id text NOT NULL,
-            inventory_item_id text NOT NULL,
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'production_order_items')
+        CREATE TABLE production_order_items (
+            id nvarchar(255) PRIMARY KEY,
+            production_order_id nvarchar(max) NOT NULL,
+            inventory_item_id nvarchar(max) NOT NULL,
             required_qty real NOT NULL,
             actual_qty real,
-            unit text NOT NULL
+            unit nvarchar(max) NOT NULL
         )
     `);
 };

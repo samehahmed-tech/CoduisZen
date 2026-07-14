@@ -12,13 +12,23 @@ describe('order side effect visibility', () => {
         db = dbModule.db;
 
         await PostingRuleEngine.invalidateCache();
-        await db.execute(sql`TRUNCATE TABLE finance_exceptions, journal_lines, journal_entries, posting_rules, payment_method_accounts, tax_accounts, chart_of_accounts CASCADE;`);
+        for (const table of [
+            'finance_exceptions',
+            'journal_lines',
+            'journal_entries',
+            'posting_rules',
+            'payment_method_accounts',
+            'tax_accounts',
+        ]) {
+            await db.execute(sql.raw(`DELETE FROM ${table}`));
+        }
+        await db.execute(sql`DELETE FROM orders WHERE id = 'test-side-effect-order'`);
 
         await db.insert(branches).values({
             id: 'test-side-effect-branch',
             name: 'Side Effect Branch',
             isActive: true,
-        });
+        }).onConflictDoNothing();
     });
 
     it('records a finance exception when POS posting rules are not configured', async () => {

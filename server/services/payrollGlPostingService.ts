@@ -24,7 +24,7 @@ const sumLines = (lines: Array<typeof payrollRunLines.$inferSelect>): PayrollTot
 
 export const payrollGlPostingService = {
     async postPayrollRun(runId: string, branchId: string, createdBy?: string) {
-        const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)).limit(1);
+        const [run] = await db.select().top(1).from(payrollRuns).where(eq(payrollRuns.id, runId));
         if (!run) throw new Error('PAYROLL_RUN_NOT_FOUND');
 
         const lines = await db.select().from(payrollRunLines).where(eq(payrollRunLines.runId, runId));

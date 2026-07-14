@@ -64,14 +64,7 @@ export const alertService = {
 
         setInterval(async () => {
             try {
-                // 1. Database Pool Stats
-                const { dbMaintenanceService } = await import('./dbMaintenanceService');
-                const poolStats = dbMaintenanceService.getPoolStats();
-                if (poolStats.waitingClients > 10) {
-                    await this.dispatch('FATAL', 'DB_POOL', 'Database connection pool is saturated and clients are waiting.', poolStats);
-                }
-
-                // 2. Redis / Socket Realtime Check
+                // 1. Redis / Socket Realtime Check
                 const { getSocketRuntimeStatus } = await import('../socket');
                 const socketStatus = getSocketRuntimeStatus();
                 if (socketStatus.adapter === 'redis' && !socketStatus.redisConnected) {

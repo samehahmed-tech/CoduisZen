@@ -92,7 +92,7 @@ const itemMatchesStation = (item: OrderItem, category: MenuCategory | undefined,
     return text.includes('crepe') || text.includes('كريب');
 };
 
-const resolveItemPrinterIds = (
+export const resolveKitchenPrinterIdsForItem = (
     item: OrderItem,
     categoryMap: Map<string, MenuCategory>,
     branchPrinters: Printer[],
@@ -100,7 +100,11 @@ const resolveItemPrinterIds = (
     maxPrinters: number
 ): string[] => {
     const itemCategory = categoryMap.get(item.categoryId || '');
-    const assignedPrinterIds = (itemCategory as any)?.kitchenPrinterIds || [];
+    const itemPrinterIds = Array.isArray(item.printerIds) ? item.printerIds : [];
+    const categoryPrinterIds = Array.isArray(itemCategory?.printerIds)
+        ? itemCategory.printerIds
+        : (Array.isArray((itemCategory as any)?.kitchenPrinterIds) ? (itemCategory as any).kitchenPrinterIds : []);
+    const assignedPrinterIds = itemPrinterIds.length > 0 ? itemPrinterIds : categoryPrinterIds;
 
     if (assignedPrinterIds.length === 0) {
         const smartRolePrinters = onlineBranchPrinters.filter((printer) => {
@@ -123,15 +127,15 @@ const resolveItemPrinterIds = (
             validIds.push(pid);
         }
     }
-    return validIds.slice(0, maxPrinters);
+    return Array.from(new Set(validIds));
 };
 
 const resolveFallbackKitchenPrinter = (
-    branchPrinters: Printer[],
+    _branchPrinters: Printer[],
     onlineBranchPrinters: Printer[]
 ): Printer | undefined => {
     const kitchenPrinters = onlineBranchPrinters.filter((p) => getPrinterRoles(p).includes('KITCHEN'));
-    return kitchenPrinters[0] || onlineBranchPrinters[0] || branchPrinters[0];
+    return kitchenPrinters[0];
 };
 
 const resolvePrimaryCashierPrinter = (
@@ -167,8 +171,11 @@ const resolvePrimaryCashierPrinter = (
         const roles = getPrinterRoles(p);
         return roles.includes('CASHIER') || roles.includes('RECEIPT');
     });
-    return cashierPrinter || online[0] || branchPrinters[0];
+    return cashierPrinter;
 };
+
+export const hasCashierPrinterConfigured = (printers: Printer[], branchId: string, settings: any) =>
+    Boolean(resolvePrimaryCashierPrinter(printers || [], branchId, settings));
 
 const resolvePrinterPaperWidth = (printer?: Printer, linkedTemplate?: { paperWidth?: '58mm' | '80mm' } | null): '58mm' | '80mm' => {
     const printerWidth = Number((printer as any)?.paperWidth || 0);
@@ -207,6 +214,7 @@ export const printKitchenTicketsByRouting = async ({
     const onlineBranchPrinters = resolveOnlineBranchPrinters(printers || [], branchId);
 
     const grouped = new Map<string, { items: OrderItem[]; isFallback: boolean }>();
+    const failedPrinterIds: string[] = [];
 
     const packagingPrinters = onlineBranchPrinters.filter((printer) => getPrinterRoles(printer).includes('PACKAGING'));
     for (const printer of packagingPrinters) {
@@ -217,13 +225,17 @@ export const printKitchenTicketsByRouting = async ({
     }
 
     for (const item of order.items || []) {
-        const resolvedPrinterIds = resolveItemPrinterIds(item, categoryMap, branchPrinters, onlineBranchPrinters, maxPrinters);
+        const resolvedPrinterIds = resolveKitchenPrinterIdsForItem(item, categoryMap, branchPrinters, onlineBranchPrinters, maxPrinters);
         const targets = resolvedPrinterIds.length > 0 ? resolvedPrinterIds : ['_fallback'];
 
         for (const printerId of targets) {
             const targetPrinter = printerId === '_fallback'
                 ? resolveFallbackKitchenPrinter(branchPrinters, onlineBranchPrinters)
                 : branchPrinters.find((p) => p.id === printerId) || resolveFallbackKitchenPrinter(branchPrinters, onlineBranchPrinters);
+
+            // Never send a kitchen ticket to an arbitrary/default printer.
+            // With no kitchen route, the cashier receipt pipeline remains independent.
+            if (!targetPrinter) continue;
 
             const groupedPrinterId = targetPrinter?.id || '_fallback';
             if (targetPrinter && getPrinterRoles(targetPrinter).includes('PACKAGING') && grouped.has(groupedPrinterId)) {
@@ -245,7 +257,6 @@ export const printKitchenTicketsByRouting = async ({
         const ticketTitle = buildKitchenTitle(lang, t, targetPrinter, payload.isFallback);
         const ticketOrder = { ...order, items: payload.items };
 
-        let networkPrintSuccess = false;
         try {
             const linkedTemplate = targetPrinter ? findTemplateForPrinter(targetPrinter.id, 'kitchen') : null;
             const htmlTicket = linkedTemplate
@@ -276,13 +287,14 @@ export const printKitchenTicketsByRouting = async ({
                 content: imagePayload.content,
                 contentType: imagePayload.contentType,
             });
-            networkPrintSuccess = !!printOk;
-        } catch (err) {}
-
-        if (!networkPrintSuccess) {
-            console.warn('[print] kitchen ticket was not queued', { orderId: order.id });
+            if (!printOk) failedPrinterIds.push(printerId);
+        } catch (error) {
+            console.error('[print] kitchen ticket failed', { orderId: order.id, printerId, error });
+            failedPrinterIds.push(printerId);
         }
     }
+
+    if (failedPrinterIds.length > 0) throw new Error('KITCHEN_PRINT_QUEUE_FAILED');
 };
 
 export const printOrderReceipt = async ({
@@ -309,48 +321,37 @@ export const printOrderReceipt = async ({
     const linkedTemplate = primaryCashierPrinter ? findTemplateForPrinter(primaryCashierPrinter.id, 'receipt') : null;
     const activeReceiptTemplate = linkedTemplate || findDefaultTemplate('receipt');
     const paperWidth = resolvePrinterPaperWidth(primaryCashierPrinter, activeReceiptTemplate);
-    const hasDedicatedReceiptPrinter = !!primaryCashierPrinter;
+    if (!primaryCashierPrinter) throw new Error('NO_CASHIER_PRINTER_CONFIGURED');
 
-    let networkPrintSuccess = false;
+    const htmlReceipt = activeReceiptTemplate
+        ? generateHtmlFromTemplate({
+            template: activeReceiptTemplate,
+            order,
+            settings: effectiveSettings,
+            currencySymbol,
+            lang,
+            branch,
+            title: receiptTitle,
+        })
+        : generateReceiptHTML({
+            order,
+            settings: effectiveSettings,
+            currencySymbol,
+            lang,
+            t,
+            branch,
+            title: receiptTitle,
+        });
 
-    if (hasDedicatedReceiptPrinter) {
-        try {
-            const htmlReceipt = activeReceiptTemplate
-                ? generateHtmlFromTemplate({
-                    template: activeReceiptTemplate,
-                    order,
-                    settings: effectiveSettings,
-                    currencySymbol,
-                    lang,
-                    branch,
-                    title: receiptTitle,
-                })
-                : generateReceiptHTML({
-                    order,
-                    settings: effectiveSettings,
-                    currencySymbol,
-                    lang,
-                    t,
-                    branch,
-                    title: receiptTitle,
-                });
-
-            const imagePayload = await createImagePrintPayload(htmlReceipt, paperWidth);
-
-            const copies = normalizeCopyCount(settings?.cashierReceiptCopies);
-            const results = await Promise.all(Array.from({ length: copies }, () => printService.print({
-                type: 'RECEIPT',
-                ...resolvePrinterDetails(primaryCashierPrinter),
-                branchId: order.branchId,
-                content: imagePayload.content,
-                contentType: 'image',
-            })));
-            networkPrintSuccess = results.every(Boolean);
-        } catch (imgErr) {}
-    }
-
-    if (!hasDedicatedReceiptPrinter || !networkPrintSuccess) {
-        console.warn('[print] receipt was not queued', { orderId: order.id });
-    }
+    const imagePayload = await createImagePrintPayload(htmlReceipt, paperWidth);
+    const copies = normalizeCopyCount(settings?.cashierReceiptCopies);
+    const queued = await Promise.all(Array.from({ length: copies }, () => printService.print({
+        type: 'RECEIPT',
+        ...resolvePrinterDetails(primaryCashierPrinter),
+        branchId: order.branchId,
+        content: imagePayload.content,
+        contentType: 'image',
+    })));
+    if (!queued.every(Boolean)) throw new Error('RECEIPT_PRINT_QUEUE_FAILED');
 };
 

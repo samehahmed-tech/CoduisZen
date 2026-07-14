@@ -5,25 +5,26 @@ import { randomUUID } from 'crypto';
 
 const ensureEmployeeDocumentsTable = async () => {
     await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS employee_documents (
-            id text PRIMARY KEY,
-            employee_id text NOT NULL,
-            branch_id text NOT NULL,
-            document_type text NOT NULL,
-            title text NOT NULL,
-            document_number text,
-            issue_date timestamp,
-            expiry_date timestamp,
-            file_url text,
-            status text DEFAULT 'ACTIVE' NOT NULL,
-            notes text,
-            metadata jsonb DEFAULT '{}'::jsonb,
-            created_at timestamp DEFAULT now(),
-            updated_at timestamp DEFAULT now()
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='employee_documents' AND xtype='U')
+        CREATE TABLE employee_documents (
+            id nvarchar(100) PRIMARY KEY,
+            employee_id nvarchar(100) NOT NULL,
+            branch_id nvarchar(50) NOT NULL,
+            document_type nvarchar(50) NOT NULL,
+            title nvarchar(255) NOT NULL,
+            document_number nvarchar(100),
+            issue_date datetime2,
+            expiry_date datetime2,
+            file_url nvarchar(1000),
+            status nvarchar(20) DEFAULT 'ACTIVE' NOT NULL,
+            notes nvarchar(max),
+            metadata nvarchar(max) DEFAULT '{}',
+            created_at datetime2 DEFAULT getdate(),
+            updated_at datetime2 DEFAULT getdate()
         )
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS employee_documents_employee_idx ON employee_documents (employee_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS employee_documents_branch_expiry_idx ON employee_documents (branch_id, expiry_date, status)`);
+    await db.execute(sql`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'employee_documents_employee_idx' AND object_id = OBJECT_ID(N'employee_documents')) CREATE INDEX employee_documents_employee_idx ON employee_documents (employee_id)`);
+    await db.execute(sql`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'employee_documents_branch_expiry_idx' AND object_id = OBJECT_ID(N'employee_documents')) CREATE INDEX employee_documents_branch_expiry_idx ON employee_documents (branch_id, expiry_date, status)`);
 };
 
 // =============================================================================
@@ -247,7 +248,7 @@ export const hrExtendedService = {
         if (!input.employeeId || !input.documentType || !input.title) {
             throw new Error('EMPLOYEE_DOCUMENT_TYPE_AND_TITLE_REQUIRED');
         }
-        const [employee] = await db.select().from(employees).where(eq(employees.id, input.employeeId)).limit(1);
+        const [employee] = await db.select().top(1).from(employees).where(eq(employees.id, input.employeeId));
         if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
 
         const payload = {
@@ -268,15 +269,15 @@ export const hrExtendedService = {
         if (input.id) {
             const [updated] = await db.update(employeeDocuments)
                 .set(payload)
-                .where(eq(employeeDocuments.id, input.id))
-                .returning();
+                .output()
+                .where(eq(employeeDocuments.id, input.id));
             return updated;
         }
 
-        const [created] = await db.insert(employeeDocuments).values({
+        const [created] = await db.insert(employeeDocuments).output().values({
             id: `EDOC-${randomUUID().slice(0, 8)}`,
             ...payload,
-        }).returning();
+        });
         return created;
     },
 
@@ -284,8 +285,8 @@ export const hrExtendedService = {
         await ensureEmployeeDocumentsTable();
         const [updated] = await db.update(employeeDocuments)
             .set({ status: 'ARCHIVED', updatedAt: new Date() })
-            .where(eq(employeeDocuments.id, id))
-            .returning();
+            .output()
+            .where(eq(employeeDocuments.id, id));
         if (!updated) throw new Error('EMPLOYEE_DOCUMENT_NOT_FOUND');
         return updated;
     },
@@ -346,13 +347,13 @@ export const hrExtendedService = {
                     isActive: policy.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(attendancePolicies.id, policy.id))
-                .returning();
+                .output()
+                .where(eq(attendancePolicies.id, policy.id));
             return updated;
         }
 
         const id = `ATP-${randomUUID().slice(0,8)}`;
-        const [created] = await db.insert(attendancePolicies).values({
+        const [created] = await db.insert(attendancePolicies).output().values({
             id,
             branchId: policy.branchId,
             name: policy.name,
@@ -371,7 +372,7 @@ export const hrExtendedService = {
             autoResolveMissingOut: policy.autoResolveMissingOut ?? false,
             isDefault: policy.isDefault ?? false,
             isActive: policy.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -417,13 +418,13 @@ export const hrExtendedService = {
                     isActive: template.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(shiftTemplates.id, template.id))
-                .returning();
+                .output()
+                .where(eq(shiftTemplates.id, template.id));
             return updated;
         }
 
         const id = `SFT-${randomUUID().slice(0,8)}`;
-        const [created] = await db.insert(shiftTemplates).values({
+        const [created] = await db.insert(shiftTemplates).output().values({
             id,
             branchId: template.branchId,
             name: template.name,
@@ -438,7 +439,7 @@ export const hrExtendedService = {
             workDays: template.workDays || ['sun', 'mon', 'tue', 'wed', 'thu'],
             isOvernight: template.isOvernight ?? false,
             isActive: template.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -459,14 +460,14 @@ export const hrExtendedService = {
         effectiveTo?: string;
         isPrimary?: boolean;
     }) {
-        const [created] = await db.insert(employeeShiftAssignments).values({
+        const [created] = await db.insert(employeeShiftAssignments).output().values({
             employeeId: input.employeeId,
             branchId: input.branchId,
             shiftTemplateId: input.shiftTemplateId,
             effectiveFrom: new Date(input.effectiveFrom),
             effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : undefined,
             isPrimary: input.isPrimary !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -518,13 +519,13 @@ export const hrExtendedService = {
                     isActive: profile.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(payrollProfiles.id, profile.id))
-                .returning();
+                .output()
+                .where(eq(payrollProfiles.id, profile.id));
             return updated;
         }
 
         const id = `PPR-${randomUUID().slice(0,8)}`;
-        const [created] = await db.insert(payrollProfiles).values({
+        const [created] = await db.insert(payrollProfiles).output().values({
             id,
             branchId: profile.branchId,
             name: profile.name,
@@ -539,7 +540,7 @@ export const hrExtendedService = {
             autoPostToGl: profile.autoPostToGl ?? true,
             isDefault: profile.isDefault ?? false,
             isActive: profile.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -550,13 +551,13 @@ export const hrExtendedService = {
         effectiveTo?: string;
         isPrimary?: boolean;
     }) {
-        const [created] = await db.insert(employeePayrollAssignments).values({
+        const [created] = await db.insert(employeePayrollAssignments).output().values({
             employeeId: input.employeeId,
             payrollProfileId: input.payrollProfileId,
             effectiveFrom: new Date(input.effectiveFrom),
             effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : undefined,
             isPrimary: input.isPrimary !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -605,13 +606,13 @@ export const hrExtendedService = {
                     isActive: component.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(payrollComponents.id, component.id))
-                .returning();
+                .output()
+                .where(eq(payrollComponents.id, component.id));
             return updated;
         }
 
         const id = `PCM-${randomUUID().slice(0,8)}`;
-        const [created] = await db.insert(payrollComponents).values({
+        const [created] = await db.insert(payrollComponents).output().values({
             id,
             branchId: component.branchId,
             code: component.code,
@@ -626,7 +627,7 @@ export const hrExtendedService = {
             affectsNetPay: component.affectsNetPay ?? true,
             sortOrder: component.sortOrder ?? 0,
             isActive: component.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -671,13 +672,13 @@ export const hrExtendedService = {
                     isActive: rule.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(payrollRules.id, rule.id))
-                .returning();
+                .output()
+                .where(eq(payrollRules.id, rule.id));
             return updated;
         }
 
         const id = `PRL-${randomUUID().slice(0,8)}`;
-        const [created] = await db.insert(payrollRules).values({
+        const [created] = await db.insert(payrollRules).output().values({
             id,
             payrollProfileId: rule.payrollProfileId,
             branchId: rule.branchId,
@@ -692,7 +693,7 @@ export const hrExtendedService = {
             formula: rule.formula,
             priority: rule.priority ?? 0,
             isActive: rule.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -728,7 +729,7 @@ export const hrExtendedService = {
             throw new Error('EMPLOYEE_AND_ITEM_NAME_REQUIRED');
         }
 
-        const [employee] = await db.select().from(employees).where(eq(employees.id, input.employeeId)).limit(1);
+        const [employee] = await db.select().top(1).from(employees).where(eq(employees.id, input.employeeId));
         if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
 
         const payload = {
@@ -753,16 +754,16 @@ export const hrExtendedService = {
         if (input.id) {
             const [updated] = await db.update(employeeCompensationItems)
                 .set(payload)
-                .where(eq(employeeCompensationItems.id, input.id))
-                .returning();
+                .output()
+                .where(eq(employeeCompensationItems.id, input.id));
             if (!updated) throw new Error('EMPLOYEE_COMPENSATION_ITEM_NOT_FOUND');
             return updated;
         }
 
-        const [created] = await db.insert(employeeCompensationItems).values({
+        const [created] = await db.insert(employeeCompensationItems).output().values({
             id: `ECI-${randomUUID().slice(0, 8)}`,
             ...payload,
-        }).returning();
+        });
         return created;
     },
 
@@ -773,8 +774,8 @@ export const hrExtendedService = {
                 effectiveTo: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(employeeCompensationItems.id, id))
-            .returning();
+            .output()
+            .where(eq(employeeCompensationItems.id, id));
         if (!updated) throw new Error('EMPLOYEE_COMPENSATION_ITEM_NOT_FOUND');
         return updated;
     },
@@ -819,7 +820,7 @@ export const hrExtendedService = {
             effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : undefined,
             notes: input.notes,
             requestedBy: input.requestedBy,
-        }).returning();
+        });
 
         if (input.effectiveFrom) {
             const baseDate = new Date(input.effectiveFrom);
@@ -849,8 +850,8 @@ export const hrExtendedService = {
                 disbursedAt: status === 'DISBURSED' ? now : undefined,
                 updatedAt: now,
             })
-            .where(eq(employeeLoans.id, loanId))
-            .returning();
+            .output()
+            .where(eq(employeeLoans.id, loanId));
         if (!updated) throw new Error('Loan not found');
         return updated;
     },
@@ -874,13 +875,12 @@ export const hrExtendedService = {
         pendingDays?: number;
         adjustmentDays?: number;
     }) {
-        const existing = await db.select().from(leaveBalances)
+        const existing = await db.select().top(1).from(leaveBalances)
             .where(and(
                 eq(leaveBalances.employeeId, input.employeeId),
                 eq(leaveBalances.leaveTypeId, input.leaveTypeId),
                 eq(leaveBalances.year, input.year),
-            ))
-            .limit(1);
+            ));
 
         if (existing[0]) {
             const [updated] = await db.update(leaveBalances)
@@ -892,12 +892,12 @@ export const hrExtendedService = {
                     adjustmentDays: input.adjustmentDays ?? existing[0].adjustmentDays,
                     updatedAt: new Date(),
                 })
-                .where(eq(leaveBalances.id, existing[0].id))
-                .returning();
+                .output()
+                .where(eq(leaveBalances.id, existing[0].id));
             return updated;
         }
 
-        const [created] = await db.insert(leaveBalances).values({
+        const [created] = await db.insert(leaveBalances).output().values({
             employeeId: input.employeeId,
             leaveTypeId: input.leaveTypeId,
             year: input.year,
@@ -907,7 +907,7 @@ export const hrExtendedService = {
             pendingDays: input.pendingDays ?? 0,
             adjustmentDays: input.adjustmentDays ?? 0,
             updatedAt: new Date(),
-        }).returning();
+        });
         return created;
     },
 
@@ -957,7 +957,7 @@ export const hrExtendedService = {
             notes: input.notes,
             requestedBy: input.requestedBy,
             status: 'PENDING',
-        }).returning();
+        });
         return created;
     },
 
@@ -969,8 +969,8 @@ export const hrExtendedService = {
                 approvedAt: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(bonusPenaltyRecords.id, id))
-            .returning();
+            .output()
+            .where(eq(bonusPenaltyRecords.id, id));
         if (!updated) throw new Error('Bonus/Penalty record not found');
         return updated;
     },
@@ -993,13 +993,13 @@ export const hrExtendedService = {
                     parentId: dept.parentId,
                     isActive: dept.isActive !== false,
                 })
-                .where(eq(departments.id, dept.id))
-                .returning();
+                .output()
+                .where(eq(departments.id, dept.id));
             return existing;
         }
 
         const id = `DEPT-${randomUUID().slice(0,8)}`;
-        const newDeptRows = await db.insert(departments).values({
+        const newDeptRows = await db.insert(departments).output().values({
             id,
             branchId: dept.branchId || null,
             name: dept.name,
@@ -1007,23 +1007,23 @@ export const hrExtendedService = {
             managerId: dept.managerId,
             parentId: dept.parentId,
             isActive: dept.isActive !== false,
-        }).returning() as any[];
+        }) as any[];
         const newDept = newDeptRows[0];
         return newDept;
     },
 
     async deleteDepartment(id: string) {
         const childDepartments = await db.select({ id: departments.id })
+            .top(1)
             .from(departments)
-            .where(eq(departments.parentId, id))
-            .limit(1);
+            .where(eq(departments.parentId, id));
         if (childDepartments.length > 0) {
             throw new Error('DEPARTMENT_HAS_CHILDREN');
         }
 
         const deletedRows = await db.delete(departments)
-            .where(eq(departments.id, id))
-            .returning() as any[];
+            .output()
+            .where(eq(departments.id, id)) as any[];
         const deleted = deletedRows[0];
         if (!deleted) throw new Error('Department not found');
         return deleted;
@@ -1048,28 +1048,28 @@ export const hrExtendedService = {
                     departmentId: null,
                     isActive: title.isActive !== false,
                 })
-                .where(eq(jobTitles.id, title.id))
-                .returning() as any[];
+                .output()
+                .where(eq(jobTitles.id, title.id)) as any[];
             const existing = existingRows[0];
             return existing;
         }
 
         const id = `JOB-${randomUUID().slice(0,8)}`;
-        const newTitleRows = await db.insert(jobTitles).values({
+        const newTitleRows = await db.insert(jobTitles).output().values({
             id,
             title: titleName,
             nameAr: title.nameAr,
             departmentId: null,
             isActive: title.isActive !== false,
-        }).returning() as any[];
+        }) as any[];
         const newTitle = newTitleRows[0];
         return newTitle;
     },
 
     async deleteJobTitle(id: string) {
         const deletedRows = await db.delete(jobTitles)
-            .where(eq(jobTitles.id, id))
-            .returning() as any[];
+            .output()
+            .where(eq(jobTitles.id, id)) as any[];
         const deleted = deletedRows[0];
         if (!deleted) throw new Error('Job title not found');
         return deleted;
@@ -1134,7 +1134,7 @@ export const hrExtendedService = {
             .orderBy(desc(leaveRequests.createdAt));
 
         if (filters?.limit && filters.limit > 0) {
-            return await baseQuery.limit(filters.limit);
+            return await baseQuery.offset(0).fetch(filters.limit);
         }
         return await baseQuery;
     },
@@ -1147,7 +1147,7 @@ export const hrExtendedService = {
         endDate: string;
         reason: string;
     }) {
-        const type = await db.query.leaveTypes.findFirst({ where: eq(leaveTypes.id, data.leaveTypeId) });
+        const type = await db._query.leaveTypes.findFirst({ where: eq(leaveTypes.id, data.leaveTypeId) });
         if (!type) throw new Error('Invalid leave type');
 
         // Calculate working days
@@ -1177,7 +1177,7 @@ export const hrExtendedService = {
             totalDays,
             reason: data.reason,
             status: 'PENDING',
-        }).returning();
+        });
 
         return request;
     },
@@ -1185,8 +1185,8 @@ export const hrExtendedService = {
     async approveLeaveRequest(requestId: string, approvedBy: string) {
         const [updated] = await db.update(leaveRequests)
             .set({ status: 'APPROVED', approvedBy, updatedAt: new Date() })
-            .where(and(eq(leaveRequests.id, requestId), eq(leaveRequests.status, 'PENDING')))
-            .returning();
+            .output()
+            .where(and(eq(leaveRequests.id, requestId), eq(leaveRequests.status, 'PENDING')));
             
         if (!updated) throw new Error('Leave request not found or not pending');
         return updated;
@@ -1195,8 +1195,8 @@ export const hrExtendedService = {
     async rejectLeaveRequest(requestId: string, rejectedBy: string, reason: string) {
         const [updated] = await db.update(leaveRequests)
             .set({ status: 'REJECTED', approvedBy: rejectedBy, rejectionReason: reason, updatedAt: new Date() })
-            .where(and(eq(leaveRequests.id, requestId), eq(leaveRequests.status, 'PENDING')))
-            .returning();
+            .output()
+            .where(and(eq(leaveRequests.id, requestId), eq(leaveRequests.status, 'PENDING')));
 
         if (!updated) throw new Error('Leave request not found or not pending');
         return updated;
@@ -1207,14 +1207,14 @@ export const hrExtendedService = {
     // =========================================================================
     async getLeaveBalance(employeeId: string, leaveTypeId?: string) {
         let typeId = leaveTypeId || 'LT-ANNUAL';
-        const type = await db.query.leaveTypes.findFirst({ where: eq(leaveTypes.id, typeId) });
+        const type = await db._query.leaveTypes.findFirst({ where: eq(leaveTypes.id, typeId) });
         if (!type) throw new Error('Leave type not found');
 
         const yearStart = new Date(new Date().getFullYear(), 0, 1);
 
         const yearEnd = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59, 999);
 
-        const requests = await db.query.leaveRequests.findMany({
+        const requests = await db._query.leaveRequests.findMany({
             where: and(
                 eq(leaveRequests.employeeId, employeeId),
                 eq(leaveRequests.leaveTypeId, type.id),
@@ -1252,7 +1252,7 @@ export const hrExtendedService = {
         if (filters?.status) conditions.push(eq(overtimeEntries.status, filters.status));
         // For month filtering we would need a SQL expression or fetch and filter
         
-        const entries = await db.query.overtimeEntries.findMany({
+        const entries = await db._query.overtimeEntries.findMany({
             where: conditions.length > 0 ? and(...conditions) : undefined,
             orderBy: [desc(overtimeEntries.date)]
         });
@@ -1286,7 +1286,7 @@ export const hrExtendedService = {
             overtimeRate: rate,
             overtimeAmount: Math.round(amount * 100) / 100,
             status: 'PENDING',
-        }).returning();
+        });
 
         return entry;
     },
@@ -1294,8 +1294,8 @@ export const hrExtendedService = {
     async approveOvertime(entryId: string, approvedBy: string) {
         const [updated] = await db.update(overtimeEntries)
             .set({ status: 'APPROVED', approvedBy })
-            .where(and(eq(overtimeEntries.id, entryId), eq(overtimeEntries.status, 'PENDING')))
-            .returning();
+            .output()
+            .where(and(eq(overtimeEntries.id, entryId), eq(overtimeEntries.status, 'PENDING')));
 
         if (!updated) throw new Error('Overtime entry not found or not pending');
         return updated;

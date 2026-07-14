@@ -43,16 +43,24 @@ const isPrivateLanIp = (value?: string | null) => {
     return false;
 };
 
-const isLanRequest = (req: any) => (
-    isPrivateLanIp(req.ip)
-    || isPrivateLanIp(req.socket?.remoteAddress)
-    || isPrivateLanIp(req.headers['x-forwarded-for'])
-    || isPrivateLanIp(req.headers['x-real-ip'])
-);
+const isLanRequest = (req: any) => isPrivateLanIp(req.socket?.remoteAddress);
 
 const requireScreenKey = (req: any, res: any, next: any) => {
     const expected = getToken();
     const actual = getParam(req.query.key) || getParam(req.headers['x-screen-key']);
+
+    if (process.env.NODE_ENV === 'production') {
+        if (!expected) {
+            return res.status(503).json({
+                code: 'PUBLIC_SCREEN_TOKEN_REQUIRED',
+                message: 'PUBLIC_SCREEN_TOKEN must be configured in production.',
+            });
+        }
+        if (actual !== expected) {
+            return res.status(403).json({ code: 'PUBLIC_SCREEN_FORBIDDEN', message: 'Invalid screen key.' });
+        }
+        return next();
+    }
 
     if (expected && actual === expected) {
         return next();
@@ -60,13 +68,6 @@ const requireScreenKey = (req: any, res: any, next: any) => {
 
     if (isLanRequest(req)) {
         return next();
-    }
-
-    if (!expected && process.env.NODE_ENV === 'production') {
-        return res.status(503).json({
-            code: 'PUBLIC_SCREEN_TOKEN_REQUIRED',
-            message: 'Public operator screens are available without a key only from the local network.',
-        });
     }
 
     if (expected) {

@@ -48,10 +48,23 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
         return { ok: false, code: 'ORDER_LOCKED_IN_BRANCH' };
     }
 
+    if (next === 'CANCELLED' && current !== 'CANCELLED') {
+        if (!HIGH_RISK_ROLES.has(role) && role !== 'CALL_CENTER_AGENT') {
+            return { ok: false, code: 'STATUS_TRANSITION_FORBIDDEN' };
+        }
+        if (!String(input.notes || '').trim()) {
+            return { ok: false, code: 'CANCELLATION_REASON_REQUIRED' };
+        }
+        return { ok: true };
+    }
+
     let allowed = [...(BASE_TRANSITION_MAP[current] || [])];
     if (orderType === 'DINE_IN' && ['PENDING', 'PREPARING', 'READY'].includes(current)) {
         // ponytail: dine-in settlement can close the table from any active kitchen state; add finer payment gates if needed.
         allowed = ['COMPLETED', 'CANCELLED'];
+    } else if (['TAKEAWAY', 'PICKUP'].includes(orderType) && current === 'PENDING') {
+        // ponytail: direct counter sales can skip kitchen/pickup screens; add per-order-type config only if needed.
+        allowed = ['PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
     } else if (current === 'READY') {
         if (orderType === 'DELIVERY') {
             allowed = ['OUT_FOR_DELIVERY', 'CANCELLED'];
@@ -65,15 +78,6 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
 
     if (!allowed || !allowed.includes(next)) {
         return { ok: false, code: 'INVALID_STATUS_TRANSITION' };
-    }
-
-    if (next === 'CANCELLED' && !HIGH_RISK_ROLES.has(role) && role !== 'CALL_CENTER_AGENT') {
-        // Allow agents to cancel their own PENDING orders
-        return { ok: false, code: 'STATUS_TRANSITION_FORBIDDEN' };
-    }
-    
-    if (next === 'CANCELLED' && !String(input.notes || '').trim()) {
-        return { ok: false, code: 'CANCELLATION_REASON_REQUIRED' };
     }
 
     return { ok: true };

@@ -291,8 +291,8 @@ export const getDeliveryPerformance = async (req: Request, res: Response) => {
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
             totalDeliveryFees: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
-            freeDeliveryCount: sql<number>`count(*) filter (where ${orders.freeDelivery} = true)`,
-            avgDeliveryMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.actualDeliveryTime} - ${orders.createdAt})) / 60), 0)`,
+            freeDeliveryCount: sql<number>`sum(case when ${orders.freeDelivery} = 1 then 1 else 0 end)`,
+            avgDeliveryMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.actualDeliveryTime}) / 60.0), 0)`,
         }).from(orders).where(and(...conditions));
 
         // By driver
@@ -300,7 +300,7 @@ export const getDeliveryPerformance = async (req: Request, res: Response) => {
             driverId: orders.driverId,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-            avgDeliveryMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.actualDeliveryTime} - ${orders.createdAt})) / 60), 0)`,
+            avgDeliveryMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.actualDeliveryTime}) / 60.0), 0)`,
         }).from(orders)
             .where(and(...conditions, sql`${orders.driverId} is not null`))
             .groupBy(orders.driverId)
@@ -380,7 +380,7 @@ export const getDineInTableAnalysis = async (req: Request, res: Response) => {
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
-            avgDurationMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgDurationMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
         }).from(orders)
             .where(and(...conditions))
             .groupBy(orders.tableId)

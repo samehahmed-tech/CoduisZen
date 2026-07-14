@@ -31,7 +31,7 @@ export const createWarehouse = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'name is required' });
         }
 
-        const [created] = await db.insert(warehouses).values({
+        const [created] = await db.insert(warehouses).output().values({
             id: body.id || `WH-${Date.now()}`,
             name: body.name,
             nameAr: body.name_ar,
@@ -40,7 +40,7 @@ export const createWarehouse = async (req: Request, res: Response) => {
             parentId: body.parent_id,
             isActive: body.is_active !== false,
             createdAt: new Date(),
-        }).returning();
+        });
 
         res.status(201).json(created);
     } catch (error: any) {

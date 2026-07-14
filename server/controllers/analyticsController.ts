@@ -124,7 +124,7 @@ export const getUserLeaderboard = async (req: Request, res: Response) => {
         .where(branchId ? eq(userDailyPerformance.branchId, branchId) : undefined)
         .groupBy(userDailyPerformance.userId, users.name)
         .orderBy(desc(sql`SUM(${userDailyPerformance.totalPoints})`))
-        .limit(limit);
+        .offset(0).fetch(limit);
 
         res.json(leaderboard);
     } catch (error: any) {

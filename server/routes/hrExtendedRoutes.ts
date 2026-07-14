@@ -74,8 +74,8 @@ const resolveCurrentEmployee = async (userId: string) => {
     if (!employeeByEmail.userId) {
         const [updated] = await db.update(employees)
             .set({ userId, updatedAt: new Date() })
-            .where(eq(employees.id, employeeByEmail.id))
-            .returning();
+            .output()
+            .where(eq(employees.id, employeeByEmail.id));
         return updated || employeeByEmail;
     }
 
@@ -640,7 +640,7 @@ router.post('/performance-records', async (req: Request, res: Response) => {
             createdBy: req.user?.id || 'system',
         };
 
-        const [created] = await db.insert(managerApprovals).values({
+        const [created] = await db.insert(managerApprovals).output().values({
             managerId: req.user?.id || 'system',
             branchId: employee.branchId,
             actionType: normalizedActionType,
@@ -648,7 +648,7 @@ router.post('/performance-records', async (req: Request, res: Response) => {
             reason: title,
             details,
             createdAt: new Date(),
-        }).returning();
+        });
 
         await db.insert(auditLogs).values({
             eventType: `HR_${normalizedActionType}_CREATED`,
@@ -694,8 +694,8 @@ router.put('/performance-records/:id/status', async (req: Request, res: Response
 
         const [updated] = await db.update(managerApprovals)
             .set({ details: nextDetails })
-            .where(eq(managerApprovals.id, id))
-            .returning();
+            .output()
+            .where(eq(managerApprovals.id, id));
 
         await db.insert(auditLogs).values({
             eventType: 'HR_PERFORMANCE_STATUS_UPDATED',
@@ -757,7 +757,7 @@ router.post('/onboarding-records', async (req: Request, res: Response) => {
             createdBy: req.user?.id || 'system',
         };
 
-        const [created] = await db.insert(managerApprovals).values({
+        const [created] = await db.insert(managerApprovals).output().values({
             managerId: req.user?.id || 'system',
             branchId: employee.branchId,
             actionType: 'HR_ONBOARD_TASK',
@@ -765,7 +765,8 @@ router.post('/onboarding-records', async (req: Request, res: Response) => {
             reason: title,
             details,
             createdAt: new Date(),
-        }).returning();
+        });
+
 
         await db.insert(auditLogs).values({
             eventType: 'HR_ONBOARD_TASK_CREATED',
@@ -799,8 +800,8 @@ router.put('/onboarding-records/:id/status', async (req: Request, res: Response)
 
         const [updated] = await db.update(managerApprovals)
             .set({ details: nextDetails })
-            .where(eq(managerApprovals.id, id))
-            .returning();
+            .output()
+            .where(eq(managerApprovals.id, id));
 
         await db.insert(auditLogs).values({
             eventType: 'HR_ONBOARD_TASK_STATUS_UPDATED',
@@ -864,7 +865,7 @@ router.post('/offboarding-records', async (req: Request, res: Response) => {
             createdBy: req.user?.id || 'system',
         };
 
-        const [created] = await db.insert(managerApprovals).values({
+        const [created] = await db.insert(managerApprovals).output().values({
             managerId: req.user?.id || 'system',
             branchId: employee.branchId,
             actionType: 'HR_OFFBOARD_TASK',
@@ -872,7 +873,7 @@ router.post('/offboarding-records', async (req: Request, res: Response) => {
             reason: title,
             details,
             createdAt: new Date(),
-        }).returning();
+        });
 
         await db.insert(auditLogs).values({
             eventType: 'HR_OFFBOARD_TASK_CREATED',
@@ -907,8 +908,8 @@ router.put('/offboarding-records/:id/status', async (req: Request, res: Response
 
         const [updated] = await db.update(managerApprovals)
             .set({ details: nextDetails })
-            .where(eq(managerApprovals.id, id))
-            .returning();
+            .output()
+            .where(eq(managerApprovals.id, id));
 
         await db.insert(auditLogs).values({
             eventType: 'HR_OFFBOARD_TASK_STATUS_UPDATED',
@@ -1047,14 +1048,14 @@ router.post('/payroll-cycles', async (req: Request, res: Response) => {
         if (!req.body.branchId || !req.body.periodStart || !req.body.periodEnd) {
             return res.status(400).json({ error: 'BRANCH_AND_PERIOD_REQUIRED' });
         }
-        const [created] = await db.insert(payrollCycles).values({
+        const [created] = await db.insert(payrollCycles).output().values({
             id: req.body.id || makeId('CYC'),
             branchId: String(req.body.branchId),
             periodStart: new Date(req.body.periodStart),
             periodEnd: new Date(req.body.periodEnd),
             status: 'DRAFT',
             executedBy: req.user?.id,
-        }).returning();
+        });
         res.status(201).json(created);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
 });

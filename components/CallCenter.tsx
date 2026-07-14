@@ -80,7 +80,7 @@ import { useOrderStore } from '../stores/useOrderStore';
 
 // Services
 import { translations } from '../services/translations';
-import { printKitchenTicketsByRouting, printOrderReceipt } from '../services/posPrintOrchestrator';
+import { hasCashierPrinterConfigured, printKitchenTicketsByRouting, printOrderReceipt } from '../services/posPrintOrchestrator';
 import { getActionableErrorMessage } from '../services/api/core';
 import { deliveryApi } from '../services/api/delivery';
 import { customersApi } from '../services/api/customers';
@@ -886,30 +886,39 @@ const CallCenter: React.FC = () => {
 
             const savedOrder = await placeOrder(newOrder);
             const activeBranch = branches.find(b => b.id === selectedBranchId);
-            await printKitchenTicketsByRouting({
-                order: savedOrder,
-                categories,
-                printers,
-                branchId: selectedBranchId,
-                maxKitchenPrinters: settings.maxKitchenPrinters,
-                settings,
-                currencySymbol: settings.currencySymbol,
-                lang,
-                t,
-                branch: activeBranch
-            });
-            const shouldPrintOnSubmit = (settings.autoPrintReceiptOnSubmit ?? settings.autoPrintReceipt ?? false) === true;
-            if (shouldPrintOnSubmit) {
-                await printOrderReceipt({
+            try {
+                await printKitchenTicketsByRouting({
                     order: savedOrder,
+                    categories,
                     printers,
+                    branchId: selectedBranchId,
+                    maxKitchenPrinters: settings.maxKitchenPrinters,
                     settings,
                     currencySymbol: settings.currencySymbol,
                     lang,
                     t,
-                    branch: activeBranch,
-                    title: t.order_receipt || (lang === 'ar' ? 'إيصال الطلب' : 'Order Receipt')
+                    branch: activeBranch
                 });
+            } catch {
+                showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة تذكرة المطبخ' : 'Order saved, but kitchen ticket print failed', 'warning');
+            }
+            const shouldPrintOnSubmit = (settings.autoPrintReceiptOnSubmit ?? settings.autoPrintReceipt ?? false) === true
+                || hasCashierPrinterConfigured(printers, savedOrder.branchId, settings);
+            if (shouldPrintOnSubmit) {
+                try {
+                    await printOrderReceipt({
+                        order: savedOrder,
+                        printers,
+                        settings,
+                        currencySymbol: settings.currencySymbol,
+                        lang,
+                        t,
+                        branch: activeBranch,
+                        title: t.order_receipt || (lang === 'ar' ? 'إيصال الطلب' : 'Order Receipt')
+                    });
+                } catch {
+                    showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة الإيصال' : 'Order saved, but receipt print failed', 'warning');
+                }
             }
             resetOrder();
             showToast(lang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Order sent successfully', 'success');

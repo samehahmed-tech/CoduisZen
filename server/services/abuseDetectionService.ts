@@ -9,6 +9,7 @@ export const abuseDetectionService = {
    */
   async detectBuddyPunching(limitMinutes: number = 5) {
     logger.info('Running buddy punching detection...');
+    const minutes = Math.min(Math.max(Math.floor(Number(limitMinutes) || 5), 1), 1440);
     
     // Naive raw SQL query to find occurrences where device_id is the same, timestamps are within 30s, but employee_id varies.
     // Given the complexity of window functions in Drizzle, raw SQL is often used for anomaly detection.
@@ -16,7 +17,7 @@ export const abuseDetectionService = {
       WITH recent_punches AS (
         SELECT id, employee_id, branch_id, device_id, occurred_at 
         FROM attendance_raw_logs 
-        WHERE occurred_at >= NOW() - INTERVAL '${sql.raw(String(limitMinutes))} minutes'
+        WHERE occurred_at >= DATEADD(MINUTE, ${-minutes}, GETDATE())
       )
       SELECT p1.employee_id as emp1, p2.employee_id as emp2, p1.branch_id, p1.device_id, p1.occurred_at
       FROM recent_punches p1
@@ -24,7 +25,7 @@ export const abuseDetectionService = {
         ON p1.device_id = p2.device_id 
         AND p1.id != p2.id 
         AND p1.employee_id != p2.employee_id
-        AND ABS(EXTRACT(EPOCH FROM (p1.occurred_at - p2.occurred_at))) < 30
+        AND ABS(DATEDIFF(SECOND, p2.occurred_at, p1.occurred_at)) < 30
     `;
 
     try {
@@ -44,7 +45,7 @@ export const abuseDetectionService = {
                status: 'PENDING',
                title: 'Suspected buddy punching',
                metadata: { relatedEmployee: row.emp2, deviceId: row.device_id, time: row.occurred_at },
-             }).onConflictDoNothing(); // Assuming unique constraints prevent duplicates
+              }); // Assuming unique constraints prevent duplicates
          }
       }
     } catch (e: any) {
@@ -81,7 +82,7 @@ export const abuseDetectionService = {
            status: 'PENDING',
            title: 'Suspicious endless overtime',
            details: 'Session open longer than 16 hours. Auto-flagged.',
-         }).onConflictDoNothing();
+          });
      }
   }
 };

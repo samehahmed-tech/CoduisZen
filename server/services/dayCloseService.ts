@@ -20,14 +20,26 @@ import {
     inventoryItems,
     warehouses,
     refundRecords,
+    settings,
+    stockCounts,
+    journalEntries,
+    journalLines,
+    chartOfAccounts,
+    costCenters,
 } from '../../src/db/schema';
-import { eq, and, gte, lte, desc, sql, like } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, sql, like, or } from 'drizzle-orm';
 import { createSignedAuditLog } from './auditService';
 import { emailService } from './emailService';
 import { generateDayClosePDF } from './pdfService';
+import { sendWhatsAppText } from './whatsappService';
 
 // Day close status
 type DayCloseStatus = 'OPEN' | 'CLOSING' | 'CLOSED';
+
+const toSqlDate = (date: string | Date) => {
+    const datePart = date instanceof Date ? date.toISOString().split('T')[0] : String(date).split('T')[0];
+    return new Date(`${datePart}T00:00:00.000Z`);
+};
 
 interface DayCloseReadinessCheck {
     code: string;
@@ -48,6 +60,7 @@ interface DayCloseReport {
     branchId: string;
     branchName?: string;
     dayCloseEmails?: string[];
+    currency?: string;
     status: DayCloseStatus;
     closedBy?: string;
     closedAt?: Date;
@@ -98,6 +111,14 @@ interface DayCloseReport {
         resolvedExceptions: number;
     };
 
+    financeSummary?: {
+        expenses: number;
+        pendingExpenses: number;
+        netProfit: number;
+        topExpenses: { name: string; total: number }[];
+        expenseRows: { date: Date | string | null; name: string; description: string | null; reference: string | null; total: number }[];
+    };
+
     // Side effect failures snapshot (Sprint 3)
     sideEffectHealth?: {
         failedFinance: number;
@@ -108,6 +129,30 @@ interface DayCloseReport {
 
     readiness?: DayCloseReadiness;
 }
+
+const getSettingValue = async <T>(key: string, fallback: T): Promise<T> => {
+    const [row] = await db.select({ value: settings.value }).top(1).from(settings).where(eq(settings.key, key));
+    return (row?.value as T | undefined) ?? fallback;
+};
+
+const getDayCloseRequireStockCount = () => getSettingValue<boolean>('dayCloseRequireStockCount', true);
+const getDayCloseWhatsappRecipients = () => getSettingValue<string[]>('dayCloseWhatsappRecipients', []);
+
+const normalizeRecipients = (items?: string[]) => (items || [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+
+const buildDayCloseWhatsAppText = (report: DayCloseReport) => {
+    const sales = report.salesSummary;
+    return [
+        `Day Close ${report.date}`,
+        `Branch: ${report.branchName || report.branchId}`,
+        `Orders: ${sales.totalOrders}`,
+        `Revenue: ${Number(sales.totalRevenue || 0).toLocaleString()} ${report.currency || 'EGP'}`,
+        `Net Sales: ${Number(sales.netSales || 0).toLocaleString()} ${report.currency || 'EGP'}`,
+        `Closed By: ${report.closedBy || 'system'}`,
+    ].join('\n');
+};
 
 interface EmailConfig {
     to: string[];
@@ -160,8 +205,8 @@ export const dayCloseService = {
     async getClosedReport(branchId: string, date: string) {
         const [closed] = await db.select()
             .from(dayCloseReports)
-            .where(and(eq(dayCloseReports.branchId, branchId), eq(dayCloseReports.date, date)))
-            .limit(1);
+            .where(and(eq(dayCloseReports.branchId, branchId), eq(dayCloseReports.date, toSqlDate(date))))
+            .top(1);
 
         if (!closed) return null;
 
@@ -177,6 +222,7 @@ export const dayCloseService = {
             closedBy: closed.closedBy,
             closedAt: closed.createdAt,
             notes: closed.notes,
+            currency: salesSnapshot.currency,
             dayCloseReportId: closed.id,
             salesSummary: salesSnapshot.salesSummary || {
                 totalOrders: Number(closed.totalOrders || 0),
@@ -196,6 +242,7 @@ export const dayCloseService = {
             },
             fiscalHealth: closed.fiscalSnapshot,
             financeHealth: closed.financeSnapshot,
+            financeSummary: (closed.financeSnapshot as any)?.summary,
             sideEffectHealth: closed.sideEffectSnapshot,
             readiness: {
                 canClose: false,
@@ -277,22 +324,69 @@ export const dayCloseService = {
             dateFilter,
         )).groupBy(orders.type);
 
-        // SQL aggregation: audit counts
-        const [auditAgg] = await db.select({
+        const expenseBranchFilter = branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined;
+
+        const [auditAgg, expenseAgg, pendingExpenseAgg, topExpenseRows, expenseRows] = await Promise.all([
+            db.select({
             totalEvents: sql<number>`count(*)`,
-            voidCount: sql<number>`count(*) filter (where ${auditLogs.eventType} like '%VOID%' or ${auditLogs.eventType} like '%CANCEL%')`,
-            discountCount: sql<number>`count(*) filter (where ${auditLogs.eventType} like '%DISCOUNT%')`,
-            refundCount: sql<number>`count(*) filter (where ${auditLogs.eventType} like '%REFUND%')`,
-        }).from(auditLogs).where(and(
-            eq(auditLogs.branchId, branchId),
-            gte(auditLogs.createdAt, startOfDay),
-            lte(auditLogs.createdAt, endOfDay),
-        ));
+                voidCount: sql<number>`sum(case when ${auditLogs.eventType} like '%VOID%' or ${auditLogs.eventType} like '%CANCEL%' then 1 else 0 end)`,
+                discountCount: sql<number>`sum(case when ${auditLogs.eventType} like '%DISCOUNT%' then 1 else 0 end)`,
+                refundCount: sql<number>`sum(case when ${auditLogs.eventType} like '%REFUND%' then 1 else 0 end)`,
+            }).from(auditLogs).where(and(
+                eq(auditLogs.branchId, branchId),
+                gte(auditLogs.createdAt, startOfDay),
+                lte(auditLogs.createdAt, endOfDay),
+            )).then(rows => rows[0]),
+            db.select({
+                total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+            }).from(journalLines)
+                .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+                .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+                .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .then(rows => rows[0]),
+            db.select({
+                total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+            }).from(journalLines)
+                .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+                .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+                .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'PENDING_APPROVAL'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .then(rows => rows[0]),
+            db.select({
+                name: chartOfAccounts.name,
+                total: sql<number>`coalesce(sum(${journalLines.debit}) - sum(${journalLines.credit}), 0)`,
+            }).from(journalLines)
+                .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+                .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+                .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .groupBy(chartOfAccounts.name)
+                .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`)
+                .offset(0).fetch(10),
+            db.select({
+                date: journalEntries.date,
+                reference: journalEntries.reference,
+                description: journalEntries.description,
+                name: chartOfAccounts.name,
+                total: sql<number>`coalesce(${journalLines.debit} - ${journalLines.credit}, 0)`,
+            }).from(journalLines)
+                .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+                .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+                .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .orderBy(desc(journalEntries.date), desc(journalLines.id))
+                .offset(0).fetch(50),
+        ]);
+
+        const expenses = Number(expenseAgg?.total || 0);
+        const pendingExpenses = Number(pendingExpenseAgg?.total || 0);
 
         return {
             date,
             branchId,
             branchName: branch?.name,
+            currency: branch?.currency || 'EGP',
             dayCloseEmails: (branch?.dayCloseEmails as string[]) || [],
             status: 'OPEN',
             salesSummary: {
@@ -318,6 +412,19 @@ export const dayCloseService = {
                 voidCount: Number(auditAgg?.voidCount || 0),
                 discountCount: Number(auditAgg?.discountCount || 0),
                 refundCount: Number(auditAgg?.refundCount || 0),
+            },
+            financeSummary: {
+                expenses,
+                pendingExpenses,
+                netProfit: totalRevenue - totalDiscount - expenses,
+                topExpenses: topExpenseRows.map(row => ({ name: row.name || 'Expense', total: Number(row.total || 0) })),
+                expenseRows: expenseRows.map(row => ({
+                    date: row.date,
+                    name: row.name || 'Expense',
+                    description: row.description,
+                    reference: row.reference,
+                    total: Number(row.total || 0),
+                })),
             },
         };
     },
@@ -422,9 +529,8 @@ export const dayCloseService = {
     async getCloseReadiness(branchId: string, date: string): Promise<DayCloseReadiness> {
         const { startOfDay, endOfDay } = this.getDayBounds(date);
 
-        const [fiscalHealth, financeHealth, openShiftRows, unpaidOrderRows] = await Promise.all([
-            this.getFiscalHealth(branchId, date),
-            this.getFinanceHealth(branchId, date),
+        const [requireStockCount, openShiftRows, postedStockCountRows] = await Promise.all([
+            getDayCloseRequireStockCount(),
             db.select({ count: sql<number>`count(*)` })
                 .from(shifts)
                 .where(and(
@@ -434,34 +540,18 @@ export const dayCloseService = {
                     sql`(${shifts.closingTime} IS NULL OR ${shifts.closingTime} >= ${startOfDay})`,
                 )),
             db.select({ count: sql<number>`count(*)` })
-                .from(orders)
+                .from(stockCounts)
                 .where(and(
-                    eq(orders.branchId, branchId),
-                    sql`${orders.status} IN ('COMPLETED', 'DELIVERED')`,
-                    eq(orders.isPaid, false),
-                    sql`(${orders.businessDate} = ${date} OR (${orders.businessDate} IS NULL AND ${orders.createdAt} >= ${startOfDay} AND ${orders.createdAt} <= ${endOfDay}))`,
+                    eq(stockCounts.branchId, branchId),
+                    eq(stockCounts.countDate, toSqlDate(date)),
+                    eq(stockCounts.status, 'POSTED'),
                 )),
         ]);
 
-        const fiscalIssueCount = fiscalHealth.pending + fiscalHealth.failed + fiscalHealth.deadLettersPending;
         const openShiftCount = Number(openShiftRows[0]?.count || 0);
-        const unpaidOrderCount = Number(unpaidOrderRows[0]?.count || 0);
+        const postedStockCount = Number(postedStockCountRows[0]?.count || 0);
 
         const checks: DayCloseReadinessCheck[] = [
-            {
-                code: 'FISCAL_NOT_CLEAN_FOR_DAY_CLOSE',
-                passed: fiscalIssueCount === 0,
-                blocking: true,
-                count: fiscalIssueCount,
-                actionPath: '/fiscal',
-            },
-            {
-                code: 'FINANCE_EXCEPTIONS_PENDING_FOR_DAY_CLOSE',
-                passed: financeHealth.pendingExceptions === 0,
-                blocking: false,
-                count: financeHealth.pendingExceptions,
-                actionPath: '/finance',
-            },
             {
                 code: 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE',
                 passed: openShiftCount === 0,
@@ -469,14 +559,17 @@ export const dayCloseService = {
                 count: openShiftCount,
                 actionPath: '/attendance',
             },
-            {
-                code: 'UNPAID_ORDERS_EXIST_FOR_DAY_CLOSE',
-                passed: unpaidOrderCount === 0,
-                blocking: true,
-                count: unpaidOrderCount,
-                actionPath: '/orders',
-            },
         ];
+
+        if (requireStockCount) {
+            checks.push({
+                code: 'DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE',
+                passed: postedStockCount > 0,
+                blocking: true,
+                count: postedStockCount > 0 ? 0 : 1,
+                actionPath: '/inventory',
+            });
+        }
 
         const blockedReasons = checks
             .filter(check => check.blocking && !check.passed)
@@ -559,7 +652,7 @@ export const dayCloseService = {
                 itemCount: sql<number>`count(distinct ${inventoryStock.itemId})`,
                 totalQuantity: sql<number>`coalesce(sum(${inventoryStock.quantity}), 0)`,
                 totalValue: sql<number>`coalesce(sum(${inventoryStock.quantity} * coalesce(${inventoryItems.costPrice}, 0)), 0)`,
-                lowStockCount: sql<number>`count(*) filter (where ${inventoryStock.quantity} <= coalesce(${inventoryItems.threshold}, 0))`,
+                lowStockCount: sql<number>`sum(case when ${inventoryStock.quantity} <= coalesce(${inventoryItems.threshold}, 0) then 1 else 0 end)`,
             }).from(inventoryStock)
                 .innerJoin(warehouses, eq(inventoryStock.warehouseId, warehouses.id))
                 .innerJoin(inventoryItems, eq(inventoryStock.itemId, inventoryItems.id))
@@ -649,10 +742,7 @@ export const dayCloseService = {
         options?: {
             emailConfig?: EmailConfig;
             notes?: string;
-            enforceFiscalClean?: boolean;
-            enforceFinanceClean?: boolean;
             enforceShiftsClosed?: boolean;
-            enforceAllPaid?: boolean;
             overrideReason?: string; // Item 22: override with written reason
         }
     ) {
@@ -672,12 +762,8 @@ export const dayCloseService = {
         // Collect all blocked reasons instead of throwing on first failure
         const blockedReasons: string[] = [];
 
-        // === GATE 1: Fiscal health ===
-        if (options?.enforceFiscalClean && (fiscalHealth.failed > 0 || fiscalHealth.pending > 0 || fiscalHealth.deadLettersPending > 0)) {
-            blockedReasons.push('FISCAL_NOT_CLEAN_FOR_DAY_CLOSE');
-        }
-
-        // Finance exceptions are accounting follow-up, not an operations day-close blocker.
+        // Finance, fiscal, and unpaid order checks stay visible in reports, but day close only blocks
+        // on open shifts and the optional daily posted stock count.
 
         // === GATE 3: Open shifts ===
         if (options?.enforceShiftsClosed) {
@@ -694,18 +780,16 @@ export const dayCloseService = {
             }
         }
 
-        // === GATE 4: Unpaid completed orders ===
-        if (options?.enforceAllPaid) {
-            const unpaidOrders = await db.select({ count: sql<number>`count(*)` })
-                .from(orders)
+        if (await getDayCloseRequireStockCount()) {
+            const postedStockCount = await db.select({ count: sql<number>`count(*)` })
+                .from(stockCounts)
                 .where(and(
-                    eq(orders.branchId, branchId),
-                    sql`${orders.status} IN ('COMPLETED', 'DELIVERED')`,
-                    eq(orders.isPaid, false),
-                    sql`(${orders.businessDate} = ${date} OR (${orders.businessDate} IS NULL AND ${orders.createdAt} >= ${startOfDay} AND ${orders.createdAt} <= ${endOfDay}))`,
+                    eq(stockCounts.branchId, branchId),
+                    eq(stockCounts.countDate, toSqlDate(date)),
+                    eq(stockCounts.status, 'POSTED'),
                 ));
-            if (Number(unpaidOrders[0]?.count || 0) > 0) {
-                blockedReasons.push('UNPAID_ORDERS_EXIST_FOR_DAY_CLOSE');
+            if (Number(postedStockCount[0]?.count || 0) === 0) {
+                blockedReasons.push('DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE');
             }
         }
 
@@ -746,7 +830,7 @@ export const dayCloseService = {
                 id: dayCloseReportId,
                 branchId,
                 closedBy: userId,
-                date,
+                date: toSqlDate(date),
                 expectedCash: snapshot.shiftsSnapshot.expectedCash,
                 actualCash: snapshot.shiftsSnapshot.actualCash,
                 variance: snapshot.shiftsSnapshot.variance,
@@ -765,7 +849,7 @@ export const dayCloseService = {
                 inventorySnapshot: snapshot.inventorySnapshot,
                 shiftsSnapshot: snapshot.shiftsSnapshot,
                 fiscalSnapshot: fiscalHealth,
-                financeSnapshot: financeHealth,
+                financeSnapshot: { ...financeHealth, summary: report.financeSummary },
                 sideEffectSnapshot: sideEffectHealth,
                 auditSnapshot: { summary: report.auditSummary },
                 operationalSnapshot: snapshot.operationalSnapshot,
@@ -805,6 +889,17 @@ export const dayCloseService = {
         // Send email if configured
         if (options?.emailConfig) {
             await this.sendDayCloseEmail(report, options.emailConfig);
+        }
+
+        const whatsappRecipients = normalizeRecipients(await getDayCloseWhatsappRecipients());
+        if (whatsappRecipients.length > 0) {
+            const text = buildDayCloseWhatsAppText(report);
+            await Promise.allSettled(whatsappRecipients.map((to) => sendWhatsAppText({
+                to,
+                text,
+                branchId,
+                sessionRole: 'DAY_CLOSE',
+            })));
         }
 
         // Advance to next business date automatically
@@ -873,7 +968,7 @@ Please find the detailed End Of Day Report attached as a PDF document.
             .from(dayCloseReports)
             .where(eq(dayCloseReports.branchId, branchId))
             .orderBy(desc(dayCloseReports.createdAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         return closeRows.map(row => ({
             id: row.id,

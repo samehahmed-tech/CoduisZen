@@ -10,12 +10,12 @@ describe('attendance smart inference', () => {
             id: 'test-smart-branch',
             name: 'Smart Branch',
             location: 'Cairo',
-        });
+        }).onConflictDoNothing();
         await db.insert(branches).values({
             id: 'test-smart-branch-2',
             name: 'Smart Branch 2',
             location: 'Giza',
-        });
+        }).onConflictDoNothing();
         await db.insert(employees).values({
             id: 'test-smart-employee',
             branchId: 'test-smart-branch',
@@ -24,7 +24,7 @@ describe('attendance smart inference', () => {
             name: 'Smart Employee',
             role: 'Cashier',
             basicSalary: 5000,
-        });
+        }).onConflictDoNothing();
     });
 
     it('treats the first unknown biometric punch as clock-in', async () => {

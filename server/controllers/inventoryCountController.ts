@@ -6,9 +6,12 @@ import { GLService } from '../services/glService';
 import { getStringParam } from '../utils/request';
 
 const toDateOnly = (value?: string | Date | null) => {
-    if (!value) return new Date().toISOString().split('T')[0];
-    if (value instanceof Date) return value.toISOString().split('T')[0];
-    return String(value).split('T')[0];
+    const datePart = !value
+        ? new Date().toISOString().split('T')[0]
+        : value instanceof Date
+            ? value.toISOString().split('T')[0]
+            : String(value).split('T')[0];
+    return new Date(`${datePart}T00:00:00.000Z`);
 };
 
 const enrichCountLines = async (lines: any[]) => {
@@ -45,13 +48,13 @@ export const getStockCounts = async (req: Request, res: Response) => {
         const conditions = [];
         if (branchId) conditions.push(eq(stockCounts.branchId, branchId));
         if (warehouseId) conditions.push(eq(stockCounts.warehouseId, warehouseId));
-        if (countDate) conditions.push(eq(stockCounts.countDate, countDate));
+        if (countDate) conditions.push(eq(stockCounts.countDate, toDateOnly(countDate)));
         if (status) conditions.push(eq(stockCounts.status, status));
 
         const rows = await db.select().from(stockCounts)
             .where(conditions.length ? and(...conditions) : undefined)
             .orderBy(desc(stockCounts.createdAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         const warehouseRows = await db.select().from(warehouses);
         const warehouseMap = new Map(warehouseRows.map((warehouse) => [warehouse.id, warehouse]));
@@ -102,12 +105,12 @@ export const getStockCount = async (req: Request, res: Response) => {
         const id = getStringParam(req.params.id);
         if (!id) return res.status(400).json({ error: 'COUNT_ID_REQUIRED' });
 
-        const [count] = await db.select().from(stockCounts).where(eq(stockCounts.id, id)).limit(1);
+        const [count] = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count) return res.status(404).json({ error: 'Count not found' });
 
         const lines = await db.select().from(stockCountLines).where(eq(stockCountLines.countId, id));
         const [warehouse] = count.warehouseId
-            ? await db.select().from(warehouses).where(eq(warehouses.id, count.warehouseId)).limit(1)
+            ? await db.select().top(1).from(warehouses).where(eq(warehouses.id, count.warehouseId))
             : [null];
 
         res.json({
@@ -130,7 +133,7 @@ export const createStockCount = async (req: Request, res: Response) => {
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         if (!warehouseId) return res.status(400).json({ error: 'WAREHOUSE_ID_REQUIRED' });
 
-        const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, warehouseId)).limit(1);
+        const [warehouse] = await db.select().top(1).from(warehouses).where(eq(warehouses.id, warehouseId));
         if (!warehouse) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND' });
         if (warehouse.branchId && warehouse.branchId !== branchId) {
             return res.status(400).json({ error: 'WAREHOUSE_BRANCH_MISMATCH' });
@@ -163,7 +166,7 @@ export const freezeStockCount = async (req: Request, res: Response) => {
         const id = getStringParam(req.params.id);
         if (!id) return res.status(400).json({ error: 'COUNT_ID_REQUIRED' });
         
-        const count = await db.select().from(stockCounts).where(eq(stockCounts.id, id)).limit(1);
+        const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
         
         const lines = await db.transaction(async (tx) => {
@@ -223,14 +226,13 @@ export const submitCount = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'COUNT_ID_REQUIRED' });
         const { counts } = req.body; // { itemId, countedQty, notes }[]
 
-        const count = await db.select().from(stockCounts).where(eq(stockCounts.id, id)).limit(1);
+        const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
         
         await db.transaction(async (tx) => {
             for (const itemCount of counts || []) {
-                const existing = await tx.select().from(stockCountLines)
-                    .where(and(eq(stockCountLines.countId, id), eq(stockCountLines.itemId, itemCount.itemId)))
-                    .limit(1);
+                const existing = await tx.select().top(1).from(stockCountLines)
+                    .where(and(eq(stockCountLines.countId, id), eq(stockCountLines.itemId, itemCount.itemId)));
                     
                 if (existing.length) {
                     const expected = existing[0].expectedQty || 0;
@@ -260,7 +262,7 @@ export const postStockCount = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'COUNT_ID_REQUIRED' });
         const { userId } = req.body;
         
-        const count = await db.select().from(stockCounts).where(eq(stockCounts.id, id)).limit(1);
+        const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
         
         let totalVarianceValue = 0;
@@ -270,8 +272,8 @@ export const postStockCount = async (req: Request, res: Response) => {
             
             const { stockMovements, auditLogs } = await import('../../src/db/schema');
             const [warehouse] = count[0].warehouseId
-                ? await tx.select().from(warehouses).where(eq(warehouses.id, count[0].warehouseId)).limit(1)
-                : await tx.select().from(warehouses).where(eq(warehouses.branchId, count[0].branchId)).limit(1);
+                ? await tx.select().top(1).from(warehouses).where(eq(warehouses.id, count[0].warehouseId))
+                : await tx.select().top(1).from(warehouses).where(eq(warehouses.branchId, count[0].branchId));
             if (!warehouse) throw new Error('NO_WAREHOUSE_FOR_BRANCH');
 
             for (const line of lines) {

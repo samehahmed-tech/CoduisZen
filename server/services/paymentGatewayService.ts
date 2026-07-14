@@ -75,47 +75,20 @@ export const paymentGatewayService = {
         }
     },
 
-    /**
-     * InstaPay Mock Flow (QR-based)
-     */
+    /** InstaPay remains unavailable until a verified provider adapter is installed. */
     async initiateInstaPay(req: PaymentRequest): Promise<PaymentResponse> {
-        // In a real implementation, you'd call InstaPay's API to generate a signed intent
-        return {
-            success: true,
-            transactionId: `IP-${Date.now()}`,
-            qrCode: 'BASE64_PLACEHOLDER_FOR_INSTAPAY_QR',
-            status: 'PENDING',
-            message: 'Scan QR to pay via InstaPay app'
-        };
+        throw new Error(`PAYMENT_PROVIDER_NOT_CONFIGURED: ${req.provider}`);
     },
 
-    /**
-     * Vodafone Cash Mock Flow (USSD/Wallet Push)
-     */
+    /** Vodafone Cash remains unavailable until a verified provider adapter is installed. */
     async initiateVodafoneCash(req: PaymentRequest): Promise<PaymentResponse> {
         if (!req.customerPhone) throw new Error('Customer phone required for Vodafone Cash');
-        
-        return {
-            success: true,
-            transactionId: `VC-${Date.now()}`,
-            status: 'PENDING',
-            message: `Check your phone for USSD confirmation sent to ${req.customerPhone}`
-        };
+        throw new Error(`PAYMENT_PROVIDER_NOT_CONFIGURED: ${req.provider}`);
     },
 
-    /**
-     * Fawry Mock Flow (Reference Code)
-     */
+    /** Fawry remains unavailable until a verified provider adapter is installed. */
     async initiateFawry(req: PaymentRequest): Promise<PaymentResponse> {
-        const referenceCode = Math.floor(100000000 + Math.random() * 900000000).toString();
-        
-        return {
-            success: true,
-            transactionId: `FW-${Date.now()}`,
-            referenceCode,
-            status: 'PENDING',
-            message: `Pay using reference code: ${referenceCode} at any Fawry point`
-        };
+        throw new Error(`PAYMENT_PROVIDER_NOT_CONFIGURED: ${req.provider}`);
     },
 
     /**

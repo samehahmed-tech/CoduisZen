@@ -5,7 +5,7 @@ import { journalEntries, journalLines, chartOfAccounts, costCenters, users, bran
 import { parseLocalDateRange, resolveScopedBranchId } from './reportUtils';
 
 const branchJournalScope = (branchId?: string) => (
-    branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined
+    branchId ? eq(costCenters.branchId, branchId) : undefined
 );
 
 export const getTrialBalance = async (req: Request, res: Response) => {
@@ -113,6 +113,7 @@ export const getTopExpenses = async (req: Request, res: Response) => {
                 gte(journalEntries.date, start),
                 lte(journalEntries.date, end),
                 eq(journalEntries.status, 'POSTED'),
+                eq(journalEntries.referenceType, 'EXPENSE'),
                 eq(chartOfAccounts.type, 'EXPENSE'),
                 branchJournalScope(branchId)
             ))
@@ -143,12 +144,13 @@ export const getExpenseReport = async (req: Request, res: Response) => {
 
         const statusCondition = allowedStatuses.length === 1
             ? eq(journalEntries.status, allowedStatuses[0])
-            : sql`${journalEntries.status} = ANY(ARRAY['POSTED','PENDING_APPROVAL'])`;
+            : or(eq(journalEntries.status, 'POSTED'), eq(journalEntries.status, 'PENDING_APPROVAL'));
 
         const conditions = [
             gte(journalEntries.date, start),
             lte(journalEntries.date, end),
             statusCondition,
+            eq(journalEntries.referenceType, 'EXPENSE'),
             eq(chartOfAccounts.type, 'EXPENSE'),
             branchJournalScope(branchId),
         ];
@@ -181,13 +183,14 @@ export const getExpenseReport = async (req: Request, res: Response) => {
             .leftJoin(branches, eq(costCenters.branchId, branches.id))
             .where(and(...conditions))
             .orderBy(desc(journalEntries.date), desc(journalLines.id))
-            .limit(pageLimit)
-            .offset(pageOffset);
+            .offset(pageOffset)
+            .fetch(pageLimit);
 
         // Also get counts for both statuses
         const countConditions = [
             gte(journalEntries.date, start),
             lte(journalEntries.date, end),
+            eq(journalEntries.referenceType, 'EXPENSE'),
             eq(chartOfAccounts.type, 'EXPENSE'),
             branchJournalScope(branchId),
         ];

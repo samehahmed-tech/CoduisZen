@@ -298,7 +298,7 @@ const OrdersCenter: React.FC = () => {
         setPendingOrderAction(actionKey);
         setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
         try {
-            await updateOrderStatus(orderId, newStatus);
+            await updateOrderStatus(orderId, newStatus, undefined, undefined, { skipVersionCheck: true });
             showToast(isAr ? 'تم تحديث حالة الطلب' : 'Order status updated', 'success');
             loadOrders();
         } catch (err: any) {
@@ -314,7 +314,7 @@ const OrdersCenter: React.FC = () => {
         setPendingOrderAction(`${orderId}:VOID`);
         setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: OrderStatus.CANCELLED } : order));
         try {
-            await updateOrderStatus(orderId, OrderStatus.CANCELLED, undefined, reason.trim());
+            await updateOrderStatus(orderId, OrderStatus.CANCELLED, undefined, reason.trim(), { skipVersionCheck: true });
             showToast(isAr ? 'تم إلغاء الطلب' : 'Order cancelled', 'success');
             loadOrders();
         } catch (err: any) {

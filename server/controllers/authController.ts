@@ -31,15 +31,25 @@ const parseJwtExpiryMs = (value: string): number => {
     return amount * 1000;
 };
 
+/** Parse a value that may be a JSON string (as stored by MSSQL nvarchar columns) or already an array/object */
+const parseJsonField = <T>(value: any, fallback: T): T => {
+    if (Array.isArray(value)) return value as unknown as T;
+    if (value && typeof value === 'object') return value as unknown as T;
+    if (typeof value === 'string' && value.trim()) {
+        try { return JSON.parse(value) as T; } catch { /* ignore */ }
+    }
+    return fallback;
+};
+
 const sanitizeUser = (u: any) => ({
     id: u.id,
     name: u.name,
     email: u.email,
     role: u.role,
-    permissions: u.permissions || [],
+    permissions: parseJsonField<string[]>(u.permissions, []),
     assignedBranchId: u.assignedBranchId,
-    allowedBranches: Array.isArray(u.allowedBranches) ? u.allowedBranches : [],
-    defaultPage: u.customPermissions?.defaultPage,
+    allowedBranches: parseJsonField<string[]>(u.allowedBranches, []),
+    defaultPage: parseJsonField<Record<string, any>>(u.customPermissions, {})?.defaultPage,
     isActive: u.isActive !== false,
     mfaEnabled: u.mfaEnabled === true,
 });
@@ -49,20 +59,19 @@ const normalizeAllowedBranches = (user: any): string[] => {
     if (typeof user?.assignedBranchId === 'string' && user.assignedBranchId.trim()) {
         branches.add(user.assignedBranchId.trim());
     }
-    if (Array.isArray(user?.allowedBranches)) {
-        for (const branchId of user.allowedBranches) {
-            if (typeof branchId === 'string' && branchId.trim()) {
-                branches.add(branchId.trim());
-            }
+    const allowedBranches = parseJsonField<string[]>(user?.allowedBranches, []);
+    for (const branchId of allowedBranches) {
+        if (typeof branchId === 'string' && branchId.trim()) {
+            branches.add(branchId.trim());
         }
     }
     return Array.from(branches);
 };
 
 const getSessionExpiry = (): Date => {
-    const jwtMs = parseJwtExpiryMs(JWT_EXPIRES_IN);
-    const sessionMs = AUTH_SESSION_TTL_HOURS > 0 ? AUTH_SESSION_TTL_HOURS * 60 * 60 * 1000 : jwtMs;
-    return new Date(Date.now() + Math.min(jwtMs, sessionMs));
+    const refreshMs = parseJwtExpiryMs(REFRESH_TOKEN_EXPIRES_IN);
+    const sessionMs = AUTH_SESSION_TTL_HOURS > 0 ? AUTH_SESSION_TTL_HOURS * 60 * 60 * 1000 : refreshMs;
+    return new Date(Date.now() + Math.min(refreshMs, sessionMs));
 };
 
 const writeAuthAudit = async (input: Parameters<typeof createSignedAuditLog>[0]) => {
@@ -97,7 +106,7 @@ const issueAccessToken = async (user: any, req: Request, deviceName?: string) =>
     const token = jwt.sign({
         id: user.id,
         role: user.role,
-        permissions: user.permissions || [],
+        permissions: parseJsonField<string[]>(user.permissions, []),
         branchId: user.assignedBranchId,
         allowedBranches: normalizeAllowedBranches(user),
         sid: sessionId,
@@ -869,16 +878,16 @@ export const getLoginAuditLog = async (req: Request, res: Response) => {
             id: auditLogs.id,
             eventType: auditLogs.eventType,
             userId: auditLogs.userId,
-            userName: sql<string>`${auditLogs.payload}->>'userName'`,
-            userRole: sql<string>`${auditLogs.payload}->>'userRole'`,
-            ipAddress: sql<string>`${auditLogs.payload}->>'ipAddress'`,
+            userName: sql<string>`JSON_VALUE(${auditLogs.payload}, '$.userName')`,
+            userRole: sql<string>`JSON_VALUE(${auditLogs.payload}, '$.userRole')`,
+            ipAddress: sql<string>`JSON_VALUE(${auditLogs.payload}, '$.ipAddress')`,
             reason: auditLogs.reason,
             payload: auditLogs.payload,
             createdAt: auditLogs.createdAt,
         }).from(auditLogs)
             .where(and(...conditions))
             .orderBy(desc(auditLogs.createdAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         // Summary stats
         const totalAttempts = logs.length;
@@ -899,7 +908,6 @@ export const getLoginAuditLog = async (req: Request, res: Response) => {
     }
 };
 
-// ============================================================================
 // ADMIN: SESSION MANAGEMENT (All Users)
 // ============================================================================
 
@@ -932,7 +940,7 @@ export const getAdminSessions = async (req: Request, res: Response) => {
         }).from(userSessions)
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(desc(userSessions.lastSeenAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         // Fetch user names for each session
         const userIds = [...new Set(sessions.map(s => s.userId))];

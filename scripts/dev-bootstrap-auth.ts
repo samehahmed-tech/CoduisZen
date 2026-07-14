@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 
-import { closeDatabase, db } from '../server/db';
+import { closeDatabase, db, pool } from '../server/db';
 import { branches, users } from '../src/db/schema';
 
 // Load .env.local first (developer machine), then fallback to .env.
@@ -41,13 +41,16 @@ const main = async () => {
     process.exit(1);
   }
 
-  await db.insert(branches).values({
-    id: branchId,
-    name: branchName,
-    address: get('DEV_BOOTSTRAP_BRANCH_ADDRESS') || 'القاهرة، مصر',
-    phone: get('DEV_BOOTSTRAP_BRANCH_PHONE') || '0123456789',
-    isActive: true,
-  }).onConflictDoNothing();
+  await pool.query(`
+    IF NOT EXISTS (SELECT 1 FROM branches WHERE id = $1)
+    INSERT INTO branches (id, name, address, phone, is_active, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, 1, GETDATE(), GETDATE())
+  `, [
+    branchId,
+    branchName,
+    get('DEV_BOOTSTRAP_BRANCH_ADDRESS') || 'القاهرة، مصر',
+    get('DEV_BOOTSTRAP_BRANCH_PHONE') || '0123456789',
+  ]);
 
   const existing = await db.select().from(users).where(eq(users.email, email));
   if (existing.length === 0) {
@@ -64,7 +67,7 @@ const main = async () => {
       managerPin: get('DEV_BOOTSTRAP_MANAGER_PIN') || '1234',
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as any).onConflictDoNothing();
+    } as any);
 
     console.log(JSON.stringify({
       ok: true,

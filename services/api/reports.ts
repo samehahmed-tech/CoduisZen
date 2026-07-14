@@ -56,6 +56,7 @@ export const reportsApi = {
                 netRevenue: number;
                 expenses: number;
                 pendingExpenses: number;
+                cogs: number;
                 netProfit: number;
                 paidRevenue: number;
                 discounts: number;

@@ -18,9 +18,9 @@ export const getKitchenPerformance = async (req: Request, res: Response) => {
         const rows = await db.select({
             itemName: orderItems.name,
             totalPrepared: sql<number>`count(*)`,
-            avgPrepMinutes: sql<number>`coalesce(avg(extract(epoch from (${orderItems.preparedAt} - ${orders.createdAt})) / 60), 0)`,
-            minPrepMinutes: sql<number>`coalesce(min(extract(epoch from (${orderItems.preparedAt} - ${orders.createdAt})) / 60), 0)`,
-            maxPrepMinutes: sql<number>`coalesce(max(extract(epoch from (${orderItems.preparedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgPrepMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orderItems.preparedAt}) / 60.0), 0)`,
+            minPrepMinutes: sql<number>`coalesce(min(datediff(second, ${orders.createdAt}, ${orderItems.preparedAt}) / 60.0), 0)`,
+            maxPrepMinutes: sql<number>`coalesce(max(datediff(second, ${orders.createdAt}, ${orderItems.preparedAt}) / 60.0), 0)`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
             .where(and(...conditions))
@@ -96,11 +96,11 @@ export const getDaypartAnalysis = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            hour: sql<number>`extract(hour from ${orders.createdAt})`,
+            hour: sql<number>`datepart(hour, ${orders.createdAt})`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
-        }).from(orders).where(and(...conditions)).groupBy(sql`extract(hour from ${orders.createdAt})`);
+        }).from(orders).where(and(...conditions)).groupBy(sql`datepart(hour, ${orders.createdAt})`);
 
         const dayparts = [
             { name: 'Breakfast', start: 6, end: 11, orderCount: 0, revenue: 0, avgTicket: 0, hours: [] as number[] },
@@ -197,18 +197,18 @@ export const getWaitTimeReport = async (req: Request, res: Response) => {
         const byType = await db.select({
             orderType: orders.type,
             orderCount: sql<number>`count(*)`,
-            avgWaitMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
-            minWaitMinutes: sql<number>`coalesce(min(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
-            maxWaitMinutes: sql<number>`coalesce(max(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgWaitMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
+            minWaitMinutes: sql<number>`coalesce(min(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
+            maxWaitMinutes: sql<number>`coalesce(max(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
         }).from(orders).where(and(...conditions)).groupBy(orders.type);
 
         const daily = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
-            avgWaitMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
+            avgWaitMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
             orderCount: sql<number>`count(*)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json({
             byType: byType.map(r => ({ orderType: r.orderType, orderCount: Number(r.orderCount), avgWaitMinutes: Number(Number(r.avgWaitMinutes).toFixed(1)), minWaitMinutes: Number(Number(r.minWaitMinutes).toFixed(1)), maxWaitMinutes: Number(Number(r.maxWaitMinutes).toFixed(1)) })),
@@ -233,7 +233,7 @@ export const getDriverUtilization = async (req: Request, res: Response) => {
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             totalDeliveryFees: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
-            avgDeliveryMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgDeliveryMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
         }).from(orders)
             .leftJoin(drivers, eq(orders.driverId, drivers.id))
             .where(and(...conditions))
@@ -260,7 +260,7 @@ export const getBranchComparison = async (req: Request, res: Response) => {
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
-            cancelCount: sql<number>`count(*) filter (where ${orders.status} = 'CANCELLED')`,
+            cancelCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
             totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
         }).from(orders)
             .leftJoin(branches, eq(orders.branchId, branches.id))

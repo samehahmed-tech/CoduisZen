@@ -58,6 +58,7 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
         INSUFFICIENT_INVENTORY: 'المخزون لا يكفي لحفظ الطلب. راجع مخزون مكونات الصنف أو اختر صنفًا آخر.',
         DUPLICATE_RECORD: 'هذا السجل موجود بالفعل. حدّث الصفحة ثم حاول مرة أخرى.',
         DATABASE_QUERY_FAILED: 'تعذر حفظ الطلب بسبب بيانات مرتبطة غير متناسقة. حدّث الصفحة وراجع العميل والفرع والشيفت.',
+        RECORD_HAS_LINKED_DATA: 'لا يمكن حذف هذا السجل لأنه مرتبط ببيانات تشغيل. استخدم الأرشفة أو التعطيل بدل الحذف.',
         ORDER_CREATE_FAILED: 'تعذر حفظ الطلب. راجع بيانات العميل والفرع والشيفت ثم حاول مرة أخرى.',
         ORDER_VERSION_CONFLICT: 'الطلب تم تعديله من جهاز آخر. تم تحديث البيانات، حاول مرة أخرى.',
         FORBIDDEN: 'ليس لديك صلاحية لتنفيذ هذا الإجراء.',
@@ -90,6 +91,7 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
         INSUFFICIENT_INVENTORY: 'Not enough recipe stock to save this order. Review item ingredients stock or choose another item.',
         DUPLICATE_RECORD: 'This record already exists. Refresh the page and retry.',
         DATABASE_QUERY_FAILED: 'The order could not be saved because related data is inconsistent. Review customer, branch, and shift.',
+        RECORD_HAS_LINKED_DATA: 'This record is linked to operational data. Archive or deactivate it instead of deleting.',
         ORDER_CREATE_FAILED: 'The order could not be saved. Review customer, branch, and shift, then retry.',
         IDEMPOTENCY_KEY_PAYLOAD_CONFLICT: 'Same request key used with different payload. Review and retry.',
         IDEMPOTENCY_KEY_IN_PROGRESS: 'Same request is still processing. Wait and refresh.',
@@ -131,6 +133,8 @@ const setAuthToken = (token: string) => {
 
 const handleUnauthorizedToken = (endpoint: string) => {
     if (endpoint.startsWith('/auth/login') || endpoint.startsWith('/auth/mfa') || endpoint.startsWith('/auth/refresh') || endpoint.startsWith('/setup/')) return;
+    const hadSession = Boolean(getAuthToken() || getRefreshToken());
+    if (!hadSession) return;
     try {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_refresh_token');
@@ -141,6 +145,13 @@ const handleUnauthorizedToken = (endpoint: string) => {
         window.dispatchEvent(new CustomEvent('coduiszen:auth-invalid', { detail: { endpoint } }));
     }
 };
+
+const canAttemptTokenRefresh = (endpoint: string) => ![
+    '/auth/login',
+    '/auth/pin-login',
+    '/auth/mfa',
+    '/auth/refresh',
+].some((path) => endpoint.startsWith(path));
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -198,7 +209,7 @@ export async function apiRequest<T>(
         if (!response.ok) {
             const error = await response.json().catch(() => ({ code: `HTTP_${response.status}`, message: 'Request failed' }));
 
-            if (response.status === 401 && !endpoint.startsWith('/auth/')) {
+            if (response.status === 401 && canAttemptTokenRefresh(endpoint)) {
                 const newToken = await tryRefreshToken();
                 if (newToken) {
                     const retryResponse = await fetch(url, {

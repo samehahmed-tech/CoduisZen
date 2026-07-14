@@ -1,62 +1,42 @@
-/**
- * Admin Password Reset + PIN Setup Script
- * Run with: npx tsx scripts/reset-admin.ts
- */
-
 import bcrypt from 'bcryptjs';
-import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import { pool } from '../server/db';
+import { validatePassword } from '../server/services/passwordPolicyService';
+
 dotenv.config();
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/restoflow';
-
 async function resetAdmin() {
-    const pool = new Pool({ connectionString: DATABASE_URL });
+    const email = String(process.env.ADMIN_RESET_EMAIL || '').trim().toLowerCase();
+    const password = String(process.env.ADMIN_RESET_PASSWORD || '');
+    const pin = String(process.env.ADMIN_RESET_PIN || '');
 
-    try {
-        // New password that meets complexity: Admin@2026
-        const newPassword = 'Admin@2026';
-        const newPin = '202626';
-
-        const passwordHash = await bcrypt.hash(newPassword, 10);
-        const pinHash = await bcrypt.hash(newPin, 10);
-
-        // Find SUPER_ADMIN users
-        const { rows: admins } = await pool.query(
-            `SELECT id, name, email, role FROM users WHERE role = 'SUPER_ADMIN' LIMIT 5`
-        );
-
-        if (admins.length === 0) {
-            console.log('❌ No SUPER_ADMIN users found');
-            return;
-        }
-
-        console.log(`Found ${admins.length} admin(s):`);
-        for (const admin of admins) {
-            console.log(`  → ${admin.name} (${admin.email})`);
-
-            await pool.query(
-                `UPDATE users
-                 SET password_hash = $1,
-                     pin_code_hash = $2,
-                     pin_login_enabled = true,
-                     updated_at = NOW()
-                 WHERE id = $3`,
-                [passwordHash, pinHash, admin.id]
-            );
-
-            console.log(`  ✅ Password reset to: ${newPassword}`);
-            console.log(`  ✅ PIN set to: ${newPin}`);
-        }
-
-        console.log('\n✅ Done! You can now login with:');
-        console.log(`   Email + Password: (your email) / ${newPassword}`);
-        console.log(`   PIN Code: ${newPin}`);
-    } catch (error: any) {
-        console.error('❌ Error:', error.message);
-    } finally {
-        await pool.end();
+    if (process.env.ADMIN_RESET_CONFIRM !== 'RESET') {
+        throw new Error('Set ADMIN_RESET_CONFIRM=RESET to authorize this operation.');
     }
+    if (!email) throw new Error('ADMIN_RESET_EMAIL is required.');
+
+    const passwordResult = validatePassword(password);
+    if (!passwordResult.valid) throw new Error(`Password policy failed: ${passwordResult.errors.join('; ')}`);
+    if (pin && !/^\d{6}$/.test(pin)) throw new Error('ADMIN_RESET_PIN must contain exactly 6 digits.');
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const pinHash = pin ? await bcrypt.hash(pin, 12) : null;
+    const { rows } = await pool.query(
+        `UPDATE users
+         SET password_hash = $1,
+             pin_code_hash = CASE WHEN $2 IS NULL THEN pin_code_hash ELSE $2 END,
+             pin_login_enabled = CASE WHEN $2 IS NULL THEN pin_login_enabled ELSE 1 END,
+             updated_at = GETDATE()
+         OUTPUT inserted.id
+         WHERE lower(email) = $3 AND role = 'SUPER_ADMIN'`,
+        [passwordHash, pinHash, email],
+    );
+
+    if (rows.length !== 1) throw new Error('Exactly one SUPER_ADMIN with ADMIN_RESET_EMAIL was not found.');
+    console.log('Administrator credentials reset successfully.');
 }
 
-resetAdmin();
+resetAdmin().catch(error => {
+    console.error(`Admin reset failed: ${error.message}`);
+    process.exitCode = 1;
+});

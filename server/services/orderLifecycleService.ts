@@ -117,7 +117,7 @@ export const transitionOrderStatus = async ({
 }: TransitionInput) => {
     const normalizedStatus = String(nextStatus || '').toUpperCase();
     const result = await db.transaction(async (tx) => {
-        const [currentOrder] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+        const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id, orderId));
         if (!currentOrder) {
             const error: any = new Error('ORDER_NOT_FOUND');
             error.status = 404;
@@ -161,8 +161,8 @@ export const transitionOrderStatus = async ({
         const now = new Date();
         const [updatedOrder] = await tx.update(orders)
             .set(getStatusPatch(normalizedStatus, now, notes))
-            .where(eq(orders.id, orderId))
-            .returning();
+            .output()
+            .where(eq(orders.id, orderId));
         if (!updatedOrder) throw new Error('ORDER_NOT_FOUND');
 
         await tx.insert(orderStatusHistory).values({

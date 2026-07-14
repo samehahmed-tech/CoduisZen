@@ -38,7 +38,7 @@ import SeatModal from './components/SeatModal';
 import CourseModal from './components/CourseModal';
 import POSCartSidebar from './components/POSCartSidebar';
 import { printService } from '@/src/services/printService';
-import { POS_PRINT_STATION_KEY, printKitchenTicketsByRouting, printOrderReceipt } from '@/services/posPrintOrchestrator';
+import { hasCashierPrinterConfigured, POS_PRINT_STATION_KEY, printKitchenTicketsByRouting, printOrderReceipt } from '@/services/posPrintOrchestrator';
 import { useToast } from '@/components/Toast';
 import { useModal } from '@/components/Modal';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
@@ -970,17 +970,21 @@ const POS: React.FC = () => {
    const handleTempBill = async (tableId: string) => {
       const activeOrder = orders.find(o => o.tableId === tableId && o.status !== OrderStatus.DELIVERED);
       if (!activeOrder) return;
-      await printOrderReceipt({
-         order: activeOrder,
-         printers,
-         title: t.temp_bill || 'Temporary Bill',
-         settings,
-         currencySymbol,
-         lang,
-         t,
-         branch: activeBranch
-      });
-      showToast(t.temp_bill_printed || (lang === 'ar' ? 'تم طباعة شيك مؤقت' : 'Temporary bill printed'), 'success');
+      try {
+         await printOrderReceipt({
+            order: activeOrder,
+            printers,
+            title: t.temp_bill || 'Temporary Bill',
+            settings,
+            currencySymbol,
+            lang,
+            t,
+            branch: activeBranch
+         });
+         showToast(t.temp_bill_printed || (lang === 'ar' ? 'تم إرسال الشيك المؤقت للطباعة' : 'Temporary bill queued for printing'), 'success');
+      } catch {
+         showToast(lang === 'ar' ? 'تعذرت طباعة الشيك المؤقت. راجع إعدادات الطابعة والـBridge.' : 'Temporary bill print failed. Check printer and bridge settings.', 'error');
+      }
    };
 
    const buildOrderNotes = () => {
@@ -1044,7 +1048,7 @@ const POS: React.FC = () => {
    };
 
    const fireOrderToKitchen = async (order: Order) => {
-      await kdsApi.dispatchOrder(order.id, branchId);
+      await kdsApi.dispatchOrder(order.id, branchId, true);
       try {
          await printKitchenTicketsByRouting({
             order,
@@ -1061,13 +1065,35 @@ const POS: React.FC = () => {
       } catch {
          showToast(lang === 'ar' ? 'تم إرسال الطلب، لكن طابعة المطبخ غير متاحة' : 'Order sent, but kitchen printer is unavailable', 'warning');
       }
-      await updateOrderStatus(order.id, OrderStatus.PREPARING);
+      await updateOrderStatus(order.id, OrderStatus.PREPARING, undefined, undefined, { skipVersionCheck: true });
    };
+
+   const [submittingOrderKey, setSubmittingOrderKey] = useState<string | null>(null);
+   const submittingOrderKeyRef = useRef<string | null>(null);
+
+   const beginOrderSubmit = (prefix: string) => {
+      if (submittingOrderKeyRef.current) return null;
+      const key = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      submittingOrderKeyRef.current = key;
+      setSubmittingOrderKey(key);
+      return key;
+   };
+
+   const endOrderSubmit = () => {
+      submittingOrderKeyRef.current = null;
+      setSubmittingOrderKey(null);
+   };
+
+   const shouldAutoCompleteDirectOrder = () =>
+      settings.autoCompleteDirectOrders === true && [OrderType.TAKEAWAY, OrderType.PICKUP].includes(activeOrderType);
 
    const handleSendKitchen = async () => {
       if (safeActiveCart.length === 0) return;
+      const submitKey = beginOrderSubmit('send');
+      if (!submitKey) return;
       try {
          const draftOrder = buildDraftOrder(false);
+         (draftOrder as any).clientSubmitKey = submitKey;
          const savedOrder = await placeOrder(draftOrder);
 
          if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
@@ -1087,6 +1113,8 @@ const POS: React.FC = () => {
          );
       } catch (error: any) {
          showToast(getActionableErrorMessage(error, lang), 'error');
+      } finally {
+         endOrderSubmit();
       }
    };
 
@@ -1094,26 +1122,30 @@ const POS: React.FC = () => {
 
    const handleSubmitOrder = async () => {
       if (safeActiveCart.length === 0) return;
+      const submitKey = beginOrderSubmit('pay');
+      if (!submitKey) return;
       if (paymentMethod === PaymentMethod.SPLIT) {
          const splitTotal = splitPayments.reduce((sum, p) => sum + p.amount, 0);
          if (Math.abs(splitTotal - cartTotal) > 0.01) {
             showToast(t.split_total_error, 'error');
+            endOrderSubmit();
             return;
          }
       }
       try {
          const draftOrder = buildDraftOrder(true);
+         (draftOrder as any).clientSubmitKey = submitKey;
 
          // 1. Place Order in Store (Syncs with server which now handles inventory)
-          const savedOrder = await placeOrder(draftOrder);
-          if (savedOrder.warnings?.some(warning => warning.code === 'INSUFFICIENT_INVENTORY')) {
-             showToast(lang === 'ar'
-                ? 'تم حفظ البيع، لكن مخزون بعض المكونات غير كاف.'
-                : 'Sale saved, but some ingredient stock is insufficient.',
-                'warning');
-          }
+         const savedOrder = await placeOrder(draftOrder);
+         if (savedOrder.warnings?.some(warning => warning.code === 'INSUFFICIENT_INVENTORY')) {
+            showToast(lang === 'ar'
+               ? 'تم حفظ البيع، لكن مخزون بعض المكونات غير كاف.'
+               : 'Sale saved, but some ingredient stock is insufficient.',
+               'warning');
+         }
 
-          // Update Table Status to OCCUPIED if Dine-In
+         // Update Table Status to OCCUPIED if Dine-In
          if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
             updateTableStatus(selectedTableId, TableStatus.OCCUPIED);
             clearTableDraft(selectedTableId);
@@ -1132,12 +1164,16 @@ const POS: React.FC = () => {
             referenceId: savedOrder.id
          });
 
-         // 3. Trigger kitchen fire on submit for all order types in background
-         fireOrderToKitchen(savedOrder)
-            .catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ' : 'Order saved, but kitchen dispatch failed', 'error'));
+         if (shouldAutoCompleteDirectOrder()) {
+            await updateOrderStatus(savedOrder.id, OrderStatus.COMPLETED, undefined, 'Auto-completed direct order', { skipVersionCheck: true, skipPrint: true });
+         } else if (settings.orderManualKitchenFlow !== true) {
+            fireOrderToKitchen(savedOrder)
+               .catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ' : 'Order saved, but kitchen dispatch failed', 'error'));
+         }
 
          // 4. Trigger customer receipts in background to avoid blocking UI animations
-         const shouldPrintOnSubmit = (settings.autoPrintReceiptOnSubmit ?? settings.autoPrintReceipt ?? false) === true;
+         const shouldPrintOnSubmit = (settings.autoPrintReceiptOnSubmit ?? settings.autoPrintReceipt ?? false) === true
+            || hasCashierPrinterConfigured(printers, savedOrder.branchId, settings);
          if (shouldPrintOnSubmit) {
             printOrderReceipt({
                order: savedOrder,
@@ -1155,6 +1191,8 @@ const POS: React.FC = () => {
          resetAfterOrderCommit();
       } catch (error: any) {
          showToast(getActionableErrorMessage(error, lang), 'error');
+      } finally {
+         endOrderSubmit();
       }
    };
 
@@ -1711,6 +1749,7 @@ const POS: React.FC = () => {
                            onSendKitchen={handleSendKitchen}
                            onSubmit={handleSubmitOrder}
                            onQuickPay={handleQuickPay}
+                           isSubmitting={Boolean(submittingOrderKey)}
                            onShowSplitModal={() => setShowSplitModal(true)}
                            onLeaveTable={leaveTable}
                            onCloseCart={() => { if (activeOrderType === OrderType.DINE_IN) leaveTable(); setIsCartOpenMobile(false); }}

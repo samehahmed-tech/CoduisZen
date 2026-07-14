@@ -47,7 +47,7 @@ const formatLocalDate = (date: Date) => {
 
 type DashboardPayload = {
   totals: {
-    revenue: number; netRevenue: number; expenses: number; pendingExpenses: number; netProfit: number;
+    revenue: number; netRevenue: number; expenses: number; pendingExpenses: number; cogs: number; netProfit: number;
     paidRevenue: number; discounts: number; orderCount: number;
     avgTicket: number; uniqueCustomers: number; itemsSold: number;
     cancelled: number; pending: number; delivered: number; cancelRate: number;
@@ -70,7 +70,7 @@ type DashboardQueryResult = {
 };
 
 const EMPTY_PAYLOAD: DashboardPayload = {
-  totals: { revenue: 0, netRevenue: 0, expenses: 0, pendingExpenses: 0, netProfit: 0, paidRevenue: 0, discounts: 0, orderCount: 0, avgTicket: 0, uniqueCustomers: 0, itemsSold: 0, cancelled: 0, pending: 0, delivered: 0, cancelRate: 0 },
+  totals: { revenue: 0, netRevenue: 0, expenses: 0, pendingExpenses: 0, cogs: 0, netProfit: 0, paidRevenue: 0, discounts: 0, orderCount: 0, avgTicket: 0, uniqueCustomers: 0, itemsSold: 0, cancelled: 0, pending: 0, delivered: 0, cancelRate: 0 },
   trendData: [], paymentBreakdown: [], orderTypeBreakdown: [], categoryData: [], topItems: [], branchPerformance: [], topCustomers: []
 };
 

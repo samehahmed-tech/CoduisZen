@@ -4,6 +4,10 @@ import { db } from '../db';
 import { shiftPlanEntries, shiftPlans, shiftTemplates } from '../../src/db/schema';
 
 const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
+const toSqlDate = (date: string | Date) => {
+    const datePart = date instanceof Date ? date.toISOString().slice(0, 10) : String(date).slice(0, 10);
+    return new Date(`${datePart}T00:00:00.000Z`);
+};
 
 const parseTimeToMinutes = (value?: string | null) => {
     if (!value) return null;
@@ -32,15 +36,15 @@ export const schedulingService = {
         const start = new Date(input.weekStart);
         const end = input.weekEnd ? new Date(input.weekEnd) : new Date(start.getTime() + (6 * 24 * 60 * 60 * 1000));
 
-        const [created] = await db.insert(shiftPlans).values({
+        const [created] = await db.insert(shiftPlans).output().values({
             id: makeId('SPL'),
             branchId: input.branchId,
             name: input.name,
-            weekStart: start.toISOString().slice(0, 10),
-            weekEnd: end.toISOString().slice(0, 10),
+            weekStart: toSqlDate(start),
+            weekEnd: toSqlDate(end),
             createdBy: input.createdBy,
             status: 'DRAFT',
-        }).returning();
+        });
         return created;
     },
 
@@ -59,8 +63,8 @@ export const schedulingService = {
         }
         const [updated] = await db.update(shiftPlans)
             .set(updates)
-            .where(eq(shiftPlans.id, input.id))
-            .returning();
+            .output()
+            .where(eq(shiftPlans.id, input.id));
         return updated;
     },
 
@@ -70,8 +74,8 @@ export const schedulingService = {
                 filters?.planId ? eq(shiftPlanEntries.planId, filters.planId) : undefined,
                 filters?.branchId ? eq(shiftPlanEntries.branchId, filters.branchId) : undefined,
                 filters?.employeeId ? eq(shiftPlanEntries.employeeId, filters.employeeId) : undefined,
-                filters?.dateFrom ? gte(shiftPlanEntries.date, filters.dateFrom) : undefined,
-                filters?.dateTo ? lte(shiftPlanEntries.date, filters.dateTo) : undefined,
+                filters?.dateFrom ? gte(shiftPlanEntries.date, toSqlDate(filters.dateFrom)) : undefined,
+                filters?.dateTo ? lte(shiftPlanEntries.date, toSqlDate(filters.dateTo)) : undefined,
             ))
             .orderBy(desc(shiftPlanEntries.date));
     },
@@ -90,9 +94,8 @@ export const schedulingService = {
         let startTime = input.startTime;
         let endTime = input.endTime;
         if ((!startTime || !endTime) && input.shiftTemplateId) {
-            const [template] = await db.select().from(shiftTemplates)
-                .where(eq(shiftTemplates.id, input.shiftTemplateId))
-                .limit(1);
+        const [template] = await db.select().top(1).from(shiftTemplates)
+            .where(eq(shiftTemplates.id, input.shiftTemplateId));
             startTime = startTime || template?.startTime;
             endTime = endTime || template?.endTime;
         }
@@ -100,7 +103,7 @@ export const schedulingService = {
         const sameDay = await db.select().from(shiftPlanEntries)
             .where(and(
                 eq(shiftPlanEntries.employeeId, input.employeeId),
-                eq(shiftPlanEntries.date, input.date),
+                eq(shiftPlanEntries.date, toSqlDate(input.date)),
             ));
 
         const conflict = sameDay.find((entry) => hasOverlap(startTime, endTime, entry.startTime, entry.endTime));
@@ -108,17 +111,17 @@ export const schedulingService = {
             throw new Error(`SHIFT_CONFLICT_WITH_ENTRY_${conflict.id}`);
         }
 
-        const [created] = await db.insert(shiftPlanEntries).values({
+        const [created] = await db.insert(shiftPlanEntries).output().values({
             planId: input.planId,
             branchId: input.branchId,
             employeeId: input.employeeId,
             shiftTemplateId: input.shiftTemplateId,
-            date: input.date,
+            date: toSqlDate(input.date),
             startTime,
             endTime,
             status: input.status || 'PLANNED',
             notes: input.notes,
-        }).returning();
+        });
         return created;
     },
 
@@ -130,7 +133,7 @@ export const schedulingService = {
         status?: string;
         notes?: string;
     }) {
-        const [current] = await db.select().from(shiftPlanEntries).where(eq(shiftPlanEntries.id, input.id)).limit(1);
+        const [current] = await db.select().top(1).from(shiftPlanEntries).where(eq(shiftPlanEntries.id, input.id));
         if (!current) throw new Error('SHIFT_ENTRY_NOT_FOUND');
 
         let startTime = input.startTime ?? current.startTime;
@@ -138,9 +141,8 @@ export const schedulingService = {
         const shiftTemplateId = input.shiftTemplateId ?? current.shiftTemplateId;
 
         if ((!startTime || !endTime) && shiftTemplateId) {
-            const [template] = await db.select().from(shiftTemplates)
-                .where(eq(shiftTemplates.id, shiftTemplateId))
-                .limit(1);
+            const [template] = await db.select().top(1).from(shiftTemplates)
+                .where(eq(shiftTemplates.id, shiftTemplateId));
             startTime = startTime || template?.startTime;
             endTime = endTime || template?.endTime;
         }
@@ -166,8 +168,8 @@ export const schedulingService = {
                 notes: input.notes ?? current.notes,
                 updatedAt: new Date(),
             })
-            .where(eq(shiftPlanEntries.id, input.id))
-            .returning();
+            .output()
+            .where(eq(shiftPlanEntries.id, input.id));
         return updated;
     },
 };

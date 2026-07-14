@@ -31,7 +31,7 @@ export const loyaltyService = {
             const pointsToAdd = Math.floor(orderTotal * POINTS_PER_EGP);
             if (pointsToAdd <= 0) return;
 
-            const [customer] = await db.select().from(customers).where(eq(customers.id, customerId)).limit(1);
+            const [customer] = await db.select().top(1).from(customers).where(eq(customers.id, customerId));
             if (!customer) return;
 
             const newTotalPoints = Number(customer.loyaltyPoints || 0) + pointsToAdd;
@@ -92,7 +92,7 @@ export const loyaltyService = {
      */
     async redeemPoints(customerId: string, points: number, branchId?: string) {
         try {
-            const [customer] = await db.select().from(customers).where(eq(customers.id, customerId)).limit(1);
+            const [customer] = await db.select().top(1).from(customers).where(eq(customers.id, customerId));
             if (!customer) throw new Error('Customer not found');
 
             const currentPoints = Number(customer.loyaltyPoints || 0);

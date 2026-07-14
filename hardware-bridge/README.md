@@ -1,35 +1,37 @@
-# Coduis Zen Print Bridge
+# RestoFlow Print Bridge
 
-Branch Print Gateway service.
-It polls backend print queue and sends jobs to thermal/network printers.
+Lightweight print bridge that polls the RestoFlow server for queued jobs and sends them to local printers.
 
-## Required env vars
+## How it works
 
-- `PRINT_GATEWAY_TOKEN` (must match backend `PRINT_GATEWAY_TOKEN`)
-- `PRINT_BRANCH_ID` (branch handled by this gateway, example: `b1`)
+1. Bridge polls `GET /api/print-gateway/bridge/jobs` every two seconds by default.
+2. Every server request includes the installer-generated gateway token.
+3. Bridge prints through the Windows printer queue.
+4. Completion or failure is reported to the server and retried locally if reporting fails.
 
-Optional:
+The bridge has no Express or `escpos` dependency. Its local health/printer API listens only on `127.0.0.1:3002`.
 
-- `PRINT_BACKEND_URL` (default: `http://localhost:3001/api/print-gateway/gateway`)
-- `PRINT_GATEWAY_ID` (default: host-based id)
-- `PRINT_GATEWAY_POLL_MS` (default: `1200`)
-- `PRINT_BRIDGE_PORT` (default: `3002`)
+## Setup
 
-## Run manually
+The RestoFlow installer configures and starts the bridge automatically. It writes
+`SERVER_URL` and the package's gateway token; do not share that token.
 
-1. `npm run bridge:install`
-2. Copy `hardware-bridge/.env.example` to `hardware-bridge/.env` and fill values.
-3. `npm run bridge:start`
+For manual development only: run `npm install`, put `SERVER_URL` and
+`GATEWAY_TOKEN` in `.env`, then run `npm start`.
 
-## Run automatically on Windows startup
+## Windows Auto-start
 
-1. `npm run bridge:autostart:install`
-2. Sign out/sign in (or reboot).
+```powershell
+npm run install:service
+```
 
-To remove auto-start:
+Run manually or reboot. The bridge starts automatically as a scheduled task.
 
-- `npm run bridge:autostart:remove`
+## Printer Configuration
 
-## Health check
+Configure printer addresses in RestoFlow. The bridge also discovers installed
+Windows printers and exposes them to the Printers page through its local API.
 
-- `GET http://localhost:3002/health`
+## Logs
+
+Logs are saved to `~/.restoflow-bridge/bridge.log`.

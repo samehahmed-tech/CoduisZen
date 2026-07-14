@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMenuItemSchema } from '../server/middleware/validation';
+import { createMenuItemSchema, updateMenuItemSchema } from '../server/middleware/validation';
 
 const baseItem = {
     id: 'test-item-1',
@@ -27,5 +27,29 @@ describe('menu item validation', () => {
             ...baseItem,
             image,
         })).toThrow(/Image reference is too large/);
+    });
+
+    it('strips UI-only fields before updating the SQL row', () => {
+        const parsed = updateMenuItemSchema.parse({
+            name: 'Updated Item',
+            price: 120,
+            priceLists: [{ id: 'retail', price: 120 }],
+            category_id: 'category-2',
+            name_ar: 'صنف معدل',
+        });
+
+        expect(parsed).toMatchObject({
+            name: 'Updated Item',
+            price: 120,
+            categoryId: 'category-2',
+            nameAr: 'صنف معدل',
+        });
+        expect(parsed).not.toHaveProperty('priceLists');
+        expect(parsed).not.toHaveProperty('category_id');
+        expect(parsed).not.toHaveProperty('name_ar');
+    });
+
+    it('accepts the archived status used by the delete fallback', () => {
+        expect(updateMenuItemSchema.parse({ status: 'archived' }).status).toBe('archived');
     });
 });

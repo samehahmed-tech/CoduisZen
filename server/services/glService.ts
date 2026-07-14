@@ -12,7 +12,7 @@ import {
 import { eq, sql, sum } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
-export type ReferenceType = 'ORDER' | 'PAYMENT' | 'GRN' | 'WASTE' | 'MANUAL' | 'REFUND' | 'VOID' | 'SHIFT_CLOSE' | 'COGS' | 'PAYROLL' | 'WALLET_DEPOSIT' | 'WALLET_PAYMENT' | 'LOYALTY_REDEMPTION';
+export type ReferenceType = 'ORDER' | 'PAYMENT' | 'GRN' | 'WASTE' | 'MANUAL' | 'EXPENSE' | 'REFUND' | 'VOID' | 'SHIFT_CLOSE' | 'COGS' | 'PAYROLL' | 'WALLET_DEPOSIT' | 'WALLET_PAYMENT' | 'LOYALTY_REDEMPTION';
 
 export interface JournalLineInput {
     accountCode?: string;
@@ -60,12 +60,12 @@ export class GLService {
             endDate: end,
             status: 'OPEN',
             createdAt: new Date(),
-        }).onConflictDoNothing();
+        });
 
         const [createdOrExisting] = await tx.select()
+            .top(1)
             .from(fiscalPeriods)
-            .where(eq(fiscalPeriods.id, id))
-            .limit(1);
+            .where(eq(fiscalPeriods.id, id));
 
         return createdOrExisting?.id || id;
     }
@@ -106,7 +106,7 @@ export class GLService {
             // 3. Resolve Account IDs from Codes if necessary
             for (const line of input.lines) {
                 if (!line.accountId && line.accountCode) {
-                    const accRow = await tx.select().from(chartOfAccounts).where(eq(chartOfAccounts.code, line.accountCode)).limit(1);
+                    const accRow = await tx.select().top(1).from(chartOfAccounts).where(eq(chartOfAccounts.code, line.accountCode));
                     if (accRow.length === 0) {
                         return await pushToExceptionQueue(`ACCOUNT_NOT_FOUND|Code:${line.accountCode}`);
                     }
@@ -120,7 +120,18 @@ export class GLService {
             // 4. Determine Global/Branch Cost Center
             let defaultCostCenterId: string | undefined = undefined;
             if (input.branchId) {
-                const head = await tx.select().from(costCenters).where(eq(costCenters.branchId, input.branchId)).limit(1);
+                let head = await tx.select().top(1).from(costCenters).where(eq(costCenters.branchId, input.branchId));
+                if (head.length === 0) {
+                    const id = `cc-${input.branchId}`;
+                    await tx.insert(costCenters).values({
+                        id,
+                        branchId: input.branchId,
+                        code: `AUTO-${input.branchId}`,
+                        name: `Branch ${input.branchId}`,
+                        isActive: true,
+                    }).onConflictDoNothing();
+                    head = await tx.select().top(1).from(costCenters).where(eq(costCenters.branchId, input.branchId));
+                }
                 if (head.length > 0) defaultCostCenterId = head[0].id;
             }
 
@@ -212,7 +223,7 @@ export class GLService {
      */
     static async reverseEntry(originalEntryId: string, reversalReference: string, createdBy?: string) {
         return await db.transaction(async (tx) => {
-            const original = await tx.select().from(journalEntries).where(eq(journalEntries.id, originalEntryId)).limit(1);
+            const original = await tx.select().top(1).from(journalEntries).where(eq(journalEntries.id, originalEntryId));
             if (!original || original.length === 0) throw new Error('Original Journal Entry not found');
 
             const lines = await tx.select().from(journalLines).where(eq(journalLines.journalEntryId, originalEntryId));

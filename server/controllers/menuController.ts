@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { inventoryItems, menuCategories, menuItems, recipeIngredients, recipes } from '../../src/db/schema';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { pool } from '../db';
 import { dbCacheService } from '../services/dbCacheService';
 import { createSignedAuditLog } from '../services/auditService';
+import { randomUUID } from 'node:crypto';
 
 const tableColumnsCache = new Map<string, Set<string>>();
 
@@ -14,15 +15,15 @@ const getTableColumns = async (tableName: string): Promise<Set<string>> => {
     const cached = tableColumnsCache.get(cacheKey);
     if (cached) return cached;
 
-    const result = await pool.query<{ column_name: string }>(
+    const result = await pool.query(
         `select column_name
          from information_schema.columns
-         where table_schema = 'public'
+         where table_schema = SCHEMA_NAME()
            and table_name = $1`,
         [cacheKey],
     );
 
-    const columns = new Set(result.rows.map((r) => r.column_name));
+    const columns = new Set<string>(result.rows.map((r) => String(r.column_name)));
     tableColumnsCache.set(cacheKey, columns);
     return columns;
 };
@@ -42,20 +43,20 @@ const readCategoriesCompat = async () => {
     }
 
     const selectParts = [
-        compatSelect(columns, 'id', 'id', `''::text`),
-        compatSelect(columns, 'name', 'name', `''::text`),
-        compatSelect(columns, 'name_ar', 'nameAr', `null::text`),
-        compatSelect(columns, 'description', 'description', `null::text`),
-        compatSelect(columns, 'icon', 'icon', `null::text`),
-        compatSelect(columns, 'image', 'image', `null::text`),
-        compatSelect(columns, 'color', 'color', `null::text`),
+        compatSelect(columns, 'id', 'id', `''`),
+        compatSelect(columns, 'name', 'name', `''`),
+        compatSelect(columns, 'name_ar', 'nameAr', `NULL`),
+        compatSelect(columns, 'description', 'description', `NULL`),
+        compatSelect(columns, 'icon', 'icon', `NULL`),
+        compatSelect(columns, 'image', 'image', `NULL`),
+        compatSelect(columns, 'color', 'color', `NULL`),
         compatSelect(columns, 'sort_order', 'sortOrder', `0`),
-        compatSelect(columns, 'is_active', 'isActive', `true`),
-        compatSelect(columns, 'target_order_types', 'targetOrderTypes', `'[]'::json`),
-        compatSelect(columns, 'menu_ids', 'menuIds', `'[]'::json`),
-        compatSelect(columns, 'printer_ids', 'printerIds', `'[]'::json`),
-        compatSelect(columns, 'created_at', 'createdAt', `now()`),
-        compatSelect(columns, 'updated_at', 'updatedAt', `now()`),
+        compatSelect(columns, 'is_active', 'isActive', `1`),
+        compatSelect(columns, 'target_order_types', 'targetOrderTypes', `'[]'`),
+        compatSelect(columns, 'menu_ids', 'menuIds', `'[]'`),
+        compatSelect(columns, 'printer_ids', 'printerIds', `'[]'`),
+        compatSelect(columns, 'created_at', 'createdAt', `GETDATE()`),
+        compatSelect(columns, 'updated_at', 'updatedAt', `GETDATE()`),
     ];
 
     const query = `
@@ -73,18 +74,18 @@ const readRecipesCompat = async () => {
     if (!hasAnyColumn(columns)) return [];
 
     const selectParts = [
-        compatSelect(columns, 'id', 'id', `''::text`),
-        compatSelect(columns, 'menu_item_id', 'menuItemId', `null::text`),
-        compatSelect(columns, 'inventory_item_id', 'inventoryItemId', `null::text`),
+        compatSelect(columns, 'id', 'id', `''`),
+        compatSelect(columns, 'menu_item_id', 'menuItemId', `NULL`),
+        compatSelect(columns, 'inventory_item_id', 'inventoryItemId', `NULL`),
         compatSelect(columns, 'yield', 'yield', `1`),
-        compatSelect(columns, 'size_id', 'sizeId', `null::text`),
-        compatSelect(columns, 'instructions', 'instructions', `null::text`),
+        compatSelect(columns, 'size_id', 'sizeId', `NULL`),
+        compatSelect(columns, 'instructions', 'instructions', `NULL`),
         compatSelect(columns, 'version', 'version', `1`),
-        compatSelect(columns, 'current_version_id', 'currentVersionId', `null::text`),
-        compatSelect(columns, 'calculated_cost', 'calculatedCost', `null::real`),
-        compatSelect(columns, 'last_cost_calculation', 'lastCostCalculation', `null::timestamp`),
-        compatSelect(columns, 'created_at', 'createdAt', `now()`),
-        compatSelect(columns, 'updated_at', 'updatedAt', `now()`),
+        compatSelect(columns, 'current_version_id', 'currentVersionId', `NULL`),
+        compatSelect(columns, 'calculated_cost', 'calculatedCost', `NULL`),
+        compatSelect(columns, 'last_cost_calculation', 'lastCostCalculation', `NULL`),
+        compatSelect(columns, 'created_at', 'createdAt', `GETDATE()`),
+        compatSelect(columns, 'updated_at', 'updatedAt', `GETDATE()`),
     ];
 
     const result = await pool.query(`
@@ -100,11 +101,11 @@ const readRecipeIngredientsCompat = async () => {
 
     const selectParts = [
         compatSelect(columns, 'id', 'id', `0`),
-        compatSelect(columns, 'recipe_id', 'recipeId', `null::text`),
-        compatSelect(columns, 'inventory_item_id', 'inventoryItemId', `null::text`),
+        compatSelect(columns, 'recipe_id', 'recipeId', `NULL`),
+        compatSelect(columns, 'inventory_item_id', 'inventoryItemId', `NULL`),
         compatSelect(columns, 'quantity', 'quantity', `0`),
-        compatSelect(columns, 'unit', 'unit', `''::text`),
-        compatSelect(columns, 'notes', 'notes', `null::text`),
+        compatSelect(columns, 'unit', 'unit', `''`),
+        compatSelect(columns, 'notes', 'notes', `NULL`),
     ];
 
     const result = await pool.query(`
@@ -115,12 +116,14 @@ const readRecipeIngredientsCompat = async () => {
 };
 
 const getMenuCacheVersion = async () => {
-    const result = await pool.query<{ version: string }>(`
-        select greatest(
-            coalesce((select max(updated_at) from menu_categories), 'epoch'::timestamp),
-            coalesce((select max(updated_at) from menu_items), 'epoch'::timestamp),
-            coalesce((select max(updated_at) from recipes), 'epoch'::timestamp)
-        )::text as version
+    const result = await pool.query(`
+        SELECT CAST(
+            (SELECT MAX(v) FROM (VALUES
+                (COALESCE((SELECT MAX(updated_at) FROM menu_categories), '1970-01-01')),
+                (COALESCE((SELECT MAX(updated_at) FROM menu_items), '1970-01-01')),
+                (COALESCE((SELECT MAX(updated_at) FROM recipes), '1970-01-01'))
+            ) AS vals(v))
+        AS NVARCHAR(MAX)) AS version
     `);
     return result.rows[0]?.version || 'epoch';
 };
@@ -191,12 +194,12 @@ export const getAllCategories = async (req: Request, res: Response) => {
 export const createCategory = async (req: Request, res: Response) => {
     try {
         const safePayload = await sanitizeCategoryPayload(req.body || {});
-        const category = await db.insert(menuCategories).values({
+        const category = await db.insert(menuCategories).output().values({
             ...(safePayload as any),
-            isActive: req.body.isActive !== false, // Default to true if not specified
+            isActive: req.body.isActive !== false,
             createdAt: new Date(),
             updatedAt: new Date(),
-        } as any).returning();
+        } as any);
         dbCacheService.invalidatePattern('menu:');
         res.status(201).json(category[0]);
     } catch (error: any) {
@@ -212,8 +215,8 @@ export const updateCategory = async (req: Request, res: Response) => {
         const updateData = await sanitizeCategoryPayload(rawUpdateData);
         const updated = await db.update(menuCategories)
             .set({ ...(updateData as any), updatedAt: new Date() } as any)
-            .where(eq(menuCategories.id, id))
-            .returning();
+            .output()
+            .where(eq(menuCategories.id, id));
 
         if (updated.length === 0) return res.status(404).json({ error: 'Category not found' });
         dbCacheService.invalidatePattern('menu:');
@@ -272,7 +275,7 @@ const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
     const recipeColumns = await getTableColumns('recipes');
     if (!recipeColumns.has('id') || !recipeColumns.has('menu_item_id')) return;
 
-    const existingRecipes = await pool.query<{ id: string }>(
+    const existingRecipes = await pool.query(
         'select id from recipes where menu_item_id = $1',
         [menuItemId],
     );
@@ -281,9 +284,11 @@ const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
     if (recipeIds.length > 0) {
         const ingredientColumns = await getTableColumns('recipe_ingredients');
         if (ingredientColumns.has('recipe_id')) {
-            await pool.query('delete from recipe_ingredients where recipe_id = any($1::text[])', [recipeIds]);
+            const rPlaceholders = recipeIds.map((_, i) => `$${i + 1}`).join(', ');
+            await pool.query(`delete from recipe_ingredients where recipe_id in (${rPlaceholders})`, recipeIds);
         }
-        await pool.query('delete from recipes where id = any($1::text[])', [recipeIds]);
+        const rPlaceholders = recipeIds.map((_, i) => `$${i + 1}`).join(', ');
+        await pool.query(`delete from recipes where id in (${rPlaceholders})`, recipeIds);
     }
 
     if (!recipesData) return;
@@ -332,11 +337,31 @@ const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
 export const createItem = async (req: Request, res: Response) => {
     try {
         const { recipe, ...itemPayload } = req.body;
-        const item = await db.insert(menuItems).values({
+        const normalizedName = itemPayload.name.trim().toLowerCase();
+        const [duplicateName] = await db.select({ id: menuItems.id })
+            .from(menuItems)
+            .where(and(
+                sql`LOWER(LTRIM(RTRIM(${menuItems.name}))) = ${normalizedName}`,
+                sql`${menuItems.deletedAt} IS NULL`,
+            ));
+
+        if (duplicateName) {
+            return res.status(409).json({
+                code: 'MENU_ITEM_NAME_EXISTS',
+                message: 'An item with the same name already exists.',
+                messageAr: 'يوجد صنف بنفس الاسم بالفعل.',
+            });
+        }
+
+        const sku = `ITM-${randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+        const item = await db.insert(menuItems).output().values({
             ...itemPayload,
+            id: `item-${randomUUID()}`,
+            name: itemPayload.name.trim(),
+            sku,
             createdAt: new Date(),
             updatedAt: new Date(),
-        }).returning();
+        });
 
         if (recipe && item[0]) {
             await saveRecipeForItem(item[0].id, recipe);
@@ -345,6 +370,14 @@ export const createItem = async (req: Request, res: Response) => {
         dbCacheService.invalidatePattern('menu:');
         res.status(201).json(item[0]);
     } catch (error: any) {
+        const errorNumber = error?.number ?? error?.originalError?.number;
+        if (errorNumber === 2601 || errorNumber === 2627) {
+            return res.status(409).json({
+                code: 'MENU_ITEM_DUPLICATE',
+                message: 'Item name or code already exists.',
+                messageAr: 'اسم الصنف أو كوده موجود بالفعل.',
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -354,14 +387,49 @@ export const updateItem = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'ITEM_ID_REQUIRED' });
         const { id: _, category_id, recipe, ...updateData } = req.body; // Prevent updating ID
+        if (updateData.name) {
+            const normalizedName = updateData.name.trim().toLowerCase();
+            const [duplicateName] = await db.select({ id: menuItems.id })
+                .from(menuItems)
+                .where(and(
+                    sql`LOWER(LTRIM(RTRIM(${menuItems.name}))) = ${normalizedName}`,
+                    sql`${menuItems.id} <> ${id}`,
+                    sql`${menuItems.deletedAt} IS NULL`,
+                ));
+            if (duplicateName) {
+                return res.status(409).json({
+                    code: 'MENU_ITEM_NAME_EXISTS',
+                    message: 'An item with the same name already exists.',
+                    messageAr: 'يوجد صنف بنفس الاسم بالفعل.',
+                });
+            }
+            updateData.name = updateData.name.trim();
+        }
+        if (updateData.sku) {
+            const [duplicateSku] = await db.select({ id: menuItems.id })
+                .from(menuItems)
+                .where(and(
+                    eq(menuItems.sku, updateData.sku.trim()),
+                    sql`${menuItems.id} <> ${id}`,
+                    sql`${menuItems.deletedAt} IS NULL`,
+                ));
+            if (duplicateSku) {
+                return res.status(409).json({
+                    code: 'MENU_ITEM_SKU_EXISTS',
+                    message: 'Item code already exists.',
+                    messageAr: 'كود الصنف موجود بالفعل.',
+                });
+            }
+            updateData.sku = updateData.sku.trim();
+        }
         const updated = await db.update(menuItems)
             .set({
                 ...updateData,
                 categoryId: category_id || updateData.categoryId,
                 updatedAt: new Date()
             })
-            .where(eq(menuItems.id, id))
-            .returning();
+            .output()
+            .where(eq(menuItems.id, id));
 
         if (updated.length === 0) return res.status(404).json({ error: 'Item not found' });
 
@@ -403,12 +471,12 @@ export const deleteItem = async (req: Request, res: Response) => {
         }
 
         const setParts = ['is_available = false'];
-        if (columns.has('deleted_at')) setParts.push('deleted_at = now()');
-        if (columns.has('updated_at')) setParts.push('updated_at = now()');
+        if (columns.has('deleted_at')) setParts.push('deleted_at = GETDATE()');
+        if (columns.has('updated_at')) setParts.push('updated_at = GETDATE()');
         if (columns.has('status')) setParts.push("status = 'archived'");
 
         const archived = await pool.query(
-            `update menu_items set ${setParts.join(', ')} where id = $1 returning *`,
+            `update menu_items set ${setParts.join(', ')} output inserted.* where id = $1`,
             [id],
         );
 
@@ -516,8 +584,8 @@ export const approveItem = async (req: Request, res: Response) => {
                 approvedAt: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(menuItems.id, id))
-            .returning();
+            .output()
+            .where(eq(menuItems.id, id));
 
         if (updated.length === 0) return res.status(404).json({ error: 'Item not found' });
 
@@ -553,8 +621,8 @@ export const publishItem = async (req: Request, res: Response) => {
                 publishedAt: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(menuItems.id, id))
-            .returning();
+            .output()
+            .where(eq(menuItems.id, id));
 
         if (updated.length === 0) return res.status(404).json({ error: 'Item not found' });
         dbCacheService.invalidatePattern('menu:');
@@ -586,8 +654,8 @@ export const requestPriceChange = async (req: Request, res: Response) => {
                 priceChangeReason: reason,
                 updatedAt: new Date(),
             })
-            .where(eq(menuItems.id, id))
-            .returning();
+            .output()
+            .where(eq(menuItems.id, id));
 
         dbCacheService.invalidatePattern('menu:');
         res.json({ ...updated[0], message: 'Price change requested, awaiting approval' });
@@ -619,8 +687,8 @@ export const approvePriceChange = async (req: Request, res: Response) => {
                 priceApprovedAt: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(menuItems.id, id))
-            .returning();
+            .output()
+            .where(eq(menuItems.id, id));
 
         await createSignedAuditLog({
             eventType: 'MENU_ITEM_PRICE_APPROVED',
@@ -764,7 +832,6 @@ const rowAliases = {
     description: ['description', 'desc', 'وصف'],
     descriptionAr: ['description_ar', 'description ar', 'وصف عربي'],
     price: ['price', 'sale_price', 'selling price', 'سعر', 'السعر'],
-    cost: ['cost', 'food_cost', 'تكلفة', 'التكلفة'],
     status: ['status', 'الحالة'],
     isAvailable: ['available', 'isavailable', 'is_available', 'active', 'متاح'],
     preparationTime: ['preparationtime', 'preparation_time', 'prep_time', 'وقت التحضير'],
@@ -950,7 +1017,7 @@ const importMenuRows = async (rows: ImportRow[], options: { updateExisting?: boo
                 if (options.dryRun) {
                     category = newCategory;
                 } else {
-                    const [createdCategory] = await db.insert(menuCategories).values(newCategory as any).returning();
+                    const [createdCategory] = await db.insert(menuCategories).output().values(newCategory as any);
                     category = createdCategory;
                 }
                 categoryById.set(category.id, category);
@@ -974,7 +1041,7 @@ const importMenuRows = async (rows: ImportRow[], options: { updateExisting?: boo
                 description: getRowString(row, rowAliases.description) || null,
                 descriptionAr: getRowString(row, rowAliases.descriptionAr) || null,
                 price,
-                cost: toNumber(getRowValue(row, rowAliases.cost), 0),
+                cost: Number(existing?.cost || 0),
                 image: getRowString(row, rowAliases.image) || null,
                 status: getRowString(row, rowAliases.status) || existing?.status || 'published',
                 isAvailable: toBoolean(getRowValue(row, rowAliases.isAvailable), true),
@@ -1084,7 +1151,6 @@ const attachMenuExtensionRows = async (
             name: sizeName,
             nameAr: getRowString(row, extensionAliases.sizeNameAr) || undefined,
             price: toNumber(getRowValue(row, rowAliases.price), Number(item.price || 0)),
-            cost: toNumber(getRowValue(row, rowAliases.cost), Number(item.cost || 0)),
             isAvailable: toBoolean(getRowValue(row, rowAliases.isAvailable), true),
         };
         const sizes = mergeByName(Array.isArray((item as any).sizes) ? (item as any).sizes : [], nextSize);
@@ -1192,14 +1258,14 @@ const attachMenuExtensionRows = async (
         if (!options.dryRun) {
             let [recipe] = await db.select().from(recipes).where(eq(recipes.menuItemId, item.id));
             if (!recipe) {
-                [recipe] = await db.insert(recipes).values({
+                [recipe] = await db.insert(recipes).output().values({
                     id: makeMenuId('recipe', item.id, index + 1),
                     menuItemId: item.id,
                     yield: toNumber(getRowValue(row, extensionAliases.yield), 1),
                     instructions: getRowString(row, extensionAliases.instructions) || null,
                     createdAt: new Date(),
                     updatedAt: new Date(),
-                } as any).returning();
+                } as any);
             }
 
             await db.insert(recipeIngredients).values({
@@ -1241,7 +1307,7 @@ export const exportItemsCSV = async (req: Request, res: Response) => {
         // CSV Header
         const headers = [
             'id', 'name', 'nameAr', 'categoryId', 'categoryName',
-            'price', 'cost', 'description', 'status', 'isAvailable',
+            'price', 'description', 'status', 'isAvailable',
             'preparationTime', 'isPopular', 'isFeatured', 'sortOrder'
         ];
 
@@ -1255,7 +1321,6 @@ export const exportItemsCSV = async (req: Request, res: Response) => {
                 item.categoryId || '',
                 `"${categoryMap.get(item.categoryId || '') || ''}"`,
                 item.price,
-                item.cost || 0,
                 `"${(item.description || '').replace(/"/g, '""')}"`,
                 item.status || 'published',
                 item.isAvailable ? 'true' : 'false',

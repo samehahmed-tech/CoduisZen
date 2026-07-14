@@ -56,7 +56,7 @@ export const webhookService = {
                 .where(
                     and(
                         eq(webhookEndpoints.isActive, true),
-                        sql`${webhookEndpoints.events}::jsonb ? ${event}`
+                        sql`charindex(${event}, cast(${webhookEndpoints.events} as nvarchar(max))) > 0`
                     )
                 );
 
@@ -179,22 +179,22 @@ export const webhookService = {
             .from(webhookDeliveries)
             .where(eq(webhookDeliveries.endpointId, endpointId))
             .orderBy(sql`${webhookDeliveries.createdAt} DESC`)
-            .limit(limit);
+            .offset(0).fetch(limit);
     },
 
     /**
      * CRUD for webhook endpoints
      */
     async createEndpoint(data: typeof webhookEndpoints.$inferInsert) {
-        const [endpoint] = await db.insert(webhookEndpoints).values(data).returning();
+        const [endpoint] = await db.insert(webhookEndpoints).output().values(data);
         return endpoint;
     },
 
     async updateEndpoint(id: string, data: Partial<typeof webhookEndpoints.$inferInsert>) {
         const [endpoint] = await db.update(webhookEndpoints)
             .set({ ...data, updatedAt: new Date() })
-            .where(eq(webhookEndpoints.id, id))
-            .returning();
+            .output()
+            .where(eq(webhookEndpoints.id, id));
         return endpoint;
     },
 
@@ -215,7 +215,7 @@ export const webhookService = {
             .from(webhookDeliveries)
             .where(eq(webhookDeliveries.status, 'FAILED'))
             .orderBy(sql`${webhookDeliveries.createdAt} ASC`)
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         if (failed.length === 0) return { retried: 0 };
 
@@ -223,9 +223,9 @@ export const webhookService = {
         for (const delivery of failed) {
             try {
                 const [endpoint] = await db.select()
+                    .top(1)
                     .from(webhookEndpoints)
-                    .where(eq(webhookEndpoints.id, delivery.endpointId))
-                    .limit(1);
+                    .where(eq(webhookEndpoints.id, delivery.endpointId));
 
                 if (!endpoint || !endpoint.isActive) continue;
 

@@ -208,8 +208,8 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
 
             const [updated] = await db.update(inventoryItems)
                 .set(patch)
-                .where(eq(inventoryItems.id, targetId))
-                .returning();
+                .output()
+                .where(eq(inventoryItems.id, targetId));
             if (!updated) throw new Error('ITEM_NOT_FOUND');
             return { entity: 'inventoryItem', id: updated.id, updated };
         }
@@ -226,8 +226,8 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             if (patch.price !== undefined) patch.price = Number(patch.price);
             const [updated] = await db.update(menuItems)
                 .set(patch)
-                .where(eq(menuItems.id, targetId))
-                .returning();
+                .output()
+                .where(eq(menuItems.id, targetId));
             if (!updated) throw new Error('ITEM_NOT_FOUND');
             return { entity: 'menuItem', id: updated.id, updated };
         }
@@ -237,7 +237,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             const price = Number((action as any).price);
             if (!targetId) throw new Error('ITEM_ID_REQUIRED');
             if (!Number.isFinite(price) || price <= 0) throw new Error('INVALID_PRICE');
-            const [existing] = await db.select().from(menuItems).where(eq(menuItems.id, targetId)).limit(1);
+            const [existing] = await db.select().top(1).from(menuItems).where(eq(menuItems.id, targetId));
             if (!existing) throw new Error('ITEM_NOT_FOUND');
             const [updated] = await db.update(menuItems)
                 .set({
@@ -247,8 +247,8 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
                     priceApprovedAt: new Date(),
                     updatedAt: new Date(),
                 })
-                .where(eq(menuItems.id, targetId))
-                .returning();
+                .output()
+                .where(eq(menuItems.id, targetId));
             return { entity: 'menuItem', id: updated.id, updated };
         }
 
@@ -259,8 +259,8 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             if (!status) throw new Error('STATUS_REQUIRED');
             const [updated] = await db.update(menuItems)
                 .set({ status, updatedAt: new Date() })
-                .where(eq(menuItems.id, targetId))
-                .returning();
+                .output()
+                .where(eq(menuItems.id, targetId));
             if (!updated) throw new Error('ITEM_NOT_FOUND');
             return { entity: 'menuItem', id: updated.id, updated };
         }
@@ -274,7 +274,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             if (!name) throw new Error('NAME_REQUIRED');
             if (!Number.isFinite(price) || price <= 0) throw new Error('INVALID_PRICE');
             const itemId = String(data.id || `ai-item-${crypto.randomUUID()}`);
-            const [created] = await db.insert(menuItems).values({
+            const [created] = await db.insert(menuItems).output().values({
                 id: itemId,
                 categoryId,
                 name,
@@ -290,7 +290,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
                 printerIds: Array.isArray(data.printerIds) ? data.printerIds : [],
                 modifierGroups: Array.isArray(data.modifierGroups) ? data.modifierGroups : [],
                 availableDays: Array.isArray(data.availableDays) ? data.availableDays : [],
-            }).returning();
+            });
             return { entity: 'menuItem', id: created.id, created };
         }
         case 'CREATE_MENU_CATEGORY': {
@@ -298,7 +298,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             const name = String(data.name || '').trim();
             if (!name) throw new Error('CATEGORY_NAME_REQUIRED');
             const categoryId = String(data.id || `ai-category-${crypto.randomUUID()}`);
-            const [created] = await db.insert(menuCategories).values({
+            const [created] = await db.insert(menuCategories).output().values({
                 id: categoryId,
                 name,
                 nameAr: data.nameAr || null,
@@ -313,7 +313,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
                 printerIds: Array.isArray(data.printerIds) ? data.printerIds : [],
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning();
+            });
             return { entity: 'menuCategory', id: created.id, created };
         }
 
@@ -328,8 +328,8 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             }
             const [updated] = await db.update(menuCategories)
                 .set(patch)
-                .where(eq(menuCategories.id, targetId))
-                .returning();
+                .output()
+                .where(eq(menuCategories.id, targetId));
             if (!updated) throw new Error('CATEGORY_NOT_FOUND');
             return { entity: 'menuCategory', id: updated.id, updated };
         }
@@ -341,7 +341,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             if (!name) throw new Error('CUSTOMER_NAME_REQUIRED');
             if (!phone) throw new Error('CUSTOMER_PHONE_REQUIRED');
             const customerId = String(data.id || `ai-customer-${crypto.randomUUID()}`);
-            const [created] = await db.insert(customers).values({
+            const [created] = await db.insert(customers).output().values({
                 id: customerId,
                 name,
                 phone,
@@ -360,7 +360,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
                 loyaltyPoints: 0,
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning();
+            });
             return { entity: 'customer', id: created.id, created };
         }
         case 'CREATE_USER': {
@@ -373,13 +373,13 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             if (!email) throw new Error('USER_EMAIL_REQUIRED');
             if (!password || password.length < 6) throw new Error('USER_PASSWORD_MIN_6_REQUIRED');
 
-            const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+            const [exists] = await db.select({ id: users.id }).top(1).from(users).where(eq(users.email, email));
             if (exists) throw new Error('USER_EMAIL_ALREADY_EXISTS');
 
             const bcrypt = await import('bcryptjs');
             const passwordHash = await bcrypt.hash(password, 10);
             const userId = String(data.id || `ai-user-${crypto.randomUUID()}`);
-            const [created] = await db.insert(users).values({
+            const [created] = await db.insert(users).output().values({
                 id: userId,
                 name,
                 email,
@@ -390,7 +390,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
                 isActive: data.isActive !== false,
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning();
+            });
             return {
                 entity: 'user',
                 id: created.id,
@@ -410,7 +410,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
             const branchId = String(data.branchId || user.branchId || user.allowedBranches?.[0] || '').trim();
             if (!name) throw new Error('EMPLOYEE_NAME_REQUIRED');
             if (!branchId) throw new Error('BRANCH_ID_REQUIRED');
-            const createdRows = await db.insert(employees).values({
+            const createdRows = await db.insert(employees).output().values({
                 id: String(data.id || `ai-emp-${crypto.randomUUID()}`),
                 branchId,
                 name,
@@ -423,7 +423,7 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
                 hourlyRate: Number(data.hourlyRate || 0),
                 joinedAt: data.employmentDate ? new Date(data.employmentDate) : new Date(),
                 isActive: data.isActive !== false,
-            }).returning() as any[];
+            }) as any[];
             const created = createdRows[0];
             return { entity: 'employee', id: created.id, created };
         }

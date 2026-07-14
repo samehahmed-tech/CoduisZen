@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
     branches,
     inventoryBatches,
@@ -103,6 +103,12 @@ describe('inventory deduction guard', () => {
             const dbModule = await import('../server/db');
             db = dbModule.db;
         }
+        await db.execute(sql`DELETE FROM batch_transactions WHERE batch_id = 'test-inventory-guard-batch'`);
+        await db.execute(sql`DELETE FROM stock_movements WHERE item_id = ${FIXTURES.itemId}`);
+        await db.execute(sql`DELETE FROM recipe_ingredients WHERE recipe_id = ${FIXTURES.recipeId}`);
+        await db.execute(sql`DELETE FROM recipes WHERE id = ${FIXTURES.recipeId}`);
+        await db.execute(sql`DELETE FROM inventory_stock WHERE item_id = ${FIXTURES.itemId} AND warehouse_id = ${FIXTURES.warehouseId}`);
+        await db.execute(sql`DELETE FROM inventory_batches WHERE id = 'test-inventory-guard-batch'`);
     });
 
     it('rejects recipe deduction before aggregate stock can go negative', async () => {

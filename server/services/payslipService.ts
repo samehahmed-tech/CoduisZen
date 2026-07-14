@@ -9,7 +9,7 @@ const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 
 export const payslipService = {
     async generatePayslips(input: { runId: string; generatedBy?: string }) {
-        const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, input.runId)).limit(1);
+        const [run] = await db.select().top(1).from(payrollRuns).where(eq(payrollRuns.id, input.runId));
         if (!run) throw new Error('PAYROLL_RUN_NOT_FOUND');
 
         const runLines = await db.select().from(payrollRunLines).where(eq(payrollRunLines.runId, input.runId));
@@ -27,7 +27,7 @@ export const payslipService = {
                     eq(payslips.employeeId, line.employeeId),
                 ))
                 .orderBy(desc(payslips.version))
-                .limit(1);
+                .offset(0).fetch(1);
 
             const version = existing[0] ? Number(existing[0].version || 1) + 1 : 1;
 
@@ -53,7 +53,7 @@ export const payslipService = {
             const pdfBuffer = await generatePayslipPDF({ cycleId: run.cycleId, employeeId: line.employeeId, payload });
             const pdfHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
 
-            const [created] = await db.insert(payslips).values({
+            const [created] = await db.insert(payslips).output().values({
                 id: makeId('PSL'),
                 runId: run.id,
                 cycleId: run.cycleId,
@@ -63,7 +63,7 @@ export const payslipService = {
                 pdfHash,
                 generatedAt: new Date(),
                 generatedBy: input.generatedBy,
-            }).returning();
+            });
 
             results.push({
                 payslip: created,
@@ -79,7 +79,7 @@ export const payslipService = {
     },
 
     async getPayslipPdf(payslipId: string) {
-        const [payslip] = await db.select().from(payslips).where(eq(payslips.id, payslipId)).limit(1);
+        const [payslip] = await db.select().top(1).from(payslips).where(eq(payslips.id, payslipId));
         if (!payslip) throw new Error('PAYSLIP_NOT_FOUND');
 
         const buffer = await generatePayslipPDF({

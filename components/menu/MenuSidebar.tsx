@@ -72,7 +72,7 @@ const MenuSidebar: React.FC<Props> = ({
     };
 
     return (
-        <div className="w-60 bg-card border-r border-gray-200 dark:border-white/[0.06] flex flex-col overflow-hidden shrink-0">
+        <div className="w-full lg:w-60 max-h-[42vh] lg:max-h-none bg-card border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/[0.06] flex flex-col overflow-hidden shrink-0">
             {/* Header */}
             <div className="px-4 py-4 border-b border-gray-100 dark:border-white/[0.04]">
                 <h2 className="text-[13px] font-semibold text-gray-900 dark:text-main">
@@ -81,7 +81,7 @@ const MenuSidebar: React.FC<Props> = ({
             </div>
 
             {/* Section Navigation */}
-            <div className="px-3 pt-3 space-y-0.5">
+            <div className="px-3 pt-3 space-y-0.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-1 lg:gap-0">
                 {sections.map(s => (
                     <button
                         key={s.id}

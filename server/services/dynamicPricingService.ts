@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { orders, menuItems, branches } from '../../src/db/schema';
-import { eq, sql, and, gte } from 'drizzle-orm';
+import { eq, sql, and, gte, inArray, lt } from 'drizzle-orm';
 import { aiService } from './aiService';
 import auditService from './auditService';
 import logger from '../utils/logger';
@@ -24,8 +24,8 @@ class DynamicPricingService {
     /**
      * Logic:
      * 1. Get all active branches.
-     * 2. For each branch, get order count in the last hour.
-     * 3. Calculate "Demand Index" (current vs average).
+     * 2. Compare global order count in the last hour with the same-hour 28-day average.
+     * 3. Calculate a global demand index for the shared menu.
      * 4. If index > 1.2 (20% above avg), suggest price increase.
      * 5. If index < 0.6 (40% below avg), suggest price decrease (Happy Hour).
      */
@@ -34,43 +34,53 @@ class DynamicPricingService {
             log.info('Starting Dynamic Pricing Analysis...');
             const allBranches = await db.select().from(branches).where(eq(branches.isActive, true));
             
-            for (const branch of allBranches) {
-                const oneHourAgo = new Date();
-                oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+            const branchIds = allBranches.map((branch) => branch.id);
+            if (branchIds.length === 0) return;
 
-                // Count orders in last hour
-                const [orderCountRes] = await db.select({
-                    count: sql<number>`count(*)`
-                })
+            const now = new Date();
+            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            const baselineStart = new Date(oneHourAgo);
+            baselineStart.setDate(baselineStart.getDate() - 28);
+
+            const [currentResult] = await db.select({ count: sql<number>`count(*)` })
                 .from(orders)
                 .where(and(
-                    eq(orders.branchId, branch.id),
+                    inArray(orders.branchId, branchIds),
                     gte(orders.createdAt, oneHourAgo)
                 ));
+            const [historyResult] = await db.select({ count: sql<number>`count(*)` })
+                .from(orders)
+                .where(and(
+                    inArray(orders.branchId, branchIds),
+                    gte(orders.createdAt, baselineStart),
+                    lt(orders.createdAt, oneHourAgo),
+                    sql`DATEPART(HOUR, ${orders.createdAt}) = ${now.getHours()}`
+                ));
 
-                const currentVolume = Number(orderCountRes?.count || 0);
-                
-                // Heuristic: Average hour volume (should be calculated from historical data, using 15 as placeholder)
-                const STABLE_AVG_VOLUME = 15; 
-                const demandIndex = currentVolume / STABLE_AVG_VOLUME;
+            const currentVolume = Number(currentResult?.count || 0);
+            const historicalVolume = Number(historyResult?.count || 0);
+            if (historicalVolume < 7) {
+                log.info({ historicalVolume }, 'Dynamic pricing skipped: insufficient same-hour history');
+                return;
+            }
 
-                log.debug({ branchId: branch.id, currentVolume, demandIndex }, 'Branch demand analyzed');
+            const averageHourlyVolume = historicalVolume / 28;
+            const demandIndex = currentVolume / averageHourlyVolume;
+            log.debug({ currentVolume, averageHourlyVolume, demandIndex }, 'Global demand analyzed');
 
-                if (demandIndex > 1.4) {
-                    await this.applyStrategy(branch.id, 'SURGE', 1.10); // 10% Increase
-                } else if (demandIndex < 0.4 && currentVolume > 0) {
-                    await this.applyStrategy(branch.id, 'HAPPY_HOUR', 0.85); // 15% Discount
-                } else if (demandIndex > 1.0 && demandIndex <= 1.4) {
-                    // Slight increase for popular items only
-                    await this.applyStrategy(branch.id, 'MODERATE_SURGE', 1.05);
-                }
+            if (demandIndex > 1.4) {
+                await this.applyStrategy(null, 'SURGE', 1.10);
+            } else if (demandIndex < 0.4 && currentVolume > 0) {
+                await this.applyStrategy(null, 'HAPPY_HOUR', 0.85);
+            } else if (demandIndex > 1.0) {
+                await this.applyStrategy(null, 'MODERATE_SURGE', 1.05);
             }
         } catch (error: any) {
             log.error({ err: error.message }, 'Dynamic pricing calculation failed');
         }
     }
 
-    private async applyStrategy(branchId: string, strategy: string, multiplier: number) {
+    private async applyStrategy(branchId: string | null, strategy: string, multiplier: number) {
         log.info({ branchId, strategy, multiplier }, 'Applying dynamic pricing strategy');
 
         // Target popular items first

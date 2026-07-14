@@ -187,7 +187,6 @@ const MenuManager: React.FC = () => {
             'Description': item.description || '',
             'Description_AR': item.descriptionAr || '',
             'Price': item.price,
-            'Cost': item.cost || 0,
             'Available': item.isAvailable ? 'Yes' : 'No',
             'Status': (item as any).status || 'published',
             'Preparation_Time': item.preparationTime || 15,
@@ -206,7 +205,6 @@ const MenuManager: React.FC = () => {
               'Size_Name': size.name,
               'Size_Name_AR': size.nameAr || '',
               'Price': size.price,
-              'Cost': size.cost || '',
               'Available': size.isAvailable ? 'Yes' : 'No',
             });
           });
@@ -252,7 +250,7 @@ const MenuManager: React.FC = () => {
       const ensureRows = (rows: any[], template: Record<string, any>) => rows.length > 0 ? rows : [template];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), 'Items');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ensureRows(sizesData, {
-        'Item_ID': '', 'SKU': '', 'Barcode': '', 'Item_Name': '', 'Size_Name': '', 'Size_Name_AR': '', 'Price': '', 'Cost': '', 'Available': 'Yes'
+        'Item_ID': '', 'SKU': '', 'Barcode': '', 'Item_Name': '', 'Size_Name': '', 'Size_Name_AR': '', 'Price': '', 'Available': 'Yes'
       })), 'Sizes');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ensureRows(modifiersData, {
         'Item_ID': '', 'SKU': '', 'Barcode': '', 'Item_Name': '', 'Group_Name': '', 'Group_Name_AR': '', 'Min_Selection': 0, 'Max_Selection': 1, 'Option_Name': '', 'Option_Name_AR': '', 'Price': 0
@@ -1106,17 +1104,15 @@ const MenuManager: React.FC = () => {
             currency={settings.currencySymbol || 'EGP'}
             onClose={() => setItemModal(null)}
             onDelete={itemModal.mode === 'EDIT' ? handleDeleteItemFromDrawer : undefined}
-            onSave={(nextItem, nextCategoryId, keepOpen) => {
-              startTransition(() => {
-                if (itemModal.mode === 'ADD') {
-                  addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, id: `item-${Date.now()}` });
-                } else if (nextCategoryId !== itemModal.categoryId) {
-                  deleteMenuItem(itemModal.menuId, itemModal.categoryId, itemModal.item.id);
-                  addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId });
-                } else {
-                  updateMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId });
-                }
-              });
+            onSave={async (nextItem, nextCategoryId, keepOpen) => {
+              if (itemModal.mode === 'ADD') {
+                await addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, id: `item-${Date.now()}` });
+              } else if (nextCategoryId !== itemModal.categoryId) {
+                await deleteMenuItem(itemModal.menuId, itemModal.categoryId, itemModal.item.id);
+                await addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId });
+              } else {
+                await updateMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId });
+              }
               if (keepOpen) {
                 setItemModal(prev => prev ? { ...prev, mode: 'ADD' } : null);
               } else {

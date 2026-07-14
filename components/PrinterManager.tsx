@@ -1,4 +1,4 @@
-﻿
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Printer as PrinterIcon, Plus, Search, Edit3, Trash2,
@@ -35,7 +35,7 @@ const PrinterManager: React.FC = () => {
         clearAll: isAr ? 'مسح الكل' : 'Clear All',
         refresh: isAr ? 'تحديث' : 'Refresh',
         noJobs: isAr ? 'لا توجد أوامر طباعة حديثة.' : 'No recent print jobs.',
-        bridgeHint: isAr ? 'الطباعة التلقائية تحتاج Print Bridge شغال على جهاز الفرع. لو الـ Bridge متوقف، أوامر الطباعة ستظل في الطابور حتى يرجع يشتغل.' : 'Automatic printing requires the branch Print Bridge. Jobs remain queued while the bridge is offline.',
+        bridgeHint: isAr ? 'شغّل Print Bridge فقط؛ النظام يتعرف عليه ويرسل أوامر الفرع تلقائيًا بدون إعدادات إضافية.' : 'Start Print Bridge and the system automatically sends this branch\'s print jobs.',
         queued: isAr ? 'منتظر' : 'Queued',
         processing: isAr ? 'جاري' : 'Processing',
         completed: isAr ? 'تم' : 'Completed',
@@ -52,7 +52,6 @@ const PrinterManager: React.FC = () => {
     const [localPrinterLoading, setLocalPrinterLoading] = useState(false);
     const [localPrinterError, setLocalPrinterError] = useState<string | null>(null);
     const [bridgeHealth, setBridgeHealth] = useState<any | null>(null);
-    const [presetSaving, setPresetSaving] = useState(false);
     const [queueLoading, setQueueLoading] = useState(false);
     const [queueError, setQueueError] = useState<string | null>(null);
     const [queueStats, setQueueStats] = useState<{ queued: number; processing: number; completed: number; failed: number; total: number }>({
@@ -109,9 +108,20 @@ const PrinterManager: React.FC = () => {
     } as Record<string, string>)[String(status || '').toUpperCase()] || status || '-';
 
     const handlePrimaryCashierChange = async (printerId: string) => {
-        updateSettings({ primaryCashierPrinterId: printerId });
         try {
-            await settingsApi.updateBulk({ primaryCashierPrinterId: printerId });
+            const selected = printers.find((printer) => printer.id === printerId);
+            if (selected) {
+                await updatePrinterInDB({ ...selected, isPrimaryCashier: true });
+            }
+            await settingsApi.updateBulk({
+                primaryCashierPrinterId: printerId,
+                autoPrintReceiptOnSubmit: Boolean(printerId),
+            });
+            updateSettings({
+                primaryCashierPrinterId: printerId,
+                autoPrintReceiptOnSubmit: Boolean(printerId),
+            });
+            await fetchPrinters();
         } catch (error: any) {
             setTestPrintResult({
                 id: 'settings',
@@ -163,12 +173,44 @@ const PrinterManager: React.FC = () => {
         fetchPrinters();
     }, [fetchPrinters]);
 
+    const bridgeUrls = () => {
+        const host = window.location.hostname;
+        const urls = ['http://localhost:3002'];
+        if (host && !['localhost', '127.0.0.1'].includes(host)) urls.push(`http://${host}:3002`);
+        return urls;
+    };
+
+    const localPrinterOptions = localPrinterDevices.filter((device) => (
+        device.address?.startsWith('usb:') || device.address?.startsWith('windows:')
+    ));
+
+    const makePrinterCode = (printer: Printer) => (
+        printer.code?.trim()
+        || `${printer.type}-${printer.name}-${Date.now()}`.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48)
+        || `PRN-${Date.now()}`
+    );
+
+    const displayPrinterAddress = (address = '') => address.replace(/^windows:/, '');
+
+    const fetchBridge = async (path: string) => {
+        let lastError: any;
+        for (const base of bridgeUrls()) {
+            try {
+                const response = await fetch(`${base}${path}`);
+                if (!response.ok) throw new Error(`Bridge ${response.status}`);
+                return response;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+        throw lastError || new Error('Print bridge is not reachable');
+    };
+
     const loadLocalPrinterDevices = async () => {
         setLocalPrinterLoading(true);
         setLocalPrinterError(null);
         try {
-            const response = await fetch('http://localhost:3002/printers');
-            if (!response.ok) throw new Error(`Bridge ${response.status}`);
+            const response = await fetchBridge('/printers');
             const data = await response.json();
             setLocalPrinterDevices(Array.isArray(data?.printers) ? data.printers : []);
         } catch (error: any) {
@@ -181,8 +223,7 @@ const PrinterManager: React.FC = () => {
 
     const loadBridgeHealth = async () => {
         try {
-            const response = await fetch('http://localhost:3002/health');
-            if (!response.ok) throw new Error(`Bridge ${response.status}`);
+            const response = await fetchBridge('/health');
             setBridgeHealth(await response.json());
             setLocalPrinterError(null);
         } catch (error: any) {
@@ -190,6 +231,12 @@ const PrinterManager: React.FC = () => {
             setLocalPrinterError(error?.message || 'Print bridge is not reachable');
         }
     };
+
+    useEffect(() => {
+        loadBridgeHealth();
+        const healthTimer = window.setInterval(loadBridgeHealth, 10_000);
+        return () => window.clearInterval(healthTimer);
+    }, []);
 
     useEffect(() => {
         if (printerModal?.isOpen && printerModal.printer.type === 'LOCAL') {
@@ -251,8 +298,12 @@ const PrinterManager: React.FC = () => {
         const nextPrinter = {
             ...printerModal.printer,
             name: printerModal.printer.name.trim(),
-            address: printerModal.printer.address.trim(),
-            code: printerModal.printer.code?.trim() || '',
+            address: printerModal.printer.type === 'LOCAL'
+                && printerModal.printer.address.trim()
+                && !printerModal.printer.address.trim().includes(':')
+                ? `windows:${printerModal.printer.address.trim()}`
+                : printerModal.printer.address.trim(),
+            code: makePrinterCode(printerModal.printer),
             stationId: (printerModal.printer.stationId || '').trim(),
             gatewayId: (printerModal.printer.gatewayId || '').trim(),
             branchId: printerModal.printer.branchId || settings.activeBranchId || branches[0]?.id || '',
@@ -268,11 +319,20 @@ const PrinterManager: React.FC = () => {
         }
         setIsSaving(true);
         try {
+            const persistedPrinter = printerModal.mode === 'ADD'
+                ? { ...nextPrinter, id: `prn-${Date.now()}` }
+                : nextPrinter;
             if (printerModal.mode === 'ADD') {
-                await createPrinterInDB({ ...nextPrinter, id: `prn-${Date.now()}` });
+                await createPrinterInDB(persistedPrinter);
             } else {
-                await updatePrinterInDB(nextPrinter);
+                await updatePrinterInDB(persistedPrinter);
             }
+            if (persistedPrinter.isPrimaryCashier) {
+                const primaryCashierPrinterId = persistedPrinter.id;
+                await settingsApi.updateBulk({ primaryCashierPrinterId, autoPrintReceiptOnSubmit: true });
+                updateSettings({ primaryCashierPrinterId, autoPrintReceiptOnSubmit: true });
+            }
+            await fetchPrinters();
             setPrinterModal(null);
             setTestPrintResult({
                 id: 'settings',
@@ -291,85 +351,6 @@ const PrinterManager: React.FC = () => {
             setTimeout(() => setTestPrintResult(null), 7000);
         } finally {
             setIsSaving(false);
-        }
-    };
-
-    const handleProvisionShCityPrinters = async () => {
-        setPresetSaving(true);
-        try {
-            const branchId = settings.activeBranchId || branches[0]?.id || '';
-            const firstUsb = localPrinterDevices.find((device) => device.address?.startsWith('usb:')) || localPrinterDevices[0];
-            const presets: Printer[] = [
-                {
-                    id: 'sh-city-cashier-usb',
-                    code: 'CASHIER-USB',
-                    name: 'كاشير - USB',
-                    type: 'LOCAL',
-                    address: firstUsb?.address || '',
-                    isActive: true,
-                    branchId,
-                    role: 'CASHIER',
-                    roles: ['CASHIER'],
-                    isPrimaryCashier: true,
-                },
-                {
-                    id: 'sh-city-packaging',
-                    code: 'PACKAGING',
-                    name: 'باكيجنج - الأوردر كامل',
-                    type: 'NETWORK',
-                    address: '',
-                    isActive: true,
-                    branchId,
-                    role: 'PACKAGING',
-                    roles: ['PACKAGING'],
-                    isPrimaryCashier: false,
-                },
-                {
-                    id: 'sh-city-shawarma',
-                    code: 'SHAWARMA',
-                    name: 'قسم الشاورما',
-                    type: 'NETWORK',
-                    address: '',
-                    isActive: true,
-                    branchId,
-                    role: 'SHAWARMA',
-                    roles: ['SHAWARMA'],
-                    isPrimaryCashier: false,
-                },
-                {
-                    id: 'sh-city-crepe',
-                    code: 'CREPE',
-                    name: 'قسم الكريب',
-                    type: 'NETWORK',
-                    address: '',
-                    isActive: true,
-                    branchId,
-                    role: 'CREPE',
-                    roles: ['CREPE'],
-                    isPrimaryCashier: false,
-                },
-            ];
-
-            for (const preset of presets) {
-                const exists = printers.some((printer) => printer.id === preset.id || printer.code === preset.code);
-                if (exists) {
-                    await updatePrinterInDB(preset);
-                } else {
-                    await createPrinterInDB(preset);
-                }
-            }
-            await updateSettings({ primaryCashierPrinterId: 'sh-city-cashier-usb' });
-            await fetchPrinters();
-            setTestPrintResult({
-                id: 'preset',
-                ok: true,
-                msg: isAr ? 'تم تجهيز طابعات شاورما سيتي. أضف IP لطابعات الأقسام واضغط اختبار.' : 'Sh City printers were prepared. Add station IPs and test.',
-            });
-        } catch (error: any) {
-            setTestPrintResult({ id: 'preset', ok: false, msg: error?.message || tr('Failed to prepare printers', 'تعذر تجهيز الطابعات') });
-        } finally {
-            setPresetSaving(false);
-            setTimeout(() => setTestPrintResult(null), 7000);
         }
     };
 
@@ -539,14 +520,6 @@ const PrinterManager: React.FC = () => {
                 </div>
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                     <button
-                        onClick={handleProvisionShCityPrinters}
-                        disabled={presetSaving}
-                        className="w-full sm:w-auto flex items-center justify-center gap-3 bg-emerald-600 text-white px-7 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-60"
-                    >
-                        <RefreshCcw size={18} />
-                        {presetSaving ? (isAr ? 'جاري التجهيز...' : 'Preparing...') : (isAr ? 'تجهيز طابعات شاورما سيتي' : 'Prepare Sh City Printers')}
-                    </button>
-                    <button
                         onClick={() => setPrinterModal({
                             isOpen: true,
                             mode: 'ADD',
@@ -560,7 +533,9 @@ const PrinterManager: React.FC = () => {
                                 isPrimaryCashier: false,
                                 stationId: '',
                                 gatewayId: '',
-                                role: 'OTHER',
+                                role: 'CASHIER',
+                                roles: ['CASHIER'],
+                                paperWidth: 80,
                                 branchId: branches[0]?.id || '',
                             }
                         })}
@@ -571,7 +546,7 @@ const PrinterManager: React.FC = () => {
                     </button>
                 </div>
             </div>
-            {testPrintResult && ['settings', 'preset'].includes(testPrintResult.id) && (
+            {testPrintResult && testPrintResult.id === 'settings' && (
                 <div className={`rounded-2xl border px-5 py-4 text-xs font-black uppercase tracking-widest ${testPrintResult.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300' : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300'}`}>
                     {testPrintResult.ok ? '[OK]' : '[ERR]'} {testPrintResult.msg}
                 </div>
@@ -603,7 +578,7 @@ const PrinterManager: React.FC = () => {
                         onClick={loadBridgeHealth}
                         className="rounded-2xl bg-slate-900 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-black"
                     >
-                        {bridgeHealth ? `${bridgeHealth.gatewayId} / ${bridgeHealth.branchId}` : tr('Check Bridge', 'فحص Bridge')}
+                        {bridgeHealth ? tr('Bridge ready', 'Bridge متصل وجاهز') : tr('Check Bridge', 'فحص Bridge')}
                     </button>
                 </div>
                 {localPrinterError && !bridgeHealth && (
@@ -754,7 +729,7 @@ const PrinterManager: React.FC = () => {
                                         <p className="text-[10px] font-bold text-amber-600">
                                             {job.target_gateway_id
                                                 ? tr('Waiting for the matching bridge gateway to claim this job.', 'مستني Bridge بنفس الـ Gateway ID يستلم المهمة.')
-                                                : tr('Waiting for any bridge in this branch with claim-unassigned enabled.', 'مستني أي Bridge في الفرع مفعل claim-unassigned.')}
+                                                : tr('Waiting for the branch bridge to come online.', 'مستني Bridge الفرع يشتغل؛ الاستلام والطباعة تلقائيان.')}
                                         </p>
                                     )}
                                     {job.last_error && <p className="text-[10px] font-bold text-rose-500 truncate">{job.last_error}</p>}
@@ -826,6 +801,7 @@ const PrinterManager: React.FC = () => {
                                     stationId: '',
                                     gatewayId: '',
                                     isPrimaryCashier: false,
+                                    paperWidth: 80,
                                 },
                             })}
                             className="mt-6 rounded-2xl bg-indigo-600 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
@@ -852,7 +828,10 @@ const PrinterManager: React.FC = () => {
                                 <div>
                                     <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{printer.name}</h3>
                                     <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mt-1">
-                                         {printer.code || tr('NO-CODE', 'بدون كود')} | {(printer.roles || [printer.role]).filter(Boolean).map(roleLabel).join(', ') || tr('Other', 'أخرى')}
+                                         {printer.code || tr('NO-CODE', 'بدون كود')} | {((Array.isArray(printer.roles) ? printer.roles : [printer.role])).filter(Boolean).map(roleLabel).join(', ') || tr('Other', 'أخرى')}
+                                    </p>
+                                    <p className="mt-2 text-[10px] font-black text-slate-500">
+                                        {Number(printer.paperWidth || 80) <= 58 ? '58mm / 384 dots' : '80mm / 576 dots'}
                                     </p>
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
                                          <Building2 size={14} className="text-indigo-500" /> {branch?.nameAr || branch?.name || tr('No Branch', 'بدون فرع')}
@@ -862,7 +841,7 @@ const PrinterManager: React.FC = () => {
                                 <div className="flex items-center gap-4 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-inner">
                                     <div className="flex-1 overflow-hidden">
                                          <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">{printer.type === 'NETWORK' ? tr('IP ADDRESS', 'عنوان IP') : tr('PRINTER ID', 'معرف الطابعة')}</p>
-                                        <p className="text-xs font-black text-slate-800 dark:text-white truncate font-mono tracking-tighter">{printer.address}</p>
+                                        <p className="text-xs font-black text-slate-800 dark:text-white truncate font-mono tracking-tighter">{displayPrinterAddress(printer.address)}</p>
                                     </div>
                                     <div className={`w-3 h-3 rounded-full shadow-[0_0_12px] ${printer.isActive ? 'bg-emerald-500 shadow-emerald-500/50 animate-pulse' : 'bg-slate-300 shadow-transparent'}`} />
                                 </div>
@@ -918,7 +897,7 @@ const PrinterManager: React.FC = () => {
                                 </div>
                                 <div className="min-w-0">
                                      <h3 className="text-base sm:text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight truncate">{printerModal.mode === 'ADD' ? tr('Add Printer', 'إضافة طابعة') : tr('Edit Printer', 'تعديل طابعة')}</h3>
-                                     <p className="text-[9px] sm:text-[10px] font-black text-slate-400 tracking-[0.2em] sm:tracking-[0.3em] uppercase mt-1 truncate">{tr('Printer settings and connection details', 'إعدادات الطابعة وبيانات الاتصال')}</p>
+                                      <p className="text-[9px] sm:text-[10px] font-black text-slate-400 tracking-[0.2em] sm:tracking-[0.3em] uppercase mt-1 truncate">{tr('Name, branch, type, and address', 'الاسم والفرع والنوع والعنوان')}</p>
                                 </div>
                             </div>
                             <button type="button" aria-label={tr('Close', 'إغلاق')} onClick={() => setPrinterModal(null)} className="p-2 sm:p-4 card-primary text-slate-400 rounded-xl sm:rounded-2xl shadow-sm hover:rotate-90 hover:text-rose-500 transition-all shrink-0"><X size={20} className="sm:hidden" /><X size={24} className="hidden sm:block" /></button>
@@ -930,25 +909,15 @@ const PrinterManager: React.FC = () => {
                                     {testPrintResult.ok ? '[OK]' : '[ERR]'} {testPrintResult.msg}
                                 </div>
                             )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
-                                <div className="space-y-3">
-                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Printer Number / Code', 'رقم / كود الطابعة')}</label>
-                                    <input
-                                        type="text"
-                                        value={printerModal.printer.code || ''}
-                                        onChange={(e) => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, code: e.target.value } })}
-                                        className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl sm:rounded-3xl font-black text-xs uppercase tracking-widest outline-none focus:ring-4 focus:ring-indigo-500/10 border-2 border-transparent focus:border-indigo-600 transition-all shadow-inner"
-                                        placeholder="e.g. PRN-01"
-                                    />
-                                </div>
-                                <div className="space-y-3">
-                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Printer Name', 'اسم الطابعة')}</label>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+                                 <div className="space-y-3">
+                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Printer Name', 'اسم الطابعة')}</label>
                                     <input
                                         type="text"
                                         value={printerModal.printer.name}
                                         onChange={(e) => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, name: e.target.value } })}
                                         className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl sm:rounded-3xl font-black text-xs uppercase tracking-widest outline-none focus:ring-4 focus:ring-indigo-500/10 border-2 border-transparent focus:border-indigo-600 transition-all shadow-inner"
-                                        placeholder="e.g. KITCHEN_B1"
+                                        placeholder={tr('Cashier, Kitchen, Bar...', 'كاشير، مطبخ، بار...')}
                                     />
                                 </div>
                                  <div className="space-y-3">
@@ -963,31 +932,11 @@ const PrinterManager: React.FC = () => {
                                         ))}
                                      </select>
                                  </div>
-                                <div className="space-y-3">
-                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('POS Station ID', 'معرف محطة POS')}</label>
-                                    <input
-                                        type="text"
-                                        value={(printerModal.printer as any).stationId || ''}
-                                        onChange={(e) => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, stationId: e.target.value } as any })}
-                                        className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl sm:rounded-3xl font-black text-xs uppercase tracking-widest outline-none focus:ring-4 focus:ring-indigo-500/10 border-2 border-transparent focus:border-indigo-600 transition-all shadow-inner"
-                                        placeholder="e.g. cashier-1"
-                                    />
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Bridge Gateway ID', 'معرف بوابة Bridge')}</label>
-                                    <input
-                                        type="text"
-                                        value={(printerModal.printer as any).gatewayId || ''}
-                                        onChange={(e) => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, gatewayId: e.target.value } as any })}
-                                        className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl sm:rounded-3xl font-black text-xs uppercase tracking-widest outline-none focus:ring-4 focus:ring-indigo-500/10 border-2 border-transparent focus:border-indigo-600 transition-all shadow-inner"
-                                        placeholder="e.g. cashier-1"
-                                    />
-                                </div>
-                             </div>
+                              </div>
 
                             <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Printer Roles (multi-select)', 'أدوار الطابعة')}</label>
-                                <p className="text-[10px] text-slate-400 ml-1">{tr('Select all stations this printer serves. Items will route here based on matching roles.', 'اختر كل المحطات التي تخدمها الطابعة. الأصناف ستتوجه حسب الأدوار المطابقة.')}</p>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Printer job', 'تطبع إيه؟')}</label>
+                                <p className="text-[10px] text-slate-400 ml-1">{tr('Choose where this printer is used. You can select more than one.', 'اختار استخدام الطابعة. ممكن تختار أكثر من واحد.')}</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {printerRoleOptions.map((role) => {
                                         const roles = printerModal.printer.roles || (printerModal.printer.role ? [printerModal.printer.role] : []);
@@ -1027,6 +976,20 @@ const PrinterManager: React.FC = () => {
                                         {printerModal.printer.isPrimaryCashier ? tr('PRIMARY ENABLED', 'مفعلة كأساسية') : tr('SET AS PRIMARY', 'تعيين كأساسية')}
                                     </button>
                                 </div>
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{tr('Paper width', 'مقاس ورق الطابعة')}</label>
+                                    <select
+                                        value={Number(printerModal.printer.paperWidth || 80) <= 58 ? 58 : 80}
+                                        onChange={(e) => setPrinterModal({
+                                            ...printerModal,
+                                            printer: { ...printerModal.printer, paperWidth: Number(e.target.value) },
+                                        })}
+                                        className="w-full p-4 sm:p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl sm:rounded-3xl font-black text-[10px] uppercase tracking-widest outline-none border-2 border-transparent focus:border-indigo-600"
+                                    >
+                                        <option value={80}>80mm — 576 dots</option>
+                                        <option value={58}>58mm — 384 dots</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="space-y-4">
@@ -1038,7 +1001,7 @@ const PrinterManager: React.FC = () => {
                                     >
                                         <Network size={24} className="sm:hidden" />
                                         <Network size={32} className="hidden sm:block" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{tr('Network Printer', 'طابعة شبكة')}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{tr('Network / IP', 'شبكة / IP')}</span>
                                     </button>
                                     <button
                                         onClick={() => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, type: 'LOCAL' } })}
@@ -1046,21 +1009,21 @@ const PrinterManager: React.FC = () => {
                                     >
                                         <Monitor size={24} className="sm:hidden" />
                                         <Monitor size={32} className="hidden sm:block" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{tr('Local Printer', 'طابعة محلية')}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{tr('USB on this device', 'USB على الجهاز')}</span>
                                     </button>
                                 </div>
                             </div>
 
                             <div className="space-y-3">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
-                                    {printerModal.printer.type === 'NETWORK' ? tr('IP Address', 'عنوان IP') : tr('Printer ID', 'معرف الطابعة')}
+                                    {printerModal.printer.type === 'NETWORK' ? tr('Printer IP Address', 'IP الطابعة') : tr('USB Printer', 'طابعة USB')}
                                 </label>
                                 <input
                                     type="text"
                                     value={printerModal.printer.address}
                                     onChange={(e) => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, address: e.target.value } })}
                                     className="w-full p-4 sm:p-5 bg-slate-900 text-indigo-400 rounded-2xl sm:rounded-3xl font-black text-xs font-mono outline-none border-2 border-indigo-950 shadow-2xl tracking-tighter"
-                                    placeholder={printerModal.printer.type === 'NETWORK' ? "10.0.0.XXX" : "EPSON-L90"}
+                                    placeholder={printerModal.printer.type === 'NETWORK' ? '192.168.1.50' : tr('Choose from list or type printer name', 'اختار من القائمة أو اكتب اسم الطابعة')}
                                 />
                                 {printerModal.printer.type === 'LOCAL' && (
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -1077,14 +1040,24 @@ const PrinterManager: React.FC = () => {
                                                 {localPrinterLoading ? tr('Loading...', 'تحميل...') : copy.refresh}
                                             </button>
                                         </div>
-                                        {localPrinterDevices.filter((device) => device.address?.startsWith('usb:')).length > 0 ? (
+                                        {localPrinterOptions.length > 0 ? (
                                             <select
                                                 value={printerModal.printer.address}
-                                                onChange={(e) => setPrinterModal({ ...printerModal, printer: { ...printerModal.printer, address: e.target.value } })}
+                                                onChange={(e) => {
+                                                    const device = localPrinterOptions.find((item) => item.address === e.target.value);
+                                                    setPrinterModal({
+                                                        ...printerModal,
+                                                        printer: {
+                                                            ...printerModal.printer,
+                                                            address: e.target.value,
+                                                            name: printerModal.mode === 'ADD' ? (device?.name || printerModal.printer.name || '') : (printerModal.printer.name || device?.name || ''),
+                                                        },
+                                                    });
+                                                }}
                                                 className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-xs font-black text-slate-800 outline-none focus:border-indigo-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                                             >
                                                 <option value="">{tr('Select connected USB printer', 'اختار الطابعة المتوصلة USB')}</option>
-                                                {localPrinterDevices.filter((device) => device.address?.startsWith('usb:')).map((device) => (
+                                                {localPrinterOptions.map((device) => (
                                                     <option key={device.id} value={device.address}>
                                                         {device.name}{device.isDefault ? tr(' - Default', ' - افتراضية') : ''}{device.isOffline ? tr(' - Offline', ' - غير متصلة') : ''}
                                                     </option>
@@ -1105,7 +1078,7 @@ const PrinterManager: React.FC = () => {
                                 <AlertCircle size={20} className="text-amber-500 flex-shrink-0 sm:hidden" />
                                 <AlertCircle size={24} className="text-amber-500 flex-shrink-0 hidden sm:block" />
                                 <p className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase leading-relaxed tracking-widest">
-                                     {tr('Connection will be tested after saving.', 'سيتم اختبار الاتصال بعد الحفظ.')}
+                                     {tr('Save, then press Print Test Receipt from the printer card.', 'احفظ، ثم اضغط طباعة إيصال تجريبي من كارت الطابعة.')}
                                 </p>
                             </div>
                         </div>

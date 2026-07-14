@@ -3,6 +3,8 @@ import { Request, Response, NextFunction } from 'express';
 interface AppErrorLike extends Error {
     statusCode?: number;
     code?: string;
+    number?: number;
+    originalError?: { number?: number };
     isOperational?: boolean;
 }
 
@@ -17,17 +19,22 @@ const maskSensitiveText = (value?: string) => {
  * Error Dictionary for UX (Item 34)
  */
 const UX_ERRORS: Record<string, { en: string; ar: string; action?: string }> = {
-    '23505': { // Postgres Unique Violation
+    '2601': { // SQL Server duplicate index key
         en: 'This record already exists. Please check your data.',
         ar: 'هذا السجل موجود مسبقاً. يرجى التحقق من البيانات.',
         action: 'refresh_or_modify'
     },
-    '23503': { // Postgres FK Violation
+    '2627': { // SQL Server duplicate constraint key
+        en: 'This record already exists. Please check your data.',
+        ar: 'لا يمكن حذف هذا السجل لأنه مرتبط ببيانات أخرى نشطة.',
+        action: 'refresh_or_modify'
+    },
+    '547': { // SQL Server FK Violation
         en: 'Cannot delete this record because it is linked to other active data.',
         ar: 'لا يمكن حذف هذا السجل لأنه مرتبط ببيانات أخرى نشطة.',
         action: 'check_dependencies'
     },
-    '40001': { // Serialization Failure (Deadlock/Concurrent)
+    '1205': { // SQL Server deadlock victim
         en: 'System is busy processing another request for this data. Please try again.',
         ar: 'النظام مشغول بمعالجة طلب آخر على نفس البيانات. يرجى المحاولة مرة أخرى.',
         action: 'retry'
@@ -64,12 +71,13 @@ export const errorHandler = (
     const requestId = req.requestId || 'unknown';
 
     // Extract DB code if available
-    const dbErrorCode = (err as any).code; 
+    const sqlServerNumber = err.number ?? err.originalError?.number;
+    const dbErrorCode = sqlServerNumber ? String(sqlServerNumber) : err.code;
     let errorCode = err.code || dbErrorCode || 'INTERNAL_ERROR';
 
     // Map DB errors to UX errors
-    if (['23505', '23503', '40001'].includes(dbErrorCode)) {
-        statusCode = dbErrorCode === '40001' ? 409 : 400;
+    if (dbErrorCode && ['2601', '2627', '547', '1205'].includes(dbErrorCode)) {
+        statusCode = ['2601', '2627', '1205'].includes(dbErrorCode) ? 409 : 400;
         errorCode = dbErrorCode;
         err.isOperational = true; // Safe to show mapped message
     }

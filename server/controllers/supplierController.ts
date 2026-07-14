@@ -53,7 +53,7 @@ export const createSupplier = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Supplier name is required' });
         }
 
-        const [newSupplier] = await db.insert(suppliers).values({
+        const [newSupplier] = await db.insert(suppliers).output().values({
             id: id || `SUP-${Date.now()}`,
             name,
             contactPerson,
@@ -66,7 +66,7 @@ export const createSupplier = async (req: Request, res: Response) => {
             isActive: true,
             createdAt: new Date(),
             updatedAt: new Date(),
-        }).returning();
+        });
 
         res.status(201).json(newSupplier);
     } catch (error: any) {
@@ -88,8 +88,8 @@ export const updateSupplier = async (req: Request, res: Response) => {
                 ...updates,
                 updatedAt: new Date(),
             })
-            .where(eq(suppliers.id, id))
-            .returning();
+            .output()
+            .where(eq(suppliers.id, id));
 
         if (!updated) {
             return res.status(404).json({ error: 'Supplier not found' });
@@ -111,8 +111,8 @@ export const deactivateSupplier = async (req: Request, res: Response) => {
 
         const [updated] = await db.update(suppliers)
             .set({ isActive: false, updatedAt: new Date() })
-            .where(eq(suppliers.id, id))
-            .returning();
+            .output()
+            .where(eq(suppliers.id, id));
 
         if (!updated) {
             return res.status(404).json({ error: 'Supplier not found' });

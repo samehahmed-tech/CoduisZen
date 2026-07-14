@@ -450,7 +450,7 @@ const updateDeviceSyncNotes = async (
 };
 
 const markAutoClearResult = async (deviceId: string, patch: { at?: string | null; error?: string | null }) => {
-    const [fresh] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+    const [fresh] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
     if (!fresh) return;
     const notes = parseDeviceNotes(fresh.notes);
     notes.sync = {
@@ -572,7 +572,7 @@ const fetchDeviceLogsForOptions = async (
                 .from(attendanceRawLogs)
                 .where(eq(attendanceRawLogs.deviceId, device.id))
                 .orderBy(desc(attendanceRawLogs.occurredAt))
-                .limit(1);
+                .offset(0).fetch(1);
             filterTime = lastLog?.occurredAt
                 ? new Date(lastLog.occurredAt).getTime() - (normalizedOptions.overlapHours * 60 * 60 * 1000)
                 : new Date('1990-01-01').getTime();
@@ -902,11 +902,11 @@ const syncDevice = async (device: typeof attendanceDevices.$inferSelect, onProgr
             const [lastLog] = await db.select({ occurredAt: attendanceRawLogs.occurredAt })
                 .from(attendanceRawLogs)
                 .where(eq(attendanceRawLogs.deviceId, device.id))
-                .orderBy(desc(attendanceRawLogs.occurredAt))
-                .limit(1);
+            .orderBy(desc(attendanceRawLogs.occurredAt))
+            .offset(0).fetch(1);
 
-            let filterTime = 0;
-            if (normalizedOptions.fetchMode === 'ALL') {
+        let filterTime = 0;
+        if (normalizedOptions.fetchMode === 'ALL') {
                 filterTime = new Date('1990-01-01').getTime();
             } else if (normalizedOptions.startDate) {
                 filterTime = normalizedOptions.startDate.getTime();
@@ -1309,9 +1309,8 @@ export const zktecoConnectorService = {
      * Sync a specific device by ID.
      */
     async syncSingleDevice(deviceId: string, options?: DeviceSyncOptions): Promise<DeviceSyncResult> {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         return syncDevice(device, undefined, options);
     },
@@ -1320,7 +1319,7 @@ export const zktecoConnectorService = {
      * Sync a specific device by ID supporting stream callback
      */
     async syncDeviceStream(deviceId: string, onProgress: (data: any) => void, options?: DeviceSyncOptions): Promise<DeviceSyncResult> {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         
         // Keep-alive heartbeat every 15s
@@ -1337,9 +1336,8 @@ export const zktecoConnectorService = {
     },
 
     async previewDeviceSync(deviceId: string, options?: DeviceSyncOptions): Promise<DeviceSyncPreviewResult> {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
 
         const pulled = await fetchDeviceLogsForOptions(device, options);
@@ -1347,9 +1345,8 @@ export const zktecoConnectorService = {
     },
 
     async commitDevicePreview(deviceId: string, records: DevicePreviewCommitRecord[]): Promise<DeviceSyncResult> {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         if (!Array.isArray(records)) throw new Error('RECORDS_REQUIRED');
         if (records.length > 10000) throw new Error('TOO_MANY_RECORDS_SELECTED');
@@ -1485,13 +1482,13 @@ export const zktecoConnectorService = {
     },
 
     async getDeviceSyncSettings(deviceId: string) {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         return getDeviceSyncConfig(device);
     },
 
     async updateDeviceSyncSettings(deviceId: string, input: { autoEnabled?: boolean; intervalMinutes?: number; autoClearAfterSync?: boolean }) {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
 
         const existing = parseDeviceNotes(device.notes);
@@ -1510,8 +1507,8 @@ export const zktecoConnectorService = {
 
         const [updated] = await db.update(attendanceDevices)
             .set({ notes: stringifyDeviceNotes(existing), updatedAt: new Date() })
-            .where(eq(attendanceDevices.id, deviceId))
-            .returning();
+            .output()
+            .where(eq(attendanceDevices.id, deviceId));
 
         return {
             deviceId,
@@ -1655,7 +1652,7 @@ export const zktecoConnectorService = {
     },
 
     async clearDeviceLogs(deviceId: string): Promise<{ success: boolean; recordsBackedUp: number; backupId?: string }> {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device || !device.ipAddress) throw new Error('DEVICE_NOT_FOUND_OR_NO_IP');
         
         const zk = new ZKDevice({ ip: device.ipAddress, port: device.port || 4370 });
@@ -1697,7 +1694,7 @@ export const zktecoConnectorService = {
         capacity: number | null;
         checkedAt: string;
     }> {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device || !device.ipAddress) throw new Error('DEVICE_NOT_FOUND_OR_NO_IP');
 
         const zk = new ZKDevice({ ip: device.ipAddress, port: device.port || 4370 });
@@ -1718,7 +1715,7 @@ export const zktecoConnectorService = {
     },
 
     async restartDevice(deviceId: string): Promise<{ success: boolean }> {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device || !device.ipAddress) throw new Error('DEVICE_NOT_FOUND_OR_NO_IP');
         
         const zk = new ZKDevice({ ip: device.ipAddress, port: device.port || 4370 });
@@ -1732,7 +1729,7 @@ export const zktecoConnectorService = {
     },
 
     async setDeviceTime(deviceId: string, time?: string): Promise<{ success: boolean; newTime: string }> {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device || !device.ipAddress) throw new Error('DEVICE_NOT_FOUND_OR_NO_IP');
         
         const targetTime = time ? new Date(time) : new Date();

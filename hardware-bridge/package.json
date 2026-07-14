@@ -1,17 +1,15 @@
 {
   "name": "restoflow-print-bridge",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "install:service": "powershell -Command \"& { $action = New-ScheduledTaskAction -Execute 'node' -Argument (Resolve-Path 'index.js'); $trigger = New-ScheduledTaskTrigger -AtStartup; Register-ScheduledTask -TaskName 'RestoflowPrintBridge' -Action $action -Trigger $trigger -RunLevel Highest -Force; Write-Host 'Service installed. Run it now or reboot.' }\"",
+    "remove:service": "powershell -Command \"Unregister-ScheduledTask -TaskName 'RestoflowPrintBridge' -Confirm:$false 2>$null; Write-Host 'Service removed.'\""
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "escpos": "^3.0.0-alpha.6",
-    "escpos-network": "^3.0.0-alpha.4",
-    "escpos-usb": "^3.0.0-alpha.3",
-    "express": "^5.1.0"
+    "dotenv": "^17.4.2",
+    "eventsource": "^3.0.5"
   }
 }

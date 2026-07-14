@@ -33,12 +33,12 @@ export const shiftTaskService = {
                     isActive: input.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(shiftTasks.id, input.id))
-                .returning();
+                .output()
+                .where(eq(shiftTasks.id, input.id));
             return updated;
         }
 
-        const [created] = await db.insert(shiftTasks).values({
+        const [created] = await db.insert(shiftTasks).output().values({
             id: makeId('STK'),
             branchId: input.branchId,
             name: input.name,
@@ -47,7 +47,7 @@ export const shiftTaskService = {
             requiresVerification: input.requiresVerification ?? false,
             sortOrder: input.sortOrder ?? 0,
             isActive: input.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -58,11 +58,11 @@ export const shiftTaskService = {
     },
 
     async createTaskRun(input: { shiftId: string; taskId: string }) {
-        const [created] = await db.insert(shiftTaskRuns).values({
+        const [created] = await db.insert(shiftTaskRuns).output().values({
             shiftId: input.shiftId,
             taskId: input.taskId,
             status: 'PENDING',
-        }).returning();
+        });
         return created;
     },
 
@@ -75,8 +75,8 @@ export const shiftTaskService = {
                 notes: input.notes,
                 updatedAt: new Date(),
             })
-            .where(eq(shiftTaskRuns.id, input.id))
-            .returning();
+            .output()
+            .where(eq(shiftTaskRuns.id, input.id));
         return updated;
     },
 };

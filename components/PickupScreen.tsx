@@ -22,18 +22,20 @@ const playChime = () => {
   try {
     const ctx = getPickupCtx();
     if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1318.51, ctx.currentTime + 0.1);
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.45, ctx.currentTime + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.5);
+    [659.25, 880, 1174.66].forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = ctx.currentTime + index * 0.13;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(frequency, start);
+      osc.type = 'triangle';
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.5, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.01, start + 0.32);
+      osc.start(start);
+      osc.stop(start + 0.34);
+    });
   } catch { /* ignore audio errors */ }
 };
 
@@ -126,8 +128,9 @@ const usePickupCallout = () => {
     };
 
     utterance.lang = 'ar-EG';
-    utterance.rate = 0.86;
-    utterance.pitch = 1.02;
+    utterance.rate = 0.82;
+    utterance.pitch = 1.08;
+    utterance.volume = 1;
     utterance.onend = finish;
     utterance.onerror = finish;
 
@@ -146,9 +149,13 @@ const usePickupCallout = () => {
     await activateAudio();
     const phrase = getCalloutPhrase(order);
     try {
+      playChime();
+      await new Promise(resolve => window.setTimeout(resolve, 650));
       await playServerArabicTts(phrase);
     } catch {
       try {
+        playChime();
+        await new Promise(resolve => window.setTimeout(resolve, 650));
         await speakWithBrowser(phrase);
       } catch {
         playChime();
@@ -163,7 +170,7 @@ const usePickupCallout = () => {
 };
 
 export const PickupScreen: React.FC = () => {
-  const { orders, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { orders, fetchOrders } = useOrderStore();
   const { settings } = useAuthStore();
   const { success, error } = useToast();
   const lang = settings.language || 'en';
@@ -176,7 +183,7 @@ export const PickupScreen: React.FC = () => {
   const [announcementQueue, setAnnouncementQueue] = useState<any[]>([]);
   const [callingOrderId, setCallingOrderId] = useState<string | null>(null);
   const [pendingHandoverIds, setPendingHandoverIds] = useState<Set<string>>(new Set());
-  const announcedReadyIds = useRef<Set<string>>(new Set());
+  const readyOrdersRef = useRef<any[]>([]);
   const { audioEnabled, activateAudio, speak } = usePickupCallout();
 
   useEffect(() => {
@@ -226,12 +233,10 @@ export const PickupScreen: React.FC = () => {
     } catch { /* ignore fullscreen errors */ }
   }, []);
 
-  const { preparingOrders, readyOrders, deliveryReadyOrders, recentlyCompleted } = useMemo(() => {
-    const now = Date.now();
+  const { preparingOrders, readyOrders, deliveryReadyOrders } = useMemo(() => {
     const preparing: any[] = [];
     const ready: any[] = [];
     const deliveryReady: any[] = [];
-    const completed: any[] = [];
     const branchOrders = settings.activeBranchId ? orders.filter(o => o.branchId === settings.activeBranchId) : orders;
 
     for (const order of branchOrders) {
@@ -243,9 +248,6 @@ export const PickupScreen: React.FC = () => {
         } else if (isPickupHandoverOrder(order)) {
           ready.push(order);
         }
-      } else if (order.status === OrderStatus.DELIVERED || order.status === OrderStatus.COMPLETED) {
-        const age = now - new Date(order.updatedAt || order.createdAt).getTime();
-        if (age < 300000) completed.push(order);
       }
     }
 
@@ -253,30 +255,29 @@ export const PickupScreen: React.FC = () => {
       preparingOrders: preparing.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
       readyOrders: ready.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
       deliveryReadyOrders: deliveryReady.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-      recentlyCompleted: completed.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()),
     };
   }, [orders, settings.activeBranchId, lastTick]);
 
   useEffect(() => {
-    const currentReadyIds = new Set(readyOrders.map(o => o.id));
-    for (const id of Array.from(announcedReadyIds.current)) {
-      if (!currentReadyIds.has(id)) announcedReadyIds.current.delete(id);
-    }
-
-    const unseen = readyOrders.filter(order => !announcedReadyIds.current.has(order.id));
-    if (unseen.length === 0) return;
-
-    unseen.forEach(order => announcedReadyIds.current.add(order.id));
-    setAnnouncementQueue(prev => [...prev, ...unseen]);
-    if (audioEnabled) playChime();
-  }, [audioEnabled, readyOrders]);
+    readyOrdersRef.current = readyOrders;
+    const readyIds = new Set(readyOrders.map(order => order.id));
+    setAnnouncementQueue(prev => [
+      ...prev.filter(order => readyIds.has(order.id)),
+      ...readyOrders.filter(order => !prev.some(item => item.id === order.id) && order.id !== callingOrderId),
+    ]);
+  }, [callingOrderId, readyOrders]);
 
   useEffect(() => {
     if (!audioEnabled || announcementQueue.length === 0 || callingOrderId) return;
     const [nextOrder] = announcementQueue;
     setAnnouncementQueue(prev => prev.slice(1));
     setCallingOrderId(nextOrder.id);
-    speak(nextOrder).finally(() => setCallingOrderId(null));
+    speak(nextOrder).finally(() => {
+      window.setTimeout(() => {
+        setCallingOrderId(null);
+        setAnnouncementQueue(prev => prev.length > 0 ? prev : readyOrdersRef.current);
+      }, 1800);
+    });
   }, [announcementQueue, audioEnabled, callingOrderId, speak]);
 
   const handleCall = useCallback((order: any) => {
@@ -289,7 +290,6 @@ export const PickupScreen: React.FC = () => {
     setPendingHandoverIds(prev => new Set(prev).add(order.id));
     try {
       await kdsApi.handoverOrder(order.id);
-      announcedReadyIds.current.delete(order.id);
       setAnnouncementQueue(prev => prev.filter(item => item.id !== order.id));
       clearQuickEntry(setQuickInput, quickInputValueRef);
       await refreshPickupOrders();
@@ -304,16 +304,6 @@ export const PickupScreen: React.FC = () => {
       });
     }
   }, [error, isAr, pendingHandoverIds, refreshPickupOrders, success]);
-
-  const undoHandover = useCallback(async (id: string) => {
-    try {
-      await updateOrderStatus(id, OrderStatus.READY);
-      await refreshPickupOrders();
-      success(isAr ? 'تم إرجاع الطلب إلى جاهز' : 'Order returned to ready');
-    } catch {
-      error(isAr ? 'تعذر التراجع عن التسليم' : 'Failed to undo handover');
-    }
-  }, [error, isAr, refreshPickupOrders, success, updateOrderStatus]);
 
   const matchedOrder = useMemo(() => {
     const trimmed = quickInput.trim();
@@ -486,37 +476,8 @@ export const PickupScreen: React.FC = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            {preparingOrders.length > 0 && (
-              <div className="mb-5">
-                <div className="mb-3 flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/8 px-4 py-3">
-                  <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-amber-600">
-                    <Clock size={16} />
-                    {isAr ? 'قيد التحضير في المطبخ' : 'Preparing In Kitchen'}
-                  </h3>
-                  <span className="rounded-lg border border-amber-500/20 bg-amber-500/15 px-3 py-1 text-xs font-black text-amber-600">
-                    {preparingOrders.length}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  {preparingOrders.map((order) => (
-                    <PickupCard
-                      key={order.id}
-                      order={order}
-                      onCall={() => undefined}
-                      onHandover={() => undefined}
-                      isAr={isAr}
-                      elapsed={getElapsedMins(order.createdAt)}
-                      isReady={false}
-                      isPreparing
-                      isCalling={false}
-                      isPending={false}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
             <AnimatePresence>
-              {readyOrders.length === 0 && preparingOrders.length === 0 && deliveryReadyOrders.length === 0 ? (
+              {readyOrders.length === 0 && deliveryReadyOrders.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-muted/60">
                   <CheckCircle2 size={64} className="mb-4 opacity-50" />
                   <p className="text-sm font-black uppercase tracking-widest">{isAr ? 'لا توجد طلبات جاهزة' : 'All caught up! No pending orders.'}</p>
@@ -576,40 +537,36 @@ export const PickupScreen: React.FC = () => {
           </div>
         </section>
 
-        <section className="w-[400px] xl:w-[450px] shrink-0 flex flex-col bg-card/60 backdrop-blur-xl rounded-[2rem] border border-border/30 shadow-2xl overflow-hidden relative">
-          <div className="px-6 py-4 border-b border-border/10 bg-elevated/40 flex items-center justify-between">
-            <h2 className="text-sm font-black uppercase tracking-widest text-muted flex items-center gap-2">
-              <CheckCircle2 size={16} />
-              {isAr ? 'آخر التسليمات' : 'Recent Hand-Offs'}
-            </h2>
-          </div>
+        {preparingOrders.length > 0 && (
+          <section className="w-[400px] xl:w-[450px] shrink-0 flex flex-col bg-card/60 backdrop-blur-xl rounded-[2rem] border border-amber-500/20 shadow-2xl overflow-hidden relative">
+            <div className="px-6 py-4 border-b border-amber-500/10 bg-amber-500/10 flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-widest text-amber-600 flex items-center gap-2">
+                <Clock size={16} />
+                {isAr ? 'قيد التحضير في المطبخ' : 'Preparing In Kitchen'}
+              </h2>
+              <span className="rounded-lg border border-amber-500/20 bg-amber-500/15 px-3 py-1 text-xs font-black text-amber-600">
+                {preparingOrders.length}
+              </span>
+            </div>
 
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            <AnimatePresence>
-              {recentlyCompleted.length === 0 ? (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex items-center justify-center text-muted/40 text-xs font-bold uppercase tracking-widest text-center px-8">
-                  {isAr ? 'لا توجد تسليمات حديثة' : 'No recent deliveries to display'}
-                </motion.div>
-              ) : (
-                <div className="space-y-3">
-                  {recentlyCompleted.map(order => (
-                    <PickupCard
-                      key={order.id}
-                      order={order}
-                      onCall={() => undefined}
-                      onHandover={() => undoHandover(order.id)}
-                      isAr={isAr}
-                      elapsed={0}
-                      isReady={false}
-                      isCalling={false}
-                      isPending={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
-        </section>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
+              {preparingOrders.map((order) => (
+                <PickupCard
+                  key={order.id}
+                  order={order}
+                  onCall={() => undefined}
+                  onHandover={() => undefined}
+                  isAr={isAr}
+                  elapsed={getElapsedMins(order.createdAt)}
+                  isReady={false}
+                  isPreparing
+                  isCalling={false}
+                  isPending={false}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );

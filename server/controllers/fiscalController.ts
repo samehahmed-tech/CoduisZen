@@ -5,6 +5,17 @@ import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { getStringParam, getNumberParam } from '../utils/request';
 import { submitOrderToFiscal } from '../services/fiscalSubmitService';
 import { etaService } from '../services/etaService';
+import { FISCAL_SELLER_ENV_KEYS } from '../services/fiscalService';
+
+const FISCAL_REQUIRED_ENV = [
+    'ETA_BASE_URL',
+    'ETA_TOKEN_URL',
+    'ETA_CLIENT_ID',
+    'ETA_CLIENT_SECRET',
+    'ETA_API_KEY',
+    'ETA_PRIVATE_KEY',
+    ...FISCAL_SELLER_ENV_KEYS,
+];
 
 const getDateRange = (dateFrom?: string, dateTo?: string) => {
     const end = dateTo ? new Date(dateTo) : new Date();
@@ -24,7 +35,7 @@ export const submitReceipt = async (req: Request, res: Response) => {
         const orderId = getStringParam(req.body?.orderId);
         if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
         const force = Boolean(req.body?.force);
-        const result = await submitOrderToFiscal(orderId, { force });
+        const result = await submitOrderToFiscal(orderId, { force, branchId: req.effectiveBranchId });
         res.json({ success: true, ...result });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -33,7 +44,7 @@ export const submitReceipt = async (req: Request, res: Response) => {
 
 export const getFiscalLogs = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId;
         const limit = getNumberParam(req.query.limit) || 50;
 
         let query = db.select().from(fiscalLogs);
@@ -41,7 +52,7 @@ export const getFiscalLogs = async (req: Request, res: Response) => {
             // @ts-ignore dynamic where chaining
             query = query.where(eq(fiscalLogs.branchId, branchId));
         }
-        const rows = await query.orderBy(desc(fiscalLogs.createdAt)).limit(Math.min(200, limit));
+        const rows = await query.orderBy(desc(fiscalLogs.createdAt)).offset(0).fetch(Math.min(200, limit));
         res.json(rows);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -50,7 +61,7 @@ export const getFiscalLogs = async (req: Request, res: Response) => {
 
 export const getFiscalSummary = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId;
         const dateFrom = getStringParam(req.query.dateFrom);
         const dateTo = getStringParam(req.query.dateTo);
         const { start, end } = getDateRange(dateFrom, dateTo);
@@ -109,7 +120,7 @@ export const getFiscalSummary = async (req: Request, res: Response) => {
 
 export const getDeadLetters = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId;
         const status = getStringParam(req.query.status);
 
         const rows = await db.select().from(etaDeadLetters)
@@ -132,6 +143,12 @@ export const retryDeadLetter = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'INVALID_DEAD_LETTER_ID' });
         }
 
+        const record = await db.query.etaDeadLetters.findFirst({ where: eq(etaDeadLetters.id, id) });
+        if (!record) return res.status(404).json({ error: 'DEAD_LETTER_NOT_FOUND' });
+        if (req.effectiveBranchId && record.branchId !== req.effectiveBranchId) {
+            return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
+        }
+
         const result = await etaService.retryDeadLetter(id);
         res.json({ success: true, result });
     } catch (error: any) {
@@ -150,6 +167,12 @@ export const dismissDeadLetter = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'AUTH_REQUIRED' });
         }
 
+        const record = await db.query.etaDeadLetters.findFirst({ where: eq(etaDeadLetters.id, id) });
+        if (!record) return res.status(404).json({ error: 'DEAD_LETTER_NOT_FOUND' });
+        if (req.effectiveBranchId && record.branchId !== req.effectiveBranchId) {
+            return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
+        }
+
         await etaService.dismissDeadLetter(id, userId);
         res.json({ success: true });
     } catch (error: any) {
@@ -158,35 +181,17 @@ export const dismissDeadLetter = async (req: Request, res: Response) => {
 };
 
 export const getFiscalConfig = async (_req: Request, res: Response) => {
-    const required = [
-        'ETA_BASE_URL',
-        'ETA_TOKEN_URL',
-        'ETA_CLIENT_ID',
-        'ETA_CLIENT_SECRET',
-        'ETA_API_KEY',
-        'ETA_PRIVATE_KEY',
-        'ETA_RIN',
-    ];
-    const missing = required.filter(key => !process.env[key]);
+    const missing = FISCAL_REQUIRED_ENV.filter(key => !process.env[key]);
     res.json({ ok: missing.length === 0, missing });
 };
 
 export const getFiscalReadiness = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId;
         const since = new Date();
         since.setDate(since.getDate() - 1);
 
-        const required = [
-            'ETA_BASE_URL',
-            'ETA_TOKEN_URL',
-            'ETA_CLIENT_ID',
-            'ETA_CLIENT_SECRET',
-            'ETA_API_KEY',
-            'ETA_PRIVATE_KEY',
-            'ETA_RIN',
-        ];
-        const missing = required.filter(key => !process.env[key]);
+        const missing = FISCAL_REQUIRED_ENV.filter(key => !process.env[key]);
 
         const rows = await db.select({
             status: fiscalLogs.status,

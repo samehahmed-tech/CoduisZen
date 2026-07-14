@@ -182,8 +182,8 @@ const ensureBridgeDevice = async (input: {
                     lastSeenAt: new Date(),
                     updatedAt: new Date(),
                 })
-                .where(eq(attendanceDevices.id, existing.id))
-                .returning();
+                .output()
+                .where(eq(attendanceDevices.id, existing.id));
             return updated || existing;
         }
     }

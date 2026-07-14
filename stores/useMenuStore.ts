@@ -269,6 +269,7 @@ export const useMenuStore = create<MenuState>()(
             },
 
             reorderCategories: async (menuId, reorderedCategories) => {
+                const previousCategories = get().categories;
                 // Optimistic UI update
                 set((state) => {
                     const otherCategories = state.categories.filter(c => !c.menuIds.includes(menuId));
@@ -276,26 +277,22 @@ export const useMenuStore = create<MenuState>()(
                 });
 
                 try {
-                    const payloads = reorderedCategories.map(c => ({ id: c.id, sortOrder: c.sortOrder }));
-
                     if (navigator.onLine) {
-                        // Assuming the backend can handle a bulk update. If not, we might need Promise.all
-                        // For now we simulate an API call or use the existing update logic in a loop
                         await Promise.all(reorderedCategories.map(c =>
                             menuApi.updateCategory(c.id, { sortOrder: c.sortOrder })
                         ));
                     } else {
-                        reorderedCategories.forEach(c => {
-                            syncService.queue('menuCategory', 'UPDATE', { id: c.id, sortOrder: c.sortOrder });
-                        });
+                        await Promise.all(reorderedCategories.map(c =>
+                            syncService.queue('menuCategory', 'UPDATE', { id: c.id, sortOrder: c.sortOrder })
+                        ));
                     }
 
                     for (const cat of reorderedCategories) {
                         await localDb.menuCategories.put({ ...cat, updatedAt: Date.now() });
                     }
                 } catch (error: any) {
-                    set({ error: 'Failed to save new category order.', isLoading: false });
-                    // Ideally, we should rollback state here if it fails
+                    set({ categories: previousCategories, error: 'Failed to save new category order.', isLoading: false });
+                    throw error;
                 }
             },
 
@@ -313,7 +310,7 @@ export const useMenuStore = create<MenuState>()(
                         )
                     );
                     if (isDuplicate) {
-                        throw new Error('Item name already exists / اسم الصنف موجود مسبقاً');
+                        throw new Error('اسم الصنف موجود بالفعل. استخدم اسمًا مختلفًا.');
                     }
 
                     const payload = {
@@ -344,8 +341,10 @@ export const useMenuStore = create<MenuState>()(
                         recipe: item.recipe || [],
                     };
 
+                    let savedItem = item;
                     if (navigator.onLine) {
-                        await menuApi.createItem(payload);
+                        const createdItem = await menuApi.createItem(payload);
+                        savedItem = { ...item, ...createdItem };
                     } else {
                         await syncService.queue('menuItem', 'CREATE', payload);
                     }
@@ -353,7 +352,7 @@ export const useMenuStore = create<MenuState>()(
                     set((state) => {
                         const targetCat = state.categories.find(c => c.id === categoryId);
                         const itemWithCategory = {
-                            ...item,
+                            ...savedItem,
                             category: targetCat?.name || 'General',
                             categoryAr: targetCat?.nameAr || targetCat?.name || 'عام',
                             categoryId
@@ -366,7 +365,7 @@ export const useMenuStore = create<MenuState>()(
                             isLoading: false
                         };
                     });
-                    await localDb.menuItems.put({ ...item, categoryId, updatedAt: Date.now() });
+                    await localDb.menuItems.put({ ...savedItem, categoryId, updatedAt: Date.now() });
                 } catch (error: any) {
                     set({ error: error.message, isLoading: false });
                     throw error;
@@ -384,7 +383,7 @@ export const useMenuStore = create<MenuState>()(
                         )
                     );
                     if (isDuplicate) {
-                        throw new Error('Item name already exists / اسم الصنف موجود مسبقاً');
+                        throw new Error('اسم الصنف موجود بالفعل. استخدم اسمًا مختلفًا.');
                     }
 
                     const payload = {

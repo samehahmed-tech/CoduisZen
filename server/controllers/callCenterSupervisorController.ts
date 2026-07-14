@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { orders, settings, branches } from '../../src/db/schema';
 import { and, eq, gte, lt, lte, or, sql, count, desc } from 'drizzle-orm';
+import { parseSettingJson, upsertSetting } from '../utils/settingsStore';
 
 type EscalationPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type EscalationStatus = 'OPEN' | 'RESOLVED';
@@ -51,87 +52,30 @@ const isPriority = (value: string): value is EscalationPriority =>
     ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(value);
 
 const loadEscalations = async (): Promise<EscalationRecord[]> => {
-    const [row] = await db.select().from(settings).where(eq(settings.key, SETTINGS_KEY)).limit(1);
-    const raw = row?.value;
-    if (!Array.isArray(raw)) return [];
-    return raw as EscalationRecord[];
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, SETTINGS_KEY));
+    return parseSettingJson<EscalationRecord[]>(row?.value, []);
 };
 
 const saveEscalations = async (records: EscalationRecord[], userId?: string | null) => {
-    await db
-        .insert(settings)
-        .values({
-            key: SETTINGS_KEY,
-            value: records,
-            category: 'call_center',
-            updatedBy: userId || 'system',
-            updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-            target: settings.key,
-            set: {
-                value: records,
-                category: 'call_center',
-                updatedBy: userId || 'system',
-                updatedAt: new Date(),
-            },
-        });
+    await upsertSetting({ key: SETTINGS_KEY, value: records, category: 'call_center', updatedBy: userId || 'system' });
 };
 
 const loadCoachingNotes = async (): Promise<CoachingNoteRecord[]> => {
-    const [row] = await db.select().from(settings).where(eq(settings.key, COACHING_SETTINGS_KEY)).limit(1);
-    const raw = row?.value;
-    if (!Array.isArray(raw)) return [];
-    return raw as CoachingNoteRecord[];
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, COACHING_SETTINGS_KEY));
+    return parseSettingJson<CoachingNoteRecord[]>(row?.value, []);
 };
 
 const saveCoachingNotes = async (records: CoachingNoteRecord[], userId?: string | null) => {
-    await db
-        .insert(settings)
-        .values({
-            key: COACHING_SETTINGS_KEY,
-            value: records,
-            category: 'call_center',
-            updatedBy: userId || 'system',
-            updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-            target: settings.key,
-            set: {
-                value: records,
-                category: 'call_center',
-                updatedBy: userId || 'system',
-                updatedAt: new Date(),
-            },
-        });
+    await upsertSetting({ key: COACHING_SETTINGS_KEY, value: records, category: 'call_center', updatedBy: userId || 'system' });
 };
 
 const loadDiscountApprovals = async (): Promise<DiscountApprovalRecord[]> => {
-    const [row] = await db.select().from(settings).where(eq(settings.key, DISCOUNT_APPROVALS_KEY)).limit(1);
-    const raw = row?.value;
-    if (!Array.isArray(raw)) return [];
-    return raw as DiscountApprovalRecord[];
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, DISCOUNT_APPROVALS_KEY));
+    return parseSettingJson<DiscountApprovalRecord[]>(row?.value, []);
 };
 
 const saveDiscountApprovals = async (records: DiscountApprovalRecord[], userId?: string | null) => {
-    await db
-        .insert(settings)
-        .values({
-            key: DISCOUNT_APPROVALS_KEY,
-            value: records,
-            category: 'call_center',
-            updatedBy: userId || 'system',
-            updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-            target: settings.key,
-            set: {
-                value: records,
-                category: 'call_center',
-                updatedBy: userId || 'system',
-                updatedAt: new Date(),
-            },
-        });
+    await upsertSetting({ key: DISCOUNT_APPROVALS_KEY, value: records, category: 'call_center', updatedBy: userId || 'system' });
 };
 
 export const getEscalations = async (req: Request, res: Response) => {
@@ -567,7 +511,7 @@ export const getFailedOrders = async (req: Request, res: Response) => {
             callCenterAgentId: orders.callCenterAgentId,
             createdAt: orders.createdAt,
             updatedAt: orders.updatedAt,
-        }).from(orders).where(and(...conditions)).orderBy(desc(orders.createdAt)).limit(100);
+        }).from(orders).where(and(...conditions)).orderBy(desc(orders.createdAt)).offset(0).fetch(100);
 
         res.json({
             total: failedOrders.length,
@@ -625,10 +569,10 @@ export const getDailyOrderSummary = async (req: Request, res: Response) => {
 
         // Hourly breakdown
         const hourly = await db.select({
-            hour: sql<number>`extract(hour from ${orders.createdAt})`,
+            hour: sql<number>`DATEPART(hour, ${orders.createdAt})`,
             orderCount: count(),
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-        }).from(orders).where(and(...conditions)).groupBy(sql`extract(hour from ${orders.createdAt})`).orderBy(sql`extract(hour from ${orders.createdAt})`);
+        }).from(orders).where(and(...conditions)).groupBy(sql`DATEPART(hour, ${orders.createdAt})`).orderBy(sql`DATEPART(hour, ${orders.createdAt})`);
 
         // Agent breakdown with AHT
         const agentBreakdown = await db.select({
@@ -637,7 +581,7 @@ export const getDailyOrderSummary = async (req: Request, res: Response) => {
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             cancelled: sql<number>`count(case when ${orders.status} = 'CANCELLED' then 1 end)`,
             delivered: sql<number>`count(case when ${orders.status} = 'DELIVERED' then 1 end)`,
-            avgAhtMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgAhtMinutes: sql<number>`coalesce(avg(DATEDIFF(SECOND, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
         }).from(orders).where(and(...conditions)).groupBy(orders.callCenterAgentId);
 
         const totalOrders = summary.reduce((sum, s) => sum + Number(s.orderCount), 0);

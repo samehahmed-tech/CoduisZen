@@ -340,9 +340,10 @@ export const generateReceiptHTML = ({
       align-items: center;
       padding: 9px 10px;
       margin: 6px 2px 0;
-      background: #111;
-      color: #fff;
-      border-radius: 6px;
+      background: #fff;
+      color: #000;
+      border: 3px solid #111;
+      border-radius: 4px;
       overflow: hidden;
    }
    .grand-total-label {

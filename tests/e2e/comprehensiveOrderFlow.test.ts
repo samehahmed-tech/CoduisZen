@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, inArray } from 'drizzle-orm';
 import { 
     branches, 
     menuCategories, 
@@ -53,14 +53,12 @@ describe('Comprehensive POS -> Inventory -> Finance Flow', () => {
     });
 
     beforeEach(async () => {
-        // Cleanup targeted tables for this comprehensive test to ensure fresh start
-        const tablesToClean = [
-            'stock_movements', 'inventory_stock', 'inventory_batches', 'batch_transactions',
-            'journal_lines', 'journal_entries', 'order_items', 'orders', 'recipes', 'recipe_ingredients'
-        ];
-        for (const table of tablesToClean) {
-            await db.execute(sql.raw(`TRUNCATE TABLE ${table} CASCADE;`));
-        }
+        await db.execute(sql`DELETE FROM batch_transactions WHERE batch_id = 'batch-comp-1'`);
+        await db.execute(sql`DELETE FROM stock_movements WHERE item_id = ${FIXTURES.invItemId}`);
+        await db.execute(sql`DELETE FROM recipe_ingredients WHERE recipe_id = ${FIXTURES.recipeId}`);
+        await db.execute(sql`DELETE FROM recipes WHERE id = ${FIXTURES.recipeId}`);
+        await db.execute(sql`DELETE FROM inventory_stock WHERE item_id = ${FIXTURES.invItemId} AND warehouse_id = ${FIXTURES.warehouseId}`);
+        await db.execute(sql`DELETE FROM inventory_batches WHERE id = 'batch-comp-1'`);
 
         // 1. Setup Branch & User
         await db.insert(branches).values({
@@ -267,7 +265,7 @@ describe('Comprehensive POS -> Inventory -> Finance Flow', () => {
         
         const lines = await db.select()
             .from(journalLines)
-            .where(eq(journalLines.journalEntryId, entries[0].id));
+            .where(inArray(journalLines.journalEntryId, entries.map((entry) => entry.id)));
         
         // Lines should include:
         // - Debit Cash: 228

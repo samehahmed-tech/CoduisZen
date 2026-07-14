@@ -47,6 +47,7 @@ interface ReceiptTemplate {
     linkedDepartments: string[];
     isDefault: boolean;
     createdAt: string;
+    styleVariant?: 'classic' | 'compact' | 'bold';
 }
 
 // ?? Default block definitions ??
@@ -105,18 +106,64 @@ const createDefaultTemplate = (type: 'receipt' | 'kitchen'): ReceiptTemplate => 
     linkedDepartments: [],
     isDefault: true,
     createdAt: new Date().toISOString(),
+    styleVariant: 'classic',
 });
+
+const createReceiptPresets = (): ReceiptTemplate[] => {
+    const createPreset = (config: {
+        id: string;
+        name: string;
+        nameAr: string;
+        styleVariant: 'classic' | 'compact' | 'bold';
+        fontSize: 'small' | 'normal' | 'large';
+        blockTypes: BlockType[];
+    }): ReceiptTemplate => ({
+        ...createDefaultTemplate('receipt'),
+        id: config.id,
+        name: config.name,
+        nameAr: config.nameAr,
+        styleVariant: config.styleVariant,
+        fontSize: config.fontSize,
+        isDefault: config.styleVariant === 'classic',
+        blocks: config.blockTypes.map(type => createBlock(type, type === 'separator'
+            ? { config: { ...BLOCK_CATALOG.separator.defaultConfig, style: config.styleVariant === 'compact' ? 'dashed' : 'solid' } }
+            : undefined)),
+    });
+
+    return [
+        createPreset({ id: 'preset_receipt_classic_80', name: 'Classic Ledger 80mm', nameAr: 'دفتر كلاسيك 80mm', styleVariant: 'classic', fontSize: 'normal', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_compact_80', name: 'Counter Compact 80mm', nameAr: 'كاونتر مختصر 80mm', styleVariant: 'compact', fontSize: 'small', blockTypes: [
+            'logo', 'header', 'orderInfo', 'items', 'totals', 'qrCode', 'footer',
+        ] }),
+        createPreset({ id: 'preset_receipt_bold_80', name: 'Bold Order Ticket 80mm', nameAr: 'تذكرة طلب بارزة 80mm', styleVariant: 'bold', fontSize: 'large', blockTypes: [
+            'logo', 'header', 'separator', 'title', 'orderInfo', 'customerInfo', 'separator',
+            'items', 'separator', 'totals', 'payment', 'qrCode', 'footer',
+        ] }),
+    ];
+};
 
 // ?? Storage helpers ??
 
 const STORAGE_KEY = 'coduiszen_receipt_templates';
+const PRESET_VERSION_KEY = 'coduiszen_receipt_presets_version';
+const PRESET_VERSION = '2';
 
-const loadTemplates = (): ReceiptTemplate[] => {
+const loadTemplates = (remoteTemplates?: ReceiptTemplate[]): ReceiptTemplate[] => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
+        const savedTemplates: ReceiptTemplate[] = remoteTemplates?.length ? remoteTemplates : (raw ? JSON.parse(raw) : []);
+        if (localStorage.getItem(PRESET_VERSION_KEY) === PRESET_VERSION) return savedTemplates;
+
+        const presetTemplates = createReceiptPresets();
+        const existingIds = new Set(savedTemplates.map(template => template.id));
+        const templates = savedTemplates.length
+            ? [...savedTemplates, ...presetTemplates.filter(template => !existingIds.has(template.id)).map(template => ({ ...template, isDefault: false }))]
+            : [...presetTemplates, createDefaultTemplate('kitchen')];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+        localStorage.setItem(PRESET_VERSION_KEY, PRESET_VERSION);
+        return templates;
     } catch { /* ignore */ }
-    return [createDefaultTemplate('receipt'), createDefaultTemplate('kitchen')];
+    return [...createReceiptPresets(), createDefaultTemplate('kitchen')];
 };
 
 const saveTemplates = (templates: ReceiptTemplate[]) => {
@@ -126,13 +173,13 @@ const saveTemplates = (templates: ReceiptTemplate[]) => {
 // ?? Main Component ??
 
 const ReceiptDesigner: React.FC = () => {
-    const { settings, printers } = useAuthStore();
+    const { settings, printers, updateSettings } = useAuthStore();
     const lang = settings.language;
     const isAr = lang === 'ar';
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
-    const [templates, setTemplates] = useState<ReceiptTemplate[]>(loadTemplates);
+    const [templates, setTemplates] = useState<ReceiptTemplate[]>(() => loadTemplates(settings.receiptTemplates as ReceiptTemplate[] | undefined));
     const [activeTemplateId, setActiveTemplateId] = useState<string>(templates[0]?.id || '');
     const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
     const [showAddBlock, setShowAddBlock] = useState(false);
@@ -148,13 +195,26 @@ const ReceiptDesigner: React.FC = () => {
 
     const activeTemplate = templates.find(t => t.id === activeTemplateId) || templates[0];
 
+    const persistTemplates = useCallback((next: ReceiptTemplate[]) => {
+        saveTemplates(next);
+        updateSettings({ receiptTemplates: next });
+    }, [updateSettings]);
+
+    useEffect(() => {
+        const remote = settings.receiptTemplates as ReceiptTemplate[] | undefined;
+        if (!Array.isArray(remote) || remote.length === 0 || JSON.stringify(remote) === JSON.stringify(templates)) return;
+        saveTemplates(remote);
+        setTemplates(remote);
+        if (!remote.some(template => template.id === activeTemplateId)) setActiveTemplateId(remote[0].id);
+    }, [settings.receiptTemplates]);
+
     const updateTemplate = useCallback((updater: (t: ReceiptTemplate) => ReceiptTemplate) => {
         setTemplates(prev => {
             const next = prev.map(t => t.id === activeTemplateId ? updater(t) : t);
-            saveTemplates(next);
+            persistTemplates(next);
             return next;
         });
-    }, [activeTemplateId]);
+    }, [activeTemplateId, persistTemplates]);
 
     // ?? Drag & Drop ??
 
@@ -234,7 +294,7 @@ const ReceiptDesigner: React.FC = () => {
         newTpl.nameAr = type === 'receipt' ? `إيصال ${templates.filter(t => t.type === 'receipt').length + 1}` : `مطبخ ${templates.filter(t => t.type === 'kitchen').length + 1}`;
         setTemplates(prev => {
             const next = [...prev, newTpl];
-            saveTemplates(next);
+            persistTemplates(next);
             return next;
         });
         setActiveTemplateId(newTpl.id);
@@ -252,7 +312,7 @@ const ReceiptDesigner: React.FC = () => {
         };
         setTemplates(prev => {
             const next = [...prev, dup];
-            saveTemplates(next);
+            persistTemplates(next);
             return next;
         });
         setActiveTemplateId(dup.id);
@@ -274,7 +334,7 @@ const ReceiptDesigner: React.FC = () => {
         setTemplates(prev => {
             const next = prev.filter(t => t.id !== id);
             if (next.length === 0) next.push(createDefaultTemplate('receipt'));
-            saveTemplates(next);
+            persistTemplates(next);
             if (activeTemplateId === id) setActiveTemplateId(next[0].id);
             return next;
         });
@@ -292,7 +352,7 @@ const ReceiptDesigner: React.FC = () => {
                 const next = prev.map(t => t.id === renamingId
                     ? { ...t, [isAr ? 'nameAr' : 'name']: renameValue.trim() }
                     : t);
-                saveTemplates(next);
+                persistTemplates(next);
                 return next;
             });
         }

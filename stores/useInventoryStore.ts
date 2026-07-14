@@ -556,6 +556,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
                 await localDb.inventoryItems.put({ ...existing, updatedAt: Date.now() });
             }
             set({ error: error.message });
+            throw error;
         }
     },
 

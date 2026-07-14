@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { inventoryItems, menuCategories, menuItems, recipeIngredients, recipes } from '../src/db/schema';
 import { importItemsCSV } from '../server/controllers/menuController';
 
@@ -35,6 +35,10 @@ describe('smart menu import', () => {
             const dbModule = await import('../server/db');
             db = dbModule.db;
         }
+        await db.execute(sql`DELETE FROM recipe_ingredients WHERE recipe_id IN (SELECT id FROM recipes WHERE menu_item_id IN (SELECT mi.id FROM menu_items mi INNER JOIN menu_categories mc ON mc.id = mi.category_id WHERE mi.sku LIKE 'TST-%' OR mc.name LIKE 'Test %'))`);
+        await db.execute(sql`DELETE FROM recipes WHERE menu_item_id IN (SELECT mi.id FROM menu_items mi INNER JOIN menu_categories mc ON mc.id = mi.category_id WHERE mi.sku LIKE 'TST-%' OR mc.name LIKE 'Test %')`);
+        await db.execute(sql`DELETE FROM menu_items WHERE sku LIKE 'TST-%' OR category_id IN (SELECT id FROM menu_categories WHERE name LIKE 'Test %')`);
+        await db.execute(sql`DELETE FROM menu_categories WHERE name LIKE 'Test %'`);
     });
 
     it('creates missing categories and menu items from flexible Excel-style rows', async () => {
@@ -86,6 +90,7 @@ describe('smart menu import', () => {
         expect(item?.categoryId).toBe(category?.id);
         expect(item?.barcode).toBe('622000000001');
         expect(Number(item?.price)).toBe(125);
+        expect(Number(item?.cost || 0)).toBe(0);
         expect(item?.printerIds).toEqual(['kitchen', 'cashier']);
     });
 
@@ -252,8 +257,9 @@ describe('smart menu import', () => {
 
         const [item] = await db.select().from(menuItems).where(eq(menuItems.sku, 'TST-COMBO-001'));
         expect(item?.sizes).toEqual([
-            expect.objectContaining({ name: 'Large', price: 130, cost: 80, isAvailable: true }),
+            expect.objectContaining({ name: 'Large', price: 130, isAvailable: true }),
         ]);
+        expect(item?.sizes?.[0]).not.toHaveProperty('cost');
         expect(item?.modifierGroups).toEqual([
             expect.objectContaining({
                 name: 'Extras',

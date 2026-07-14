@@ -15,9 +15,10 @@ import { analyticsService } from '../services/analyticsService';
 import { loyaltyService } from '../services/loyaltyService';
 import { whatsappAutomationService } from '../services/whatsappAutomationService';
 import { kdsController } from './kdsController';
-import { enqueuePrintJob } from '../services/printQueueService';
+import { enqueuePrintJob, shouldEnqueueServerCashierReceipt } from '../services/printQueueService';
 import { randomUUID } from 'crypto';
 import { nanoid } from 'nanoid';
+import { parseSettingJson, toSettingValue } from '../utils/settingsStore.js';
 
 const ORDER_CREATE_SCOPE = 'ORDER_CREATE';
 const ORDER_STATUS_UPDATE_SCOPE = 'ORDER_STATUS_UPDATE';
@@ -62,15 +63,15 @@ const formatServerReceipt = (order: any, items: any[]) => {
 const enqueueCashierReceiptPrint = async (order: any) => {
     if (String(process.env.SERVER_AUTO_PRINT_RECEIPT || 'false').toLowerCase() !== 'true') return;
     try {
-        const [cashierPrinter] = await db
+const [cashierPrinter] = await db
             .select()
+            .top(1)
             .from(printers)
             .where(and(
                 eq(printers.branchId, order.branchId),
                 eq(printers.isActive, true),
                 eq(printers.isPrimaryCashier, true),
-            ))
-            .limit(1);
+            ));
         if (!cashierPrinter) return;
 
         const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
@@ -81,7 +82,7 @@ const enqueueCashierReceiptPrint = async (order: any) => {
             contentType: 'text',
             printerId: cashierPrinter.id,
             printerAddress: cashierPrinter.address || null,
-            printerType: (cashierPrinter.type as 'LOCAL' | 'NETWORK') || 'LOCAL',
+            printerType: String(cashierPrinter.type).toUpperCase() as any || 'LOCAL',
             createdBy: 'order-server',
             maxAttempts: 3,
         });
@@ -333,9 +334,9 @@ export const validateCoupon = async (req: Request, res: Response) => {
 
         const [couponSetting] = await db
             .select()
+            .top(1)
             .from(settings)
-            .where(eq(settings.key, 'posCoupons'))
-            .limit(1);
+            .where(eq(settings.key, 'posCoupons'));
 
         const settingsCoupons = toCouponRules(couponSetting?.value);
         let coupon = settingsCoupons.find((c) => c.code === normalizedCode);
@@ -343,7 +344,7 @@ export const validateCoupon = async (req: Request, res: Response) => {
         // Fallback: check the coupons DB table.
         if (!coupon) {
             const { coupons: couponsTable } = await import('../../src/db/schema');
-            const [dbCoupon] = await db.select().from(couponsTable).where(eq(couponsTable.code, normalizedCode)).limit(1);
+            const [dbCoupon] = await db.select().top(1).from(couponsTable).where(eq(couponsTable.code, normalizedCode));
             if (dbCoupon) {
                 coupon = {
                     code: dbCoupon.code,
@@ -447,8 +448,8 @@ export const getAllOrders = async (req: Request, res: Response) => {
             conditions.push(
                 sql`(${orders.businessDate} = ${dateStr} OR (
                     ${orders.businessDate} IS NULL AND
-                    ${orders.createdAt} >= ${dateStr}::date AND
-                    ${orders.createdAt} < (${dateStr}::date + '1 day'::interval)
+                    ${orders.createdAt} >= CAST(${dateStr} AS DATE) AND
+                    ${orders.createdAt} < DATEADD(day, 1, CAST(${dateStr} AS DATE))
                 ))`
             );
         }
@@ -460,8 +461,8 @@ export const getAllOrders = async (req: Request, res: Response) => {
                     (${orders.businessDate} IS NOT NULL AND ${orders.businessDate} >= ${startDate} AND ${orders.businessDate} <= ${endDate})
                     OR (
                         ${orders.businessDate} IS NULL AND
-                        ${orders.createdAt} >= ${startDate}::date AND
-                        ${orders.createdAt} < (${endDate}::date + '1 day'::interval)
+                        ${orders.createdAt} >= CAST(${startDate} AS DATE) AND
+                        ${orders.createdAt} < DATEADD(day, 1, CAST(${endDate} AS DATE))
                     )
                 )`
             );
@@ -475,19 +476,18 @@ export const getAllOrders = async (req: Request, res: Response) => {
             const decoded = decodeCursor(cursor);
             if (decoded) {
                 conditions.push(
-                    sql`(${orders.createdAt} < ${decoded.createdAt}::timestamp OR (${orders.createdAt} = ${decoded.createdAt}::timestamp AND ${orders.id} < ${decoded.id}))`
+                    sql`(${orders.createdAt} < CAST(${decoded.createdAt} AS DATETIME2) OR (${orders.createdAt} = CAST(${decoded.createdAt} AS DATETIME2) AND ${orders.id} < ${decoded.id}))`
                 );
             }
         }
 
+        const fetchLimit = cursor ? max + 1 : max;
         let query = db.select(orderSelect).from(orders);
         if (conditions.length > 0) {
             // @ts-ignore
             query = query.where(and(...conditions));
         }
-
-        const fetchLimit = cursor ? max + 1 : max;
-        const allOrders = await query.orderBy(desc(orders.createdAt)).limit(fetchLimit);
+        const allOrders = await query.orderBy(desc(orders.createdAt)).offset(0).fetch(fetchLimit);
 
         if (allOrders.length === 0) {
             if (cursor) return res.json({ data: [], pagination: { limit: max, nextCursor: null, hasMore: false } });
@@ -569,6 +569,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
         }
         res.json(enrichedOrders);
     } catch (error: any) {
+        console.error('[getAllOrders] Error:', error?.stack || error?.message || error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -584,6 +585,7 @@ export const createOrder = async (req: Request, res: Response) => {
         if (!idempotencyKey || !idempotencyHash) return null;
         const [existingClaim] = await db
             .select()
+            .top(1)
             .from(idempotencyKeys)
             .where(
                 and(
@@ -591,8 +593,7 @@ export const createOrder = async (req: Request, res: Response) => {
                     eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE),
                     gt(idempotencyKeys.expiresAt, new Date()),
                 ),
-            )
-            .limit(1);
+            );
 
         if (!existingClaim) return null;
         if (existingClaim.requestHash !== idempotencyHash) {
@@ -603,11 +604,11 @@ export const createOrder = async (req: Request, res: Response) => {
         }
 
         if (existingClaim.responseBody) {
-            return res.status(existingClaim.responseCode || 200).json(existingClaim.responseBody);
+            return res.status(existingClaim.responseCode || 200).json(parseSettingJson(existingClaim.responseBody, existingClaim.responseBody));
         }
 
         if (existingClaim.resourceId) {
-            const [existingOrder] = await db.select().from(orders).where(eq(orders.id, existingClaim.resourceId)).limit(1);
+            const [existingOrder] = await db.select().top(1).from(orders).where(eq(orders.id, existingClaim.resourceId));
             if (existingOrder) {
                 return res.status(existingClaim.responseCode || 200).json(existingOrder);
             }
@@ -636,22 +637,23 @@ export const createOrder = async (req: Request, res: Response) => {
             const replay = await replayIdempotentResponse();
             if (replay) return replay;
 
-            const inserted = await db
-                .insert(idempotencyKeys)
-                .values({
+            const [existingClaim] = await db
+                .select({ id: idempotencyKeys.id })
+                .top(1)
+                .from(idempotencyKeys)
+                .where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE)));
+            if (!existingClaim) {
+                await db.insert(idempotencyKeys).values({
                     key: idempotencyKey,
                     scope: ORDER_CREATE_SCOPE,
                     requestHash: idempotencyHash,
                     status: 'IN_PROGRESS',
                     expiresAt: idempotencyExpiry,
                     updatedAt: new Date(),
-                })
-                .onConflictDoNothing({
-                    target: [idempotencyKeys.key, idempotencyKeys.scope],
-                })
-                .returning({ id: idempotencyKeys.id });
+                });
+            }
 
-            if (inserted.length === 0) {
+            if (existingClaim) {
                 const replay = await replayIdempotentResponse();
                 if (replay) return replay;
             }
@@ -732,13 +734,13 @@ export const createOrder = async (req: Request, res: Response) => {
         if (orderData.id) {
             const [existingOrderRef] = await db
                 .select({ id: orders.id })
+                .top(1)
                 .from(orders)
-                .where(eq(orders.id, orderData.id))
-                .limit(1);
+                .where(eq(orders.id, orderData.id));
             if (existingOrderRef) {
                 let existingOrder: any = { id: existingOrderRef.id };
                 try {
-                    const [fullOrder] = await db.select().from(orders).where(eq(orders.id, orderData.id)).limit(1);
+                    const [fullOrder] = await db.select().top(1).from(orders).where(eq(orders.id, orderData.id));
                     if (fullOrder) {
                         existingOrder = fullOrder;
                     }
@@ -752,7 +754,7 @@ export const createOrder = async (req: Request, res: Response) => {
                             status: 'COMPLETED',
                             responseCode: 200,
                             resourceId: existingOrder.id,
-                            responseBody: existingOrder,
+                            responseBody: toSettingValue(existingOrder),
                             updatedAt: new Date(),
                             expiresAt: idempotencyExpiry,
                         })
@@ -772,7 +774,7 @@ export const createOrder = async (req: Request, res: Response) => {
         // Prioritize shift provided by frontend (Crucial for offline sync when a shift might have closed)
         let activeShift: typeof shifts.$inferSelect | null = null;
         if (orderData.shiftId) {
-            const [found] = await db.select().from(shifts).where(eq(shifts.id, orderData.shiftId)).limit(1);
+            const [found] = await db.select().top(1).from(shifts).where(eq(shifts.id, orderData.shiftId));
             if (found && found.branchId !== orderData.branchId) {
                 await clearIdempotencyClaim();
                 return res.status(400).json({
@@ -794,12 +796,12 @@ export const createOrder = async (req: Request, res: Response) => {
         }
 
         if (!activeShift) {
-            const [found] = await db.select().from(shifts).where(
+            const [found] = await db.select().top(1).from(shifts).where(
                 and(
                     eq(shifts.branchId, orderData.branchId),
                     eq(shifts.status, 'OPEN')
                 )
-            ).limit(1);
+            );
             activeShift = found;
         }
 
@@ -811,11 +813,11 @@ export const createOrder = async (req: Request, res: Response) => {
             });
         }
 
-        const [branchRecordForOrder] = await db
+const [branchRecordForOrder] = await db
             .select({ id: branches.id, businessDate: branches.businessDate })
+            .top(1)
             .from(branches)
-            .where(eq(branches.id, orderData.branchId))
-            .limit(1);
+            .where(eq(branches.id, orderData.branchId));
 
         if (!branchRecordForOrder) {
             await clearIdempotencyClaim();
@@ -827,11 +829,11 @@ export const createOrder = async (req: Request, res: Response) => {
         }
 
         if (orderData.customerId) {
-            const [customerRecordForOrder] = await db
+const [customerRecordForOrder] = await db
                 .select({ id: customers.id })
+                .top(1)
                 .from(customers)
-                .where(eq(customers.id, orderData.customerId))
-                .limit(1);
+                .where(eq(customers.id, orderData.customerId));
 
             if (!customerRecordForOrder && !String(orderData.customerPhone || '').trim()) {
                 await clearIdempotencyClaim();
@@ -845,7 +847,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
         // ================== ETA CONFIG GATE ==================
         const [etaRequiredSetting] = await db.select().from(settings).where(eq(settings.key, 'GO_LIVE_REQUIRE_ETA'));
-        const isETARequired = etaRequiredSetting?.value === 'true' || etaRequiredSetting?.value === true;
+        const isETARequired = etaRequiredSetting?.value === 'true';
 
         if (isETARequired && !process.env.ETA_RIN) {
             await clearIdempotencyClaim();
@@ -899,7 +901,7 @@ export const createOrder = async (req: Request, res: Response) => {
             });
         }
         const sourceKey = String(orderData.deliverySource || '').trim().toLowerCase();
-        const [sourcePlatform] = sourceKey
+const [sourcePlatform] = sourceKey
             ? await db
                 .select({
                     id: deliveryPlatforms.id,
@@ -908,6 +910,7 @@ export const createOrder = async (req: Request, res: Response) => {
                     priceMarkupPercentage: deliveryPlatforms.priceMarkupPercentage,
                     priceMarkupFixed: deliveryPlatforms.priceMarkupFixed,
                 })
+                .top(1)
                 .from(deliveryPlatforms)
                 .where(and(
                     eq(deliveryPlatforms.isActive, true),
@@ -916,7 +919,6 @@ export const createOrder = async (req: Request, res: Response) => {
                         OR lower(${deliveryPlatforms.name}) = ${sourceKey}
                     )`,
                 ))
-                .limit(1)
             : [];
         const platformPriceConfig = sourcePlatform?.applyFeesToMenuPrice ? sourcePlatform : undefined;
         // =============================================================
@@ -958,8 +960,8 @@ export const createOrder = async (req: Request, res: Response) => {
             // Standard 12% Service Charge for Dine-In if not provided
             let serviceCharge = 0;
             if (orderData.type === 'DINE_IN') {
-                const [branchRecord] = await tx.select({ serviceCharge: branches.serviceCharge })
-                    .from(branches).where(eq(branches.id, orderData.branchId)).limit(1);
+                const [branchRecord] = await tx.select({ serviceCharge: branches.serviceCharge }).top(1)
+                    .from(branches).where(eq(branches.id, orderData.branchId));
 
                 const serviceRate = branchRecord?.serviceCharge || 0.12; // Fallback to 12%
                 serviceCharge = orderData.serviceCharge !== undefined ? orderData.serviceCharge : parseFloat((netAmount * serviceRate).toFixed(2));
@@ -971,20 +973,20 @@ export const createOrder = async (req: Request, res: Response) => {
             if (orderData.customerId || customerPhone) {
                 let crmCustomer: { id: string } | undefined;
                 if (orderData.customerId) {
-                    const [customerById] = await tx
+const [customerById] = await tx
                         .select({ id: customers.id })
+                        .top(1)
                         .from(customers)
-                        .where(eq(customers.id, orderData.customerId))
-                        .limit(1);
+                        .where(eq(customers.id, orderData.customerId));
                     crmCustomer = customerById;
                 }
 
                 if (!crmCustomer && customerPhone) {
-                    const [customerByPhone] = await tx
+const [customerByPhone] = await tx
                         .select({ id: customers.id })
+                        .top(1)
                         .from(customers)
-                        .where(eq(customers.phone, customerPhone))
-                        .limit(1);
+                        .where(eq(customers.phone, customerPhone));
                     crmCustomer = customerByPhone;
                 }
 
@@ -992,28 +994,31 @@ export const createOrder = async (req: Request, res: Response) => {
                     const customerIdToInsert = orderData.customerId && !isClientOnlyReference(orderData.customerId)
                         ? orderData.customerId
                         : `CUS-${Date.now()}-${nanoid(4)}`;
-                    await tx.insert(customers).values({
-                        id: customerIdToInsert,
-                        name: orderData.customerName || customerPhone,
-                        phone: customerPhone,
-                        address: orderData.deliveryAddress,
-                        lat: orderData.deliveryLat,
-                        lng: orderData.deliveryLng,
-                        addressLabel: orderData.deliveryAddressLabel,
-                        visits: 0,
-                        totalSpent: 0,
-                        loyaltyTier: 'Bronze',
-                        loyaltyPoints: 0,
-                        source: orderData.source || 'pos',
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                    }).onConflictDoNothing();
+                    const [existingCustomerById] = await tx.select({ id: customers.id }).top(1).from(customers).where(eq(customers.id, customerIdToInsert));
+                    if (!existingCustomerById) {
+                        await tx.insert(customers).values({
+                            id: customerIdToInsert,
+                            name: orderData.customerName || customerPhone,
+                            phone: customerPhone,
+                            address: orderData.deliveryAddress,
+                            lat: orderData.deliveryLat,
+                            lng: orderData.deliveryLng,
+                            addressLabel: orderData.deliveryAddressLabel,
+                            visits: 0,
+                            totalSpent: 0,
+                            loyaltyTier: 'Bronze',
+                            loyaltyPoints: 0,
+                            source: orderData.source || 'pos',
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                        });
+                    }
 
-                    const [createdOrExistingCustomer] = await tx
+const [createdOrExistingCustomer] = await tx
                         .select({ id: customers.id })
+                        .top(1)
                         .from(customers)
-                        .where(eq(customers.phone, customerPhone))
-                        .limit(1);
+                        .where(eq(customers.phone, customerPhone));
                     crmCustomer = createdOrExistingCustomer;
                 }
 
@@ -1042,15 +1047,21 @@ export const createOrder = async (req: Request, res: Response) => {
                         .where(eq(customers.id, crmCustomer.id));
 
                     if (orderData.deliveryAddress) {
-                        await tx.insert(customerAddresses).values({
-                            customerId: crmCustomer.id,
-                            label: 'Order Address',
-                            address: orderData.deliveryAddress,
-                            lat: orderData.deliveryLat,
-                            lng: orderData.deliveryLng,
-                            isDefault: false,
-                            createdAt: new Date(),
-                        }).onConflictDoNothing();
+                        const [existingAddress] = await tx.select({ id: customerAddresses.id }).top(1).from(customerAddresses).where(and(
+                            eq(customerAddresses.customerId, crmCustomer.id),
+                            eq(customerAddresses.address, orderData.deliveryAddress),
+                        ));
+                        if (!existingAddress) {
+                            await tx.insert(customerAddresses).values({
+                                customerId: crmCustomer.id,
+                                label: 'Order Address',
+                                address: orderData.deliveryAddress,
+                                lat: orderData.deliveryLat,
+                                lng: orderData.deliveryLng,
+                                isDefault: false,
+                                createdAt: new Date(),
+                            });
+                        }
                     }
                 }
             } else {
@@ -1065,26 +1076,32 @@ export const createOrder = async (req: Request, res: Response) => {
                     .where(eq(branches.id, orderData.branchId));
             }
 
-            const [newOrder] = await tx.insert(orders).values({
+            const [newOrder] = await tx.insert(orders).output().values({
                 ...orderData,
-                subtotal, // Recalculated/Verified subtotal
+                subtotal,
                 discount: discountAmount,
                 tax,
                 tipAmount: orderData.tipAmount || 0,
                 serviceCharge: serviceCharge,
-                total,    // Recalculated/Verified total
-                shiftId: activeShift.id, // Link order to shift
-                businessDate: activeBusinessDate, // Architecturally tie order to logical day
-                createdAt: orderTimestamp,
+                total,
+                shiftId: activeShift.id,
+                businessDate: activeBusinessDate,
+                createdAt: sql`CAST(${orderTimestamp.toISOString()} AS datetime2(3))` as any,
                 updatedAt: new Date(),
-            }).returning();
+            });
 
-            // 2. Find a warehouse for this branch to deduct from (Kitchen preferred)
-            const [warehouse] = await tx.select({ id: warehouses.id })
+            // 2. Prefer the kitchen, then fall back to any branch warehouse that
+            // can actually fulfil the recipe. Alphabetical type sorting used to
+            // pick POINT_OF_SALE first and silently skip stock held in MAIN.
+            const branchWarehouses = await tx.select({ id: warehouses.id })
                 .from(warehouses)
                 .where(eq(warehouses.branchId, newOrder.branchId))
-                .orderBy(desc(warehouses.type))
-                .limit(1);
+                .orderBy(sql`CASE ${warehouses.type}
+                    WHEN 'KITCHEN' THEN 0
+                    WHEN 'MAIN' THEN 1
+                    WHEN 'POINT_OF_SALE' THEN 2
+                    ELSE 3
+                END`);
 
             let cogsCost = 0;
 
@@ -1104,40 +1121,52 @@ export const createOrder = async (req: Request, res: Response) => {
                     modifiers: item.modifiers,
                 });
 
-                if (warehouse) {
-                    try {
-                        const deduction = await inventoryService.deductIngredients(
-                            tx,
-                            resolveOrderItemMenuItemId(item) || item.id,
-                            item.quantity,
-                            warehouse.id,
-                            newOrder.id,
-                            newOrder.callCenterAgentId || 'system'
-                        );
-                        cogsCost += Number(Array.isArray(deduction) ? 0 : deduction?.totalCost || 0);
-                    } catch (deductionError: any) {
-                        const message = String(deductionError?.message || '');
-                        if (!INVENTORY_DEDUCTION_WARNING_PATTERN.test(message)) {
-                            throw deductionError;
+                if (branchWarehouses.length > 0) {
+                    let deductionApplied = false;
+                    let lastDeductionError: any = null;
+                    let attemptedWarehouseId = branchWarehouses[0].id;
+
+                    for (const candidateWarehouse of branchWarehouses) {
+                        attemptedWarehouseId = candidateWarehouse.id;
+                        try {
+                            const deduction = await inventoryService.deductIngredients(
+                                tx,
+                                resolveOrderItemMenuItemId(item) || item.id,
+                                item.quantity,
+                                candidateWarehouse.id,
+                                newOrder.id,
+                                newOrder.callCenterAgentId || 'system'
+                            );
+                            cogsCost += Number(Array.isArray(deduction) ? 0 : deduction?.totalCost || 0);
+                            deductionApplied = true;
+                            break;
+                        } catch (deductionError: any) {
+                            const message = String(deductionError?.message || '');
+                            if (!INVENTORY_DEDUCTION_WARNING_PATTERN.test(message)) throw deductionError;
+                            lastDeductionError = deductionError;
                         }
+                    }
+
+                    if (!deductionApplied && lastDeductionError) {
+                        const message = String(lastDeductionError.message || '');
                         if (!ALLOW_SALE_WITH_INSUFFICIENT_STOCK) {
                             throw appError(409, 'INSUFFICIENT_INVENTORY', 'Order cannot be saved because recipe stock is not enough.', {
                                 orderId: newOrder.id,
                                 menuItemId: resolveOrderItemMenuItemId(item) || item.id,
-                                warehouseId: warehouse.id,
+                                warehouseId: attemptedWarehouseId,
                                 reason: message,
                             });
                         }
                         inventoryWarnings.push({
                             code: 'INSUFFICIENT_INVENTORY',
                             menuItemId: resolveOrderItemMenuItemId(item) || item.id,
-                            warehouseId: warehouse.id,
+                            warehouseId: attemptedWarehouseId,
                             reason: message,
                         });
                         console.warn('[ORDER] inventory deduction skipped', {
                             orderId: newOrder.id,
                             menuItemId: resolveOrderItemMenuItemId(item) || item.id,
-                            warehouseId: warehouse.id,
+                            warehouseId: attemptedWarehouseId,
                             reason: message,
                         });
                     }
@@ -1166,7 +1195,7 @@ export const createOrder = async (req: Request, res: Response) => {
                 const p = paymentsToInsert[idx];
                 if (!p?.method || p?.amount === undefined) continue;
                 const paymentId = p.id || p.paymentId || `PAY-${newOrder.id}-${idx + 1}`;
-                const [existingPayment] = await tx.select().from(payments).where(eq(payments.id, paymentId)).limit(1);
+                const [existingPayment] = await tx.select().top(1).from(payments).where(eq(payments.id, paymentId));
                 if (existingPayment) continue;
                 await tx.insert(payments).values({
                     id: paymentId,
@@ -1243,10 +1272,14 @@ export const createOrder = async (req: Request, res: Response) => {
         // ================== KDS DISPATCHING LOGIC ==================
         // Smart Dispatch Protocol:
         // TAKEAWAY/DELIVERY fire automatically on payment (isPaid). DINE_IN requires a manual explicit "Send" action (not fired here unless forced).
-        if (paidNow && savedOrder.type !== 'DINE_IN') {
+        const isPosOrder = String(savedOrder.source || '').toLowerCase() === 'pos';
+        if (paidNow && savedOrder.type !== 'DINE_IN' && !isPosOrder) {
             kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
         }
-        if (paidNow) {
+        // POS prints the cashier receipt through the client orchestrator so its
+        // selected template and station apply. Other order sources need the
+        // server queue as their printing fallback.
+        if (shouldEnqueueServerCashierReceipt(paidNow, savedOrder.source)) {
             enqueueCashierReceiptPrint(savedOrder).catch(() => {});
         }
         // ============================================================
@@ -1299,7 +1332,7 @@ export const createOrder = async (req: Request, res: Response) => {
                     status: 'COMPLETED',
                     responseCode: 201,
                     resourceId: savedOrder.id,
-                    responseBody: savedOrder,
+                    responseBody: toSettingValue(savedOrder),
                     updatedAt: new Date(),
                     expiresAt: idempotencyExpiry,
                 })
@@ -1351,6 +1384,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         if (!idempotencyKey || !idempotencyHash) return null;
         const [existingClaim] = await db
             .select()
+            .top(1)
             .from(idempotencyKeys)
             .where(
                 and(
@@ -1358,8 +1392,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
                     eq(idempotencyKeys.scope, ORDER_STATUS_UPDATE_SCOPE),
                     gt(idempotencyKeys.expiresAt, new Date()),
                 ),
-            )
-            .limit(1);
+            );
 
         if (!existingClaim) return null;
         if (existingClaim.requestHash !== idempotencyHash) {
@@ -1370,11 +1403,11 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         }
 
         if (existingClaim.responseBody) {
-            return res.status(existingClaim.responseCode || 200).json(existingClaim.responseBody);
+            return res.status(existingClaim.responseCode || 200).json(parseSettingJson(existingClaim.responseBody, existingClaim.responseBody));
         }
 
         if (existingClaim.resourceId) {
-            const [existingOrder] = await db.select().from(orders).where(eq(orders.id, existingClaim.resourceId)).limit(1);
+            const [existingOrder] = await db.select().top(1).from(orders).where(eq(orders.id, existingClaim.resourceId));
             if (existingOrder) {
                 return res.status(existingClaim.responseCode || 200).json(existingOrder);
             }
@@ -1407,22 +1440,23 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             const replay = await replayIdempotentResponse();
             if (replay) return replay;
 
-            const inserted = await db
-                .insert(idempotencyKeys)
-                .values({
+            const [existingClaim] = await db
+                .select({ id: idempotencyKeys.id })
+                .top(1)
+                .from(idempotencyKeys)
+                .where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, ORDER_STATUS_UPDATE_SCOPE)));
+            if (!existingClaim) {
+                await db.insert(idempotencyKeys).values({
                     key: idempotencyKey,
                     scope: ORDER_STATUS_UPDATE_SCOPE,
                     requestHash: idempotencyHash,
                     status: 'IN_PROGRESS',
                     expiresAt: idempotencyExpiry,
                     updatedAt: new Date(),
-                })
-                .onConflictDoNothing({
-                    target: [idempotencyKeys.key, idempotencyKeys.scope],
-                })
-                .returning({ id: idempotencyKeys.id });
+                });
+            }
 
-            if (inserted.length === 0) {
+            if (existingClaim) {
                 const replay = await replayIdempotentResponse();
                 if (replay) return replay;
             }
@@ -1448,7 +1482,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
                     status: 'COMPLETED',
                     responseCode: 200,
                     resourceId: result.id,
-                    responseBody: result,
+                    responseBody: toSettingValue(result),
                     updatedAt: new Date(),
                     expiresAt: idempotencyExpiry,
                 })
@@ -1493,16 +1527,16 @@ export const updateOrderCustomer = async (req: Request, res: Response) => {
         }
 
         const updated = await db.transaction(async (tx) => {
-            const [currentOrder] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id, orderId));
             if (!currentOrder) throw appError(404, 'ORDER_NOT_FOUND', 'Order not found.');
 
             const customerId = String(body.id || body.customerId || currentOrder.customerId || '').trim();
             let crmCustomer: any;
             if (customerId) {
-                [crmCustomer] = await tx.select().from(customers).where(eq(customers.id, customerId)).limit(1);
+[crmCustomer] = await tx.select().top(1).from(customers).where(eq(customers.id, customerId));
             }
             if (!crmCustomer) {
-                [crmCustomer] = await tx.select().from(customers).where(eq(customers.phone, phone)).limit(1);
+                [crmCustomer] = await tx.select().top(1).from(customers).where(eq(customers.phone, phone));
             }
 
             const zoneId = body.zoneId || body.zone_id ? Number(body.zoneId || body.zone_id) : undefined;
@@ -1511,7 +1545,7 @@ export const updateOrderCustomer = async (req: Request, res: Response) => {
             const lng = body.lng ?? body.deliveryLng ?? body.delivery_lng ?? body.longitude;
             const addressLabel = body.addressLabel || body.address_label || body.deliveryAddressLabel || body.delivery_address_label;
             if (!crmCustomer) {
-                [crmCustomer] = await tx.insert(customers).values({
+                [crmCustomer] = await tx.insert(customers).output().values({
                     id: customerId || `CUS-${Date.now()}-${nanoid(4)}`,
                     name,
                     phone,
@@ -1534,7 +1568,8 @@ export const updateOrderCustomer = async (req: Request, res: Response) => {
                     source: body.source || currentOrder.source || 'pos',
                     createdAt: new Date(),
                     updatedAt: new Date(),
-                }).returning();
+                });
+
             } else {
                 [crmCustomer] = await tx.update(customers)
                     .set({
@@ -1554,26 +1589,32 @@ export const updateOrderCustomer = async (req: Request, res: Response) => {
                         notes: body.notes,
                         updatedAt: new Date(),
                     })
-                    .where(eq(customers.id, crmCustomer.id))
-                    .returning();
+                    .output()
+                    .where(eq(customers.id, crmCustomer.id));
             }
 
             if (address) {
-                await tx.insert(customerAddresses).values({
-                    customerId: crmCustomer.id,
-                    label: addressLabel || 'Order Address',
-                    address,
-                    lat,
-                    lng,
-                    zoneId,
-                    area: body.area,
-                    building: body.building,
-                    floor: body.floor,
-                    apartment: body.apartment,
-                    landmark: body.landmark,
-                    isDefault: false,
-                    createdAt: new Date(),
-                }).onConflictDoNothing();
+                const [existingAddress] = await tx.select({ id: customerAddresses.id }).top(1).from(customerAddresses).where(and(
+                    eq(customerAddresses.customerId, crmCustomer.id),
+                    eq(customerAddresses.address, address),
+                ));
+                if (!existingAddress) {
+                    await tx.insert(customerAddresses).values({
+                        customerId: crmCustomer.id,
+                        label: addressLabel || 'Order Address',
+                        address,
+                        lat,
+                        lng,
+                        zoneId,
+                        area: body.area,
+                        building: body.building,
+                        floor: body.floor,
+                        apartment: body.apartment,
+                        landmark: body.landmark,
+                        isDefault: false,
+                        createdAt: new Date(),
+                    });
+                }
             }
 
             const [updatedOrder] = await tx.update(orders)
@@ -1587,8 +1628,8 @@ export const updateOrderCustomer = async (req: Request, res: Response) => {
                     deliveryAddressLabel: crmCustomer.addressLabel || addressLabel || currentOrder.deliveryAddressLabel,
                     updatedAt: new Date(),
                 })
-                .where(eq(orders.id, orderId))
-                .returning();
+                .output()
+                .where(eq(orders.id, orderId));
 
             return { order: updatedOrder, customer: crmCustomer };
         });

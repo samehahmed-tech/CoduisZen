@@ -168,7 +168,7 @@ const MenuProfitCenter: React.FC = () => {
         });
 
         return items;
-    }, [allItems, searchQuery, filterTag, sortField, sidebarSection]);
+    }, [allItems, selectedCategoryId, searchQuery, filterTag, sortField, sidebarSection]);
 
     const filteredCategories = useMemo(() => {
         if (!selectedMenu) return [];
@@ -340,11 +340,11 @@ const MenuProfitCenter: React.FC = () => {
 
     // --- Excel Export ---
     const handleExportMenu = useCallback(() => {
-        const headers = ['Name', 'Name (AR)', 'Category', 'Price', 'Cost', 'Margin %', 'SKU', 'Barcode', 'Available', 'Tags'];
+        const headers = ['Name', 'Name (AR)', 'Category', 'Price', 'Margin %', 'SKU', 'Barcode', 'Available', 'Tags'];
         const rows = allItems.map(i => {
             const margin = i.cost && i.price > 0 ? ((i.price - i.cost) / i.price * 100).toFixed(1) : '';
             return [
-                i.name, i.nameAr || '', (i as any)._categoryName || '', i.price, i.cost || '',
+                i.name, i.nameAr || '', (i as any)._categoryName || '', i.price,
                 margin, i.sku || '', i.barcode || '', i.isAvailable ? 'Yes' : 'No',
                 (i.tags || []).join('; ')
             ];
@@ -378,13 +378,12 @@ const MenuProfitCenter: React.FC = () => {
                 const name = cols[0];
                 const nameAr = cols[1] || '';
                 const price = parseFloat(cols[3]) || 0;
-                const cost = parseFloat(cols[4]) || 0;
-                const sku = cols[6] || '';
-                const barcode = cols[7] || '';
-                const isAvailable = (cols[8] || 'Yes').toLowerCase() !== 'no';
+                const sku = cols[5] || '';
+                const barcode = cols[6] || '';
+                const isAvailable = (cols[7] || 'Yes').toLowerCase() !== 'no';
                 addMenuItem(selectedMenuId, firstCat.id, {
                     id: `item-${Date.now()}-${i}`,
-                    name, nameAr, price, cost, sku, barcode, isAvailable,
+                    name, nameAr, price, sku, barcode, isAvailable,
                     categoryId: firstCat.id,
                     modifierGroups: [], priceLists: [], printerIds: [],
                 });
@@ -509,7 +508,7 @@ const MenuProfitCenter: React.FC = () => {
     }
 
     return (
-        <div className="h-full bg-app relative">
+        <div className="h-full min-h-screen bg-app relative overflow-hidden">
             {/* Error Banner */}
             {error && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[200] py-2.5 px-4 bg-rose-500/10 border border-rose-500/20 rounded-md text-rose-400 text-[12px] font-medium flex items-center gap-3 max-w-lg">
@@ -519,7 +518,7 @@ const MenuProfitCenter: React.FC = () => {
                 </div>
             )}
 
-            <div className="flex h-full overflow-hidden">
+            <div className="flex h-full overflow-hidden flex-col lg:flex-row">
                 <MenuSidebar
                     menus={menus}
                     categories={filteredCategories}
@@ -542,7 +541,7 @@ const MenuProfitCenter: React.FC = () => {
 
 
                 {/* MAIN CONTENT */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
                     {sidebarSection === 'pricing' ? (
                         <PricingEngine 
                             allItems={allItems} 
@@ -588,7 +587,7 @@ const MenuProfitCenter: React.FC = () => {
                     />
 
                     {/* BREADCRUMB + METRICS STRIP */}
-                    <div className="px-5 py-2.5 border-b border-gray-100 dark:border-white/[0.04] flex items-center gap-4">
+                    <div className="px-3 sm:px-5 py-2.5 border-b border-gray-100 dark:border-white/[0.04] flex flex-wrap items-center gap-3 sm:gap-4">
                         {/* Breadcrumb */}
                         <div className="flex items-center gap-1.5 text-[12px]">
                             <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'المنيو' : 'Menu'}</span>
@@ -599,7 +598,7 @@ const MenuProfitCenter: React.FC = () => {
                         <div className="flex-1" />
 
                         {/* Compact Metrics */}
-                        <div className="flex items-center gap-4 text-[11px]">
+                        <div className="hidden sm:flex items-center gap-4 text-[11px]">
                             <div>
                                 <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'إجمالي' : 'Total'}: </span>
                                 <span className="font-medium text-gray-700 dark:text-main">{filteredItems.length}</span>
@@ -622,9 +621,9 @@ const MenuProfitCenter: React.FC = () => {
                     </div>
 
                     {/* CONTENT AREA */}
-                    <div className="flex-1 overflow-y-auto p-5 pb-32 no-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-3 sm:p-5 pb-32 no-scrollbar">
                         {viewMode === 'analytics' ? (
-                            <AnalyticsPanel items={allItems} lang={lang} currency={settings.currencySymbol} />
+                            <AnalyticsPanel items={filteredItems} lang={lang} currency={settings.currencySymbol} />
                         ) : viewMode === 'list' ? (
                             <div className="max-w-[1600px] h-full">
                                 <ItemTable
@@ -663,7 +662,7 @@ const MenuProfitCenter: React.FC = () => {
                                         <div
                                             {...provided.droppableProps}
                                             ref={provided.innerRef}
-                                            className={`grid gap-4 max-w-[1600px] pb-4 ${density === 'compact' ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}`}
+                                            className={`grid gap-4 max-w-[1600px] pb-4 ${density === 'compact' ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}`}
                                         >
                                             {filteredItems.map((item, idx) => (
                                                 <Draggable
@@ -861,19 +860,19 @@ const MenuProfitCenter: React.FC = () => {
 
             {/* IMPORT MODAL */}
             {showImportModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
                     <div className="absolute inset-0 bg-slate-950/60" onClick={() => setShowImportModal(false)} />
-                    <div className="relative w-full max-w-lg bg-card rounded-lg shadow-2xl border border-border/20 p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                    <div className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-card rounded-lg shadow-2xl border border-border/20 p-4 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between">
                             <h3 className="text-[15px] font-semibold text-main">{lang === 'ar' ? 'استيراد من CSV' : 'Import from CSV'}</h3>
                             <button onClick={() => setShowImportModal(false)} className="p-2 rounded-md text-muted/70 hover:text-main hover:bg-white/[0.05] border border-border/30"><X size={16} /></button>
                         </div>
-                        <p className="text-[12px] text-muted/70">{lang === 'ar' ? 'الصق بيانات CSV (العنوان: Name, Name (AR), Category, Price, Cost, Margin%, SKU, Barcode, Available, Tags)' : 'Paste CSV data (header: Name, Name (AR), Category, Price, Cost, Margin%, SKU, Barcode, Available, Tags)'}</p>
+                        <p className="text-[12px] text-muted/70">{lang === 'ar' ? 'الصق بيانات CSV (العنوان: Name, Name (AR), Category, Price, Margin%, SKU, Barcode, Available, Tags)' : 'Paste CSV data (header: Name, Name (AR), Category, Price, Margin%, SKU, Barcode, Available, Tags)'}</p>
                         <textarea
                             rows={10}
                             value={importData}
                             onChange={e => setImportData(e.target.value)}
-                            placeholder={`Name,Name (AR),Category,Price,Cost,Margin%,SKU,Barcode,Available,Tags\nClassic Burger,برجر كلاسيك,Burgers,85,30,,SKU-001,,Yes,best-seller`}
+                            placeholder={`Name,Name (AR),Category,Price,Margin%,SKU,Barcode,Available,Tags\nClassic Burger,برجر كلاسيك,Burgers,85,,SKU-001,,Yes,best-seller`}
                             className="w-full bg-elevated/50 rounded-md border border-border/30 p-3 text-[12px] text-main outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 font-mono resize-none placeholder:text-muted/30"
                         />
                         <div className="flex gap-3">
@@ -890,7 +889,7 @@ const MenuProfitCenter: React.FC = () => {
 
             {/* MENU DESIGN MODAL */}
             {showDesignModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
                     <div className="absolute inset-0 bg-slate-950/60" onClick={() => setShowDesignModal(false)} />
                     <div className="relative w-full max-w-4xl max-h-[90vh] bg-white dark:bg-card rounded-lg shadow-2xl border border-border/20 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
                         <div className="p-5 border-b border-gray-200 dark:border-white/[0.05] flex items-center justify-between">

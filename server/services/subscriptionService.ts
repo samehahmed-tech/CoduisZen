@@ -9,7 +9,7 @@ export const subscriptionService = {
   },
 
   async createPlan(data: any) {
-    const [plan] = await db.insert(subscriptionPlans).values(data).returning();
+    const [plan] = await db.insert(subscriptionPlans).output().values(data);
     return plan;
   },
 
@@ -23,12 +23,12 @@ export const subscriptionService = {
     const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, planId));
     if (!plan) throw new Error('Subscription plan not found');
 
-    const [sub] = await db.insert(subscriptions).values({
+    const [sub] = await db.insert(subscriptions).output().values({
       id: crypto.randomUUID(),
       tenantBranchId,
       planId,
       status: 'ACTIVE',
-    }).returning();
+    });
     return sub;
   },
 
@@ -47,10 +47,10 @@ export const subscriptionService = {
   async getOnboardingStatus(tenantBranchId: string) {
     const [record] = await db.select().from(onboardingRecords).where(eq(onboardingRecords.tenantBranchId, tenantBranchId));
     if (!record) {
-      return await db.insert(onboardingRecords).values({
+      return await db.insert(onboardingRecords).output().values({
         id: crypto.randomUUID(),
         tenantBranchId,
-      }).returning();
+      });
     }
     return record;
   },
@@ -58,8 +58,8 @@ export const subscriptionService = {
   async updateOnboardingStep(tenantBranchId: string, updates: any) {
     const [record] = await db.update(onboardingRecords)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(onboardingRecords.tenantBranchId, tenantBranchId))
-      .returning();
+      .output()
+      .where(eq(onboardingRecords.tenantBranchId, tenantBranchId));
     return record;
   }
 };

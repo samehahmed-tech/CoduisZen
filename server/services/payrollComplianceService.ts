@@ -119,10 +119,10 @@ export const payrollComplianceService = {
 
         const preview = await payrollCalculationService.previewCycle(cycleId);
         const review = await payrollCloseService.previewCycle(cycleId);
-        const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, cycleId)).limit(1);
+        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, cycleId));
         if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
-        const [branch] = await db.select().from(branches).where(eq(branches.id, cycle.branchId)).limit(1);
+        const [branch] = await db.select().top(1).from(branches).where(eq(branches.id, cycle.branchId));
         const employeeRows = await db.select().from(employees).where(eq(employees.branchId, cycle.branchId));
         const employeeMap = new Map(employeeRows.map((employee) => [employee.id, employee]));
 
@@ -266,7 +266,7 @@ export const payrollComplianceService = {
 
     async exportCycle(cycleId: string, template: string, format: string, query: any = {}) {
         const summary = await this.getCycleSummary(cycleId, query);
-        const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, cycleId)).limit(1);
+        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, cycleId));
         if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
         const employeeMap = new Map(
             (await db.select().from(employees).where(eq(employees.branchId, cycle.branchId)))

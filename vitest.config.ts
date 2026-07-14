@@ -8,6 +8,12 @@ export default defineConfig({
         env: {
             NODE_ENV: 'test',
         },
+        pool: 'forks',
+        poolOptions: {
+            forks: {
+                singleFork: true,
+            },
+        },
         fileParallelism: false,
         setupFiles: ['./tests/setup.ts'],
         include: ['tests/**/*.test.ts'],

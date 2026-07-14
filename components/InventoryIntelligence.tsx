@@ -54,17 +54,23 @@ const InventoryIntelligence: React.FC = () => {
     const loadAlerts = async () => {
         setIsLoading(true);
         try { setAlerts(await inventoryIntelligenceApi.getReorderAlerts(warehouseId || undefined)); }
-        catch { } finally { setIsLoading(false); }
+        catch (error: any) { showError(error.message || tr('Failed to load reorder alerts', 'تعذر تحميل تنبيهات إعادة الطلب')); }
+        finally { setIsLoading(false); }
     };
 
     const loadSuggestions = async () => {
         setIsLoading(true);
         try { setSuggestions(await inventoryIntelligenceApi.getPurchaseSuggestions(warehouseId || undefined)); }
-        catch { } finally { setIsLoading(false); }
+        catch (error: any) { showError(error.message || tr('Failed to load purchase suggestions', 'تعذر تحميل مقترحات الشراء')); }
+        finally { setIsLoading(false); }
     };
 
     const loadUnits = async () => {
-        try { setSupportedUnits(await inventoryIntelligenceApi.getSupportedUnits()); } catch { }
+        try {
+            setSupportedUnits(await inventoryIntelligenceApi.getSupportedUnits());
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load supported units', 'تعذر تحميل الوحدات المدعومة'));
+        }
     };
 
     useEffect(() => { loadAlerts(); loadSuggestions(); loadUnits(); }, []);

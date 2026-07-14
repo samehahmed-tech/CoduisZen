@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import { ackJob, claimJob, failJob, gatewayHealth } from '../controllers/printGatewayController';
+import { bridgeConnect } from '../controllers/printGatewayController.js';
+import { requirePrintGatewayToken } from '../middleware/printGatewayAuth.js';
 
 const router = Router();
 
-router.get('/health', gatewayHealth);
-router.post('/claim', claimJob);
-router.post('/:jobId/ack', ackJob);
-router.post('/:jobId/fail', failJob);
+router.get('/bridge/connect', requirePrintGatewayToken, bridgeConnect);
 
 export default router;

@@ -15,13 +15,13 @@ export const getPeakHoursHeatmap = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            dayOfWeek: sql<number>`extract(dow from ${orders.createdAt})`,
-            hour: sql<number>`extract(hour from ${orders.createdAt})`,
+            dayOfWeek: sql<number>`datepart(weekday, ${orders.createdAt})`,
+            hour: sql<number>`datepart(hour, ${orders.createdAt})`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`extract(dow from ${orders.createdAt})`, sql`extract(hour from ${orders.createdAt})`)
-            .orderBy(sql`extract(dow from ${orders.createdAt})`, sql`extract(hour from ${orders.createdAt})`);
+            .groupBy(sql`datepart(weekday, ${orders.createdAt})`, sql`datepart(hour, ${orders.createdAt})`)
+            .orderBy(sql`datepart(weekday, ${orders.createdAt})`, sql`datepart(hour, ${orders.createdAt})`);
 
         res.json(rows.map(r => ({
             dayOfWeek: Number(r.dayOfWeek),
@@ -87,13 +87,13 @@ export const getAvgTicketTrend = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json(rows.map(r => ({
             day: r.day,
@@ -198,13 +198,13 @@ export const getRevenueByWeekday = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
-            dayOfWeek: sql<number>`extract(dow from ${orders.createdAt})`,
+            dayOfWeek: sql<number>`datepart(weekday, ${orders.createdAt})`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`extract(dow from ${orders.createdAt})`)
-            .orderBy(sql`extract(dow from ${orders.createdAt})`);
+            .groupBy(sql`datepart(weekday, ${orders.createdAt})`)
+            .orderBy(sql`datepart(weekday, ${orders.createdAt})`);
 
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         res.json(rows.map(r => ({

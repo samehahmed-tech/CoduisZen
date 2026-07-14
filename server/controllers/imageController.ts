@@ -75,7 +75,7 @@ export const uploadImage = async (req: Request, res: Response) => {
 
         const url = buildPublicUrl(key);
 
-        await db.insert(images).values({
+        const imageRecord = {
             id,
             key,
             url,
@@ -85,9 +85,11 @@ export const uploadImage = async (req: Request, res: Response) => {
             height,
             size,
             createdAt: new Date(),
-        }).onConflictDoUpdate({
-            target: images.id,
-            set: {
+        };
+        const [existingImage] = await db.select().top(1).from(images).where(eq(images.id, id));
+        if (existingImage) {
+            await db.update(images)
+                .set({
                 key,
                 url,
                 filename,
@@ -95,8 +97,11 @@ export const uploadImage = async (req: Request, res: Response) => {
                 width,
                 height,
                 size,
-            }
-        });
+            })
+                .where(eq(images.id, id));
+        } else {
+            await db.insert(images).values(imageRecord);
+        }
 
         res.status(201).json({ id, url, width, height, size });
     } catch (error: any) {

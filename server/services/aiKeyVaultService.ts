@@ -68,11 +68,11 @@ const loadRaw = async () => {
     if (cache && now - cache.at < CACHE_TTL_MS) return cache;
 
     const [sourceRow, encRow, modelRow, providerRow, ollamaModelRow] = await Promise.all([
-        db.select().from(settings).where(eq(settings.key, AI_KEY_SOURCE_KEY)).limit(1),
-        db.select().from(settings).where(eq(settings.key, AI_KEY_ENCRYPTED_KEY)).limit(1),
-        db.select().from(settings).where(eq(settings.key, AI_MODEL_SETTING_KEY)).limit(1),
-        db.select().from(settings).where(eq(settings.key, AI_PROVIDER_KEY)).limit(1),
-        db.select().from(settings).where(eq(settings.key, AI_OLLAMA_MODEL_KEY)).limit(1),
+        db.select().top(1).from(settings).where(eq(settings.key, AI_KEY_SOURCE_KEY)),
+        db.select().top(1).from(settings).where(eq(settings.key, AI_KEY_ENCRYPTED_KEY)),
+        db.select().top(1).from(settings).where(eq(settings.key, AI_MODEL_SETTING_KEY)),
+        db.select().top(1).from(settings).where(eq(settings.key, AI_PROVIDER_KEY)),
+        db.select().top(1).from(settings).where(eq(settings.key, AI_OLLAMA_MODEL_KEY)),
     ]);
 
     const source = (String(sourceRow?.[0]?.value || 'DEFAULT').toUpperCase() === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT') as AiKeySource;
@@ -90,7 +90,7 @@ const loadRaw = async () => {
 };
 
 const upsert = async (key: string, value: any, category = 'ai_security') => {
-    const existing = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+    const existing = await db.select().top(1).from(settings).where(eq(settings.key, key));
     if (existing.length > 0) {
         await db.update(settings)
             .set({ value, category, updatedAt: new Date() })

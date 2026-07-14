@@ -20,7 +20,7 @@ export const createPO = async (req: Request, res: Response) => {
 
         const savedPO = await db.transaction(async (tx) => {
             // 1. Create PO header
-            const [po] = await tx.insert(purchaseOrders).values({
+            const [po] = await tx.insert(purchaseOrders).output().values({
                 id: id || `PO-${Date.now()}`,
                 supplierId,
                 branchId,
@@ -31,7 +31,7 @@ export const createPO = async (req: Request, res: Response) => {
                 createdBy,
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning();
+            });
 
             // 2. Create PO line items
             for (const item of items) {
@@ -262,7 +262,7 @@ export const getPOs = async (req: Request, res: Response) => {
             ? db.select().from(purchaseOrders).where(and(...conditions)).orderBy(desc(purchaseOrders.createdAt))
             : db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
 
-        const pos = await query.limit(100);
+        const pos = await query.offset(0).fetch(100);
         res.json(pos);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -337,8 +337,8 @@ export const updatePOStatus = async (req: Request, res: Response) => {
 
         const [updated] = await db.update(purchaseOrders)
             .set({ status: requestedStatus, updatedAt: new Date() })
-            .where(eq(purchaseOrders.id, id))
-            .returning();
+            .output()
+            .where(eq(purchaseOrders.id, id));
 
         if (!updated) {
             return res.status(404).json({ error: 'Purchase Order not found' });

@@ -113,15 +113,15 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60  flex items-center justify-center z-[110] p-4">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 dark:border-slate-800">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[110] p-1.5 sm:p-4">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-xl sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[98dvh] sm:max-h-[90vh] border border-slate-200 dark:border-slate-800">
+                <div className="p-3 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
                             <Package size={24} />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
+                            <h3 className="text-base sm:text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
                                 {lang === 'ar' ? (initialItem ? 'تعديل صنف' : 'إضافة صنف جديد') : (initialItem ? 'Edit Item' : 'Add New Item')}
                             </h3>
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -134,7 +134,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-8 space-y-5 sm:space-y-8 no-scrollbar">
                     {/* Basic Info */}
                     <section className="space-y-4">
                         <h4 className="flex items-center gap-2 text-xs font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">
@@ -272,6 +272,31 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                         </div>
                     </section>
 
+                    {warehouses.length > 0 && (
+                        <section className="space-y-4">
+                            <h4 className="flex items-center gap-2 text-xs font-black text-indigo-600 uppercase tracking-[0.2em]">
+                                <Package size={14} /> {lang === 'ar'
+                                    ? (initialItem ? 'الكمية الحالية حسب المخزن' : 'الرصيد الافتتاحي حسب المخزن')
+                                    : (initialItem ? 'Current quantity by warehouse' : 'Opening stock by warehouse')}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {warehouses.map((warehouse) => {
+                                    const quantity = formData.warehouseQuantities?.find(row => row.warehouseId === warehouse.id)?.quantity || 0;
+                                    return <label key={warehouse.id} className="space-y-1.5">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase">{lang === 'ar' ? warehouse.nameAr || warehouse.name : warehouse.name}</span>
+                                        <input type="number" min="0" step="0.001" value={quantity} onChange={(event) => setFormData({
+                                            ...formData,
+                                            warehouseQuantities: warehouses.map(row => ({
+                                                warehouseId: row.id,
+                                                quantity: row.id === warehouse.id ? Math.max(0, Number(event.target.value || 0)) : formData.warehouseQuantities?.find(value => value.warehouseId === row.id)?.quantity || 0,
+                                            })),
+                                        })} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
+                                    </label>;
+                                })}
+                            </div>
+                        </section>
+                    )}
+
                     {/* Audit Settings */}
                     <section className="space-y-4">
                         <h4 className="flex items-center gap-2 text-xs font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">
@@ -338,7 +363,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                             <div className="p-6 bg-violet-50 dark:bg-violet-950/20 rounded-2xl border border-violet-100 dark:border-violet-900/50 space-y-4">
                                 <div className="space-y-3">
                                     {formData.bom?.map((ing, idx) => (
-                                        <div key={idx} className="flex gap-3 items-center">
+                                <div key={idx} className="grid grid-cols-[minmax(0,1fr)_5rem_auto] sm:flex gap-2 sm:gap-3 items-center">
                                             <select
                                                 value={ing.itemId}
                                                 onChange={e => handleUpdateIngredient(idx, 'itemId', e.target.value)}
@@ -356,7 +381,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                                 onChange={e => handleUpdateIngredient(idx, 'quantity', Number(e.target.value))}
                                                 className="w-24 px-4 py-2.5 card-primary rounded-xl outline-none text-sm font-bold"
                                             />
-                                            <span className="text-xs font-black text-slate-400 w-12">{existingItems.find(i => i.id === ing.itemId)?.unit || '-'}</span>
+                                            <span className="hidden sm:block text-xs font-black text-slate-400 w-12">{existingItems.find(i => i.id === ing.itemId)?.unit || '-'}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveIngredient(idx)}
@@ -379,7 +404,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                     </section>
                 </form>
 
-                <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex gap-4 shrink-0">
+                <div className="p-3 sm:p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex gap-2 sm:gap-4 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}

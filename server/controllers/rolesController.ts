@@ -107,13 +107,13 @@ async function migrateBuiltInRolePermissions() {
                 icon: 'user',
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).onConflictDoNothing();
+            });
         }
     }
 }
 
 async function ensurePermissionDefinitions() {
-    const existing = await db.select({ key: permissionDefinitions.key }).from(permissionDefinitions).limit(1);
+        const existing = await db.select({ key: permissionDefinitions.key }).top(1).from(permissionDefinitions);
     if (existing.length > 0) return;
     for (const perm of PERMISSION_METADATA) {
         await db.insert(permissionDefinitions).values({
@@ -125,7 +125,7 @@ async function ensurePermissionDefinitions() {
             categoryAr: perm.categoryAr,
             isActive: true,
             sortOrder: PERMISSION_METADATA.indexOf(perm),
-        }).onConflictDoNothing();
+        });
     }
 }
 
@@ -158,7 +158,7 @@ export const createRole = async (req: Request, res: Response) => {
         if (!id || !name) return res.status(400).json({ error: 'ROLE_ID_AND_NAME_REQUIRED' });
         const [existing] = await db.select().from(roles).where(eq(roles.id, id));
         if (existing) return res.status(409).json({ error: 'ROLE_ALREADY_EXISTS' });
-        const [created] = await db.insert(roles).values({
+        const [created] = await db.insert(roles).output().values({
             id,
             name,
             nameAr: nameAr || name,
@@ -170,7 +170,8 @@ export const createRole = async (req: Request, res: Response) => {
             icon: icon || 'user',
             createdAt: new Date(),
             updatedAt: new Date(),
-        }).returning();
+        });
+
         res.status(201).json(created);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -195,8 +196,8 @@ export const updateRole = async (req: Request, res: Response) => {
                 ...(priority !== undefined && { priority }),
                 updatedAt: new Date(),
             })
-            .where(eq(roles.id, id))
-            .returning();
+            .output()
+            .where(eq(roles.id, id));
         res.json(updated);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

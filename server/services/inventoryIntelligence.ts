@@ -471,7 +471,7 @@ export const inventoryIntelligence = {
         if (consumption.length < 5) return "Insufficient historical data for AI forecasting.";
 
         // 2. Format data for the LLM
-        const itemData = await db.select().from(inventoryItems).where(eq(inventoryItems.id, itemId)).limit(1);
+        const itemData = await db.select().top(1).from(inventoryItems).where(eq(inventoryItems.id, itemId));
         const itemName = itemData[0]?.name || "Unknown Item";
         
         const dataStr = consumption.map(c => `${c.date}: ${c.qty}`).join('\n');

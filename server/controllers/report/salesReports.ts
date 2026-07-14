@@ -153,7 +153,7 @@ export const getHourlySales = async (req: Request, res: Response) => {
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
         const rows = await db.select({
-            hour: sql<string>`to_char(${orders.createdAt}, 'HH24:00')`,
+            hour: sql<string>`format(${orders.createdAt}, 'HH:mm')`,
             revenue: sql<number>`sum(${orders.total})`,
             orderCount: sql<number>`count(*)`,
         }).from(orders)
@@ -164,8 +164,8 @@ export const getHourlySales = async (req: Request, res: Response) => {
                     inArray(orders.status, deliveredStatuses),
                 ),
             )
-            .groupBy(sql`to_char(${orders.createdAt}, 'HH24:00')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'HH24:00') asc`);
+            .groupBy(sql`format(${orders.createdAt}, 'HH:mm')`)
+            .orderBy(sql`format(${orders.createdAt}, 'HH:mm') asc`);
 
         res.json(rows);
     } catch (error: any) {

@@ -84,6 +84,17 @@ const readinessCopy: Record<string, {
         actionLabelAr: 'افتح إغلاق الشيفت',
         actionPath: '/finance',
     },
+    DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE: {
+        titleEn: 'Daily stock count',
+        titleAr: 'الجرد اليومي',
+        readyEn: 'A posted stock count exists for this business day.',
+        readyAr: 'تم ترحيل جرد يومي لهذا التاريخ.',
+        actionEn: 'Post the daily stock count before closing the day.',
+        actionAr: 'أدخل الجرد اليومي ورحّله قبل إقفال اليوم.',
+        actionLabelEn: 'Open Inventory',
+        actionLabelAr: 'افتح المخزون',
+        actionPath: '/inventory',
+    },
     UNPAID_ORDERS_EXIST_FOR_DAY_CLOSE: {
         titleEn: 'Unpaid orders',
         titleAr: 'طلبات غير مدفوعة',
@@ -110,7 +121,7 @@ const readinessCopy: Record<string, {
 
 const DayCloseHub: React.FC = () => {
     const navigate = useNavigate();
-    const { settings, branches, updateSettings } = useAuthStore();
+    const { settings, branches } = useAuthStore();
     const setShift = useFinanceStore((state) => state.setShift);
     const setIsShiftDrawerOpen = useFinanceStore((state) => state.setIsShiftDrawerOpen);
     const lang = settings.language || 'en';
@@ -128,7 +139,6 @@ const DayCloseHub: React.FC = () => {
     const [report, setReport] = useState<any | null>(null);
     const [history, setHistory] = useState<any[]>([]);
     const [notes, setNotes] = useState('');
-    const [enforceFiscalClean, setEnforceFiscalClean] = useState(true);
     const [emailTo, setEmailTo] = useState('');
     const [isLoadingReport, setIsLoadingReport] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
@@ -238,10 +248,7 @@ const DayCloseHub: React.FC = () => {
         try {
             const result = await dayCloseApi.close(branchId, date, {
                 notes: notes.trim() || undefined,
-                enforceFiscalClean,
-                enforceFinanceClean: true,
                 enforceShiftsClosed: true,
-                enforceAllPaid: true,
                 emailConfig: settings.endOfDayEmailEnabled && settings.endOfDayEmailRecipients?.filter(isEmail).length ? {
                     to: settings.endOfDayEmailRecipients.filter(isEmail),
                     subject: `Day Close Report - ${date}`,
@@ -292,8 +299,54 @@ const DayCloseHub: React.FC = () => {
         }
     };
 
-    const handlePrintReport = () => {
-        window.print();
+    const handlePrintReport = async () => {
+        if (!branchId || !date) return;
+        setError(null);
+        setMessage(null);
+        try {
+            const blob = await dayCloseApi.getPdf(branchId, date, lang === 'ar' ? 'ar' : 'en');
+            const url = URL.createObjectURL(blob);
+            const win = window.open(url, '_blank');
+            if (!win) {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `day-close-${branchId}-${date}.pdf`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 30000);
+                return;
+            }
+            setTimeout(() => {
+                try {
+                    win.focus();
+                    win.print();
+                } catch {
+                    // Browser PDF viewers can block scripted print; the opened report is still printable.
+                }
+            }, 800);
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (e: any) {
+            setError(e?.message || (lang === 'ar' ? 'تعذر تجهيز تقرير الطباعة' : 'Failed to prepare print report'));
+        }
+    };
+
+    const handleExportReport = async (format: 'pdf' | 'xlsx') => {
+        if (!branchId || !date) return;
+        setError(null);
+        setMessage(null);
+        try {
+            const reportLang = lang === 'ar' ? 'ar' : 'en';
+            const blob = format === 'pdf'
+                ? await dayCloseApi.getPdf(branchId, date, reportLang)
+                : await dayCloseApi.getXlsx(branchId, date, reportLang);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `day-close-${branchId}-${date}.${format}`;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+        } catch (e: any) {
+            setError(e?.message || (lang === 'ar' ? 'تعذر تصدير التقرير' : 'Failed to export report'));
+        }
     };
 
     const closedDateSet = useMemo(() => new Set(history.map((row: any) => String(row.date))), [history]);
@@ -402,12 +455,24 @@ const DayCloseHub: React.FC = () => {
                             : `Business day ${date} is closed. This is a saved review snapshot and cannot be closed again.`}
                     </div>
                 )}
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap gap-2">
                     <button
                         onClick={handlePrintReport}
                         className="px-4 py-2.5 rounded-xl bg-slate-700 text-white font-black text-xs uppercase tracking-widest"
                     >
                         {lang === 'ar' ? 'طباعة التقرير' : 'Print Report'}
+                    </button>
+                    <button
+                        onClick={() => handleExportReport('pdf')}
+                        className="px-4 py-2.5 rounded-xl bg-blue-700 text-white font-black text-xs uppercase tracking-widest"
+                    >
+                        PDF
+                    </button>
+                    <button
+                        onClick={() => handleExportReport('xlsx')}
+                        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-black text-xs uppercase tracking-widest"
+                    >
+                        Excel
                     </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
@@ -417,14 +482,6 @@ const DayCloseHub: React.FC = () => {
                         placeholder={lang === 'ar' ? 'ملاحظات الإغلاق (اختياري)' : 'Close notes (optional)'}
                         className="px-3 py-2.5 rounded-xl bg-elevated border border-border/50 font-bold"
                     />
-                    <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-elevated border border-border/50 font-bold text-sm">
-                        <input
-                            type="checkbox"
-                            checked={enforceFiscalClean}
-                            onChange={(e) => setEnforceFiscalClean(e.target.checked)}
-                        />
-                        {lang === 'ar' ? 'منع الإغلاق إذا الحالة الضريبية غير نظيفة' : 'Block close if fiscal health is not clean'}
-                    </label>
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-border/50 bg-elevated/60 p-4">
@@ -501,42 +558,6 @@ const DayCloseHub: React.FC = () => {
                     >
                         {isSending ? (lang === 'ar' ? 'إرسال بناء على الطلب...' : 'Sending manually...') : (lang === 'ar' ? 'إرسال يدوي' : 'Manual Send')}
                     </button>
-                </div>
-
-                <div className="mt-8 border-t border-border/40 pt-6">
-                    <h3 className="text-lg font-black text-main mb-3">{lang === 'ar' ? 'إعدادات البريد الآلي' : 'Auto-Email Settings'}</h3>
-                    <div className="space-y-4">
-                        <label className="flex items-center gap-2 font-bold text-sm text-main">
-                            <input
-                                type="checkbox"
-                                className="w-4 h-4 rounded text-primary focus:ring-primary/20 bg-elevated border-border/50"
-                                checked={settings.endOfDayEmailEnabled || false}
-                                onChange={(e) => updateSettings({ endOfDayEmailEnabled: e.target.checked })}
-                            />
-                            {lang === 'ar' ? 'إرسال تقرير الإغلاق تلقائياً عند الإغلاق' : 'Send close report automatically on day close'}
-                        </label>
-                        
-                        {settings.endOfDayEmailEnabled && (
-                            <div>
-                                <label className="block text-xs font-bold text-muted mb-1.5 uppercase tracking-wider">
-                                    {lang === 'ar' ? 'قائمة المستلمين (يتم حفظها تلقائياً)' : 'Recipient List (Auto-saved)'}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={settings.endOfDayEmailRecipients?.join(', ') || ''}
-                                    onChange={(e) => {
-                                        const emails = e.target.value.split(',').map(m => m.trim()).filter(Boolean);
-                                        updateSettings({ endOfDayEmailRecipients: emails });
-                                    }}
-                                    placeholder={lang === 'ar' ? 'admin@company.com, ceo@company.com' : 'admin@company.com, ceo@company.com'}
-                                    className="w-full xl:w-2/3 px-3 py-2.5 rounded-xl bg-elevated border border-border/50 font-bold"
-                                />
-                                <p className="text-[11px] font-semibold text-muted mt-2">
-                                    {lang === 'ar' ? 'افصل بين الإيميلات بفاصلة ( , )' : 'Separate multiple emails with commas ( , )'}
-                                </p>
-                            </div>
-                        )}
-                    </div>
                 </div>
 
                 {error && (

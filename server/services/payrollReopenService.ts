@@ -5,13 +5,13 @@ import { createSignedAuditLog } from './auditService';
 
 export const payrollReopenService = {
     async reopenCycle(input: { cycleId: string; reopenedBy: string; reason: string }) {
-        const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, input.cycleId)).limit(1);
+        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, input.cycleId));
         if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
         const [latestRun] = await db.select().from(payrollRuns)
             .where(eq(payrollRuns.cycleId, input.cycleId))
             .orderBy(payrollRuns.closedAt)
-            .limit(1);
+            .offset(0).fetch(1);
 
         if (!latestRun || latestRun.status !== 'CLOSED') {
             throw new Error('PAYROLL_RUN_NOT_CLOSED');

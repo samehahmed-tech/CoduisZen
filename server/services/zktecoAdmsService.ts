@@ -38,13 +38,12 @@ class ZktecoAdmsService {
      */
     public async processPushPayload(sn: string, body: string): Promise<void> {
         // Find mapped device by SN
-        const [device] = await db.select().from(attendanceDevices)
+        const [device] = await db.select().top(1).from(attendanceDevices)
             .where(or(
                 eq(attendanceDevices.serialNumber, sn),
                 eq(attendanceDevices.code, sn),
                 eq(attendanceDevices.name, sn),
-            ))
-            .limit(1);
+            ));
 
         if (!device) {
             logger.warn(`Device SN ${sn} pushed data but is not registered in system.`);

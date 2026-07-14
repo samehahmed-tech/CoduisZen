@@ -11,7 +11,12 @@ type StepResult = {
 
 type ApiError = Error & { status?: number; code?: string; requestId?: string; details?: any };
 
-const API_BASE_URL = (process.env.SMOKE_API_BASE_URL || process.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/+$/, '');
+const configuredApiBaseUrl = String(process.env.SMOKE_API_BASE_URL || '').trim();
+const frontendApiBaseUrl = String(process.env.VITE_API_URL || '').trim();
+const API_BASE_URL = (
+    configuredApiBaseUrl
+    || (/^https?:\/\//i.test(frontendApiBaseUrl) ? frontendApiBaseUrl : 'http://localhost:3001/api')
+).replace(/\/+$/, '');
 const SMOKE_TOKEN = String(process.env.SMOKE_TOKEN || '').trim();
 const SMOKE_BRANCH_ID = String(process.env.SMOKE_BRANCH_ID || 'b1').trim();
 

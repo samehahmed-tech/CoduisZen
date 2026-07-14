@@ -70,15 +70,27 @@ const RefundManager: React.FC = () => {
             if (statusFilter !== 'ALL') filters.status = statusFilter;
             if (settings.activeBranchId) filters.branchId = settings.activeBranchId;
             setRefunds(await refundApi.getRefunds(filters));
-        } catch { } finally { setIsLoading(false); }
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load refunds', 'تعذر تحميل طلبات الاسترداد'));
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const loadStats = async () => {
-        try { setStats(await refundApi.getStats(settings.activeBranchId)); } catch { }
+        try {
+            setStats(await refundApi.getStats(settings.activeBranchId));
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load refund analytics', 'تعذر تحميل تحليلات الاسترداد'));
+        }
     };
 
     const loadPolicy = async () => {
-        try { setPolicy(await refundApi.getPolicy()); } catch { }
+        try {
+            setPolicy(await refundApi.getPolicy());
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load refund policy', 'تعذر تحميل سياسة الاسترداد'));
+        }
     };
 
     useEffect(() => { loadRefunds(); loadStats(); loadPolicy(); }, []);

@@ -1,13 +1,35 @@
 import { Request, Response } from 'express';
-import { db } from '../db';
-import { inventoryItems, inventoryStock, stockMovements, warehouses, auditLogs } from '../../src/db/schema';
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { db, pool } from '../db';
+import { inventoryItems, inventoryStock, stockMovements, warehouses, auditLogs, orders, orderItems, recipes, recipeIngredients } from '../../src/db/schema';
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
+import { isForeignKeyDeleteError, writeForeignKeyDeleteConflict } from '../utils/dbErrors';
 import { postInventoryAdjustmentEntry, postInventoryAdjustmentReversalEntry } from '../services/financePostingService';
 import { getIO } from '../socket';
 import { inventoryBatches } from '../../src/db/schema';
 import { inventoryService } from '../services/inventoryService';
 import { createSignedAuditLog } from '../services/auditService';
+
+let inventorySchemaReady = false;
+
+const ensureInventorySchema = async () => {
+    if (inventorySchemaReady) return;
+    await pool.query(`
+        IF OBJECT_ID('uq_inventory_items_sku', 'UQ') IS NOT NULL
+            ALTER TABLE inventory_items DROP CONSTRAINT uq_inventory_items_sku;
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM sys.indexes
+            WHERE name = 'idx_inventory_items_sku_not_null'
+              AND object_id = OBJECT_ID('inventory_items')
+        )
+            CREATE UNIQUE INDEX idx_inventory_items_sku_not_null
+            ON inventory_items(sku)
+            WHERE sku IS NOT NULL;
+    `);
+    inventorySchemaReady = true;
+};
 
 /**
  * Inventory Items
@@ -76,23 +98,28 @@ export const getInventoryItems = async (req: Request, res: Response) => {
 
         res.json(result);
     } catch (error: any) {
+        if (isForeignKeyDeleteError(error)) {
+            return writeForeignKeyDeleteConflict(res, 'inventory item', ['inventory_ledger', 'inventory_stock', 'purchase_order_items', 'recipes']);
+        }
         res.status(500).json({ error: error.message });
     }
 };
 
 export const createInventoryItem = async (req: Request, res: Response) => {
     try {
+        await ensureInventorySchema();
         const body = req.body || {};
 
         if (!body.name || !body.unit) {
             return res.status(400).json({ error: 'name and unit are required' });
         }
+        const id = body.id || `INV-${Date.now()}`;
 
-        const [created] = await db.insert(inventoryItems).values({
-            id: body.id || `INV-${Date.now()}`,
+        const [created] = await db.insert(inventoryItems).output().values({
+            id,
             name: body.name,
             nameAr: body.name_ar,
-            sku: body.sku,
+            sku: body.sku || id,
             barcode: body.barcode,
             unit: body.unit,
             category: body.category,
@@ -107,7 +134,7 @@ export const createInventoryItem = async (req: Request, res: Response) => {
             isActive: body.is_active !== false,
             createdAt: new Date(),
             updatedAt: new Date(),
-        }).returning();
+        });
 
         res.status(201).json(created);
     } catch (error: any) {
@@ -140,8 +167,8 @@ export const updateInventoryItem = async (req: Request, res: Response) => {
 
         const [updated] = await db.update(inventoryItems)
             .set(updates)
-            .where(eq(inventoryItems.id, id))
-            .returning();
+            .output()
+            .where(eq(inventoryItems.id, id));
 
         if (!updated) {
             return res.status(404).json({ error: 'Inventory item not found' });
@@ -168,9 +195,12 @@ export const deleteInventoryItem = async (req: Request, res: Response) => {
     try {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'ITEM_ID_REQUIRED' });
-        const [deleted] = await db.delete(inventoryItems).where(eq(inventoryItems.id, id)).returning();
+        const [deleted] = await db.update(inventoryItems)
+            .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
+            .output()
+            .where(eq(inventoryItems.id, id));
         if (!deleted) return res.status(404).json({ error: 'Inventory item not found' });
-        res.json({ message: 'Inventory item deleted', item: deleted });
+        res.json({ message: 'Inventory item archived', item: deleted });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -199,9 +229,9 @@ export const updateStock = async (req: Request, res: Response) => {
         if (reference_id) {
             const [existingMovement] = await db
                 .select()
+                .top(1)
                 .from(stockMovements)
-                .where(eq(stockMovements.referenceId, String(reference_id)))
-                .limit(1);
+                .where(eq(stockMovements.referenceId, String(reference_id)));
             if (existingMovement) {
                 const [currentStock] = await db.select().from(inventoryStock).where(
                     and(eq(inventoryStock.itemId, item_id), eq(inventoryStock.warehouseId, warehouse_id))
@@ -220,6 +250,8 @@ export const updateStock = async (req: Request, res: Response) => {
 
         const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, item_id));
         const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, warehouse_id));
+        if (!item) return res.status(404).json({ error: 'INVENTORY_ITEM_NOT_FOUND', message: 'Inventory item not found' });
+        if (!warehouse) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND', message: 'Warehouse not found' });
         const [existing] = await db.select().from(inventoryStock).where(
             and(eq(inventoryStock.itemId, item_id), eq(inventoryStock.warehouseId, warehouse_id))
         );
@@ -338,6 +370,9 @@ export const updateStock = async (req: Request, res: Response) => {
 
         res.json({ success: true, previousQuantity: previousQty, newQuantity: newQty, delta });
     } catch (error: any) {
+        if (isForeignKeyDeleteError(error)) {
+            return writeForeignKeyDeleteConflict(res, 'stock adjustment', ['inventory_items', 'warehouses']);
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -371,12 +406,12 @@ export const transferStock = async (req: Request, res: Response) => {
 
         // Idempotency guard for offline replay.
         if (reference_id) {
-            const [existingTransfer] = await db.select().from(stockMovements).where(
+            const [existingTransfer] = await db.select().top(1).from(stockMovements).where(
                 and(
                     eq(stockMovements.referenceId, String(reference_id)),
                     eq(stockMovements.type, 'TRANSFER')
                 )
-            ).limit(1);
+            );
             if (existingTransfer) {
                 return res.json({
                     success: true,
@@ -406,13 +441,13 @@ export const transferStock = async (req: Request, res: Response) => {
                     quantity: sql`${inventoryStock.quantity} - ${transferQty}`,
                     lastUpdated: new Date(),
                 })
+                .output()
                 .where(
                     and(
                         eq(inventoryStock.id, sourceStock.id),
                         sql`${inventoryStock.quantity} >= ${transferQty}`
                     )
-                )
-                .returning({ id: inventoryStock.id });
+                );
 
             if (!deductedSourceStock) {
                 throw new Error('Insufficient stock in source warehouse');
@@ -524,7 +559,7 @@ export const getTransferMovements = async (req: Request, res: Response) => {
                 .from(stockMovements)
                 .where(eq(stockMovements.type, 'TRANSFER'))
                 .orderBy(desc(stockMovements.createdAt))
-                .limit(safeLimit),
+                .offset(0).fetch(safeLimit),
             db.select({ id: inventoryItems.id, name: inventoryItems.name }).from(inventoryItems),
             db.select({ id: warehouses.id, name: warehouses.name, branchId: warehouses.branchId }).from(warehouses),
         ]);
@@ -564,6 +599,34 @@ export const getTransferMovements = async (req: Request, res: Response) => {
  */
 export const getRecipeConsumption = async (req: Request, res: Response) => {
     try {
+        const attachCurrentStock = async (sourceRows: any[]) => {
+            const itemIds = Array.from(new Set(sourceRows.map((row) => row.itemId).filter(Boolean))) as string[];
+            const branchIds = Array.from(new Set(sourceRows.map((row) => row.branchId).filter(Boolean))) as string[];
+            if (itemIds.length === 0 || branchIds.length === 0) {
+                return sourceRows.map((row) => ({ ...row, currentStock: 0 }));
+            }
+            const stocks = await db
+                .select({
+                    itemId: inventoryStock.itemId,
+                    branchId: warehouses.branchId,
+                    quantity: sql<number>`coalesce(sum(${inventoryStock.quantity}), 0)`,
+                })
+                .from(inventoryStock)
+                .innerJoin(warehouses, eq(warehouses.id, inventoryStock.warehouseId))
+                .where(and(
+                    inArray(inventoryStock.itemId, itemIds),
+                    inArray(warehouses.branchId, branchIds),
+                ))
+                .groupBy(inventoryStock.itemId, warehouses.branchId);
+            const stockByItemBranch = new Map(stocks.map((stock) => [
+                `${stock.itemId}:${stock.branchId}`,
+                Number(stock.quantity || 0),
+            ]));
+            return sourceRows.map((row) => ({
+                ...row,
+                currentStock: stockByItemBranch.get(`${row.itemId}:${row.branchId}`) || 0,
+            }));
+        };
         const limit = Number(req.query.limit || 100);
         const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : 100;
         const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : null;
@@ -590,7 +653,7 @@ export const getRecipeConsumption = async (req: Request, res: Response) => {
                 movementCount: sql<number>`count(*)`,
                 estimatedCost: sql<number>`coalesce(sum(${stockMovements.quantity} * coalesce(${inventoryItems.costPrice}, 0)), 0)`,
                 lastConsumedAt: sql<Date>`max(${stockMovements.createdAt})`,
-                lastReferenceId: sql<string>`(array_agg(${stockMovements.referenceId} order by ${stockMovements.createdAt} desc))[1]`,
+                lastReferenceId: sql<string>`coalesce(max(${stockMovements.referenceId}), '')`,
             })
             .from(stockMovements)
             .leftJoin(inventoryItems, eq(inventoryItems.id, stockMovements.itemId))
@@ -606,14 +669,66 @@ export const getRecipeConsumption = async (req: Request, res: Response) => {
                 warehouses.branchId,
             )
             .orderBy(desc(sql`coalesce(sum(${stockMovements.quantity}), 0)`))
-            .limit(safeLimit);
+            .offset(0).fetch(safeLimit);
 
-        res.json(rows.map((row) => ({
+        if (rows.length === 0) {
+            const orderConditions: any[] = [
+                gte(orders.createdAt, startDate && !Number.isNaN(startDate.getTime()) ? startDate : new Date(0)),
+                lte(orders.createdAt, endDate && !Number.isNaN(endDate.getTime()) ? endDate : new Date()),
+                sql`${orders.status} not in ('CANCELLED', 'VOID', 'REFUNDED')`,
+            ];
+            if (req.effectiveBranchId) orderConditions.push(eq(orders.branchId, req.effectiveBranchId));
+
+            const [warehouse] = await db
+                .select({ id: warehouses.id, name: warehouses.name, branchId: warehouses.branchId })
+                .from(warehouses)
+                .where(req.effectiveBranchId ? eq(warehouses.branchId, req.effectiveBranchId) : sql`true`)
+                .orderBy(desc(warehouses.type))
+                .offset(0).fetch(1);
+
+            const theoreticalRows = await db
+                .select({
+                    itemId: recipeIngredients.inventoryItemId,
+                    itemName: inventoryItems.name,
+                    itemNameAr: inventoryItems.nameAr,
+                    unit: recipeIngredients.unit,
+                    totalQuantity: sql<number>`coalesce(sum(${orderItems.quantity} * ${recipeIngredients.quantity} / coalesce(${recipes.yield}, 1)), 0)`,
+                    movementCount: sql<number>`count(distinct ${orders.id})`,
+                    estimatedCost: sql<number>`coalesce(sum(${orderItems.quantity} * ${recipeIngredients.quantity} / coalesce(${recipes.yield}, 1) * coalesce(${inventoryItems.costPrice}, 0)), 0)`,
+                    lastConsumedAt: sql<Date>`max(${orders.createdAt})`,
+                    lastReferenceId: sql<string>`coalesce(max(${orders.id}), '')`,
+                })
+                .from(orderItems)
+                .innerJoin(orders, eq(orderItems.orderId, orders.id))
+                .innerJoin(recipes, eq(orderItems.menuItemId, recipes.menuItemId))
+                .innerJoin(recipeIngredients, eq(recipes.id, recipeIngredients.recipeId))
+                .innerJoin(inventoryItems, eq(recipeIngredients.inventoryItemId, inventoryItems.id))
+                .where(and(...orderConditions))
+                .groupBy(recipeIngredients.inventoryItemId, inventoryItems.name, inventoryItems.nameAr, recipeIngredients.unit)
+                .orderBy(desc(sql`coalesce(sum(${orderItems.quantity} * ${recipeIngredients.quantity} / coalesce(${recipes.yield}, 1)), 0)`))
+                .offset(0).fetch(safeLimit);
+
+            const theoreticalResult = theoreticalRows.map((row) => ({
+                ...row,
+                warehouseId: warehouse?.id || null,
+                warehouseName: warehouse?.name || null,
+                branchId: warehouse?.branchId || req.effectiveBranchId || null,
+                totalQuantity: Number(row.totalQuantity || 0),
+                movementCount: Number(row.movementCount || 0),
+                estimatedCost: Number(row.estimatedCost || 0),
+                source: 'THEORETICAL',
+            }));
+            return res.json(await attachCurrentStock(theoreticalResult));
+        }
+
+        const actualResult = rows.map((row) => ({
             ...row,
             totalQuantity: Number(row.totalQuantity || 0),
             movementCount: Number(row.movementCount || 0),
             estimatedCost: Number(row.estimatedCost || 0),
-        })));
+            source: 'ACTUAL',
+        }));
+        res.json(await attachCurrentStock(actualResult));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

@@ -9,7 +9,7 @@ describe('HR document vault', () => {
             id: 'test-doc-branch',
             name: 'Document Branch',
             location: 'Alexandria',
-        });
+        }).onConflictDoNothing();
         await db.insert(employees).values({
             id: 'test-doc-employee',
             branchId: 'test-doc-branch',
@@ -18,7 +18,7 @@ describe('HR document vault', () => {
             name: 'Document Employee',
             role: 'Staff',
             basicSalary: 5000,
-        });
+        }).onConflictDoNothing();
     });
 
     it('stores employee documents and marks near-expiry records', async () => {

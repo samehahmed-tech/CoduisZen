@@ -76,11 +76,11 @@ describe('business-date reporting', () => {
             values
                 (
                     ${lateNightOrderId}, 'TAKEAWAY', ${branchId}, 'COMPLETED', 100, 0, 14, 114,
-                    true, ${businessDate}, ${new Date('2026-06-12T02:15:00.000Z')}
+                    1, ${businessDate}, ${new Date('2026-06-12T02:15:00.000Z')}
                 ),
                 (
                     ${nextDayOrderId}, 'TAKEAWAY', ${branchId}, 'COMPLETED', 900, 0, 126, 1026,
-                    true, ${nextBusinessDate}, ${new Date('2026-06-12T03:00:00.000Z')}
+                    1, ${nextBusinessDate}, ${new Date('2026-06-12T03:00:00.000Z')}
                 )
         `);
 

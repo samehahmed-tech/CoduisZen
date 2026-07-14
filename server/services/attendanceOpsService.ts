@@ -368,15 +368,15 @@ const getPayrollContextForDate = async (employeeId: string, branchId: string, da
 
     let profile: typeof payrollProfiles.$inferSelect | null = null;
     if (assignment) {
-        profile = (await db.select().from(payrollProfiles).where(eq(payrollProfiles.id, assignment.payrollProfileId)).limit(1))[0] || null;
+        profile = (await db.select().top(1).from(payrollProfiles).where(eq(payrollProfiles.id, assignment.payrollProfileId)))[0] || null;
     }
 
     if (!profile) {
-        profile = (await db.select().from(payrollProfiles).where(and(
+        profile = (await db.select().top(1).from(payrollProfiles).where(and(
             eq(payrollProfiles.branchId, branchId),
             eq(payrollProfiles.isDefault, true),
             eq(payrollProfiles.isActive, true),
-        )).limit(1))[0] || null;
+        )))[0] || null;
     }
 
     const rules = profile
@@ -406,20 +406,20 @@ export const attendanceOpsService = {
         }) || null;
 
         const template = assignment
-            ? (await db.select().from(shiftTemplates).where(eq(shiftTemplates.id, assignment.shiftTemplateId)).limit(1))[0] || null
+            ? (await db.select().top(1).from(shiftTemplates).where(eq(shiftTemplates.id, assignment.shiftTemplateId)))[0] || null
             : null;
 
         let policy = null;
         try {
             if (template?.attendancePolicyId) {
-                policy = (await db.select().from(attendancePolicies).where(eq(attendancePolicies.id, template.attendancePolicyId)).limit(1))[0] || null;
+                policy = (await db.select().top(1).from(attendancePolicies).where(eq(attendancePolicies.id, template.attendancePolicyId)))[0] || null;
             }
             if (!policy) {
-                policy = (await db.select().from(attendancePolicies).where(and(
+                policy = (await db.select().top(1).from(attendancePolicies).where(and(
                     eq(attendancePolicies.branchId, branchId),
                     eq(attendancePolicies.isDefault, true),
                     eq(attendancePolicies.isActive, true),
-                )).limit(1))[0] || null;
+                )))[0] || null;
             }
         } catch (error: any) {
             console.warn('[attendance-ops] attendance policy lookup failed; using smart defaults', {
@@ -522,12 +522,12 @@ export const attendanceOpsService = {
                     isActive: input.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(attendanceDevices.id, input.id))
-                .returning();
+            .output()
+            .where(eq(attendanceDevices.id, input.id));
             return updated;
         }
 
-        const [created] = await db.insert(attendanceDevices).values({
+        const [created] = await db.insert(attendanceDevices).output().values({
             id: makeId('ATD'),
             branchId: input.branchId,
             name: input.name,
@@ -542,14 +542,13 @@ export const attendanceOpsService = {
             branchGatewayId: input.branchGatewayId,
             notes: input.notes,
             isActive: input.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
     async deleteDevice(deviceId: string, deletedBy?: string | null) {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
 
         const notes = parseDeviceNotes(device.notes) as any;
@@ -569,16 +568,15 @@ export const attendanceOpsService = {
                 }),
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceDevices.id, deviceId))
-            .returning();
+            .output()
+            .where(eq(attendanceDevices.id, deviceId));
 
         return { ok: true, deviceId, archivedAt, device: updated };
     },
 
     async requestBridgeDeviceSync(deviceId: string, requestedBy?: string | null, options: { startDate?: string | null; endDate?: string | null; forceFull?: boolean | null } = {}) {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         if (device.communicationMode !== 'BRANCH_BRIDGE') {
             throw new Error('DEVICE_IS_NOT_BRANCH_BRIDGE');
@@ -594,7 +592,7 @@ export const attendanceOpsService = {
                 eq(attendanceSyncRuns.sourceType, 'BRANCH_BRIDGE_COMMAND'),
             ))
             .orderBy(desc(attendanceSyncRuns.createdAt))
-            .limit(10);
+            .offset(0).fetch(10);
 
         const activeCommand = pendingCommands.find((run: any) => (
             ['QUEUED', 'IN_PROGRESS'].includes(String(run.status || '').toUpperCase())
@@ -624,7 +622,7 @@ export const attendanceOpsService = {
                 .from(attendanceRawLogs)
                 .where(eq(attendanceRawLogs.deviceId, device.id))
                 .orderBy(desc(attendanceRawLogs.occurredAt))
-                .limit(1);
+                .offset(0).fetch(1);
         const sinceAt = requestedStart && !Number.isNaN(requestedStart.getTime())
             ? requestedStart.toISOString()
             : shouldForceFull
@@ -673,9 +671,8 @@ export const attendanceOpsService = {
     },
 
     async requestBridgePing(deviceId: string, requestedBy?: string | null) {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         if (device.communicationMode !== 'BRANCH_BRIDGE') {
             throw new Error('DEVICE_IS_NOT_BRANCH_BRIDGE');
@@ -721,9 +718,8 @@ export const attendanceOpsService = {
     },
 
     async requestBridgeDeviceOperation(deviceId: string, command: 'RESTART_DEVICE' | 'CLEAR_DEVICE_LOGS_WITH_BACKUP', requestedBy?: string | null) {
-        const [device] = await db.select().from(attendanceDevices)
-            .where(eq(attendanceDevices.id, deviceId))
-            .limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices)
+            .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
         if (device.communicationMode !== 'BRANCH_BRIDGE') {
             throw new Error('DEVICE_IS_NOT_BRANCH_BRIDGE');
@@ -797,18 +793,17 @@ export const attendanceOpsService = {
                 ${Math.max(0, Number(input.recordCount || 0))},
                 ${input.backupFormat || 'JSON'},
                 ${input.localFilePath || null},
-                ${JSON.stringify(input.rawPayload)}::jsonb,
+                ${JSON.stringify(input.rawPayload)},
                 ${nullableUserReference(input.createdBy)},
-                now()
+getdate()
             )
         `);
         return { ok: true, id };
     },
 
     async getSyncRun(runId: string) {
-        const [run] = await db.select().from(attendanceSyncRuns)
-            .where(eq(attendanceSyncRuns.id, runId))
-            .limit(1);
+        const [run] = await db.select().top(1).from(attendanceSyncRuns)
+            .where(eq(attendanceSyncRuns.id, runId));
         if (!run) throw new Error('SYNC_RUN_NOT_FOUND');
         return run;
     },
@@ -832,12 +827,12 @@ export const attendanceOpsService = {
                     isActive: input.isActive !== false,
                     updatedAt: new Date(),
                 })
-                .where(eq(attendanceGeofences.id, input.id))
-                .returning();
+                .output()
+                .where(eq(attendanceGeofences.id, input.id));
             return updated;
         }
 
-        const [created] = await db.insert(attendanceGeofences).values({
+        const [created] = await db.insert(attendanceGeofences).output().values({
             id: makeId('GEO'),
             branchId: input.branchId,
             name: input.name,
@@ -845,7 +840,7 @@ export const attendanceOpsService = {
             longitude: input.longitude,
             radiusMeters: input.radiusMeters || 150,
             isActive: input.isActive !== false,
-        }).returning();
+        });
         return created;
     },
 
@@ -862,7 +857,7 @@ export const attendanceOpsService = {
                 deviceId ? eq(attendanceRawLogs.deviceId, deviceId) : undefined,
             ))
             .orderBy(desc(attendanceRawLogs.occurredAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
     },
 
     async getEmployeeAttendanceProfile(input: {
@@ -876,20 +871,20 @@ export const attendanceOpsService = {
         const end = input.endDate ? new Date(input.endDate) : undefined;
         if (end) end.setHours(23, 59, 59, 999);
 
-        const [employee] = await db.select().from(employees)
-            .where(eq(employees.id, input.employeeId))
-            .limit(1);
+        const [employee] = await db.select().top(1).from(employees)
+            .where(eq(employees.id, input.employeeId));
         if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
 
         // Auto-process unprocessed raw logs into sessions for better profile view
-        const unprocessedLogs = await db.select().from(attendanceRawLogs)
+        const unprocessedLogs = await db.select()
+            .top(100)
+            .from(attendanceRawLogs)
             .where(and(
                 eq(attendanceRawLogs.employeeId, input.employeeId),
                 eq(attendanceRawLogs.processingStatus, 'PENDING'),
                 start ? gte(attendanceRawLogs.occurredAt, start) : undefined,
                 end ? lte(attendanceRawLogs.occurredAt, end) : undefined,
-            ))
-            .limit(100);
+            ));
 
         for (const log of unprocessedLogs) {
             try {
@@ -933,7 +928,7 @@ export const attendanceOpsService = {
                 end ? lte(attendanceSessions.clockInAt, end) : undefined,
             ))
             .orderBy(desc(attendanceSessions.clockInAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         const rawLogIdentityConditions = [
             eq(attendanceRawLogs.employeeId, input.employeeId),
@@ -966,7 +961,7 @@ export const attendanceOpsService = {
                 end ? lte(attendanceRawLogs.occurredAt, end) : undefined,
             ))
             .orderBy(desc(attendanceRawLogs.occurredAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         const totals = sessions.reduce((acc, session) => {
             acc.totalHours += Number(session.totalHours || 0);
@@ -1007,7 +1002,7 @@ export const attendanceOpsService = {
                 end ? lte(attendanceSessions.clockInAt, end) : undefined,
             ))
             .orderBy(desc(attendanceSessions.clockInAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         let updated = 0;
         let flexibleSessions = 0;
@@ -1067,7 +1062,7 @@ export const attendanceOpsService = {
                 end ? lte(attendanceRawLogs.occurredAt, end) : undefined,
             ))
             .orderBy(attendanceRawLogs.occurredAt)
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         const knownLogs = logs.filter(log => log.employeeId);
         const groups = new Map<string, typeof knownLogs>();
@@ -1158,7 +1153,7 @@ export const attendanceOpsService = {
                         eq(attendanceExceptions.rawLogId, first.id),
                         eq(attendanceExceptions.type, 'MISSING_IN'),
                     ))
-                    .limit(1);
+                    .top(1);
                 if (!existingException) {
                     await this.createException({
                         employeeId: first.employeeId,
@@ -1260,12 +1255,13 @@ export const attendanceOpsService = {
                         })
                         .where(eq(attendanceRawLogs.id, last.id));
                 }
-                const [existingException] = await db.select().from(attendanceExceptions)
+                const [existingException] = await db.select()
+                    .top(1)
+                    .from(attendanceExceptions)
                     .where(and(
                         eq(attendanceExceptions.rawLogId, suspiciousLongSession ? last.id : first.id),
                         eq(attendanceExceptions.type, 'MISSING_OUT'),
-                    ))
-                    .limit(1);
+                    ));
                 if (!existingException) {
                     await this.createException({
                         employeeId: first.employeeId,
@@ -1312,13 +1308,14 @@ export const attendanceOpsService = {
                 const clockInAt = new Date(firstLog.occurredAt);
                 const context = await this.getAttendanceContext(firstLog.employeeId, firstLog.branchId, clockInAt);
                 const metrics = this.calculateShiftMetrics(clockInAt, null, context);
-                const [existingSession] = await db.select().from(attendanceSessions)
+                const [existingSession] = await db.select()
+                    .top(1)
+                    .from(attendanceSessions)
                     .where(and(
                         eq(attendanceSessions.employeeId, firstLog.employeeId),
                         gte(attendanceSessions.clockInAt, new Date(clockInAt.getTime() - duplicateWindowMinutes * 60000)),
                         lte(attendanceSessions.clockInAt, new Date(clockInAt.getTime() + duplicateWindowMinutes * 60000)),
-                    ))
-                    .limit(1);
+                    ));
 
                 const sessionPatch = {
                     branchId: firstLog.branchId,
@@ -1353,12 +1350,13 @@ export const attendanceOpsService = {
                     .set({ eventType: 'IN', processingStatus: 'PROCESSED', processingNotes: reason, updatedAt: new Date() })
                     .where(eq(attendanceRawLogs.id, firstLog.id));
 
-                const [existingException] = await db.select().from(attendanceExceptions)
+                const [existingException] = await db.select()
+                    .top(1)
+                    .from(attendanceExceptions)
                     .where(and(
                         eq(attendanceExceptions.rawLogId, firstLog.id),
                         eq(attendanceExceptions.type, 'MISSING_OUT'),
-                    ))
-                    .limit(1);
+                    ));
                 if (!existingException) {
                     await this.createException({
                         employeeId: firstLog.employeeId,
@@ -1381,13 +1379,14 @@ export const attendanceOpsService = {
                 const context = await this.getAttendanceContext(firstLog.employeeId, firstLog.branchId, clockInAt);
                 const metrics = this.calculateShiftMetrics(clockInAt, clockOutAt, context);
                 const totalHours = Number(Math.max(0, (clockOutAt.getTime() - clockInAt.getTime()) / 3600000).toFixed(2));
-                const [existingSession] = await db.select().from(attendanceSessions)
+                const [existingSession] = await db.select()
+                    .top(1)
+                    .from(attendanceSessions)
                     .where(and(
                         eq(attendanceSessions.employeeId, firstLog.employeeId),
                         gte(attendanceSessions.clockInAt, new Date(clockInAt.getTime() - duplicateWindowMinutes * 60000)),
                         lte(attendanceSessions.clockInAt, new Date(clockInAt.getTime() + duplicateWindowMinutes * 60000)),
-                    ))
-                    .limit(1);
+                    ));
 
                 const sessionPatch = {
                     branchId: firstLog.branchId,
@@ -1480,11 +1479,11 @@ export const attendanceOpsService = {
             const [latestRun] = await db.select().from(attendanceSyncRuns)
                 .where(eq(attendanceSyncRuns.deviceId, device.id))
                 .orderBy(desc(attendanceSyncRuns.startedAt))
-                .limit(1);
+                .offset(0).fetch(1);
             const [latestLog] = await db.select().from(attendanceRawLogs)
                 .where(eq(attendanceRawLogs.deviceId, device.id))
                 .orderBy(desc(attendanceRawLogs.occurredAt))
-                .limit(1);
+                .offset(0).fetch(1);
             const syncConfig = (device as any).syncConfig || getDeviceSyncConfig(device.notes);
             const lastSuccessAt = syncConfig.lastSuccessAt || (latestRun?.status === 'COMPLETED' ? latestRun.completedAt : null);
             const lastAttemptAt = syncConfig.lastAttemptAt || latestRun?.startedAt || null;
@@ -1900,9 +1899,8 @@ export const attendanceOpsService = {
         deviceId?: string;
         notes?: string;
     }) {
-        const [employee] = await db.select().from(employees)
-            .where(eq(employees.id, input.employeeId))
-            .limit(1);
+        const [employee] = await db.select().top(1).from(employees)
+            .where(eq(employees.id, input.employeeId));
         if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
         if (!input.reason || !String(input.reason).trim()) throw new Error('MANUAL_PUNCH_REASON_REQUIRED');
 
@@ -1968,8 +1966,8 @@ export const attendanceOpsService = {
                 resolutionNotes: input.resolutionNotes,
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceExceptions.id, input.id))
-            .returning();
+            .output()
+            .where(eq(attendanceExceptions.id, input.id));
         return updated;
     },
 
@@ -1985,8 +1983,8 @@ export const attendanceOpsService = {
                 resolutionNotes: input.resolutionNotes,
                 updatedAt: new Date(),
             })
-            .where(inArray(attendanceExceptions.id, ids))
-            .returning({ id: attendanceExceptions.id });
+            .output()
+            .where(inArray(attendanceExceptions.id, ids));
 
         return { resolved: updated.length, ids: updated.map(row => row.id) };
     },
@@ -1997,15 +1995,14 @@ export const attendanceOpsService = {
                 assignedTo: input.assignedTo,
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceExceptions.id, input.id))
-            .returning();
+            .output()
+            .where(eq(attendanceExceptions.id, input.id));
         return updated;
     },
 
     async escalateException(input: { id: string; escalatedBy: string; notes?: string }) {
-        const [current] = await db.select().from(attendanceExceptions)
-            .where(eq(attendanceExceptions.id, input.id))
-            .limit(1);
+        const [current] = await db.select().top(1).from(attendanceExceptions)
+            .where(eq(attendanceExceptions.id, input.id));
         if (!current) throw new Error('ATTENDANCE_EXCEPTION_NOT_FOUND');
 
         const nextLevel = Number(current.escalationLevel || 0) + 1;
@@ -2015,8 +2012,8 @@ export const attendanceOpsService = {
                 lastEscalatedAt: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceExceptions.id, input.id))
-            .returning();
+            .output()
+            .where(eq(attendanceExceptions.id, input.id));
 
         await this.createException({
             employeeId: current.employeeId,
@@ -2046,7 +2043,7 @@ export const attendanceOpsService = {
                 attendanceExceptions.slaDueAt,
                 desc(attendanceExceptions.createdAt),
             )
-            .limit(limit);
+            .offset(0).fetch(limit);
     },
 
     async getExceptionQueueSummary(input: { branchId?: string; status?: string }) {
@@ -2054,7 +2051,7 @@ export const attendanceOpsService = {
         const rows = await db.select({
             type: attendanceExceptions.type,
             severity: attendanceExceptions.severity,
-            count: sql<number>`count(*)::int`,
+            count: sql<number>`count(*)`,
             latestAt: sql<Date>`max(${attendanceExceptions.createdAt})`,
         }).from(attendanceExceptions)
             .where(and(
@@ -2075,12 +2072,11 @@ export const attendanceOpsService = {
         requestedClockOutAt?: string | Date;
         reason: string;
     }) {
-        const [session] = await db.select().from(attendanceSessions)
-            .where(eq(attendanceSessions.id, input.sessionId))
-            .limit(1);
+        const [session] = await db.select().top(1).from(attendanceSessions)
+            .where(eq(attendanceSessions.id, input.sessionId));
         if (!session) throw new Error('ATTENDANCE_SESSION_NOT_FOUND');
 
-        const [created] = await db.insert(attendanceCorrections).values({
+        const [created] = await db.insert(attendanceCorrections).output().values({
             id: makeId('COR'),
             sessionId: input.sessionId,
             employeeId: session.employeeId,
@@ -2088,7 +2084,7 @@ export const attendanceOpsService = {
             requestedClockInAt: input.requestedClockInAt ? new Date(input.requestedClockInAt) : undefined,
             requestedClockOutAt: input.requestedClockOutAt ? new Date(input.requestedClockOutAt) : undefined,
             reason: input.reason,
-        }).returning();
+        });
 
         await this.createException({
             employeeId: session.employeeId,
@@ -2109,15 +2105,13 @@ export const attendanceOpsService = {
     },
 
     async approveCorrection(input: { correctionId: string; approvedBy: string; approverNotes?: string }) {
-        const [correction] = await db.select().from(attendanceCorrections)
-            .where(eq(attendanceCorrections.id, input.correctionId))
-            .limit(1);
+        const [correction] = await db.select().top(1).from(attendanceCorrections)
+            .where(eq(attendanceCorrections.id, input.correctionId));
         if (!correction) throw new Error('ATTENDANCE_CORRECTION_NOT_FOUND');
         if (correction.status !== 'PENDING') throw new Error('ATTENDANCE_CORRECTION_NOT_PENDING');
 
-        const [session] = await db.select().from(attendanceSessions)
-            .where(eq(attendanceSessions.id, correction.sessionId))
-            .limit(1);
+        const [session] = await db.select().top(1).from(attendanceSessions)
+            .where(eq(attendanceSessions.id, correction.sessionId));
         if (!session) throw new Error('ATTENDANCE_SESSION_NOT_FOUND');
 
         const nextClockIn = correction.requestedClockInAt || session.clockInAt;
@@ -2136,8 +2130,8 @@ export const attendanceOpsService = {
                 status: nextClockOut ? 'CLOSED' : 'OPEN',
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceSessions.id, session.id))
-            .returning();
+            .output()
+            .where(eq(attendanceSessions.id, session.id));
 
         const [updatedCorrection] = await db.update(attendanceCorrections)
             .set({
@@ -2146,8 +2140,8 @@ export const attendanceOpsService = {
                 approverNotes: input.approverNotes,
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceCorrections.id, correction.id))
-            .returning();
+            .output()
+            .where(eq(attendanceCorrections.id, correction.id));
 
         const relatedExceptions = await db.select().from(attendanceExceptions).where(and(
             eq(attendanceExceptions.sessionId, session.id),
@@ -2170,9 +2164,8 @@ export const attendanceOpsService = {
     },
 
     async rejectCorrection(input: { correctionId: string; approvedBy: string; approverNotes?: string }) {
-        const [correction] = await db.select().from(attendanceCorrections)
-            .where(eq(attendanceCorrections.id, input.correctionId))
-            .limit(1);
+        const [correction] = await db.select().top(1).from(attendanceCorrections)
+            .where(eq(attendanceCorrections.id, input.correctionId));
         if (!correction) throw new Error('ATTENDANCE_CORRECTION_NOT_FOUND');
         if (correction.status !== 'PENDING') throw new Error('ATTENDANCE_CORRECTION_NOT_PENDING');
 
@@ -2183,20 +2176,20 @@ export const attendanceOpsService = {
                 approverNotes: input.approverNotes,
                 updatedAt: new Date(),
             })
-            .where(eq(attendanceCorrections.id, correction.id))
-            .returning();
+            .output()
+            .where(eq(attendanceCorrections.id, correction.id));
 
         return updatedCorrection;
     },
 
     async startSyncRun(input: { branchId?: string; deviceId?: string; sourceType: string; metadata?: Record<string, any> }) {
-        const [run] = await db.insert(attendanceSyncRuns).values({
+        const [run] = await db.insert(attendanceSyncRuns).output().values({
             id: makeId('SYNC'),
             branchId: input.branchId,
             deviceId: input.deviceId,
             sourceType: input.sourceType,
             metadata: input.metadata || {},
-        }).returning();
+        });
         return run;
     },
 
@@ -2210,21 +2203,22 @@ export const attendanceOpsService = {
                 errorMessage: input.errorMessage,
                 completedAt: new Date(),
             })
-            .where(eq(attendanceSyncRuns.id, input.syncRunId))
-            .returning();
+            .output()
+            .where(eq(attendanceSyncRuns.id, input.syncRunId));
         return updated;
     },
 
     async upsertDeviceMapping(input: { deviceId: string; employeeId: string; deviceUserId: string }) {
-        const [employee] = await db.select().from(employees).where(eq(employees.id, input.employeeId)).limit(1);
+        const [employee] = await db.select().top(1).from(employees).where(eq(employees.id, input.employeeId));
         if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
 
-        const existing = await db.select().from(attendanceDeviceMappings)
+        const existing = await db.select()
+            .top(1)
+            .from(attendanceDeviceMappings)
             .where(and(
                 eq(attendanceDeviceMappings.deviceId, input.deviceId),
                 eq(attendanceDeviceMappings.deviceUserId, input.deviceUserId),
-            ))
-            .limit(1);
+            ));
 
         if (existing[0]) {
             const [updated] = await db.update(attendanceDeviceMappings)
@@ -2234,18 +2228,18 @@ export const attendanceOpsService = {
                     isActive: true,
                     updatedAt: new Date(),
                 })
-                .where(eq(attendanceDeviceMappings.id, existing[0].id))
-                .returning();
+                .output()
+                .where(eq(attendanceDeviceMappings.id, existing[0].id));
             return updated;
         }
 
-        const [created] = await db.insert(attendanceDeviceMappings).values({
+        const [created] = await db.insert(attendanceDeviceMappings).output().values({
             deviceId: input.deviceId,
             employeeId: input.employeeId,
             deviceUserId: input.deviceUserId,
             employeeCodeSnapshot: employee.employeeCode || employee.attendanceCode || employee.id,
             isActive: true,
-        }).returning();
+        });
         return created;
     },
 
@@ -2285,7 +2279,7 @@ export const attendanceOpsService = {
                 ),
             ))
             .orderBy(attendanceRawLogs.occurredAt)
-            .limit(5000);
+            .offset(0).fetch(5000);
         const rawLogs = Array.from(
             new Map([...referencedRawLogs, ...relatedRawLogs].map(rawLog => [rawLog.id, rawLog])).values(),
         );
@@ -2356,7 +2350,7 @@ export const attendanceOpsService = {
                 input.branchId ? eq(attendanceExceptions.branchId, input.branchId) : undefined,
             ))
             .orderBy(desc(attendanceExceptions.createdAt))
-            .limit(Math.max(1, Math.min(Number(input.limit || 200), 1000)));
+            .offset(0).fetch(Math.max(1, Math.min(Number(input.limit || 200), 1000)));
 
         const groups = new Map<string, {
             deviceId: string;
@@ -2469,8 +2463,8 @@ export const attendanceOpsService = {
     async deactivateDeviceMapping(id: number) {
         const [updated] = await db.update(attendanceDeviceMappings)
             .set({ isActive: false, updatedAt: new Date() })
-            .where(eq(attendanceDeviceMappings.id, id))
-            .returning();
+            .output()
+            .where(eq(attendanceDeviceMappings.id, id));
         if (!updated) throw new Error('MAPPING_NOT_FOUND');
         return updated;
     },
@@ -2483,13 +2477,14 @@ export const attendanceOpsService = {
         const candidates = getAttendanceIdentifierCandidates(input.deviceUserId, input.employeeIdentifier);
 
         if (input.deviceId && deviceUserId) {
-            const [mapping] = await db.select().from(attendanceDeviceMappings)
+            const [mapping] = await db.select()
+                .top(1)
+                .from(attendanceDeviceMappings)
                 .where(and(
                     eq(attendanceDeviceMappings.deviceId, input.deviceId),
                     eq(attendanceDeviceMappings.deviceUserId, deviceUserId),
                     eq(attendanceDeviceMappings.isActive, true),
-                ))
-                .limit(1);
+                ));
             if (mapping?.employeeId) return mapping.employeeId;
         }
 
@@ -2501,33 +2496,36 @@ export const attendanceOpsService = {
             ];
 
             if (!input.deviceId && deviceUserId) {
-                const [globalMapping] = await db.select().from(attendanceDeviceMappings)
+                const [globalMapping] = await db.select()
+                    .top(1)
+                    .from(attendanceDeviceMappings)
                     .where(and(
                         eq(attendanceDeviceMappings.deviceUserId, deviceUserId),
                         eq(attendanceDeviceMappings.isActive, true),
-                    ))
-                    .limit(1);
+                    ));
                 if (globalMapping?.employeeId) return globalMapping.employeeId;
             }
 
             if (input.branchId) {
-                const branchMatches = await db.select({ id: employees.id }).from(employees)
+                const branchMatches = await db.select({ id: employees.id })
+                    .top(2)
+                    .from(employees)
                     .where(and(
                         eq(employees.branchId, input.branchId),
                         eq(employees.isActive, true),
                         or(...conditions)!,
-                    ))
-                    .limit(2);
+                    ));
                 if (branchMatches.length === 1) return branchMatches[0].id;
                 if (branchMatches.length > 1) return branchMatches[0].id;
             }
 
-            const globalMatches = await db.select({ id: employees.id }).from(employees)
+            const globalMatches = await db.select({ id: employees.id })
+                .top(2)
+                .from(employees)
                 .where(and(
                     eq(employees.isActive, true),
                     or(...conditions)!,
-                ))
-                .limit(2);
+                ));
             if (globalMatches.length === 1) return globalMatches[0].id;
             if (globalMatches.length > 1) return globalMatches[0].id;
         }
@@ -2565,7 +2563,7 @@ export const attendanceOpsService = {
                 lte(attendanceRawLogs.occurredAt, duplicateWindowEnd),
             ))
             .orderBy(desc(attendanceRawLogs.occurredAt))
-            .limit(1);
+            .offset(0).fetch(1);
 
         if (nearRawLog) {
             return {
@@ -2582,7 +2580,7 @@ export const attendanceOpsService = {
                 eq(attendanceSessions.status, 'OPEN'),
             ))
             .orderBy(desc(attendanceSessions.clockInAt))
-            .limit(1);
+            .offset(0).fetch(1);
 
         if (openSession) {
             const minutesSinceIn = Math.round((input.occurredAt.getTime() - new Date(openSession.clockInAt).getTime()) / 60000);
@@ -2618,7 +2616,7 @@ export const attendanceOpsService = {
                 lte(attendanceSessions.clockInAt, dayEnd),
             ))
             .orderBy(desc(attendanceSessions.clockInAt))
-            .limit(1);
+            .offset(0).fetch(1);
 
         if (sameDaySessions[0]?.clockOutAt) {
             const minutesAfterOut = Math.round((input.occurredAt.getTime() - new Date(sameDaySessions[0].clockOutAt).getTime()) / 60000);
@@ -2656,13 +2654,14 @@ export const attendanceOpsService = {
         const mappingIdentifier = input.deviceUserId || input.employeeIdentifier;
         if (resolvedEmployeeId && input.deviceId && mappingIdentifier && !input.employeeId) {
             try {
-                const [existingMapping] = await db.select().from(attendanceDeviceMappings)
+                const [existingMapping] = await db.select()
+                    .top(1)
+                    .from(attendanceDeviceMappings)
                     .where(and(
                         eq(attendanceDeviceMappings.deviceId, input.deviceId),
                         eq(attendanceDeviceMappings.deviceUserId, mappingIdentifier),
                         eq(attendanceDeviceMappings.isActive, true),
-                    ))
-                    .limit(1);
+                    ));
                 if (!existingMapping) {
                     await this.upsertDeviceMapping({
                         deviceId: input.deviceId,
@@ -2705,7 +2704,7 @@ export const attendanceOpsService = {
                     eq(attendanceSessions.status, 'OPEN'),
                 ))
                 .orderBy(desc(attendanceSessions.clockInAt))
-                .limit(1);
+                .offset(0).fetch(1);
             if (openSession) {
                 const minutesSinceIn = Math.round((occurredAt.getTime() - new Date(openSession.clockInAt).getTime()) / 60000);
                 if (minutesSinceIn >= getSmartMinOutAfterInMinutes()) {
@@ -2737,7 +2736,7 @@ export const attendanceOpsService = {
                     eq(attendanceSessions.status, 'OPEN'),
                 ))
                 .orderBy(desc(attendanceSessions.clockInAt))
-                .limit(1);
+                .offset(0).fetch(1);
             if (!openSession) {
                 const explicitOutProcessingConfig = getAttendanceProcessingConfig(await this.getAttendanceContext(resolvedEmployeeId, input.branchId, occurredAt));
                 if (smartDecision?.reason === 'SMART_ROLLOVER_OUT_WITHOUT_IN' || isRolloverExitPunchForConfig(occurredAt, explicitOutProcessingConfig)) {
@@ -2770,8 +2769,9 @@ export const attendanceOpsService = {
                     lte(attendanceRawLogs.occurredAt, duplicateWindowEnd),
                 ))
                 .orderBy(desc(attendanceRawLogs.occurredAt))
-                .limit(1);
-            if (nearRawLog) {
+                .offset(0).fetch(1);
+
+        if (nearRawLog) {
                 return {
                     rawLog: nearRawLog,
                     session: null,
@@ -2800,9 +2800,8 @@ export const attendanceOpsService = {
             }))
             .digest('hex');
 
-        const [existing] = await db.select().from(attendanceRawLogs)
-            .where(eq(attendanceRawLogs.dedupeHash, dedupeHash))
-            .limit(1);
+        const [existing] = await db.select().top(1).from(attendanceRawLogs)
+            .where(eq(attendanceRawLogs.dedupeHash, dedupeHash));
         if (existing) {
             return { rawLog: existing, session: null, exception: null, duplicate: true };
         }
@@ -2830,11 +2829,10 @@ export const attendanceOpsService = {
                 smartInference: smartDecision || undefined,
                 originalEventType: input.eventType,
             },
-        } as any).onConflictDoNothing({ target: attendanceRawLogs.dedupeHash }).returning();
+        }).output();
 
-        const rawLog = insertedRawLogs[0] || (await db.select().from(attendanceRawLogs)
-            .where(eq(attendanceRawLogs.dedupeHash, dedupeHash))
-            .limit(1))[0];
+        const rawLog = insertedRawLogs[0] || (await db.select().top(1).from(attendanceRawLogs)
+            .where(eq(attendanceRawLogs.dedupeHash, dedupeHash)))[0];
         if (!insertedRawLogs[0] && rawLog) {
             return { rawLog, session: null, exception: null, duplicate: true };
         }
@@ -2900,7 +2898,7 @@ export const attendanceOpsService = {
                     eq(attendanceSessions.status, 'OPEN'),
                 ))
                 .orderBy(desc(attendanceSessions.clockInAt))
-                .limit(1);
+                .offset(0).fetch(1);
 
             if (openSession) {
                 exception = await this.createException({
@@ -2918,7 +2916,7 @@ export const attendanceOpsService = {
                     .set({ processingStatus: 'REJECTED', processingNotes: 'DUPLICATE_OPEN_SESSION', updatedAt: new Date() })
                     .where(eq(attendanceRawLogs.id, rawLog.id));
             } else {
-                [session] = await db.insert(attendanceSessions).values({
+                [session] = await db.insert(attendanceSessions).output().values({
                     ...this.calculateShiftMetrics(occurredAt, null, context),
                     id: makeId('SES'),
                     employeeId: resolvedEmployeeId,
@@ -2928,7 +2926,7 @@ export const attendanceOpsService = {
                     checkInRawLogId: rawLog.id,
                     clockInAt: occurredAt,
                     riskFlags: geofenceBreach ? ['OFF_GEOFENCE'] : [],
-                }).returning();
+                });
                 await db.update(attendanceRawLogs)
                     .set({ processingStatus: 'PROCESSED', updatedAt: new Date() })
                     .where(eq(attendanceRawLogs.id, rawLog.id));
@@ -2940,7 +2938,7 @@ export const attendanceOpsService = {
                     eq(attendanceSessions.status, 'OPEN'),
                 ))
                 .orderBy(desc(attendanceSessions.clockInAt))
-                .limit(1);
+                .offset(0).fetch(1);
 
             if (!openSession) {
                 exception = await this.createException({
@@ -2985,8 +2983,8 @@ export const attendanceOpsService = {
                         ].filter(Boolean).join('\n') || openSession.notes,
                         updatedAt: new Date(),
                     })
-                    .where(eq(attendanceSessions.id, openSession.id))
-                    .returning();
+                    .output()
+                    .where(eq(attendanceSessions.id, openSession.id));
                 await db.update(attendanceRawLogs)
                     .set({ processingStatus: 'PROCESSED', updatedAt: new Date() })
                     .where(eq(attendanceRawLogs.id, rawLog.id));
@@ -3033,7 +3031,7 @@ export const attendanceOpsService = {
                 eq(attendanceSessions.status, 'OPEN'),
             ))
             .orderBy(desc(attendanceSessions.clockInAt))
-            .limit(1);
+            .offset(0).fetch(1);
         return openSession || null;
     },
 
@@ -3065,7 +3063,7 @@ export const attendanceOpsService = {
         const now = new Date();
         const slaMinutes = getSlaMinutes(input.severity);
         const slaDueAt = new Date(now.getTime() + (slaMinutes * 60000));
-        const [created] = await db.insert(attendanceExceptions).values({
+        const [created] = await db.insert(attendanceExceptions).output().values({
             id: makeId('AEX'),
             employeeId: input.employeeId || undefined,
             branchId: input.branchId,
@@ -3077,7 +3075,7 @@ export const attendanceOpsService = {
             details: input.details,
             metadata: input.metadata || {},
             slaDueAt,
-        }).returning();
+        });
 
         await eventBusService.emitEvent({
             type: 'attendance.exception.raised',
@@ -3161,17 +3159,16 @@ export const attendanceOpsService = {
     async backfillLegacyAttendanceSessions(limit = 250) {
         const legacyRows = await db.select().from(attendance)
             .orderBy(desc(attendance.clockIn))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         let createdCount = 0;
         for (const row of legacyRows) {
-            const [existing] = await db.select().from(attendanceSessions)
+            const [existing] = await db.select().top(1).from(attendanceSessions)
                 .where(and(
                     eq(attendanceSessions.employeeId, row.employeeId),
                     eq(attendanceSessions.branchId, row.branchId),
                     eq(attendanceSessions.clockInAt, row.clockIn),
-                ))
-                .limit(1);
+                ));
             if (existing) continue;
 
             await db.insert(attendanceSessions).values({
@@ -3214,13 +3211,14 @@ export const attendanceOpsService = {
             const context = await this.getAttendanceContext(session.employeeId, session.branchId, new Date(session.clockInAt));
             const allowAutoClose = input.forceClose || Boolean(context.policy?.autoCloseOpenSessions);
             if (!allowAutoClose) {
-                const existing = await db.select().from(attendanceExceptions)
+                const existing = await db.select()
+                    .top(1)
+                    .from(attendanceExceptions)
                     .where(and(
                         eq(attendanceExceptions.sessionId, session.id),
                         eq(attendanceExceptions.type, 'MISSING_OUT'),
                         eq(attendanceExceptions.status, 'OPEN'),
-                    ))
-                    .limit(1);
+                    ));
                 if (!existing[0]) {
                     await this.createException({
                         employeeId: session.employeeId,
@@ -3411,13 +3409,14 @@ export const attendanceOpsService = {
             const context = await this.getAttendanceContext(session.employeeId, session.branchId, new Date(session.clockInAt));
             const allowAutoClose = input.forceClose || Boolean(context.policy?.autoCloseOpenSessions);
             if (!allowAutoClose) {
-                const existing = await db.select().from(attendanceExceptions)
+                const existing = await db.select()
+                    .top(1)
+                    .from(attendanceExceptions)
                     .where(and(
                         eq(attendanceExceptions.sessionId, session.id),
                         eq(attendanceExceptions.type, 'MISSING_OUT'),
                         eq(attendanceExceptions.status, 'OPEN'),
-                    ))
-                    .limit(1);
+                    ));
                 if (!existing[0]) {
                     await this.createException({
                         employeeId: session.employeeId,
@@ -3604,11 +3603,12 @@ export const attendanceOpsService = {
                         ));
                 }
                 const deleteResult = await db.delete(attendanceRawLogs)
+                    .output({ id: attendanceRawLogs.id })
                     .where(and(
                         eq(attendanceRawLogs.branchId, input.branchId),
                         gte(attendanceRawLogs.occurredAt, startOfPeriod),
                         lte(attendanceRawLogs.occurredAt, endOfPeriod)
-                    )).returning({ id: attendanceRawLogs.id });
+                    ));
                 logsPurgedCount = deleteResult.length;
             }
         }
@@ -3693,7 +3693,7 @@ export const attendanceOpsService = {
     },
 
     async setDeviceInitialHistoryLoaded(deviceId: string, loadedAt: string | null = new Date().toISOString()) {
-        const [device] = await db.select().from(attendanceDevices).where(eq(attendanceDevices.id, deviceId)).limit(1);
+        const [device] = await db.select().top(1).from(attendanceDevices).where(eq(attendanceDevices.id, deviceId));
         if (!device) return null;
         const notes: any = parseDeviceNotes(device.notes);
         notes.sync = {
@@ -3702,8 +3702,8 @@ export const attendanceOpsService = {
         };
         const [updated] = await db.update(attendanceDevices)
             .set({ notes: JSON.stringify(notes), updatedAt: new Date() })
-            .where(eq(attendanceDevices.id, deviceId))
-            .returning();
+            .output()
+            .where(eq(attendanceDevices.id, deviceId));
         return updated;
     },
 };

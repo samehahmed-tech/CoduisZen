@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { pool } from '../server/db';
 import * as dotenv from 'dotenv';
 import { COASeedService } from '../server/services/coaSeedService';
 import { closeDatabase } from '../server/db';
@@ -6,42 +6,27 @@ import { closeDatabase } from '../server/db';
 dotenv.config();
 
 const CREATE_POSTING_RULES_TABLE_SQL = `
-create table if not exists "posting_rules" (
-    "id" text primary key not null,
-    "document_type" text not null,
-    "amount_source" text not null,
-    "direction" text not null,
-    "account_code" text not null,
-    "condition_field" text,
-    "condition_value" text,
-    "is_active" boolean default true,
-    "is_system" boolean default false,
-    "version" integer default 1,
-    "created_at" timestamp default now(),
-    "updated_at" timestamp default now()
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='posting_rules' AND xtype='U')
+CREATE TABLE posting_rules (
+    id nvarchar(100) PRIMARY KEY,
+    document_type nvarchar(50) NOT NULL,
+    amount_source nvarchar(50) NOT NULL,
+    direction nvarchar(20) NOT NULL,
+    account_code nvarchar(50) NOT NULL,
+    condition_field nvarchar(100),
+    condition_value nvarchar(100),
+    is_active bit DEFAULT 1,
+    is_system bit DEFAULT 0,
+    version int DEFAULT 1,
+    created_at datetime2 DEFAULT GETDATE(),
+    updated_at datetime2 DEFAULT GETDATE()
 );
 `;
-
-async function ensurePostingRulesTable() {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-        throw new Error('DATABASE_URL is required.');
-    }
-
-    const client = new pg.Client({ connectionString });
-    await client.connect();
-
-    try {
-        await client.query(CREATE_POSTING_RULES_TABLE_SQL);
-    } finally {
-        await client.end();
-    }
-}
 
 async function main() {
     console.log('[finance-foundation] Ensuring posting_rules table exists...');
     try {
-        await ensurePostingRulesTable();
+        await pool.query(CREATE_POSTING_RULES_TABLE_SQL);
 
         console.log('[finance-foundation] Running idempotent COA backfill...');
         await COASeedService.seed();

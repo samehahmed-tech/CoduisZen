@@ -355,6 +355,7 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                                                     to={item.path}
                                                     onClick={() => setMobileOpen(false)}
                                                     onMouseEnter={() => handlePreload(item.path)}
+                                                    onPointerDown={() => handlePreload(item.path)}
                                                     className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item-active' : ''}`}
                                                     style={{ animationDelay: isOpen ? `${itemIdx * 30}ms` : '0ms' }}
                                                     title={lang === 'ar' ? item.labelAr : item.label}

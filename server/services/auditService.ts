@@ -55,7 +55,7 @@ export async function createSignedAuditLog(input: AuditLogInput) {
         // HMAC secret not configured, skip signature
     }
 
-    const [created] = await db.insert(auditLogs).values({
+    const [created] = await db.insert(auditLogs).output().values({
         eventType: input.eventType,
         userId: input.userId,
         userName: input.userName,
@@ -69,7 +69,7 @@ export async function createSignedAuditLog(input: AuditLogInput) {
         reason: input.reason,
         signature,
         createdAt,
-    }).returning();
+    });
 
     return created;
 }

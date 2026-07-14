@@ -34,7 +34,7 @@ const createFinanceException = async (input: {
 
 export const postPosOrderEntry = async (data: { orderId: string; amount: number; branchId?: string; userId?: string }) => {
     try {
-        const [order] = await db.select().from(orders).where(eq(orders.id, data.orderId)).limit(1);
+        const [order] = await db.select().top(1).from(orders).where(eq(orders.id, data.orderId));
         if (!order) {
             return await createFinanceException({
                 reference: data.orderId,
@@ -112,7 +112,7 @@ export const postCogsForOrderEntry = async (data: { orderId: string; amount: num
             eq(journalEntries.reference, data.orderId),
             eq(journalEntries.referenceType, 'COGS'),
         ))
-        .limit(1);
+        .top(1);
 
     if (existing) {
         return { status: 'skipped', reason: 'COGS_ALREADY_POSTED' } satisfies FinancePostingResult;

@@ -60,7 +60,7 @@ export const getAuditLogs = async (req: Request, res: Response) => {
                 const decoded = decodeCursor(cursor);
                 if (decoded) {
                     conditions.push(
-                        sql`(${auditLogs.createdAt}, ${auditLogs.id}::text) < (${decoded.createdAt}::timestamptz, ${decoded.id})`
+                        sql`(${auditLogs.createdAt}, CAST(${auditLogs.id} AS NVARCHAR(MAX))) < (CAST(${decoded.createdAt} AS DATETIME2), ${decoded.id})`
                     );
                 }
             }
@@ -69,7 +69,7 @@ export const getAuditLogs = async (req: Request, res: Response) => {
                 .from(auditLogs)
                 .where(conditions.length ? and(...conditions) : undefined)
                 .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
-                .limit(limit + 1) as any[];
+                .offset(0).fetch(limit + 1) as any[];
 
             // Attach integrity check
             const withIntegrity = rows.map(attachIntegrity);
@@ -84,8 +84,8 @@ export const getAuditLogs = async (req: Request, res: Response) => {
         const max = Math.min(Number(limit) || 200, 500);
 
         const results = (conditions.length
-            ? await db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).limit(max)
-            : await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(max)) as any[];
+            ? await db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).offset(0).fetch(max)
+            : await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).offset(0).fetch(max)) as any[];
 
         res.json(results.map(attachIntegrity));
     } catch (error: any) {
@@ -135,7 +135,7 @@ export const createAuditLog = async (req: Request, res: Response) => {
             createdAt: isNaN(createdAt.getTime()) ? new Date() : createdAt,
         });
 
-        const [created] = await db.insert(auditLogs).values({
+        const [created] = await db.insert(auditLogs).output().values({
             eventType: body.eventType || body.event_type,
             userId: body.userId || body.user_id,
             userName: body.userName || body.user_name,
@@ -149,7 +149,7 @@ export const createAuditLog = async (req: Request, res: Response) => {
             reason,
             signature,
             createdAt: isNaN(createdAt.getTime()) ? new Date() : createdAt,
-        }).returning();
+        });
 
         res.status(201).json({ ...created, signatureValid: true });
     } catch (error: any) {
@@ -222,7 +222,7 @@ export const verifyAllAuditLogs = async (req: Request, res: Response) => {
         const rows = await db.select()
             .from(auditLogs)
             .orderBy(desc(auditLogs.id))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         let verified = 0;
         let failed = 0;
@@ -290,7 +290,7 @@ export const scanForTampering = async (req: Request, res: Response) => {
         const rows = await db.select()
             .from(auditLogs)
             .orderBy(desc(auditLogs.id))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         const tamperedEntries: any[] = [];
         const missingSignatures: number[] = [];
@@ -395,8 +395,8 @@ export const forensicSearch = async (req: Request, res: Response) => {
 
         // Get all logs matching basic conditions
         let rows = await (conditions.length
-            ? db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).limit(limit * 2)
-            : db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(limit * 2));
+            ? db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).offset(0).fetch(limit * 2)
+            : db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).offset(0).fetch(limit * 2));
 
         // Filter by entity (extract from eventType like ORDER_CREATED, PAYMENT_RECEIVED)
         if (entity && typeof entity === 'string') {

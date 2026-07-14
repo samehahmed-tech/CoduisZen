@@ -33,7 +33,7 @@ export const waitlistController = {
                 return res.status(400).json({ error: 'BranchId, customerName, and partySize are required' });
             }
 
-            const [entry] = await db.insert(waitlists).values({
+            const [entry] = await db.insert(waitlists).output().values({
                 branchId,
                 customerName,
                 customerPhone,
@@ -41,7 +41,7 @@ export const waitlistController = {
                 quotedTimeMinutes: Number(quotedTimeMinutes || 15),
                 status: 'WAITING',
                 notes,
-            }).returning();
+            });
 
             try {
                 getIO().to(`branch:${branchId}`).emit('waitlist:updated', entry);
@@ -67,8 +67,8 @@ export const waitlistController = {
                     tableId: tableId || null,
                     seatedAt: status === 'SEATED' ? new Date() : null,
                 })
-                .where(eq(waitlists.id, id))
-                .returning();
+                .output()
+                .where(eq(waitlists.id, id));
 
             if (!updated) return res.status(404).json({ error: 'Waitlist entry not found' });
 

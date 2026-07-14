@@ -3,7 +3,7 @@
  * Run with: npx tsx scripts/seed-roles-permissions.ts
  */
 
-import { db } from '../server/db';
+import { db, pool } from '../server/db';
 import { roles, permissionDefinitions } from '../src/db/schema';
 import { sql } from 'drizzle-orm';
 
@@ -421,26 +421,41 @@ async function seedRolesAndPermissions() {
     console.log('📋 Inserting permission definitions...');
     for (const perm of ALL_PERMISSIONS) {
         const catInfo = PERMISSION_CATEGORIES[perm.category as keyof typeof PERMISSION_CATEGORIES];
-        await db.insert(permissionDefinitions).values({
-            id: `perm_${perm.key.replace(/\./g, '_')}`,
-            key: perm.key,
-            name: perm.name,
-            nameAr: perm.nameAr,
-            category: perm.category,
-            categoryAr: catInfo?.nameAr || perm.category,
-            isActive: true,
-            sortOrder: ALL_PERMISSIONS.indexOf(perm),
-        }).onConflictDoNothing();
+        await pool.query(`
+            IF NOT EXISTS (SELECT 1 FROM permission_definitions WHERE [key] = $1)
+            INSERT INTO permission_definitions (id, [key], name, name_ar, category, category_ar, is_active, sort_order, created_at)
+            VALUES ($2, $1, $3, $4, $5, $6, 1, $7, GETDATE())
+        `, [
+            perm.key,
+            `perm_${perm.key.replace(/\./g, '_')}`,
+            perm.name,
+            perm.nameAr,
+            perm.category,
+            catInfo?.nameAr || perm.category,
+            ALL_PERMISSIONS.indexOf(perm),
+        ]);
     }
     console.log(`   ✓ Inserted ${ALL_PERMISSIONS.length} permissions\n`);
 
     // 2. Insert predefined roles
     console.log('👥 Inserting predefined roles...');
     for (const role of PREDEFINED_ROLES) {
-        await db.insert(roles).values({
-            ...role,
-            isActive: true,
-        }).onConflictDoNothing();
+        await pool.query(`
+            IF NOT EXISTS (SELECT 1 FROM roles WHERE name = $1)
+            INSERT INTO roles (id, name, name_ar, description, description_ar, permissions, is_system, is_active, priority, color, icon, created_at, updated_at)
+            VALUES ($2, $1, $3, $4, $5, $6, $7, 1, $8, $9, $10, GETDATE(), GETDATE())
+        `, [
+            role.name,
+            role.id,
+            role.nameAr,
+            role.description,
+            role.descriptionAr,
+            JSON.stringify(role.permissions || []),
+            role.isSystem === false ? 0 : 1,
+            role.priority || 0,
+            role.color || '#6366f1',
+            role.icon || 'user',
+        ]);
         console.log(`   ✓ Role: ${role.nameAr} (${role.name})`);
     }
 

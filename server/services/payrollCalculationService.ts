@@ -86,19 +86,18 @@ const getActiveShiftTemplate = async (employeeId: string, branchId: string, peri
     if (activeAssignment) {
         const [template] = await db.select().from(shiftTemplates)
             .where(eq(shiftTemplates.id, activeAssignment.shiftTemplateId))
-            .limit(1);
+            .top(1);
         if (template?.isActive !== false) return template;
     }
 
-    const [defaultTemplate] = await db.select().from(shiftTemplates)
-        .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.code, 'DEFAULT'), eq(shiftTemplates.isActive, true)))
-        .limit(1);
+        const [defaultTemplate] = await db.select().top(1).from(shiftTemplates)
+            .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.code, 'DEFAULT'), eq(shiftTemplates.isActive, true)));
     if (defaultTemplate) return defaultTemplate;
 
     const [firstActiveTemplate] = await db.select().from(shiftTemplates)
         .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.isActive, true)))
         .orderBy(desc(shiftTemplates.createdAt))
-        .limit(1);
+        .offset(0).fetch(1);
     return firstActiveTemplate || null;
 };
 
@@ -148,15 +147,13 @@ const getPayrollContext = async (employeeId: string, branchId: string, periodSta
 
     let profile: typeof payrollProfiles.$inferSelect | null = null;
     if (assignment) {
-        profile = (await db.select().from(payrollProfiles)
-            .where(eq(payrollProfiles.id, assignment.payrollProfileId))
-            .limit(1))[0] || null;
+        profile = (await db.select().top(1).from(payrollProfiles)
+            .where(eq(payrollProfiles.id, assignment.payrollProfileId)))[0] || null;
     }
 
     if (!profile) {
-        profile = (await db.select().from(payrollProfiles)
-            .where(and(eq(payrollProfiles.branchId, branchId), eq(payrollProfiles.isDefault, true), eq(payrollProfiles.isActive, true)))
-            .limit(1))[0] || null;
+        profile = (await db.select().top(1).from(payrollProfiles)
+            .where(and(eq(payrollProfiles.branchId, branchId), eq(payrollProfiles.isDefault, true), eq(payrollProfiles.isActive, true))))[0] || null;
     }
 
     const rules = profile
@@ -184,7 +181,7 @@ const resolveBasePay = (profile: typeof payrollProfiles.$inferSelect | null, bas
 };
 
 const buildCycleCalculation = async (cycleId: string) => {
-    const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, cycleId)).limit(1);
+    const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, cycleId));
     if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
     const periodStart = new Date(cycle.periodStart);
@@ -416,9 +413,8 @@ export const payrollCalculationService = {
         const { cycle, lines, totalAmount } = await buildCycleCalculation(cycleId);
 
         for (const line of lines) {
-            const [existing] = await db.select().from(payrollPayouts)
-                .where(and(eq(payrollPayouts.cycleId, cycle.id), eq(payrollPayouts.employeeId, line.employeeId)))
-                .limit(1);
+            const [existing] = await db.select().top(1).from(payrollPayouts)
+                .where(and(eq(payrollPayouts.cycleId, cycle.id), eq(payrollPayouts.employeeId, line.employeeId)));
 
             if (existing) {
                 await db.update(payrollPayouts)

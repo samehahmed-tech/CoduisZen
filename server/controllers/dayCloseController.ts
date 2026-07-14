@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { dayCloseService } from '../services/dayCloseService';
+import { generateDayClosePDF, generateDayCloseXlsx } from '../services/pdfService';
 
 /**
  * Get day close report preview
@@ -34,6 +35,75 @@ export const getDayCloseReport = async (req: Request, res: Response) => {
 };
 
 /**
+ * Download printable day close PDF
+ * GET /api/day-close/:branchId/:date/pdf
+ */
+export const downloadDayClosePdf = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.params.branchId as string;
+        const date = req.params.date as string;
+
+        if (!branchId || !date) {
+            return res.status(400).json({
+                error: 'BRANCH_ID_AND_DATE_REQUIRED',
+                message: 'Please provide branch and date',
+            });
+        }
+
+        const report = await buildExportReport(branchId, date);
+        const lang = req.query.lang === 'en' ? 'en' : 'ar';
+        const pdf = await generateDayClosePDF(report, lang);
+        const safeName = `CoduisZen-DayClose-${branchId}-${date}.pdf`.replace(/[^\w.-]+/g, '_');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+        res.send(pdf);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const downloadDayCloseXlsx = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.params.branchId as string;
+        const date = req.params.date as string;
+        if (!branchId || !date) {
+            return res.status(400).json({
+                error: 'BRANCH_ID_AND_DATE_REQUIRED',
+                message: 'Please provide branch and date',
+            });
+        }
+
+        const report = await buildExportReport(branchId, date);
+        const lang = req.query.lang === 'en' ? 'en' : 'ar';
+        const xlsx = await generateDayCloseXlsx(report, lang);
+        const safeName = `CoduisZen-DayClose-${branchId}-${date}.xlsx`.replace(/[^\w.-]+/g, '_');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+        res.send(xlsx);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const buildExportReport = async (branchId: string, date: string) => {
+    const [closedReport, liveReport] = await Promise.all([
+        dayCloseService.getClosedReport(branchId, date),
+        dayCloseService.generateReport(branchId, date),
+    ]);
+    const report = closedReport
+        ? {
+            ...closedReport,
+            currency: closedReport.currency || liveReport.currency,
+            financeSummary: closedReport.financeSummary || liveReport.financeSummary,
+        }
+        : liveReport;
+    if (!report.fiscalHealth) report.fiscalHealth = await dayCloseService.getFiscalHealth(branchId, date);
+    if (!report.financeHealth) report.financeHealth = await dayCloseService.getFinanceHealth(branchId, date);
+    if (!report.sideEffectHealth) report.sideEffectHealth = await dayCloseService.getSideEffectHealth(branchId, date);
+    return report;
+};
+
+/**
  * Close the day for a branch
  * POST /api/day-close/:branchId/:date/close
  */
@@ -45,10 +115,7 @@ export const closeDay = async (req: Request, res: Response) => {
         const {
             emailConfig,
             notes,
-            enforceFiscalClean,
-            enforceFinanceClean,
             enforceShiftsClosed,
-            enforceAllPaid,
             overrideReason,
         } = req.body;
 
@@ -69,10 +136,7 @@ export const closeDay = async (req: Request, res: Response) => {
         const report = await dayCloseService.closeDay(branchId, date, userId, {
             emailConfig,
             notes,
-            enforceFiscalClean: Boolean(enforceFiscalClean),
-            enforceFinanceClean: Boolean(enforceFinanceClean),
             enforceShiftsClosed: Boolean(enforceShiftsClosed),
-            enforceAllPaid: Boolean(enforceAllPaid),
             overrideReason,
         });
 

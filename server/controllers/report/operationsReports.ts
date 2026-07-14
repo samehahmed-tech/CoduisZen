@@ -16,7 +16,7 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
-            cancelledCount: sql<number>`count(*) filter (where ${orders.status} = 'CANCELLED')`,
+            cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
         })
             .from(orders)
             .innerJoin(branches, eq(orders.branchId, branches.id))
@@ -57,9 +57,9 @@ export const getOrderPrepTime = async (req: Request, res: Response) => {
         const rows = await db.select({
             branchName: branches.name,
             orderType: orders.type,
-            avgPrepMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
-            minPrepMinutes: sql<number>`coalesce(min(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
-            maxPrepMinutes: sql<number>`coalesce(max(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgPrepMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
+            minPrepMinutes: sql<number>`coalesce(min(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
+            maxPrepMinutes: sql<number>`coalesce(max(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
             orderCount: sql<number>`count(*)`,
         })
             .from(orders)

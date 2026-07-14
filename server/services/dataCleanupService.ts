@@ -56,8 +56,8 @@ export const dataCleanupService = {
     async cleanIdempotencyKeys(): Promise<CleanupResult> {
         try {
             const deleted = await db.delete(idempotencyKeys)
-                .where(lt(idempotencyKeys.expiresAt, new Date()))
-                .returning({ id: idempotencyKeys.id });
+                .output({ id: idempotencyKeys.id })
+                .where(lt(idempotencyKeys.expiresAt, new Date()));
 
             return { table: 'idempotency_keys', deletedCount: deleted.length };
         } catch (err: any) {
@@ -75,11 +75,11 @@ export const dataCleanupService = {
             cutoff.setDate(cutoff.getDate() - retentionDays);
 
             const deleted = await db.delete(webhookDeliveries)
+                .output({ id: webhookDeliveries.id })
                 .where(and(
                     lt(webhookDeliveries.createdAt, cutoff),
                     sql`${webhookDeliveries.status} != 'PENDING'`,
-                ))
-                .returning({ id: webhookDeliveries.id });
+                ));
 
             return { table: 'webhook_deliveries', deletedCount: deleted.length };
         } catch (err: any) {
@@ -97,11 +97,11 @@ export const dataCleanupService = {
             cutoff.setDate(cutoff.getDate() - retentionDays);
 
             const deleted = await db.delete(domainEvents)
+                .output({ id: domainEvents.id })
                 .where(and(
                     lt(domainEvents.createdAt, cutoff),
                     eq(domainEvents.status, 'PROCESSED'),
-                ))
-                .returning({ id: domainEvents.id });
+                ));
 
             return { table: 'domain_events', deletedCount: deleted.length };
         } catch (err: any) {
@@ -119,11 +119,11 @@ export const dataCleanupService = {
             cutoff.setDate(cutoff.getDate() - retentionDays);
 
             const deleted = await db.delete(userSessions)
+                .output({ id: userSessions.id })
                 .where(and(
                     lt(userSessions.expiresAt, cutoff),
                     eq(userSessions.isActive, false),
-                ))
-                .returning({ id: userSessions.id });
+                ));
 
             return { table: 'user_sessions', deletedCount: deleted.length };
         } catch (err: any) {

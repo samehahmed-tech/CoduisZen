@@ -27,12 +27,12 @@ export const getTipsReport = async (req: Request, res: Response) => {
         }).from(orders).where(and(...conditions)).groupBy(orders.type).orderBy(sql`sum(${orders.tipAmount}) desc`);
 
         const daily = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             totalTips: sql<number>`coalesce(sum(${orders.tipAmount}), 0)`,
             count: sql<number>`count(*)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json({
             summary: { totalTips: Number(Number(summary?.totalTips || 0).toFixed(2)), orderCount: Number(summary?.orderCount || 0), avgTip: Number(Number(summary?.avgTip || 0).toFixed(2)), maxTip: Number(Number(summary?.maxTip || 0).toFixed(2)) },
@@ -60,12 +60,12 @@ export const getServiceChargeReport = async (req: Request, res: Response) => {
         }).from(orders).where(and(...conditions));
 
         const daily = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             totalServiceCharge: sql<number>`coalesce(sum(${orders.serviceCharge}), 0)`,
             count: sql<number>`count(*)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json({
             summary: { totalServiceCharge: Number(Number(summary?.totalServiceCharge || 0).toFixed(2)), orderCount: Number(summary?.orderCount || 0), avgServiceCharge: Number(Number(summary?.avgServiceCharge || 0).toFixed(2)) },
@@ -103,7 +103,7 @@ export const getShiftSummary = async (req: Request, res: Response) => {
             const shiftOrders = shift.shiftId ? await db.select({
                 orderCount: sql<number>`count(*)`,
                 revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-                cancelledCount: sql<number>`count(*) filter (where ${orders.status} = 'CANCELLED')`,
+            cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
             }).from(orders).where(eq(orders.shiftId, shift.shiftId)) : [{ orderCount: 0, revenue: 0, cancelledCount: 0 }];
 
             const so = shiftOrders[0] || { orderCount: 0, revenue: 0, cancelledCount: 0 };

@@ -51,7 +51,7 @@ export const renderReceiptToImage = async (
             width: ${widthPx}px !important;
             max-width: ${widthPx}px !important;
             margin: 0 !important;
-            padding: ${widthPx <= 384 ? 5 : 6}px !important;
+            padding: ${widthPx <= 384 ? 5 : 6}px ${widthPx <= 384 ? 5 : 6}px 48px !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #fff !important;
@@ -67,6 +67,9 @@ export const renderReceiptToImage = async (
             letter-spacing: 0 !important;
             box-shadow: none !important;
             text-shadow: none !important;
+        }
+        .receipt-print-root > * {
+            width: 100% !important;
         }
         .receipt-print-root table {
             border-collapse: collapse !important;

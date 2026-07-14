@@ -29,16 +29,16 @@ export const revenueForecastService = {
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
             const query = db.select({
-                date: sql<string>`DATE(${orders.createdAt})`,
+                date: sql<string>`CAST(${orders.createdAt} AS DATE)`,
                 revenue: sql<number>`SUM(${orders.total})`,
             })
             .from(orders)
             .where(and(
                 gte(orders.createdAt, thirtyDaysAgo),
-                branchId ? eq(orders.branchId, branchId) : sql`TRUE`
+                branchId ? eq(orders.branchId, branchId) : sql`1 = 1`
             ))
-            .groupBy(sql`DATE(${orders.createdAt})`)
-            .orderBy(asc(sql`DATE(${orders.createdAt})`));
+            .groupBy(sql`CAST(${orders.createdAt} AS DATE)`)
+            .orderBy(asc(sql`CAST(${orders.createdAt} AS DATE)`));
 
             const historicalData = await query;
             const historical = historicalData.map(d => ({

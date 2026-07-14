@@ -42,7 +42,7 @@ export const fiscalRetryService = {
                 )
             )
             .orderBy(desc(fiscalLogs.createdAt))
-            .limit(30);
+            .offset(0).fetch(30);
 
         for (const fiscalLog of failedLogs) {
             result.processed++;

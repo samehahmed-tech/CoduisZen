@@ -22,12 +22,12 @@ const backfillPendingExpenseApprovals = async (branchId: string | undefined, use
     if (!branchId || !userId) return;
 
     const pendingExpenseExceptions = await db.select()
+        .top(50)
         .from(financeExceptions)
         .where(and(
             eq(financeExceptions.referenceType, 'EXPENSE'),
             eq(financeExceptions.status, 'PENDING'),
-        ))
-        .limit(50);
+        ));
 
     for (const exception of pendingExpenseExceptions) {
         const reason = String(exception.reason || '');
@@ -46,12 +46,12 @@ const backfillPendingExpenseApprovals = async (branchId: string | undefined, use
     }
 
     const pendingExpenses = await db.select()
+        .top(100)
         .from(journalEntries)
         .where(and(
             eq(journalEntries.referenceType, 'EXPENSE'),
             eq(journalEntries.status, 'PENDING_APPROVAL'),
-        ))
-        .limit(100);
+        ));
 
     if (pendingExpenses.length === 0) return;
 
@@ -85,7 +85,7 @@ export const createApproval = async (req: Request, res: Response) => {
     try {
         const { managerId, branchId, actionType, relatedId, reason, details } = req.body;
 
-        const [approval] = await db.insert(managerApprovals).values({
+        const [approval] = await db.insert(managerApprovals).output().values({
             managerId,
             branchId,
             actionType,
@@ -93,7 +93,7 @@ export const createApproval = async (req: Request, res: Response) => {
             reason,
             details: { ...(details || {}), status: details?.status || 'PENDING' },
             createdAt: new Date(),
-        }).returning();
+        });
 
         // Also log to audit logs for central visibility
         await db.insert(auditLogs).values({
@@ -123,7 +123,7 @@ export const getApprovals = async (req: Request, res: Response) => {
             query = query.where(eq(managerApprovals.branchId, effectiveBranchId));
         }
 
-        const approvals = await query.orderBy(desc(managerApprovals.createdAt)).limit(100);
+        const approvals = await query.orderBy(desc(managerApprovals.createdAt)).offset(0).fetch(100);
         res.json(approvals.map(normalizeApproval));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -142,7 +142,7 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
         }
 
         const [approval] = approvalId
-            ? await db.select().from(managerApprovals).where(eq(managerApprovals.id, Number(approvalId))).limit(1)
+            ? await db.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, Number(approvalId)))
             : [];
         const effectiveBranchId = branchId || approval?.branchId;
         const effectiveAction = action || approval?.actionType || 'APPROVAL';
@@ -182,7 +182,7 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                 }
 
                 if (approval.actionType === 'EXPENSE' && approval.relatedId) {
-                    const [entry] = await db.select().from(journalEntries).where(eq(journalEntries.id, approval.relatedId)).limit(1);
+                    const [entry] = await db.select().top(1).from(journalEntries).where(eq(journalEntries.id, approval.relatedId));
                     if (!entry) return res.status(404).json({ error: 'JOURNAL_ENTRY_NOT_FOUND' });
                     if (entry.status === 'PENDING_APPROVAL') {
                         await db.update(journalEntries)
@@ -205,8 +205,8 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                         reason: 'PIN Verified',
                         details: resolvedDetails,
                     })
-                    .where(eq(managerApprovals.id, approval.id))
-                    .returning();
+                    .output()
+                    .where(eq(managerApprovals.id, approval.id));
 
                 await db.insert(auditLogs).values({
                     eventType: `MANAGER_APPROVAL_${approval.actionType}`,
@@ -260,7 +260,7 @@ export const rejectApproval = async (req: Request, res: Response) => {
         const reason = String(req.body?.reason || '').trim() || 'Rejected by reviewer';
         if (!Number.isFinite(id)) return res.status(400).json({ error: 'INVALID_APPROVAL_ID' });
 
-        const [approval] = await db.select().from(managerApprovals).where(eq(managerApprovals.id, id)).limit(1);
+        const [approval] = await db.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, id));
         if (!approval) return res.status(404).json({ error: 'APPROVAL_NOT_FOUND' });
 
         const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
@@ -288,8 +288,8 @@ export const rejectApproval = async (req: Request, res: Response) => {
                 reason,
                 details: resolvedDetails,
             })
-            .where(eq(managerApprovals.id, id))
-            .returning();
+            .output()
+            .where(eq(managerApprovals.id, id));
 
         await db.insert(auditLogs).values({
             eventType: `MANAGER_REJECT_${approval.actionType}`,

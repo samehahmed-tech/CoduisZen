@@ -12,12 +12,12 @@ export const getDemandForecast = async (req: Request, res: Response) => {
 
         // Get last 8 weeks daily data
         const daily = await db.select({
-            dayOfWeek: sql<number>`extract(dow from ${orders.createdAt})`,
+            dayOfWeek: sql<number>`datepart(weekday, ${orders.createdAt})`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-        }).from(orders).where(and(...conditions, sql`${orders.createdAt} > now() - interval '8 weeks'`))
-            .groupBy(sql`extract(dow from ${orders.createdAt})`)
-            .orderBy(sql`extract(dow from ${orders.createdAt})`);
+        }).from(orders).where(and(...conditions, sql`${orders.createdAt} > dateadd(week, -8, getdate())`))
+            .groupBy(sql`datepart(weekday, ${orders.createdAt})`)
+            .orderBy(sql`datepart(weekday, ${orders.createdAt})`);
 
         // Top items last 4 weeks
         const topItems = await db.select({
@@ -26,7 +26,7 @@ export const getDemandForecast = async (req: Request, res: Response) => {
             totalQty: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
-            .where(and(...conditions, sql`${orders.createdAt} > now() - interval '4 weeks'`))
+            .where(and(...conditions, sql`${orders.createdAt} > dateadd(week, -4, getdate())`))
             .groupBy(orderItems.name)
             .orderBy(sql`sum(${orderItems.quantity}) desc`)
             .limit(20);
@@ -61,7 +61,7 @@ export const getPriceElasticity = async (req: Request, res: Response) => {
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
             .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
-            .where(and(...conditions, sql`${orders.createdAt} > now() - interval '30 days'`))
+            .where(and(...conditions, sql`${orders.createdAt} > dateadd(day, -30, getdate())`))
             .groupBy(orderItems.menuItemId, orderItems.name)
             .orderBy(sql`sum(${orderItems.quantity}) desc`)
             .limit(30);
@@ -91,12 +91,12 @@ export const getMenuCannibalization = async (req: Request, res: Response) => {
 
         const recent = await db.select({ itemName: orderItems.name, qty: sql<number>`sum(${orderItems.quantity})`, revenue: sql<number>`sum(${orderItems.price} * ${orderItems.quantity})` })
             .from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id))
-            .where(and(...conditions, sql`${orders.createdAt} > now() - interval '30 days'`))
+            .where(and(...conditions, sql`${orders.createdAt} > dateadd(day, -30, getdate())`))
             .groupBy(orderItems.name);
 
         const prior = await db.select({ itemName: orderItems.name, qty: sql<number>`sum(${orderItems.quantity})`, revenue: sql<number>`sum(${orderItems.price} * ${orderItems.quantity})` })
             .from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id))
-            .where(and(...conditions, sql`${orders.createdAt} > now() - interval '60 days' AND ${orders.createdAt} <= now() - interval '30 days'`))
+            .where(and(...conditions, sql`${orders.createdAt} > dateadd(day, -60, getdate()) AND ${orders.createdAt} <= dateadd(day, -30, getdate())`))
             .groupBy(orderItems.name);
 
         const priorMap = new Map(prior.map(p => [p.itemName, { qty: Number(p.qty), revenue: Number(p.revenue) }]));
@@ -125,19 +125,19 @@ export const getAnomalyDetection = async (req: Request, res: Response) => {
             .from(orders).where(and(...conditions, sql`${orders.discount} > ${orders.subtotal} * 0.3`)).orderBy(desc(orders.discount)).limit(20);
 
         // Off-hours orders (before 6AM or after midnight)
-        const offHours = await db.select({ hour: sql<number>`extract(hour from ${orders.createdAt})`, count: sql<number>`count(*)` })
-            .from(orders).where(and(...conditions, sql`extract(hour from ${orders.createdAt}) < 6 OR extract(hour from ${orders.createdAt}) >= 24`))
-            .groupBy(sql`extract(hour from ${orders.createdAt})`);
+        const offHours = await db.select({ hour: sql<number>`datepart(hour, ${orders.createdAt})`, count: sql<number>`count(*)` })
+            .from(orders).where(and(...conditions, sql`datepart(hour, ${orders.createdAt}) < 6 OR datepart(hour, ${orders.createdAt}) >= 24`))
+            .groupBy(sql`datepart(hour, ${orders.createdAt})`);
 
         // Cancelled rate by day
         const dailyCancel = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             totalOrders: sql<number>`count(*)`,
-            cancelledOrders: sql<number>`count(*) filter (where ${orders.status} = 'CANCELLED')`,
+            cancelledOrders: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .having(sql`count(*) filter (where ${orders.status} = 'CANCELLED')::float / count(*)::float > 0.15`)
-            .orderBy(sql`count(*) filter (where ${orders.status} = 'CANCELLED')::float / count(*)::float desc`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+        .having(sql`cast(sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end) as float) / cast(count(*) as float) > 0.15`)
+        .orderBy(sql`cast(sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end) as float) / cast(count(*) as float) desc`);
 
         res.json({
             highDiscounts: highDiscounts.map(o => ({ ...o, discountPercent: Number(o.total) > 0 ? Number(((Number(o.discount) / (Number(o.total) + Number(o.discount))) * 100).toFixed(1)) : 0 })),
@@ -155,12 +155,12 @@ export const getBreakEvenAnalysis = async (req: Request, res: Response) => {
 
         // Monthly revenue & COGS
         const monthly = await db.select({
-            month: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM')`,
+            month: sql<string>`format(${orders.createdAt}, 'yyyy-MM')`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             orderCount: sql<number>`count(*)`,
-        }).from(orders).where(and(...conditions, sql`${orders.createdAt} > now() - interval '6 months'`))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`);
+        }).from(orders).where(and(...conditions, sql`${orders.createdAt} > dateadd(month, -6, getdate())`))
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM')`);
 
         // Estimate fixed costs from chart of accounts
         const [fixedCosts] = await db.select({
@@ -168,7 +168,7 @@ export const getBreakEvenAnalysis = async (req: Request, res: Response) => {
         }).from(journalLines)
             .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
             .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
-            .where(sql`${chartOfAccounts.type} = 'EXPENSE' AND ${journalEntries.createdAt} > now() - interval '1 month'`);
+            .where(sql`${chartOfAccounts.type} = 'EXPENSE' AND ${journalEntries.createdAt} > dateadd(month, -1, getdate())`);
 
         const avgRevenue = monthly.length > 0 ? monthly.reduce((s, m) => s + Number(m.revenue), 0) / monthly.length : 0;
         const avgOrders = monthly.length > 0 ? monthly.reduce((s, m) => s + Number(m.orderCount), 0) / monthly.length : 0;
@@ -258,13 +258,13 @@ export const getMenuItemLifecycle = async (req: Request, res: Response) => {
         if (menuItemId) conditions.push(eq(orderItems.menuItemId, menuItemId as string));
 
         const monthly = await db.select({
-            month: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM')`,
+            month: sql<string>`format(${orders.createdAt}, 'yyyy-MM')`,
             itemName: orderItems.name,
             qty: sql<number>`sum(${orderItems.quantity})`,
             revenue: sql<number>`sum(${orderItems.price} * ${orderItems.quantity})`,
         }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id))
-            .where(and(...conditions)).groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`, orderItems.name)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`)
+            .where(and(...conditions)).groupBy(sql`format(${orders.createdAt}, 'yyyy-MM')`, orderItems.name)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM')`)
             .limit(200);
 
         res.json(monthly.map(m => ({ month: m.month, itemName: m.itemName, qty: Number(m.qty), revenue: Number(Number(m.revenue).toFixed(2)) })));
@@ -338,13 +338,13 @@ export const getDeliveryZoneAnalysis = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const zones = await db.select({
-            area: sql<string>`split_part(${orders.deliveryAddress}, ',', -1)`,
+            area: sql<string>`reverse(substring(reverse(${orders.deliveryAddress}), 1, charindex(',', reverse(${orders.deliveryAddress})) - 1))`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
             totalFees: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`split_part(${orders.deliveryAddress}, ',', -1)`)
+            .groupBy(sql`reverse(substring(reverse(${orders.deliveryAddress}), 1, charindex(',', reverse(${orders.deliveryAddress})) - 1))`)
             .orderBy(sql`count(*) desc`).limit(30);
 
         res.json(zones.map(z => ({ area: z.area?.trim() || 'Unknown', orderCount: Number(z.orderCount), revenue: Number(Number(z.revenue).toFixed(2)), avgTicket: Number(Number(z.avgTicket).toFixed(2)), totalFees: Number(Number(z.totalFees).toFixed(2)) })));
@@ -360,20 +360,20 @@ export const getDeliveryCostVsRevenue = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const daily = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             deliveryFees: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
-            freeDeliveries: sql<number>`count(*) filter (where ${orders.freeDelivery} = true)`,
+            freeDeliveries: sql<number>`sum(case when ${orders.freeDelivery} = 1 then 1 else 0 end)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         const [totals] = await db.select({
             totalOrders: sql<number>`count(*)`,
             totalRevenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             totalFees: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
-            freeCount: sql<number>`count(*) filter (where ${orders.freeDelivery} = true)`,
+            freeCount: sql<number>`sum(case when ${orders.freeDelivery} = 1 then 1 else 0 end)`,
         }).from(orders).where(and(...conditions));
 
         res.json({
@@ -414,13 +414,13 @@ export const getChannelMixTrend = async (req: Request, res: Response) => {
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const daily = await db.select({
-            day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             source: orders.source,
             count: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`, orders.source)
-            .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`);
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`, orders.source)
+            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json(daily.map(d => ({ day: d.day, source: d.source || 'pos', count: Number(d.count), revenue: Number(Number(d.revenue).toFixed(2)) })));
     } catch (error: any) { res.status(400).json({ error: error.message }); }
@@ -460,7 +460,7 @@ export const getThirdPartyVsInHouse = async (req: Request, res: Response) => {
         const inHouse = await db.select({
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-            avgDeliveryMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+            avgDeliveryMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
         }).from(orders).where(and(...conditions, sql`${orders.driverId} is not null`));
 
         const thirdParty = await db.select({

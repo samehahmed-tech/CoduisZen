@@ -325,18 +325,18 @@ const SettingsHub: React.FC = () => {
     const handleHardDeleteBranch = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         const ok = await confirm({
-            title: tn('Delete branch permanently', 'حذف الفرع نهائيا'),
+            title: tn('Archive branch', 'أرشفة الفرع'),
             message: t('confirm_hard_delete_branch'),
-            confirmText: tn('Delete', 'حذف'),
+            confirmText: tn('Archive', 'أرشفة'),
             cancelText: tn('Cancel', 'إلغاء'),
-            variant: 'danger',
+            variant: 'warning',
         });
         if (!ok) return;
         setIsSubmitting(true);
         try {
-            await branchesApi.delete(id, true);
+            await branchesApi.delete(id);
             await fetchBranches();
-            showToast(t('branch_deleted'), 'success');
+            showToast(t('branch_deactivated'), 'success');
             setShowBranchModal(false);
             setEditingBranch(null);
         } catch (err: any) {
@@ -510,6 +510,7 @@ const SettingsHub: React.FC = () => {
             { id: 'WAREHOUSES', label: 'Warehouses', labelAr: 'المخازن', icon: Package },
             { id: 'PRINTERS', label: 'Printers', labelAr: 'الطابعات', icon: Printer },
             { id: 'OPS', label: 'Business Hours', labelAr: 'ساعات العمل', icon: Clock },
+            { id: 'DAY_CLOSE', label: 'Day Close', labelAr: 'إغلاق اليوم', icon: FileText },
         ]},
         { label: 'Financial', labelAr: 'المالية', items: [
             { id: 'FINANCE', label: 'Finance', labelAr: 'المالية', icon: DollarSign },
@@ -604,6 +605,23 @@ const SettingsHub: React.FC = () => {
                             <div>
                                 <label className={labelClass}>{tn('Receipt QR URL', 'رابط QR الفاتورة')}</label>
                                 <input type="text" value={settings.receiptQrUrl || ''} onChange={e => handleChange('receiptQrUrl', e.target.value)} className={inputClass} placeholder="https://..." />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={labelClass}>{tn('Order workflow', 'مسار الطلبات')}</label>
+                                <div className="flex items-center gap-4 p-4 bg-elevated/40 border border-border/20 rounded-2xl">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-main">{tn('Manual kitchen/pickup flow', 'تجهيز وتسليم يدوي من مركز الطلبات')}</p>
+                                        <p className="mt-1 text-[10px] font-bold text-muted">{tn('New POS orders stay pending until Orders Center marks them ready/completed.', 'الأوردرات الجديدة تفضل معلقة حتى مركز الطلبات يجهزها أو يكملها.')}</p>
+                                    </div>
+                                    <Toggle enabled={settings.orderManualKitchenFlow === true} onChange={v => handleChange('orderManualKitchenFlow', v)} />
+                                </div>
+                                <div className="flex items-center gap-4 p-4 mt-3 bg-elevated/40 border border-border/20 rounded-2xl">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-main">{tn('Auto-complete takeaway/pickup', 'اعتبار التيك أواي والاستلام مكتمل فورًا')}</p>
+                                        <p className="mt-1 text-[10px] font-bold text-muted">{tn('Paid takeaway/pickup POS orders become completed without kitchen or pickup screens.', 'أوردرات التيك أواي والاستلام المدفوعة تخلص مباشرة بدون شاشة مطبخ أو استلام.')}</p>
+                                    </div>
+                                    <Toggle enabled={settings.autoCompleteDirectOrders === true} onChange={v => handleChange('autoCompleteDirectOrders', v)} />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -837,6 +855,87 @@ const SettingsHub: React.FC = () => {
                         <button onClick={handleSaveBusinessHours} className="px-8 py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:shadow-xl hover:shadow-primary/30 transition-all">
                             {tn('Save Business Hours', 'حفظ ساعات العمل')}
                         </button>
+                    </div>
+                );
+            case 'DAY_CLOSE':
+                return (
+                    <div className="space-y-6">
+                        <SectionHeader
+                            icon={FileText}
+                            title={tn('Day Close', 'إغلاق اليوم')}
+                            sub={tn('Controls for end-of-day closing, reports, and recipient lists', 'إعدادات إقفال اليوم والتقارير والمستلمين')}
+                        />
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            <div className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between gap-5">
+                                <div>
+                                    <p className="text-sm font-black text-main uppercase">{tn('Require Daily Stock Count', 'إلزام الجرد اليومي')}</p>
+                                    <p className="text-[10px] text-muted font-bold mt-1 leading-relaxed">
+                                        {tn('Block day close until a posted stock count exists for the selected business date.', 'يمنع إقفال اليوم لحد ما يتم ترحيل جرد يومي لنفس تاريخ التشغيل.')}
+                                    </p>
+                                </div>
+                                <Toggle
+                                    enabled={settings.dayCloseRequireStockCount !== false}
+                                    onChange={(value) => handleChange('dayCloseRequireStockCount', value)}
+                                />
+                            </div>
+
+                            <div className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between gap-5">
+                                <div>
+                                    <p className="text-sm font-black text-main uppercase">{tn('Auto Email Report', 'إرسال التقرير بالإيميل')}</p>
+                                    <p className="text-[10px] text-muted font-bold mt-1 leading-relaxed">
+                                        {tn('Send the close report automatically after a successful close.', 'يرسل تقرير الإغلاق تلقائياً بعد نجاح الإقفال.')}
+                                    </p>
+                                </div>
+                                <Toggle
+                                    enabled={Boolean(settings.endOfDayEmailEnabled)}
+                                    onChange={(value) => handleChange('endOfDayEmailEnabled', value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                            <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl">
+                                <label className={labelClass}>{tn('Email recipients', 'إيميلات تقرير الإغلاق')}</label>
+                                <textarea
+                                    rows={4}
+                                    value={(settings.endOfDayEmailRecipients || []).join(', ')}
+                                    onChange={(event) => {
+                                        const recipients = event.target.value.split(',').map((item) => item.trim()).filter(Boolean);
+                                        handleChange('endOfDayEmailRecipients', recipients);
+                                    }}
+                                    placeholder="admin@company.com, owner@company.com"
+                                    className={`${inputClass} resize-none leading-relaxed`}
+                                />
+                                <p className="text-[10px] font-bold text-muted mt-2">
+                                    {tn('Separate emails with commas.', 'افصل بين الإيميلات بفاصلة.')}
+                                </p>
+                            </div>
+
+                            <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl">
+                                <label className={labelClass}>{tn('WhatsApp recipients', 'أرقام واتساب لتقرير الإغلاق')}</label>
+                                <textarea
+                                    rows={4}
+                                    value={(settings.dayCloseWhatsappRecipients || []).join(', ')}
+                                    onChange={(event) => {
+                                        const recipients = event.target.value.split(',').map((item) => item.trim()).filter(Boolean);
+                                        handleChange('dayCloseWhatsappRecipients', recipients);
+                                    }}
+                                    placeholder="+201001234567, +201009876543"
+                                    className={`${inputClass} resize-none leading-relaxed`}
+                                />
+                                <p className="text-[10px] font-bold text-muted mt-2">
+                                    {tn('Use full phone numbers, separated with commas. WhatsApp Bridge must be connected.', 'اكتب الأرقام كاملة وافصل بينها بفاصلة. لازم واتساب بريدج يكون متصل.')}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 bg-amber-500/5 border border-amber-500/20 rounded-3xl">
+                            <p className="text-xs font-black text-amber-600 uppercase">{tn('Business date rule', 'قاعدة تاريخ التشغيل')}</p>
+                            <p className="text-[11px] text-muted font-bold mt-2 leading-relaxed">
+                                {tn('The branch business date advances only after a successful day close.', 'تاريخ تشغيل الفرع لا يتحرك لليوم التالي إلا بعد إقفال اليوم بنجاح.')}
+                            </p>
+                        </div>
                     </div>
                 );
             case 'FINANCE':

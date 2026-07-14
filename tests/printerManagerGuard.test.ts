@@ -12,7 +12,9 @@ describe('printer manager operational guards', () => {
     });
 
     it('persists the primary cashier printer explicitly', () => {
-        expect(source).toContain('settingsApi.updateBulk({ primaryCashierPrinterId: printerId })');
+        expect(source).toContain('primaryCashierPrinterId: printerId');
+        expect(source).toContain('await updatePrinterInDB({ ...selected, isPrimaryCashier: true })');
+        expect(source).toContain('autoPrintReceiptOnSubmit: Boolean(printerId)');
     });
 
     it('exposes and persists cashier receipt copy count', () => {

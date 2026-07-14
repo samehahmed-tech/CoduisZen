@@ -5,6 +5,7 @@ import { eq, and, desc, or, sql } from 'drizzle-orm';
 import { getIO } from '../socket';
 import { getStringParam } from '../utils/request';
 import { webhookService } from '../services/webhookService';
+import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
 
 type DriverTelemetryData = {
     driverId: string;
@@ -24,34 +25,36 @@ const DRIVER_STATUSES = new Set(['AVAILABLE', 'BUSY', 'BREAK', 'OFFLINE', 'RETUR
 
 const ensureDeliveryTelemetryTables = async () => {
     await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS driver_telemetry (
-            id serial PRIMARY KEY,
-            driver_id text NOT NULL,
-            branch_id text,
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'driver_telemetry')
+        CREATE TABLE driver_telemetry (
+            id nvarchar(255) PRIMARY KEY,
+            driver_id nvarchar(max) NOT NULL,
+            branch_id nvarchar(max),
             lat real NOT NULL,
             lng real NOT NULL,
             speed_kmh real,
             accuracy real,
             heading real,
             altitude real,
-            battery_level integer,
-            is_charging boolean,
-            order_id text,
-            created_at timestamp DEFAULT now()
+            battery_level int,
+            is_charging bit,
+            order_id nvarchar(max),
+            created_at datetime2 DEFAULT GETDATE()
         )
     `);
     await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS driver_telemetry_latest (
-            driver_id text PRIMARY KEY,
-            branch_id text,
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'driver_telemetry_latest')
+        CREATE TABLE driver_telemetry_latest (
+            driver_id nvarchar(max) PRIMARY KEY,
+            branch_id nvarchar(max),
             lat real NOT NULL,
             lng real NOT NULL,
             speed_kmh real,
             accuracy real,
             heading real,
-            battery_level integer,
-            order_id text,
-            updated_at timestamp DEFAULT now()
+            battery_level int,
+            order_id nvarchar(max),
+            updated_at datetime2 DEFAULT GETDATE()
         )
     `);
 };
@@ -147,23 +150,10 @@ export const createDriver = async (req: Request, res: Response) => {
                     pinLoginEnabled = true;
                 }
 
-                await tx.insert(users).values({
-                    id: driverId,
-                    name,
-                    email,
-                    role: 'DRIVER',
-                    permissions: ['NAV_DRIVER'],
-                    assignedBranchId: branchId,
-                    allowedBranches: [branchId],
-                    isActive: true,
-                    passwordHash,
-                    pinCodeHash,
-                    pinLoginEnabled,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                }).onConflictDoUpdate({
-                    target: users.id,
-                    set: {
+                const [existingUser] = await tx.select().top(1).from(users).where(eq(users.id, driverId));
+                if (existingUser) {
+                    await tx.update(users)
+                        .set({
                         name,
                         role: 'DRIVER',
                         permissions: ['NAV_DRIVER'],
@@ -173,11 +163,28 @@ export const createDriver = async (req: Request, res: Response) => {
                         ...(passwordHash ? { passwordHash } : {}),
                         ...(pinCodeHash ? { pinCodeHash, pinLoginEnabled } : {}),
                         updatedAt: new Date(),
-                    },
-                });
+                    })
+                        .where(eq(users.id, driverId));
+                } else {
+                    await tx.insert(users).values({
+                        id: driverId,
+                        name,
+                        email,
+                        role: 'DRIVER',
+                        permissions: ['NAV_DRIVER'],
+                        assignedBranchId: branchId,
+                        allowedBranches: [branchId],
+                        isActive: true,
+                        passwordHash,
+                        pinCodeHash,
+                        pinLoginEnabled,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    });
+                }
             }
 
-            const [inserted] = await tx.insert(drivers).values({
+            const [inserted] = await tx.insert(drivers).output().values({
                 id: driverId,
                 name,
                 phone,
@@ -185,7 +192,7 @@ export const createDriver = async (req: Request, res: Response) => {
                 status,
                 isActive: body.isActive !== false,
                 createdAt: new Date(),
-            }).returning();
+            });
             createdDriver = inserted;
         });
 
@@ -213,7 +220,7 @@ export const updateDriver = async (req: Request, res: Response) => {
         if (req.body?.isActive !== undefined) patch.isActive = Boolean(req.body.isActive);
         if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'NO_DRIVER_CHANGES' });
 
-        const [updated] = await db.update(drivers).set(patch).where(eq(drivers.id, id)).returning();
+        const [updated] = await db.update(drivers).set(patch).output().where(eq(drivers.id, id));
         if (!updated) return res.status(404).json({ error: 'DRIVER_NOT_FOUND' });
         emitDriverStatus(updated);
         res.json(updated);
@@ -228,7 +235,7 @@ export const updateDriverStatus = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'DRIVER_ID_REQUIRED' });
         const status = normalizeDriverStatus(req.body?.status, '');
         if (!status) return res.status(400).json({ error: 'INVALID_DRIVER_STATUS' });
-        const [updated] = await db.update(drivers).set({ status }).where(eq(drivers.id, id)).returning();
+        const [updated] = await db.update(drivers).set({ status }).output().where(eq(drivers.id, id));
         if (!updated) return res.status(404).json({ error: 'Driver not found' });
         emitDriverStatus(updated);
         res.json(updated);
@@ -243,19 +250,19 @@ export const assignDriver = async (req: Request, res: Response) => {
         let orderBranchId: string | null = null;
         await db.transaction(async (tx) => {
             // 0. Double Booking Prevention (Item 42)
-            const [driver] = await tx.select().from(drivers).where(eq(drivers.id, driverId)).limit(1);
+            const [driver] = await tx.select().top(1).from(drivers).where(eq(drivers.id, driverId));
             if (!driver) throw new Error('DRIVER_NOT_FOUND');
             if (driver.status !== 'AVAILABLE' || !driver.isActive) throw new Error('DRIVER_ALREADY_BUSY');
 
-            const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+            const [order] = await tx.select().top(1).from(orders).where(eq(orders.id, orderId));
             if (!order) throw new Error('ORDER_NOT_FOUND');
             if (order.driverId && order.driverId !== driverId) throw new Error('ORDER_ALREADY_ASSIGNED');
 
             // 1. Update Order
             const [updatedOrder] = await tx.update(orders)
                 .set({ driverId, status: 'OUT_FOR_DELIVERY', updatedAt: new Date() })
-                .where(eq(orders.id, orderId))
-                .returning();
+                .output()
+                .where(eq(orders.id, orderId));
             orderBranchId = updatedOrder?.branchId || null;
 
             // 2. Update Driver status
@@ -299,7 +306,7 @@ export const updateDriverLocation = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'INVALID_COORDINATES' });
         }
 
-        const [driver] = await db.select().from(drivers).where(eq(drivers.id, driverId)).limit(1);
+        const [driver] = await db.select().top(1).from(drivers).where(eq(drivers.id, driverId));
         if (!driver) return res.status(404).json({ error: 'DRIVER_NOT_FOUND' });
 
         // 1. Insert into telemetry history (time-series)
@@ -317,8 +324,7 @@ export const updateDriverLocation = async (req: Request, res: Response) => {
 
         // 2. Upsert into latest-telemetry (fast lookups)
         const now = new Date();
-        await db.insert(driverTelemetryLatest).values({
-            driverId,
+        const telemetryUpdate = {
             branchId: driver.branchId || null,
             lat,
             lng,
@@ -327,19 +333,16 @@ export const updateDriverLocation = async (req: Request, res: Response) => {
             ...(Number.isFinite(heading) ? { heading } : {}),
             ...(Number.isFinite(batteryLevel) ? { batteryLevel } : {}),
             updatedAt: now,
-        }).onConflictDoUpdate({
-            target: driverTelemetryLatest.driverId,
-            set: {
-                branchId: driver.branchId || null,
-                lat,
-                lng,
-                ...(Number.isFinite(speedKmh) ? { speedKmh } : {}),
-                ...(Number.isFinite(accuracy) ? { accuracy } : {}),
-                ...(Number.isFinite(heading) ? { heading } : {}),
-                ...(Number.isFinite(batteryLevel) ? { batteryLevel } : {}),
-                updatedAt: now,
-            },
-        });
+        };
+        const [existingTelemetry] = await db.select().top(1).from(driverTelemetryLatest).where(eq(driverTelemetryLatest.driverId, driverId));
+        if (existingTelemetry) {
+            await db.update(driverTelemetryLatest).set(telemetryUpdate).where(eq(driverTelemetryLatest.driverId, driverId));
+        } else {
+            await db.insert(driverTelemetryLatest).values({
+                driverId,
+                ...telemetryUpdate,
+            });
+        }
 
         const nextItem: DriverTelemetryData = {
             driverId,
@@ -418,27 +421,16 @@ type DeliverySlaEscalationRecord = SlaAlert & {
 };
 
 const loadSlaEscalations = async (): Promise<DeliverySlaEscalationRecord[]> => {
-    const [row] = await db.select().from(settings).where(eq(settings.key, SLA_ESCALATIONS_KEY)).limit(1);
-    const raw = row?.value;
-    if (!Array.isArray(raw)) return [];
-    return raw as DeliverySlaEscalationRecord[];
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, SLA_ESCALATIONS_KEY));
+    return parseSettingJson<DeliverySlaEscalationRecord[]>(row?.value, []);
 };
 
 const saveSlaEscalations = async (records: DeliverySlaEscalationRecord[], updatedBy?: string | null) => {
-    await db.insert(settings).values({
+    await upsertSetting({
         key: SLA_ESCALATIONS_KEY,
         value: records,
         category: 'delivery',
         updatedBy: updatedBy || 'system',
-        updatedAt: new Date(),
-    }).onConflictDoUpdate({
-        target: settings.key,
-        set: {
-            value: records,
-            category: 'delivery',
-            updatedBy: updatedBy || 'system',
-            updatedAt: new Date(),
-        },
     });
 };
 
@@ -593,7 +585,7 @@ export const autoEscalateSlaAlerts = async (req: Request, res: Response) => {
 export const createZone = async (req: Request, res: Response) => {
     try {
         const data = req.body;
-        const [inserted] = await db.insert(deliveryZones).values(data).returning();
+        const [inserted] = await db.insert(deliveryZones).output().values(data);
         res.json(inserted);
     } catch (e: any) {
         res.status(500).json({ error: e.message });
@@ -604,7 +596,7 @@ export const updateZone = async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
         const data = req.body;
-        const [updated] = await db.update(deliveryZones).set(data).where(eq(deliveryZones.id, id)).returning();
+        const [updated] = await db.update(deliveryZones).set(data).output().where(eq(deliveryZones.id, id));
         res.json(updated);
     } catch (e: any) {
         res.status(500).json({ error: e.message });

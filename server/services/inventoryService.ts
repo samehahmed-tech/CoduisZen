@@ -13,7 +13,7 @@ type DeductInventoryOptions = {
 
 export const inventoryService = {
     async deductAggregateStock(tx: any, itemId: string, warehouseId: string, deductionQty: number) {
-        const [updatedStock] = await tx.update(inventoryStock)
+        const stockUpdate = tx.update(inventoryStock)
             .set({
                 quantity: sql`${inventoryStock.quantity} - ${deductionQty}`,
                 lastUpdated: new Date(),
@@ -25,10 +25,8 @@ export const inventoryService = {
                     sql`${inventoryStock.quantity} >= ${deductionQty}`
                 )
             )
-            .returning({
-                id: inventoryStock.id,
-                quantity: inventoryStock.quantity,
-            });
+            .output();
+        const [updatedStock] = await stockUpdate;
 
         if (!updatedStock) {
             throw new Error(`INSUFFICIENT_STOCK|item=${itemId}|warehouse=${warehouseId}|requested=${deductionQty}`);
@@ -149,7 +147,7 @@ export const inventoryService = {
         const transactionsToCreate = [];
 
         // 2. We need a stock movement record to link the batch transactions
-        const [movement] = await tx.insert(stockMovements).values({
+        const [movement] = await tx.insert(stockMovements).output().values({
             itemId,
             fromWarehouseId: warehouseId,
             quantity: requestedQty,
@@ -158,7 +156,7 @@ export const inventoryService = {
             reason: reason || 'FEFO Auto-Deduction',
             performedBy: options.performedBy,
             createdAt: new Date(),
-        }).returning();
+        });
 
         // 3. Loop through batches to fulfill quantity
         for (const batch of batches) {
@@ -182,7 +180,7 @@ export const inventoryService = {
                         sql`${inventoryBatches.currentQty} + ${QUANTITY_EPSILON} >= ${usedQty}`
                     )
                 )
-                .returning({ id: inventoryBatches.id });
+                .output();
 
             if (!updatedBatch) {
                 throw new Error(`INVENTORY_BATCH_CONCURRENCY_CONFLICT|batch=${batch.id}|item=${itemId}`);

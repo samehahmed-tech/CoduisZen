@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import compression from 'compression';
-import { helmetMiddleware, generalRateLimit, inputSanitizer, hideErrorDetails, csrfProtection } from './middleware/security';
+import { helmetMiddleware, inputSanitizer, hideErrorDetails, csrfProtection } from './middleware/security';
 import { auditMiddleware } from './middleware/audit';
 import logger from './utils/logger';
 import posModule from './modules/pos';
@@ -50,12 +50,16 @@ app.use(cors({
     },
     credentials: true,
 }));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({
+    limit: '5mb',
+    verify: (req, _res, buffer) => {
+        (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+}));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(inputSanitizer);
 app.use(csrfProtection);
 app.use(auditMiddleware);
-app.use(generalRateLimit);
 app.use(attachRequestId);
 app.use(requestLogger);
 app.use(errorContractMiddleware);
@@ -73,10 +77,14 @@ import publicScreenRoutes from './routes/publicScreenRoutes';
 app.use('/api/auth', authRoutes); // Expose auth globally before token check
 app.use('/api/setup', setupRoutes); // Expose setup globally
 app.use('/api/whatsapp', whatsappWebhookRoutes); // Public WhatsApp webhook only
-app.use('/api/print-gateway/gateway', printGatewayGatewayRoutes); // Expose gateway for hardware bridge
 app.use('/api/attendance-bridge', attendanceBridgeRoutes); // Expose branch attendance bridge ingest
 app.use('/api/public-screens', publicScreenRoutes); // Link-only KDS/Packing screens for legacy operator displays
 app.use('/iclock', admsRoutes); // ADMS Biometric Endpoint (Must be top-level)
+
+// Bridge routes — fail closed unless PRINT_GATEWAY_TOKEN is configured and supplied.
+app.use('/api/print-gateway/gateway', printGatewayGatewayRoutes); // SSE bridge connect
+import printGatewayRoutes from './routes/printGatewayRoutes';
+app.use('/api/print-gateway', printGatewayRoutes); // Bridge polling + complete/fail
 
 // Health check (Public)
 app.get('/api/health', async (req, res) => {
@@ -117,7 +125,6 @@ import warehouseRoutes from './routes/warehouseRoutes';
 import kdsRoutes from './routes/kdsRoutes';
 import deliveryRoutes from './routes/deliveryRoutes';
 import imageRoutes from './routes/imageRoutes';
-import printGatewayRoutes from './routes/printGatewayRoutes';
 import platformsRoutes from './routes/platformsRoutes';
 import refundRoutes from './routes/refundRoutes';
 import dayCloseRoutes from './routes/dayCloseRoutes';
@@ -150,7 +157,6 @@ app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/kds', kdsRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/images', imageRoutes);
-app.use('/api/print-gateway', printGatewayRoutes);
 app.use('/api/platforms', platformsRoutes);
 app.use('/api/refunds', refundRoutes);
 app.use('/api/day-close', dayCloseRoutes);

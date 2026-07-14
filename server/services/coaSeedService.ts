@@ -90,9 +90,9 @@ export const COASeedService = {
         for (const acc of standardCOA) {
             const [existingAccount] = await db
                 .select({ id: chartOfAccounts.id })
+                .top(1)
                 .from(chartOfAccounts)
-                .where(eq(chartOfAccounts.code, acc.code))
-                .limit(1);
+                .where(eq(chartOfAccounts.code, acc.code));
 
             if (existingAccount) {
                 await db.update(chartOfAccounts)
@@ -139,18 +139,18 @@ export const COASeedService = {
         if (cashAccId) {
             await db.insert(paymentMethodAccounts)
                 .values({ paymentMethod: 'CASH', accountId: cashAccId })
-                .onConflictDoNothing({ target: paymentMethodAccounts.paymentMethod });
+                .onConflictDoNothing();
         }
         if (visaAccId) {
             await db.insert(paymentMethodAccounts)
                 .values({ paymentMethod: 'VISA', accountId: visaAccId })
-                .onConflictDoNothing({ target: paymentMethodAccounts.paymentMethod });
+                .onConflictDoNothing();
             await db.insert(paymentMethodAccounts)
                 .values({ paymentMethod: 'MASTERCARD', accountId: visaAccId })
-                .onConflictDoNothing({ target: paymentMethodAccounts.paymentMethod });
+                .onConflictDoNothing();
             await db.insert(paymentMethodAccounts)
                 .values({ paymentMethod: 'VODAFONE_CASH', accountId: visaAccId })
-                .onConflictDoNothing({ target: paymentMethodAccounts.paymentMethod });
+                .onConflictDoNothing();
         }
 
         // 4. Seed Default Tax Mappings
@@ -158,12 +158,12 @@ export const COASeedService = {
         if (taxOutId) {
             const [existingOutputVat] = await db
                 .select({ id: taxAccounts.id })
+                .top(1)
                 .from(taxAccounts)
                 .where(and(
                     eq(taxAccounts.taxType, 'OUTPUT_VAT'),
                     eq(taxAccounts.rate, 14),
-                ))
-                .limit(1);
+                ));
 
             if (!existingOutputVat) {
                 await db.insert(taxAccounts).values({ taxType: 'OUTPUT_VAT', accountId: taxOutId, rate: 14 });
@@ -182,7 +182,7 @@ export const COASeedService = {
                 conditionValue: rule.conditionValue,
                 isSystem: true,
                 isActive: true
-            }).onConflictDoNothing({ target: postingRules.id });
+            }).onConflictDoNothing();
         }
 
         console.log('[COA Seed] Completed seeding Chart of Accounts, mappings, and posting rules.');

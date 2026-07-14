@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
     getDayCloseReport,
+    downloadDayClosePdf,
+    downloadDayCloseXlsx,
     closeDay,
     getDayCloseHistory,
     sendDayCloseEmail
@@ -14,6 +16,8 @@ const router = Router();
 router.get('/:branchId/history', enforceBranch, getDayCloseHistory);
 
 // Get day close report preview
+router.get('/:branchId/:date/pdf', enforceBranch, downloadDayClosePdf);
+router.get('/:branchId/:date/xlsx', enforceBranch, downloadDayCloseXlsx);
 router.get('/:branchId/:date', enforceBranch, getDayCloseReport);
 
 // Close the day — restricted to managers

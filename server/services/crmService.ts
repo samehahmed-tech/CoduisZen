@@ -302,11 +302,11 @@ export const crmService = {
             .from(auditLogs)
             .where(and(
                 sql`${auditLogs.eventType} LIKE 'CRM_%'`,
-                // Drizzle-orm doesn't support jsonb access easily in where without sql template
-                sql`${auditLogs.payload}->>'customerId' = ${customerId}`
+                // JSON text predicates require an explicit SQL expression here.
+                sql`JSON_VALUE(${auditLogs.payload}, '$.customerId') = ${customerId}`
             ))
             .orderBy(desc(auditLogs.createdAt))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         return logs;
     },

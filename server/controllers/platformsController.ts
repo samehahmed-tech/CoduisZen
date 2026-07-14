@@ -21,7 +21,7 @@ export const createPlatform = async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
 
-        const [created] = await db.insert(deliveryPlatforms).values({
+        const [created] = await db.insert(deliveryPlatforms).output().values({
             id: body.id || `PLAT-${nanoid(8)}`,
             name: body.name || 'New Platform',
             isActive: body.isActive !== undefined ? body.isActive : true,
@@ -30,7 +30,7 @@ export const createPlatform = async (req: Request, res: Response) => {
             priceMarkupPercentage: Number(body.priceMarkupPercentage || 0),
             priceMarkupFixed: Number(body.priceMarkupFixed || 0),
             integrationType: body.integrationType || 'MANUAL',
-        }).returning();
+        });
 
         res.status(201).json(created);
     } catch (error: any) {
@@ -54,8 +54,8 @@ export const updatePlatform = async (req: Request, res: Response) => {
             integrationType: body.integrationType,
             updatedAt: new Date(),
         })
-            .where(eq(deliveryPlatforms.id, id))
-            .returning();
+            .output()
+            .where(eq(deliveryPlatforms.id, id));
 
         if (!updated) return res.status(404).json({ error: 'Platform not found' });
 

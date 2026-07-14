@@ -31,6 +31,7 @@ export interface MarketplaceOrder {
     };
     notes?: string;
     provider: MarketplaceProvider;
+    isPaid: boolean;
 }
 
 export const marketplaceService = {
@@ -42,6 +43,9 @@ export const marketplaceService = {
         log.info({ branchId, provider: orderData.provider, extId: orderData.orderNumber }, 'Ingesting marketplace order');
 
         try {
+            if (typeof orderData.isPaid !== 'boolean') {
+                throw new Error('MARKETPLACE_PAYMENT_STATUS_REQUIRED');
+            }
             // 1. Transactionally insert the order
             const orderId = `ext-${orderData.provider.toLowerCase()}-${orderData.orderNumber}`;
             const sourceKey = String(orderData.provider || '').trim().toLowerCase();
@@ -59,7 +63,7 @@ export const marketplaceService = {
                         OR lower(${deliveryPlatforms.name}) = ${sourceKey}
                     )`,
                 ))
-                .limit(1);
+                .top(1);
             const pricedItems = orderData.items.map((item) => {
                 const basePrice = Number(item.price || 0);
                 const price = platform?.applyFeesToMenuPrice
@@ -83,8 +87,8 @@ export const marketplaceService = {
                     subtotal: orderTotal, // Assume pre-tax for now
                     tax: 0,
                     status: 'PENDING',
-                    isPaid: true, // Marketplace orders are usually prepaid
-                    paymentMethod: 'ONLINE',
+                    isPaid: orderData.isPaid,
+                    paymentMethod: orderData.isPaid ? 'ONLINE' : null,
                     notes: `[${orderData.provider}] ${orderData.notes || ''}`,
                     createdAt: new Date(),
                 });

@@ -5,24 +5,23 @@ import { eq } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import { logger } from '../utils/logger';
+import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
 
 const tableRefKey = (referenceId: string) => `tableOpRef:${referenceId}`;
 
 const loadReplayPayload = async (referenceId?: string) => {
     if (!referenceId) return null;
-    const [row] = await db.select().from(settings).where(eq(settings.key, tableRefKey(referenceId))).limit(1);
-    if (!row?.value || typeof row.value !== 'object') return null;
-    return row.value as any;
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, tableRefKey(referenceId)));
+    return parseSettingJson<any | null>(row?.value, null);
 };
 
 const saveReplayPayload = async (referenceId: string, payload: any, updatedBy?: string) => {
-    await db.insert(settings).values({
+    await upsertSetting({
         key: tableRefKey(referenceId),
         value: payload,
         category: 'table-idempotency',
         updatedBy: updatedBy || 'system',
-        updatedAt: new Date(),
-    }).onConflictDoNothing({ target: settings.key });
+    });
 };
 
 const parseLayoutInt = (value: unknown, fallback: number) => {
@@ -149,17 +148,20 @@ export const saveLayout = async (req: Request, res: Response) => {
         await db.transaction(async (tx) => {
             // Upsert Zones
             for (const zone of zoneRows) {
-                await tx.insert(floorZones).values(zone)
-                    .onConflictDoUpdate({
-                        target: floorZones.id,
-                        set: {
+                const [existingZone] = await tx.select().top(1).from(floorZones).where(eq(floorZones.id, zone.id));
+                if (existingZone) {
+                    await tx.update(floorZones)
+                        .set({
                             name: zone.name,
                             branchId: zone.branchId,
                             width: zone.width,
                             height: zone.height,
                             updatedAt: zone.updatedAt,
-                        },
-                    });
+                        })
+                        .where(eq(floorZones.id, zone.id));
+                } else {
+                    await tx.insert(floorZones).values(zone);
+                }
             }
 
             // Upsert Tables
@@ -167,9 +169,10 @@ export const saveLayout = async (req: Request, res: Response) => {
             for (const table of tableRows) {
                 // We typically only update layout fields here (x, y, width, height, shape, seats, name, zoneId)
                 // If the table is new, insert it.
-                await tx.insert(tables).values(table).onConflictDoUpdate({
-                    target: tables.id,
-                    set: {
+                const [existingTable] = await tx.select().top(1).from(tables).where(eq(tables.id, table.id));
+                if (existingTable) {
+                    await tx.update(tables)
+                        .set({
                         branchId: table.branchId,
                         x: table.x,
                         y: table.y,
@@ -180,8 +183,11 @@ export const saveLayout = async (req: Request, res: Response) => {
                         name: table.name,
                         zoneId: table.zoneId,
                         updatedAt: new Date()
-                    }
-                });
+                    })
+                        .where(eq(tables.id, table.id));
+                } else {
+                    await tx.insert(tables).values(table);
+                }
             }
         });
 
@@ -217,9 +223,9 @@ export const updateTableStatus = async (req: Request, res: Response) => {
 
         if (reference_id) {
             const replayKey = `tableStatusRef:${String(reference_id)}`;
-            const [existingReplay] = await db.select().from(settings).where(eq(settings.key, replayKey)).limit(1);
+            const [existingReplay] = await db.select().top(1).from(settings).where(eq(settings.key, replayKey));
             if (existingReplay) {
-                const [existingTable] = await db.select().from(tables).where(eq(tables.id, id)).limit(1);
+                const [existingTable] = await db.select().top(1).from(tables).where(eq(tables.id, id));
                 if (existingTable) {
                     return res.json({ ...existingTable, idempotentReplay: true, referenceId: reference_id });
                 }
@@ -232,14 +238,14 @@ export const updateTableStatus = async (req: Request, res: Response) => {
                 currentOrderId: currentOrderId || null,
                 updatedAt: new Date()
             })
-            .where(eq(tables.id, id))
-            .returning();
+            .output()
+            .where(eq(tables.id, id));
 
         if (!updatedTable) return res.status(404).json({ error: 'Table not found' });
 
         if (reference_id) {
             const replayKey = `tableStatusRef:${String(reference_id)}`;
-            await db.insert(settings).values({
+            await upsertSetting({
                 key: replayKey,
                 value: {
                     tableId: updatedTable.id,
@@ -249,8 +255,7 @@ export const updateTableStatus = async (req: Request, res: Response) => {
                 },
                 category: 'table-idempotency',
                 updatedBy: req.user?.id || 'system',
-                updatedAt: new Date(),
-            }).onConflictDoNothing({ target: settings.key });
+            });
         }
 
         try {
@@ -283,7 +288,7 @@ const computeSubtotalFromItems = async (tx: typeof db, orderId: string) => {
 };
 
 const recalcOrderTotals = async (tx: any, orderId: string) => {
-    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    const [order] = await tx.select().top(1).from(orders).where(eq(orders.id, orderId));
     if (!order) return null;
 
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
@@ -314,7 +319,7 @@ const recalcOrderTotals = async (tx: any, orderId: string) => {
     let serviceCharge = Number(order.serviceCharge || 0);
     if (order.type === 'DINE_IN' && subtotal > 0) {
         const [branchRecord] = await tx.select({ serviceCharge: branches.serviceCharge })
-            .from(branches).where(eq(branches.id, order.branchId)).limit(1);
+            .top(1).from(branches).where(eq(branches.id, order.branchId));
         
         const serviceRate = branchRecord?.serviceCharge || 0.12;
         serviceCharge = parseFloat((netAmount * serviceRate).toFixed(2));
@@ -328,7 +333,7 @@ const recalcOrderTotals = async (tx: any, orderId: string) => {
         serviceCharge,
         total,
         updatedAt: new Date(),
-    }).where(eq(orders.id, orderId)).returning();
+    }).output().where(eq(orders.id, orderId));
 
     return updated || null;
 };
@@ -402,7 +407,7 @@ export const transferTableOrder = async (req: Request, res: Response) => {
             const [movedOrder] = await tx.update(orders).set({
                 tableId: String(targetTableId),
                 updatedAt: new Date(),
-            }).where(eq(orders.id, sourceOrder.id)).returning();
+            }).output().where(eq(orders.id, sourceOrder.id));
 
             await tx.update(tables).set({
                 status: 'AVAILABLE',
@@ -466,7 +471,7 @@ export const splitTableOrder = async (req: Request, res: Response) => {
             if (pickedItems.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
             const newOrderId = `split-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-            const [newOrder] = await tx.insert(orders).values({
+            const [newOrder] = await tx.insert(orders).output().values({
                 id: newOrderId,
                 type: sourceOrder.type,
                 source: sourceOrder.source,
@@ -490,11 +495,11 @@ export const splitTableOrder = async (req: Request, res: Response) => {
                 syncStatus: sourceOrder.syncStatus || 'SYNCED',
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning();
+            });
 
             for (const item of pickedItems) {
                 // reduce quantity/delete from source rows
-                const [row] = await tx.select().from(orderItems).where(eq(orderItems.id, item.id)).limit(1);
+            const [row] = await tx.select().top(1).from(orderItems).where(eq(orderItems.id, item.id));
                 if (!row) continue;
                 const existingQty = Number(row.quantity || 0);
                 const moveQty = Number(item.quantity || 0);
@@ -579,7 +584,7 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
             if (pickedItems.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
             for (const item of pickedItems) {
-                const [row] = await tx.select().from(orderItems).where(eq(orderItems.id, item.id)).limit(1);
+                const [row] = await tx.select().top(1).from(orderItems).where(eq(orderItems.id, item.id));
                 if (!row) continue;
                 const existingQty = Number(row.quantity || 0);
                 const moveQty = Number(item.quantity || 0);
@@ -627,8 +632,8 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
                 updatedAt: new Date(),
             }).where(eq(tables.id, String(targetTableId)));
 
-            const [freshSource] = await tx.select().from(orders).where(eq(orders.id, sourceOrder.id)).limit(1);
-            const [freshTarget] = await tx.select().from(orders).where(eq(orders.id, targetOrder.id)).limit(1);
+            const [freshSource] = await tx.select().top(1).from(orders).where(eq(orders.id, sourceOrder.id));
+            const [freshTarget] = await tx.select().top(1).from(orders).where(eq(orders.id, targetOrder.id));
             return { sourceOrder: freshSource, targetOrder: freshTarget };
         });
 

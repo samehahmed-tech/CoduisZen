@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { kdsTickets, kdsTicketItems, menuCategories, menuItems, orders, orderItems, printers, tables } from '../../src/db/schema';
 import { eq, inArray, and, notInArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
@@ -8,6 +8,52 @@ import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import { transitionOrderStatus } from '../services/orderLifecycleService';
 import { enqueuePrintJob } from '../services/printQueueService';
+
+let kdsSchemaReady = false;
+
+const ensureKdsSchema = async () => {
+    if (kdsSchemaReady) return;
+    await pool.query(`
+        IF OBJECT_ID('kds_tickets', 'U') IS NULL
+        CREATE TABLE kds_tickets (
+            id nvarchar(255) NOT NULL,
+            branch_id nvarchar(255) NOT NULL,
+            order_id nvarchar(255) NOT NULL,
+            routing_station nvarchar(255) NOT NULL,
+            target_time datetime2 NULL,
+            status nvarchar(255) DEFAULT 'PENDING',
+            priority nvarchar(255) DEFAULT 'NORMAL',
+            printed_at datetime2 NULL,
+            bumped_at datetime2 NULL,
+            created_at datetime2 DEFAULT GETDATE(),
+            updated_at datetime2 DEFAULT GETDATE(),
+            CONSTRAINT pk_kds_tickets PRIMARY KEY (id),
+            CONSTRAINT fk_kds_tickets_branch FOREIGN KEY (branch_id) REFERENCES branches(id),
+            CONSTRAINT fk_kds_tickets_order FOREIGN KEY (order_id) REFERENCES orders(id)
+        );
+
+        IF OBJECT_ID('kds_ticket_items', 'U') IS NULL
+        CREATE TABLE kds_ticket_items (
+            id int IDENTITY(1,1) NOT NULL,
+            kds_ticket_id nvarchar(255) NOT NULL,
+            order_item_id int NULL,
+            menu_item_id nvarchar(255) NOT NULL,
+            item_name nvarchar(max) NOT NULL,
+            quantity int NOT NULL,
+            modifiers_text nvarchar(max) NULL,
+            is_bumped bit DEFAULT 0,
+            CONSTRAINT pk_kds_ticket_items PRIMARY KEY (id),
+            CONSTRAINT fk_kds_ticket_items_ticket FOREIGN KEY (kds_ticket_id) REFERENCES kds_tickets(id) ON DELETE CASCADE
+        );
+
+        IF OBJECT_ID('kds_ticket_items', 'U') IS NOT NULL
+           AND COL_LENGTH('kds_ticket_items', 'is_bumped') IS NULL
+        ALTER TABLE kds_ticket_items
+            ADD is_bumped bit NOT NULL
+                CONSTRAINT df_kds_ticket_items_is_bumped DEFAULT 0;
+    `);
+    kdsSchemaReady = true;
+};
 
 const canAccessBranch = (req: Request, branchId?: string | null) => {
     if (!branchId) return false;
@@ -22,6 +68,18 @@ const normalizeStationName = (value?: string | null) => {
         .replace(/[^A-Z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '');
     return normalized || 'KITCHEN';
+};
+
+const normalizePrinterIds = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+    if (typeof value !== 'string') return [];
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+    } catch {}
+    return trimmed.split(',').map((id) => id.trim()).filter(Boolean);
 };
 
 const formatKitchenTicket = (params: {
@@ -64,7 +122,7 @@ const syncOrderReadyWhenKitchenComplete = async (req: Request, orderId?: string 
         return false;
     }
 
-    const [order] = await db.select({ id: orders.id, status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1);
+const [order] = await db.select({ id: orders.id, status: orders.status }).top(1).from(orders).where(eq(orders.id, orderId));
     if (!order || ['READY', 'DELIVERED', 'COMPLETED', 'CANCELLED'].includes(String(order.status))) {
         return Boolean(order && String(order.status) === 'READY');
     }
@@ -87,6 +145,7 @@ export const kdsController = {
     // Polling endpoint for kitchen displays
     async getTickets(req: Request, res: Response) {
         try {
+            await ensureKdsSchema();
             const { station } = req.query;
             const branchId = req.effectiveBranchId;
             const includeServed = String(req.query.includeServed || '').toLowerCase() === 'true';
@@ -158,12 +217,15 @@ export const kdsController = {
             const requestedBranchId = getStringParam(req.body?.branchId || req.body?.branch_id || req.effectiveBranchId);
             if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
 
-            const [order] = await db.select({ id: orders.id, branchId: orders.branchId }).from(orders).where(eq(orders.id, orderId)).limit(1);
+            const [order] = await db.select({ id: orders.id, branchId: orders.branchId }).top(1).from(orders).where(eq(orders.id, orderId));
             if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
             if (requestedBranchId && requestedBranchId !== order.branchId) return res.status(400).json({ error: 'ORDER_BRANCH_MISMATCH' });
             if (!canAccessBranch(req, order.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
 
-            await kdsController.dispatchToKitchen(order.branchId, order.id);
+            const clientHandlesPrinting = req.body?.clientHandlesPrinting === true;
+            await kdsController.dispatchToKitchen(order.branchId, order.id, {
+                enqueuePrintJobs: !clientHandlesPrinting,
+            });
             return res.json({ success: true, branchId: order.branchId, orderId: order.id });
         } catch (error: any) {
             return res.status(500).json({ error: error.message });
@@ -171,10 +233,15 @@ export const kdsController = {
     },
 
     // Trigger KDS Tickets (Called internally by POS / Order Service)
-    async dispatchToKitchen(branchId: string, orderId: string) {
+    async dispatchToKitchen(
+        branchId: string,
+        orderId: string,
+        options: { enqueuePrintJobs?: boolean } = {},
+    ) {
         try {
+            await ensureKdsSchema();
             // Guard against duplicate dispatching
-            const existing = await db.select().from(kdsTickets).where(eq(kdsTickets.orderId, orderId)).limit(1);
+            const existing = await db.select().top(1).from(kdsTickets).where(eq(kdsTickets.orderId, orderId));
             if (existing.length > 0) return;
 
             const orderItemsList = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
@@ -189,10 +256,10 @@ export const kdsController = {
                     kitchenNotes: orders.kitchenNotes,
                     createdAt: orders.createdAt,
                 })
+                .top(1)
                 .from(orders)
                 .leftJoin(tables, eq(tables.id, orders.tableId))
-                .where(eq(orders.id, orderId))
-                .limit(1);
+                .where(eq(orders.id, orderId));
 
             const menuItemIds = Array.from(new Set(
                 orderItemsList
@@ -212,8 +279,8 @@ export const kdsController = {
                 : [];
             const routedPrinterIds = Array.from(new Set(
                 menuRoutingRows.flatMap(row => [
-                    ...((row.itemPrinterIds || []) as string[]),
-                    ...((row.categoryPrinterIds || []) as string[]),
+                    ...normalizePrinterIds(row.itemPrinterIds),
+                    ...normalizePrinterIds(row.categoryPrinterIds),
                 ]),
             ));
             const printerRows = routedPrinterIds.length > 0
@@ -235,7 +302,8 @@ export const kdsController = {
             const printerIdsByStation = new Map<string, string[]>();
 
             for (const row of menuRoutingRows) {
-                const printerIds = (row.itemPrinterIds?.length ? row.itemPrinterIds : row.categoryPrinterIds) || [];
+                const itemPrinterIds = normalizePrinterIds(row.itemPrinterIds);
+                const printerIds = itemPrinterIds.length ? itemPrinterIds : normalizePrinterIds(row.categoryPrinterIds);
                 const stations = printerIds.map((printerId) => {
                     const printer = printerById.get(printerId);
                     const primaryRole = Array.isArray(printer?.roles) ? printer.roles.find(Boolean) : null;
@@ -293,7 +361,7 @@ export const kdsController = {
                 }
             });
 
-            for (const printJob of printJobsToCreate) {
+            for (const printJob of options.enqueuePrintJobs === false ? [] : printJobsToCreate) {
                 try {
                     await enqueuePrintJob({
                         branchId,
@@ -307,7 +375,7 @@ export const kdsController = {
                         contentType: 'text',
                         printerId: printJob.printerId || null,
                         printerAddress: printJob.printer?.address || null,
-                        printerType: printJob.printer?.type || 'LOCAL',
+                        printerType: String(printJob.printer?.type || 'LOCAL').toUpperCase() as any,
                         createdBy: 'kds-dispatch',
                         maxAttempts: 3,
                     });
@@ -340,11 +408,12 @@ export const kdsController = {
     // Mark ticket as ready
     async bumpTicket(req: Request, res: Response) {
         try {
+            await ensureKdsSchema();
             const ticketId = getStringParam(req.params.id);
             if (!ticketId) return res.status(400).json({ error: 'TICKET_ID_REQUIRED' });
 
             // 1. Fetch current ticket to identify order context
-            const [ticket] = await db.select().from(kdsTickets).where(eq(kdsTickets.id, ticketId)).limit(1);
+            const [ticket] = await db.select().top(1).from(kdsTickets).where(eq(kdsTickets.id, ticketId));
             if (!ticket) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
             if (!canAccessBranch(req, ticket.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
 
@@ -387,10 +456,11 @@ export const kdsController = {
     // Recall ticket (Undo bump)
     async recallTicket(req: Request, res: Response) {
         try {
+            await ensureKdsSchema();
             const ticketId = getStringParam(req.params.id);
             if (!ticketId) return res.status(400).json({ error: 'TICKET_ID_REQUIRED' });
 
-            const [ticket] = await db.select().from(kdsTickets).where(eq(kdsTickets.id, ticketId)).limit(1);
+            const [ticket] = await db.select().top(1).from(kdsTickets).where(eq(kdsTickets.id, ticketId));
             if (!ticket) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
             if (!canAccessBranch(req, ticket.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
 
@@ -401,7 +471,7 @@ export const kdsController = {
 
             if (ticket.orderId) {
                 // Determine if overall order should be restored to PREPARING
-                const [order] = await db.select().from(orders).where(eq(orders.id, ticket.orderId)).limit(1);
+                const [order] = await db.select().top(1).from(orders).where(eq(orders.id, ticket.orderId));
                 if (order && (order.status === 'READY' || order.status === 'SERVED')) {
                     await db.update(orders)
                         .set({ status: 'PREPARING', updatedAt: new Date() })
@@ -429,13 +499,14 @@ export const kdsController = {
 
     async handoverOrder(req: Request, res: Response) {
         try {
+            await ensureKdsSchema();
             const orderId = getStringParam(req.params.orderId);
             if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
 
             const [order] = await db.select({ id: orders.id, branchId: orders.branchId, status: orders.status })
+                .top(1)
                 .from(orders)
-                .where(eq(orders.id, orderId))
-                .limit(1);
+                .where(eq(orders.id, orderId));
             if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
             if (!canAccessBranch(req, order.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
 
@@ -479,14 +550,14 @@ export const kdsController = {
     // Toggle specific item logic (Strike-through)
     async toggleItem(req: Request, res: Response) {
         try {
+            await ensureKdsSchema();
             const ticketId = getStringParam(req.params.id);
             const itemId = parseInt(getStringParam(req.params.itemId) || '0', 10);
 
             if (!ticketId || !itemId) return res.status(400).json({ error: 'INVALID_PARAMS' });
 
-            const [item] = await db.select().from(kdsTicketItems)
-                .where(and(eq(kdsTicketItems.id, itemId), eq(kdsTicketItems.kdsTicketId, ticketId)))
-                .limit(1);
+            const [item] = await db.select().top(1).from(kdsTicketItems)
+                .where(and(eq(kdsTicketItems.id, itemId), eq(kdsTicketItems.kdsTicketId, ticketId)));
 
             if (!item) return res.status(404).json({ error: 'ITEM_NOT_FOUND' });
 
@@ -494,7 +565,7 @@ export const kdsController = {
                 .set({ isBumped: !item.isBumped })
                 .where(eq(kdsTicketItems.id, itemId));
 
-            const [ticket] = await db.select().from(kdsTickets).where(eq(kdsTickets.id, ticketId)).limit(1);
+            const [ticket] = await db.select().top(1).from(kdsTickets).where(eq(kdsTickets.id, ticketId));
             if (ticket && !canAccessBranch(req, ticket.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
             if (ticket && ticket.branchId) {
                 try { getIO().to(`branch:${ticket.branchId}`).emit('kds:update'); } catch(e){}

@@ -54,7 +54,13 @@ const ApprovalCenter: React.FC = () => {
 
     const load = async () => {
         setIsLoading(true);
-        try { setApprovals(await approvalApi.getAll(settings.activeBranchId)); } catch { } finally { setIsLoading(false); }
+        try {
+            setApprovals(await approvalApi.getAll(settings.activeBranchId));
+        } catch (error: any) {
+            showError(error.message || (lang === 'ar' ? 'تعذر تحميل طلبات الاعتماد' : 'Failed to load approvals'));
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => { load(); }, []);

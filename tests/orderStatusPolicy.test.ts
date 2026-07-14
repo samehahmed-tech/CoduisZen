@@ -74,4 +74,17 @@ describe('order status lifecycle policy', () => {
             }).ok).toBe(true);
         }
     });
+
+    it('allows direct takeaway and pickup orders to complete from POS payment', () => {
+        for (const orderType of ['TAKEAWAY', 'PICKUP']) {
+            expect(evaluateOrderStatusUpdate({
+                currentStatus: 'PENDING',
+                nextStatus: 'COMPLETED',
+                orderType,
+                userRole: 'CASHIER',
+                userBranchId: 'BR-1',
+                orderBranchId: 'BR-1',
+            }).ok).toBe(true);
+        }
+    });
 });

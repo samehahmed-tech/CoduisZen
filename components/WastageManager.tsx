@@ -60,7 +60,11 @@ const WastageManager: React.FC = () => {
             const [entries, rep] = await Promise.all([wastageApi.getRecent(100), wastageApi.getReport()]);
             setEntries(entries || []);
             setReport(rep);
-        } catch { } finally { setIsLoading(false); }
+        } catch (error: any) {
+            showError(error.message || tr('Failed to load wastage data', 'تعذر تحميل بيانات الهالك'));
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => { load(); }, []);

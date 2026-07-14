@@ -14,10 +14,12 @@ const buildServer = async () => {
       format: 'cjs',
       external: [
         ...builtinModules,
-        'pg-native', // Postgres driver often has native parts
         'bcryptjs',  // Sometimes problematic to bundle
         'fsevents',
-        'pino-pretty'
+        'pino-pretty',
+        'msnodesqlv8',
+        'mssql',
+        'mssql/msnodesqlv8'
       ],
       sourcemap: true,
       minify: false, // Keep it readable for debugging in prod if needed

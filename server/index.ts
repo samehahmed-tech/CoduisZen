@@ -6,6 +6,7 @@ import http from 'http';
 import { initSocket, closeSocket } from './socket';
 import { closeDatabase } from './db';
 import { initRedisCache } from './utils/redisCache';
+import { validateEnvironment } from '../scripts/validate-env';
 
 const PORT = process.env.API_PORT || 3001;
 
@@ -30,6 +31,11 @@ const start = async () => {
     const isProduction = process.env.NODE_ENV === 'production';
     const requiredVars = ['DATABASE_URL', 'JWT_SECRET'];
     if (isProduction) {
+        const validation = validateEnvironment();
+        if (!validation.valid) {
+            console.error(`LAUNCH GATE FAILED:\n${validation.errors.join('\n')}`);
+            process.exit(1);
+        }
         const missing = requiredVars.filter(k => !process.env[k]);
         if (missing.length > 0) {
             console.error(`🚫 LAUNCH GATE FAILED: Missing required env vars: ${missing.join(', ')}`);
@@ -37,7 +43,11 @@ const start = async () => {
         }
         // Conditional gates
         if (process.env.GO_LIVE_REQUIRE_ETA === 'true') {
-            const etaVars = ['ETA_BASE_URL', 'ETA_CLIENT_ID', 'ETA_CLIENT_SECRET'];
+            const etaVars = [
+                'ETA_BASE_URL', 'ETA_TOKEN_URL', 'ETA_CLIENT_ID', 'ETA_CLIENT_SECRET', 'ETA_API_KEY',
+                'ETA_PRIVATE_KEY', 'ETA_RIN', 'ETA_COMPANY_NAME', 'ETA_BRANCH_CODE', 'ETA_COUNTRY',
+                'ETA_GOVERNATE', 'ETA_CITY', 'ETA_STREET', 'ETA_BUILDING',
+            ];
             const missingEta = etaVars.filter(k => !process.env[k]);
             if (missingEta.length > 0) {
                 console.error(`🚫 LAUNCH GATE FAILED: ETA is required but missing: ${missingEta.join(', ')}`);
@@ -51,6 +61,11 @@ const start = async () => {
     }
 
     await initSocket(server);
+    const HOST = process.env.HOST || '0.0.0.0';
+    server.listen(Number(PORT), HOST, () => {
+        console.log(`Coduis Zen Backend - Production Modular Foundation - running on ${HOST}:${PORT}`);
+    });
+
     if (shouldStartWhatsAppEngine()) {
         import('./services/whatsappService')
             .then(w => w.whatsappService.initialize())
@@ -73,10 +88,6 @@ const start = async () => {
     await initRedisCache();
     import('./workers/checkoutWorker').then(w => w.startCheckoutWorker());
     
-    const HOST = process.env.HOST || '0.0.0.0';
-    server.listen(Number(PORT), HOST, () => {
-        console.log(`Coduis Zen Backend - Production Modular Foundation - running on ${HOST}:${PORT}`);
-    });
 };
 
 start().catch((error) => {

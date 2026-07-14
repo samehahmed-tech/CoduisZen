@@ -9,6 +9,8 @@ module.exports = tseslint.config(
       'coverage/**',
       'node_modules/**',
       'node_modules_old/**',
+      '.wwebjs_auth/**',
+      '.wwebjs_cache/**',
       'drizzle/meta/**',
       'artifacts/**',
       'scratch/**',

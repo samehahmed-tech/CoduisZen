@@ -43,13 +43,13 @@ interface RecurringTemplate {
 // ============================================================================
 
 async function loadTemplates(): Promise<RecurringTemplate[]> {
-    const [row] = await db.select().from(settings).where(eq(settings.key, RECURRING_ENTRIES_KEY)).limit(1);
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, RECURRING_ENTRIES_KEY));
     const value = row?.value;
     return Array.isArray(value) ? (value as RecurringTemplate[]) : [];
 }
 
 async function saveTemplates(templates: RecurringTemplate[]): Promise<void> {
-    const [existing] = await db.select().from(settings).where(eq(settings.key, RECURRING_ENTRIES_KEY)).limit(1);
+    const [existing] = await db.select().top(1).from(settings).where(eq(settings.key, RECURRING_ENTRIES_KEY));
     if (existing) {
         await db.update(settings).set({ value: templates as any, updatedAt: new Date() }).where(eq(settings.key, RECURRING_ENTRIES_KEY));
     } else {

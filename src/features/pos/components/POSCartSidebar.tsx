@@ -50,6 +50,7 @@ interface POSCartSidebarProps {
     onLeaveTable: () => void;
     onCloseCart: () => void;
     onFocusSearch: () => void;
+    isSubmitting?: boolean;
     currencySymbol: string;
     isTouchMode: boolean;
     lang: 'en' | 'ar';
@@ -74,7 +75,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
     couponCode, activeCoupon, isApplyingCoupon, onCouponCodeChange, onApplyCoupon, onClearCoupon,
     onEditNote, onEditSeat, onEditCourse, onUpdateQuantity, onRemoveItem, onEditItemDiscount,
     onVoid, onClear, onSendKitchen, onSubmit, onQuickPay, onShowSplitModal,
-    onLeaveTable, onCloseCart, onFocusSearch,
+    onLeaveTable, onCloseCart, onFocusSearch, isSubmitting = false,
     tipAmount, onSetTipAmount,
     currencySymbol, isTouchMode, lang, t,
     isCartOpenMobile, shouldShowCart, cartPanelWidthClass, splitPayments = [],
@@ -234,7 +235,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                     onShowSplitModal={onShowSplitModal} isTouchMode={isTouchMode} lang={lang} t={t}
                     tipAmount={tipAmount} onSetTipAmount={onSetTipAmount} onVoid={onVoid}
                     onSendKitchen={onSendKitchen} onSubmit={onSubmit} onQuickPay={onQuickPay}
-                    canSubmit={hasCartItems} couponCode={couponCode} activeCoupon={activeCoupon}
+                    canSubmit={hasCartItems && !isSubmitting} couponCode={couponCode} activeCoupon={activeCoupon}
                     isApplyingCoupon={isApplyingCoupon}
                     onCouponCodeChange={onCouponCodeChange}
                     onApplyCoupon={onApplyCoupon} onClearCoupon={onClearCoupon} itemCount={cartStats.qty}

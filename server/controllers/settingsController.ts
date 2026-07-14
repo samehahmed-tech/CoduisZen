@@ -3,6 +3,7 @@ import { db } from '../db';
 import { settings } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
+import { upsertSetting } from '../utils/settingsStore';
 
 const SENSITIVE_SETTINGS_KEYS = new Set([
     'geminiApiKey',
@@ -64,24 +65,12 @@ export const updateSetting = async (req: Request, res: Response) => {
         if (isSensitiveSettingKey(key)) return res.status(403).json({ error: 'SENSITIVE_SETTING_BLOCKED' });
         const { value, category, updated_by } = req.body;
 
-        const [updated] = await db.insert(settings)
-            .values({
-                key,
-                value,
-                category: category || 'general',
-                updatedBy: updated_by,
-                updatedAt: new Date(),
-            })
-            .onConflictDoUpdate({
-                target: settings.key,
-                set: {
-                    value,
-                    category: category || 'general',
-                    updatedBy: updated_by,
-                    updatedAt: new Date(),
-                }
-            })
-            .returning();
+        const updated = await upsertSetting({
+            key,
+            value,
+            category: category || 'general',
+            updatedBy: updated_by,
+        });
 
         res.json(updated);
     } catch (error: any) {
@@ -101,21 +90,9 @@ export const updateBulkSettings = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'SENSITIVE_SETTING_BLOCKED', keys: blocked });
         }
 
-        const operations = Object.entries(updates).map(([key, value]) => {
-            return db.insert(settings)
-                .values({
-                    key,
-                    value,
-                    updatedAt: new Date(),
-                })
-                .onConflictDoUpdate({
-                    target: settings.key,
-                    set: {
-                        value,
-                        updatedAt: new Date(),
-                    }
-                });
-        });
+        const operations = Object.entries(updates).map(([key, value]) =>
+            upsertSetting({ key, value }),
+        );
 
         await Promise.all(operations);
         res.json({ success: true });

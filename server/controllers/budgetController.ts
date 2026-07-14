@@ -67,7 +67,7 @@ export const createBudget = async (req: Request, res: Response) => {
         const budgetId = `BDG-${nanoid(8)}`;
         const userId = (req as any).user?.id || req.body.createdBy || 'system';
 
-        const [created] = await db.insert(budgets).values({
+        const [created] = await db.insert(budgets).output().values({
             id: budgetId,
             name,
             branchId: branchId || null,
@@ -76,7 +76,7 @@ export const createBudget = async (req: Request, res: Response) => {
             status: 'DRAFT',
             notes: notes || null,
             createdBy: userId,
-        }).returning();
+        });
 
         // Insert budget lines if provided
         if (Array.isArray(lines) && lines.length > 0) {
@@ -109,7 +109,7 @@ export const updateBudget = async (req: Request, res: Response) => {
         if (notes !== undefined) updates.notes = notes;
         if (status !== undefined) updates.status = status;
 
-        const [updated] = await db.update(budgets).set(updates).where(eq(budgets.id, id)).returning();
+        const [updated] = await db.update(budgets).set(updates).output().where(eq(budgets.id, id));
         if (!updated) return res.status(404).json({ error: 'Budget not found' });
 
         // Replace lines if provided

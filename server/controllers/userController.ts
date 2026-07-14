@@ -6,6 +6,7 @@ import { db } from '../db';
 import { branches, users, userSessions } from '../../src/db/schema';
 import { INITIAL_ROLE_PERMISSIONS, UserRole } from '../../types';
 import { createSignedAuditLog } from '../services/auditService';
+import { isForeignKeyDeleteError, writeForeignKeyDeleteConflict } from '../utils/dbErrors';
 
 const PROTECTED_USER_IDS = ['user_sys_sameh_191224'];
 
@@ -19,6 +20,25 @@ const cleanString = (value: unknown) => {
 
 const cleanStringArray = (value: unknown) =>
     Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim()) : undefined;
+
+const parseJsonField = <T>(value: any, fallback: T): T => {
+    if (Array.isArray(value)) return value as unknown as T;
+    if (value && typeof value === 'object') return value as unknown as T;
+    if (typeof value === 'string' && value.trim()) {
+        try { return JSON.parse(value) as T; } catch { /* ignore */ }
+    }
+    return fallback;
+};
+
+const mapUserResponse = (u: any) => {
+    if (!u) return u;
+    return {
+        ...u,
+        permissions: parseJsonField<string[]>(u.permissions, []),
+        allowedBranches: parseJsonField<string[]>(u.allowedBranches, []),
+        customPermissions: parseJsonField<Record<string, any>>(u.customPermissions, {}),
+    };
+};
 
 const isEmailLike = (value: string | undefined) => !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -53,12 +73,16 @@ const writeError = (res: Response, error: any) => {
     if (code === '23505' || text.includes('duplicate key') || text.includes('users_email_unique')) {
         return res.status(409).json({ error: 'USER_CONFLICT', message: 'A user with the same email already exists' });
     }
+    if (isForeignKeyDeleteError(error)) {
+        return writeForeignKeyDeleteConflict(res, 'user', ['shifts', 'approvals', 'audit logs']);
+    }
     return res.status(500).json({ error: error.message || 'USER_WRITE_FAILED' });
 };
 
 export const getAllUsers = async (_req: Request, res: Response) => {
     try {
-        res.json(await db.select().from(users).orderBy(desc(users.createdAt)));
+        const rawUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+        res.json(rawUsers.map(mapUserResponse));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -70,7 +94,7 @@ export const getUserById = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         const [user] = await db.select().from(users).where(eq(users.id, id));
         if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
-        res.json(user);
+        res.json(mapUserResponse(user));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -106,7 +130,7 @@ export const createUser = async (req: Request, res: Response) => {
             updatedAt: new Date(),
         }).returning();
         await audit(req, 'USER_CREATED', { targetUserId: created.id, role: created.role }, 'User account created');
-        res.status(201).json(created);
+        res.status(201).json(mapUserResponse(created));
     } catch (error: any) {
         writeError(res, error);
     }
@@ -148,7 +172,7 @@ export const updateUser = async (req: Request, res: Response) => {
                 .where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
         }
         await audit(req, 'USER_UPDATED', { targetUserId: updated.id, roleChanged, activeChanged, permissionsChanged }, 'User account updated');
-        res.json(updated);
+        res.json(mapUserResponse(updated));
     } catch (error: any) {
         writeError(res, error);
     }
@@ -159,13 +183,13 @@ export const deleteUser = async (req: Request, res: Response) => {
         const id = param(req.params.id);
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         if (PROTECTED_USER_IDS.includes(id)) return res.status(403).json({ error: 'FORBIDDEN', message: 'System Owner cannot be deleted' });
-        await db.delete(userSessions).where(eq(userSessions.userId, id));
-        const [deleted] = await db.delete(users).where(eq(users.id, id)).returning();
+        await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(eq(userSessions.userId, id));
+        const [deleted] = await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!deleted) return res.status(404).json({ error: 'USER_NOT_FOUND' });
-        await audit(req, 'USER_DELETED', { targetUserId: deleted.id }, 'User account deleted');
-        res.json({ message: 'User deleted', user: deleted });
+        await audit(req, 'USER_DEACTIVATED', { targetUserId: deleted.id }, 'User account deactivated');
+        res.json({ message: 'User deactivated', user: mapUserResponse(deleted) });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        writeError(res, error);
     }
 };
 
@@ -196,7 +220,7 @@ export const bulkCreateUsers = async (req: Request, res: Response) => {
             }
         }
         await audit(req, 'USER_CREATED', { bulk: true, created: created.length, failed: errors.length }, 'Bulk user creation');
-        res.status(201).json({ created: created.length, failed: errors.length, users: created, errors });
+        res.status(201).json({ created: created.length, failed: errors.length, users: created.map(mapUserResponse), errors });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -212,7 +236,7 @@ export const bulkUpdateStatus = async (req: Request, res: Response) => {
         if (!req.body?.isActive && toUpdate.length) {
             await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(inArray(userSessions.userId, toUpdate));
         }
-        res.json({ updated: updated.length, skipped: userIds.length - toUpdate.length, users: updated });
+        res.json({ updated: updated.length, skipped: userIds.length - toUpdate.length, users: updated.map(mapUserResponse) });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -230,7 +254,7 @@ export const bulkAssignRole = async (req: Request, res: Response) => {
             updatedAt: new Date(),
         }).where(inArray(users.id, toUpdate)).returning();
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(inArray(userSessions.userId, toUpdate));
-        res.json({ updated: updated.length, skipped: userIds.length - toUpdate.length, users: updated });
+        res.json({ updated: updated.length, skipped: userIds.length - toUpdate.length, users: updated.map(mapUserResponse) });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -242,7 +266,7 @@ export const bulkAssignBranch = async (req: Request, res: Response) => {
         const branchId = cleanString(req.body?.branchId);
         if (!userIds.length || !branchId) return res.status(400).json({ error: 'USER_IDS_AND_BRANCH_REQUIRED' });
         const updated = await db.update(users).set({ assignedBranchId: branchId, allowedBranches: [branchId], updatedAt: new Date() }).where(inArray(users.id, userIds)).returning();
-        res.json({ updated: updated.length, users: updated });
+        res.json({ updated: updated.length, users: updated.map(mapUserResponse) });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -252,11 +276,11 @@ export const bulkDeleteUsers = async (req: Request, res: Response) => {
     try {
         const userIds = cleanStringArray(req.body?.userIds) || [];
         const toDelete = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
-        if (toDelete.length) await db.delete(userSessions).where(inArray(userSessions.userId, toDelete));
-        const deleted = toDelete.length ? await db.delete(users).where(inArray(users.id, toDelete)).returning() : [];
-        res.json({ deleted: deleted.length, skipped: userIds.length - toDelete.length, users: deleted });
+        if (toDelete.length) await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(inArray(userSessions.userId, toDelete));
+        const deleted = toDelete.length ? await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(inArray(users.id, toDelete)).returning() : [];
+        res.json({ deleted: deleted.length, skipped: userIds.length - toDelete.length, users: deleted.map(mapUserResponse) });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        writeError(res, error);
     }
 };
 
@@ -333,7 +357,7 @@ export const getUserActivity = async (req: Request, res: Response) => {
         const id = param(req.params.id);
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         const { pool } = await import('../db');
-        const result = await pool.query(`SELECT id, event_type, user_id, branch_id, payload, reason, created_at FROM audit_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`, [id]);
+        const result = await pool.query(`SELECT TOP 100 id, event_type, user_id, branch_id, payload, reason, created_at FROM audit_logs WHERE user_id = $1 ORDER BY created_at DESC`, [id]);
         res.json(result.rows);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -343,7 +367,7 @@ export const getUserActivity = async (req: Request, res: Response) => {
 export const getUserAuditChanges = async (_req: Request, res: Response) => {
     try {
         const { pool } = await import('../db');
-        const result = await pool.query(`SELECT al.id, al.event_type, al.user_id AS actor_id, u.name AS actor_name, al.payload, al.reason, al.created_at, al.branch_id FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id WHERE al.event_type LIKE 'USER_%' ORDER BY al.created_at DESC LIMIT 200`);
+        const result = await pool.query(`SELECT TOP 200 al.id, al.event_type, al.user_id AS actor_id, u.name AS actor_name, al.payload, al.reason, al.created_at, al.branch_id FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id WHERE al.event_type LIKE 'USER_%' ORDER BY al.created_at DESC`);
         res.json(result.rows);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -366,7 +390,7 @@ export const resetUserPin = async (req: Request, res: Response) => {
     try {
         const id = param(req.params.id);
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
-        const pin = cleanString(req.body?.newPin) || Math.floor(100000 + Math.random() * 900000).toString();
+        const pin = cleanString(req.body?.newPin) || crypto.randomInt(100000, 1000000).toString();
         if (!/^\d{6}$/.test(pin)) return res.status(400).json({ error: 'PIN_MUST_BE_6_DIGITS' });
         const [updated] = await db.update(users).set({ pinCode: pin, pinCodeHash: await bcrypt.hash(pin, 10), pinLoginEnabled: true, updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
@@ -396,7 +420,7 @@ export const getLoginHistory = async (req: Request, res: Response) => {
         const id = param(req.params.id);
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         const { pool } = await import('../db');
-        const result = await pool.query(`SELECT id, event_type, payload, ip_address, created_at FROM audit_logs WHERE user_id = $1 AND (event_type = 'SECURITY_LOGIN' OR event_type = 'LOGIN_ATTEMPT') ORDER BY created_at DESC LIMIT 50`, [id]);
+        const result = await pool.query(`SELECT TOP 50 id, event_type, payload, ip_address, created_at FROM audit_logs WHERE user_id = $1 AND (event_type = 'SECURITY_LOGIN' OR event_type = 'LOGIN_ATTEMPT') ORDER BY created_at DESC`, [id]);
         res.json(result.rows);
     } catch {
         try {
@@ -418,7 +442,7 @@ export const toggleUserActive = async (req: Request, res: Response) => {
         if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         const [updated] = await db.update(users).set({ isActive: !user.isActive, updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!updated.isActive) await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
-        res.json(updated);
+        res.json(mapUserResponse(updated));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -435,7 +459,7 @@ export const updateUserPermissions = async (req: Request, res: Response) => {
         }).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
-        res.json(updated);
+        res.json(mapUserResponse(updated));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -448,10 +472,11 @@ export const getEffectivePermissions = async (req: Request, res: Response) => {
         const [user] = await db.select().from(users).where(eq(users.id, id));
         if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         const roleDefaults = INITIAL_ROLE_PERMISSIONS[user.role as UserRole] || [];
-        const custom = user.customPermissions || {};
-        const effective = new Set([...(roleDefaults || []), ...((user.permissions || []) as string[])]);
+        const parsedPermissions = parseJsonField<string[]>(user.permissions, []);
+        const custom = parseJsonField<Record<string, any>>(user.customPermissions, {});
+        const effective = new Set([...(roleDefaults || []), ...parsedPermissions]);
         for (const [perm, enabled] of Object.entries(custom)) enabled ? effective.add(perm) : effective.delete(perm);
-        res.json({ userId: user.id, role: user.role, permissions: Array.from(effective), roleDefaults, userOverrides: user.permissions || [], customOverrides: custom });
+        res.json({ userId: user.id, role: user.role, permissions: Array.from(effective), roleDefaults, userOverrides: parsedPermissions, customOverrides: custom });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -469,7 +494,7 @@ export const updateBranchAccess = async (req: Request, res: Response) => {
         }
         const [updated] = await db.update(users).set({ assignedBranchId, allowedBranches: allowedBranches || [], updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
-        res.json(updated);
+        res.json(mapUserResponse(updated));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

@@ -57,7 +57,7 @@ const CategoryDrawer: React.FC<Props> = ({
     return (
         <div className="fixed inset-0 z-[250] flex justify-end">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-[400px] bg-white dark:bg-card shadow-2xl border-l border-gray-100 dark:border-white/[0.04] flex flex-col animate-slide-in h-full">
+            <div className="relative w-full sm:w-[400px] bg-white dark:bg-card shadow-2xl border-l border-gray-100 dark:border-white/[0.04] flex flex-col animate-slide-in h-full">
                 {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/[0.04]">
                 <h2 className="text-[16px] font-semibold text-gray-900 dark:text-main">
@@ -85,7 +85,7 @@ const CategoryDrawer: React.FC<Props> = ({
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
                 {/* Names */}
                 <div className="space-y-4">
                     <div>
@@ -215,7 +215,7 @@ const CategoryDrawer: React.FC<Props> = ({
                             {lang === 'ar' ? 'لا توجد طابعات مضافة.' : 'No printers configured.'}
                         </p>
                     ) : (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {printers.map(printer => {
                                 const isSelected = (formData.printerIds || []).includes(printer.id);
                                 return (

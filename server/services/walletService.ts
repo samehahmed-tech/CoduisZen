@@ -12,11 +12,11 @@ export const walletService = {
         let [wallet] = await db.select().from(customerWallets).where(eq(customerWallets.customerId, customerId));
         if (!wallet) {
             const walletId = `WLT-${customerId}-${Date.now()}`;
-            [wallet] = await db.insert(customerWallets).values({
+            [wallet] = await db.insert(customerWallets).output().values({
                 id: walletId,
                 customerId,
                 balance: 0,
-            }).returning();
+            });
         }
         return wallet;
     },
@@ -33,8 +33,8 @@ export const walletService = {
                     balance: sql`balance + ${amount}`,
                     lastUpdated: new Date()
                 })
-                .where(eq(customerWallets.id, wallet.id))
-                .returning();
+                .output()
+                .where(eq(customerWallets.id, wallet.id));
             
             // 2. Log Wallet Transaction
             await tx.insert(walletTransactions).values({

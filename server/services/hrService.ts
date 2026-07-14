@@ -26,6 +26,7 @@ export const hrService = {
             // }
 
             const [entry] = await db.insert(attendance)
+                .output()
                 .values({
                     id: `ATT-${Date.now()}`,
                     employeeId,
@@ -34,8 +35,7 @@ export const hrService = {
                     clockInLat: lat,
                     clockInLng: lng,
                     status: 'PRESENT',
-                })
-                .returning();
+                });
             
             log.info({ employeeId, branchId }, 'Employee clocked in');
             return entry;
@@ -53,7 +53,7 @@ export const hrService = {
             const [lastEntry] = await db.select().from(attendance)
                 .where(and(eq(attendance.employeeId, employeeId), sql`${attendance.clockOut} IS NULL`))
                 .orderBy(desc(attendance.clockIn))
-                .limit(1);
+                .offset(0).fetch(1);
 
             if (!lastEntry) throw new Error('No active clock-in found');
 
@@ -64,8 +64,8 @@ export const hrService = {
                     clockOutLng: lng,
                     updatedAt: new Date(),
                 })
-                .where(eq(attendance.id, lastEntry.id))
-                .returning();
+                .output()
+                .where(eq(attendance.id, lastEntry.id));
 
             log.info({ employeeId }, 'Employee clocked out');
             return updated;
@@ -105,14 +105,7 @@ export const hrService = {
                         status: 'DRAFT',
                         processedBy: requestedBy,
                     })
-                    .onConflictDoUpdate({
-                        target: [payroll.userId, payroll.month],
-                        set: {
-                            netSalary,
-                            updatedAt: new Date(),
-                        }
-                    })
-                    .returning();
+                    .output();
                 
                 payrolls.push(pr);
             }

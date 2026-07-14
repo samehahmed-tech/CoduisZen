@@ -38,6 +38,7 @@ interface ReceiptTemplate {
     linkedDepartments: string[];
     isDefault: boolean;
     createdAt: string;
+    styleVariant?: 'classic' | 'compact' | 'bold';
 }
 
 // ── Storage key (same as ReceiptDesigner) ──
@@ -185,6 +186,9 @@ export const generateHtmlFromTemplate = ({
     const widthMm = paperWidth === '58mm' ? 58 : 80;
     const bodyWidthMm = paperWidth === '58mm' ? 56 : 78;
     const fontSizePx = template.fontSize === 'small' ? 17 : template.fontSize === 'large' ? 24 : 21;
+    const styleVariant = template.styleVariant || 'classic';
+    const isCompact = styleVariant === 'compact';
+    const isBold = styleVariant === 'bold';
     const createdAt = order.createdAt ? new Date(order.createdAt) : new Date();
     const dateStr = createdAt.toLocaleDateString(isAr ? 'ar-EG' : 'en-GB', {
         day: '2-digit',
@@ -235,13 +239,15 @@ export const generateHtmlFromTemplate = ({
             const cfg = block.config || {};
 
             switch (block.type) {
-                case 'logo':
-                    if (!cfg.url || template.showLogo === false) return '';
+                case 'logo': {
+                    const logoUrl = cfg.url || settings.receiptLogoUrl || '';
+                    if (!logoUrl || template.showLogo === false) return '';
                     return `
                         <div class="block logo-block">
-                            <img src="${escapeHtml(cfg.url)}" alt="logo" style="max-height:${Number(cfg.maxHeight || 60)}px;max-width:100%;object-fit:contain" />
+                            <img src="${escapeHtml(logoUrl)}" alt="logo" style="max-height:${Number(cfg.maxHeight || 60)}px;max-width:100%;object-fit:contain" />
                         </div>
                     `;
+                }
 
                 case 'header':
                     return `
@@ -455,19 +461,19 @@ export const generateHtmlFromTemplate = ({
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
-    img { display: block; margin: 0 auto; }
-    .block { margin: 5px 0; }
+    img { display: block; margin: 0 auto; filter: grayscale(1) contrast(1.15); }
+    .block { margin: ${isCompact ? 2 : 5}px 0; }
     .logo-block, .payment-section, .qr-block, .receipt-footer { text-align: center; }
-    .header-block { text-align: center; padding-bottom: 8px; border-bottom: 2px solid #111; }
+    .header-block { text-align: center; padding-bottom: ${isCompact ? 4 : 8}px; border-bottom: ${isBold ? 4 : 2}px solid #111; }
     .restaurant-name { font-size: ${fontSizePx + 6}px; font-weight: 900; line-height: 1.2; }
     .branch-name { font-size: ${Math.max(fontSizePx - 1, 14)}px; font-weight: 900; color: #222; }
     .branch-info { font-size: ${Math.max(fontSizePx - 2, 13)}px; color: #333; font-weight: 900; }
     .receipt-title {
         text-align: center;
         padding: 6px 0;
-        border: 1px dashed #999;
+        border: ${isBold ? 3 : 1}px ${isBold ? 'solid' : 'dashed'} #111;
         border-radius: 4px;
-        background: #f5f5f5;
+        background: ${isBold ? '#fff' : '#f5f5f5'};
         font-size: ${fontSizePx + 1}px;
         font-weight: 800;
     }
@@ -505,7 +511,7 @@ export const generateHtmlFromTemplate = ({
         font-weight: 900;
         text-transform: uppercase;
         color: #777;
-        border-bottom: 2px solid #222;
+        border-bottom: ${isBold ? 4 : 2}px solid #222;
     }
     .items-table td {
         padding: 5px 2px;
@@ -523,7 +529,7 @@ export const generateHtmlFromTemplate = ({
     .mod-price { color: #999; }
     .summary-row td { padding: 4px 0; font-weight: 900; }
     .summary-row td:last-child { text-align: ${textAlignEnd}; }
-    .discount-row td { color: #2e7d32; }
+    .discount-row td { color: #111; }
     .money {
         display: inline-block;
         direction: ltr;
@@ -539,11 +545,13 @@ export const generateHtmlFromTemplate = ({
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 9px 10px;
-        border-radius: 6px;
-        background: #111;
-        color: #fff;
-        font-weight: 800;
+        padding: ${isCompact ? 6 : 9}px 10px;
+        border: 3px solid #111;
+        ${isBold ? 'border-width: 5px;' : ''}
+        border-radius: 4px;
+        background: #fff;
+        color: #000;
+        font-weight: 900;
         margin: 6px 2px 0;
         overflow: hidden;
     }
@@ -584,8 +592,39 @@ export const generateHtmlFromTemplate = ({
     .dashed-sep, .thick-sep { border: none; margin: 6px 0; }
     .dashed-sep { border-top: 1px dashed #bbb; }
     .thick-sep { border-top: 2px solid #222; }
+
+    /* Classic ledger: familiar restaurant receipt with clear ruled sections. */
+    body.receipt-classic .header-block { border-top: 3px double #111; border-bottom: 3px double #111; padding: 8px 0; }
+    body.receipt-classic .receipt-title { border-left: 0; border-right: 0; border-radius: 0; background: #fff; }
+    body.receipt-classic .items-header td { border-top: 1px solid #111; border-bottom: 2px solid #111; }
+
+    /* Counter compact: dense, left/right aligned, minimal paper usage. */
+    body.receipt-compact { line-height: 1.22; }
+    body.receipt-compact .logo-block img { max-height: 40px !important; }
+    body.receipt-compact .header-block { text-align: ${textAlign}; border: 0; border-bottom: 1px solid #111; padding: 0 0 4px; }
+    body.receipt-compact .restaurant-name { font-size: ${fontSizePx + 3}px; }
+    body.receipt-compact .branch-info { display: inline; margin-inline-end: 8px; }
+    body.receipt-compact .order-meta { border-top: 1px solid #111; border-bottom: 1px solid #111; padding: 4px 0; }
+    body.receipt-compact .items-table td { padding-top: 3px; padding-bottom: 3px; border-bottom: 0; }
+    body.receipt-compact .items-table tr:not(.items-header):nth-child(even) td { background: #f0f0f0; }
+    body.receipt-compact .summary-table { border-top: 1px solid #111; }
+    body.receipt-compact .grand-total { border-width: 2px; margin-inline: 0; }
+    body.receipt-compact .receipt-footer { border-top: 1px dashed #111; padding-top: 5px; }
+
+    /* Bold ticket: order number and final amount dominate from arm's length. */
+    body.receipt-bold { border: 4px solid #111; padding: 2mm; }
+    body.receipt-bold .header-block { border: 0; padding-bottom: 3px; }
+    body.receipt-bold .restaurant-name { font-size: ${fontSizePx + 10}px; letter-spacing: -0.5px; }
+    body.receipt-bold .receipt-title { background: #111; color: #fff; border: 0; border-radius: 0; font-size: ${fontSizePx + 4}px; }
+    body.receipt-bold .order-meta { align-items: stretch; border: 3px solid #111; padding: 6px; }
+    body.receipt-bold .order-meta .meta-block:first-child .meta-value { font-size: ${fontSizePx + 10}px; line-height: 1; }
+    body.receipt-bold .items-header td { color: #111; border-top: 4px solid #111; border-bottom: 4px solid #111; }
+    body.receipt-bold .item-name { font-size: ${fontSizePx + 4}px; }
+    body.receipt-bold .grand-total { background: #111; color: #fff; border: 0; border-radius: 0; padding: 12px 8px; }
+    body.receipt-bold .grand-total-value { font-size: ${fontSizePx + 8}px; }
+    body.receipt-bold .payment-pill { border: 3px solid #111; border-radius: 0; }
 </style>
 </head>
-<body>${blockHtml}</body>
+<body class="receipt-${styleVariant}">${blockHtml}</body>
 </html>`;
 };

@@ -81,6 +81,13 @@ export const getPlatformHealth = async (req: Request, res: Response) => {
         'ETA_API_KEY',
         'ETA_PRIVATE_KEY',
         'ETA_RIN',
+        'ETA_COMPANY_NAME',
+        'ETA_BRANCH_CODE',
+        'ETA_COUNTRY',
+        'ETA_GOVERNATE',
+        'ETA_CITY',
+        'ETA_STREET',
+        'ETA_BUILDING',
     ].filter((key) => !process.env[key]);
 
     const alerts = {

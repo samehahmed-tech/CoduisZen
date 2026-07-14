@@ -80,7 +80,7 @@ interface OrderState {
     // Async Actions (API)
     fetchOrders: (params?: { status?: string; branch_id?: string; date?: string; limit?: number }) => Promise<void>;
     placeOrder: (order: Order) => Promise<Order>;
-    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean }) => Promise<void>;
+    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean }) => Promise<void>;
 
     fetchTables: (branchId: string) => Promise<void>;
     updateTableStatus: (tableId: string, status: TableStatus) => Promise<void>;
@@ -343,8 +343,9 @@ export const useOrderStore = create<OrderState>()(
 
                     let savedOrder: any = order;
 
+                    const idempotencyKey = (order as any).clientSubmitKey || order.id;
                     if (navigator.onLine) {
-                        savedOrder = await ordersApi.create(payload);
+                        savedOrder = await ordersApi.create(payload, { idempotencyKey });
                     } else {
                         await syncService.queue('order', 'CREATE', payload);
                         savedOrder = { ...order, syncStatus: 'PENDING' };
@@ -414,9 +415,9 @@ export const useOrderStore = create<OrderState>()(
                 try {
                     const current = get().orders.find(o => o.id === orderId);
                     const previousStatus = current?.status;
-                    const expectedUpdatedAt = current?.updatedAt ? new Date(current.updatedAt).toISOString() : undefined;
+                    const expectedUpdatedAt = options?.skipVersionCheck ? undefined : (current?.updatedAt ? new Date(current.updatedAt).toISOString() : undefined);
                     if (navigator.onLine) {
-                        await ordersApi.updateStatus(orderId, { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt });
+                        await ordersApi.updateStatus(orderId, { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt }, { idempotencyKey: `${orderId}:${status}:${Date.now()}` });
                     } else {
                         await syncService.queue('orderStatus', 'UPDATE', {
                             id: orderId,
@@ -442,8 +443,14 @@ export const useOrderStore = create<OrderState>()(
                         if (orderForPrint) {
                             try {
                                 // Run in background to prevent UI lag
-                                printCompletionReceiptIfNeeded(orderForPrint as Order).catch(() => undefined);
-                            } catch (error) {}
+                                printCompletionReceiptIfNeeded(orderForPrint as Order).catch((error) => {
+                                    console.error('[print] completion receipt failed', error);
+                                    set({ error: 'RECEIPT_PRINT_FAILED' });
+                                });
+                            } catch (error) {
+                                console.error('[print] completion receipt failed', error);
+                                set({ error: 'RECEIPT_PRINT_FAILED' });
+                            }
                         }
                     }
                 } catch (error: any) {

@@ -41,21 +41,21 @@ export const openShift = async (req: Request, res: Response) => {
                 eq(shifts.branchId, branchId),
                 eq(shifts.status, 'OPEN')
             )
-        ).orderBy(desc(shifts.openingTime)).limit(1);
+        ).orderBy(desc(shifts.openingTime)).offset(0).fetch(1);
 
         if (existingOpenShift.length > 0) {
             return res.status(200).json(existingOpenShift[0]);
         }
 
-        const [newShift] = await db.insert(shifts).values({
-            id,
+        const [newShift] = await db.insert(shifts).output().values({
+            id: id || `SFT-${Date.now()}`,
             branchId,
             userId,
             openingBalance: Number(openingBalance || 0),
             status: 'OPEN',
             notes,
             openingTime: new Date(),
-        }).returning();
+        });
 
         res.status(201).json(newShift);
     } catch (error: any) {
@@ -136,8 +136,8 @@ export const closeShift = async (req: Request, res: Response) => {
                 notes: [notes, varianceNote].filter(Boolean).join(' | ') || shift[0].notes,
                 updatedAt: new Date(),
             })
-            .where(eq(shifts.id, shiftId))
-            .returning();
+            .output()
+            .where(eq(shifts.id, shiftId));
 
         res.json({
             ...updatedShift,
@@ -164,7 +164,7 @@ export const getActiveShift = async (req: Request, res: Response) => {
                 eq(shifts.branchId, branchId),
                 eq(shifts.status, 'OPEN')
             )
-        ).orderBy(desc(shifts.openingTime)).limit(1);
+        ).orderBy(desc(shifts.openingTime)).offset(0).fetch(1);
 
         if (activeShift.length === 0) return res.status(404).json({ error: 'No active shift found' });
         res.json(activeShift[0]);

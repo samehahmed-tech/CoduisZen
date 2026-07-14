@@ -1,24 +1,61 @@
 import { Order, OrderItem } from '../../types';
 import { requireEnv } from '../config/env';
 
-const ETA_RIN = process.env.ETA_RIN;
-const ETA_COMPANY_NAME = process.env.ETA_COMPANY_NAME || 'Restaurant Enterprise';
-const ETA_BRANCH_CODE = process.env.ETA_BRANCH_CODE || '0';
-const ETA_ADDRESS = {
-    country: process.env.ETA_COUNTRY || 'EG',
-    governate: process.env.ETA_GOVERNATE || 'Cairo',
-    city: process.env.ETA_CITY || 'Cairo',
-    street: process.env.ETA_STREET || '90th St',
-    buildingNumber: process.env.ETA_BUILDING || 'Business Tower',
-};
+export const FISCAL_SELLER_ENV_KEYS = [
+    'ETA_RIN',
+    'ETA_COMPANY_NAME',
+    'ETA_BRANCH_CODE',
+    'ETA_COUNTRY',
+    'ETA_GOVERNATE',
+    'ETA_CITY',
+    'ETA_STREET',
+    'ETA_BUILDING',
+] as const;
 
 export const fiscalService = {
     prepareETAReceipt: (order: Order, items: OrderItem[], options?: { isReturn?: boolean, originalReceiptNumber?: string }) => {
-        if (!ETA_RIN) {
-            throw new Error('ETA_RIN is not configured');
-        }
-
+        const seller = {
+            rin: requireEnv('ETA_RIN'),
+            companyTradeName: requireEnv('ETA_COMPANY_NAME'),
+            branchCode: requireEnv('ETA_BRANCH_CODE'),
+            address: {
+                country: requireEnv('ETA_COUNTRY'),
+                governate: requireEnv('ETA_GOVERNATE'),
+                city: requireEnv('ETA_CITY'),
+                street: requireEnv('ETA_STREET'),
+                buildingNumber: requireEnv('ETA_BUILDING'),
+            },
+        };
         const isReturn = options?.isReturn || order.status === 'REFUNDED';
+
+        const itemData = (items || []).map(item => {
+            const itemCode = String(item.fiscalCode || '').trim();
+            if (!itemCode) throw new Error(`FISCAL_ITEM_CODE_MISSING: ${item.name}`);
+
+            const quantity = Number(item.quantity || 0);
+            const unitPrice = Number(item.price || 0);
+            const netSale = Number((quantity * unitPrice).toFixed(2));
+            const taxAmount = Number(Number(item.tax || 0).toFixed(2));
+            const taxRate = netSale > 0 ? Number(((taxAmount / netSale) * 100).toFixed(4)) : 0;
+
+            return {
+                description: item.name,
+                itemType: /^\d{8,14}$/.test(itemCode) ? 'GS1' : 'EGS',
+                itemCode,
+                unitType: 'EA',
+                quantity,
+                unitPrice,
+                netSale,
+                totalSale: netSale,
+                total: Number((netSale + taxAmount).toFixed(2)),
+                taxableItems: taxAmount > 0 ? [{
+                    taxType: 'T1',
+                    amount: taxAmount,
+                    subType: 'V001',
+                    rate: taxRate,
+                }] : [],
+            };
+        });
 
         return {
             header: {
@@ -27,43 +64,20 @@ export const fiscalService = {
                 uuid: '',
                 previousUUID: '',
                 referenceOldReceiptNumber: options?.originalReceiptNumber || '',
-                type: isReturn ? 'R' : 'S', // R for Return, S for Sale
+                type: isReturn ? 'R' : 'S',
             },
-            seller: {
-                rin: ETA_RIN,
-                companyTradeName: ETA_COMPANY_NAME,
-                branchCode: ETA_BRANCH_CODE,
-                address: ETA_ADDRESS
-            },
+            seller,
             buyer: {
-                type: order.customerPhone ? 'P' : 'F', // P for Person, F for Foreigner/Generic
+                type: order.customerPhone ? 'P' : 'F',
                 id: order.customerPhone || '000000000',
-                name: order.customerName || 'Walk-in Customer'
+                name: order.customerName || 'Walk-in Customer',
             },
-            itemData: (items || []).map(item => ({
-                description: item.name,
-                itemType: 'GS1',
-                itemCode: item.fiscalCode || '10001234',
-                unitType: 'EA',
-                quantity: item.quantity,
-                unitPrice: item.price,
-                netSale: item.price * item.quantity,
-                totalSale: item.price * item.quantity,
-                total: (item.price * item.quantity) + (item.tax || 0),
-                taxableItems: [
-                    {
-                        taxType: 'T1',
-                        amount: item.tax || (item.price * item.quantity * 0.14),
-                        subType: 'V001',
-                        rate: 14
-                    }
-                ]
-            })),
+            itemData,
             totalSales: order.subtotal,
             totalVAT: order.tax,
             netAmount: order.subtotal,
             totalAmount: order.total,
-            paymentMethod: order.paymentMethod === 'CASH' ? 'C' : 'K'
+            paymentMethod: order.paymentMethod === 'CASH' ? 'C' : 'K',
         };
-    }
+    },
 };

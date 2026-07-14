@@ -1064,14 +1064,19 @@ export interface AppSettings {
   receiptLogoUrl?: string;
   receiptQrUrl?: string;
   receiptBrandingByOrderType?: Partial<Record<OrderType, { logoUrl?: string; qrUrl?: string }>>;
+  receiptTemplates?: Array<Record<string, any>>;
   primaryCashierPrinterId?: string;
   cashierReceiptCopies?: number;
   autoPrintReceipt?: boolean;
   autoPrintReceiptOnSubmit?: boolean;
   autoPrintCompletionReceipt?: boolean;
+  orderManualKitchenFlow?: boolean;
+  autoCompleteDirectOrders?: boolean;
   autoPrintReports?: boolean;
   endOfDayEmailEnabled?: boolean;
   endOfDayEmailRecipients?: string[];
+  dayCloseRequireStockCount?: boolean;
+  dayCloseWhatsappRecipients?: string[];
   blindShiftReconciliation?: boolean;
   maxKitchenPrinters?: number;
   activeBranchId?: string; // Current operating branch context

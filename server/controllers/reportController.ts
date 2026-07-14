@@ -53,7 +53,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             )
         )`;
 
-        const [overviewRows, paymentsMix, paidRevenueRows, uniqueCustomersRows, itemsSoldRows, opsStatusRows, orderTypeRows, trendRows, topItemsRows, categoryRows, branchRows, topCustomerRows, expenseRows, pendingExpenseRows] = await Promise.all([
+        const [overviewRows, paymentsMix, paidRevenueRows, uniqueCustomersRows, itemsSoldRows, opsStatusRows, orderTypeRows, trendRows, _allTopItemsRows, _allCategoryRows, _allBranchRows, _allTopCustomerRows, expenseRows, pendingExpenseRows, cogsRows] = await Promise.all([
             db.select({
                 orderCount: sql<number>`count(*)`,
                 grossSales: sql<number>`coalesce(sum(${orders.total}), 0)`,
@@ -133,7 +133,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             ).groupBy(orders.type),
             (scopeValue === 'DAILY'
                 ? db.select({
-                    name: sql<string>`to_char(${orders.createdAt}, 'HH24:00')`,
+                    name: sql<string>`FORMAT(${orders.createdAt}, 'HH') + ':00'`,
                     revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
                 }).from(orders).where(
                     and(
@@ -141,9 +141,9 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                         orderDateInRange,
                         revenueRecognized
                     )
-                ).groupBy(sql`to_char(${orders.createdAt}, 'HH24:00')`).orderBy(sql`to_char(${orders.createdAt}, 'HH24:00') asc`)
+                ).groupBy(sql`FORMAT(${orders.createdAt}, 'HH') + ':00'`).orderBy(sql`FORMAT(${orders.createdAt}, 'HH') + ':00' asc`)
                 : db.select({
-                    name: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+                    name: sql<string>`FORMAT(${orders.createdAt}, 'yyyy-MM-dd')`,
                     revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
                 }).from(orders).where(
                     and(
@@ -151,7 +151,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                         orderDateInRange,
                         revenueRecognized
                     )
-                ).groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`).orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD') asc`)),
+                ).groupBy(sql`FORMAT(${orders.createdAt}, 'yyyy-MM-dd')`).orderBy(sql`FORMAT(${orders.createdAt}, 'yyyy-MM-dd') asc`)),
+            // Top items query without .limit() — use slice() instead as mssql-core doesn't support .limit() after .groupBy()
             db.select({
                 name: sql<string>`coalesce(${orderItems.name}, 'Unknown')`,
                 qty: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
@@ -166,8 +167,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     )
                 )
                 .groupBy(sql`coalesce(${orderItems.name}, 'Unknown')`)
-                .orderBy(sql`coalesce(sum(${orderItems.quantity}), 0) desc`)
-                .limit(8),
+                .orderBy(sql`coalesce(sum(${orderItems.quantity}), 0) desc`),
+            // Categories query
             db.select({
                 name: sql<string>`coalesce(${menuCategories.name}, 'Uncategorized')`,
                 value: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.price}), 0)`,
@@ -183,8 +184,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     )
                 )
                 .groupBy(sql`coalesce(${menuCategories.name}, 'Uncategorized')`)
-                .orderBy(sql`coalesce(sum(${orderItems.quantity} * ${orderItems.price}), 0) desc`)
-                .limit(6),
+                .orderBy(sql`coalesce(sum(${orderItems.quantity} * ${orderItems.price}), 0) desc`),
+            // Branch performance query
             db.select({
                 branchId: orders.branchId,
                 branchName: sql<string>`coalesce(${branches.name}, ${orders.branchId})`,
@@ -200,8 +201,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     )
                 )
                 .groupBy(orders.branchId, branches.name)
-                .orderBy(sql`coalesce(sum(${orders.total}), 0) desc`)
-                .limit(6),
+                .orderBy(sql`coalesce(sum(${orders.total}), 0) desc`),
+            // Top customers query
             db.select({
                 id: sql<string>`coalesce(${orders.customerId}, ${orders.customerPhone}, ${orders.customerName}, 'guest')`,
                 name: sql<string>`coalesce(max(${orders.customerName}), max(${orders.customerPhone}), 'Guest')`,
@@ -215,8 +216,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                 )
             )
                 .groupBy(sql`coalesce(${orders.customerId}, ${orders.customerPhone}, ${orders.customerName}, 'guest')`)
-                .orderBy(sql`coalesce(sum(${orders.total}), 0) desc`)
-                .limit(5),
+                .orderBy(sql`coalesce(sum(${orders.total}), 0) desc`),
             db.select({
                 expenses: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
             }).from(journalLines)
@@ -227,8 +227,9 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     gte(journalEntries.date, start),
                     lte(journalEntries.date, end),
                     eq(journalEntries.status, 'POSTED'),
+                    eq(journalEntries.referenceType, 'EXPENSE'),
                     eq(chartOfAccounts.type, 'EXPENSE'),
-                    branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined
+                    branchId ? eq(costCenters.branchId, branchId) : undefined
                 )),
             db.select({
                 pendingExpenses: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
@@ -240,10 +241,33 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     gte(journalEntries.date, start),
                     lte(journalEntries.date, end),
                     eq(journalEntries.status, 'PENDING_APPROVAL'),
+                    eq(journalEntries.referenceType, 'EXPENSE'),
                     eq(chartOfAccounts.type, 'EXPENSE'),
-                    branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined
+                    branchId ? eq(costCenters.branchId, branchId) : undefined
+                )),
+            db.select({
+                cogs: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+            }).from(journalLines)
+                .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+                .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+                .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                .leftJoin(orders, eq(journalEntries.reference, orders.id))
+                .where(and(
+                    gte(journalEntries.date, start),
+                    lte(journalEntries.date, end),
+                    eq(journalEntries.status, 'POSTED'),
+                    eq(journalEntries.referenceType, 'COGS'),
+                    eq(chartOfAccounts.type, 'EXPENSE'),
+                    branchId ? or(
+                        eq(costCenters.branchId, branchId),
+                        and(sql`${journalLines.costCenterId} is null`, eq(orders.branchId, branchId)),
+                    ) : undefined
                 )),
         ]);
+        const topItemsRows = _allTopItemsRows.slice(0, 8);
+        const categoryRows = _allCategoryRows.slice(0, 6);
+        const branchRows = _allBranchRows.slice(0, 6);
+        const topCustomerRows = _allTopCustomerRows.slice(0, 5);
 
         const summary = overviewRows[0] || {
             orderCount: 0,
@@ -258,6 +282,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
         const netSales = Number(summary.netSales || 0);
         const approvedExpenses = Number(expenseRows[0]?.expenses || 0);
         const pendingExpenses = Number(pendingExpenseRows[0]?.pendingExpenses || 0);
+        const cogs = Number(cogsRows[0]?.cogs || 0);
         const pending = Number(opsStatusRows.find(r => r.status === 'PENDING')?.count || 0)
             + Number(opsStatusRows.find(r => r.status === 'PREPARING')?.count || 0)
             + Number(opsStatusRows.find(r => r.status === 'READY')?.count || 0)
@@ -275,7 +300,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                 netRevenue: netSales,
                 expenses: approvedExpenses,
                 pendingExpenses,
-                netProfit: netSales - approvedExpenses,
+                cogs,
+                netProfit: netSales - cogs - approvedExpenses,
                 paidRevenue: Number(paidRevenueRows[0]?.paidRevenue || 0),
                 discounts: Number(summary.discountTotal || 0),
                 orderCount,
@@ -338,6 +364,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
         });
     } catch (error: any) {
         const message = error?.message || 'Failed to load dashboard KPIs';
+        console.error('[DashboardKPIs] Error:', error);
         if (message === 'AUTH_REQUIRED') return res.status(401).json({ error: message });
         if (message === 'FORBIDDEN_BRANCH_SCOPE' || message === 'BRANCH_SCOPE_REQUIRED') return res.status(403).json({ error: message });
         return res.status(500).json({ error: message });
@@ -363,7 +390,7 @@ const getExportSnapshot = async (branchId: string | undefined, start: Date, end:
     );
 
     const daily = await db.select({
-        day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
+        day: sql<string>`FORMAT(${orders.createdAt}, 'yyyy-MM-dd')`,
         revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         net: sql<number>`coalesce(sum(${orders.subtotal} - ${orders.discount}), 0)`,
         tax: sql<number>`coalesce(sum(${orders.tax}), 0)`,
@@ -377,8 +404,8 @@ const getExportSnapshot = async (branchId: string | undefined, start: Date, end:
                 inArray(orders.status, deliveredStatuses)
             )
         )
-        .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
-        .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD') asc`);
+        .groupBy(sql`FORMAT(${orders.createdAt}, 'yyyy-MM-dd')`)
+        .orderBy(sql`FORMAT(${orders.createdAt}, 'yyyy-MM-dd') asc`);
 
     const [profit] = await db.select({
         cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${menuItems.cost}, 0)), 0)`,
@@ -618,7 +645,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                     .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE')))
                     .groupBy(chartOfAccounts.name)
-                    .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).limit(20);
+                    .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).offset(0).fetch(20);
                 lines.push('Expense Account,Total');
                 rows.forEach(r => lines.push([`"${r.name}"`, Number(r.total).toFixed(2)].join(',')));
                 break;
@@ -642,8 +669,8 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                         eq(chartOfAccounts.type, 'EXPENSE'),
                         branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined
                     ))
-                    .orderBy(desc(journalEntries.date), desc(journalLines.id))
-                    .limit(1000);
+.orderBy(desc(journalEntries.date), desc(journalLines.id))
+                    .offset(0).fetch(1000);
                 lines.push('Date,Account Code,Expense Account,Description,Reference,Amount');
                 rows.forEach(r => lines.push([
                     r.date ? new Date(r.date).toISOString() : '',
@@ -662,7 +689,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 }).from(stockMovements)
                     .innerJoin(inventoryItems, eq(stockMovements.itemId, inventoryItems.id))
                     .where(and(gte(stockMovements.createdAt, start), lte(stockMovements.createdAt, end)))
-                    .orderBy(desc(stockMovements.createdAt)).limit(500);
+                    .orderBy(desc(stockMovements.createdAt)).offset(0).fetch(500);
                 lines.push('Item,Type,Quantity,Cost,Reason,Date');
                 rows.forEach(r => lines.push([`"${r.itemName}"`, r.type, r.quantity, Number(r.totalCost || 0).toFixed(2), `"${r.reason || ''}"`, new Date(r.createdAt!).toISOString()].join(',')));
                 break;
@@ -674,7 +701,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 }).from(stockMovements)
                     .innerJoin(inventoryItems, eq(stockMovements.itemId, inventoryItems.id))
                     .where(and(gte(stockMovements.createdAt, start), lte(stockMovements.createdAt, end), inArray(stockMovements.type, ['WASTE', 'ADJUSTMENT'])))
-                    .orderBy(desc(stockMovements.createdAt)).limit(500);
+                    .orderBy(desc(stockMovements.createdAt)).offset(0).fetch(500);
                 lines.push('Item,Unit,Quantity,Cost,Reason,Date');
                 rows.forEach(r => lines.push([`"${r.itemName}"`, r.unit, r.quantity, Number(r.totalCost || 0).toFixed(2), `"${r.reason || ''}"`, new Date(r.createdAt!).toISOString()].join(',')));
                 break;
@@ -701,7 +728,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 }).from(inventoryBatches)
                     .innerJoin(inventoryItems, eq(inventoryBatches.itemId, inventoryItems.id))
                     .where(and(lte(inventoryBatches.expiryDate, thirtyDaysLater), gte(inventoryBatches.currentQty, sql`0.01`), inArray(inventoryBatches.status, ['ACTIVE', 'QUARANTINE'])))
-                    .orderBy(inventoryBatches.expiryDate).limit(200);
+                    .orderBy(inventoryBatches.expiryDate).offset(0).fetch(200);
                 lines.push('Item,Batch,Qty,Unit Cost,Value,Expiry Date');
                 rows.forEach(r => lines.push([`"${r.itemName}"`, r.batchNumber, r.currentQty, Number(r.unitCost).toFixed(2), (Number(r.currentQty) * Number(r.unitCost)).toFixed(2), new Date(r.expiryDate!).toISOString().split('T')[0]].join(',')));
                 break;
@@ -727,9 +754,9 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 const rows = await db.select({
                     employeeName: employees.name, role: employees.role,
                     totalDays: sql<number>`count(*)`,
-                    presentDays: sql<number>`count(*) filter (where ${attendance.status} = 'PRESENT')`,
-                    lateDays: sql<number>`count(*) filter (where ${attendance.status} = 'LATE')`,
-                    absentDays: sql<number>`count(*) filter (where ${attendance.status} = 'ABSENT')`,
+            presentDays: sql<number>`sum(case when ${attendance.status} = 'PRESENT' then 1 else 0 end)`,
+            lateDays: sql<number>`sum(case when ${attendance.status} = 'LATE' then 1 else 0 end)`,
+            absentDays: sql<number>`sum(case when ${attendance.status} = 'ABSENT' then 1 else 0 end)`,
                     totalHours: sql<number>`coalesce(sum(${attendance.totalHours}), 0)`,
                 }).from(attendance).innerJoin(employees, eq(attendance.employeeId, employees.id))
                     .where(and(...conditions)).groupBy(employees.name, employees.role);
@@ -760,13 +787,13 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                     avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
                 }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id))
                     .where(and(...conditions)).groupBy(customers.name, customers.phone)
-                    .orderBy(sql`sum(${orders.total}) desc`).limit(100);
+                    .orderBy(sql`sum(${orders.total}) desc`).offset(0).fetch(100);
                 lines.push('Customer,Phone,Total Spent,Orders,Avg Ticket');
                 rows.forEach(r => lines.push([`"${r.customerName}"`, r.phone, Number(r.totalSpent).toFixed(2), r.orderCount, Number(r.avgTicket).toFixed(2)].join(',')));
                 break;
             }
             case 'CAMPAIGN_ROI': {
-                const rows = await db.select().from(campaigns).orderBy(desc(campaigns.createdAt)).limit(50);
+                const rows = await db.select().from(campaigns).orderBy(desc(campaigns.createdAt)).offset(0).fetch(50);
                 lines.push('Campaign,Type,Status,Reach,Conversions,Revenue,Budget,ROI %');
                 rows.forEach(r => {
                     const roi = Number(r.budget || 0) > 0 ? ((Number(r.revenue || 0) - Number(r.budget || 0)) / Number(r.budget || 0) * 100).toFixed(1) : '0';
@@ -779,7 +806,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                     branchName: branches.name, orderCount: sql<number>`count(*)`,
                     revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
                     avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
-                    cancelledCount: sql<number>`count(*) filter (where ${orders.status} = 'CANCELLED')`,
+            cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
                 }).from(orders).innerJoin(branches, eq(orders.branchId, branches.id))
                     .where(and(gte(orders.createdAt, start), lte(orders.createdAt, end)))
                     .groupBy(branches.name).orderBy(sql`sum(${orders.total}) desc`);
@@ -792,7 +819,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 if (branchId) conditions.push(eq(orders.branchId, branchId));
                 const rows = await db.select({
                     branchName: branches.name, orderType: orders.type,
-                    avgPrepMinutes: sql<number>`coalesce(avg(extract(epoch from (${orders.completedAt} - ${orders.createdAt})) / 60), 0)`,
+                    avgPrepMinutes: sql<number>`coalesce(avg(DATEDIFF(SECOND, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
                     orderCount: sql<number>`count(*)`,
                 }).from(orders).innerJoin(branches, eq(orders.branchId, branches.id))
                     .where(and(...conditions)).groupBy(branches.name, orders.type);
@@ -890,7 +917,7 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                     .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                     .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE')))
-                    .groupBy(chartOfAccounts.name).orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).limit(20);
+                    .groupBy(chartOfAccounts.name).orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).offset(0).fetch(20);
                 doc.fontSize(12).text('Top Expenses', { underline: true }); doc.moveDown(0.5);
                 rows.forEach((r, i) => { doc.text(`${i + 1}. ${r.name}: ${Number(r.total).toFixed(2)} LE`); });
                 break;
@@ -914,8 +941,8 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                         eq(chartOfAccounts.type, 'EXPENSE'),
                         branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined
                     ))
-                    .orderBy(desc(journalEntries.date), desc(journalLines.id))
-                    .limit(120);
+.orderBy(desc(journalEntries.date), desc(journalLines.id))
+                    .offset(0).fetch(120);
                 const total = rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
                 doc.fontSize(12).text(`Expense Report - Total ${total.toFixed(2)} LE`, { underline: true }); doc.moveDown(0.5);
                 rows.forEach((r) => {
@@ -960,9 +987,9 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                 if (branchId) conditions.push(eq(attendance.branchId, branchId));
                 const rows = await db.select({
                     employeeName: employees.name, role: employees.role,
-                    presentDays: sql<number>`count(*) filter (where ${attendance.status} = 'PRESENT')`,
-                    lateDays: sql<number>`count(*) filter (where ${attendance.status} = 'LATE')`,
-                    absentDays: sql<number>`count(*) filter (where ${attendance.status} = 'ABSENT')`,
+            presentDays: sql<number>`sum(case when ${attendance.status} = 'PRESENT' then 1 else 0 end)`,
+            lateDays: sql<number>`sum(case when ${attendance.status} = 'LATE' then 1 else 0 end)`,
+            absentDays: sql<number>`sum(case when ${attendance.status} = 'ABSENT' then 1 else 0 end)`,
                     totalHours: sql<number>`coalesce(sum(${attendance.totalHours}), 0)`,
                 }).from(attendance).innerJoin(employees, eq(attendance.employeeId, employees.id))
                     .where(and(...conditions)).groupBy(employees.name, employees.role);
@@ -977,7 +1004,7 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                     customerName: customers.name, totalSpent: sql<number>`coalesce(sum(${orders.total}), 0)`,
                     orderCount: sql<number>`count(*)`,
                 }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id))
-                    .where(and(...conditions)).groupBy(customers.name).orderBy(sql`sum(${orders.total}) desc`).limit(50);
+                    .where(and(...conditions)).groupBy(customers.name).orderBy(sql`sum(${orders.total}) desc`).offset(0).fetch(50);
                 doc.fontSize(12).text('Customer LTV', { underline: true }); doc.moveDown(0.5);
                 rows.forEach((r, i) => { doc.text(`${i + 1}. ${r.customerName}: ${Number(r.totalSpent).toFixed(2)} LE (${r.orderCount} orders)`); });
                 break;
@@ -1086,10 +1113,10 @@ export const exportReportXlsx = async (req: Request, res: Response) => {
                 employeeName: employees.name,
                 role: employees.role,
                 totalDays: sql<number>`count(*)`,
-                presentDays: sql<number>`count(*) filter (where ${attendance.status} = 'PRESENT')`,
-                lateDays: sql<number>`count(*) filter (where ${attendance.status} = 'LATE')`,
-                absentDays: sql<number>`count(*) filter (where ${attendance.status} = 'ABSENT')`,
-                sickDays: sql<number>`count(*) filter (where ${attendance.status} = 'SICK_LEAVE')`,
+            presentDays: sql<number>`sum(case when ${attendance.status} = 'PRESENT' then 1 else 0 end)`,
+            lateDays: sql<number>`sum(case when ${attendance.status} = 'LATE' then 1 else 0 end)`,
+            absentDays: sql<number>`sum(case when ${attendance.status} = 'ABSENT' then 1 else 0 end)`,
+            sickDays: sql<number>`sum(case when ${attendance.status} = 'SICK_LEAVE' then 1 else 0 end)`,
                 totalHours: sql<number>`coalesce(sum(${attendance.totalHours}), 0)`,
                 avgHoursPerDay: sql<number>`coalesce(avg(${attendance.totalHours}), 0)`,
             }).from(attendance)

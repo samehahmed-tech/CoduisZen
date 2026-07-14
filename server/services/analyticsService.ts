@@ -5,7 +5,7 @@
  * Provides pre-computed snapshots for high-performance dashboards and AI insights.
  */
 
-import { db } from '../db';
+import { db, pool } from '../db';
 import { 
     orders, 
     orderItems, 
@@ -22,6 +22,100 @@ import logger from '../utils/logger';
 
 const log = logger.child({ service: 'analytics' });
 
+let analyticsSchemaReady = false;
+
+const ensureAnalyticsSchema = async () => {
+    if (analyticsSchemaReady) return;
+
+    await pool.query(`
+        IF OBJECT_ID('daily_branch_summaries', 'U') IS NOT NULL
+           AND COL_LENGTH('daily_branch_summaries', 'business_date') IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM daily_branch_summaries)
+            DROP TABLE daily_branch_summaries;
+
+        IF OBJECT_ID('item_daily_snapshots', 'U') IS NOT NULL
+           AND COL_LENGTH('item_daily_snapshots', 'business_date') IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM item_daily_snapshots)
+            DROP TABLE item_daily_snapshots;
+
+        IF OBJECT_ID('daily_branch_summaries', 'U') IS NULL
+        CREATE TABLE daily_branch_summaries (
+            id int IDENTITY(1,1) NOT NULL,
+            branch_id nvarchar(255) NOT NULL,
+            [date] date NOT NULL,
+            total_revenue real DEFAULT 0,
+            net_revenue real DEFAULT 0,
+            total_orders int DEFAULT 0,
+            avg_order_value real DEFAULT 0,
+            total_tax real DEFAULT 0,
+            total_discounts real DEFAULT 0,
+            dine_in_revenue real DEFAULT 0,
+            takeaway_revenue real DEFAULT 0,
+            delivery_revenue real DEFAULT 0,
+            gross_profit real DEFAULT 0,
+            unique_customers int DEFAULT 0,
+            created_at datetime2 DEFAULT GETDATE(),
+            updated_at datetime2 DEFAULT GETDATE(),
+            CONSTRAINT pk_daily_branch_summaries PRIMARY KEY (id),
+            CONSTRAINT fk_daily_branch_summaries_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
+        );
+
+        IF OBJECT_ID('item_daily_snapshots', 'U') IS NULL
+        CREATE TABLE item_daily_snapshots (
+            id int IDENTITY(1,1) NOT NULL,
+            menu_item_id nvarchar(255) NOT NULL,
+            branch_id nvarchar(255) NULL,
+            [date] date NOT NULL,
+            quantity_sold real DEFAULT 0,
+            total_sales real DEFAULT 0,
+            total_cost real DEFAULT 0,
+            gross_profit real DEFAULT 0,
+            avg_price real DEFAULT 0,
+            updated_at datetime2 DEFAULT GETDATE(),
+            CONSTRAINT pk_item_daily_snapshots PRIMARY KEY (id),
+            CONSTRAINT fk_item_daily_snapshots_menu_item FOREIGN KEY (menu_item_id) REFERENCES menu_items(id),
+            CONSTRAINT fk_item_daily_snapshots_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
+        );
+
+        IF OBJECT_ID('customer_rfm_metrics', 'U') IS NULL
+        CREATE TABLE customer_rfm_metrics (
+            id int IDENTITY(1,1) NOT NULL,
+            customer_id nvarchar(255) NOT NULL,
+            branch_id nvarchar(255) NULL,
+            recency int NULL,
+            frequency int NULL,
+            monetary real NULL,
+            recency_score int NULL,
+            frequency_score int NULL,
+            monetary_score int NULL,
+            rfm_segment nvarchar(255) NULL,
+            last_order_date datetime2 NULL,
+            updated_at datetime2 DEFAULT GETDATE(),
+            CONSTRAINT pk_customer_rfm_metrics PRIMARY KEY (id),
+            CONSTRAINT fk_customer_rfm_metrics_customer FOREIGN KEY (customer_id) REFERENCES customers(id)
+        );
+
+        IF OBJECT_ID('user_daily_performance', 'U') IS NULL
+        CREATE TABLE user_daily_performance (
+            id int IDENTITY(1,1) NOT NULL,
+            user_id nvarchar(255) NOT NULL,
+            branch_id nvarchar(255) NOT NULL,
+            [date] nvarchar(255) NOT NULL,
+            order_count int DEFAULT 0,
+            total_sales real DEFAULT 0,
+            total_points int DEFAULT 0,
+            avg_processing_time real DEFAULT 0,
+            created_at datetime2 DEFAULT GETDATE(),
+            updated_at datetime2 DEFAULT GETDATE(),
+            CONSTRAINT pk_user_daily_performance PRIMARY KEY (id),
+            CONSTRAINT fk_user_daily_performance_user FOREIGN KEY (user_id) REFERENCES users(id),
+            CONSTRAINT fk_user_daily_performance_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
+        );
+    `);
+
+    analyticsSchemaReady = true;
+};
+
 export const analyticsService = {
 
     /**
@@ -30,11 +124,12 @@ export const analyticsService = {
      */
     async recordOrderImpact(orderId: string) {
         try {
-            const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+            await ensureAnalyticsSchema();
+            const [order] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
             if (!order || order.status !== 'COMPLETED' && order.status !== 'DELIVERED') return;
 
             const branchId = order.branchId;
-            const orderDate = new Date(order.createdAt || new Date()).toISOString().split('T')[0];
+            const orderDate = new Date(`${new Date(order.createdAt || new Date()).toISOString().split('T')[0]}T00:00:00.000Z`);
             const total = Number(order.total || 0);
             const subtotal = Number(order.subtotal || 0);
             const tax = Number(order.tax || 0);
@@ -55,27 +150,6 @@ export const analyticsService = {
                     deliveryRevenue: order.type === 'DELIVERY' ? total : 0,
                     uniqueCustomers: order.customerId ? 1 : 0,
                     updatedAt: new Date(),
-                })
-                .onConflictDoUpdate({
-                    target: [dailyBranchSummaries.branchId, dailyBranchSummaries.date],
-                    set: {
-                        totalRevenue: sql`${dailyBranchSummaries.totalRevenue} + ${total}`,
-                        netRevenue: sql`${dailyBranchSummaries.netRevenue} + ${subtotal}`,
-                        totalOrders: sql`${dailyBranchSummaries.totalOrders} + 1`,
-                        totalTax: sql`${dailyBranchSummaries.totalTax} + ${tax}`,
-                        totalDiscounts: sql`${dailyBranchSummaries.totalDiscounts} + ${discount}`,
-                        dineInRevenue: order.type === 'DINE_IN' 
-                            ? sql`${dailyBranchSummaries.dineInRevenue} + ${total}` 
-                            : dailyBranchSummaries.dineInRevenue,
-                        takeawayRevenue: order.type === 'TAKEAWAY' 
-                            ? sql`${dailyBranchSummaries.takeawayRevenue} + ${total}` 
-                            : dailyBranchSummaries.takeawayRevenue,
-                        deliveryRevenue: order.type === 'DELIVERY' 
-                            ? sql`${dailyBranchSummaries.deliveryRevenue} + ${total}` 
-                            : dailyBranchSummaries.deliveryRevenue,
-                        avgOrderValue: sql`(${dailyBranchSummaries.totalRevenue} + ${total}) / (${dailyBranchSummaries.totalOrders} + 1)`,
-                        updatedAt: new Date(),
-                    }
                 });
 
             // 2. Update Item Performance Snapshots
@@ -98,17 +172,6 @@ export const analyticsService = {
                         grossProfit: profit,
                         avgPrice: Number(item.price || 0),
                         updatedAt: new Date(),
-                    })
-                    .onConflictDoUpdate({
-                        target: [itemDailySnapshots.menuItemId, itemDailySnapshots.branchId, itemDailySnapshots.date],
-                        set: {
-                            quantitySold: sql`${itemDailySnapshots.quantitySold} + ${item.quantity}`,
-                            totalSales: sql`${itemDailySnapshots.totalSales} + ${itemTotal}`,
-                            totalCost: sql`${itemDailySnapshots.totalCost} + ${itemCost}`,
-                            grossProfit: sql`${itemDailySnapshots.grossProfit} + ${profit}`,
-                            avgPrice: Number(item.price || 0), // Use latest price
-                            updatedAt: new Date(),
-                        }
                     });
             }
 
@@ -134,6 +197,7 @@ export const analyticsService = {
      */
     async updateCustomerRfm(customerId: string, branchId?: string) {
         try {
+            await ensureAnalyticsSchema();
             // Get all customer orders
             const customerOrders = await db.select({
                 total: orders.total,
@@ -187,20 +251,6 @@ export const analyticsService = {
                     rfmSegment: segment,
                     lastOrderDate,
                     updatedAt: new Date(),
-                })
-                .onConflictDoUpdate({
-                    target: [customerRfmMetrics.customerId, customerRfmMetrics.branchId],
-                    set: {
-                        recency: diffDays,
-                        frequency: orderCount,
-                        monetary: totalSpent,
-                        recencyScore: rScore,
-                        frequencyScore: fScore,
-                        monetaryScore: mScore,
-                        rfmSegment: segment,
-                        lastOrderDate,
-                        updatedAt: new Date(),
-                    }
                 });
 
         } catch (error: any) {
@@ -213,6 +263,7 @@ export const analyticsService = {
      */
     async recordUserPerformance(userId: string, branchId: string, date: string, amount: number, order: any) {
         try {
+            await ensureAnalyticsSchema();
             // Calculate points: 10 per order + 1 per 100 units of currency
             let points = 10 + Math.floor(amount / 100);
 
@@ -231,16 +282,6 @@ export const analyticsService = {
                         totalPoints: points,
                         avgProcessingTime: processingTime,
                         updatedAt: new Date(),
-                    })
-                    .onConflictDoUpdate({
-                        target: [userDailyPerformance.userId, userDailyPerformance.branchId, userDailyPerformance.date],
-                        set: {
-                            orderCount: sql`${userDailyPerformance.orderCount} + 1`,
-                            totalSales: sql`${userDailyPerformance.totalSales} + ${amount}`,
-                            totalPoints: sql`${userDailyPerformance.totalPoints} + ${points}`,
-                            avgProcessingTime: sql`(${userDailyPerformance.avgProcessingTime} + ${processingTime}) / 2`,
-                            updatedAt: new Date(),
-                        }
                     });
             } else {
                  await db.insert(userDailyPerformance)
@@ -252,15 +293,6 @@ export const analyticsService = {
                         totalSales: amount,
                         totalPoints: points,
                         updatedAt: new Date(),
-                    })
-                    .onConflictDoUpdate({
-                        target: [userDailyPerformance.userId, userDailyPerformance.branchId, userDailyPerformance.date],
-                        set: {
-                            orderCount: sql`${userDailyPerformance.orderCount} + 1`,
-                            totalSales: sql`${userDailyPerformance.totalSales} + ${amount}`,
-                            totalPoints: sql`${userDailyPerformance.totalPoints} + ${points}`,
-                            updatedAt: new Date(),
-                        }
                     });
             }
         } catch (error: any) {

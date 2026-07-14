@@ -3,8 +3,10 @@ import { db } from '../db';
 import { campaigns, orders, customers } from '../../src/db/schema';
 import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { sendWhatsAppText } from '../services/whatsappService';
+import { sendSmsText, smsService } from '../services/smsService';
 import { nanoid } from 'nanoid';
 import logger from '../utils/logger';
+import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
 
 // Optional: keep dispatch logs in settings for now, or just don't log them extensively like before.
 import { settings } from '../../src/db/schema';
@@ -44,7 +46,7 @@ export const createCampaign = async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
 
-        const [created] = await db.insert(campaigns).values({
+        const [created] = await db.insert(campaigns).output().values({
             id: body.id || `CMP-${nanoid(8)}`,
             name: body.name || 'Untitled Campaign',
             type: body.method || body.type || 'SMS',
@@ -53,7 +55,7 @@ export const createCampaign = async (req: Request, res: Response) => {
             content: body.content || body.message || '',
             scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
             budget: Number(body.spend || body.budget || 0),
-        }).returning();
+        });
 
         res.status(201).json({
             id: created.id,
@@ -89,8 +91,8 @@ export const updateCampaign = async (req: Request, res: Response) => {
             budget: body.spend !== undefined ? Number(body.spend) : undefined,
             updatedAt: new Date(),
         })
-            .where(eq(campaigns.id, id))
-            .returning();
+            .output()
+            .where(eq(campaigns.id, id));
 
         if (!updated) return res.status(404).json({ error: 'Campaign not found' });
 
@@ -176,25 +178,16 @@ type CampaignDispatchLog = {
 
 const loadDispatchLogs = async (): Promise<CampaignDispatchLog[]> => {
     const [row] = await db.select().from(settings).where(eq(settings.key, CAMPAIGN_DISPATCH_LOG_KEY));
-    return (row?.value as CampaignDispatchLog[]) || [];
+    return parseSettingJson<CampaignDispatchLog[]>(row?.value, []);
 };
 
 const saveDispatchLogs = async (logs: CampaignDispatchLog[], updatedBy?: string) => {
     const payload = logs.slice(0, 200);
-    await db.insert(settings).values({
+    await upsertSetting({
         key: CAMPAIGN_DISPATCH_LOG_KEY,
-        value: payload as any,
+        value: payload,
         category: 'marketing',
         updatedBy: updatedBy || 'system',
-        updatedAt: new Date(),
-    }).onConflictDoUpdate({
-        target: settings.key,
-        set: {
-            value: payload as any,
-            category: 'marketing',
-            updatedBy: updatedBy || 'system',
-            updatedAt: new Date(),
-        },
     });
 };
 
@@ -230,7 +223,7 @@ export const dispatchCampaign = async (req: Request, res: Response) => {
         });
 
         if (recipientPhones.length === 0) {
-            // IF no explicit recipients passed, default simulate targeting all customer DB (max 500)
+            // No explicit recipients means target customer records, capped for operator safety.
             const allCust = await db.query.customers.findMany({ limit: 500 });
             allCust.forEach(c => {
                 if (c.phone) recipientPhones.push(normalizePhone(c.phone));
@@ -243,9 +236,12 @@ export const dispatchCampaign = async (req: Request, res: Response) => {
 
         let sent = 0;
         let failed = 0;
+        let simulated = 0;
         const startedAt = new Date().toISOString();
 
-        if (!dryRun) {
+        if (dryRun) {
+            simulated = recipientPhones.length;
+        } else {
             if (campaign.type === 'WHATSAPP') {
                 for (const phone of recipientPhones) {
                     try {
@@ -255,22 +251,30 @@ export const dispatchCampaign = async (req: Request, res: Response) => {
                         failed += 1;
                     }
                 }
+            } else if (campaign.type === 'SMS') {
+                if (smsService.getStatus().status !== 'READY') {
+                    return res.status(503).json({ error: 'SMS_PROVIDER_NOT_CONFIGURED' });
+                }
+                for (const phone of recipientPhones) {
+                    try {
+                        await sendSmsText({ to: phone, text: message });
+                        sent += 1;
+                    } catch {
+                        failed += 1;
+                    }
+                }
             } else {
-                // Placeholder for SMS/Email/Push
-                sent = recipientPhones.length;
+                return res.status(503).json({ error: 'CAMPAIGN_PROVIDER_NOT_CONFIGURED', method: campaign.type });
             }
-        } else {
-            sent = recipientPhones.length;
         }
 
-        const newReach = Number(campaign.reach || 0) + sent;
-        const newStatus = campaign.status === 'SCHEDULED' ? 'ACTIVE' : campaign.status;
-
-        await db.update(campaigns).set({
-            reach: newReach,
-            status: newStatus,
-            updatedAt: new Date()
-        }).where(eq(campaigns.id, campaign.id));
+        if (!dryRun && sent > 0) {
+            await db.update(campaigns).set({
+                reach: Number(campaign.reach || 0) + sent,
+                status: campaign.status === 'SCHEDULED' ? 'ACTIVE' : campaign.status,
+                updatedAt: new Date()
+            }).where(eq(campaigns.id, campaign.id));
+        }
 
         const dispatchLog: CampaignDispatchLog = {
             id: `CMP-DISPATCH-${Date.now()}`,
@@ -295,6 +299,7 @@ export const dispatchCampaign = async (req: Request, res: Response) => {
             recipients: recipientPhones.length,
             sent,
             failed,
+            simulated,
             dispatchId: dispatchLog.id,
         });
     } catch (error: any) {

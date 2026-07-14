@@ -83,7 +83,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </label>
             )}
 
-            <div className="flex items-stretch gap-3">
+            <div className="flex min-w-0 flex-col min-[420px]:flex-row items-stretch gap-3">
                 {/* Upload Area */}
                 <div
                     onClick={() => !isLoading && inputRef.current?.click()}
@@ -91,7 +91,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={() => setIsDragging(false)}
                     className={`
-                        w-24 h-24 rounded-2xl overflow-hidden cursor-pointer
+                        w-full h-24 min-[420px]:w-24 shrink-0 rounded-2xl overflow-hidden cursor-pointer
                         flex items-center justify-center transition-all relative
                         border-2
                         ${isDragging
@@ -133,8 +133,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </div>
 
                 {/* Controls + URL Input */}
-                <div className="flex-1 flex flex-col gap-2">
-                    <div className="flex gap-2">
+                <div className="min-w-0 flex-1 flex flex-col gap-2">
+                    <div className="flex min-w-0 gap-2">
                         <input
                             type="text"
                             value={value || ''}
@@ -143,7 +143,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                                 setUploadInfo(null);
                             }}
                             placeholder={lang === 'ar' ? 'او الصق رابط الصورة' : 'or paste image URL'}
-                            className="theme-input flex-1 p-3 rounded-xl text-xs font-mono border outline-none transition-all"
+                            className="theme-input min-w-0 flex-1 p-3 rounded-xl text-xs font-mono border outline-none transition-all"
                         />
                         {value && (
                             <button

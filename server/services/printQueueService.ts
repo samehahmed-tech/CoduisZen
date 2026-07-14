@@ -1,7 +1,6 @@
 import crypto from 'crypto';
-import { pool } from '../db';
-
-export type PrintQueueStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+import { pool } from '../db/index.js';
+import { pushJobToBridge } from './printerBridgeService.js';
 
 export interface EnqueuePrintJobInput {
     branchId: string;
@@ -10,201 +9,236 @@ export interface EnqueuePrintJobInput {
     contentType?: 'text' | 'image';
     printerId?: string | null;
     printerAddress?: string | null;
-    printerType?: 'LOCAL' | 'NETWORK' | null;
+    printerType?: 'LOCAL' | 'NETWORK' | 'WINDOWS' | 'USB' | null;
     targetGatewayId?: string | null;
     createdBy?: string | null;
     maxAttempts?: number;
 }
 
+export const shouldEnqueueServerCashierReceipt = (paidNow: boolean, source?: string | null) =>
+    paidNow && String(source || '').toLowerCase() !== 'pos';
+
 let ensured = false;
+
+const normalizeGatewayId = (value?: string | null) => {
+    const trimmed = String(value || '').trim();
+    return trimmed || null;
+};
 
 const ensureTable = async () => {
     if (ensured) return;
     await pool.query(`
-        create table if not exists print_jobs (
-            id text primary key,
-            branch_id text not null,
-            type text not null,
-            content text not null,
-            content_type text not null default 'text',
-            printer_id text,
-            printer_address text,
-            printer_type text default 'LOCAL',
-            target_gateway_id text,
-            status text not null default 'QUEUED',
-            attempts integer not null default 0,
-            max_attempts integer not null default 3,
-            created_by text,
-            claimed_by text,
-            claimed_at timestamp,
-            completed_at timestamp,
-            last_error text,
-            created_at timestamp not null default now(),
-            updated_at timestamp not null default now()
-        );
-        create index if not exists print_jobs_branch_status_created_idx on print_jobs(branch_id, status, created_at);
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='print_jobs' AND xtype='U')
+        CREATE TABLE print_jobs (
+            id NVARCHAR(100) PRIMARY KEY,
+            branch_id NVARCHAR(50) NOT NULL,
+            type NVARCHAR(20) NOT NULL,
+            content NVARCHAR(MAX) NOT NULL,
+            content_type NVARCHAR(20) NOT NULL DEFAULT 'text',
+            printer_id NVARCHAR(100) NULL,
+            printer_address NVARCHAR(500) NULL,
+            printer_type NVARCHAR(20) DEFAULT 'LOCAL',
+            target_gateway_id NVARCHAR(100) NULL,
+            status NVARCHAR(20) NOT NULL DEFAULT 'QUEUED',
+            error NVARCHAR(1000) NULL,
+            created_by NVARCHAR(100) NULL,
+            completed_at DATETIME2 NULL,
+            created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+            updated_at DATETIME2 NOT NULL DEFAULT GETDATE()
+        )
     `);
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS content text NOT NULL DEFAULT ''`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS content_type text NOT NULL DEFAULT 'text'`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS printer_id text`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS printer_address text`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS printer_type text DEFAULT 'LOCAL'`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS target_gateway_id text`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS max_attempts integer NOT NULL DEFAULT 3`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS created_by text`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS claimed_by text`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS claimed_at timestamp`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS completed_at timestamp`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS last_error text`); } catch { }
-    try { await pool.query(`ALTER TABLE print_jobs ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT now()`); } catch { }
-    try { await pool.query(`CREATE INDEX IF NOT EXISTS print_jobs_gateway_status_created_idx ON print_jobs(branch_id, target_gateway_id, status, created_at)`); } catch { }
+    const columns = [
+        ['target_gateway_id', 'NVARCHAR(100) NULL'],
+        ['gateway_id', 'NVARCHAR(100) NULL'],
+        ['error', 'NVARCHAR(1000) NULL'],
+        ['error_message', 'NVARCHAR(MAX) NULL'],
+        ['claimed_by', 'NVARCHAR(100) NULL'],
+        ['claimed_at', 'DATETIME2 NULL'],
+        ['failed_at', 'DATETIME2 NULL'],
+        ['attempts', 'INT NOT NULL DEFAULT 0'],
+        ['max_attempts', 'INT NOT NULL DEFAULT 3'],
+    ];
+    for (const [name, definition] of columns) {
+        await pool.query(`
+            IF COL_LENGTH('print_jobs', '${name}') IS NULL
+            ALTER TABLE print_jobs ADD ${name} ${definition}
+        `);
+    }
+    try {
+        await pool.query(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_print_jobs_branch_status' AND object_id = OBJECT_ID(N'print_jobs')) CREATE INDEX idx_print_jobs_branch_status ON print_jobs(branch_id, status, created_at)`);
+    } catch { }
     ensured = true;
+};
+
+export const claimNextPrintJob = async (params: {
+    branchId?: string;
+    gatewayId: string;
+    claimUnassigned: boolean;
+    globalClaim?: boolean;
+}) => {
+    await ensureTable();
+    const { rows } = await pool.query(
+        `UPDATE print_jobs
+         SET status = CASE
+                 WHEN claimed_by IS NOT NULL AND attempts < max_attempts THEN 'QUEUED'
+                 ELSE 'FAILED'
+             END,
+             claimed_by = NULL, claimed_at = NULL, updated_at = GETDATE(),
+             error = COALESCE(error, 'STALE_PROCESSING_REQUEUED')
+         WHERE ($1 IS NULL OR branch_id = $1)
+           AND status = 'PROCESSING'
+           AND claimed_at < DATEADD(MINUTE, -2, GETDATE());
+
+         ;WITH next_job AS (
+            SELECT TOP (1) *
+            FROM print_jobs WITH (UPDLOCK, READPAST, ROWLOCK)
+            WHERE ($1 IS NULL OR branch_id = $1)
+              AND status = 'QUEUED'
+              AND attempts < max_attempts
+              AND (COALESCE(target_gateway_id, gateway_id) = $2
+                   OR ($3 = 1 AND COALESCE(target_gateway_id, gateway_id) IS NULL))
+            ORDER BY created_at ASC
+         )
+         UPDATE next_job
+         SET status = 'PROCESSING', claimed_by = $2, claimed_at = GETDATE(),
+             attempts = attempts + 1, updated_at = GETDATE()
+         OUTPUT INSERTED.*`,
+        [params.branchId || null, params.gatewayId, params.claimUnassigned ? 1 : 0, params.globalClaim ? 1 : 0]
+    );
+    return rows[0] || null;
+};
+
+const resolvePrinterTarget = async (input: EnqueuePrintJobInput) => {
+    if (!input.printerId) {
+        return {
+            printerAddress: input.printerAddress || null,
+            printerType: input.printerType || 'LOCAL',
+            targetGatewayId: input.targetGatewayId || null,
+        };
+    }
+
+    const { rows } = await pool.query(
+        `SELECT address, type, gateway_id, station_id FROM printers WHERE id = $1`,
+        [input.printerId]
+    );
+    const printer = rows[0];
+    if (!printer) {
+        return {
+            printerAddress: input.printerAddress || null,
+            printerType: input.printerType || 'LOCAL',
+            targetGatewayId: input.targetGatewayId || null,
+        };
+    }
+
+    return {
+        printerAddress: printer.address || input.printerAddress || null,
+        printerType: printer.type || input.printerType || 'LOCAL',
+        targetGatewayId: input.targetGatewayId || printer.gateway_id || printer.station_id || null,
+    };
 };
 
 export const enqueuePrintJob = async (input: EnqueuePrintJobInput) => {
     await ensureTable();
     const id = `PRNJOB-${crypto.randomUUID()}`;
-    const values = [
-        id,
-        input.branchId,
-        input.type,
-        input.content,
-        input.contentType || 'text',
-        input.printerId || null,
-        input.printerAddress || null,
-        input.printerType || 'LOCAL',
-        input.targetGatewayId || null,
-        'QUEUED',
-        0,
-        Math.max(1, Number(input.maxAttempts || 3)),
-        input.createdBy || null,
-    ];
-    const { rows } = await pool.query(
-        `insert into print_jobs
-        (id, branch_id, type, content, content_type, printer_id, printer_address, printer_type, target_gateway_id, status, attempts, max_attempts, created_by)
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-        returning *`,
-        values,
+    const target = await resolvePrinterTarget(input);
+    const targetGatewayId = normalizeGatewayId(target.targetGatewayId);
+    const requestedMaxAttempts = Number(input.maxAttempts);
+    const maxAttempts = Number.isFinite(requestedMaxAttempts)
+        ? Math.max(1, Math.floor(requestedMaxAttempts))
+        : 3;
+
+    await pool.query(
+        `INSERT INTO print_jobs (id, branch_id, type, content, content_type, printer_id, printer_address, printer_type, target_gateway_id, gateway_id, status, created_by, max_attempts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, 'QUEUED', $10, $11)`,
+        [id, input.branchId, input.type, input.content, input.contentType || 'text',
+         input.printerId || null, target.printerAddress, target.printerType, targetGatewayId, input.createdBy || null,
+         maxAttempts]
     );
-    return rows[0];
+
+    // Try to push via SSE immediately — if bridge is connected, it prints now
+    const pushed = await pushJobToBridge(id, input.branchId).catch(() => false);
+
+    return { id, pushed };
 };
 
-export const claimNextPrintJob = async (params: { branchId: string; gatewayId: string; claimUnassigned?: boolean }) => {
+export const completePrintJob = async (jobId: string, gatewayId: string, branchId?: string | null) => {
     await ensureTable();
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        await client.query(
-            `update print_jobs
-             set status = case when attempts >= max_attempts then 'FAILED' else 'QUEUED' end,
-                 claimed_by = null,
-                 claimed_at = null,
-                 last_error = coalesce(last_error, 'STALE_PROCESSING_REQUEUED'),
-                 updated_at = now()
-             where branch_id = $1
-               and status = 'PROCESSING'
-               and claimed_at < now() - interval '2 minutes'`,
-            [params.branchId],
-        );
-
-        const exactBranch = await client.query(
-            `select * from print_jobs
-             where branch_id = $1
-               and status = 'QUEUED'
-               and (target_gateway_id = $2 or ($3::boolean = true and target_gateway_id is null))
-             order by created_at asc
-             limit 1
-             for update skip locked`,
-            [params.branchId, params.gatewayId, params.claimUnassigned === true],
-        );
-
-        const next = exactBranch.rows[0];
-        if (!next) {
-            await client.query('COMMIT');
-            return null;
-        }
-        const { rows: updatedRows } = await client.query(
-            `update print_jobs
-             set status = 'PROCESSING', claimed_by = $2, claimed_at = now(), updated_at = now()
-             where id = $1
-             returning *`,
-            [next.id, params.gatewayId],
-        );
-        await client.query('COMMIT');
-        return updatedRows[0];
-    } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
-    }
-};
-
-export const completePrintJob = async (jobId: string, gatewayId: string) => {
-    await ensureTable();
+    const targetGatewayId = normalizeGatewayId(gatewayId);
+    const targetBranchId = normalizeGatewayId(branchId);
     const { rows } = await pool.query(
-        `update print_jobs
-         set status = 'COMPLETED', completed_at = now(), updated_at = now()
-         where id = $1 and claimed_by = $2
-         returning *`,
-        [jobId, gatewayId],
+        `UPDATE print_jobs
+         SET status = 'COMPLETED', completed_at = GETDATE(), updated_at = GETDATE()
+         OUTPUT INSERTED.*
+         WHERE id = $1
+           AND ($2 IS NULL OR branch_id = $2)
+           AND (status = 'COMPLETED' OR (status = 'PROCESSING' AND claimed_by = $3))`,
+        [jobId, targetBranchId, targetGatewayId]
     );
     return rows[0] || null;
 };
 
-export const failPrintJob = async (params: { jobId: string; gatewayId: string; error: string }) => {
+export const failPrintJob = async (jobId: string, error: string, gatewayId?: string | null, branchId?: string | null) => {
     await ensureTable();
+    const message = error.slice(0, 1000);
+    const targetGatewayId = normalizeGatewayId(gatewayId);
+    const targetBranchId = normalizeGatewayId(branchId);
     const { rows } = await pool.query(
-        `update print_jobs
-         set attempts = attempts + 1,
-             status = case when attempts + 1 >= max_attempts then 'FAILED' else 'QUEUED' end,
-             last_error = $3,
-             updated_at = now()
-         where id = $1 and claimed_by = $2
-         returning *`,
-        [params.jobId, params.gatewayId, params.error.slice(0, 1000)],
+        `UPDATE print_jobs
+         SET status = CASE
+                 WHEN claimed_by IS NOT NULL AND attempts < max_attempts THEN 'QUEUED'
+                 ELSE 'FAILED'
+             END,
+             error = $1, error_message = $1, failed_at = GETDATE(), updated_at = GETDATE()
+         OUTPUT INSERTED.*
+         WHERE id = $2
+           AND ($3 IS NULL OR branch_id = $3)
+           AND status = 'PROCESSING'
+           AND claimed_by = $4`,
+        [message, jobId, targetBranchId, targetGatewayId]
     );
     return rows[0] || null;
 };
 
 export const listPrintJobs = async (params: {
     branchId?: string;
-    status?: PrintQueueStatus;
+    status?: string;
+    gatewayId?: string;
     limit?: number;
 }) => {
     await ensureTable();
-    const clauses: string[] = [];
+    const conditions: string[] = [];
     const values: any[] = [];
     if (params.branchId) {
         values.push(params.branchId);
-        clauses.push(`branch_id = $${values.length}`);
+        conditions.push(`branch_id = $${values.length}`);
     }
     if (params.status) {
         values.push(params.status);
-        clauses.push(`status = $${values.length}`);
+        conditions.push(`status = $${values.length}`);
     }
-    const where = clauses.length ? `where ${clauses.join(' and ')}` : '';
+    if (params.gatewayId) {
+        values.push(params.gatewayId);
+        conditions.push(`(COALESCE(target_gateway_id, gateway_id) IS NULL OR COALESCE(target_gateway_id, gateway_id) = $${values.length})`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const limit = Math.min(500, Math.max(1, Number(params.limit || 100)));
-    values.push(limit);
     const { rows } = await pool.query(
-        `select * from print_jobs ${where} order by created_at desc limit $${values.length}`,
-        values,
+        `SELECT * FROM print_jobs ${where} ORDER BY created_at DESC`,
+        values
     );
-    return rows;
+    return (rows || []).slice(0, limit);
 };
 
 export const getPrintQueueStats = async (branchId?: string) => {
     await ensureTable();
-    const values: any[] = [];
-    const scope = branchId ? `where branch_id = $1` : '';
-    if (branchId) values.push(branchId);
+    const scope = branchId ? `WHERE branch_id = $1` : '';
+    const params = branchId ? [branchId] : [];
     const { rows } = await pool.query(
-        `select status, count(*)::int as count from print_jobs ${scope} group by status`,
-        values,
+        `SELECT status, COUNT(*) AS count FROM print_jobs ${scope} GROUP BY status`,
+        params
     );
     const stats = { queued: 0, processing: 0, completed: 0, failed: 0, total: 0 };
-    for (const row of rows) {
+    for (const row of (rows || [])) {
         const count = Number(row.count || 0);
         const status = String(row.status || '').toUpperCase();
         if (status === 'QUEUED') stats.queued = count;
@@ -219,34 +253,32 @@ export const getPrintQueueStats = async (branchId?: string) => {
 export const retryPrintJob = async (jobId: string, branchId: string) => {
     await ensureTable();
     const { rows } = await pool.query(
-        `update print_jobs
-         set status = 'QUEUED',
-             claimed_by = null,
-             claimed_at = null,
-             completed_at = null,
-             last_error = null,
-             updated_at = now()
-         where id = $1 and branch_id = $2 and status = 'FAILED'
-         returning *`,
-        [jobId, branchId],
+        `UPDATE print_jobs SET status = 'QUEUED', attempts = 0, claimed_by = NULL, claimed_at = NULL,
+             error = NULL, error_message = NULL, failed_at = NULL, updated_at = GETDATE()
+         OUTPUT INSERTED.* WHERE id = $1 AND branch_id = $2 AND status = 'FAILED'`,
+        [jobId, branchId]
     );
-    return rows[0] || null;
+    const job = rows[0];
+    if (job) {
+        await pushJobToBridge(jobId, branchId).catch(() => false);
+    }
+    return job || null;
 };
 
-export const cancelPrintJob = async (jobId: string, branchId: string): Promise<any | null> => {
+export const cancelPrintJob = async (jobId: string, branchId: string) => {
     await ensureTable();
     const { rows } = await pool.query(
-        `DELETE FROM print_jobs WHERE id = $1 AND branch_id = $2 AND status != 'PROCESSING' RETURNING *`,
-        [jobId, branchId],
+        `DELETE FROM print_jobs OUTPUT DELETED.* WHERE id = $1 AND branch_id = $2`,
+        [jobId, branchId]
     );
     return rows[0] || null;
 };
 
-export const purgePrintJobs = async (branchId: string): Promise<number> => {
+export const purgePrintJobs = async (branchId: string) => {
     await ensureTable();
-    const { rowCount } = await pool.query(
+    const result = await pool.query(
         `DELETE FROM print_jobs WHERE branch_id = $1`,
-        [branchId],
+        [branchId]
     );
-    return rowCount || 0;
+    return result.rowCount || 0;
 };

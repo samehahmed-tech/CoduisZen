@@ -20,7 +20,7 @@ export const marketingController = {
             const { code, type, value, minOrderValue, maxDiscount, endDate, usageLimit } = req.body;
             if (!code || !type || !value) return res.status(400).json({ error: 'Code, type, and value are required' });
 
-            const [created] = await db.insert(coupons).values({
+            const [created] = await db.insert(coupons).output().values({
                 id: `CPN-${Date.now()}`,
                 code: code.toUpperCase(),
                 type,
@@ -29,7 +29,7 @@ export const marketingController = {
                 maxDiscount,
                 endDate: endDate ? new Date(endDate) : null,
                 usageLimit,
-            }).returning();
+            });
 
             res.status(201).json(created);
         } catch (error: any) {
@@ -52,7 +52,7 @@ export const marketingController = {
             const { customerId, orderId, subject, description, priority } = req.body;
             if (!customerId || !subject || !description) return res.status(400).json({ error: 'Missing required fields' });
 
-            const [created] = await db.insert(customerComplaints).values({
+            const [created] = await db.insert(customerComplaints).output().values({
                 id: `CST-CASE-${Date.now()}`,
                 customerId,
                 orderId,
@@ -60,7 +60,7 @@ export const marketingController = {
                 description,
                 priority: priority || 'MEDIUM',
                 status: 'OPEN',
-            }).returning();
+            });
 
             res.status(201).json(created);
         } catch (error: any) {

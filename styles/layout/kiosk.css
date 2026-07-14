@@ -1,86 +1,112 @@
-/* 
- * ═══════════════════════════════════════════════════════════════
- *  KIOSK PREMIUM DESIGN SYSTEM
- *  Focus: Glassmorphism, Large Touch Targets, Depth & Fluidity
- * ═══════════════════════════════════════════════════════════════
+/*
+ * Kiosk ordering surface. Theme-aware, large touch targets, restrained motion.
  */
 
 :root {
-  --kiosk-radius: 2.5rem; /* 40px */
-  --kiosk-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  --kiosk-glass: rgba(255, 255, 255, 0.03);
-  --kiosk-glass-border: rgba(255, 255, 255, 0.08);
+  --kiosk-shadow: 0 28px 70px -34px rgba(0, 0, 0, 0.65);
+  --kiosk-panel: rgb(var(--color-card) / 0.82);
+  --kiosk-panel-strong: rgb(var(--color-card) / 0.96);
+  --kiosk-elevated: rgb(var(--color-elevated) / 0.72);
+  --kiosk-border: rgb(var(--color-border) / 0.58);
+  --kiosk-muted: rgb(var(--color-muted));
+  --kiosk-accent: rgb(var(--color-primary));
+  --kiosk-accent-soft: rgb(var(--color-primary) / 0.12);
 }
 
-/* ─── 1. Kiosk Base Containers ─── */
 .kiosk-screen {
   position: fixed;
   inset: 0;
-  background-color: #050507;
-  color: white;
   overflow: hidden;
   user-select: none;
+  color: rgb(var(--color-main));
+  background:
+    radial-gradient(circle at 12% 8%, rgb(var(--color-primary) / 0.22), transparent 32rem),
+    radial-gradient(circle at 88% 18%, rgb(244 114 182 / 0.14), transparent 28rem),
+    linear-gradient(135deg, rgb(var(--color-app)), rgb(var(--color-elevated) / 0.82));
   font-family: var(--font-body, 'Tajawal', system-ui, sans-serif);
 }
+
+.kiosk-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--color-border) / 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-border) / 0.1) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+}
+
+.kiosk-screen::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% 0 -20%;
+  height: 35%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(var(--color-primary) / 0.16), transparent);
+  filter: blur(38px);
+  animation: kiosk-scan 8s ease-in-out infinite;
+}
+
 .kiosk-screen ::selection {
-  background-color: rgba(99, 102, 241, 0.3);
+  background-color: rgb(var(--color-primary) / 0.22);
 }
 
 .glass-panel {
-  background: var(--kiosk-glass);
-  backdrop-filter: blur(40px) saturate(180%);
-  border: 1px solid var(--kiosk-glass-border);
+  background: var(--kiosk-panel);
+  backdrop-filter: blur(26px) saturate(150%);
+  border: 1px solid var(--kiosk-border);
   box-shadow: var(--kiosk-shadow);
 }
 
-.glass-panel-hover:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+.kiosk-plate {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 32%, rgb(255 255 255 / 0.18), transparent 15rem),
+    linear-gradient(155deg, rgb(10 10 12 / 0.96), rgb(28 24 20 / 0.92));
+  color: white;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 30px 90px -38px rgba(0,0,0,.85);
 }
 
-/* ─── 2. Interactive States ─── */
+.kiosk-plate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 22% 28%, rgb(255 255 255 / 0.16) 0 1px, transparent 1px),
+    radial-gradient(circle at 72% 18%, rgb(255 255 255 / 0.12) 0 1px, transparent 1px);
+  background-size: 22px 22px, 34px 34px;
+  opacity: .45;
+}
+
+.kiosk-product-img {
+  filter: drop-shadow(0 22px 38px rgba(0,0,0,.45));
+}
+
+.glass-panel-hover:hover {
+  background: var(--kiosk-panel-strong);
+  border-color: rgb(var(--color-primary) / 0.28);
+}
+
 .kiosk-btn-primary {
-  background-color: rgb(79, 70, 229);
+  background-color: var(--kiosk-accent);
   color: white;
   font-weight: 900;
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
-  box-shadow: 0 20px 40px rgba(79, 70, 229, 0.3);
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  box-shadow: 0 18px 44px rgb(var(--color-primary) / 0.28);
 }
 
 .kiosk-btn-primary:active {
-  background-color: rgb(99, 102, 241);
   transform: scale(.95);
-  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2);
-}
-
-.kiosk-category-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition-property: all;
-  transition-duration: 300ms;
-}
-
-.kiosk-category-card.active {
-  background-color: rgb(79, 70, 229);
-  border-color: rgb(129, 140, 248);
-  transform: scale(1.05);
-  box-shadow: 0 15px 35px rgba(79, 70, 229, 0.4);
-}
-
-/* ─── 3. Typography ─── */
-.kiosk-title {
-  font-size: 3rem;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -0.025em;
+  box-shadow: 0 10px 20px rgb(var(--color-primary) / 0.18);
 }
 
 .kiosk-shell {
-  width: min(100% - 1.5rem, 96rem);
+  width: min(100% - 1.25rem, 98rem);
   margin-inline: auto;
 }
 
@@ -97,23 +123,17 @@
   font-weight: 900;
   letter-spacing: 0;
 }
-@media (min-width: 768px) {
-  .kiosk-title {
-    font-size: 4.5rem;
-  }
-}
 
 .kiosk-subtitle {
   font-size: clamp(1.05rem, 2.8vw, 1.5rem);
   line-height: 1.45;
-  color: rgb(148, 163, 184);
-  font-weight: 500;
+  color: var(--kiosk-muted);
+  font-weight: 600;
 }
 
-/* ─── 4. Layout Helpers ─── */
 .kiosk-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
 }
 
@@ -124,25 +144,78 @@
   bottom: 0;
 }
 
-/* ─── 5. Animations ─── */
+.kiosk-feature {
+  position: relative;
+  isolation: isolate;
+  background: var(--kiosk-panel);
+  border: 1px solid var(--kiosk-border);
+  box-shadow: var(--kiosk-shadow);
+}
+
+.kiosk-dock {
+  background: rgb(var(--color-card) / 0.94);
+  border: 1px solid rgb(var(--color-border) / 0.65);
+  box-shadow: 0 24px 64px -32px rgba(0, 0, 0, .72);
+}
+
+.kiosk-choice {
+  background: rgb(var(--color-elevated) / .76);
+  border: 1px solid rgb(var(--color-border) / .58);
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.kiosk-choice:active {
+  transform: scale(.97);
+}
+
+.kiosk-feature::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 0%, transparent 42%, rgb(255 255 255 / 0.18) 50%, transparent 58%, transparent 100%);
+  transform: translateX(-85%);
+  animation: kiosk-sheen 5s ease-in-out infinite;
+}
+
+.kiosk-accent {
+  color: var(--kiosk-accent);
+}
+
+.kiosk-accent-bg {
+  background: var(--kiosk-accent);
+}
+
+.kiosk-soft {
+  background: var(--kiosk-accent-soft);
+}
+
+.kiosk-muted {
+  color: var(--kiosk-muted);
+}
+
+.kiosk-surface {
+  background: var(--kiosk-elevated);
+  border: 1px solid var(--kiosk-border);
+}
+
 @keyframes kiosk-fade-up {
   from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-kiosk-entry {
-  animation: kiosk-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+@keyframes kiosk-sheen {
+  0%, 42% { transform: translateX(-85%); }
+  72%, 100% { transform: translateX(85%); }
 }
 
-/* ─── 6. Custom Background Accents ─── */
-.kiosk-bg-glow {
-  position: absolute;
-  pointer-events: none;
-  width: 50vw;
-  height: 50vw;
-  filter: blur(120px);
-  opacity: 0.15;
-  border-radius: 9999px;
+@keyframes kiosk-scan {
+  0%, 100% { transform: translateX(-12%) translateY(20%); opacity: .35; }
+  50% { transform: translateX(12%) translateY(0); opacity: .7; }
+}
+
+.animate-kiosk-entry {
+  animation: kiosk-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @media (max-width: 1023px) {
@@ -153,7 +226,7 @@
 
 @media (max-width: 640px) {
   .kiosk-shell {
-    width: min(100% - 1rem, 96rem);
+    width: min(100% - 1rem, 98rem);
   }
 
   .kiosk-grid {

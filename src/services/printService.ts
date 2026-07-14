@@ -4,7 +4,7 @@
     type: 'RECEIPT' | 'KITCHEN';
     printerId?: string;
     printerAddress?: string;
-    printerType?: 'LOCAL' | 'NETWORK';
+    printerType?: 'LOCAL' | 'NETWORK' | 'WINDOWS' | 'USB';
     targetGatewayId?: string;
     branchId: string;
 }
@@ -34,7 +34,7 @@ export const printService = {
         const payload = {
             type: job.type,
             content: job.content,
-            contentType: job.contentType || 'text',
+            contentType: job.contentType || 'image',
             printerId: job.printerId,
             printerAddress: job.printerAddress,
             printerType: job.printerType,
@@ -59,6 +59,6 @@ export const printService = {
     },
 
     async triggerCashDrawer(branchId: string): Promise<boolean> {
-        return this.print({ content: '\x1B\x70\x00\x19\xFA', type: 'RECEIPT', branchId });
+        return this.print({ content: '\x1B\x70\x00\x19\xFA', contentType: 'text', type: 'RECEIPT', branchId });
     }
 };

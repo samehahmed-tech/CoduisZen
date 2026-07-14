@@ -3,8 +3,8 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   AlertTriangle, Plus, Search, X, Truck, FileText, Package,
   Tag, Briefcase,
-  ArrowRightLeft, ListChecks, Download, Calculator, Home, Layers, LayoutGrid,
-  ClipboardCheck, Activity, Play, CheckCircle2, Save, Calendar, Utensils
+  ArrowRightLeft, ListChecks, Download, Upload, Calculator, Home, Layers, LayoutGrid,
+  ClipboardCheck, Activity, Play, CheckCircle2, Save, Calendar, Utensils, Printer
 } from 'lucide-react';
 import { Supplier, PurchaseOrder, Warehouse, Branch, WarehouseType, InventoryItem } from '@/types';
 
@@ -18,6 +18,7 @@ import { inventoryIntelligenceApi } from '@/services/api/inventoryIntelligence';
 import { reportsApi } from '@/services/api/reports';
 import { inventoryApi } from '@/services/api/inventory';
 import { socketService } from '@/services/socketService';
+import { prepareInventoryExcelRows } from '@/services/inventoryExcelRows';
 
 // Modals
 import ItemModal from './components/ItemModal';
@@ -32,6 +33,7 @@ import PageSkeleton from '@/components/common/PageSkeleton';
 import Skeleton from '@/components/common/Skeleton';
 import { ProcurementHub } from './components/Procurement';
 import { useConfirm } from '@/components/common/ConfirmProvider';
+import { useToast } from '@/components/Toast';
 
 // --- Subcomponents for Premium UI ---
 
@@ -120,6 +122,7 @@ const Inventory: React.FC = () => {
   const lang = settings.language;
   const t = translations[lang];
   const { confirm } = useConfirm();
+  const { showToast } = useToast();
   const displayItemName = (item?: InventoryItem | null) => (lang === 'ar' ? item?.nameAr || item?.name : item?.name) || '';
   const displayWarehouseName = (warehouse?: Warehouse | null) => (lang === 'ar' ? warehouse?.nameAr || warehouse?.name : warehouse?.name) || '';
 
@@ -167,6 +170,7 @@ const Inventory: React.FC = () => {
   const [branchTransferToWh, setBranchTransferToWh] = useState('');
   const [branchTransferQty, setBranchTransferQty] = useState(1);
   const [branchTransferReason, setBranchTransferReason] = useState('Inter-branch transfer');
+  const [isImportingInventory, setIsImportingInventory] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const handleDeactivateSupplier = async (supplier: Supplier) => {
@@ -241,6 +245,11 @@ const Inventory: React.FC = () => {
     });
     return totals;
   }, [inventory]);
+
+  const inventoryById = useMemo(
+    () => new Map(inventory.map((item) => [item.id, item])),
+    [inventory]
+  );
 
   const warehouseSkuCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -325,12 +334,97 @@ const Inventory: React.FC = () => {
 
   const handleSaveItem = async (item: InventoryItem) => {
     if (editingItem) {
-      await updateInventoryItem(item.id, item);
+      await updateInventoryItem(item.id, {
+        ...item,
+        warehouseQuantities: editingItem.warehouseQuantities,
+      });
+      for (const row of item.warehouseQuantities || []) {
+        const previousQuantity = editingItem.warehouseQuantities.find(value => value.warehouseId === row.warehouseId)?.quantity || 0;
+        const nextQuantity = Number(row.quantity) || 0;
+        if (nextQuantity !== previousQuantity) {
+          await updateStock(item.id, row.warehouseId, nextQuantity, 'ADJUSTMENT', 'Stock corrected from inventory item edit');
+        }
+      }
     } else {
-      await addInventoryItem(item);
+      await addInventoryItem({ ...item, warehouseQuantities: [] });
+      for (const row of item.warehouseQuantities || []) {
+        if (Number(row.quantity) > 0) {
+          await updateStock(item.id, row.warehouseId, Number(row.quantity), 'ADJUSTMENT', 'Opening stock');
+        }
+      }
     }
     setItemModalOpen(false);
     setEditingItem(null);
+  };
+
+  const exportInventoryTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const rows = (warehouses.length ? warehouses : [{ id: '', name: '', nameAr: '' } as Warehouse]).map(warehouse => ({
+        code: '', name_en: '', name_ar: '', unit: 'COUNT', category: '', barcode: '',
+        purchase_price: 0, cost_price: 0, alert_threshold: 0,
+        warehouse_id: warehouse.id, warehouse_name: displayWarehouseName(warehouse), opening_quantity: 0,
+      }));
+      const guide = [
+        { column: 'code', required: 'Yes', description: 'Unique item code / كود الصنف الفريد' },
+        { column: 'name_en', required: 'Yes', description: 'English name / الاسم بالإنجليزية' },
+        { column: 'name_ar', required: 'Yes', description: 'Arabic name / الاسم بالعربية' },
+        { column: 'warehouse_id', required: 'For opening stock', description: 'Use an ID supplied in the Inventory sheet' },
+        { column: 'opening_quantity', required: 'No', description: 'Opening quantity, zero or greater / رصيد أول المدة' },
+      ];
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows), 'Inventory');
+      XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(guide), 'Guide');
+      XLSX.writeFile(book, 'restoflow-inventory-template.xlsx');
+      showToast(lang === 'ar' ? 'تم تنزيل قالب المخزون.' : 'Inventory template downloaded.', 'success');
+    } catch (error: any) {
+      showToast(error?.message || (lang === 'ar' ? 'تعذر تصدير القالب.' : 'Template export failed.'), 'error');
+    }
+  };
+
+  const importInventoryTemplate = async (file: File) => {
+    const XLSX = await import('xlsx');
+    const book = XLSX.read(await file.arrayBuffer());
+    if (!book.SheetNames.length) throw new Error(lang === 'ar' ? 'ملف Excel لا يحتوي على صفحات.' : 'Excel file has no sheets.');
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[book.SheetNames[0]], { defval: '' });
+    if (!rows.length) throw new Error(lang === 'ar' ? 'ملف Excel فارغ.' : 'Excel file is empty.');
+    const { candidates, skipped } = prepareInventoryExcelRows(
+      rows,
+      inventory.map(item => String(item.sku || '')),
+      warehouses.map(warehouse => warehouse.id),
+    );
+    let imported = 0;
+    for (const { index, row, name, nameAr, sku, warehouseId, quantity, purchasePrice, costPrice, threshold } of candidates) {
+      const id = `INV-${Date.now()}-${index}`;
+      await addInventoryItem({
+        id, name, nameAr, sku, barcode: String(row.barcode || ''),
+        unit: String(row.unit || 'COUNT'), category: String(row.category || ''),
+        purchasePrice, costPrice, threshold, isAudited: true, auditFrequency: 'DAILY',
+        isComposite: false, bom: [], warehouseQuantities: [],
+      } as InventoryItem);
+      if (warehouseId && quantity > 0) await updateStock(id, warehouseId, quantity, 'ADJUSTMENT', 'Excel opening stock import');
+      imported++;
+    }
+    await fetchInventory();
+    return { imported, skipped };
+  };
+
+  const handleInventoryFileImport = async (file: File) => {
+    setIsImportingInventory(true);
+    try {
+      const { imported, skipped } = await importInventoryTemplate(file);
+      showToast(lang === 'ar' ? `تم استيراد ${imported} صنف، وتخطي ${skipped}.` : `Imported ${imported} items; skipped ${skipped}.`, imported ? 'success' : 'warning');
+    } catch (error: any) {
+      const [code, row] = String(error?.message || '').split(':');
+      const message = code === 'INVALID_NUMERIC_VALUE'
+        ? (lang === 'ar' ? `قيمة رقمية غير صحيحة في الصف ${row}.` : `Invalid numeric value at row ${row}.`)
+        : code === 'INVALID_WAREHOUSE'
+          ? (lang === 'ar' ? `كود مخزن غير صحيح في الصف ${row}.` : `Invalid warehouse at row ${row}.`)
+          : error?.message || (lang === 'ar' ? 'فشل استيراد ملف Excel.' : 'Excel import failed.');
+      showToast(message, 'error');
+    } finally {
+      setIsImportingInventory(false);
+    }
   };
 
   const handleSaveWarehouse = async (wh: Warehouse) => {
@@ -787,11 +881,95 @@ const Inventory: React.FC = () => {
   });
   const [consumptionDateTo, setConsumptionDateTo] = useState(() => new Date().toISOString().split('T')[0]);
 
+  const consumptionReportRows = useMemo(() => consumptionRows.map((row) => {
+    const item = inventoryById.get(row.itemId);
+    const apiCurrentStock = Number(row.currentStock);
+    const currentStock = Number.isFinite(apiCurrentStock)
+      ? apiCurrentStock
+      : row.warehouseId
+        ? Number(item?.warehouseQuantities?.find((qty) => qty.warehouseId === row.warehouseId)?.quantity || 0)
+        : Number(inventoryTotalsById.get(row.itemId) || 0);
+    const consumedQty = Number(row.totalQuantity || 0);
+    return {
+      ...row,
+      currentStock,
+      shortageQty: Math.max(consumedQty - currentStock, 0),
+      overQty: Math.max(currentStock - consumedQty, 0),
+    };
+  }), [consumptionRows, inventoryById, inventoryTotalsById]);
+
   const consumptionTotals = useMemo(() => ({
-    quantity: consumptionRows.reduce((sum, row) => sum + Number(row.totalQuantity || 0), 0),
-    cost: consumptionRows.reduce((sum, row) => sum + Number(row.estimatedCost || 0), 0),
-    movements: consumptionRows.reduce((sum, row) => sum + Number(row.movementCount || 0), 0),
-  }), [consumptionRows]);
+    quantity: consumptionReportRows.reduce((sum, row) => sum + Number(row.totalQuantity || 0), 0),
+    cost: consumptionReportRows.reduce((sum, row) => sum + Number(row.estimatedCost || 0), 0),
+    movements: consumptionReportRows.reduce((sum, row) => sum + Number(row.movementCount || 0), 0),
+    shortage: consumptionReportRows.reduce((sum, row) => sum + Number(row.shortageQty || 0), 0),
+    over: consumptionReportRows.reduce((sum, row) => sum + Number(row.overQty || 0), 0),
+  }), [consumptionReportRows]);
+
+  const getConsumptionExportRows = () => consumptionReportRows.map((row) => ({
+    item: lang === 'ar' ? row.itemNameAr || row.itemName : row.itemName,
+    warehouse: row.warehouseName || row.warehouseId || '-',
+    consumed: Number(row.totalQuantity || 0),
+    currentStock: Number(row.currentStock || 0),
+    shortage: Number(row.shortageQty || 0),
+    over: Number(row.overQty || 0),
+    unit: row.unit || '',
+    cost: Number(row.estimatedCost || 0),
+    movements: Number(row.movementCount || 0),
+    lastOrder: row.lastReferenceId || '',
+    lastConsumedAt: row.lastConsumedAt ? new Date(row.lastConsumedAt).toLocaleString() : '',
+  }));
+
+  const exportRecipeConsumptionCsv = () => {
+    const headers = lang === 'ar'
+      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة', 'الحركات', 'آخر أوردر', 'آخر سحب']
+      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost', 'Movements', 'Last Order', 'Last Consumed At'];
+    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost, row.movements, row.lastOrder, row.lastConsumedAt]);
+    const csv = [headers, ...rows]
+      .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `recipe-consumption-${consumptionDateFrom}-${consumptionDateTo}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printRecipeConsumption = () => {
+    const headers = lang === 'ar'
+      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة']
+      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost'];
+    const escapeHtml = (value: any) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost.toFixed(2)]);
+    const win = window.open('', '_blank', 'width=1100,height=800');
+    if (!win) return;
+    win.document.write(`
+      <html dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
+        <head>
+          <title>${lang === 'ar' ? 'مسحوبات الوصفات' : 'Recipe Consumption'}</title>
+          <style>
+            body{font-family:Arial,sans-serif;padding:24px;color:#111}
+            h1{font-size:20px;margin:0 0 6px}
+            p{margin:0 0 18px;color:#555}
+            table{width:100%;border-collapse:collapse;font-size:12px}
+            th,td{border:1px solid #ddd;padding:8px;text-align:center}
+            th{background:#f4f4f5}
+          </style>
+        </head>
+        <body>
+          <h1>${lang === 'ar' ? 'مسحوبات الوصفات' : 'Recipe Consumption'}</h1>
+          <p>${consumptionDateFrom} - ${consumptionDateTo}</p>
+          <table>
+            <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+          <script>window.onload=()=>window.print()</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
 
   const loadRecipeConsumption = async () => {
     setConsumptionLoading(true);
@@ -849,9 +1027,33 @@ const Inventory: React.FC = () => {
           <Activity size={14} className={consumptionLoading ? 'animate-spin' : ''} />
           {lang === 'ar' ? 'تحديث' : 'REFRESH'}
         </button>
+        <button
+          onClick={printRecipeConsumption}
+          disabled={consumptionRows.length === 0}
+          className="flex items-center gap-3 px-5 py-3 bg-card/60 text-muted rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-main hover:text-app disabled:opacity-40 transition-all active:scale-95"
+        >
+          <Printer size={14} />
+          {lang === 'ar' ? 'طباعة' : 'PRINT'}
+        </button>
+        <button
+          onClick={printRecipeConsumption}
+          disabled={consumptionRows.length === 0}
+          className="flex items-center gap-3 px-5 py-3 bg-card/60 text-muted rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-main hover:text-app disabled:opacity-40 transition-all active:scale-95"
+        >
+          <FileText size={14} />
+          PDF
+        </button>
+        <button
+          onClick={exportRecipeConsumptionCsv}
+          disabled={consumptionRows.length === 0}
+          className="flex items-center gap-3 px-5 py-3 bg-card/60 text-muted rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-emerald-500 hover:text-white disabled:opacity-40 transition-all active:scale-95"
+        >
+          <Download size={14} />
+          Excel
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="rounded-2xl border border-border/20 bg-card/50 p-5">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'إجمالي الكمية المسحوبة' : 'Total Deducted Qty'}</p>
           <p className="mt-2 text-2xl font-black text-main tabular-nums">{consumptionTotals.quantity.toLocaleString()}</p>
@@ -864,6 +1066,14 @@ const Inventory: React.FC = () => {
           <p className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'عدد حركات السحب' : 'Deduction Movements'}</p>
           <p className="mt-2 text-2xl font-black text-main tabular-nums">{consumptionTotals.movements.toLocaleString()}</p>
         </div>
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">{lang === 'ar' ? 'إجمالي العجز' : 'Total Shortage'}</p>
+          <p className="mt-2 text-2xl font-black text-rose-500 tabular-nums">{consumptionTotals.shortage.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">{lang === 'ar' ? 'إجمالي الأوفر' : 'Total Over'}</p>
+          <p className="mt-2 text-2xl font-black text-emerald-500 tabular-nums">{consumptionTotals.over.toLocaleString()}</p>
+        </div>
       </div>
 
       <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm">
@@ -875,33 +1085,58 @@ const Inventory: React.FC = () => {
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1180px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-[220px]" />
+              <col className="w-[150px]" />
+              <col className="w-[90px]" />
+              <col className="w-[110px]" />
+              <col className="w-[90px]" />
+              <col className="w-[90px]" />
+              <col className="w-[70px]" />
+              <col className="w-[110px]" />
+              <col className="w-[80px]" />
+              <col className="w-[170px]" />
+            </colgroup>
             <thead className="bg-elevated/40 text-muted uppercase font-black text-[10px] tracking-widest">
               <tr>
-                <th className="text-left px-8 py-5">{lang === 'ar' ? 'الصنف المخزني' : 'Inventory Item'}</th>
-                <th className="text-left px-4 py-5">{lang === 'ar' ? 'المخزن' : 'Warehouse'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'الوحدة' : 'Unit'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'التكلفة' : 'Cost'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'الحركات' : 'Moves'}</th>
-                <th className="text-left px-8 py-5">{lang === 'ar' ? 'آخر أوردر' : 'Last Order'}</th>
+                <th className="px-5 py-5 text-start">{lang === 'ar' ? 'الصنف المخزني' : 'Inventory Item'}</th>
+                <th className="px-4 py-5 text-start">{lang === 'ar' ? 'المخزن' : 'Warehouse'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الرصيد الحالي' : 'Current'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'العجز' : 'Shortage'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الأوفر' : 'Over'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الوحدة' : 'Unit'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'التكلفة' : 'Cost'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الحركات' : 'Moves'}</th>
+                <th className="px-5 py-5 text-start">{lang === 'ar' ? 'آخر أوردر' : 'Last Order'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {consumptionRows.map((row, idx) => (
+              {consumptionReportRows.map((row, idx) => (
                 <tr key={`${row.itemId}-${row.warehouseId || idx}`} className="hover:bg-rose-500/5 transition-colors">
-                  <td className="px-8 py-4">
-                    <p className="font-black text-main text-xs">{lang === 'ar' ? row.itemNameAr || row.itemName : row.itemName}</p>
-                    <p className="mt-1 text-[10px] font-bold text-muted">{row.itemId}</p>
+                  <td className="px-5 py-4">
+                    <p className="truncate text-xs font-black text-main">{lang === 'ar' ? row.itemNameAr || row.itemName : row.itemName}</p>
+                    <p className="mt-1 flex items-center gap-2 truncate text-[10px] font-bold text-muted">
+                      {row.itemId}
+                      {row.source === 'THEORETICAL' && (
+                        <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-500">
+                          {lang === 'ar' ? 'نظري' : 'THEORETICAL'}
+                        </span>
+                      )}
+                    </p>
                   </td>
-                  <td className="px-4 py-4 text-xs font-bold text-muted">{row.warehouseName || row.warehouseId || '-'}</td>
-                  <td className="px-4 py-4 text-center font-black tabular-nums text-rose-500">{Number(row.totalQuantity || 0).toLocaleString()}</td>
-                  <td className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted">{row.unit || '-'}</td>
-                  <td className="px-4 py-4 text-center font-black tabular-nums text-main">{settings.currencySymbol || 'EGP'} {Number(row.estimatedCost || 0).toFixed(2)}</td>
-                  <td className="px-4 py-4 text-center font-black tabular-nums text-muted">{row.movementCount}</td>
-                  <td className="px-8 py-4">
-                    <p className="text-[11px] font-black text-main">{row.lastReferenceId || '-'}</p>
-                    <p className="mt-1 text-[10px] font-bold text-muted">{row.lastConsumedAt ? new Date(row.lastConsumedAt).toLocaleString() : '-'}</p>
+                  <td className="px-4 py-4 text-xs font-bold text-muted truncate">{row.warehouseName || row.warehouseId || '-'}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-rose-500 whitespace-nowrap">{Number(row.totalQuantity || 0).toLocaleString()}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-main whitespace-nowrap">{Number(row.currentStock || 0).toLocaleString()}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-rose-500 whitespace-nowrap">{Number(row.shortageQty || 0).toLocaleString()}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-emerald-500 whitespace-nowrap">{Number(row.overQty || 0).toLocaleString()}</td>
+                  <td className="px-3 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted whitespace-nowrap">{row.unit || '-'}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-main whitespace-nowrap">{settings.currencySymbol || 'EGP'} {Number(row.estimatedCost || 0).toFixed(2)}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-muted whitespace-nowrap">{row.movementCount}</td>
+                  <td className="px-5 py-4">
+                    <p className="truncate text-[11px] font-black text-main">{row.lastReferenceId || '-'}</p>
+                    <p className="mt-1 truncate text-[10px] font-bold text-muted">{row.lastConsumedAt ? new Date(row.lastConsumedAt).toLocaleString() : '-'}</p>
                   </td>
                 </tr>
               ))}
@@ -924,7 +1159,7 @@ const Inventory: React.FC = () => {
     return (
       <div className="flex-1 flex flex-col min-h-0 relative z-10 w-full overflow-hidden">
         {/* Sort Bar */}
-        <div className="px-6 py-4 flex items-center gap-2 border-b border-border/20 bg-elevated/20 sticky top-0 z-20 ">
+        <div className="shrink-0 px-4 sm:px-6 py-4 flex items-center gap-2 overflow-x-auto border-b border-border/20 bg-elevated/20 sticky top-0 z-20">
           <span className="text-[9px] font-black uppercase tracking-widest text-muted mr-2">{lang === 'ar' ? 'ترتيب:' : 'Sort:'}</span>
           {[
             { id: 'name', label: lang === 'ar' ? 'الاسم' : 'Name' },
@@ -944,13 +1179,13 @@ const Inventory: React.FC = () => {
               {s.label}
             </button>
           ))}
-          <span className="ml-auto text-[9px] font-bold text-muted tabular-nums bg-elevated/40 px-2 py-1 rounded-lg border border-border/10">
+          <span className="ms-auto shrink-0 text-[9px] font-bold text-muted tabular-nums bg-elevated/40 px-2 py-1 rounded-lg border border-border/10">
             {filteredInventory.length} {lang === 'ar' ? 'صنف' : 'items'}
           </span>
         </div>
 
         {/* Header Row */}
-        <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_0.8fr] gap-4 px-8 py-5 bg-elevated/30 border-b border-border/20 text-muted text-[10px] uppercase font-black tracking-widest sticky top-0 z-20">
+        <div className="hidden lg:grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_0.8fr] gap-4 px-8 py-5 bg-elevated/30 border-b border-border/20 text-muted text-[10px] uppercase font-black tracking-widest sticky top-0 z-20">
           <div className="whitespace-nowrap">{lang === 'ar' ? 'الصنف' : 'Item Name'}</div>
           <div className="whitespace-nowrap">{lang === 'ar' ? 'التوزيع' : 'Warehouses'}</div>
           <div className="whitespace-nowrap">{lang === 'ar' ? 'الكمية الإجمالية' : 'Total Qty'}</div>
@@ -960,7 +1195,7 @@ const Inventory: React.FC = () => {
         </div>
 
         {/* Virtualized Body */}
-        <div className="flex-1 overflow-hidden min-h-0 bg-card/10">
+        <div className="hidden lg:block flex-1 overflow-hidden min-h-0 bg-card/10">
           {filteredInventory.length === 0 ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center gap-5 p-8 text-center">
               <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
@@ -1110,6 +1345,71 @@ const Inventory: React.FC = () => {
               }}
             />
           )}
+        </div>
+
+        <div className="lg:hidden flex-1 min-h-0 overflow-y-auto bg-card/10 p-3 sm:p-4 space-y-3">
+          {filteredInventory.length === 0 ? (
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 px-5 text-center">
+              <Package size={38} className="text-muted/30" />
+              <p className="text-sm font-black text-muted">
+                {lang === 'ar' ? 'لا توجد أصناف مخزنية ظاهرة' : 'No inventory items visible'}
+              </p>
+            </div>
+          ) : filteredInventory.map((item) => {
+            const totalQty = inventoryTotalsById.get(item.id) || 0;
+            const isLow = totalQty <= item.threshold;
+            return (
+              <article key={item.id} className="rounded-2xl border border-border/25 bg-card/70 p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 rounded-xl border p-2.5 ${item.isComposite ? 'border-violet-500/20 bg-violet-500/10 text-violet-500' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'}`}>
+                    {item.isComposite ? <Layers size={18} /> : <Package size={18} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-sm font-black text-main">{displayItemName(item)}</h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted">
+                      <span>{item.category || (lang === 'ar' ? 'بدون تصنيف' : 'Uncategorized')}</span>
+                      {item.sku && <span className="rounded-md bg-elevated px-1.5 py-0.5 font-mono">{item.sku}</span>}
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${isLow ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                    {isLow ? (lang === 'ar' ? 'منخفض' : 'LOW') : (lang === 'ar' ? 'متاح' : 'OK')}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-elevated/35 p-3 text-center">
+                  <div>
+                    <p className="text-[9px] font-black text-muted">{lang === 'ar' ? 'الرصيد' : 'STOCK'}</p>
+                    <p className={`mt-1 text-sm font-black tabular-nums ${isLow ? 'text-rose-500' : 'text-main'}`}>{totalQty} <small>{item.unit}</small></p>
+                  </div>
+                  <div className="border-x border-border/20">
+                    <p className="text-[9px] font-black text-muted">{lang === 'ar' ? 'الشراء' : 'BUY'}</p>
+                    <p className="mt-1 text-sm font-black text-emerald-500 tabular-nums">{settings.currencySymbol || 'ج.م'} {item.purchasePrice || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-muted">{lang === 'ar' ? 'التكلفة' : 'COST'}</p>
+                    <p className="mt-1 text-sm font-black text-main tabular-nums">{settings.currencySymbol || 'ج.م'} {item.costPrice || 0}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {item.warehouseQuantities.slice(0, 2).map((wq) => (
+                    <span key={wq.warehouseId} className="rounded-lg border border-border/20 bg-elevated/30 px-2 py-1 text-[9px] font-bold text-muted">
+                      {displayWarehouseName(warehouseById.get(wq.warehouseId))}: {wq.quantity}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => { setEditingItem(item); setItemModalOpen(true); }} className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-[10px] font-black text-emerald-500">
+                    {lang === 'ar' ? 'تعديل الصنف' : 'Edit item'}
+                  </button>
+                  <button type="button" onClick={() => { setEditingItem(item); setAdjustmentModalOpen(true); }} className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-[10px] font-black text-amber-500">
+                    {lang === 'ar' ? 'تسوية الرصيد' : 'Adjust stock'}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     );
@@ -1419,6 +1719,17 @@ const Inventory: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={exportInventoryTemplate} className="h-14 flex items-center justify-center gap-2 bg-card/60 text-emerald-500 px-5 rounded-2xl border border-border/30 font-black text-[10px] uppercase tracking-widest">
+              <Download size={17} /> {lang === 'ar' ? 'قالب إكسل' : 'Excel template'}
+            </button>
+            <label className={`h-14 flex items-center justify-center gap-2 bg-card/60 text-sky-500 px-5 rounded-2xl border border-border/30 font-black text-[10px] uppercase tracking-widest ${isImportingInventory ? 'cursor-wait opacity-60 pointer-events-none' : 'cursor-pointer'}`}>
+              <Upload size={17} /> {isImportingInventory ? (lang === 'ar' ? 'جاري الاستيراد...' : 'Importing...') : (lang === 'ar' ? 'استيراد إكسل' : 'Import Excel')}
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={async event => {
+                const file = event.target.files?.[0];
+                if (file) await handleInventoryFileImport(file);
+                event.target.value = '';
+              }} />
+            </label>
             <button
               onClick={() => setItemModalOpen(true)}
               className="h-14 flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 rounded-2xl shadow-2xl shadow-emerald-600/30 font-black text-[11px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"

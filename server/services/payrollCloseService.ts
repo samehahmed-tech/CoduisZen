@@ -70,21 +70,18 @@ const getActiveShiftTemplate = async (employeeId: string, branchId: string, peri
         return Boolean(from && from <= periodEndIso && (!to || to >= periodStartIso));
     });
 
-    if (activeAssignment) {
-        const [template] = await db.select().from(shiftTemplates)
-            .where(eq(shiftTemplates.id, activeAssignment.shiftTemplateId))
-            .limit(1);
+        if (activeAssignment) {
+        const [template] = await db.select().top(1).from(shiftTemplates)
+            .where(eq(shiftTemplates.id, activeAssignment.shiftTemplateId));
         if (template?.isActive !== false) return template;
     }
 
-    const [defaultTemplate] = await db.select().from(shiftTemplates)
-        .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.code, 'DEFAULT'), eq(shiftTemplates.isActive, true)))
-        .limit(1);
+    const [defaultTemplate] = await db.select().top(1).from(shiftTemplates)
+        .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.code, 'DEFAULT'), eq(shiftTemplates.isActive, true)));
     if (defaultTemplate) return defaultTemplate;
 
-    const [firstActiveTemplate] = await db.select().from(shiftTemplates)
-        .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.isActive, true)))
-        .limit(1);
+    const [firstActiveTemplate] = await db.select().top(1).from(shiftTemplates)
+        .where(and(eq(shiftTemplates.branchId, branchId), eq(shiftTemplates.isActive, true)));
     return firstActiveTemplate || null;
 };
 
@@ -152,12 +149,12 @@ type PreviewResult = {
 
 export const payrollCloseService = {
     async getLock(branchId: string) {
-        const [lock] = await db.select().from(payrollLocks).where(eq(payrollLocks.branchId, branchId)).limit(1);
+        const [lock] = await db.select().top(1).from(payrollLocks).where(eq(payrollLocks.branchId, branchId));
         return lock || null;
     },
 
     async setLock(input: { branchId: string; lockedThrough: Date; lockedBy?: string; reason?: string }) {
-        const [existing] = await db.select().from(payrollLocks).where(eq(payrollLocks.branchId, input.branchId)).limit(1);
+        const [existing] = await db.select().top(1).from(payrollLocks).where(eq(payrollLocks.branchId, input.branchId));
         if (existing) {
             const [updated] = await db.update(payrollLocks)
                 .set({
@@ -166,23 +163,23 @@ export const payrollCloseService = {
                     reason: input.reason,
                     updatedAt: new Date(),
                 })
-                .where(eq(payrollLocks.id, existing.id))
-                .returning();
+                .output()
+                .where(eq(payrollLocks.id, existing.id));
             return updated;
         }
 
-        const [created] = await db.insert(payrollLocks).values({
+        const [created] = await db.insert(payrollLocks).output().values({
             id: makeId('PRL'),
             branchId: input.branchId,
             lockedThrough: input.lockedThrough,
             lockedBy: input.lockedBy,
             reason: input.reason,
-        }).returning();
+        });
         return created;
     },
 
     async previewCycle(cycleId: string): Promise<PreviewResult> {
-        const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, cycleId)).limit(1);
+        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, cycleId));
         if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
         const calculationPreview = await payrollCalculationService.previewCycle(cycleId);
@@ -360,10 +357,10 @@ export const payrollCloseService = {
         if (preview.totals.blockers > 0) {
             throw new Error(`PAYROLL_REVIEW_HAS_BLOCKERS:${preview.totals.blockers}`);
         }
-        const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, input.cycleId)).limit(1);
+        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, input.cycleId));
         if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
-        const [run] = await db.insert(payrollRuns).values({
+        const [run] = await db.insert(payrollRuns).output().values({
             id: makeId('PRN'),
             cycleId: input.cycleId,
             branchId: cycle.branchId,
@@ -376,7 +373,7 @@ export const payrollCloseService = {
             closedBy: input.closedBy,
             closedAt: new Date(),
             notes: input.notes,
-        }).returning();
+        });
 
         for (const line of preview.lines) {
             await db.insert(payrollRunLines).values({
@@ -428,7 +425,7 @@ export const payrollCloseService = {
                 eq(payrollProfiles.isDefault, true),
                 eq(payrollProfiles.isActive, true),
             ))
-            .limit(1);
+            .top(1);
 
         if (profile?.autoPostToGl !== false) {
             await payrollGlPostingService.postPayrollRun(run.id, cycle.branchId, input.closedBy);

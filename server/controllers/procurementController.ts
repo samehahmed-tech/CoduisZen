@@ -293,7 +293,7 @@ export const createSupplierInvoice = async (req: Request, res: Response) => {
 
             // Post to GL if Auto-Approved
             if (matchStatus === 'APPROVED') {
-                const branchReq = grnId ? await tx.select().from(goodsReceiptNotes).where(eq(goodsReceiptNotes.id, grnId)).limit(1) : [];
+                const branchReq = grnId ? await tx.select().top(1).from(goodsReceiptNotes).where(eq(goodsReceiptNotes.id, grnId)) : [];
                 const branchId = branchReq[0]?.branchId || 'HQ';
                 
                 await GLService.postJournalEntry({
@@ -326,7 +326,7 @@ export const approveSupplierInvoice = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'SUPPLIER_INVOICE_ID_REQUIRED' });
         const { userId } = req.body; // Approved by manager
         
-        const invoice = await db.select().from(supplierInvoices).where(eq(supplierInvoices.id, id)).limit(1);
+        const invoice = await db.select().top(1).from(supplierInvoices).where(eq(supplierInvoices.id, id));
         if (!invoice.length) return res.status(404).json({ error: 'Not found' });
         
         if (invoice[0].status === 'APPROVED' || invoice[0].status === 'PAID') {

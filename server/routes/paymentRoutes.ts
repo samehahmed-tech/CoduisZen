@@ -1,5 +1,5 @@
 import express from 'express';
-import { PaymentSessionService, PaymentProviderType } from '../services/paymentSessionService';
+import { PaymentSessionError, PaymentSessionService, PaymentProviderType } from '../services/paymentSessionService';
 import { db } from '../db';
 import { orders } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
@@ -9,6 +9,13 @@ import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = express.Router();
 const paymentAccess = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'CASHIER');
+
+const sendPaymentError = (res: express.Response, error: unknown) => {
+    if (error instanceof PaymentSessionError) {
+        return res.status(error.status).json({ error: error.code, message: error.message });
+    }
+    return res.status(500).json({ error: 'PAYMENT_OPERATION_FAILED' });
+};
 
 router.use(paymentAccess, enforceBranch);
 
@@ -49,7 +56,7 @@ router.post('/sessions/initiate', async (req, res) => {
         res.status(201).json(session);
     } catch (error: any) {
         logger.error({ error }, 'POST /sessions/initiate failed');
-        res.status(500).json({ error: error.message });
+        sendPaymentError(res, error);
     }
 });
 
@@ -76,16 +83,10 @@ router.post('/sessions/:id/confirm', async (req, res) => {
 
         const session = await PaymentSessionService.confirmPayment(sessionId, externalReference);
 
-        // Ideally here we mark the Order as Paid via OrderService if full amount is collected
-        // For simplicity, updating order status paid flag:
-        await db.update(orders)
-            .set({ isPaid: true, status: 'PREPARING' })
-            .where(eq(orders.id, session.orderId!));
-
         res.status(200).json(session);
     } catch (error: any) {
         logger.error({ error, sessionId: req.params.id }, 'POST /sessions/:id/confirm failed');
-        res.status(500).json({ error: error.message });
+        sendPaymentError(res, error);
     }
 });
 
@@ -113,7 +114,7 @@ router.post('/sessions/:id/reverse', async (req, res) => {
         res.status(200).json(session);
     } catch (error: any) {
         logger.error({ error, sessionId: req.params.id }, 'POST /sessions/:id/reverse failed');
-        res.status(500).json({ error: error.message });
+        sendPaymentError(res, error);
     }
 });
 

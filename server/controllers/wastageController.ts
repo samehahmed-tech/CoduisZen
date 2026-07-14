@@ -28,21 +28,22 @@ export const recordWastage = async (req: Request, res: Response) => {
                 quantity: sql`quantity - ${qty}`,
                 lastUpdated: new Date(),
             })
+            .output()
             .where(
                 and(
                     eq(inventoryStock.itemId, itemId),
                     eq(inventoryStock.warehouseId, warehouseId),
                     gte(inventoryStock.quantity, qty)
                 )
-            )
-            .returning();
+            );
+
         if (!updatedStock) {
             const [stock] = await db.select().from(inventoryStock).where(and(eq(inventoryStock.itemId, itemId), eq(inventoryStock.warehouseId, warehouseId)));
             return res.status(stock ? 400 : 404).json({ error: stock ? 'INSUFFICIENT_STOCK' : 'STOCK_NOT_FOUND' });
         }
 
         // 2. Create wastage movement
-        const [movement] = await db.insert(stockMovements).values({
+        const [movement] = await db.insert(stockMovements).output().values({
             itemId,
             fromWarehouseId: warehouseId,
             quantity: qty,
@@ -51,7 +52,7 @@ export const recordWastage = async (req: Request, res: Response) => {
             referenceId: notes || null,
             performedBy: performedBy || 'system',
             createdAt: new Date(),
-        }).returning();
+        });
 
         await db.insert(auditLogs).values({
             eventType: 'INVENTORY_WASTAGE',
@@ -128,8 +129,8 @@ export const getWastageReport = async (req: Request, res: Response) => {
 
         // Get totals
         const totalsQuery = await db.select({
-            totalItems: sql<number>`count(distinct ${stockMovements.itemId})::int`,
-            totalIncidents: sql<number>`count(*)::int`,
+totalItems: sql<number>`count(distinct ${stockMovements.itemId})`,
+            totalIncidents: sql<number>`count(*)`,
             totalQty: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
         })
             .from(stockMovements)
@@ -165,7 +166,7 @@ export const getRecentWastage = async (req: Request, res: Response) => {
             .innerJoin(inventoryItems, eq(stockMovements.itemId, inventoryItems.id))
             .where(eq(stockMovements.type, 'WASTE'))
             .orderBy(desc(stockMovements.createdAt))
-            .limit(Number(limit));
+            .offset(0).fetch(Number(limit));
 
         res.json(entries);
     } catch (error: any) {

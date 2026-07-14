@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { whatsappService, sendWhatsAppText } from '../services/whatsappService';
 import { whatsappAutomationService } from '../services/whatsappAutomationService';
 import { getIO } from '../socket';
+import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
 
 const WHATSAPP_LAST_EVENT_KEY = 'whatsapp_last_webhook_event';
 const WHATSAPP_INBOX_KEY = 'whatsapp_inbox_v1';
@@ -38,68 +39,39 @@ type WhatsAppEscalation = {
 };
 
 const saveLastWebhookEvent = async (payload: unknown) => {
-    await db.insert(settings).values({
+    await upsertSetting({
         key: WHATSAPP_LAST_EVENT_KEY,
-        value: payload as any,
+        value: payload,
         category: 'integration',
         updatedBy: 'webhook',
-        updatedAt: new Date(),
-    }).onConflictDoUpdate({
-        target: settings.key,
-        set: {
-            value: payload as any,
-            category: 'integration',
-            updatedBy: 'webhook',
-            updatedAt: new Date(),
-        },
     });
 };
 
 const loadInbox = async (): Promise<WhatsAppInboxMessage[]> => {
-    const [row] = await db.select().from(settings).where(eq(settings.key, WHATSAPP_INBOX_KEY)).limit(1);
-    const value = row?.value;
-    return Array.isArray(value) ? (value as WhatsAppInboxMessage[]) : [];
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, WHATSAPP_INBOX_KEY));
+    return parseSettingJson<WhatsAppInboxMessage[]>(row?.value, []);
 };
 
 const saveInbox = async (messages: WhatsAppInboxMessage[]) => {
-    await db.insert(settings).values({
+    await upsertSetting({
         key: WHATSAPP_INBOX_KEY,
-        value: messages.slice(0, MAX_WHATSAPP_INBOX) as any,
+        value: messages.slice(0, MAX_WHATSAPP_INBOX),
         category: 'integration',
         updatedBy: 'webhook',
-        updatedAt: new Date(),
-    }).onConflictDoUpdate({
-        target: settings.key,
-        set: {
-            value: messages.slice(0, MAX_WHATSAPP_INBOX) as any,
-            category: 'integration',
-            updatedBy: 'webhook',
-            updatedAt: new Date(),
-        },
     });
 };
 
 const loadEscalations = async (): Promise<WhatsAppEscalation[]> => {
-    const [row] = await db.select().from(settings).where(eq(settings.key, WHATSAPP_ESCALATIONS_KEY)).limit(1);
-    const value = row?.value;
-    return Array.isArray(value) ? (value as WhatsAppEscalation[]) : [];
+    const [row] = await db.select().top(1).from(settings).where(eq(settings.key, WHATSAPP_ESCALATIONS_KEY));
+    return parseSettingJson<WhatsAppEscalation[]>(row?.value, []);
 };
 
 const saveEscalations = async (items: WhatsAppEscalation[], updatedBy?: string | null) => {
-    await db.insert(settings).values({
+    await upsertSetting({
         key: WHATSAPP_ESCALATIONS_KEY,
-        value: items.slice(0, MAX_WHATSAPP_ESCALATIONS) as any,
+        value: items.slice(0, MAX_WHATSAPP_ESCALATIONS),
         category: 'integration',
         updatedBy: updatedBy || 'system',
-        updatedAt: new Date(),
-    }).onConflictDoUpdate({
-        target: settings.key,
-        set: {
-            value: items.slice(0, MAX_WHATSAPP_ESCALATIONS) as any,
-            category: 'integration',
-            updatedBy: updatedBy || 'system',
-            updatedAt: new Date(),
-        },
     });
 };
 
@@ -176,7 +148,7 @@ const toEscalationReason = (text: string): WhatsAppEscalation['reason'] => {
 export const getWhatsAppStatus = async (_req: Request, res: Response) => {
     try {
         const status = await whatsappService.getStatus();
-        const [lastEvent] = await db.select().from(settings).where(eq(settings.key, WHATSAPP_LAST_EVENT_KEY)).limit(1);
+        const [lastEvent] = await db.select().top(1).from(settings).where(eq(settings.key, WHATSAPP_LAST_EVENT_KEY));
         const inbox = await loadInbox();
         const escalations = await loadEscalations();
         res.json({
@@ -212,7 +184,7 @@ export const resetWhatsAppSession = async (_req: Request, res: Response) => {
 
 export const getWhatsAppAutomationConfig = async (_req: Request, res: Response) => {
     try {
-        const [row] = await db.select().from(settings).where(eq(settings.key, WHATSAPP_AUTOMATION_CONFIG_KEY)).limit(1);
+        const [row] = await db.select().top(1).from(settings).where(eq(settings.key, WHATSAPP_AUTOMATION_CONFIG_KEY));
         res.json({
             ok: true,
             config: row?.value || {
@@ -236,20 +208,11 @@ export const getWhatsAppAutomationConfig = async (_req: Request, res: Response) 
 export const saveWhatsAppAutomationConfig = async (req: Request, res: Response) => {
     try {
         const config = req.body?.config || req.body || {};
-        await db.insert(settings).values({
+        await upsertSetting({
             key: WHATSAPP_AUTOMATION_CONFIG_KEY,
-            value: config as any,
+            value: config,
             category: 'integration',
             updatedBy: req.user?.id || 'system',
-            updatedAt: new Date(),
-        }).onConflictDoUpdate({
-            target: settings.key,
-            set: {
-                value: config as any,
-                category: 'integration',
-                updatedBy: req.user?.id || 'system',
-                updatedAt: new Date(),
-            },
         });
         res.json({ ok: true, config });
     } catch (error: any) {

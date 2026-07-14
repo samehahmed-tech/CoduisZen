@@ -97,7 +97,9 @@ class WhatsAppService {
                 headless: String(process.env.WHATSAPP_HEADLESS || 'true').toLowerCase() !== 'false',
                 executablePath: this.resolveChromeExecutable(),
                 protocolTimeout: 60000,
-                args: String(process.env.WHATSAPP_CHROME_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu')
+                // Some Windows Chrome builds briefly expose the native headless surface.
+                // Keep that fallback surface off-screen without disabling WhatsApp Web.
+                args: String(process.env.WHATSAPP_CHROME_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--window-position=-32000,-32000,--window-size=1,1')
                     .split(',')
                     .map((arg) => arg.trim())
                     .filter(Boolean),
@@ -506,7 +508,7 @@ class WhatsAppService {
 
         if (session.step === 'CONFIRMING') {
             if (lower.includes('نعم') || lower.includes('yes') || lower.includes('ok') || lower.includes('تأكيد')) {
-                this.enqueueMessage({ to: from, text: `تم تأكيد طلبك بنجاح. رقم الطلب #WP${Math.floor(Math.random() * 1000)}.` });
+                this.enqueueMessage({ to: from, text: 'لا يمكن تأكيد الطلب من المحادثة حاليًا. تواصل مع الفرع لإتمام الطلب.' });
                 session.step = 'IDLE';
                 session.cart = [];
             } else {

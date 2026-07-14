@@ -38,10 +38,10 @@ export const financeRetryService = {
             .where(
                 and(
                     eq(financeExceptions.status, 'PENDING'),
-                    sql`coalesce((${financeExceptions.payload}->>'retryCount')::int, 0) < ${MAX_RETRY_ATTEMPTS}`
+                    sql`coalesce(cast(json_value(${financeExceptions.payload}, '$.retryCount') as int), 0) < ${MAX_RETRY_ATTEMPTS}`
                 )
             )
-            .limit(50);
+            .top(50);
 
         for (const exception of pendingExceptions) {
             result.processed++;
@@ -68,7 +68,7 @@ export const financeRetryService = {
                 }
 
                 // Fetch the order
-                const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+                const [order] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
                 if (!order) {
                     // Order no longer exists — mark as resolved
                     await db.update(financeExceptions)

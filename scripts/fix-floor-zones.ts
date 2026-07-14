@@ -19,11 +19,13 @@ const run = async () => {
         const branchId = row.branch_id || 'b1';
         const zoneName = zoneId.replace(/[_-]+/g, ' ').trim() || 'Main';
 
-        await db.execute(sql.raw(`
-            insert into floor_zones (id, name, branch_id, width, height, created_at, updated_at)
-            values ('${zoneId.replace(/'/g, "''")}', '${zoneName.replace(/'/g, "''")}', '${branchId.replace(/'/g, "''")}', 1600, 1200, now(), now())
-            on conflict (id) do nothing
-        `));
+        try {
+            await db.execute(sql.raw(`
+                insert into floor_zones (id, name, branch_id, width, height, created_at, updated_at)
+                select '${zoneId.replace(/'/g, "''")}', '${zoneName.replace(/'/g, "''")}', '${branchId.replace(/'/g, "''")}', 1600, 1200, GETDATE(), GETDATE()
+                where not exists (select 1 from floor_zones where id = '${zoneId.replace(/'/g, "''")}')
+            `));
+        } catch { }
 
         console.log(`Created floor zone: ${zoneId} for branch ${branchId}`);
     }

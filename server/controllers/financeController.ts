@@ -22,7 +22,10 @@ const defaultChartOfAccounts = [
 
 const ensureDefaultChartOfAccounts = async () => {
     for (const account of defaultChartOfAccounts) {
-        await db.insert(chartOfAccounts).values(account).onConflictDoNothing({ target: chartOfAccounts.code });
+        const [existing] = await db.select().top(1).from(chartOfAccounts).where(eq(chartOfAccounts.code, account.code));
+        if (!existing) {
+            await db.insert(chartOfAccounts).values(account);
+        }
     }
 };
 
@@ -58,7 +61,7 @@ export const createExpenseAccount = async (req: Request, res: Response) => {
         if (!name) return res.status(400).json({ error: 'ACCOUNT_NAME_REQUIRED' });
 
         const code = String(body.code || `5${Date.now().toString().slice(-5)}`).trim();
-        const [created] = await db.insert(chartOfAccounts).values({
+        const [created] = await db.insert(chartOfAccounts).output().values({
             id: `coa-exp-${nanoid(8)}`,
             code,
             name,
@@ -68,7 +71,7 @@ export const createExpenseAccount = async (req: Request, res: Response) => {
             parentId: 'coa-expenses',
             isControlAccount: false,
             allowManualJournals: true,
-        }).returning();
+        });
 
         res.status(201).json(created);
     } catch (error: any) {
@@ -85,7 +88,7 @@ export const getJournal = async (req: Request, res: Response) => {
         const entries = await db.select()
             .from(journalEntries)
             .orderBy(desc(journalEntries.date))
-            .limit(limit);
+            .offset(0).fetch(limit);
 
         const allLines = entries.length
             ? await db.select()
@@ -169,7 +172,7 @@ export const createJournalEntry = async (req: Request, res: Response) => {
                     requestedAt: new Date().toISOString(),
                 },
                 createdAt: new Date(),
-            }).onConflictDoNothing();
+            });
         }
 
         res.status(201).json({ success: true, entryId, message: 'Journal entry submitted for approval' });
@@ -181,7 +184,7 @@ export const createJournalEntry = async (req: Request, res: Response) => {
 export const approveJournalEntry = async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
-        const entry = await db.select().from(journalEntries).where(eq(journalEntries.id, id)).limit(1);
+        const entry = await db.select().top(1).from(journalEntries).where(eq(journalEntries.id, id));
         
         if (entry.length === 0) return res.status(404).json({ error: 'Entry not found' });
         if (entry[0].status !== 'PENDING_APPROVAL') return res.status(400).json({ error: 'Entry is not pending approval' });
@@ -242,7 +245,7 @@ export const resolveException = async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id);
         const action = req.body.action; // 'RETRY' or 'DISMISS'
-        const exception = await db.select().from(financeExceptions).where(eq(financeExceptions.id, id)).limit(1);
+        const exception = await db.select().top(1).from(financeExceptions).where(eq(financeExceptions.id, id));
         if (exception.length === 0) return res.status(404).json({ error: 'Exception not found' });
         
         const exc = exception[0];

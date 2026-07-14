@@ -123,7 +123,7 @@ export default {
                 ))
                 .groupBy(attendanceExceptions.branchId),
             db.select({
-                day: sql<string>`to_char(${attendanceSessions.clockInAt}, 'YYYY-MM-DD')`,
+                day: sql<string>`FORMAT(${attendanceSessions.clockInAt}, 'yyyy-MM-dd')`,
                 sessions: sql<number>`count(*)`,
                 openSessions: sql<number>`sum(case when ${attendanceSessions.status} = 'OPEN' then 1 else 0 end)`,
                 totalHours: sql<number>`coalesce(sum(${attendanceSessions.totalHours}), 0)`,
@@ -134,8 +134,8 @@ export default {
                     gte(attendanceSessions.clockInAt, periodStart),
                     lte(attendanceSessions.clockInAt, periodEnd),
                 ))
-                .groupBy(sql`to_char(${attendanceSessions.clockInAt}, 'YYYY-MM-DD')`)
-                .orderBy(sql`to_char(${attendanceSessions.clockInAt}, 'YYYY-MM-DD')`),
+                .groupBy(sql`FORMAT(${attendanceSessions.clockInAt}, 'yyyy-MM-dd')`)
+                .orderBy(sql`FORMAT(${attendanceSessions.clockInAt}, 'yyyy-MM-dd')`),
             db.select({
                 id: leaveRequests.id,
                 employeeId: leaveRequests.employeeId,
@@ -178,7 +178,7 @@ export default {
                     gte(payrollCycles.periodEnd, periodStart),
                 ))
                 .orderBy(desc(payrollCycles.periodEnd))
-                .limit(8),
+                .offset(0).fetch(8),
             db.select({
                 id: managerApprovals.id,
                 branchId: managerApprovals.branchId,
@@ -193,7 +193,7 @@ export default {
                     lte(managerApprovals.createdAt, periodEnd),
                 ))
                 .orderBy(desc(managerApprovals.createdAt))
-                .limit(300),
+                .offset(0).fetch(300),
             db.select({
                 employeeId: attendanceSessions.employeeId,
                 branchId: attendanceSessions.branchId,

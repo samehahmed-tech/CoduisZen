@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { customers, customerAddresses } from '../../src/db/schema';
-import { eq, or, ilike, and, desc, lt, gt, sql } from 'drizzle-orm';
+import { eq, or, and, desc, lt, gt, sql, isNull } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { parseCursorPagination, decodeCursor, encodeCursor, cursorPaginatedResponse } from '../middleware/pagination';
 
@@ -36,6 +36,8 @@ const parseZoneId = (value: unknown) => {
     return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const likeSearch = (column: any, search: string) => sql`LOWER(${column}) LIKE ${`%${search.toLowerCase()}%`}`;
+
 /**
  * Get all customers with optional search and cursor pagination.
  * Supports: ?cursor=<opaque>&limit=50 for cursor pagination
@@ -48,19 +50,22 @@ export const getAllCustomers = async (req: Request, res: Response) => {
 
         // Phone lookup (exact match, no pagination needed)
         if (phone) {
-            const results = await db.select(customerSelect).from(customers).where(eq(customers.phone, phone));
+            const results = await db.select(customerSelect).from(customers).where(and(eq(customers.phone, phone), isNull(customers.deletedAt)));
             return res.json(results);
         }
 
         // Search mode (limited, no cursor)
         if (search) {
-            const results = await db.select(customerSelect).from(customers).where(
-                or(
-                    ilike(customers.name, `%${search}%`),
-                    ilike(customers.phone, `%${search}%`),
-                    ilike(customers.email, `%${search}%`)
+            const results = await db.select(customerSelect).top(100).from(customers).where(
+                and(
+                    isNull(customers.deletedAt),
+                    or(
+                        likeSearch(customers.name, search),
+                        likeSearch(customers.phone, search),
+                        likeSearch(customers.email, search)
+                    )
                 )
-            ).limit(100);
+            );
             return res.json(results);
         }
 
@@ -72,16 +77,16 @@ export const getAllCustomers = async (req: Request, res: Response) => {
             const decoded = decodeCursor(cursor);
             if (decoded) {
                 conditions.push(
-                    sql`(${customers.createdAt}, ${customers.id}) < (${decoded.createdAt}::timestamptz, ${decoded.id})`
+                    sql`(${customers.createdAt}, ${customers.id}) < (CAST(${decoded.createdAt} AS DATETIME2), ${decoded.id})`
                 );
             }
         }
 
         const rows = await db.select(customerSelect)
             .from(customers)
-            .where(conditions.length ? and(...conditions) : undefined)
+            .where(and(isNull(customers.deletedAt), ...conditions))
             .orderBy(desc(customers.createdAt), desc(customers.id))
-            .limit(limit + 1);
+            .offset(0).fetch(limit + 1);
 
         res.json(cursorPaginatedResponse(rows as any, limit));
     } catch (error: any) {
@@ -96,7 +101,7 @@ export const getCustomerByPhone = async (req: Request, res: Response) => {
     try {
         const phone = getStringParam((req.params as any).phone);
         if (!phone) return res.status(400).json({ error: 'PHONE_REQUIRED' });
-        const [customer] = await db.select(customerSelect).from(customers).where(eq(customers.phone, phone));
+        const [customer] = await db.select(customerSelect).top(1).from(customers).where(eq(customers.phone, phone));
 
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
@@ -116,7 +121,7 @@ export const getCustomerById = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'CUSTOMER_ID_REQUIRED' });
 
-        const [customer] = await db.select(customerSelect).from(customers).where(eq(customers.id, id)).limit(1);
+        const [customer] = await db.select(customerSelect).top(1).from(customers).where(and(eq(customers.id, id), isNull(customers.deletedAt)));
         if (!customer) {
             return res.status(404).json({ error: 'CUSTOMER_NOT_FOUND', code: 'CUSTOMER_NOT_FOUND', message: 'Customer not found.' });
         }
@@ -146,13 +151,13 @@ export const createCustomer = async (req: Request, res: Response) => {
         const result = await db.transaction(async (tx) => {
             const [existingCustomer] = await tx
                 .select(customerSelect)
+                .top(1)
                 .from(customers)
-                .where(eq(customers.phone, phone))
-                .limit(1);
+                .where(eq(customers.phone, phone));
 
             if (existingCustomer) return existingCustomer;
 
-            const [newCustomer] = await tx.insert(customers).values({
+            const [newCustomer] = await tx.insert(customers).output(customerSelect).values({
                 id: customerData.id || `CUS-${Date.now()}`,
                 name: customerData.name,
                 phone,
@@ -175,7 +180,7 @@ export const createCustomer = async (req: Request, res: Response) => {
                 source: customerData.source || 'call_center',
                 createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning(customerSelect);
+            });
 
             if (customerData.address) {
                 await tx.insert(customerAddresses).values({
@@ -249,8 +254,8 @@ export const updateCustomer = async (req: Request, res: Response) => {
                 ...updates,
                 updatedAt: new Date(),
             })
-            .where(eq(customers.id, id))
-            .returning();
+            .output()
+            .where(eq(customers.id, id));
 
         if (!updated) {
             return res.status(404).json({ error: 'Customer not found' });
@@ -270,17 +275,16 @@ export const deleteCustomer = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'CUSTOMER_ID_REQUIRED' });
 
-        const result = await db.transaction(async (tx) => {
-            await tx.delete(customerAddresses).where(eq(customerAddresses.customerId, id));
-            const [deleted] = await tx.delete(customers).where(eq(customers.id, id)).returning();
-            return deleted;
-        });
+        const [result] = await db.update(customers)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .output()
+            .where(eq(customers.id, id));
 
         if (!result) {
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        res.json({ message: 'Customer deleted', customer: result });
+        res.json({ message: 'Customer archived', customer: result });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

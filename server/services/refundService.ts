@@ -20,7 +20,7 @@ const log = logger.child({ service: 'refund' });
 
 export type RefundType = 'FULL' | 'PARTIAL' | 'ITEM';
 
-export type RefundStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'PROCESSED' | 'CANCELLED';
+export type RefundStatus = 'PENDING' | 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'PROCESSED' | 'CANCELLED';
 
 export type RefundMethod = 'CASH' | 'ORIGINAL_PAYMENT' | 'STORE_CREDIT';
 
@@ -138,6 +138,12 @@ export const refundService = {
         endDate?: string;
     }): Promise<RefundRequest[]> {
         let refunds = await readSetting<RefundRequest[]>(REFUND_KEY, []);
+        refunds = refunds.map((refund: any) => ({
+            ...refund,
+            status: refund.status === 'REQUESTED' ? 'PENDING' : refund.status,
+            totalAmount: refund.refundAmount,
+            customAmount: refund.refundAmount,
+        }));
 
         if (filters?.branchId) refunds = refunds.filter(r => r.branchId === filters.branchId);
         if (filters?.status) refunds = refunds.filter(r => r.status === filters.status);
@@ -188,7 +194,7 @@ export const refundService = {
         const existingRefunds = await readSetting<RefundRequest[]>(REFUND_KEY, []);
         const existingActive = existingRefunds.find(r =>
             r.orderId === data.orderId &&
-            (r.status === 'REQUESTED' || r.status === 'APPROVED' || r.status === 'PROCESSED')
+            (r.status === 'PENDING' || r.status === 'REQUESTED' || r.status === 'APPROVED' || r.status === 'PROCESSED')
         );
         if (existingActive && data.type === 'FULL') {
             throw new Error('An active refund already exists for this order');
@@ -241,7 +247,7 @@ export const refundService = {
             orderNumber: Number(order.orderNumber || 0),
             branchId: order.branchId,
             type: data.type,
-            status: needsApproval ? 'REQUESTED' : 'APPROVED',
+            status: needsApproval ? 'PENDING' : 'APPROVED',
             originalAmount: Number(order.total || 0),
             refundAmount,
             refundMethod: data.refundMethod,
@@ -274,7 +280,7 @@ export const refundService = {
         const refunds = await readSetting<RefundRequest[]>(REFUND_KEY, []);
         const refund = refunds.find(r => r.id === refundId);
         if (!refund) throw new Error('Refund not found');
-        if (refund.status !== 'REQUESTED') throw new Error('Refund is not pending approval');
+        if (refund.status !== 'PENDING' && refund.status !== 'REQUESTED') throw new Error('Refund is not pending approval');
 
         refund.status = 'APPROVED';
         refund.approvedBy = approvedBy;
@@ -289,7 +295,7 @@ export const refundService = {
         const refunds = await readSetting<RefundRequest[]>(REFUND_KEY, []);
         const refund = refunds.find(r => r.id === refundId);
         if (!refund) throw new Error('Refund not found');
-        if (refund.status !== 'REQUESTED') throw new Error('Refund is not pending approval');
+        if (refund.status !== 'PENDING' && refund.status !== 'REQUESTED') throw new Error('Refund is not pending approval');
 
         refund.status = 'REJECTED';
         refund.approvedBy = rejectedBy;
@@ -414,7 +420,7 @@ export const refundService = {
         return {
             totalRefunds: processed.length,
             totalAmount: Math.round(totalRefunded * 100) / 100,
-            pendingCount: refunds.filter(r => r.status === 'REQUESTED').length,
+            pendingCount: refunds.filter(r => r.status === 'PENDING' || r.status === 'REQUESTED').length,
             rejectedCount: refunds.filter(r => r.status === 'REJECTED').length,
             byCategory,
             avgRefundAmount: processed.length > 0
