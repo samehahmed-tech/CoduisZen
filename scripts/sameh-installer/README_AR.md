@@ -72,6 +72,17 @@ artifacts\sameh-installer\Final Setup.exe
 ```
 
 بدون `--confirm=RESTORE` يرفض السكربت التنفيذ ولا يغيّر قاعدة البيانات.
+
+## نقل الكتالوج من PostgreSQL القديم
+
+على جهاز يقدر يتصل بقاعدة PostgreSQL القديمة، شغّل `scripts\sameh-installer\data-export\Export PostgreSQL Catalog SQL.bat`. الناتج ملف باسم `RestoFlow-Catalog-Import-<date>.sql` بدون كلمة مرور أو بيانات اتصال.
+
+انقل ملف SQL إلى جهاز العميل، ثم افتح من قائمة Start:
+
+`Sameh Installer > Import Catalog SQL File`
+
+اختر الملف واكتب `IMPORT`. الأداة تأخذ Backup متحققاً منه، وتشغّل الملف على قاعدة `CoduisZen` داخل Transaction واحدة، ثم تعيد تشغيل النظام. أي خطأ يلغي كل تغييرات النقل.
+
 - Port Guard يوقف فقط عمليات Node القديمة التابعة لـRestoFlow على Port `3001`، ويعرض اسم أي برنامج غريب يحجز البورت بدون قتله.
 - زر **فحص وإصلاح شامل** يتحقق من Hash الملفات الحرجة، يستعيد التالف، يصلح Tasks وFirewall، ثم يعيد تشغيل الخدمات.
 - API يبدأ ويعرض الواجهة حتى لو SQL/DB غير جاهزة؛ Health يظهر `degraded` بدل `ECONNREFUSED`.

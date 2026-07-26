@@ -3,6 +3,7 @@ import { db } from '../db';
 import { managerApprovals, auditLogs, users, journalEntries, financeExceptions } from '../../src/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { GLService } from '../services/glService';
+import { findApproverByPin } from '../services/managerApprovalAuth';
 
 const normalizeApproval = (approval: typeof managerApprovals.$inferSelect) => {
     const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
@@ -151,23 +152,17 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         }
 
-        // Find managers in this branch with matching PIN
-        const managers = await db.select({
+        const approvers = await db.select({
             id: users.id,
             name: users.name,
-            role: users.role
-        }).from(users).where(
-            and(
-                eq(users.assignedBranchId, effectiveBranchId),
-                eq(users.managerPin, pin),
-                eq(users.isActive, true)
-            )
-        );
-
-        // Check if any matching user has manager-level role
-        const validManager = managers.find(m =>
-            ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'FINANCE_DIRECTOR', 'ACCOUNTANT'].includes(m.role)
-        );
+            role: users.role,
+            assignedBranchId: users.assignedBranchId,
+            allowedBranches: users.allowedBranches,
+            managerPin: users.managerPin,
+            pinCodeHash: users.pinCodeHash,
+            pinLoginEnabled: users.pinLoginEnabled,
+        }).from(users).where(eq(users.isActive, true));
+        const validManager = await findApproverByPin(approvers, String(pin), effectiveBranchId);
 
         if (validManager) {
             if (approval) {

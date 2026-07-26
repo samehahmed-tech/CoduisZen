@@ -5,7 +5,8 @@ import {
     downloadDayCloseXlsx,
     closeDay,
     getDayCloseHistory,
-    sendDayCloseEmail
+    sendDayCloseEmail,
+    updateBusinessDate
 } from '../controllers/dayCloseController';
 import { requireRoles } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
@@ -14,6 +15,7 @@ const router = Router();
 
 // Get day close history for a branch
 router.get('/:branchId/history', enforceBranch, getDayCloseHistory);
+router.put('/:branchId/business-date', enforceBranch, requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'), updateBusinessDate);
 
 // Get day close report preview
 router.get('/:branchId/:date/pdf', enforceBranch, downloadDayClosePdf);

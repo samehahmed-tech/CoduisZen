@@ -19,6 +19,7 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
     const settings = useAuthStore(state => state.settings);
     const t = translations[settings.language];
     const isRTL = settings.language === 'ar';
+    const isPinComplete = pin.length >= 4;
 
     if (!isOpen) return null;
 
@@ -32,7 +33,7 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
     const handleClear = () => setPin('');
 
     const handleSubmit = async () => {
-        if (pin.length !== 6) return;
+        if (!isPinComplete) return;
         setLoading(true);
         setError('');
         try {
@@ -79,7 +80,7 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
                             <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6">
                                 <div className="absolute inset-0 bg-amber-500/10 rounded-[2rem] shadow-[0_0_20px_rgba(245,158,11,0.2)]" />
                                 <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-amber-500 rounded-[2rem] flex items-center justify-center shadow-lg border border-amber-400">
-                                    {pin.length === 6 && !loading ? <Unlock className="w-8 h-8 sm:w-10 sm:h-10 text-white" /> : <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-white" />}
+                                    {isPinComplete && !loading ? <Unlock className="w-8 h-8 sm:w-10 sm:h-10 text-white" /> : <Lock className="w-8 h-8 sm:w-10 sm:h-10 text-white" />}
                                 </div>
                             </div>
                             <h2 className="text-xl sm:text-2xl font-black text-main uppercase tracking-tighter leading-tight">
@@ -124,8 +125,8 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
                             <button onClick={() => handleDigit('0')} className="h-14 sm:h-16 rounded-2xl bg-elevated/40 border border-border/10 text-2xl sm:text-3xl font-black text-main hover:bg-elevated hover:border-amber-500/40 hover:shadow-lg transition-all active:scale-95">0</button>
                             <button 
                                 onClick={handleSubmit} 
-                                disabled={pin.length !== 6 || loading} 
-                                className={`h-14 sm:h-16 rounded-2xl flex items-center justify-center transition-all shadow-lg active:scale-95 ${pin.length === 6 && !loading ? 'bg-primary text-white shadow-primary/30 border border-primary hover:bg-primary-hover' : 'bg-elevated text-muted opacity-50 cursor-not-allowed'}`}
+                                disabled={!isPinComplete || loading} 
+                                className={`h-14 sm:h-16 rounded-2xl flex items-center justify-center transition-all shadow-lg active:scale-95 ${isPinComplete && !loading ? 'bg-primary text-white shadow-primary/30 border border-primary hover:bg-primary-hover' : 'bg-elevated text-muted opacity-50 cursor-not-allowed'}`}
                             >
                                 {loading ? <div className="w-7 h-7 border-4 border-white/30 border-t-white rounded-full animate-spin" /> : <ChevronRight size={32} className={isRTL ? 'rotate-180' : ''} />}
                             </button>

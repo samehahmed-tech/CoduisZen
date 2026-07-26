@@ -108,7 +108,7 @@ export const REPORT_DISPLAY_LABELS: Record<string, string> = {
    'Daily Flash Report': 'التقرير اليومي السريع',
    'Demand Forecasting': 'توقع الطلب',
    'Price Elasticity Simulator': 'محاكي مرونة الأسعار',
-   'Anomaly Detection': 'كشف الشذوذ',
+   'Anomaly Detection': 'تقرير الفحص',
    'Channel Mix Trend': 'اتجاه قنوات البيع',
 };
 

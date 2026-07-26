@@ -74,6 +74,7 @@ try {
     Copy-Item (Join-Path $repo "scripts\sql-server-schema.sql") (Join-Path $stage "database\empty-schema.sql") -Force
     Copy-Item (Join-Path $repo "scripts\sqlserver-schema-repair.sql") (Join-Path $stage "database\schema-repair.sql") -Force
     Copy-Item (Join-Path $repo "src\db\schema.ts") (Join-Path $stage "database\schema.ts") -Force
+    Copy-Item (Join-Path $PSScriptRoot "daily-order-number-fix\migrate-daily-order-number.sql") (Join-Path $stage "database\daily-order-number.sql") -Force
     Copy-Item (Join-Path $repo "package.json"), (Join-Path $repo "package-lock.json") $stage -Force
 
     $node = (Get-Command node.exe -ErrorAction Stop).Source
@@ -114,6 +115,7 @@ try {
         @{ Target = "runtime\monitor.cjs"; Role = "all" },
         @{ Target = "runtime\port-guard.cjs"; Role = "all" },
         @{ Target = "runtime\schema-doctor.cjs"; Role = "server" },
+        @{ Target = "database\daily-order-number.sql"; Role = "server" },
         @{ Target = "runtime\create-recovery-admin.cjs"; Role = "server" },
         @{ Target = "runtime\bridge-runner.cjs"; Role = "all" },
         @{ Target = "hardware-bridge\index.js"; Role = "all" },

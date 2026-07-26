@@ -115,7 +115,29 @@ export const CrmReports = ({ state }: any) => {
                      </div>
                   </div>
                )}
-               {activeCategory === 'CRM' && activeSubReport === 'Customer Retention' && !customerRetentionData && <p className="text-center text-muted py-16">No data.</p>}
+                {activeCategory === 'CRM' && activeSubReport === 'Customer Retention' && customerRetentionData && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-muted">Total Customers</p>
+                           <p className="text-2xl font-black text-main mt-1">{customerRetentionData.totalCustomers}</p>
+                        </div>
+                        <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Returning</p>
+                           <p className="text-2xl font-black text-emerald-500 mt-1">{customerRetentionData.returningCustomers}</p>
+                        </div>
+                        <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">New</p>
+                           <p className="text-2xl font-black text-blue-500 mt-1">{customerRetentionData.newCustomers}</p>
+                        </div>
+                        <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-muted">Retention Rate</p>
+                           <p className={`text-2xl font-black mt-1 ${customerRetentionData.retentionRate >= 50 ? 'text-emerald-500' : 'text-rose-500'}`}>{customerRetentionData.retentionRate}%</p>
+                        </div>
+                     </div>
+                  </div>
+                )}
+                {activeCategory === 'CRM' && activeSubReport === 'Customer Retention' && !customerRetentionData && <p className="text-center text-muted py-16">No data.</p>}
 
                {activeCategory === 'CRM' && activeSubReport === 'New vs Returning' && newVsReturningData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">

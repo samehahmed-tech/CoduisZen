@@ -52,7 +52,8 @@ export const downloadDayClosePdf = async (req: Request, res: Response) => {
 
         const report = await buildExportReport(branchId, date);
         const lang = req.query.lang === 'en' ? 'en' : 'ar';
-        const pdf = await generateDayClosePDF(report, lang);
+        const paper = req.query.paper === '80mm' ? '80mm' : 'a4';
+        const pdf = await generateDayClosePDF(report, lang, paper);
         const safeName = `CoduisZen-DayClose-${branchId}-${date}.pdf`.replace(/[^\w.-]+/g, '_');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
@@ -86,17 +87,8 @@ export const downloadDayCloseXlsx = async (req: Request, res: Response) => {
 };
 
 const buildExportReport = async (branchId: string, date: string) => {
-    const [closedReport, liveReport] = await Promise.all([
-        dayCloseService.getClosedReport(branchId, date),
-        dayCloseService.generateReport(branchId, date),
-    ]);
-    const report = closedReport
-        ? {
-            ...closedReport,
-            currency: closedReport.currency || liveReport.currency,
-            financeSummary: closedReport.financeSummary || liveReport.financeSummary,
-        }
-        : liveReport;
+    const closedReport = await dayCloseService.getClosedReport(branchId, date);
+    const report = closedReport || await dayCloseService.generateReport(branchId, date);
     if (!report.fiscalHealth) report.fiscalHealth = await dayCloseService.getFiscalHealth(branchId, date);
     if (!report.financeHealth) report.financeHealth = await dayCloseService.getFinanceHealth(branchId, date);
     if (!report.sideEffectHealth) report.sideEffectHealth = await dayCloseService.getSideEffectHealth(branchId, date);
@@ -172,7 +164,37 @@ export const closeDay = async (req: Request, res: Response) => {
                 },
             });
         }
+        if (error?.message === 'BUSINESS_DATE_MISMATCH') {
+            return res.status(409).json({
+                error: error.message,
+                message: 'Close the active business date or change it explicitly first',
+                businessDate: error.businessDate,
+            });
+        }
         res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateBusinessDate = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.params.branchId as string;
+        const userId = req.user?.id;
+        const businessDate = String(req.body?.businessDate || '').trim();
+        if (!branchId || !businessDate) return res.status(400).json({ error: 'BRANCH_ID_AND_DATE_REQUIRED' });
+        if (!userId) return res.status(401).json({ error: 'AUTH_REQUIRED' });
+
+        const updated = await dayCloseService.setBusinessDate(branchId, businessDate, userId);
+        res.json({ success: true, ...updated });
+    } catch (error: any) {
+        const code = String(error?.message || 'BUSINESS_DATE_UPDATE_FAILED');
+        if (code === 'INVALID_BUSINESS_DATE' || code === 'FUTURE_BUSINESS_DATE_NOT_ALLOWED') {
+            return res.status(400).json({ error: code });
+        }
+        if (code === 'BRANCH_NOT_FOUND') return res.status(404).json({ error: code });
+        if (code === 'OPEN_SHIFTS_EXIST_FOR_BUSINESS_DATE_CHANGE' || code === 'BUSINESS_DATE_ALREADY_CLOSED') {
+            return res.status(409).json({ error: code });
+        }
+        res.status(500).json({ error: code });
     }
 };
 

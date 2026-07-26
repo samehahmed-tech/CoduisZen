@@ -362,6 +362,7 @@ CREATE TABLE orders (
     trace_id                nvarchar(max),
     parent_order_id         nvarchar(255),
     order_number            int             IDENTITY(1,1),
+    daily_order_number      int,
     type                    nvarchar(max)   NOT NULL,
     source                  nvarchar(max)   DEFAULT 'pos',
     branch_id               nvarchar(255)   NOT NULL,
@@ -595,12 +596,11 @@ CREATE TABLE inventory_items (
     deleted_at          datetime2,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
-    CONSTRAINT pk_inventory_items PRIMARY KEY (id),
-    CONSTRAINT uq_inventory_items_sku UNIQUE (sku)
+    CONSTRAINT pk_inventory_items PRIMARY KEY (id)
 );
 
 CREATE INDEX idx_inventory_items_barcode ON inventory_items (barcode) WHERE barcode IS NOT NULL;
-CREATE INDEX idx_inventory_items_sku ON inventory_items (sku) WHERE sku IS NOT NULL;
+CREATE UNIQUE INDEX idx_inventory_items_sku_not_null ON inventory_items (sku) WHERE sku IS NOT NULL;
 
 CREATE TABLE inventory_ledger (
     id                  nvarchar(255)   NOT NULL,

@@ -42,7 +42,24 @@ async function main() {
     await pool.close();
   }
 
-  process.stdout.write(JSON.stringify({ ok: true, restored: true, database, backupFile }));
+  const uploadsBackup = `${backupFile}.uploads`;
+  const programData = process.env.ProgramData || process.env.PROGRAMDATA;
+  const uploadsDir = programData && path.join(programData, 'Sameh', 'RestoFlow ERP', 'uploads');
+  if (uploadsDir && fs.existsSync(uploadsBackup)) {
+    const previousUploads = `${uploadsDir}.restore-old-${Date.now()}`;
+    fs.mkdirSync(path.dirname(uploadsDir), { recursive: true });
+    if (fs.existsSync(uploadsDir)) fs.renameSync(uploadsDir, previousUploads);
+    try {
+      fs.cpSync(uploadsBackup, uploadsDir, { recursive: true, force: true });
+      fs.rmSync(previousUploads, { recursive: true, force: true });
+    } catch (error) {
+      fs.rmSync(uploadsDir, { recursive: true, force: true });
+      if (fs.existsSync(previousUploads)) fs.renameSync(previousUploads, uploadsDir);
+      throw error;
+    }
+  }
+
+  process.stdout.write(JSON.stringify({ ok: true, restored: true, database, backupFile, uploadsRestored: fs.existsSync(uploadsBackup) }));
 }
 
 main().catch(error => {

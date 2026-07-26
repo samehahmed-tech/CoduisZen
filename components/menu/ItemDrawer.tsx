@@ -13,7 +13,7 @@ import ImageUploader from "../common/ImageUploader";
 import { barcodeApi } from "../../services/api/barcode";
 import { useToast } from "../common/ToastProvider";
 
-type DrawerTab = "BASIC" | "SIZES" | "MODIFIERS" | "RECIPE" | "PRICING" | "PLATFORMS" | "SCHEDULE" | "HISTORY";
+type DrawerTab = "BASIC" | "SIZES" | "MODIFIERS" | "RECIPE" | "PRICING" | "PLATFORMS" | "SCHEDULE" | "PRINTERS" | "HISTORY";
 
 interface Props {
   item: MenuItem;
@@ -219,6 +219,7 @@ export const ItemDrawer: React.FC<Props> = ({
     { id: "PRICING", icon: DollarSign, en: "Branches", ar: "تسعير الفروع" },
     { id: "PLATFORMS", icon: Globe, en: "Platforms", ar: "تسعير المنصات" },
     { id: "SCHEDULE", icon: Clock, en: "Schedule", ar: "الجدولة" },
+    { id: "PRINTERS", icon: PrinterIcon, en: "Printers", ar: "الطابعات" },
     { id: "HISTORY", icon: History, en: "Audit", ar: "سجل العمليات" },
   ];
 
@@ -846,16 +847,27 @@ export const ItemDrawer: React.FC<Props> = ({
                        </div>
                     </div>
 
+                 </div>
+               )}
+
+               {tab === "PRINTERS" && (
+                 <div className="space-y-6 animate-fade-in relative z-10">
                     <div className="glass-2 p-4 sm:p-8 border-border/40">
-                       <h4 className="text-sm font-black text-main uppercase tracking-widest mb-6 flex items-center gap-2">
-                         <PrinterIcon size={16} className="text-amber-500"/> {lang === 'ar' ? 'توجيه طلبات المطبخ' : 'Print Routing'}
+                       <h4 className="text-sm font-black text-main uppercase tracking-widest mb-2 flex items-center gap-2">
+                         <PrinterIcon size={16} className="text-amber-500"/> {lang === 'ar' ? 'طابعات الصنف' : 'Item Printers'}
                        </h4>
+                       <p className="mb-6 text-xs font-bold text-muted">
+                         {lang === 'ar'
+                           ? 'اختر طابعة أو أكثر لهذا الصنف. بدون اختيار سيستخدم الصنف طابعات القسم تلقائياً.'
+                           : 'Choose one or more printers for this item. With no selection, category printers are used automatically.'}
+                       </p>
                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           {printers.map(p => {
                              const isActive = item.printerIds?.includes(p.id);
                              return (
                                <button
                                  key={p.id}
+                                 type="button"
                                  onClick={() => togglePrinter(p.id)}
                                  className={`h-14 rounded-xl border flex items-center justify-center gap-2 transition-all
                                    ${isActive ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' : 'bg-elevated/40 border-border/30 text-muted hover:bg-elevated hover:text-main'}`}
@@ -865,6 +877,11 @@ export const ItemDrawer: React.FC<Props> = ({
                                </button>
                              )
                           })}
+                          {printers.length === 0 && (
+                            <p className="text-xs font-bold text-muted">
+                              {lang === 'ar' ? 'لا توجد طابعات مضافة بعد.' : 'No printers configured yet.'}
+                            </p>
+                          )}
                        </div>
                     </div>
                  </div>

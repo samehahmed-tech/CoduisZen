@@ -41,7 +41,8 @@ $payloadFrontend = Join-Path $PSScriptRoot 'payload\dist'
 $payloadBridge = Join-Path $PSScriptRoot 'payload\hardware-bridge\index.js'
 $payloadBridgeRaster = Join-Path $PSScriptRoot 'payload\hardware-bridge\png-raster.js'
 $payloadAdmin = Join-Path $PSScriptRoot 'payload\create-recovery-admin.cjs'
-foreach ($required in @($node, $backupScript, $stateFile, $payloadServer, $payloadFrontend, $payloadBridge, $payloadBridgeRaster, $payloadAdmin)) {
+$payloadDatabaseRepair = Join-Path $PSScriptRoot 'payload\repair-client-database.cjs'
+foreach ($required in @($node, $backupScript, $stateFile, $payloadServer, $payloadFrontend, $payloadBridge, $payloadBridgeRaster, $payloadAdmin, $payloadDatabaseRepair)) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Required file is missing: $required" }
 }
 
@@ -57,6 +58,7 @@ $recoveryBridge = Join-Path $InstallDir 'recovery\hardware-bridge\index.js'
 $recoveryBridgeRaster = Join-Path $InstallDir 'recovery\hardware-bridge\png-raster.js'
 $recoveryManifest = Join-Path $InstallDir 'recovery\manifest.json'
 $adminScript = Join-Path $InstallDir 'runtime\create-recovery-admin.cjs'
+$databaseRepairScript = Join-Path $InstallDir 'runtime\repair-client-database.cjs'
 $logDir = Join-Path $InstallDir 'logs'
 New-Item -ItemType Directory -Path $rollback, $logDir -Force | Out-Null
 $log = Join-Path $logDir "hotfix-$timestamp.log"
@@ -84,12 +86,13 @@ try {
     if (Test-Path -LiteralPath $recoveryBridge) { Copy-Item -LiteralPath $recoveryBridge -Destination (Join-Path $rollback 'recovery-bridge-index.js') -Force }
     if (Test-Path -LiteralPath $recoveryManifest) { Copy-Item -LiteralPath $recoveryManifest -Destination (Join-Path $rollback 'manifest.json') -Force }
 
-    Step 'Applying session, menu, printer, receipt, and inventory fix'
+    Step 'Applying cumulative application fix'
     Copy-Item -LiteralPath $payloadServer -Destination $currentServer -Force
     Copy-Item -Path (Join-Path $payloadFrontend '*') -Destination $currentFrontend -Recurse -Force
     Copy-Item -LiteralPath $payloadBridge -Destination $currentBridge -Force
     Copy-Item -LiteralPath $payloadBridgeRaster -Destination $currentBridgeRaster -Force
     Copy-Item -LiteralPath $payloadAdmin -Destination $adminScript -Force
+    Copy-Item -LiteralPath $payloadDatabaseRepair -Destination $databaseRepairScript -Force
     $bridgeEnv = Join-Path $InstallDir 'hardware-bridge\.env'
     if (Test-Path -LiteralPath $bridgeEnv) {
         $bridgeConfig = Get-Content -LiteralPath $bridgeEnv -Raw
@@ -117,6 +120,11 @@ try {
             [IO.File]::WriteAllText($recoveryManifest, ($manifest | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
         }
     }
+
+    Step 'Repairing business date and today sales date'
+    $databaseRepairResult = & $node $databaseRepairScript 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Database date repair failed: $databaseRepairResult" }
+    $databaseRepairResult | Add-Content -LiteralPath $log -Encoding UTF8
 
     Step 'Creating recovery Admin and Cashier users'
     $adminResult = & $node $adminScript 2>&1
@@ -163,7 +171,7 @@ try {
     }
     if (-not $bridgeHealthy) { throw 'Print Bridge CORS/health validation failed.' }
 
-    @{ version='1.1.8-final-launch-fix'; appliedAt=(Get-Date).ToString('o'); rollback=$rollback } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallDir 'hotfix-state.json') -Encoding UTF8
+    @{ version='1.1.9-tax-day-close-fix'; appliedAt=(Get-Date).ToString('o'); rollback=$rollback } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallDir 'hotfix-state.json') -Encoding UTF8
     "SUCCESS $(Get-Date -Format o)" | Add-Content -LiteralPath $log -Encoding UTF8
     Write-Host "`nSUCCESS: Admin PIN 202626 | Cashier PIN 111111" -ForegroundColor Green
     exit 0

@@ -350,7 +350,10 @@ export interface Order {
   subtotal: number;
   tax: number;
   total: number;
-  discount?: number; // Discount percentage applied
+  discount?: number; // Monetary discount amount
+  discountType?: string;
+  discountReason?: string;
+  couponCode?: string;
   freeDelivery?: boolean; // Call Center - free delivery flag
   isUrgent?: boolean; // Call Center - priority order flag
   createdAt: Date;

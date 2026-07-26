@@ -4,8 +4,10 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { analyticsApi } from '../services/api/analytics';
 import { socketService } from '../services/socketService';
 
+const formatDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 const AdminDashboardPage: React.FC = () => {
-    const { settings, token } = useAuthStore();
+    const { settings, token, branches } = useAuthStore();
     const activeBranchId = settings.activeBranchId;
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const [rows, setRows] = React.useState<any[]>([]);
@@ -13,19 +15,24 @@ const AdminDashboardPage: React.FC = () => {
     const [error, setError] = React.useState<string | null>(null);
     const [isLive, setIsLive] = React.useState(false);
     const [lastUpdated, setLastUpdated] = React.useState<Date>(new Date());
+    const activeBusinessDate = React.useMemo(
+        () => branches.find((branch) => branch.id === activeBranchId)?.businessDate || formatDateKey(new Date()),
+        [branches, activeBranchId]
+    );
 
     const period = React.useMemo(() => {
-        const end = new Date();
-        const start = new Date();
+        const [year, month, day] = activeBusinessDate.split('-').map(Number);
+        const end = year && month && day ? new Date(year, month - 1, day, 12) : new Date();
+        const start = new Date(end);
         start.setDate(end.getDate() - 29);
         return {
-            startDate: start.toISOString().slice(0, 10),
-            endDate: end.toISOString().slice(0, 10),
+            startDate: formatDateKey(start),
+            endDate: formatDateKey(end),
             label: lang === 'ar'
                 ? `${start.toLocaleDateString('ar-EG')} - ${end.toLocaleDateString('ar-EG')}`
                 : `${start.toLocaleDateString('en-US')} - ${end.toLocaleDateString('en-US')}`,
         };
-    }, [lang]);
+    }, [lang, activeBusinessDate]);
 
     const loadData = React.useCallback(async (mounted = true) => {
         try {

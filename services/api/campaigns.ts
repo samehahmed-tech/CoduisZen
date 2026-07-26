@@ -18,3 +18,21 @@ export const campaignsApi = {
     update: (id: string, data: any) => apiRequest<any>(`/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => apiRequest<any>(`/campaigns/${id}`, { method: 'DELETE' }),
 };
+
+export type ManagedCoupon = {
+    id: string;
+    code: string;
+    type: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    value: number;
+    usedCount: number | null;
+    usageLimit: number | null;
+    isActive: boolean | null;
+};
+
+export const couponsApi = {
+    getAll: () => apiRequest<ManagedCoupon[]>('/marketing/coupons'),
+    createPercentage: (code: string, percent: number) => apiRequest<ManagedCoupon>('/marketing/coupons', {
+        method: 'POST',
+        body: JSON.stringify({ code, type: 'PERCENTAGE', value: percent }),
+    }),
+};

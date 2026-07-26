@@ -68,3 +68,8 @@ CoduisZenBridgeBranches.json
 
 # Test data
 stream-test.xlsx
+
+# Temp / scratch runtime artifacts
+.tmp-*
+.playwright-cli/
+*.rar

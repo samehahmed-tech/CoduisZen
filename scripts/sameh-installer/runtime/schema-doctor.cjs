@@ -47,6 +47,10 @@ async function repair() {
         added.push(`${table}.${column}`);
       }
     }
+    if (actual.has('orders')) {
+      const dailyOrderNumberMigration = fs.readFileSync(path.join(root, 'database', 'daily-order-number.sql'), 'utf8');
+      await new mssql.Request(transaction).batch(dailyOrderNumberMigration);
+    }
     await transaction.commit();
     console.log(JSON.stringify({ ok: true, added, missingTables }));
   } catch (error) {

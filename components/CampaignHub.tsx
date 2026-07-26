@@ -6,7 +6,7 @@ import {
     Bot, Globe, Zap, ToggleLeft, ThumbsUp
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
-import { campaignsApi } from '../services/api/campaigns';
+import { campaignsApi, couponsApi, type ManagedCoupon } from '../services/api/campaigns';
 import { useToast } from './common/ToastProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -30,6 +30,7 @@ const CampaignHub: React.FC = () => {
     const currencySymbol = settings.currencySymbol || (lang === 'ar' ? 'ج.م' : 'EGP');
     const { success, error: showError } = useToast();
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [coupons, setCoupons] = useState<ManagedCoupon[]>([]);
     const [stats, setStats] = useState<any>(null);
     const [creating, setCreating] = useState(false);
     const [dispatchingId, setDispatchingId] = useState<string | null>(null);
@@ -42,15 +43,41 @@ const CampaignHub: React.FC = () => {
     const [waConnected, setWaConnected] = useState(false);
     const [updatingCampaignId, setUpdatingCampaignId] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'DRAFT'>('ACTIVE');
+    const [couponCode, setCouponCode] = useState('');
+    const [couponPercent, setCouponPercent] = useState('');
+    const [creatingCoupon, setCreatingCoupon] = useState(false);
     const creatingRef = useRef(false);
 
     const loadData = async () => {
         try {
-            const [list, s] = await Promise.all([campaignsApi.getAll(), campaignsApi.getStats()]);
+            const [list, s, couponList] = await Promise.all([campaignsApi.getAll(), campaignsApi.getStats(), couponsApi.getAll()]);
             setCampaigns(list);
             setStats(s);
+            setCoupons(couponList);
         } catch (error) {
             showError(tr('تعذر تحميل الحملات', 'Could not load campaigns'));
+        }
+    };
+
+    const createPercentageCoupon = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const normalizedCode = couponCode.trim().toUpperCase();
+        const percent = Number(couponPercent);
+        if (!normalizedCode || !Number.isFinite(percent) || percent <= 0 || percent > 100) {
+            showError(tr('اكتب اسماً ونسبة من 1 إلى 100.', 'Enter a name and a percentage from 1 to 100.'));
+            return;
+        }
+        setCreatingCoupon(true);
+        try {
+            await couponsApi.createPercentage(normalizedCode, percent);
+            setCouponCode('');
+            setCouponPercent('');
+            await loadData();
+            success(tr('تم إنشاء كود الخصم', 'Discount code created'));
+        } catch (error: any) {
+            showError(error?.message || tr('تعذر إنشاء كود الخصم', 'Could not create discount code'));
+        } finally {
+            setCreatingCoupon(false);
         }
     };
 
@@ -226,7 +253,7 @@ const CampaignHub: React.FC = () => {
                     { label: tr('الوصول', 'Network Reach'), value: totalReach.toLocaleString(), sub: channelMix.map(c => `${c.label}:${c.value}`).join(' • '), icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
                     { label: tr('التحويلات', 'Conversions'), value: totalConversions.toLocaleString(), sub: `${conversionRate.toFixed(2)}% ${tr('معدل التحويل', 'Conversion Rate')}`, icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
                     { label: tr('إيراد منسوب للحملات', 'Attributed Revenue'), value: `${campaignRevenueEstimate.toLocaleString()} ${currencySymbol}`, sub: tr('تأثير تقديري', 'Estimated Impact'), icon: BarChart2, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-                    { label: tr('أكواد نشطة', 'Active Codes'), value: String(stats?.activeCoupons || 0), sub: `${campaigns.length} ${tr('حملات مباشرة', 'live campaigns')}`, icon: Ticket, color: 'text-primary', bg: 'bg-primary/10' },
+                    { label: tr('أكواد نشطة', 'Active Codes'), value: String(coupons.filter(coupon => coupon.isActive !== false).length), sub: `${coupons.reduce((sum, coupon) => sum + Number(coupon.usedCount || 0), 0)} ${tr('استخدام', 'uses')}`, icon: Ticket, color: 'text-primary', bg: 'bg-primary/10' },
                 ].map((stat, i) => (
                     <motion.div variants={cardVariants} key={i} className="bg-card/60 backdrop-blur-3xl border border-border/40 p-8 rounded-[2rem] shadow-xl relative overflow-hidden group hover:border-border/80 transition-colors">
                         <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} blur-3xl opacity-50 group-hover:opacity-100 transition-opacity`} />
@@ -242,6 +269,54 @@ const CampaignHub: React.FC = () => {
                     </motion.div>
                 ))}
             </motion.div>
+
+            <section className="relative z-10 mb-8 rounded-[2rem] border border-border/40 bg-card/80 p-5 shadow-xl lg:p-6" aria-labelledby="coupon-manager-title">
+                <div className="grid gap-6 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.7fr)]">
+                    <form onSubmit={createPercentageCoupon} className="space-y-4">
+                        <div>
+                            <h3 id="coupon-manager-title" className="flex items-center gap-2 text-lg font-black text-main"><Ticket size={20} className="text-primary" />{tr('أكواد الخصم', 'Discount codes')}</h3>
+                            <p className="mt-1 text-xs font-bold text-muted">{tr('أنشئ كوداً بالنسبة ثم استخدمه من شاشة البيع.', 'Create a percentage code, then apply it from POS.')}</p>
+                        </div>
+                        <div className="grid grid-cols-[minmax(0,1fr)_110px] gap-3">
+                            <label className="space-y-1.5 text-xs font-black text-muted">
+                                <span>{tr('اسم / كود الخصم', 'Discount name / code')}</span>
+                                <input value={couponCode} onChange={(event) => setCouponCode(event.target.value)} maxLength={50} placeholder={tr('مثال: عملاء VIP', 'Example: VIP')} className="h-11 w-full rounded-xl border border-border/60 bg-app px-3 font-bold uppercase text-main outline-none transition-colors focus:border-primary" />
+                            </label>
+                            <label className="space-y-1.5 text-xs font-black text-muted">
+                                <span>{tr('النسبة', 'Percent')}</span>
+                                <div className="flex h-11 items-center rounded-xl border border-border/60 bg-app px-3 focus-within:border-primary">
+                                    <input type="number" min="1" max="100" step="0.01" value={couponPercent} onChange={(event) => setCouponPercent(event.target.value)} className="min-w-0 flex-1 bg-transparent font-bold text-main outline-none" />
+                                    <Percent size={15} />
+                                </div>
+                            </label>
+                        </div>
+                        <button type="submit" disabled={creatingCoupon} className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-white transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-50">
+                            <Plus size={16} />{creatingCoupon ? tr('جارٍ الحفظ...', 'Saving...') : tr('حفظ كود الخصم', 'Save discount code')}
+                        </button>
+                    </form>
+
+                    <div className="min-w-0 overflow-hidden rounded-2xl border border-border/40">
+                        <div className="max-h-72 overflow-auto">
+                            <table className="w-full text-xs sm:text-sm">
+                                <thead className="sticky top-0 bg-elevated text-xs font-black text-muted">
+                                    <tr><th className="px-2 py-3 text-start sm:px-4">{tr('الكود', 'Code')}</th><th className="px-2 py-3 text-end sm:px-4">{tr('النسبة', 'Percent')}</th><th className="px-2 py-3 text-end sm:px-4">{tr('الاستخدام', 'Uses')}</th><th className="px-2 py-3 text-end sm:px-4">{tr('الحالة', 'Status')}</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/30">
+                                    {coupons.map(coupon => (
+                                        <tr key={coupon.id} className="hover:bg-elevated/50">
+                                            <td className="px-2 py-3 font-black uppercase text-main sm:px-4">{coupon.code}</td>
+                                            <td className="px-2 py-3 text-end font-black tabular-nums text-main sm:px-4">{coupon.value}%</td>
+                                            <td className="px-2 py-3 text-end font-bold tabular-nums text-muted sm:px-4">{Number(coupon.usedCount || 0).toLocaleString()}</td>
+                                            <td className="px-2 py-3 text-end sm:px-4"><span className={`rounded-full px-2 py-1 text-[9px] font-black sm:px-2.5 sm:text-[10px] ${coupon.isActive === false ? 'bg-slate-500/10 text-slate-500' : 'bg-emerald-500/10 text-emerald-600'}`}>{coupon.isActive === false ? tr('متوقف', 'Inactive') : tr('نشط', 'Active')}</span></td>
+                                        </tr>
+                                    ))}
+                                    {coupons.length === 0 && <tr><td colSpan={4} className="px-4 py-10 text-center text-xs font-bold text-muted">{tr('لا توجد أكواد خصم بعد.', 'No discount codes yet.')}</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* ── Social Media Platform Tabs ── */}
             <div className="relative z-10 -mt-4 mb-6">

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { AlertCircle, CalendarClock, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dayCloseApi } from '../services/api/dayClose';
 import { shiftsApi } from '../services/api/shifts';
+import { settingsApi } from '../services/api/settings';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useFinanceStore } from '../stores/useFinanceStore';
 
@@ -121,7 +122,7 @@ const readinessCopy: Record<string, {
 
 const DayCloseHub: React.FC = () => {
     const navigate = useNavigate();
-    const { settings, branches } = useAuthStore();
+    const { settings, branches, fetchBranches, fetchSettings } = useAuthStore();
     const setShift = useFinanceStore((state) => state.setShift);
     const setIsShiftDrawerOpen = useFinanceStore((state) => state.setIsShiftDrawerOpen);
     const lang = settings.language || 'en';
@@ -146,6 +147,17 @@ const DayCloseHub: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [blockedReasons, setBlockedReasons] = useState<string[]>([]);
+    const [manualBusinessDate, setManualBusinessDate] = useState(todayLocalDate());
+    const [isUpdatingBusinessDate, setIsUpdatingBusinessDate] = useState(false);
+    const [whatsappRecipients, setWhatsappRecipients] = useState((settings.dayCloseWhatsappRecipients || []).join(', '));
+    const [isSavingWhatsapp, setIsSavingWhatsapp] = useState(false);
+    const [printPaper, setPrintPaper] = useState<'a4' | '80mm'>('80mm');
+
+    const activeBranch = useMemo(() => branches.find((branch) => branch.id === branchId), [branches, branchId]);
+    const today = todayLocalDate();
+    const businessDate = activeBranch?.businessDate || today;
+    const isStaleBusinessDate = businessDate < today;
+    const isViewingBusinessDate = date === businessDate;
 
     const readinessChecks = useMemo(() => {
         return (report?.readiness?.checks || []).map((check: any) => {
@@ -201,11 +213,20 @@ const DayCloseHub: React.FC = () => {
         }
     }, [availableBranches, branchId]);
 
+    useEffect(() => {
+        if (!branchId) return;
+        setDate(businessDate);
+        setManualBusinessDate(businessDate);
+    }, [branchId, businessDate]);
+
+    useEffect(() => {
+        setWhatsappRecipients((settings.dayCloseWhatsappRecipients || []).join(', '));
+    }, [settings.dayCloseWhatsappRecipients]);
+
     const loadReport = async () => {
         if (!branchId || !date) return;
         setIsLoadingReport(true);
         setError(null);
-        setMessage(null);
         setBlockedReasons([]);
         try {
             const data = await dayCloseApi.getReport(branchId, date);
@@ -236,6 +257,10 @@ const DayCloseHub: React.FC = () => {
 
     const handleCloseDay = async () => {
         if (!branchId || !date) return;
+        if (!isViewingBusinessDate) {
+            setError(lang === 'ar' ? `الإغلاق مسموح فقط ليوم التشغيل النشط ${businessDate}.` : `Only the active business day ${businessDate} can be closed.`);
+            return;
+        }
         if (isClosedDay) {
             setBlockedReasons(['DAY_ALREADY_CLOSED']);
             setError(lang === 'ar' ? 'هذا اليوم مقفول بالفعل ولا يمكن إقفاله مرة أخرى.' : 'This day is already closed and cannot be closed again.');
@@ -255,20 +280,82 @@ const DayCloseHub: React.FC = () => {
                     includeReports: ['sales', 'payments', 'audit']
                 } : undefined
             });
-            setMessage(result.message || 'Day closed successfully');
+            const queued = result.report?.whatsappDelivery?.queued || 0;
+            setMessage(queued
+                ? (lang === 'ar' ? `تم إغلاق اليوم وإضافة التقرير لطابور واتساب (${queued}).` : `Day closed and WhatsApp report queued for ${queued} recipient(s).`)
+                : (result.message || (lang === 'ar' ? 'تم إغلاق اليوم بنجاح' : 'Day closed successfully')));
             setBlockedReasons([]);
-            await loadReport();
             await loadHistory();
+            await fetchBranches();
         } catch (e: any) {
             const reasons = e?.details?.blockedReasons || e?.blockedReasons || [];
             setBlockedReasons(Array.isArray(reasons) ? reasons : []);
             setError(
                 e?.code === 'DAY_CLOSE_BLOCKED'
                     ? (lang === 'ar' ? 'لا يمكن إغلاق اليوم قبل تنفيذ الإجراءات المطلوبة.' : 'Day close is blocked until the required actions are completed.')
+                    : e?.code === 'BUSINESS_DATE_MISMATCH'
+                        ? (lang === 'ar' ? `تاريخ التشغيل النشط هو ${e?.businessDate || e?.details?.businessDate || businessDate}. حدّث الصفحة ثم حاول مرة أخرى.` : `Active business date is ${e?.businessDate || e?.details?.businessDate || businessDate}. Refresh and try again.`)
                     : (e?.message || 'Failed to close day')
             );
         } finally {
             setIsClosing(false);
+        }
+    };
+
+    const handleUpdateBusinessDate = async () => {
+        if (!branchId || !manualBusinessDate) return;
+        if (manualBusinessDate > today) {
+            setError(lang === 'ar' ? 'لا يمكن ضبط تاريخ التشغيل على تاريخ مستقبلي.' : 'Business date cannot be in the future.');
+            return;
+        }
+        if (!window.confirm(lang === 'ar'
+            ? `تغيير تاريخ تشغيل الفرع من ${businessDate} إلى ${manualBusinessDate}؟`
+            : `Change branch business date from ${businessDate} to ${manualBusinessDate}?`)) return;
+
+        setIsUpdatingBusinessDate(true);
+        setError(null);
+        setMessage(null);
+        try {
+            await dayCloseApi.updateBusinessDate(branchId, manualBusinessDate);
+            await fetchBranches();
+            setDate(manualBusinessDate);
+            setMessage(lang === 'ar' ? `تم تحديث تاريخ التشغيل إلى ${manualBusinessDate}.` : `Business date updated to ${manualBusinessDate}.`);
+        } catch (e: any) {
+            const messages: Record<string, string> = lang === 'ar' ? {
+                OPEN_SHIFTS_EXIST_FOR_BUSINESS_DATE_CHANGE: 'اقفل كل الشيفتات المفتوحة قبل تعديل تاريخ التشغيل.',
+                BUSINESS_DATE_ALREADY_CLOSED: 'التاريخ المطلوب مقفول بالفعل ولا يمكن تشغيله مرة أخرى.',
+                FUTURE_BUSINESS_DATE_NOT_ALLOWED: 'لا يمكن اختيار تاريخ مستقبلي.',
+            } : {
+                OPEN_SHIFTS_EXIST_FOR_BUSINESS_DATE_CHANGE: 'Close all open shifts before changing the business date.',
+                BUSINESS_DATE_ALREADY_CLOSED: 'The selected date is already closed and cannot be reopened.',
+                FUTURE_BUSINESS_DATE_NOT_ALLOWED: 'A future date is not allowed.',
+            };
+            setError(messages[e?.code] || e?.message || 'Failed to update business date');
+        } finally {
+            setIsUpdatingBusinessDate(false);
+        }
+    };
+
+    const handleSaveWhatsapp = async () => {
+        const recipients = whatsappRecipients.split(',').map((value) => value.trim()).filter(Boolean);
+        const isPhone = (value: string) => {
+            const digits = value.replace(/\D/g, '');
+            return /^\+?[0-9][0-9\s()-]{8,18}$/.test(value) && digits.length >= 10 && digits.length <= 15;
+        };
+        if (recipients.some((phone) => !isPhone(phone))) {
+            setError(lang === 'ar' ? 'راجع أرقام واتساب وافصل بينها بفاصلة، مع كود الدولة.' : 'Check WhatsApp numbers, separated by commas and including country code.');
+            return;
+        }
+        setIsSavingWhatsapp(true);
+        setError(null);
+        try {
+            await settingsApi.update('dayCloseWhatsappRecipients', recipients, 'operations');
+            await fetchSettings();
+            setMessage(lang === 'ar' ? 'تم حفظ أرقام واتساب. سيُرسل الملخص تلقائياً بعد الإغلاق.' : 'WhatsApp recipients saved. The summary will be sent automatically after close.');
+        } catch (e: any) {
+            setError(e?.message || (lang === 'ar' ? 'تعذر حفظ أرقام واتساب' : 'Failed to save WhatsApp recipients'));
+        } finally {
+            setIsSavingWhatsapp(false);
         }
     };
 
@@ -304,13 +391,13 @@ const DayCloseHub: React.FC = () => {
         setError(null);
         setMessage(null);
         try {
-            const blob = await dayCloseApi.getPdf(branchId, date, lang === 'ar' ? 'ar' : 'en');
+            const blob = await dayCloseApi.getPdf(branchId, date, lang === 'ar' ? 'ar' : 'en', printPaper);
             const url = URL.createObjectURL(blob);
             const win = window.open(url, '_blank');
             if (!win) {
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `day-close-${branchId}-${date}.pdf`;
+                link.download = `day-close-${branchId}-${date}-${printPaper}.pdf`;
                 link.click();
                 setTimeout(() => URL.revokeObjectURL(url), 30000);
                 return;
@@ -336,7 +423,7 @@ const DayCloseHub: React.FC = () => {
         try {
             const reportLang = lang === 'ar' ? 'ar' : 'en';
             const blob = format === 'pdf'
-                ? await dayCloseApi.getPdf(branchId, date, reportLang)
+                ? await dayCloseApi.getPdf(branchId, date, reportLang, 'a4')
                 : await dayCloseApi.getXlsx(branchId, date, reportLang);
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -374,6 +461,28 @@ const DayCloseHub: React.FC = () => {
                 <h2 className="text-2xl font-black text-main">{lang === 'ar' ? 'إغلاق اليوم' : 'Day Close'}</h2>
                 <p className="text-sm text-muted mt-1">{lang === 'ar' ? 'إغلاق يوم الفرع مع مراجعة الإيراد والحالة الضريبية' : 'Close branch day with sales and fiscal health checks'}</p>
 
+                <div role={isStaleBusinessDate ? 'alert' : undefined} className={`mt-5 rounded-2xl border p-4 ${isStaleBusinessDate ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-emerald-200 bg-emerald-50 text-emerald-950'}`}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-start gap-3">
+                            <CalendarClock className={isStaleBusinessDate ? 'text-amber-600' : 'text-emerald-600'} size={22} />
+                            <div>
+                                <p className="font-black">{lang === 'ar' ? `تاريخ التشغيل: ${businessDate}` : `Business date: ${businessDate}`}</p>
+                                <p className="mt-1 text-xs font-bold opacity-80">
+                                    {isStaleBusinessDate
+                                        ? (lang === 'ar' ? `تنبيه: تاريخ اليوم الحالي ${today}. النظام ما زال يعمل على يوم قديم.` : `Warning: today is ${today}. The system is still running on an older date.`)
+                                        : (lang === 'ar' ? 'تاريخ التشغيل مطابق لليوم الحالي.' : 'Business date matches today.')}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <input type="date" max={today} value={manualBusinessDate} onChange={(e) => setManualBusinessDate(e.target.value)} className="rounded-xl border border-current/20 bg-white px-3 py-2 text-sm font-black" aria-label={lang === 'ar' ? 'تاريخ التشغيل الجديد' : 'New business date'} />
+                            <button type="button" onClick={handleUpdateBusinessDate} disabled={isUpdatingBusinessDate || manualBusinessDate === businessDate} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-widest text-white disabled:opacity-40">
+                                {isUpdatingBusinessDate ? (lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (lang === 'ar' ? 'تعديل تاريخ التشغيل' : 'Update Business Date')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-5">
                     <select
                         value={branchId}
@@ -403,7 +512,7 @@ const DayCloseHub: React.FC = () => {
                     </button>
                     <button
                         onClick={handleCloseDay}
-                        disabled={isClosing || isClosedDay || !canClose}
+                        disabled={isClosing || isClosedDay || !canClose || !isViewingBusinessDate}
                         className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest disabled:opacity-50"
                         title={!canClose && !isClosedDay ? (lang === 'ar' ? 'راجع قائمة الجاهزية قبل الإغلاق' : 'Review readiness checklist before closing') : undefined}
                     >
@@ -456,6 +565,10 @@ const DayCloseHub: React.FC = () => {
                     </div>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
+                    <select value={printPaper} onChange={(e) => setPrintPaper(e.target.value as 'a4' | '80mm')} className="rounded-xl border border-border/50 bg-elevated px-3 py-2.5 text-xs font-black" aria-label={lang === 'ar' ? 'مقاس ورق الطباعة' : 'Print paper size'}>
+                        <option value="80mm">80 mm</option>
+                        <option value="a4">A4</option>
+                    </select>
                     <button
                         onClick={handlePrintReport}
                         className="px-4 py-2.5 rounded-xl bg-slate-700 text-white font-black text-xs uppercase tracking-widest"
@@ -560,8 +673,19 @@ const DayCloseHub: React.FC = () => {
                     </button>
                 </div>
 
+                <div className="mt-4 rounded-2xl border border-border/50 bg-elevated/60 p-4">
+                    <p className="text-sm font-black text-main">{lang === 'ar' ? 'إرسال ملخص الإغلاق تلقائياً على واتساب' : 'Automatic WhatsApp close summary'}</p>
+                    <p className="mt-1 text-xs font-bold text-muted">{lang === 'ar' ? 'أدخل الأرقام بكود الدولة وافصل بينها بفاصلة.' : 'Enter numbers with country code, separated by commas.'}</p>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <input value={whatsappRecipients} onChange={(e) => setWhatsappRecipients(e.target.value)} placeholder="+2010..., +2011..." className="rounded-xl border border-border/50 bg-card px-3 py-2.5 font-bold md:col-span-3" />
+                        <button type="button" onClick={handleSaveWhatsapp} disabled={isSavingWhatsapp} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50">
+                            {isSavingWhatsapp ? (lang === 'ar' ? 'جارٍ الحفظ...' : 'Saving...') : (lang === 'ar' ? 'حفظ الأرقام' : 'Save Numbers')}
+                        </button>
+                    </div>
+                </div>
+
                 {error && (
-                    <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm">
+                    <div role="alert" className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm">
                         <div className="flex items-start gap-3">
                             <AlertCircle size={20} className="mt-0.5 shrink-0 text-rose-600" />
                             <div className="min-w-0 flex-1">
@@ -598,7 +722,7 @@ const DayCloseHub: React.FC = () => {
                         </div>
                     </div>
                 )}
-                {message && <p className="mt-5 text-emerald-600 text-sm font-bold">{message}</p>}
+                {message && <p aria-live="polite" className="mt-5 text-emerald-600 text-sm font-bold">{message}</p>}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

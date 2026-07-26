@@ -69,6 +69,7 @@ Name: "{group}\RestoFlow ERP"; Filename: "{code:GetSystemUrl}"
 Name: "{commondesktop}\RestoFlow ERP"; Filename: "{code:GetSystemUrl}"
 Name: "{group}\Sameh System Monitor"; Filename: "http://127.0.0.1:3099"
 Name: "{commondesktop}\Sameh System Monitor"; Filename: "http://127.0.0.1:3099"
+Name: "{group}\Import Catalog SQL File"; Filename: "{app}\runtime\Import Catalog SQL File.bat"; WorkingDir: "{app}"; Check: IsServer
 
 [Run]
 Filename: "http://127.0.0.1:3099"; Description: "فتح شاشة حالة النظام"; Flags: postinstall shellexec skipifsilent nowait

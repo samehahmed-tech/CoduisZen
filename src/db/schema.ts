@@ -299,7 +299,8 @@ export const orders = mssqlTable('orders', {
     id: nvarchar('id').primaryKey(),
     traceId: nvarchar('trace_id'), // Trace ID for cross-module tracking
     parentOrderId: nvarchar('parent_order_id'), // Self-referencing link for split checks (null for original)
-    orderNumber: int('order_number').identity(), // Sequential SQL Server identity number
+    globalOrderNumber: int('order_number').identity(),
+    orderNumber: int('daily_order_number'), // Restarts from 1 per branch business date
     type: nvarchar('type').notNull(), // DINE_IN, TAKEAWAY, DELIVERY
     source: nvarchar('source').default('pos'), // pos, call_center, online, app
     // Branch & Location
@@ -493,7 +494,7 @@ export const inventoryItems = mssqlTable('inventory_items', {
     id: nvarchar('id').primaryKey(),
     name: nvarchar('name').notNull(),
     nameAr: nvarchar('name_ar'),
-    sku: nvarchar('sku').unique(),
+    sku: nvarchar('sku'),
     barcode: nvarchar('barcode'),
     unit: nvarchar('unit').notNull(), // kg, g, liter, piece, etc.
     category: nvarchar('category'),
@@ -511,7 +512,7 @@ export const inventoryItems = mssqlTable('inventory_items', {
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 }, (table) => [
     index('idx_inventory_items_barcode').on(table.barcode).where(sql`barcode IS NOT NULL`),
-    index('idx_inventory_items_sku').on(table.sku).where(sql`sku IS NOT NULL`),
+    uniqueIndex('idx_inventory_items_sku_not_null').on(table.sku).where(sql`sku IS NOT NULL`),
 ]);
 
 export const inventoryLedger = mssqlTable('inventory_ledger', {
@@ -1529,6 +1530,9 @@ export const deliveryAssignments = mssqlTable('delivery_assignments', {
 export const dayCloseReports = mssqlTable('day_close_reports', {
     id: nvarchar('id').primaryKey(),
     branchId: nvarchar('branch_id').references(() => branches.id).notNull(),
+    // Kept for compatibility with databases created by the production installer.
+    // That column is NOT NULL, so every close must populate both date columns.
+    businessDate: date('business_date').notNull(),
     shiftId: nvarchar('shift_id').references(() => shifts.id),
     closedBy: nvarchar('closed_by').references(() => users.id).notNull(),
     date: date('date').notNull(),

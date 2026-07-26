@@ -307,10 +307,19 @@ export const useAuthStore = create<AuthState>()(
                             const branches = data.map((b: any) => ({
                                 id: b.id,
                                 name: b.name,
+                                nameAr: b.name_ar || b.nameAr,
                                 location: b.location || b.address,
                                 address: b.address,
                                 phone: b.phone,
+                                email: b.email,
+                                serverIp: b.server_ip || b.serverIp,
+                                dayCloseEmails: b.day_close_emails || b.dayCloseEmails || [],
                                 isActive: b.is_active !== false,
+                                timezone: b.timezone,
+                                currency: b.currency,
+                                taxRate: b.tax_rate ?? b.taxRate,
+                                serviceCharge: b.service_charge ?? b.serviceCharge,
+                                businessDate: b.business_date ?? b.businessDate,
                             }));
                             set((state) => {
                                 const currentActive = state.settings.activeBranchId;

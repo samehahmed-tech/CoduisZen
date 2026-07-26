@@ -318,6 +318,7 @@ export const useOrderStore = create<OrderState>()(
                         status: order.status || 'PENDING',
                         subtotal: order.subtotal,
                         discount: order.discount,
+                        couponCode: order.couponCode,
                         tax: order.tax,
                         total: totalAmount,
                         tip_amount: state.tipAmount || 0,

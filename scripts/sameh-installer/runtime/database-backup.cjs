@@ -37,7 +37,15 @@ async function main() {
   }
 
   const bytes = fs.statSync(backupFile).size;
-  process.stdout.write(JSON.stringify({ ok: true, verified: true, database, backupFile, bytes }));
+  const programData = process.env.ProgramData || process.env.PROGRAMDATA;
+  const uploadsDir = programData && path.join(programData, 'Sameh', 'RestoFlow ERP', 'uploads');
+  let uploadsBackup;
+  if (uploadsDir && fs.existsSync(uploadsDir)) {
+    uploadsBackup = `${backupFile}.uploads`;
+    fs.cpSync(uploadsDir, uploadsBackup, { recursive: true, force: true });
+  }
+
+  process.stdout.write(JSON.stringify({ ok: true, verified: true, database, backupFile, bytes, uploadsBackup }));
 }
 
 main().catch(error => {

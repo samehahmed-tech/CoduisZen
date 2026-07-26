@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useMemo, useEffect } from 'react';
+import React, { Suspense, lazy, useCallback, useMemo, useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import ContextRail from './common/ContextRail';
@@ -16,18 +16,37 @@ const OnlineStatus = lazy(() => import('./common/OnlineStatus'));
 const AIWidgetsRenderer = lazy(() => import('./common/AIWidgetsRenderer'));
 const AIAssistant = lazy(() => import('./AIAssistant'));
 import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, X } from 'lucide-react';
+
+const localDateKey = () => {
+    const value = new Date();
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+};
 
 const MainLayout: React.FC = () => {
-    const { isAuthenticated, language, currentUser } = useAuthStore(
+    const { isAuthenticated, language, currentUser, branches, activeBranchId } = useAuthStore(
         useShallow((state) => ({
             isAuthenticated: state.isAuthenticated,
             language: state.settings.language,
             currentUser: state.settings.currentUser,
+            branches: state.branches,
+            activeBranchId: state.settings.activeBranchId,
         }))
     );
     const location = useLocation();
     const navigate = useNavigate();
     const { config } = useTheme();
+    const today = localDateKey();
+    const activeBranch = useMemo(() => branches.find((branch) => branch.id === activeBranchId), [branches, activeBranchId]);
+    const businessDate = activeBranch?.businessDate || today;
+    const staleBusinessDate = businessDate !== today;
+    const canManageBusinessDate = ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'].includes(String(currentUser?.role || ''));
+    const reminderKey = `business-date-reminder:${activeBranchId || 'none'}:${today}`;
+    const [isReminderDismissed, setIsReminderDismissed] = useState(false);
+
+    useEffect(() => {
+        setIsReminderDismissed(sessionStorage.getItem(reminderKey) === 'dismissed');
+    }, [reminderKey]);
 
     usePageTitle();
 
@@ -130,6 +149,45 @@ const MainLayout: React.FC = () => {
             </main>
 
             <AnimatePresence>
+                {staleBusinessDate && !isReminderDismissed && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        role="alert"
+                        className="fixed bottom-4 left-1/2 z-[70] w-[min(94vw,720px)] -translate-x-1/2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-2xl"
+                    >
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={22} />
+                            <div className="min-w-0 flex-1">
+                                <p className="font-black">
+                                    {language === 'ar' ? `تنبيه: النظام ما زال يعمل بتاريخ ${businessDate}` : `Warning: the system is still operating on ${businessDate}`}
+                                </p>
+                                <p className="mt-1 text-xs font-bold opacity-80">
+                                    {language === 'ar' ? `تاريخ اليوم ${today}. راجع إغلاق اليوم قبل تسجيل عمليات جديدة.` : `Today is ${today}. Review Day Close before recording new activity.`}
+                                </p>
+                                {canManageBusinessDate ? (
+                                    <button type="button" onClick={() => navigate('/day-close')} className="mt-3 rounded-lg bg-amber-700 px-3 py-2 text-xs font-black text-white">
+                                        {language === 'ar' ? 'فتح إغلاق اليوم' : 'Open Day Close'}
+                                    </button>
+                                ) : (
+                                    <p className="mt-2 text-xs font-black">{language === 'ar' ? 'أبلغ مدير الفرع لتصحيح تاريخ التشغيل.' : 'Ask the branch manager to correct the business date.'}</p>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                aria-label={language === 'ar' ? 'إخفاء التنبيه مؤقتاً' : 'Dismiss reminder'}
+                                onClick={() => {
+                                    sessionStorage.setItem(reminderKey, 'dismissed');
+                                    setIsReminderDismissed(true);
+                                }}
+                                className="rounded-lg p-1.5 text-amber-800 hover:bg-amber-100"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
                 {isAssistantOpen && (
                     <motion.div
                         initial={{ x: direction === 'rtl' ? -400 : 400, opacity: 0 }}

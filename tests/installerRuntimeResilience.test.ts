@@ -35,4 +35,19 @@ describe('installer runtime resilience', () => {
         expect(readFileSync(`${logFile}.1`).length).toBe(5 * 1024 * 1024);
         expect(readFileSync(logFile, 'utf8')).toContain('service ready');
     });
+
+    it('keeps the configured database connection during an upgrade', () => {
+        const setupAgent = readFileSync(join(runtime, 'setup-agent.cjs'), 'utf8');
+
+        expect(setupAgent).toContain('upgrade && old.DATABASE_URL ? old.DATABASE_URL : detectedUrl');
+        expect(setupAgent).toContain("if (!upgrade && /Server=(?:localhost|\\.)\\\\CODUISZEN/i.test");
+    });
+
+    it('packages the daily order number backfill into schema repair', () => {
+        const schemaDoctor = readFileSync(join(runtime, 'schema-doctor.cjs'), 'utf8');
+        const installerBuilder = readFileSync(resolve('scripts/sameh-installer/build-sameh-installer.ps1'), 'utf8');
+
+        expect(schemaDoctor).toContain("database', 'daily-order-number.sql");
+        expect(installerBuilder).toContain('database\\daily-order-number.sql');
+    });
 });

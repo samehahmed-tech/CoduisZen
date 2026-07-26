@@ -128,6 +128,10 @@ interface DayCloseReport {
     };
 
     readiness?: DayCloseReadiness;
+    whatsappDelivery?: {
+        queued: number;
+        recipients: string[];
+    };
 }
 
 const getSettingValue = async <T>(key: string, fallback: T): Promise<T> => {
@@ -140,7 +144,20 @@ const getDayCloseWhatsappRecipients = () => getSettingValue<string[]>('dayCloseW
 
 const normalizeRecipients = (items?: string[]) => (items || [])
     .map((item) => String(item || '').trim())
-    .filter(Boolean);
+    .filter((item) => /^\+?\d{10,15}$/.test(item.replace(/[\s()-]/g, '')));
+
+const localDateKey = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const isValidDateKey = (date: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+};
 
 const buildDayCloseWhatsAppText = (report: DayCloseReport) => {
     const sales = report.salesSummary;
@@ -203,10 +220,16 @@ export const dayCloseService = {
     },
 
     async getClosedReport(branchId: string, date: string) {
-        const [closed] = await db.select()
-            .from(dayCloseReports)
-            .where(and(eq(dayCloseReports.branchId, branchId), eq(dayCloseReports.date, toSqlDate(date))))
-            .top(1);
+        const [[closed], [branch]] = await Promise.all([
+            db.select()
+                .from(dayCloseReports)
+                .where(and(eq(dayCloseReports.branchId, branchId), eq(dayCloseReports.date, toSqlDate(date))))
+                .top(1),
+            db.select({ name: branches.name, currency: branches.currency })
+                .from(branches)
+                .where(eq(branches.id, branchId))
+                .top(1),
+        ]);
 
         if (!closed) return null;
 
@@ -218,11 +241,12 @@ export const dayCloseService = {
         return {
             date,
             branchId,
+            branchName: branch?.name,
             status: 'CLOSED' as DayCloseStatus,
             closedBy: closed.closedBy,
             closedAt: closed.createdAt,
             notes: closed.notes,
-            currency: salesSnapshot.currency,
+            currency: salesSnapshot.currency || branch?.currency || 'EGP',
             dayCloseReportId: closed.id,
             salesSummary: salesSnapshot.salesSummary || {
                 totalOrders: Number(closed.totalOrders || 0),
@@ -232,7 +256,7 @@ export const dayCloseService = {
                 netSales: Number(closed.totalRevenue || 0) - Number(closed.totalDiscounts || 0),
                 averageOrderValue: Number(closed.totalOrders || 0) > 0 ? Number(closed.totalRevenue || 0) / Number(closed.totalOrders || 0) : 0,
             },
-            paymentBreakdown: closed.paymentBreakdown || paymentsSnapshot.byMethod || [],
+            paymentBreakdown: paymentsSnapshot.byMethod || [],
             orderTypeBreakdown: ordersSnapshot.byType || [],
             auditSummary: auditSnapshot.summary || {
                 totalEvents: 0,
@@ -746,6 +770,18 @@ export const dayCloseService = {
             overrideReason?: string; // Item 22: override with written reason
         }
     ) {
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+        if (!branch) throw new Error('BRANCH_NOT_FOUND');
+        const activeBusinessDate = branch.businessDate || localDateKey();
+        if (date !== activeBusinessDate) {
+            const error = new Error('BUSINESS_DATE_MISMATCH');
+            (error as any).businessDate = activeBusinessDate;
+            throw error;
+        }
+
         const existingClose = await this.getClosedReport(branchId, date);
         if (existingClose) {
             const err = new Error('DAY_ALREADY_CLOSED');
@@ -824,13 +860,15 @@ export const dayCloseService = {
 
         const snapshot = await this.generateOperationalSnapshot(branchId, date, report);
         const dayCloseReportId = `dayclose_${branchId}_${date}`;
+        const closeDate = toSqlDate(date);
 
         try {
             await db.insert(dayCloseReports).values({
                 id: dayCloseReportId,
                 branchId,
+                businessDate: closeDate,
                 closedBy: userId,
-                date: toSqlDate(date),
+                date: closeDate,
                 expectedCash: snapshot.shiftsSnapshot.expectedCash,
                 actualCash: snapshot.shiftsSnapshot.actualCash,
                 variance: snapshot.shiftsSnapshot.variance,
@@ -857,7 +895,8 @@ export const dayCloseService = {
                 notes: options?.notes,
             });
         } catch (error: any) {
-            if (error?.code === '23505') {
+            const errorNumber = Number(error?.number ?? error?.originalError?.info?.number);
+            if (error?.code === '23505' || errorNumber === 2601 || errorNumber === 2627) {
                 const err = new Error('DAY_ALREADY_CLOSED');
                 (err as any).closedReport = await this.getClosedReport(branchId, date);
                 throw err;
@@ -894,17 +933,22 @@ export const dayCloseService = {
         const whatsappRecipients = normalizeRecipients(await getDayCloseWhatsappRecipients());
         if (whatsappRecipients.length > 0) {
             const text = buildDayCloseWhatsAppText(report);
-            await Promise.allSettled(whatsappRecipients.map((to) => sendWhatsAppText({
+            const deliveryResults = await Promise.allSettled(whatsappRecipients.map((to) => sendWhatsAppText({
                 to,
                 text,
                 branchId,
                 sessionRole: 'DAY_CLOSE',
             })));
+            const queuedRecipients = whatsappRecipients.filter((_, index) => deliveryResults[index]?.status === 'fulfilled');
+            report.whatsappDelivery = {
+                queued: queuedRecipients.length,
+                recipients: queuedRecipients,
+            };
         }
 
         // Advance to next business date automatically
-        const nextDate = new Date(date);
-        nextDate.setDate(nextDate.getDate() + 1);
+        const nextDate = toSqlDate(date);
+        nextDate.setUTCDate(nextDate.getUTCDate() + 1);
         const nextBusinessDate = nextDate.toISOString().split('T')[0];
         
         await db.update(branches)
@@ -912,6 +956,38 @@ export const dayCloseService = {
             .where(eq(branches.id, branchId));
 
         return report;
+    },
+
+    async setBusinessDate(branchId: string, businessDate: string, userId: string) {
+        if (!isValidDateKey(businessDate)) throw new Error('INVALID_BUSINESS_DATE');
+        if (businessDate > localDateKey()) throw new Error('FUTURE_BUSINESS_DATE_NOT_ALLOWED');
+
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+        if (!branch) throw new Error('BRANCH_NOT_FOUND');
+        if (branch.businessDate === businessDate) return { businessDate };
+
+        const [[openShift], closedReport] = await Promise.all([
+            db.select({ count: sql<number>`count(*)` })
+                .from(shifts)
+                .where(and(eq(shifts.branchId, branchId), eq(shifts.status, 'OPEN'))),
+            this.getClosedReport(branchId, businessDate),
+        ]);
+        if (Number(openShift?.count || 0) > 0) throw new Error('OPEN_SHIFTS_EXIST_FOR_BUSINESS_DATE_CHANGE');
+        if (closedReport) throw new Error('BUSINESS_DATE_ALREADY_CLOSED');
+
+        await db.update(branches)
+            .set({ businessDate, updatedAt: new Date() })
+            .where(eq(branches.id, branchId));
+        await createSignedAuditLog({
+            eventType: 'BUSINESS_DATE_CHANGED',
+            userId,
+            branchId,
+            payload: { from: branch.businessDate, to: businessDate },
+        });
+        return { businessDate };
     },
 
     /**

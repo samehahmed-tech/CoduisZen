@@ -45,6 +45,11 @@ const formatLocalDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const parseDateKey = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return year && month && day ? new Date(year, month - 1, day, 12) : new Date();
+};
+
 type DashboardPayload = {
   totals: {
     revenue: number; netRevenue: number; expenses: number; pendingExpenses: number; cogs: number; netProfit: number;
@@ -167,7 +172,7 @@ const Dashboard: React.FC = () => {
   // Handler to clear all stored data (menus, categories, items, orders)
   // Imported from utils/clearData
 
-  const { settings, hasPermission } = useAuthStore();
+  const { settings, hasPermission, branches } = useAuthStore();
   const navigate = useNavigate();
   const autonomousEngine = useAutonomousEngine();
   const { showToast } = useToast();
@@ -175,14 +180,21 @@ const Dashboard: React.FC = () => {
   const isAr = lang === 'ar';
   const t = translations[lang];
   const { isDarkMode, currencySymbol } = settings;
+  const activeBranch = useMemo(() => branches.find((branch) => branch.id === settings.activeBranchId), [branches, settings.activeBranchId]);
+  const activeBusinessDate = activeBranch?.businessDate || formatLocalDate(new Date());
+  const isStaleBusinessDate = activeBusinessDate !== formatLocalDate(new Date());
 
   const [viewScope, setViewScope] = useState<Scope>('DAILY');
-  const [customDates, setCustomDates] = useState({ start: formatLocalDate(new Date()), end: formatLocalDate(new Date()) });
+  const [customDates, setCustomDates] = useState({ start: activeBusinessDate, end: activeBusinessDate });
   const [targets] = useState({ revenue: 5000, orders: 150 });
+
+  useEffect(() => {
+    if (viewScope !== 'CUSTOM') setCustomDates({ start: activeBusinessDate, end: activeBusinessDate });
+  }, [activeBusinessDate, viewScope]);
   
 
   const range = useMemo(() => {
-    const end = new Date();
+    const end = parseDateKey(activeBusinessDate);
     const start = new Date(end);
     let compareStart = new Date(end);
     let compareEnd = new Date(end);
@@ -226,7 +238,7 @@ const Dashboard: React.FC = () => {
       compareStartDate: formatLocalDate(compareStart),
       compareEndDate: formatLocalDate(compareEnd)
     };
-  }, [viewScope, customDates]);
+  }, [viewScope, customDates, activeBusinessDate]);
 
   const { data, error, isLoading, refetch } = useQuery({
     queryKey: ['dashboard', viewScope, range, settings.activeBranchId],
@@ -331,10 +343,13 @@ const Dashboard: React.FC = () => {
                   {t.live}
                 </span>
               </h1>
-              <div className="flex items-center gap-4 mt-2 text-muted">
+              <div className="flex flex-wrap items-center gap-4 mt-2 text-muted">
                 <LiveClock />
                 <div className="h-1 w-1 rounded-full bg-border" />
                 <p className="text-xs font-bold opacity-60">{t.performance_reports}</p>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${isStaleBusinessDate ? 'bg-amber-500/15 text-amber-600' : 'bg-emerald-500/15 text-emerald-600'}`}>
+                  {isAr ? `تاريخ التشغيل: ${activeBusinessDate}` : `Business date: ${activeBusinessDate}`}
+                </span>
               </div>
             </div>
           </div>

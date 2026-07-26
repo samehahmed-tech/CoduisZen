@@ -18,13 +18,23 @@ export const marketingController = {
     async createCoupon(req: Request, res: Response) {
         try {
             const { code, type, value, minOrderValue, maxDiscount, endDate, usageLimit } = req.body;
-            if (!code || !type || !value) return res.status(400).json({ error: 'Code, type, and value are required' });
+            const normalizedCode = String(code || '').trim().toUpperCase();
+            const normalizedType = String(type || '').trim().toUpperCase();
+            const discountValue = Number(value);
+            if (!normalizedCode || !['PERCENTAGE', 'FIXED_AMOUNT'].includes(normalizedType) || !Number.isFinite(discountValue) || discountValue <= 0) {
+                return res.status(400).json({ error: 'INVALID_COUPON' });
+            }
+            if (normalizedType === 'PERCENTAGE' && discountValue > 100) {
+                return res.status(400).json({ error: 'INVALID_COUPON_PERCENTAGE' });
+            }
+            const [existingCoupon] = await db.select({ id: coupons.id }).top(1).from(coupons).where(eq(coupons.code, normalizedCode));
+            if (existingCoupon) return res.status(409).json({ error: 'COUPON_CODE_EXISTS' });
 
             const [created] = await db.insert(coupons).output().values({
                 id: `CPN-${Date.now()}`,
-                code: code.toUpperCase(),
-                type,
-                value,
+                code: normalizedCode,
+                type: normalizedType,
+                value: discountValue,
                 minOrderValue,
                 maxDiscount,
                 endDate: endDate ? new Date(endDate) : null,

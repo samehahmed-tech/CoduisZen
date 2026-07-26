@@ -24,6 +24,7 @@ import { useMenuStore } from '../stores/useMenuStore';
 import { useInventoryStore } from '../stores/useInventoryStore';
 import { useWhatsAppStore, WhatsAppAutomationConfig } from '../stores/useWhatsAppStore';
 import { useConfirm } from './common/ConfirmProvider';
+import ImageUploader from './common/ImageUploader';
 
 interface MenuGroup {
     label: string;
@@ -599,12 +600,24 @@ const SettingsHub: React.FC = () => {
                                 <input type="text" value={settings.branchAddress || ''} onChange={e => handleChange('branchAddress', e.target.value)} className={inputClass} placeholder="e.g. 15 Tahrir Street, Downtown" />
                             </div>
                             <div>
-                                <label className={labelClass}>{tn('Receipt Logo URL', 'رابط شعار الفاتورة')}</label>
-                                <input type="text" value={settings.receiptLogoUrl || ''} onChange={e => handleChange('receiptLogoUrl', e.target.value)} className={inputClass} placeholder="https://..." />
+                                <label className={labelClass}>{tn('Receipt Logo', 'شعار الفاتورة')}</label>
+                                <ImageUploader
+                                    value={settings.receiptLogoUrl || ''}
+                                    onChange={value => handleChange('receiptLogoUrl', value)}
+                                    type="logo"
+                                    lang={lang === 'ar' ? 'ar' : 'en'}
+                                    showDetails
+                                />
                             </div>
                             <div>
-                                <label className={labelClass}>{tn('Receipt QR URL', 'رابط QR الفاتورة')}</label>
-                                <input type="text" value={settings.receiptQrUrl || ''} onChange={e => handleChange('receiptQrUrl', e.target.value)} className={inputClass} placeholder="https://..." />
+                                <label className={labelClass}>{tn('Receipt QR Image', 'صورة QR الفاتورة')}</label>
+                                <ImageUploader
+                                    value={settings.receiptQrUrl || ''}
+                                    onChange={value => handleChange('receiptQrUrl', value)}
+                                    type="other"
+                                    lang={lang === 'ar' ? 'ar' : 'en'}
+                                    showDetails
+                                />
                             </div>
                             <div className="md:col-span-2">
                                 <label className={labelClass}>{tn('Order workflow', 'مسار الطلبات')}</label>

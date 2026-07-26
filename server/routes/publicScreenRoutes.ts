@@ -48,6 +48,11 @@ const isLanRequest = (req: any) => isPrivateLanIp(req.socket?.remoteAddress);
 const requireScreenKey = (req: any, res: any, next: any) => {
     const expected = getToken();
     const actual = getParam(req.query.key) || getParam(req.headers['x-screen-key']);
+    const allowLanWithoutKey = process.env.PUBLIC_SCREEN_LAN_NO_KEY === 'true';
+
+    if (allowLanWithoutKey && isLanRequest(req)) {
+        return next();
+    }
 
     if (process.env.NODE_ENV === 'production') {
         if (!expected) {

@@ -236,42 +236,21 @@ export const uploadImage = async (
         throw new Error(validation.error);
     }
 
-    try {
-        // Compress image
-        const { data, width, height, size } = await compressImage(file, type, { fitMode: 'cover' });
-
-        const result = await apiRequest<{ url?: string; id: string }>('/images', {
-            method: 'POST',
-            body: JSON.stringify({
-                id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                filename: file.name,
-                data: data,
-                contentType: 'image/webp',
-                type,
-                width,
-                height,
-                size,
-            }),
-        });
-
-        return {
-            url: result.url || data,
-            id: result.id,
+    const { data, width, height, size } = await compressImage(file, type, { fitMode: 'cover' });
+    const result = await apiRequest<{ url: string; id: string }>('/images', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            filename: file.name,
+            data,
+            type,
             width,
             height,
             size,
-        };
-    } catch (error: any) {
-        // Fallback: return compressed base64 directly (works offline)
-        const { data, width, height, size } = await compressImage(file, type, { fitMode: 'cover' });
-        return {
-            url: data,
-            id: `local-${Date.now()}`,
-            width,
-            height,
-            size,
-        };
-    }
+        }),
+    });
+
+    return { url: result.url, id: result.id, width, height, size };
 };
 
 /**

@@ -23,6 +23,7 @@ import { apiCacheHeaders } from './middleware/cacheHeaders';
 import { errorTrackingMiddleware, getRecentErrors, getErrorStats } from './services/errorTrackingService';
 import { enforceHttps, hstsHeader } from './middleware/sslEnforcement';
 import { healthService } from './services/healthService';
+import { ensureUploadsDirectory, uploadsDirectory } from './utils/imageStorage';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -66,6 +67,13 @@ app.use(errorContractMiddleware);
 app.use(apiCacheHeaders);
 
 logger.info({ port: process.env.API_PORT || 3001, env: process.env.NODE_ENV || 'development' }, 'Coduis Zen server initializing');
+
+ensureUploadsDirectory();
+app.use('/uploads', express.static(uploadsDirectory, {
+    fallthrough: false,
+    maxAge: '7d',
+    immutable: true,
+}));
 
 import authRoutes from './routes/authRoutes';
 import setupRoutes from './routes/setupRoutes';

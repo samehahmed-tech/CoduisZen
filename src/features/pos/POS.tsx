@@ -494,11 +494,11 @@ const POS: React.FC = () => {
       const safeDiscount = Number(discount) || 0;
       const orderDiscountAmount = subtotal * (safeDiscount / 100);
       const afterDiscount = Math.max(0, subtotal - orderDiscountAmount - (itemDiscountTotal || 0));
-      const branchTaxRate = (activeBranch?.taxRate ?? 14) / 100; // Dynamic tax from branch settings (default 14% for Egypt)
-      const tax = afterDiscount * branchTaxRate;
+      const configuredTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
+      const tax = afterDiscount * configuredTaxRate;
       const total = afterDiscount + tax + (tipAmount || 0);
       return { cartSubtotal: subtotal, cartTotal: total, cartTax: tax, orderDiscountAmount };
-   }, [safeActiveCart, discount, tipAmount, itemDiscountTotal, activeBranch?.taxRate]);
+   }, [safeActiveCart, discount, tipAmount, itemDiscountTotal, settings.taxRate, activeBranch?.taxRate]);
 
    const cartQuery = useMemo(() => cartSearchQuery.trim().toLowerCase(), [cartSearchQuery]);
    const filteredCartItems = useMemo(() => {
@@ -1024,6 +1024,10 @@ const POS: React.FC = () => {
       // New orders always start from PENDING; kitchen fire moves to PREPARING.
       status: OrderStatus.PENDING,
       subtotal: cartSubtotal,
+      discount: orderDiscountAmount,
+      discountType: activeCoupon ? 'COUPON' : undefined,
+      discountReason: activeCoupon ? `Coupon: ${activeCoupon}` : undefined,
+      couponCode: activeCoupon || undefined,
       tax: cartTax,
       total: cartTotal,
       createdAt: new Date(),

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { marketingController } from '../controllers/marketingController';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireRoles } from '../middleware/auth';
 
 const router = Router();
 
@@ -9,7 +9,7 @@ router.use(authenticateToken);
 
 // Coupons
 router.get('/coupons', marketingController.getCoupons);
-router.post('/coupons', marketingController.createCoupon);
+router.post('/coupons', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MARKETING_MANAGER'), marketingController.createCoupon);
 
 // Complaints
 router.get('/complaints', marketingController.getComplaints);

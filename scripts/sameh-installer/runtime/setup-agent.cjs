@@ -297,18 +297,15 @@ async function install() {
 
   if (role === 'server') {
     const detectedServer = detectSqlInstance();
-    const installerManagedUrl = !old.DATABASE_URL
-      || !/^Driver=\{ODBC Driver 18 for SQL Server\}/i.test(old.DATABASE_URL)
-      || /Server=\(localdb\)/i.test(old.DATABASE_URL)
-      || /Server=(?:localhost|\.)\\CODUISZEN/i.test(old.DATABASE_URL);
     const databaseServer = detectedServer || '.\\CODUISZEN';
     const detectedUrl = `Driver={ODBC Driver 18 for SQL Server};Server=${databaseServer};Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;`;
-    const databaseUrl = detectedServer || installerManagedUrl ? detectedUrl : old.DATABASE_URL;
+    const databaseUrl = upgrade && old.DATABASE_URL ? old.DATABASE_URL : detectedUrl;
     writeEnv(path.join(root, '.env'), {
       ...old, NODE_ENV: 'production', HOST: '0.0.0.0', API_PORT: '3001', DATABASE_URL: databaseUrl,
       JWT_SECRET: old.JWT_SECRET || secret(), AUDIT_HMAC_SECRET: old.AUDIT_HMAC_SECRET || secret(),
       AI_KEY_ENCRYPTION_SECRET: old.AI_KEY_ENCRYPTION_SECRET || secret(), PRINT_GATEWAY_TOKEN: packageToken || old.PRINT_GATEWAY_TOKEN || secret(),
       PUBLIC_SCREEN_TOKEN: old.PUBLIC_SCREEN_TOKEN || secret(),
+      PUBLIC_SCREEN_LAN_NO_KEY: old.PUBLIC_SCREEN_LAN_NO_KEY || 'true',
       ENABLE_WHATSAPP_WEB: has('whatsapp') ? 'true' : (old.ENABLE_WHATSAPP_WEB || 'false'), WHATSAPP_PROVIDER: old.WHATSAPP_PROVIDER || 'whatsapp-web.js',
       CORS_ORIGINS: old.CORS_ORIGINS && old.CORS_ORIGINS !== '*'
         ? old.CORS_ORIGINS
@@ -337,7 +334,7 @@ async function install() {
     const installedServer = installSqlExpress(value('sqlInstaller'));
     waitForSqlService(installedServer);
     const current = readEnv(path.join(root, '.env'));
-    if (/Server=(?:localhost|\.)\\CODUISZEN/i.test(current.DATABASE_URL || '') && installedServer !== '.\\CODUISZEN') {
+    if (!upgrade && /Server=(?:localhost|\.)\\CODUISZEN/i.test(current.DATABASE_URL || '') && installedServer !== '.\\CODUISZEN') {
       current.DATABASE_URL = `Driver={ODBC Driver 18 for SQL Server};Server=${installedServer};Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;`;
       writeEnv(path.join(root, '.env'), current);
     }

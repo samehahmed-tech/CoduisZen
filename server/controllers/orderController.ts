@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms } from '../../src/db/schema';
+import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons } from '../../src/db/schema';
 import { eq, and, desc, gte, lte, inArray, gt, sql } from 'drizzle-orm';
 import { inventoryService } from '../services/inventoryService';
 import { getStringParam } from '../utils/request';
@@ -19,6 +19,8 @@ import { enqueuePrintJob, shouldEnqueueServerCashierReceipt } from '../services/
 import { randomUUID } from 'crypto';
 import { nanoid } from 'nanoid';
 import { parseSettingJson, toSettingValue } from '../utils/settingsStore.js';
+import { calculateCouponDiscount } from '../services/couponPricing';
+import { allocateDailyOrderNumber } from '../services/orderNumberService';
 
 const ORDER_CREATE_SCOPE = 'ORDER_CREATE';
 const ORDER_STATUS_UPDATE_SCOPE = 'ORDER_STATUS_UPDATE';
@@ -399,13 +401,7 @@ export const validateCoupon = async (req: Request, res: Response) => {
             }
         }
 
-        let discountAmount = coupon.type === 'PERCENT'
-            ? (subtotalValue * coupon.value) / 100
-            : coupon.value;
-        if (coupon.maxDiscount !== undefined) {
-            discountAmount = Math.min(discountAmount, coupon.maxDiscount);
-        }
-        discountAmount = Math.max(0, Math.min(discountAmount, subtotalValue));
+        const discountAmount = calculateCouponDiscount(coupon, subtotalValue);
 
         const discountPercent = subtotalValue > 0 ? (discountAmount / subtotalValue) * 100 : 0;
 
@@ -681,6 +677,7 @@ export const createOrder = async (req: Request, res: Response) => {
             status: bodyData.status,
             subtotal: bodyData.subtotal,
             discount: bodyData.discount,
+            couponCode: String(bodyData.couponCode || bodyData.coupon_code || '').trim().toUpperCase() || undefined,
             discountType: bodyData.discount_type || bodyData.discountType,
             discountReason: bodyData.discount_reason || bodyData.discountReason,
             tax: bodyData.tax,
@@ -926,7 +923,14 @@ const [sourcePlatform] = sourceKey
         const inventoryWarnings: any[] = [];
         const { savedOrder, paidNow, finalStocks, cogsCost } = await db.transaction(async (tx) => {
             // 1. Calculate and Enforce Totals (Egyptian Standards)
-            // Use DB values for tax/price if possible, otherwise fallback to request
+            // Tax is server-authoritative and reads the saved setting. Zero is a valid rate.
+            const [taxSetting] = await tx.select({ value: settings.value }).top(1)
+                .from(settings).where(eq(settings.key, 'taxRate'));
+            const [branchRecord] = await tx.select({ taxRate: branches.taxRate, serviceCharge: branches.serviceCharge }).top(1)
+                .from(branches).where(eq(branches.id, orderData.branchId));
+            const rawTaxPercent = Number(parseSettingJson(taxSetting?.value, branchRecord?.taxRate ?? 14));
+            const taxPercent = Number.isFinite(rawTaxPercent) && rawTaxPercent >= 0 && rawTaxPercent <= 100 ? rawTaxPercent : 14;
+            const configuredTaxRate = taxPercent / 100;
             let calculatedSubtotal = 0;
             let calculatedTax = 0;
 
@@ -940,7 +944,7 @@ const [sourcePlatform] = sourceKey
                 const isExempt = dbItem?.isTaxExempt || false;
 
                 const lineSubtotal = price * item.quantity;
-                const lineTax = isExempt ? 0 : parseFloat((lineSubtotal * 0.14).toFixed(2));
+                const lineTax = isExempt ? 0 : parseFloat((lineSubtotal * configuredTaxRate).toFixed(2));
 
                 calculatedSubtotal += lineSubtotal;
                 calculatedTax += lineTax;
@@ -949,21 +953,42 @@ const [sourcePlatform] = sourceKey
             });
 
             const subtotal = calculatedSubtotal;
-            const discountAmount = orderData.discount || 0;
+            let discountAmount = Math.max(0, Math.min(Number(orderData.discount || 0), subtotal));
+            if (orderData.couponCode) {
+                const [coupon] = await tx.select().top(1).from(coupons).where(eq(coupons.code, orderData.couponCode));
+                const now = new Date();
+                if (!coupon || coupon.isActive === false) throw appError(400, 'COUPON_INACTIVE', 'Coupon is missing or inactive.');
+                if (coupon.startDate && now < coupon.startDate) throw appError(400, 'COUPON_NOT_STARTED', 'Coupon has not started.');
+                if (coupon.endDate && now > coupon.endDate) throw appError(400, 'COUPON_EXPIRED', 'Coupon has expired.');
+                if (subtotal < Number(coupon.minOrderValue || 0)) throw appError(400, 'MIN_SUBTOTAL_NOT_MET', 'Minimum subtotal was not met.');
+                discountAmount = calculateCouponDiscount({
+                    type: String(coupon.type).toUpperCase() === 'FIXED_AMOUNT' ? 'FIXED' : 'PERCENT',
+                    value: Number(coupon.value),
+                    maxDiscount: coupon.maxDiscount === null ? undefined : Number(coupon.maxDiscount),
+                }, subtotal);
+                const [claimedCoupon] = await tx.update(coupons)
+                    .set({ usedCount: sql`coalesce(${coupons.usedCount}, 0) + 1` })
+                    .output()
+                    .where(and(
+                        eq(coupons.id, coupon.id),
+                        eq(coupons.isActive, true),
+                        sql`(${coupons.usageLimit} is null or coalesce(${coupons.usedCount}, 0) < ${coupons.usageLimit})`,
+                    ));
+                if (!claimedCoupon) throw appError(400, 'COUPON_USAGE_LIMIT_REACHED', 'Coupon usage limit was reached.');
+                orderData.discountType = 'COUPON';
+                orderData.discountReason = `Coupon: ${coupon.code}`;
+            }
             const netAmount = subtotal - discountAmount;
 
-            // VAT 14% on net amount (proportionally reduced if there's a discount)
+            // VAT on net amount (proportionally reduced if there's a discount).
             // If the discount is overall, we reduce the total tax by the same ratio
             const taxRatio = subtotal > 0 ? (netAmount / subtotal) : 0;
-            const tax = orderData.tax !== undefined ? orderData.tax : parseFloat((calculatedTax * taxRatio).toFixed(2));
+            const tax = parseFloat((calculatedTax * taxRatio).toFixed(2));
 
             // Standard 12% Service Charge for Dine-In if not provided
             let serviceCharge = 0;
             if (orderData.type === 'DINE_IN') {
-                const [branchRecord] = await tx.select({ serviceCharge: branches.serviceCharge }).top(1)
-                    .from(branches).where(eq(branches.id, orderData.branchId));
-
-                const serviceRate = branchRecord?.serviceCharge || 0.12; // Fallback to 12%
+                const serviceRate = branchRecord?.serviceCharge || 0.12;
                 serviceCharge = orderData.serviceCharge !== undefined ? orderData.serviceCharge : parseFloat((netAmount * serviceRate).toFixed(2));
             }
 
@@ -1076,8 +1101,11 @@ const [createdOrExistingCustomer] = await tx
                     .where(eq(branches.id, orderData.branchId));
             }
 
+            const dailyOrderNumber = await allocateDailyOrderNumber(tx, orderData.branchId, activeBusinessDate);
+
             const [newOrder] = await tx.insert(orders).output().values({
                 ...orderData,
+                orderNumber: dailyOrderNumber,
                 subtotal,
                 discount: discountAmount,
                 tax,
