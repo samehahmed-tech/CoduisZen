@@ -36,8 +36,10 @@ import { useOrderStore } from '../stores/useOrderStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import { tablesApi } from '../services/api/tables';
+import { couponsApi, ManagedCoupon } from '../services/api/campaigns';
 import { localDb } from '../db/localDb';
 import { syncService } from '../services/syncService';
+import { toBranchEntityCache } from '../src/utils/branchEntityCache';
 import { useToast } from './common/ToastProvider';
 import { useConfirm } from './common/ConfirmProvider';
 
@@ -58,14 +60,21 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
 
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const tr = (en: string, ar: string) => lang === 'ar' ? ar : en;
+    const DEFAULT_ZONE_SIZE = { width: 1600, height: 1200 };
+    const initialZones = zones.length > 0 ? zones : [{
+        id: 'MAIN',
+        name: tr('Main Hall', 'الصالة الرئيسية'),
+        color: 'bg-indigo-600',
+        ...DEFAULT_ZONE_SIZE,
+    }];
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [localTables, setLocalTables] = useState<Table[]>(tables);
-    const [localZones, setLocalZones] = useState<FloorZone[]>(zones);
-    const [activeZone, setActiveZone] = useState<string>(zones[0]?.id || 'MAIN');
+    const [localZones, setLocalZones] = useState<FloorZone[]>(initialZones);
+    const [activeZone, setActiveZone] = useState<string>(initialZones[0].id);
     const [isZoneManagerOpen, setIsZoneManagerOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const DEFAULT_ZONE_SIZE = { width: 1600, height: 1200 };
+    const [coupons, setCoupons] = useState<ManagedCoupon[]>([]);
 
     // Layout Templates
     const LAYOUT_TEMPLATES = [
@@ -85,6 +94,21 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
             setLocalZones(localZones.map(z => z.id === activeZone ? { ...z, width: zone.width || DEFAULT_ZONE_SIZE.width, height: zone.height || DEFAULT_ZONE_SIZE.height } : z));
         }
     }, [activeZone, localZones]);
+
+    useEffect(() => {
+        let active = true;
+        couponsApi.getAll()
+            .then(rows => {
+                if (active) setCoupons(rows.filter(coupon => coupon.isActive !== false));
+            })
+            .catch((couponError: unknown) => {
+                console.error('[FloorDesigner] Failed to load coupons', couponError);
+                if (active) setCoupons([]);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const getZoneBounds = () => {
         const zone = localZones.find(z => z.id === activeZone);
@@ -340,7 +364,12 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                 width: t.width,
                 height: t.height,
                 shape: t.shape || 'square',
-                zoneId: t.zoneId || activeZone
+                zoneId: t.zoneId || activeZone,
+                discount: Math.min(100, Math.max(0, Number(t.discount) || 0)),
+                defaultCouponCode: t.defaultCouponCode?.trim().toUpperCase() || '',
+                minSpend: Math.max(0, Number(t.minSpend) || 0),
+                isVIP: t.isVIP === true,
+                notes: t.notes?.trim() || ''
             }))
         };
 
@@ -354,18 +383,18 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
             updateTables(localTables);
             updateZones(localZones);
 
-            await localDb.floorTables.bulkPut(localTables.map(t => ({
+            await localDb.floorTables.where('branchId').equals(branchId).delete();
+            await localDb.floorZones.where('branchId').equals(branchId).delete();
+            await localDb.floorTables.bulkPut(localTables.map(t => toBranchEntityCache({
                 ...t,
-                branchId,
                 x: t.position.x,
                 y: t.position.y
-            })) as any);
-            await localDb.floorZones.bulkPut(localZones.map(z => ({
+            }, branchId)) as any);
+            await localDb.floorZones.bulkPut(localZones.map(z => toBranchEntityCache({
                 ...z,
-                branchId,
                 width: z.width || DEFAULT_ZONE_SIZE.width,
                 height: z.height || DEFAULT_ZONE_SIZE.height
-            })) as any);
+            }, branchId)) as any);
 
             success(navigator.onLine ? tr('Layout saved', 'تم حفظ التخطيط') : tr('Layout queued for sync', 'تم وضع التخطيط في قائمة المزامنة'));
             handleExit();
@@ -545,17 +574,70 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[9px] font-black text-muted uppercase tracking-widest ml-1">{tr('Discount %', 'الخصم %')}</label>
-                                        <div className="flex items-center gap-2 px-4 py-3 bg-elevated border border-border/50 rounded-xl">
-                                            <Tag size={14} className="text-muted" />
-                                            <input
-                                                type="number"
-                                                value={selectedTable.discount || 0}
-                                                onChange={(e) => handleUpdateTable(selectedTable.id, { discount: parseInt(e.target.value) || 0 })}
-                                                className="w-full bg-transparent font-black text-sm text-main outline-none"
-                                            />
-                                        </div>
+                                        <label className="text-[9px] font-black text-muted uppercase tracking-widest ml-1">{tr('Default Discount', 'الخصم الافتراضي')}</label>
+                                        <select
+                                            value={selectedTable.discountMode || (selectedTable.defaultCouponCode ? 'COUPON' : 'PERCENT')}
+                                            onChange={(e) => handleUpdateTable(selectedTable.id, e.target.value === 'COUPON'
+                                                ? { discountMode: 'COUPON', discount: 0, defaultCouponCode: coupons[0]?.code || '' }
+                                                : { discountMode: 'PERCENT', defaultCouponCode: '' })}
+                                            className="w-full p-3 bg-elevated rounded-xl font-black text-xs text-main outline-none border border-border/50 focus:border-indigo-500"
+                                        >
+                                            <option value="PERCENT">{tr('Percentage', 'نسبة مئوية')}</option>
+                                            <option value="COUPON">{tr('Campaign coupon', 'كود حملة تسويقية')}</option>
+                                        </select>
+                                        {(selectedTable.discountMode || (selectedTable.defaultCouponCode ? 'COUPON' : 'PERCENT')) === 'COUPON' ? (
+                                            <>
+                                                <input
+                                                    type="text"
+                                                    list={`table-coupons-${selectedTable.id}`}
+                                                    value={selectedTable.defaultCouponCode || ''}
+                                                    onChange={(e) => handleUpdateTable(selectedTable.id, {
+                                                        discountMode: 'COUPON',
+                                                        defaultCouponCode: e.target.value.toUpperCase(),
+                                                        discount: 0
+                                                    })}
+                                                    placeholder={tr('Enter coupon code', 'اكتب كود الخصم')}
+                                                    className="w-full p-3 bg-elevated rounded-xl font-black text-sm text-main uppercase outline-none border border-border/50 focus:border-indigo-500"
+                                                />
+                                                <datalist id={`table-coupons-${selectedTable.id}`}>
+                                                    {coupons.map(coupon => (
+                                                        <option key={coupon.id} value={coupon.code}>
+                                                            {coupon.type === 'PERCENTAGE' ? `${coupon.value}%` : coupon.value}
+                                                        </option>
+                                                    ))}
+                                                </datalist>
+                                            </>
+                                        ) : (
+                                            <div className="flex items-center gap-2 px-4 py-3 bg-elevated border border-border/50 rounded-xl">
+                                                <Tag size={14} className="text-muted" />
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={selectedTable.discount || 0}
+                                                    onChange={(e) => handleUpdateTable(selectedTable.id, {
+                                                        discount: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                                                        discountMode: 'PERCENT',
+                                                        defaultCouponCode: ''
+                                                    })}
+                                                    className="w-full bg-transparent font-black text-sm text-main outline-none"
+                                                />
+                                                <span className="text-xs font-black text-muted">%</span>
+                                            </div>
+                                        )}
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black text-muted uppercase tracking-widest ml-1">{tr('Minimum Spend', 'الحد الأدنى للطلب')}</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={selectedTable.minSpend || 0}
+                                        onChange={(e) => handleUpdateTable(selectedTable.id, { minSpend: Math.max(0, Number(e.target.value) || 0) })}
+                                        className="w-full p-4 bg-elevated rounded-xl font-black text-sm text-main outline-none border border-border/50 focus:border-indigo-500 transition-all"
+                                    />
                                 </div>
 
                                 <div className="flex items-center justify-between p-4 bg-elevated rounded-xl border border-border/50 transition-all">
@@ -683,12 +765,25 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                                 <div className="flex items-center gap-1.5 mt-1 opacity-60">
                                     <Users size={12} className={selectedId === table.id ? 'text-indigo-400' : 'text-muted'} />
                                     <span className={`text-[11px] font-black ${selectedId === table.id ? 'text-indigo-500' : 'text-muted'}`}>{table.seats}</span>
-                                    {table.discount ? (
+                                    {table.defaultCouponCode ? (
+                                        <div className="flex items-center gap-1 ml-1 text-violet-500">
+                                            <Tag size={10} />
+                                            <span className="max-w-20 truncate text-[9px] font-black">{table.defaultCouponCode}</span>
+                                        </div>
+                                    ) : table.discount ? (
                                         <div className="flex items-center gap-1 ml-1 text-emerald-500">
                                             <Tag size={10} />
                                             <span className="text-[9px] font-black">{table.discount}%</span>
                                         </div>
                                     ) : null}
+                                    {Number(table.minSpend) > 0 && (
+                                        <span className="ml-1 text-[9px] font-black text-amber-500">
+                                            {tr('MIN', 'حد')} {Number(table.minSpend).toFixed(0)}
+                                        </span>
+                                    )}
+                                    {table.notes && (
+                                        <StickyNote size={10} className="ml-1 text-sky-500" />
+                                    )}
                                 </div>
 
                                 {selectedId === table.id && (

@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticateToken);
 router.use(enforceBranch);
 
+router.get('/meta', kdsController.getMeta);
 router.get('/', kdsController.getTickets);
 router.post('/dispatch', kdsController.dispatchOrder);
 router.post('/orders/:orderId/handover', kdsController.handoverOrder);

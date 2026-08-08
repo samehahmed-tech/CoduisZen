@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { attendancePolicies, bonusPenaltyRecords, departments, employeeCompensationItems, employeeDocuments, employeeLoans, employeePayrollAssignments, employeeShiftAssignments, employees, jobTitles, leaveBalances, leaveRequests, leaveTypes, loanInstallments, overtimeEntries, payrollComponents, payrollProfiles, payrollRules, shiftTemplates } from '../../src/db/schema';
-import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
+import { eq, and, desc, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 const ensureEmployeeDocumentsTable = async () => {
@@ -898,6 +898,7 @@ export const hrExtendedService = {
         }
 
         const [created] = await db.insert(leaveBalances).output().values({
+            id: `LB-${randomUUID().slice(0, 12)}`,
             employeeId: input.employeeId,
             leaveTypeId: input.leaveTypeId,
             year: input.year,
@@ -911,11 +912,15 @@ export const hrExtendedService = {
         return created;
     },
 
-    async getPersistedLeaveBalances(employeeId?: string, year?: number) {
+    async getPersistedLeaveBalances(employeeId?: string, year?: number, branchId?: string) {
         return await db.select().from(leaveBalances)
             .where(and(
                 employeeId ? eq(leaveBalances.employeeId, employeeId) : undefined,
                 year ? eq(leaveBalances.year, year) : undefined,
+                branchId ? inArray(
+                    leaveBalances.employeeId,
+                    db.select({ id: employees.id }).from(employees).where(eq(employees.branchId, branchId)),
+                ) : undefined,
             ))
             .orderBy(desc(leaveBalances.year));
     },
@@ -978,8 +983,10 @@ export const hrExtendedService = {
     // =========================================================================
     // Departments
     // =========================================================================
-    async getDepartments() {
-        return await db.select().from(departments);
+    async getDepartments(branchId?: string) {
+        return branchId
+            ? await db.select().from(departments).where(or(isNull(departments.branchId), eq(departments.branchId, branchId)))
+            : await db.select().from(departments);
     },
 
     async upsertDepartment(dept: { id?: string; name: string; nameAr?: string; parentId?: string; managerId?: string; branchId?: string | null; isActive?: boolean }, updatedBy?: string) {
@@ -1032,8 +1039,12 @@ export const hrExtendedService = {
     // =========================================================================
     // Job Titles
     // =========================================================================
-    async getJobTitles() {
-        return await db.select().from(jobTitles).orderBy(jobTitles.title);
+    async getJobTitles(departmentIds?: string[]) {
+        if (!departmentIds) return await db.select().from(jobTitles).orderBy(jobTitles.title);
+        const scope = departmentIds.length > 0
+            ? or(isNull(jobTitles.departmentId), inArray(jobTitles.departmentId, departmentIds))
+            : isNull(jobTitles.departmentId);
+        return await db.select().from(jobTitles).where(scope).orderBy(jobTitles.title);
     },
 
     async upsertJobTitle(title: { id?: string; name: string; nameAr?: string; departmentId?: string; isActive?: boolean }, updatedBy?: string) {
@@ -1044,8 +1055,9 @@ export const hrExtendedService = {
             const existingRows = await db.update(jobTitles)
                 .set({
                     title: titleName,
+                    name: titleName,
                     nameAr: title.nameAr,
-                    departmentId: null,
+                    departmentId: title.departmentId || null,
                     isActive: title.isActive !== false,
                 })
                 .output()
@@ -1058,8 +1070,9 @@ export const hrExtendedService = {
         const newTitleRows = await db.insert(jobTitles).output().values({
             id,
             title: titleName,
+            name: titleName,
             nameAr: title.nameAr,
-            departmentId: null,
+            departmentId: title.departmentId || null,
             isActive: title.isActive !== false,
         }) as any[];
         const newTitle = newTitleRows[0];

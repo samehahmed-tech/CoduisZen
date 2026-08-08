@@ -58,3 +58,63 @@ const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, action, 
 };
 
 export default EmptyState;
+
+/**
+ * `EmptyStatePresets` — bilingual strings + types per common surface.
+ * Use this to avoid re-inventing copy/icon in each module.
+ *
+ * Usage:
+ *   const e = EmptyStatePresets.orders(lang);
+ *   <EmptyState type={e.type} title={e.title} subtitle={e.subtitle} action={…} />
+ */
+type Lang = 'en' | 'ar';
+
+const EMPTY_PRESETS: Record<string, (lang: Lang) => { type: EmptyStateProps['type']; title: string; subtitle: string }> = {
+    orders: (lang) => ({
+        type: 'orders',
+        title: lang === 'ar' ? 'لا توجد طلبات بعد' : 'No orders yet',
+        subtitle: lang === 'ar' ? 'ستظهر الطلبات الجديدة هنا تلقائياً' : 'New orders will appear here automatically.',
+    }),
+    customers: (lang) => ({
+        type: 'customers',
+        title: lang === 'ar' ? 'لا يوجد عملاء' : 'No customers yet',
+        subtitle: lang === 'ar' ? 'ابدأ بإضافة أول عميل لقاعدة البيانات.' : 'Add your first customer to start tracking loyalty.',
+    }),
+    inventory: (lang) => ({
+        type: 'data',
+        title: lang === 'ar' ? 'لا توجد أصناف مخزنة' : 'No inventory items',
+        subtitle: lang === 'ar' ? 'سجّل أول صنف لإدارة مخزونك.' : 'Register the first item to manage your stock.',
+    }),
+    menu: (lang) => ({
+        type: 'data',
+        title: lang === 'ar' ? 'لا توجد أصناف في القائمة' : 'No menu items',
+        subtitle: lang === 'ar' ? 'ابدأ ببناء قائمتك.' : 'Start building your menu.',
+    }),
+    reports: (lang) => ({
+        type: 'reports',
+        title: lang === 'ar' ? 'لا توجد بيانات لعرضها' : 'No data to report',
+        subtitle: lang === 'ar' ? 'غيّر النطاق الزمني أو الفلتر.' : 'Adjust the date range or filters.',
+    }),
+    search: (lang) => ({
+        type: 'search',
+        title: lang === 'ar' ? 'لا نتائج مطابقة' : 'No matching results',
+        subtitle: lang === 'ar' ? 'جرّب كلمة بحث أخرى أو امسح الفلاتر.' : 'Try a different query or clear filters.',
+    }),
+    inbox: (lang) => ({
+        type: 'inbox',
+        title: lang === 'ar' ? 'صندوق الوارد فارغ' : 'Inbox is empty',
+        subtitle: lang === 'ar' ? 'لا توجد موافقات معلّقة.' : 'Nothing waiting for approval.',
+    }),
+    finance: (lang) => ({
+        type: 'data',
+        title: lang === 'ar' ? 'لا توجد قيود' : 'No journal entries',
+        subtitle: lang === 'ar' ? 'ابدأ بإنشاء أول قيد محاسبي.' : 'Post the first journal entry to begin.',
+    }),
+    campaigns: (lang) => ({
+        type: 'data',
+        title: lang === 'ar' ? 'لا توجد حملات' : 'No campaigns yet',
+        subtitle: lang === 'ar' ? 'أنشئ أول حملة تسويقية.' : 'Create your first marketing campaign.',
+    }),
+};
+
+export const EmptyStatePresets: Record<string, (lang: Lang) => { type: EmptyStateProps['type']; title: string; subtitle: string }> = EMPTY_PRESETS;

@@ -40,10 +40,25 @@
     --theme-radius-sm: 4px;
     --theme-radius-lg: 12px;
     --theme-radius-xl: 16px;
+    /* Canonical radii — use via `rounded-[var(--radius)]` / tokens.
+       Provided as a fallback layer so legacy arbitrary `rounded-[3.5rem]` etc.
+       can converge to these during module refactors. */
+    --radius-xs: var(--theme-radius-sm);
+    --radius-sm: 8px;
+    --radius: var(--theme-radius);
+    --radius-lg: var(--theme-radius-lg);
+    --radius-xl: var(--theme-radius-xl);
+    --radius-2xl: 24px;
     --theme-blur: 20px;
     --theme-surface-opacity: 0.85;
     --theme-border-width: 1px;
     --theme-border-opacity: 0.12;
+
+    /* Touch targets — minimum per WCAG 2.5.5 (44px) and a "cozy" variant (48px)
+       for POS cash-buttons and KDS bump areas.
+       Apply via the `.touch-target` utility class on actionable controls. */
+    --touch-target-min: 44px;
+    --touch-target-cozy: 48px;
 
     /* Shadows */
     --theme-shadow-card: 0 2px 4px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);

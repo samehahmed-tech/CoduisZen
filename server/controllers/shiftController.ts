@@ -3,6 +3,9 @@ import { db } from '../db';
 import { shifts, orders, payments, paymentSessions } from '../../src/db/schema';
 import { eq, and, sql, gte, desc } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
+import { parseNonNegativeShiftAmount, requireShiftVarianceReason } from '../services/shiftReconciliation';
+import { reconcilePaymentRows } from '../services/paymentReconciliation';
+import { revenueEligibleOrder } from '../utils/orderRevenue';
 
 const canAccessShiftBranch = (req: Request, branchId: string | null | undefined) => {
     if (!branchId) return false;
@@ -17,13 +20,6 @@ const canAccessShiftBranch = (req: Request, branchId: string | null | undefined)
     return allowedBranches.has(branchId);
 };
 
-const sessionProviderToMethod = (providerType: string | null | undefined) => {
-    const provider = String(providerType || '').toLowerCase();
-    if (provider === 'manual_cash') return 'CASH';
-    if (provider === 'eft_pos') return 'VISA';
-    return provider.toUpperCase();
-};
-
 export const openShift = async (req: Request, res: Response) => {
     try {
         const { id, openingBalance, notes } = req.body;
@@ -34,7 +30,6 @@ export const openShift = async (req: Request, res: Response) => {
         if (!canAccessShiftBranch(req, branchId)) {
             return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
         }
-
         // Check if branch already has an open shift
         const existingOpenShift = await db.select().from(shifts).where(
             and(
@@ -46,12 +41,13 @@ export const openShift = async (req: Request, res: Response) => {
         if (existingOpenShift.length > 0) {
             return res.status(200).json(existingOpenShift[0]);
         }
+        const openingBalanceNum = parseNonNegativeShiftAmount(openingBalance, 'OPENING_BALANCE_REQUIRED');
 
         const [newShift] = await db.insert(shifts).output().values({
             id: id || `SFT-${Date.now()}`,
             branchId,
             userId,
-            openingBalance: Number(openingBalance || 0),
+            openingBalance: openingBalanceNum,
             status: 'OPEN',
             notes,
             openingTime: new Date(),
@@ -59,7 +55,10 @@ export const openShift = async (req: Request, res: Response) => {
 
         res.status(201).json(newShift);
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(Number(error?.status) || 500).json({
+            error: error?.code || error?.message,
+            message: error?.message,
+        });
     }
 };
 
@@ -69,9 +68,7 @@ export const closeShift = async (req: Request, res: Response) => {
         const { actualBalance, notes } = req.body;
         const shiftId = getStringParam((req.params as any).id);
         if (!shiftId) return res.status(400).json({ error: 'SHIFT_ID_REQUIRED' });
-        if (actualBalance === undefined || actualBalance === null) {
-            return res.status(400).json({ error: 'ACTUAL_BALANCE_REQUIRED', message: 'Cash count (actualBalance) is required to close a shift.' });
-        }
+        const actualNum = parseNonNegativeShiftAmount(actualBalance, 'ACTUAL_BALANCE_REQUIRED');
 
         const shift = await db.select().from(shifts).where(eq(shifts.id, shiftId));
         if (shift.length === 0) return res.status(404).json({ error: 'Shift not found' });
@@ -80,45 +77,51 @@ export const closeShift = async (req: Request, res: Response) => {
         }
         if (shift[0].status === 'CLOSED') return res.status(400).json({ error: 'Shift is already closed' });
 
-        // Calculate expected balance: Opening + Cash Payments
-        const cashTotalResult = await db.select({
-            sum: sql<number>`sum(amount)`
+        // Reconcile every tender, then use cash only for drawer variance.
+        const paymentRows = await db.select({
+            orderId: payments.orderId,
+            method: payments.method,
+            count: sql<number>`count(*)`,
+            total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
         }).from(payments)
             .innerJoin(orders, eq(payments.orderId, orders.id))
             .where(
                 and(
                     eq(orders.branchId, shift[0].branchId),
                     eq(orders.shiftId, shiftId),
-                    eq(payments.method, 'CASH'),
                     eq(payments.status, 'COMPLETED'),
                     gte(payments.createdAt, shift[0].openingTime)
                 )
-            );
+            ).groupBy(payments.orderId, payments.method);
 
-        let cashSessionTotal = 0;
+        let sessionRows: Array<{ orderId: string; method: string | null; count: number; total: number }> = [];
         try {
-            const cashSessionTotalResult = await db.select({
-                sum: sql<number>`coalesce(sum(${paymentSessions.amount}), 0)`
+            sessionRows = await db.select({
+                orderId: paymentSessions.orderId,
+                method: paymentSessions.providerType,
+                count: sql<number>`count(*)`,
+                total: sql<number>`coalesce(sum(${paymentSessions.amount}), 0)`,
             }).from(paymentSessions)
                 .innerJoin(orders, eq(paymentSessions.orderId, orders.id))
                 .where(
                     and(
                         eq(orders.branchId, shift[0].branchId),
                         eq(orders.shiftId, shiftId),
-                        eq(paymentSessions.providerType, 'manual_cash'),
                         eq(paymentSessions.status, 'confirmed'),
                         gte(paymentSessions.createdAt, shift[0].openingTime)
                     )
-                );
-            cashSessionTotal = Number(cashSessionTotalResult[0]?.sum || 0);
+                ).groupBy(paymentSessions.orderId, paymentSessions.providerType);
         } catch {
             // ponytail: old client DBs may not have payment_sessions migrated; payments table still covers normal POS cash.
         }
 
-        const cashTotal = Number(cashTotalResult[0]?.sum || 0) + cashSessionTotal;
+        const paymentBreakdown = reconcilePaymentRows(
+            paymentRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+            sessionRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+        );
+        const cashTotal = paymentBreakdown.find(row => row.method === 'CASH')?.total || 0;
         const expectedBalance = Number(shift[0].openingBalance) + cashTotal;
-        const actualNum = Number(actualBalance);
-        const variance = actualNum - expectedBalance;
+        const variance = requireShiftVarianceReason(actualNum, expectedBalance, notes);
         const varianceAbs = Math.abs(variance);
 
         // Flag significant discrepancies (> 1 EGP)
@@ -148,10 +151,14 @@ export const closeShift = async (req: Request, res: Response) => {
                 actualBalance: actualNum,
                 variance,
                 hasDiscrepancy,
-            }
+            },
+            payments: paymentBreakdown,
         });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(Number(error?.status) || 500).json({
+            error: error?.code || error?.message,
+            message: error?.message,
+        });
     }
 };
 
@@ -195,46 +202,38 @@ export const getXReport = async (req: Request, res: Response) => {
             discountsAndRefunds: sql<number>`coalesce(sum(coalesce(discount, 0)), 0)`,
             totalTax: sql<number>`coalesce(sum(tax), 0)`,
             totalServiceCharge: sql<number>`coalesce(sum(service_charge), 0)`
-        }).from(orders).where(eq(orders.shiftId, shiftId));
+        }).from(orders).where(and(eq(orders.shiftId, shiftId), revenueEligibleOrder()));
 
         // Get payment breakdown
         const paymentBreakdown = await db.select({
+            orderId: payments.orderId,
             method: payments.method,
             total: sql<number>`coalesce(sum(amount), 0)`,
             count: sql<number>`count(*)`
         }).from(payments)
             .innerJoin(orders, eq(payments.orderId, orders.id))
             .where(and(eq(orders.shiftId, shiftId), eq(payments.status, 'COMPLETED')))
-            .groupBy(payments.method);
+            .groupBy(payments.orderId, payments.method);
 
-        let sessionBreakdown: Array<{ providerType: string | null; total: number; count: number }> = [];
+        let sessionBreakdown: Array<{ orderId: string; method: string | null; total: number; count: number }> = [];
         try {
             sessionBreakdown = await db.select({
-                providerType: paymentSessions.providerType,
+                orderId: paymentSessions.orderId,
+                method: paymentSessions.providerType,
                 total: sql<number>`coalesce(sum(${paymentSessions.amount}), 0)`,
                 count: sql<number>`count(*)`
             }).from(paymentSessions)
                 .innerJoin(orders, eq(paymentSessions.orderId, orders.id))
                 .where(and(eq(orders.shiftId, shiftId), eq(paymentSessions.status, 'confirmed')))
-                .groupBy(paymentSessions.providerType);
+                .groupBy(paymentSessions.orderId, paymentSessions.providerType);
         } catch {
             // ponytail: old client DBs may not have payment_sessions migrated; don't break shift report.
         }
 
-        const totalsByMethod = new Map<string, { method: string; total: number; count: number }>();
-        for (const p of paymentBreakdown) {
-            totalsByMethod.set(String(p.method), { method: String(p.method), total: Number(p.total || 0), count: Number(p.count || 0) });
-        }
-        for (const p of sessionBreakdown) {
-            const method = sessionProviderToMethod(p.providerType);
-            const current = totalsByMethod.get(method) || { method, total: 0, count: 0 };
-            totalsByMethod.set(method, {
-                method,
-                total: current.total + Number(p.total || 0),
-                count: current.count + Number(p.count || 0),
-            });
-        }
-        const combinedPaymentBreakdown = Array.from(totalsByMethod.values());
+        const combinedPaymentBreakdown = reconcilePaymentRows(
+            paymentBreakdown.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+            sessionBreakdown.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+        );
 
         const cashPayments = combinedPaymentBreakdown.find(p => p.method === 'CASH');
         const visaPayments = combinedPaymentBreakdown.find(p => ['VISA', 'CARD', 'CREDIT_CARD', 'DEBIT_CARD'].includes(String(p.method || '').toUpperCase()));

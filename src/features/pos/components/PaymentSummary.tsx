@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Banknote, CreditCard, Smartphone, Landmark, Calculator, ChefHat, ChevronDown, Tag, ArrowRight, X } from 'lucide-react';
-import { PaymentMethod } from '@/types';
+import React, { useEffect, useState, useRef } from 'react';
+import { Banknote, CreditCard, Smartphone, Landmark, Calculator, ChefHat, ChevronDown, Tag, ArrowRight, X, AlertCircle } from 'lucide-react';
+import { CustomPaymentMethod, PaymentMethod } from '@/types';
+import { useToast } from '@/components/common/ToastProvider';
 
 interface PaymentSummaryProps {
     subtotal: number;
@@ -9,8 +10,8 @@ interface PaymentSummaryProps {
     tax: number;
     total: number;
     currencySymbol: string;
-    paymentMethod: PaymentMethod;
-    onSetPaymentMethod: (method: PaymentMethod) => void;
+    paymentMethod: PaymentMethod | string;
+    onSetPaymentMethod: (method: PaymentMethod | string) => void;
     onShowSplitModal: () => void;
     isTouchMode: boolean;
     lang: 'en' | 'ar';
@@ -29,7 +30,8 @@ interface PaymentSummaryProps {
     onApplyCoupon: () => void;
     onClearCoupon: () => void;
     itemCount?: number;
-    splitPayments: { method: PaymentMethod; amount: number }[];
+    splitPayments: { method: PaymentMethod | string; amount: number }[];
+    customPaymentMethods?: CustomPaymentMethod[];
     activeOrderType?: string;
 }
 
@@ -53,14 +55,17 @@ const ar = {
 const PaymentSummary: React.FC<PaymentSummaryProps> = ({
     subtotal = 0, discount = 0, discountAmount = 0, tax = 0, total = 0, currencySymbol, paymentMethod, onSetPaymentMethod, onShowSplitModal,
     lang, t, tipAmount = 0, onSetTipAmount, onSubmit, onSendKitchen,
-    canSubmit, couponCode, activeCoupon, isApplyingCoupon, onCouponCodeChange, onApplyCoupon, onClearCoupon, splitPayments = [], activeOrderType
+    canSubmit, couponCode, activeCoupon, isApplyingCoupon, onCouponCodeChange, onApplyCoupon, onClearCoupon, splitPayments = [], activeOrderType,
+    customPaymentMethods = []
 }) => {
+    const isAr = lang === 'ar';
+    const { showToast } = useToast();
     const [openSection, setOpenSection] = useState<'methods' | 'tips' | 'coupon' | null>(null);
     const [tenderedStr, setTenderedStr] = useState<string>('');
     const [isCashDrawerOpen, setIsCashDrawerOpen] = useState(false);
     const amountTendered = Number(tenderedStr) || 0;
     const changeDue = amountTendered > 0 ? amountTendered - total : 0;
-    const isAr = lang === 'ar';
+    const [cashTakeawayFirstTap, setCashTakeawayFirstTap] = useState(false);
     const toggleSection = (section: 'methods' | 'tips' | 'coupon') => setOpenSection(p => p === section ? null : section);
 
     useEffect(() => {
@@ -69,9 +74,17 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
 
     const handleSubmitClick = () => {
         if (activeOrderType === 'TAKEAWAY' && paymentMethod === PaymentMethod.CASH && !isCashDrawerOpen) {
-            setIsCashDrawerOpen(true);
-            setOpenSection(null);
-            return;
+            if (!cashTakeawayFirstTap) {
+                setCashTakeawayFirstTap(true);
+                setIsCashDrawerOpen(true);
+                setOpenSection(null);
+                showToast(isAr ? 'تم فتح درج النقدية. اضغط "دفع" مرة أخرى للتأكيد.' : 'Cash drawer opened. Tap "Pay" again to confirm.', 'info');
+                return;
+            }
+            // Second tap - submit
+            setCashTakeawayFirstTap(false);
+        } else {
+            setCashTakeawayFirstTap(false);
         }
         onSubmit();
     };
@@ -90,8 +103,16 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
         { id: PaymentMethod.VODAFONE_CASH, label: t.v_cash, icon: Smartphone },
         { id: PaymentMethod.INSTAPAY, label: t.insta, icon: Landmark },
         { id: PaymentMethod.SPLIT, label: t.split, icon: Calculator },
+        ...customPaymentMethods
+            .filter(method => method.isActive !== false)
+            .map(method => ({
+                id: method.id,
+                label: isAr ? method.nameAr || method.name : method.name,
+                icon: CreditCard,
+            })),
     ];
     const activeMethodLabel = methods.find(m => m.id === paymentMethod)?.label.split(' ')[0] || t.cash;
+    const isOpenDineIn = activeOrderType === 'DINE_IN';
 
     return (
         <div className="space-y-2.5 shrink-0 flex flex-col pos-payment-summary">
@@ -105,7 +126,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 )}
             </div>
 
-            <div className="flex gap-2">
+            {!isOpenDineIn && <div className="flex gap-2">
                 <button
                     onClick={() => toggleSection('methods')}
                     className={`flex-[2] h-10 flex items-center justify-between px-4 rounded-xl text-xs font-bold transition-all duration-200 active:scale-[0.98] ${openSection === 'methods' ? 'bg-primary text-white shadow-md' : 'bg-card border border-border/10 text-main hover:border-primary/30 hover:shadow-sm'}`}
@@ -133,9 +154,19 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 >
                     <Tag size={15} />
                 </button>
-            </div>
+            </div>}
 
-            {(openSection === 'tips' || openSection === 'coupon') && (
+            {isOpenDineIn && (
+                <button
+                    onClick={() => setOpenSection(openSection === 'coupon' ? null : 'coupon')}
+                    className={`h-10 w-full flex items-center justify-center gap-2 rounded-xl text-xs font-bold transition-all duration-200 active:scale-[0.98] ${openSection === 'coupon' || activeCoupon ? 'bg-indigo-500 text-white shadow-md' : 'bg-card border border-border/10 text-muted hover:text-indigo-500 hover:border-indigo-500/30'}`}
+                >
+                    <Tag size={15} />
+                    <span>{isAr ? ar.coupon : 'Coupon'} {activeCoupon ? '✓' : ''}</span>
+                </button>
+            )}
+
+            {!isOpenDineIn && (openSection === 'tips' || openSection === 'coupon') && (
                 <div className="flex bg-elevated/40 p-1 rounded-xl gap-1 pos-animate-in border border-border/5">
                     <button onClick={() => setOpenSection('tips')} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${openSection === 'tips' ? 'bg-card text-main shadow-sm' : 'text-muted/50 hover:text-main'}`}>
                         {isAr ? ar.tips : 'Tips'} {tipAmount > 0 ? `(${tipAmount})` : ''}
@@ -146,7 +177,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 </div>
             )}
 
-            {openSection === 'methods' && (
+            {!isOpenDineIn && openSection === 'methods' && (
                 <div className="grid grid-cols-5 gap-1.5 pos-animate-in bg-elevated/20 p-1.5 rounded-xl border border-border/5">
                     {methods.map(btn => (
                         <button
@@ -161,7 +192,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 </div>
             )}
 
-            {openSection === 'tips' && (
+            {!isOpenDineIn && openSection === 'tips' && (
                 <div className="flex bg-elevated/20 rounded-xl p-1.5 gap-1.5 pos-animate-in border border-border/5">
                     {[0, Math.round(subtotal * 0.05), Math.round(subtotal * 0.1), Math.round(subtotal * 0.15)].map((amt, i) => (
                         <button
@@ -198,7 +229,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 </div>
             )}
 
-            {paymentMethod === PaymentMethod.CASH && total > 0 && isCashDrawerOpen && (
+            {!isOpenDineIn && paymentMethod === PaymentMethod.CASH && total > 0 && isCashDrawerOpen && (
                 <div className="pos-cash-drawer bg-elevated/25 backdrop-blur-sm border border-border/10 rounded-xl p-2.5 space-y-2.5 pos-animate-in shadow-inner max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain">
                     <div className="sticky -top-2.5 z-10 flex items-center justify-between bg-elevated/95 backdrop-blur px-1 py-1 rounded-lg">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted">{isAr ? ar.tender : 'Amount Tendered'}</span>
@@ -223,7 +254,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
 
                     <div className="pos-quick-cash grid grid-cols-4 gap-2">
                         {[50, 100, 200, 500].map(amt => (
-                            <button key={amt} onClick={() => setTenderedStr(String(amt))} className="h-8 rounded-lg text-[12px] font-black bg-card border border-border/10 text-muted/80 hover:text-primary hover:border-primary/30 hover:shadow-sm transition-all active:scale-95 tabular-nums">
+                            <button key={amt} onClick={() => setTenderedStr(String(amt))} className="h-10 rounded-lg text-[12px] font-black bg-card border border-border/10 text-muted/80 hover:text-primary hover:border-primary/30 hover:shadow-sm transition-all active:scale-95 tabular-nums touch-target">
                                 {amt}
                             </button>
                         ))}
@@ -231,11 +262,11 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
 
                     <div className="pos-numpad grid grid-cols-3 gap-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map(key => (
-                            <button key={key} onClick={() => handleNumpad(key)} className="pos-numpad-key h-10 bg-card border border-border/10 rounded-lg text-base font-black text-main hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-all active:scale-90 shadow-sm">
+                            <button key={key} onClick={() => handleNumpad(key)} className="pos-numpad-key h-11 bg-card border border-border/10 rounded-lg text-base font-black text-main hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-all active:scale-90 shadow-sm touch-target">
                                 {key}
                             </button>
                         ))}
-                        <button onClick={() => setTenderedStr(String(Math.ceil(total)))} className="pos-exact-cash h-10 bg-emerald-500 text-white rounded-lg active:scale-90 transition-all flex flex-col items-center justify-center shadow-md hover:bg-emerald-600">
+                        <button onClick={() => setTenderedStr(String(Math.ceil(total)))} className="pos-exact-cash h-11 bg-emerald-500 text-white rounded-lg active:scale-90 transition-all flex flex-col items-center justify-center shadow-md hover:bg-emerald-600 touch-target">
                             <span className="text-[10px] font-black uppercase tracking-wider">{isAr ? ar.exact : 'Exact'}</span>
                             <span className="text-[11px] font-bold opacity-80 tabular-nums">{Math.ceil(total)}</span>
                         </button>
@@ -252,7 +283,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 </div>
             )}
 
-            {paymentMethod === PaymentMethod.SPLIT && splitPayments.length > 0 && total > 0 && (
+            {!isOpenDineIn && paymentMethod === PaymentMethod.SPLIT && splitPayments.length > 0 && total > 0 && (
                 <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3 space-y-2 pos-animate-in">
                     <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-black uppercase tracking-wider text-indigo-500">{isAr ? ar.multiTender : 'Multi-Tender'}</span>
@@ -270,14 +301,14 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 </div>
             )}
 
-            <div className="flex gap-2 pt-1">
+            <div className="pos-payment-actions sticky bottom-0 z-20 flex gap-2 border-t border-border/10 bg-card/95 pt-2 pb-0.5 backdrop-blur-md">
                 {(!activeOrderType || activeOrderType === 'DINE_IN') && (
                     <button onClick={onSendKitchen} disabled={!canSubmit} className="pos-send-kitchen-btn w-12 h-12 bg-card border border-border/10 text-muted hover:text-primary hover:border-primary/30 hover:bg-primary/5 rounded-xl flex items-center justify-center disabled:opacity-30 disabled:hover:border-border/10 disabled:hover:bg-card transition-all duration-300 active:scale-95 shadow-sm" title={t.send_kitchen}>
                         <ChefHat size={22} />
                     </button>
                 )}
 
-                <button
+                {!isOpenDineIn && <button
                     onClick={handleSubmitClick}
                     disabled={!canSubmit}
                     className="pos-submit-payment-btn flex-1 h-12 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 active:shadow-md flex items-center justify-between px-4 disabled:opacity-40 disabled:shadow-none disabled:from-muted disabled:to-muted transition-all duration-300 relative overflow-hidden group"
@@ -291,7 +322,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                         <span className="text-xl font-black tabular-nums tracking-tighter">{total.toFixed(2)}</span>
                         <span className="text-[10px] font-semibold opacity-70 mb-1">{currencySymbol}</span>
                     </div>
-                </button>
+                </button>}
             </div>
         </div>
     );

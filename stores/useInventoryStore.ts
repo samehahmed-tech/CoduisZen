@@ -5,6 +5,8 @@ import { suppliersApi, purchaseOrdersApi, productionApi } from '../services/api/
 import { inventoryApi } from '../services/api/inventory';
 import { localDb } from '../db/localDb';
 import { syncService } from '../services/syncService';
+import { parseStockAdjustmentQuantity } from '../services/stockAdjustment';
+import { applyAbsoluteStockQuantity } from '../services/stockSocket';
 
 interface InventoryState {
     inventory: InventoryItem[];
@@ -263,7 +265,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
                 is_audited: item.isAudited,
                 audit_frequency: item.auditFrequency,
                 is_composite: item.isComposite,
-                bom: item.bom
+                bom: item.bom,
+                warehouse_ids: item.warehouseQuantities.map(row => row.warehouseId),
             };
             if (navigator.onLine) {
                 await inventoryApi.create(payload);
@@ -303,6 +306,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
                 audit_frequency: updated.auditFrequency,
                 is_composite: updated.isComposite,
                 bom: updated.bom,
+                warehouse_ids: updated.warehouseQuantities.map(row => row.warehouseId),
                 is_active: true
             };
             if (navigator.onLine) {
@@ -349,24 +353,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
     patchStockFromSocket: (itemId: string, warehouseId: string, quantity: number) => {
         const { inventory } = get();
-        const item = inventory.find((i) => i.id === itemId);
-        if (!item) return;
-
-        const updatedInventory = inventory.map((i) => {
-            if (i.id === itemId) {
-                const updatedWarehouseQuantities = [...i.warehouseQuantities];
-                const whIdx = updatedWarehouseQuantities.findIndex((wq) => wq.warehouseId === warehouseId);
-                
-                if (whIdx >= 0) {
-                    updatedWarehouseQuantities[whIdx] = { ...updatedWarehouseQuantities[whIdx], quantity };
-                } else {
-                    updatedWarehouseQuantities.push({ warehouseId, quantity });
-                }
-
-                return { ...i, warehouseQuantities: updatedWarehouseQuantities };
-            }
-            return i;
-        });
+        const updatedInventory = applyAbsoluteStockQuantity(inventory, itemId, warehouseId, quantity);
+        if (updatedInventory === inventory) return;
 
         set({ inventory: updatedInventory });
         
@@ -443,12 +431,14 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
                 id: po.id,
                 supplierId: po.supplierId,
                 branchId,
+                targetWarehouseId: po.targetWarehouseId,
                 items: po.items.map(i => ({ itemId: i.itemId, orderedQty: i.quantity, unitPrice: i.unitPrice })),
             });
             const mapped: PurchaseOrder = {
                 id: created.id,
                 supplierId: created.supplierId,
                 status: created.status,
+                targetWarehouseId: created.targetWarehouseId || po.targetWarehouseId,
                 items: po.items,
                 totalCost: Number(created.subtotal || po.totalCost || 0),
                 date: new Date(created.createdAt || Date.now()),
@@ -516,6 +506,12 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     },
 
     updateStock: async (itemId, warehouseId, quantity, type, reason) => {
+        const validatedQuantity = parseStockAdjustmentQuantity(quantity);
+        if (validatedQuantity === null) {
+            throw new Error('Stock quantity must be a finite number greater than or equal to zero');
+        }
+        quantity = validatedQuantity;
+
         const itemOrigin = get().inventory.find(i => i.id === itemId);
         if (!itemOrigin) return;
 
@@ -612,7 +608,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     cancelProductionOrder: async (poId) => {
         try {
             await productionApi.cancelOrder(poId);
-            await get().fetchProductionOrders();
+            await Promise.all([get().fetchProductionOrders(), get().fetchInventory()]);
         } catch (error: any) {
             set({ error: error.message });
             throw error;

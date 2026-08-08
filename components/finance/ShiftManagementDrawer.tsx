@@ -7,7 +7,7 @@ import {
 import { useFinanceStore } from '../../stores/useFinanceStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { shiftsApi } from '../../services/api/shifts';
-import { translations } from '../../services/translations';
+import { getActionableErrorMessage } from '../../services/api/core';
 import { useToast } from '../Toast';
 
 export const ShiftManagementDrawer: React.FC = () => {
@@ -19,7 +19,6 @@ export const ShiftManagementDrawer: React.FC = () => {
     const { showToast } = useToast();
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const isRtl = lang === 'ar';
-    const t = translations[lang] || translations.en;
     
     // Feature Toggle for Blind Reconciliation
     const isBlindReconciliation = settings?.blindShiftReconciliation === true;
@@ -54,7 +53,15 @@ export const ShiftManagementDrawer: React.FC = () => {
 
     const handleCloseShift = async () => {
         if (!activeShift) return;
-        const balance = parseFloat(actualBalance) || 0;
+        const balance = Number(actualBalance);
+        if (!Number.isFinite(balance) || balance < 0) {
+            showToast(getActionableErrorMessage({ code: 'INVALID_CASH_BALANCE' }, lang), 'error');
+            return;
+        }
+        if (Math.abs(balance - expectedCash) > 1 && !closingNotes.trim()) {
+            showToast(getActionableErrorMessage({ code: 'VARIANCE_REASON_REQUIRED' }, lang), 'error');
+            return;
+        }
         
         setIsClosing(true);
         try {
@@ -64,13 +71,8 @@ export const ShiftManagementDrawer: React.FC = () => {
                 branchId: activeShift.branchId
             });
             setClosedData(res);
-            setTimeout(() => {
-                setShift(null);
-                setClosedData(null);
-                setIsShiftDrawerOpen(false);
-            }, 2500);
-        } catch {
-            showToast(t.shift_close_failed || (isRtl ? 'فشل إغلاق الشيفت' : 'Reconciliation failed'), 'error');
+        } catch (closeError) {
+            showToast(getActionableErrorMessage(closeError, lang), 'error');
         } finally {
             setIsClosing(false);
         }
@@ -78,9 +80,22 @@ export const ShiftManagementDrawer: React.FC = () => {
 
     if (!isShiftDrawerOpen) return null;
 
-    const expectedCash = report?.expectedCashBalance || activeShift?.openingBalance || 0;
-    const inputCash = parseFloat(actualBalance) || 0;
+    const expectedCash = report?.expectedCashBalance ?? activeShift?.openingBalance ?? 0;
+    const inputCash = Number(actualBalance);
     const variance = inputCash - expectedCash;
+    const isActualBalanceValid = actualBalance !== '' && Number.isFinite(inputCash) && inputCash >= 0;
+    const requiresVarianceReason = isActualBalanceValid && Math.abs(variance) > 1;
+    const paymentLabel = (method: string) => {
+        const custom = settings.customPaymentMethods?.find(item => item.id === method);
+        return custom ? (isRtl ? custom.nameAr || custom.name : custom.name) : method.replace(/_/g, ' ');
+    };
+    const closeDrawer = () => {
+        if (closedData) {
+            setShift(null);
+            setClosedData(null);
+        }
+        setIsShiftDrawerOpen(false);
+    };
 
     return (
         <AnimatePresence>
@@ -121,7 +136,7 @@ export const ShiftManagementDrawer: React.FC = () => {
                         </div>
                         {!isClosing && (
                             <button 
-                                onClick={() => setIsShiftDrawerOpen(false)}
+                                onClick={closeDrawer}
                                 className="w-10 h-10 rounded-xl bg-elevated border border-border/20 text-muted hover:text-main hover:bg-card transition-colors flex items-center justify-center active:scale-95"
                             >
                                 <X size={18} />
@@ -161,6 +176,17 @@ export const ShiftManagementDrawer: React.FC = () => {
                                     {(closedData.actualBalance || 0).toFixed(2)}
                                 </p>
                             </div>
+                            <div className="bg-card w-full p-4 rounded-2xl border border-border/30 mt-3 space-y-2">
+                                {(closedData.payments || []).map((payment: any) => (
+                                    <div key={payment.method} className="flex items-center justify-between text-xs">
+                                        <span className="font-black text-muted uppercase">{paymentLabel(payment.method)}</span>
+                                        <span className="font-black tabular-nums">{Number(payment.total || 0).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={closeDrawer} className="mt-5 w-full py-3 rounded-xl bg-emerald-600 text-white font-black text-xs">
+                                {isRtl ? 'تم' : 'Done'}
+                            </button>
                         </div>
                     ) : (
                         <div className="relative flex-1 flex flex-col min-h-0 z-10">
@@ -225,20 +251,17 @@ export const ShiftManagementDrawer: React.FC = () => {
                                                 </div>
                                                 
                                                 <div className="mt-4 pt-4 border-t border-border/20 grid grid-cols-2 gap-4">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500"><Banknote size={14} /></div>
-                                                        <div>
-                                                            <p className="text-[9px] font-black uppercase text-muted tracking-widest">Cash</p>
-                                                            <p className="text-xs font-black tabular-nums">{(report.cashCollected || 0).toFixed(2)}</p>
+                                                    {(report.payments || []).map((payment: any) => (
+                                                        <div key={payment.method} className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                                                                {payment.method === 'CASH' ? <Banknote size={14} /> : <CreditCard size={14} />}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[9px] font-black uppercase text-muted tracking-widest truncate">{paymentLabel(payment.method)}</p>
+                                                                <p className="text-xs font-black tabular-nums">{Number(payment.total || 0).toFixed(2)}</p>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2.5">
-                                                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><CreditCard size={14} /></div>
-                                                        <div>
-                                                            <p className="text-[9px] font-black uppercase text-muted tracking-widest">Visa/Cards</p>
-                                                            <p className="text-xs font-black tabular-nums">{(report.visaCollected || 0).toFixed(2)}</p>
-                                                        </div>
-                                                    </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         ) : (
@@ -284,12 +307,17 @@ export const ShiftManagementDrawer: React.FC = () => {
                                     </div>
                                     
                                     {/* Notes */}
-                                    <textarea 
+                                     <textarea 
                                         placeholder={isRtl ? 'ملاحظات العجز/الزيادة أو الشيفت...' : 'Closing notes or explanations...'}
                                         value={closingNotes}
                                         onChange={e => setClosingNotes(e.target.value)}
                                         className="theme-input w-full p-5 text-sm font-semibold resize-none h-24"
-                                    />
+                                     />
+                                    {requiresVarianceReason && !closingNotes.trim() && (
+                                        <p className="text-xs font-bold text-rose-500">
+                                            {isRtl ? 'سبب العجز أو الزيادة مطلوب قبل الإغلاق.' : 'A variance reason is required before closing.'}
+                                        </p>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="flex-1 p-5 flex items-center justify-center">
@@ -307,7 +335,7 @@ export const ShiftManagementDrawer: React.FC = () => {
                                 <div className="relative p-6 border-t border-border/20 shrink-0 bg-card">
                                     <button
                                         onClick={handleCloseShift}
-                                        disabled={isClosing || !actualBalance}
+                                        disabled={isClosing || !isActualBalanceValid || (requiresVarianceReason && !closingNotes.trim())}
                                         className="theme-btn theme-btn-primary w-full disabled:opacity-50 text-xs uppercase tracking-[0.2em]"
                                     >
                                         {isClosing ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <LogOutIcon />}

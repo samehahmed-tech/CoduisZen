@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { 
     purchaseOrders, 
+    purchaseOrderItems,
     goodsReceiptNotes, 
     grnItems, 
     supplierInvoices, 
@@ -10,14 +11,19 @@ import {
     inventoryStock,
     inventoryBatches,
     stockMovements,
-    warehouses
+    warehouses,
+    idempotencyKeys,
 } from '../../src/db/schema';
-import { eq, inArray, and, sql, desc } from 'drizzle-orm';
+import { eq, inArray, and, sql, desc, gt } from 'drizzle-orm';
 import crypto from 'crypto';
 import { GLService } from '../services/glService';
 import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import { createSignedAuditLog } from '../services/auditService';
+import { buildRequestHash } from '../services/idempotencyService';
+
+const PO_RECEIPT_SCOPE = 'PURCHASE_ORDER_GRN';
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const getGRNs = async (req: Request, res: Response) => {
     try {
@@ -77,6 +83,40 @@ export const getSupplierInvoices = async (req: Request, res: Response) => {
  * Creates a Goods Receipt Note (GRN) from a PO
  */
 export const createGRN = async (req: Request, res: Response) => {
+    const idempotencyKey = String(req.body?.referenceNumber || '').trim() || undefined;
+    const requestHash = idempotencyKey
+        ? buildRequestHash({
+            poId: req.body?.poId,
+            warehouseId: req.body?.warehouseId,
+            items: req.body?.items,
+        })
+        : undefined;
+    const idempotencyExpiry = new Date(Date.now() + IDEMPOTENCY_TTL_MS);
+    let ownsIdempotencyClaim = false;
+
+    const replayIdempotentReceipt = async () => {
+        if (!idempotencyKey || !requestHash) return null;
+        const [claim] = await db.select().top(1).from(idempotencyKeys).where(and(
+            eq(idempotencyKeys.key, idempotencyKey),
+            eq(idempotencyKeys.scope, PO_RECEIPT_SCOPE),
+            gt(idempotencyKeys.expiresAt, new Date()),
+        ));
+        if (!claim) return null;
+        if (claim.requestHash !== requestHash) {
+            return res.status(409).json({ error: 'IDEMPOTENCY_KEY_PAYLOAD_CONFLICT' });
+        }
+        if (claim.responseBody) {
+            const storedResponse = typeof claim.responseBody === 'string'
+                ? JSON.parse(claim.responseBody)
+                : claim.responseBody;
+            return res.status(200).json({
+                ...storedResponse,
+                idempotentReplay: true,
+            });
+        }
+        return res.status(409).json({ error: 'IDEMPOTENCY_KEY_IN_PROGRESS' });
+    };
+
     try {
         const { poId, supplierId, branchId, warehouseId, referenceNumber, items, userId, notes } = req.body;
         // items: { itemId, poItemId, receivedQty, unitPrice, batchNumber, expiryDate }[]
@@ -84,16 +124,128 @@ export const createGRN = async (req: Request, res: Response) => {
         if (!warehouseId || !items || items.length === 0) {
             return res.status(400).json({ error: 'warehouseId and items are required for GRN' });
         }
+        if (poId && !referenceNumber) {
+            return res.status(400).json({ error: 'referenceNumber is required for PO receipts' });
+        }
 
-        const grnId = `GRN-${Date.now()}`;
+        if (idempotencyKey && requestHash) {
+            const replay = await replayIdempotentReceipt();
+            if (replay) return replay;
+            try {
+                await db.insert(idempotencyKeys).values({
+                    key: idempotencyKey,
+                    scope: PO_RECEIPT_SCOPE,
+                    requestHash,
+                    status: 'IN_PROGRESS',
+                    expiresAt: idempotencyExpiry,
+                    updatedAt: new Date(),
+                });
+                ownsIdempotencyClaim = true;
+            } catch {
+                const concurrentReplay = await replayIdempotentReceipt();
+                if (concurrentReplay) return concurrentReplay;
+                throw new Error('IDEMPOTENCY_CLAIM_FAILED');
+            }
+        }
+
+        if (poId && referenceNumber) {
+            const [existingReceipt] = await db.select().top(1).from(goodsReceiptNotes).where(and(
+                eq(goodsReceiptNotes.poId, poId),
+                eq(goodsReceiptNotes.referenceNumber, referenceNumber),
+            ));
+            if (existingReceipt) {
+                const responseBody = { id: existingReceipt.id, status: existingReceipt.status, idempotentReplay: true };
+                if (ownsIdempotencyClaim && idempotencyKey) {
+                    await db.update(idempotencyKeys).set({
+                        status: 'COMPLETED',
+                        responseCode: 200,
+                        resourceId: existingReceipt.id,
+                        responseBody: JSON.stringify(responseBody),
+                        expiresAt: idempotencyExpiry,
+                        updatedAt: new Date(),
+                    }).where(and(
+                        eq(idempotencyKeys.key, idempotencyKey),
+                        eq(idempotencyKeys.scope, PO_RECEIPT_SCOPE),
+                    ));
+                }
+                return res.status(200).json(responseBody);
+            }
+        }
+
+        const grnId = `GRN-${crypto.randomUUID()}`;
         
         await db.transaction(async (tx) => {
+            const [poHeader] = poId
+                ? await tx.select().top(1).from(purchaseOrders).where(eq(purchaseOrders.id, poId))
+                : [null];
+            if (poId && !poHeader) throw new Error('PURCHASE_ORDER_NOT_FOUND');
+            if (poHeader && !['SENT', 'PARTIAL', 'ORDERED'].includes(String(poHeader.status || '').toUpperCase())) {
+                throw new Error(`PO_STATUS_NOT_RECEIVABLE:${poHeader.status}`);
+            }
+
+            const [warehouse] = await tx.select().top(1).from(warehouses).where(eq(warehouses.id, warehouseId));
+            if (!warehouse) throw new Error('WAREHOUSE_NOT_FOUND');
+            if (poHeader?.targetWarehouseId && poHeader.targetWarehouseId !== warehouseId) {
+                throw new Error('PO_TARGET_WAREHOUSE_MISMATCH');
+            }
+            const authoritativeBranchId = poHeader?.branchId || branchId;
+            if (authoritativeBranchId && warehouse.branchId && warehouse.branchId !== authoritativeBranchId) {
+                throw new Error('WAREHOUSE_BRANCH_MISMATCH');
+            }
+
+            const itemsToInsert = [];
+            for (const item of items) {
+                const receivedQty = Number(item.receivedQty);
+                if (!Number.isFinite(receivedQty) || receivedQty <= 0) {
+                    throw new Error(`INVALID_RECEIVED_QUANTITY:${item.itemId}`);
+                }
+
+                let poLine: typeof purchaseOrderItems.$inferSelect | undefined;
+                if (poHeader) {
+                    const [matchedLine] = await tx.select().top(1).from(purchaseOrderItems).where(and(
+                        eq(purchaseOrderItems.poId, poHeader.id),
+                        item.poItemId
+                            ? eq(purchaseOrderItems.id, Number(item.poItemId))
+                            : eq(purchaseOrderItems.itemId, item.itemId),
+                    ));
+                    if (!matchedLine || matchedLine.itemId !== item.itemId) {
+                        throw new Error(`PO_ITEM_NOT_FOUND:${item.itemId}`);
+                    }
+
+                    const [updatedLine] = await tx.update(purchaseOrderItems)
+                        .set({ receivedQty: sql`COALESCE(${purchaseOrderItems.receivedQty}, 0) + ${receivedQty}` })
+                        .output()
+                        .where(and(
+                            eq(purchaseOrderItems.id, matchedLine.id),
+                            sql`COALESCE(${purchaseOrderItems.receivedQty}, 0) + ${receivedQty} <= ${purchaseOrderItems.orderedQty}`,
+                        ));
+                    if (!updatedLine) throw new Error(`RECEIVED_QUANTITY_EXCEEDS_REMAINING:${item.itemId}`);
+                    poLine = matchedLine;
+                }
+
+                const unitPrice = Number(poLine?.unitPrice ?? item.unitPrice);
+                if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+                    throw new Error(`INVALID_UNIT_PRICE:${item.itemId}`);
+                }
+
+                itemsToInsert.push({
+                    grnId,
+                    itemId: item.itemId,
+                    poItemId: poLine?.id || item.poItemId,
+                    receivedQty,
+                    rejectedQty: Number(item.rejectedQty || 0),
+                    unitPrice,
+                    batchNumber: item.batchNumber,
+                    expiryDate: item.expiryDate ? new Date(item.expiryDate) : undefined,
+                });
+            }
+
             // 1. Create GRN Header
             await tx.insert(goodsReceiptNotes).values({
                 id: grnId,
                 poId,
-                supplierId,
-                branchId,
+                supplierId: poHeader?.supplierId || supplierId,
+                branchId: authoritativeBranchId,
                 receivedBy: userId,
                 referenceNumber,
                 notes,
@@ -101,17 +253,6 @@ export const createGRN = async (req: Request, res: Response) => {
             });
 
             // 2. Insert GRN Items
-            const itemsToInsert = items.map((item: any) => ({
-                grnId,
-                itemId: item.itemId,
-                poItemId: item.poItemId,
-                receivedQty: item.receivedQty,
-                rejectedQty: item.rejectedQty || 0,
-                unitPrice: item.unitPrice,
-                batchNumber: item.batchNumber,
-                expiryDate: item.expiryDate ? new Date(item.expiryDate) : undefined,
-            }));
-            
             await tx.insert(grnItems).values(itemsToInsert);
             
             // 3. Post to inventory ledger (batch transactions & moving average update)
@@ -179,11 +320,21 @@ export const createGRN = async (req: Request, res: Response) => {
                         initialQty: item.receivedQty,
                         currentQty: item.receivedQty,
                         unitCost: item.unitPrice,
-                        supplierId,
+                        supplierId: poHeader?.supplierId || supplierId,
                         status: 'ACTIVE',
                         createdAt: new Date(),
                     });
                 }
+            }
+
+            if (poHeader) {
+                const updatedLines = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.poId, poHeader.id));
+                const allReceived = updatedLines.every(line => Number(line.receivedQty || 0) >= Number(line.orderedQty || 0));
+                const anyReceived = updatedLines.some(line => Number(line.receivedQty || 0) > 0);
+                await tx.update(purchaseOrders).set({
+                    status: allReceived ? 'RECEIVED' : anyReceived ? 'PARTIAL' : poHeader.status,
+                    updatedAt: new Date(),
+                }).where(eq(purchaseOrders.id, poHeader.id));
             }
 
             try {
@@ -210,8 +361,31 @@ export const createGRN = async (req: Request, res: Response) => {
             }
         });
 
-        res.status(201).json({ id: grnId, status: 'RECEIVED' });
+        const responseBody = { id: grnId, status: 'RECEIVED' };
+        if (ownsIdempotencyClaim && idempotencyKey) {
+            await db.update(idempotencyKeys).set({
+                status: 'COMPLETED',
+                responseCode: 201,
+                resourceId: grnId,
+                responseBody: JSON.stringify(responseBody),
+                expiresAt: idempotencyExpiry,
+                updatedAt: new Date(),
+            }).where(and(
+                eq(idempotencyKeys.key, idempotencyKey),
+                eq(idempotencyKeys.scope, PO_RECEIPT_SCOPE),
+            ));
+        }
+        res.status(201).json(responseBody);
     } catch (error: any) {
+        if (ownsIdempotencyClaim && idempotencyKey) {
+            await db.delete(idempotencyKeys).where(and(
+                eq(idempotencyKeys.key, idempotencyKey),
+                eq(idempotencyKeys.scope, PO_RECEIPT_SCOPE),
+            ));
+        } else {
+            const replay = await replayIdempotentReceipt();
+            if (replay) return replay;
+        }
         res.status(500).json({ error: error.message });
     }
 };

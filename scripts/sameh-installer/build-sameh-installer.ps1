@@ -65,6 +65,7 @@ try {
     Get-ChildItem (Join-Path $stage "dist-server") -Filter "*.map" -Recurse | Remove-Item -Force
     Copy-Clean (Join-Path $PSScriptRoot "runtime") (Join-Path $stage "runtime")
     Copy-Item (Join-Path $PSScriptRoot "hotfix\create-recovery-admin.cjs") (Join-Path $stage "runtime\create-recovery-admin.cjs") -Force
+    Copy-Item (Join-Path $PSScriptRoot "table-pos-fix\reset-tables.cjs") (Join-Path $stage "runtime\reset-tables.cjs") -Force
     $tokenBytes = New-Object byte[] 48
     $tokenGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
     try { $tokenGenerator.GetBytes($tokenBytes) } finally { $tokenGenerator.Dispose() }
@@ -115,6 +116,7 @@ try {
         @{ Target = "runtime\monitor.cjs"; Role = "all" },
         @{ Target = "runtime\port-guard.cjs"; Role = "all" },
         @{ Target = "runtime\schema-doctor.cjs"; Role = "server" },
+        @{ Target = "runtime\reset-tables.cjs"; Role = "server" },
         @{ Target = "database\daily-order-number.sql"; Role = "server" },
         @{ Target = "runtime\create-recovery-admin.cjs"; Role = "server" },
         @{ Target = "runtime\bridge-runner.cjs"; Role = "all" },
@@ -143,4 +145,4 @@ try {
     Pop-Location
 }
 
-Write-Host "Built: $(Join-Path $out "Final Setup.exe")" -ForegroundColor Green
+Write-Host "Built: $(Join-Path $out "Codeuis Setup V2.exe")" -ForegroundColor Green

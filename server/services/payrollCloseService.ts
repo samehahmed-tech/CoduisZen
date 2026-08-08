@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '../db';
 import {
@@ -353,71 +353,120 @@ export const payrollCloseService = {
     },
 
     async closeCycle(input: { cycleId: string; closedBy?: string; notes?: string }) {
+        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, input.cycleId));
+        if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
+        if (cycle.status === 'CLOSED') throw new Error('PAYROLL_CYCLE_ALREADY_CLOSED');
+
+        const [existingRun] = await db.select({ id: payrollRuns.id }).top(1).from(payrollRuns)
+            .where(and(eq(payrollRuns.cycleId, input.cycleId), eq(payrollRuns.status, 'CLOSED')));
+        if (existingRun) throw new Error('PAYROLL_CYCLE_ALREADY_CLOSED');
+
         const preview = await this.previewCycle(input.cycleId);
         if (preview.totals.blockers > 0) {
             throw new Error(`PAYROLL_REVIEW_HAS_BLOCKERS:${preview.totals.blockers}`);
         }
-        const [cycle] = await db.select().top(1).from(payrollCycles).where(eq(payrollCycles.id, input.cycleId));
-        if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
-        const [run] = await db.insert(payrollRuns).output().values({
-            id: makeId('PRN'),
-            cycleId: input.cycleId,
-            branchId: cycle.branchId,
-            status: 'CLOSED',
-            totalEmployees: preview.totals.employees,
-            grossTotal: preview.totals.gross,
-            deductionsTotal: preview.totals.deductions,
-            netTotal: preview.totals.net,
-            createdBy: input.closedBy,
-            closedBy: input.closedBy,
-            closedAt: new Date(),
-            notes: input.notes,
-        });
-
-        for (const line of preview.lines) {
-            await db.insert(payrollRunLines).values({
-                id: makeId('PRL'),
-                runId: run.id,
-                employeeId: line.employeeId,
-                baseSalary: line.baseSalary,
-                overtime: line.overtime,
-                bonuses: line.bonuses,
-                penalties: line.penalties,
-                loanDeductions: line.loanDeductions,
-                otherDeductions: line.otherDeductions,
-                grossPay: line.grossPay,
-                netPay: line.netPay,
-                components: {
-                    fixedAllowances: line.fixedAllowances || 0,
-                    fixedDeductions: line.fixedDeductions || 0,
-                    attendanceDeductions: line.attendanceDeductions || 0,
-                    bonuses: line.bonuses,
-                    penalties: line.penalties,
-                    loanDeductions: line.loanDeductions,
-                    otherDeductions: line.otherDeductions,
-                },
-            });
-            await db.insert(payslips).values({
-                id: makeId('PSL'),
-                runId: run.id,
+        const run = await db.transaction(async (tx) => {
+            const [createdRun] = await tx.insert(payrollRuns).output().values({
+                id: makeId('PRN'),
                 cycleId: input.cycleId,
-                employeeId: line.employeeId,
-                payload: {
+                branchId: cycle.branchId,
+                status: 'CLOSED',
+                totalEmployees: preview.totals.employees,
+                grossTotal: preview.totals.gross,
+                deductionsTotal: preview.totals.deductions,
+                netTotal: preview.totals.net,
+                createdBy: input.closedBy,
+                closedBy: input.closedBy,
+                closedAt: new Date(),
+                notes: input.notes,
+            });
+
+            for (const line of preview.lines) {
+                await tx.insert(payrollRunLines).values({
+                    id: makeId('PRL'),
+                    runId: createdRun.id,
+                    employeeId: line.employeeId,
                     baseSalary: line.baseSalary,
                     overtime: line.overtime,
-                    fixedAllowances: line.fixedAllowances || 0,
-                    fixedDeductions: line.fixedDeductions || 0,
-                    attendanceDeductions: line.attendanceDeductions || 0,
                     bonuses: line.bonuses,
                     penalties: line.penalties,
                     loanDeductions: line.loanDeductions,
                     otherDeductions: line.otherDeductions,
                     grossPay: line.grossPay,
                     netPay: line.netPay,
-                },
-            });
-        }
+                    components: {
+                        fixedAllowances: line.fixedAllowances || 0,
+                        fixedDeductions: line.fixedDeductions || 0,
+                        attendanceDeductions: line.attendanceDeductions || 0,
+                        bonuses: line.bonuses,
+                        penalties: line.penalties,
+                        loanDeductions: line.loanDeductions,
+                        otherDeductions: line.otherDeductions,
+                    },
+                });
+                await tx.insert(payslips).values({
+                    id: makeId('PSL'),
+                    runId: createdRun.id,
+                    cycleId: input.cycleId,
+                    employeeId: line.employeeId,
+                    payload: {
+                        baseSalary: line.baseSalary,
+                        overtime: line.overtime,
+                        fixedAllowances: line.fixedAllowances || 0,
+                        fixedDeductions: line.fixedDeductions || 0,
+                        attendanceDeductions: line.attendanceDeductions || 0,
+                        bonuses: line.bonuses,
+                        penalties: line.penalties,
+                        loanDeductions: line.loanDeductions,
+                        otherDeductions: line.otherDeductions,
+                        grossPay: line.grossPay,
+                        netPay: line.netPay,
+                    },
+                });
+            }
+
+            await tx.update(bonusPenaltyRecords)
+                .set({ status: 'APPLIED', updatedAt: new Date() })
+                .where(and(
+                    eq(bonusPenaltyRecords.branchId, cycle.branchId),
+                    eq(bonusPenaltyRecords.status, 'APPROVED'),
+                    gte(bonusPenaltyRecords.effectiveDate, cycle.periodStart),
+                    lte(bonusPenaltyRecords.effectiveDate, cycle.periodEnd),
+                ));
+
+            const branchLoans = await tx.select({ id: employeeLoans.id }).from(employeeLoans)
+                .where(eq(employeeLoans.branchId, cycle.branchId));
+            if (branchLoans.length) {
+                await tx.update(loanInstallments)
+                    .set({ status: 'DEDUCTED', paidAt: new Date(), updatedAt: new Date() })
+                    .where(and(
+                        inArray(loanInstallments.loanId, branchLoans.map(loan => loan.id)),
+                        eq(loanInstallments.status, 'PENDING'),
+                        gte(loanInstallments.dueDate, cycle.periodStart),
+                        lte(loanInstallments.dueDate, cycle.periodEnd),
+                    ));
+            }
+
+            await tx.update(payrollCycles)
+                .set({ status: 'CLOSED', updatedAt: new Date() })
+                .where(eq(payrollCycles.id, input.cycleId));
+
+            const [existingLock] = await tx.select().top(1).from(payrollLocks)
+                .where(eq(payrollLocks.branchId, cycle.branchId));
+            const lockValues = {
+                lockedThrough: new Date(cycle.periodEnd),
+                lockedBy: input.closedBy,
+                reason: `Payroll cycle closed ${input.cycleId}`,
+                updatedAt: new Date(),
+            };
+            if (existingLock) {
+                await tx.update(payrollLocks).set(lockValues).where(eq(payrollLocks.id, existingLock.id));
+            } else {
+                await tx.insert(payrollLocks).values({ id: makeId('PRL'), branchId: cycle.branchId, ...lockValues });
+            }
+            return createdRun;
+        });
 
         const [profile] = await db.select().from(payrollProfiles)
             .where(and(
@@ -430,34 +479,6 @@ export const payrollCloseService = {
         if (profile?.autoPostToGl !== false) {
             await payrollGlPostingService.postPayrollRun(run.id, cycle.branchId, input.closedBy);
         }
-
-        await db.update(bonusPenaltyRecords)
-            .set({ status: 'APPLIED', updatedAt: new Date() })
-            .where(and(
-                eq(bonusPenaltyRecords.branchId, cycle.branchId),
-                eq(bonusPenaltyRecords.status, 'APPROVED'),
-                gte(bonusPenaltyRecords.effectiveDate, cycle.periodStart),
-                lte(bonusPenaltyRecords.effectiveDate, cycle.periodEnd),
-            ));
-
-        await db.update(loanInstallments)
-            .set({ status: 'DEDUCTED', paidAt: new Date(), updatedAt: new Date() })
-            .where(and(
-                eq(loanInstallments.status, 'PENDING'),
-                gte(loanInstallments.dueDate, cycle.periodStart),
-                lte(loanInstallments.dueDate, cycle.periodEnd),
-            ));
-
-        await db.update(payrollCycles)
-            .set({ status: 'CLOSED', updatedAt: new Date() })
-            .where(eq(payrollCycles.id, input.cycleId));
-
-        await this.setLock({
-            branchId: cycle.branchId,
-            lockedThrough: new Date(cycle.periodEnd),
-            lockedBy: input.closedBy,
-            reason: `Payroll cycle closed ${input.cycleId}`,
-        });
 
         await eventBusService.emitEvent({
             type: 'payroll.closed',

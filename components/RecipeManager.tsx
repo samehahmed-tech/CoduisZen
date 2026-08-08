@@ -93,7 +93,7 @@ const RecipeManager: React.FC = () => {
 
     const updateQuantity = (itemId: string, quantity: number) => {
         setCurrentRecipe(currentRecipe.map(ing =>
-            getIngredientItemId(ing) === itemId ? { ...ing, itemId, quantity: Math.max(0.001, quantity) } : ing
+            getIngredientItemId(ing) === itemId ? { ...ing, itemId, quantity } : ing
         ));
     };
 
@@ -272,7 +272,7 @@ const RecipeManager: React.FC = () => {
                                                 const ingredientItemId = getIngredientItemId(ing);
                                                 const invItem = inventory.find(i => i.id === ingredientItemId);
                                                 return (
-                                                    <div key={ingredientItemId} className="flex items-center gap-5 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border-2 border-transparent hover:border-indigo-600/20 transition-all group">
+                                                    <div key={`${selectedSizeId || 'base'}-${ingredientItemId}`} className="flex items-center gap-5 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border-2 border-transparent hover:border-indigo-600/20 transition-all group">
                                                         <div className="w-12 h-12 rounded-2xl card-primary flex items-center justify-center text-slate-400 group-hover:text-indigo-600 shadow-sm">
                                                             <Package size={24} />
                                                         </div>
@@ -288,10 +288,17 @@ const RecipeManager: React.FC = () => {
                                                             <input
                                                                 type="number"
                                                                 className="w-20 card-primary border-2 border-slate-100 dark:border-slate-700 rounded-xl py-2 px-3 font-black text-xs text-center focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all outline-none"
-                                                                value={ing.quantity}
+                                                                defaultValue={ing.quantity}
                                                                 min="0.001"
                                                                 step="0.001"
-                                                                onChange={e => updateQuantity(ingredientItemId, parseFloat(e.target.value) || 0)}
+                                                                onBlur={e => {
+                                                                    const quantity = e.currentTarget.valueAsNumber;
+                                                                    if (!Number.isFinite(quantity) || quantity < 0.001) {
+                                                                        e.currentTarget.value = String(ing.quantity);
+                                                                        return;
+                                                                    }
+                                                                    updateQuantity(ingredientItemId, quantity);
+                                                                }}
                                                             />
                                                             <span className="text-[10px] font-black text-slate-400 uppercase w-10">{ing.unit}</span>
                                                         </div>

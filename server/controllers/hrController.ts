@@ -1,12 +1,40 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { employees, attendance, payrollCycles, payrollPayouts, users } from '../../src/db/schema';
+import { employees, attendance, departments, jobTitles, payrollCycles, payrollPayouts, users } from '../../src/db/schema';
 import { count, desc, eq, and, gte, lte, or, sql, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import logger from '../utils/logger';
 import { GLService } from '../services/glService';
 
 const likeSearch = (column: any, search: string) => sql`LOWER(${column}) LIKE ${`%${search.toLowerCase()}%`}`;
+
+const employeeInputError = (message: string) => Object.assign(new Error(message), { status: 400 });
+
+const validateEmployeeInput = async (data: any, branchId: string, creating: boolean) => {
+    if (creating && !String(data.name || '').trim()) throw employeeInputError('EMPLOYEE_NAME_REQUIRED');
+    for (const value of [data.basicSalary ?? data.salary, data.hourlyRate]) {
+        if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+            throw employeeInputError('INVALID_EMPLOYEE_COMPENSATION');
+        }
+    }
+    const joinedAt = data.joinedAt ?? data.employmentDate;
+    if (joinedAt && Number.isNaN(new Date(joinedAt).getTime())) throw employeeInputError('INVALID_EMPLOYMENT_DATE');
+
+    const departmentId = data.departmentId ?? data.department_id;
+    const jobTitleId = data.jobTitleId ?? data.job_title_id;
+    const [department] = departmentId
+        ? await db.select().from(departments).where(eq(departments.id, String(departmentId))).limit(1)
+        : [];
+    if (departmentId && (!department || (department.branchId && department.branchId !== branchId))) {
+        throw employeeInputError('INVALID_EMPLOYEE_DEPARTMENT');
+    }
+    const [jobTitle] = jobTitleId
+        ? await db.select().from(jobTitles).where(eq(jobTitles.id, String(jobTitleId))).limit(1)
+        : [];
+    if (jobTitleId && (!jobTitle || (jobTitle.departmentId && jobTitle.departmentId !== departmentId))) {
+        throw employeeInputError('INVALID_EMPLOYEE_JOB_TITLE');
+    }
+};
 
 // ============================================================================
 // Employees
@@ -66,6 +94,7 @@ export const upsertEmployee = async (req: Request, res: Response) => {
         }
         const targetBranchId = req.effectiveBranchId || data.branchId || existingEmployee?.branchId;
         if (!targetBranchId) return res.status(400).json({ error: 'Branch is required' });
+        await validateEmployeeInput(existingEmployee ? { ...existingEmployee, ...data } : data, targetBranchId, !existingEmployee);
 
         if (existingEmployee) {
             const employeeCode = data.employeeCode ?? data.employee_code ?? existingEmployee.employeeCode;
@@ -128,7 +157,7 @@ export const upsertEmployee = async (req: Request, res: Response) => {
         }
     } catch (error: any) {
         logger.error({ err: error }, 'Error upserting employee');
-        res.status(500).json({ error: 'Failed to save employee' });
+        res.status(error?.status || 500).json({ error: error?.status ? error.message : 'Failed to save employee' });
     }
 };
 

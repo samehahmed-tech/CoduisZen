@@ -412,56 +412,56 @@ export const payrollCalculationService = {
     async calculateCycle(cycleId: string) {
         const { cycle, lines, totalAmount } = await buildCycleCalculation(cycleId);
 
-        for (const line of lines) {
-            const [existing] = await db.select().top(1).from(payrollPayouts)
-                .where(and(eq(payrollPayouts.cycleId, cycle.id), eq(payrollPayouts.employeeId, line.employeeId)));
+        await db.transaction(async (tx) => {
+            for (const line of lines) {
+                const [existing] = await tx.select().top(1).from(payrollPayouts)
+                    .where(and(eq(payrollPayouts.cycleId, cycle.id), eq(payrollPayouts.employeeId, line.employeeId)));
 
-            if (existing) {
-                await db.update(payrollPayouts)
-                    .set({
+                if (existing) {
+                    await tx.update(payrollPayouts)
+                        .set({
+                            basicSalary: line.baseSalary,
+                            overtime: line.overtime,
+                            deductions: line.deductions,
+                            netPay: line.netPay,
+                            status: 'PENDING',
+                        })
+                        .where(eq(payrollPayouts.id, existing.id));
+                } else {
+                    await tx.insert(payrollPayouts).values({
+                        id: makeId('PPO'),
+                        cycleId: cycle.id,
+                        employeeId: line.employeeId,
                         basicSalary: line.baseSalary,
                         overtime: line.overtime,
                         deductions: line.deductions,
                         netPay: line.netPay,
                         status: 'PENDING',
-                    })
-                    .where(eq(payrollPayouts.id, existing.id));
-            } else {
-                await db.insert(payrollPayouts).values({
-                    id: makeId('PPO'),
-                    cycleId: cycle.id,
-                    employeeId: line.employeeId,
-                    basicSalary: line.baseSalary,
-                    overtime: line.overtime,
-                    deductions: line.deductions,
-                    netPay: line.netPay,
-                    status: 'PENDING',
-                });
-            }
-        }
+                    });
+                }
 
-        for (const line of lines) {
-            if (line.adjustments.bonusPenaltyIds.length) {
-                await db.update(bonusPenaltyRecords)
-                    .set({ payrollCycleId: cycle.id, updatedAt: new Date() })
-                    .where(inArray(bonusPenaltyRecords.id, line.adjustments.bonusPenaltyIds));
+                if (line.adjustments.bonusPenaltyIds.length) {
+                    await tx.update(bonusPenaltyRecords)
+                        .set({ payrollCycleId: cycle.id, updatedAt: new Date() })
+                        .where(inArray(bonusPenaltyRecords.id, line.adjustments.bonusPenaltyIds));
+                }
+
+                if (line.adjustments.loanInstallmentIds.length) {
+                    await tx.update(loanInstallments)
+                        .set({
+                            status: 'PAID',
+                            payrollCycleId: cycle.id,
+                            paidAt: new Date(),
+                            updatedAt: new Date(),
+                        })
+                        .where(inArray(loanInstallments.id, line.adjustments.loanInstallmentIds));
+                }
             }
 
-            if (line.adjustments.loanInstallmentIds.length) {
-                await db.update(loanInstallments)
-                    .set({
-                        status: 'PAID',
-                        payrollCycleId: cycle.id,
-                        paidAt: new Date(),
-                        updatedAt: new Date(),
-                    })
-                    .where(inArray(loanInstallments.id, line.adjustments.loanInstallmentIds));
-            }
-        }
-
-        await db.update(payrollCycles)
-            .set({ totalAmount, updatedAt: new Date() })
-            .where(eq(payrollCycles.id, cycle.id));
+            await tx.update(payrollCycles)
+                .set({ totalAmount, updatedAt: new Date() })
+                .where(eq(payrollCycles.id, cycle.id));
+        });
 
         await eventBusService.emitEvent({
             type: 'payroll.calculated',

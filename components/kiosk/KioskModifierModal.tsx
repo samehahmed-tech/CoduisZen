@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Plus, Minus, Info } from 'lucide-react';
-import { MenuItem, ModifierGroup, ModifierOption } from '../../types';
+import React, { useMemo, useState } from 'react';
+import { Check, Minus, Plus, X } from 'lucide-react';
+import { MenuItem, ModifierOption } from '../../types';
 
 interface KioskModifierModalProps {
   item: MenuItem;
@@ -11,192 +10,126 @@ interface KioskModifierModalProps {
   currency: string;
 }
 
-const KioskModifierModal: React.FC<KioskModifierModalProps> = ({ 
-  item, 
-  onClose, 
-  onConfirm, 
-  lang, 
-  currency 
-}) => {
+const KioskModifierModal: React.FC<KioskModifierModalProps> = ({ item, onClose, onConfirm, lang, currency }) => {
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [error, setError] = useState('');
   const isAr = lang === 'ar';
   const tr = (en: string, ar: string) => isAr ? ar : en;
 
-  const handleToggleOption = (groupId: string, option: ModifierOption, max: number) => {
-    setSelections(prev => {
-      const current = prev[groupId] || [];
+  const toggleOption = (groupId: string, option: ModifierOption, maxSelection: number) => {
+    setSelections(currentSelections => {
+      const current = currentSelections[groupId] || [];
       if (current.includes(option.id)) {
-        return { ...prev, [groupId]: current.filter(id => id !== option.id) };
+        setError('');
+        return { ...currentSelections, [groupId]: current.filter(id => id !== option.id) };
       }
-      if (max === 1) {
-        return { ...prev, [groupId]: [option.id] };
+      if (maxSelection === 1) {
+        setError('');
+        return { ...currentSelections, [groupId]: [option.id] };
       }
-      if (current.length < max) {
-        return { ...prev, [groupId]: [...current, option.id] };
+      if (current.length >= maxSelection) {
+        setError(tr(`Choose up to ${maxSelection} options.`, `اختار بحد أقصى ${maxSelection}.`));
+        return currentSelections;
       }
-      return prev;
+      setError('');
+      return { ...currentSelections, [groupId]: [...current, option.id] };
     });
   };
 
-  const totalPrice = useMemo(() => {
-    let extra = 0;
-    Object.entries(selections).forEach(([groupId, optionIds]) => {
-      const group = item.modifierGroups?.find(g => g.id === groupId);
-      optionIds.forEach(id => {
-        const option = group?.options.find(o => o.id === id);
-        if (option) extra += option.price;
+  const selectedModifiers = useMemo(() => (
+    Object.entries(selections).flatMap(([groupId, optionIds]) => {
+      const group = item.modifierGroups?.find(candidate => candidate.id === groupId);
+      return optionIds.flatMap(optionId => {
+        const option = group?.options.find(candidate => candidate.id === optionId);
+        return option ? [{ ...option, groupId }] : [];
       });
-    });
-    return (item.price + extra) * quantity;
-  }, [item, selections, quantity]);
+    })
+  ), [item.modifierGroups, selections]);
 
-  const missingRequiredGroups = useMemo(
-    () => (item.modifierGroups || []).filter(group => (selections[group.id]?.length || 0) < group.minSelection),
-    [item.modifierGroups, selections]
-  );
+  const total = useMemo(() => (
+    (Number(item.price || 0) + selectedModifiers.reduce((sum, option) => sum + Number(option.price || 0), 0)) * quantity
+  ), [item.price, quantity, selectedModifiers]);
 
-  const handleConfirm = () => {
-    if (missingRequiredGroups.length > 0) {
-      setError(tr('Please complete the required choices.', 'من فضلك أكمل الاختيارات المطلوبة.'));
+  const confirm = () => {
+    const missingGroup = (item.modifierGroups || []).find(group => (
+      (selections[group.id]?.length || 0) < Number(group.minSelection || 0)
+    ));
+    if (missingGroup) {
+      const groupName = isAr ? missingGroup.nameAr || missingGroup.name : missingGroup.name;
+      setError(tr(`Complete the required choices in ${groupName}.`, `كمل الاختيارات المطلوبة في ${groupName}.`));
       return;
     }
-    const finalModifiers: any[] = [];
-    Object.entries(selections).forEach(([groupId, optionIds]) => {
-      const group = item.modifierGroups?.find(g => g.id === groupId);
-      optionIds.forEach(id => {
-        const opt = group?.options.find(o => o.id === id);
-        if (opt) finalModifiers.push({ ...opt, groupId });
-      });
-    });
-    onConfirm(item, finalModifiers, quantity);
+    onConfirm(item, selectedModifiers, quantity);
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-app/80 backdrop-blur-xl"
-    >
-      <motion.div 
-        initial={{ scale: 0.9, y: 30 }}
-        animate={{ scale: 1, y: 0 }}
-        className="glass-panel w-full max-w-6xl h-[92vh] rounded-[32px] lg:rounded-[52px] flex flex-col overflow-hidden"
-      >
-        {/* Header */}
-        <div className="p-5 sm:p-8 border-b border-border/50 flex items-center justify-between gap-4 kiosk-plate text-white">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-3xl bg-black/30 overflow-hidden shadow-2xl shrink-0">
-              {item.image ? (
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-4xl">🍱</div>
-              )}
-            </div>
+    <div className="kiosk-modifier-overlay" role="dialog" aria-modal="true" aria-labelledby="kiosk-modifier-title">
+      <section className="kiosk-modifier-panel">
+        <header>
+          <div className="kiosk-modifier-product">
+            {item.image ? <img src={item.image} alt="" /> : null}
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black mb-2 line-clamp-1">{isAr ? (item.nameAr || item.name) : item.name}</h2>
-              <p className="text-white/65 font-medium line-clamp-2">{isAr ? (item.descriptionAr || item.description) : item.description}</p>
+              <p className="kiosk-eyebrow">{tr('Customize item', 'ظبط الصنف')}</p>
+              <h2 id="kiosk-modifier-title">{isAr ? item.nameAr || item.name : item.name}</h2>
+              <span>{Number(item.price || 0).toLocaleString()} {currency}</span>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-white/12 border border-white/10 flex items-center justify-center text-white active:scale-90 transition-transform shrink-0"
-          >
-            <X size={32} />
-          </button>
-        </div>
+          <button type="button" onClick={onClose} aria-label={tr('Close', 'إغلاق')} className="kiosk-close-button"><X size={26} /></button>
+        </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-8 no-scrollbar">
-          {item.modifierGroups?.map((group) => (
-            <section key={group.id} className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight">{isAr ? (group.nameAr || group.name) : group.name}</h3>
-                  <div className="flex items-center gap-2 kiosk-accent mt-2 font-bold uppercase tracking-wider text-xs">
-                    <Info size={14} />
-                    <span>{tr('Select', 'اختر')} {group.minSelection} {tr('to', 'إلى')} {group.maxSelection}</span>
-                  </div>
+        <div className="kiosk-modifier-content">
+          {(item.modifierGroups || []).map(group => {
+            const selectedCount = selections[group.id]?.length || 0;
+            const minSelection = Number(group.minSelection || 0);
+            const maxSelection = Math.max(1, Number(group.maxSelection || 1));
+            return (
+              <fieldset key={group.id} className="kiosk-modifier-group">
+                <legend>
+                  <span>{isAr ? group.nameAr || group.name : group.name}</span>
+                  <small>{minSelection > 0 ? tr(`Required · ${minSelection}–${maxSelection}`, `مطلوب · من ${minSelection} إلى ${maxSelection}`) : tr(`Up to ${maxSelection}`, `حتى ${maxSelection}`)}</small>
+                </legend>
+                <div className="kiosk-option-grid">
+                  {group.options.filter(option => option.isAvailable !== false).map(option => {
+                    const selected = selections[group.id]?.includes(option.id) || false;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => toggleOption(group.id, option, maxSelection)}
+                      >
+                        <span className="kiosk-option-check">{selected ? <Check size={20} /> : null}</span>
+                        <strong>{isAr ? option.nameAr || option.name : option.name}</strong>
+                        <small>{Number(option.price || 0) > 0 ? `+${Number(option.price).toLocaleString()} ${currency}` : tr('No extra charge', 'بدون زيادة')}</small>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
+                <p>{selectedCount} / {maxSelection}</p>
+              </fieldset>
+            );
+          })}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {group.options.map((opt) => {
-                  const isSelected = selections[group.id]?.includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => handleToggleOption(group.id, opt, group.maxSelection)}
-                      className={`relative min-h-[128px] flex flex-col items-center justify-center gap-2 p-4 rounded-[24px] border-2 text-center transition-all duration-300 ${
-                        isSelected 
-                          ? 'kiosk-soft border-primary/60 shadow-lg'
-                          : 'kiosk-choice hover:border-primary/25'
-                      }`}
-                    >
-                      <div className="text-4xl">{['🧀', '🍄', '🌶️', '🫒', '🍅', '🥩'][Math.abs(opt.id.length) % 6]}</div>
-                      <div>
-                        <p className="font-black text-base leading-tight">{isAr ? (opt.nameAr || opt.name) : opt.name}</p>
-                        {opt.price > 0 && (
-                          <p className="kiosk-accent font-bold">+{opt.price} {currency}</p>
-                        )}
-                      </div>
-                      <div className={`absolute right-3 top-3 h-8 w-8 rounded-full flex items-center justify-center transition-all ${
-                        isSelected ? 'kiosk-accent-bg text-white scale-110' : 'bg-elevated text-transparent'
-                      }`}>
-                        <Check size={24} strokeWidth={4} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-          
-          {/* Quantity Section */}
-          <section className="kiosk-surface p-5 sm:p-8 rounded-[32px] flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-            <div className="space-y-1">
-              <h3 className="text-2xl sm:text-3xl font-black tracking-tight">{tr('Quantity', 'الكمية')}</h3>
-              <p className="kiosk-muted font-medium">{tr('How many would you like?', 'تحب كام قطعة؟')}</p>
-            </div>
-            <div className="flex items-center gap-5 kiosk-surface p-3 rounded-3xl">
-              <button 
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="h-14 w-14 rounded-2xl bg-card border border-border flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <Minus size={32} />
-              </button>
-              <span className="text-4xl font-black min-w-[64px] text-center">{quantity}</span>
-              <button 
-                onClick={() => setQuantity(quantity + 1)}
-                className="h-14 w-14 rounded-2xl kiosk-btn-primary flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <Plus size={32} />
-              </button>
+          <section className="kiosk-modifier-quantity">
+            <div><strong>{tr('Quantity', 'الكمية')}</strong><span>{tr('Choose how many you want', 'حدد العدد المطلوب')}</span></div>
+            <div className="kiosk-quantity-control">
+              <button type="button" onClick={() => setQuantity(current => Math.max(1, current - 1))} aria-label={tr('Decrease', 'تقليل')}><Minus size={22} /></button>
+              <span>{quantity}</span>
+              <button type="button" onClick={() => setQuantity(current => Math.min(99, current + 1))} aria-label={tr('Increase', 'زيادة')}><Plus size={22} /></button>
             </div>
           </section>
         </div>
 
-        {/* Footer */}
-        <div className="p-5 sm:p-8 border-t border-border/50 bg-elevated/20 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+        <footer>
+          <div><span>{tr('Item total', 'إجمالي الصنف')}</span><strong>{total.toLocaleString()} {currency}</strong></div>
           <div>
-            <p className="kiosk-muted font-bold uppercase tracking-widest text-sm mb-1">{tr('Total for items', 'إجمالي الأصناف')}</p>
-            <p className="text-3xl sm:text-4xl font-black kiosk-accent">
-              {totalPrice.toLocaleString()} <small className="text-xl font-bold uppercase">{currency}</small>
-            </p>
-            {error && <p className="mt-3 text-sm font-black text-rose-400">{error}</p>}
+            {error && <p role="alert">{error}</p>}
+            <button type="button" onClick={confirm} className="kiosk-primary-action"><Plus size={22} />{tr('Add to order', 'أضف للطلب')}</button>
           </div>
-          <button
-            onClick={handleConfirm}
-            className="h-16 sm:h-20 w-full sm:w-auto px-8 sm:px-12 rounded-[24px] kiosk-btn-primary text-xl sm:text-2xl active:scale-95 flex items-center justify-center gap-3"
-          >
-            {tr('Add to Bag', 'إضافة للطلب')}
-            <Plus size={36} strokeWidth={3} />
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+        </footer>
+      </section>
+    </div>
   );
 };
 

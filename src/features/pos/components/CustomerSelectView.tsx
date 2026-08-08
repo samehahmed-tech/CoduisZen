@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Truck, Search, Plus, MapPin, Phone, ArrowRight, Loader2, Save, Store, Globe2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Users, Truck, Search, Plus, MapPin, Phone, ArrowRight, Loader2, Save, Store, Globe2, AlertCircle } from 'lucide-react';
 import { Customer, DeliveryPlatform } from '@/types';
 import { useCRMStore } from '@/stores/useCRMStore';
 import AddressMapPicker from '@/components/common/AddressMapPicker';
 import { useToast } from '@/components/common/ToastProvider';
+import { useConfirm } from '@/components/common/ConfirmProvider';
+import { isPlatformDeliveryValid } from '../platformDeliveryValidation';
 
 interface CustomerSelectViewProps {
     customers: Customer[];
@@ -44,12 +46,14 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
 }) => {
     const isRTL = lang === 'ar';
     const { error: showError } = useToast();
+    const confirm = useConfirm();
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [apiResults, setApiResults] = useState<Customer[]>([]);
     const searchCustomers = useCRMStore(state => state.searchCustomers);
     const addCustomer = useCRMStore(state => state.addCustomer);
     const activePlatforms = deliveryPlatforms.filter((platform: any) => platform.isActive !== false);
+    const searchAbortRef = useRef<AbortController | null>(null);
     const sourceOptions = [
         {
             id: 'restaurant',
@@ -96,15 +100,34 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
     useEffect(() => {
         const handler = setTimeout(async () => {
             if (searchQuery.trim().length > 2) {
+                // Abort previous request
+                searchAbortRef.current?.abort();
+                const controller = new AbortController();
+                searchAbortRef.current = controller;
+
                 setIsSearching(true);
-                const results = await searchCustomers(searchQuery);
-                setApiResults(results);
-                setIsSearching(false);
+                try {
+                    const results = await searchCustomers(searchQuery);
+                    // Only update if this request wasn't aborted
+                    if (!controller.signal.aborted) {
+                        setApiResults(results);
+                        setIsSearching(false);
+                    }
+                } catch (err) {
+                    if (!controller.signal.aborted) {
+                        setIsSearching(false);
+                        setApiResults([]);
+                    }
+                }
             } else {
                 setApiResults([]);
+                setIsSearching(false);
             }
         }, 500);
-        return () => clearTimeout(handler);
+        return () => {
+            clearTimeout(handler);
+            searchAbortRef.current?.abort();
+        };
     }, [searchQuery, searchCustomers]);
 
     const activeCustomers = searchQuery.trim().length > 2 ? apiResults : customers.filter(c => 
@@ -293,31 +316,31 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-black tracking-widest text-muted uppercase mb-2">
-                                            {isRTL ? 'اسم العميل من المنصة' : 'Platform customer name'}
+                                            {isRTL ? 'اسم العميل من المنصة *' : 'Platform customer name *'}
                                         </label>
                                         <input
                                             value={platformDeliveryDraft.customerName}
                                             onChange={(event) => patchPlatformDraft({ customerName: event.target.value })}
                                             className="w-full h-14 bg-card border border-border/20 rounded-xl px-5 text-sm font-bold outline-none focus:border-orange-500"
-                                            placeholder={isRTL ? 'اختياري' : 'Optional'}
+                                            placeholder={isRTL ? 'مطلوب' : 'Required'}
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black tracking-widest text-muted uppercase mb-2">
-                                            {isRTL ? 'هاتف العميل' : 'Customer phone'}
+                                            {isRTL ? 'هاتف العميل *' : 'Customer phone *'}
                                         </label>
                                         <input
                                             value={platformDeliveryDraft.customerPhone}
                                             onChange={(event) => patchPlatformDraft({ customerPhone: event.target.value })}
                                             className="w-full h-14 bg-card border border-border/20 rounded-xl px-5 text-sm font-bold outline-none focus:border-orange-500"
-                                            placeholder={isRTL ? 'لو ظاهر في طلبات' : 'If visible in platform'}
+                                            placeholder={isRTL ? 'مطلوب للتواصل' : 'Required for contact'}
                                         />
                                     </div>
                                 </div>
 
                                 <div>
                                     <label className="block text-[10px] font-black tracking-widest text-muted uppercase mb-2">
-                                        {isRTL ? 'عنوان التسليم / ملاحظات العنوان' : 'Delivery address / address notes'}
+                                        {isRTL ? 'عنوان التسليم / ملاحظات العنوان *' : 'Delivery address / address notes *'}
                                     </label>
                                     <textarea
                                         value={platformDeliveryDraft.address}
@@ -342,7 +365,7 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
                                 <button
                                     type="button"
                                     onClick={onUsePlatformDelivery}
-                                    disabled={!externalOrderNumber.trim()}
+                                    disabled={!isPlatformDeliveryValid(externalOrderNumber, platformDeliveryDraft)}
                                     className="w-full h-14 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-xl font-black uppercase text-xs tracking-wider transition-all shadow-lg shadow-orange-600/20 active:scale-95"
                                 >
                                     {isRTL ? 'متابعة أوردر المنصة' : 'Continue Platform Order'}

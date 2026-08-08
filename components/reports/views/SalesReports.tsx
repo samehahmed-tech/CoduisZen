@@ -163,10 +163,41 @@ export const SalesReports = ({ state }: any) => {
                   </div>
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Refunds' && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
-                        <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Refunds and Returned Orders</h3></div>
-                        <div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Order</th><th className="px-6 py-5 text-left">Reason</th><th className="px-6 py-5 text-left">Status</th><th className="px-6 py-5 text-right">Date</th><th className="px-8 py-5 text-right">Amount</th></tr></thead><tbody className="divide-y divide-border/30">{refunds.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 font-mono text-muted">{r.orderNumber || r.id}</td><td className="px-6 py-4 text-xs text-main">{r.cancelReason || r.refundReason || '-'}</td><td className="px-6 py-4"><span className="px-2 py-1 rounded-lg bg-rose-500/10 text-rose-500 text-[9px] font-black uppercase">{r.status || 'REFUNDED'}</span></td><td className="px-6 py-4 font-mono text-[10px] text-muted text-right">{r.cancelledAt || r.refundedAt || r.createdAt ? new Date(r.cancelledAt || r.refundedAt || r.createdAt).toLocaleString() : '-'}</td><td className="px-8 py-4 font-mono font-bold text-rose-500 text-right">{Number(r.total || r.amount || r.refundAmount || 0).toLocaleString()} {currencySymbol}</td></tr>)}</tbody></table></div>
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+                         <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                            <h3 className="text-xl font-black text-main">{lang === 'ar' ? 'تفاصيل المرتجعات والطلبات الملغاة' : 'Refunds and Cancelled Orders'}</h3>
+                            <p className="mt-1 text-xs font-bold text-muted">{lang === 'ar' ? 'تاريخ الطلب ووقت الإلغاء والسبب وبيانات العميل للمراجعة.' : 'Order date, cancellation time, reason, and customer details for audit.'}</p>
+                         </div>
+                         <div className="responsive-table">
+                            <table className="w-full min-w-[1080px] text-xs">
+                               <thead><tr className="bg-elevated/20 text-muted text-[10px] font-black">
+                                  <th className="px-5 py-4 text-start">{lang === 'ar' ? 'رقم الطلب' : 'Order'}</th>
+                                  <th className="px-5 py-4 text-start">{lang === 'ar' ? 'النوع' : 'Type'}</th>
+                                  <th className="px-5 py-4 text-start">{lang === 'ar' ? 'تاريخ الطلب' : 'Order date'}</th>
+                                  <th className="px-5 py-4 text-start">{lang === 'ar' ? 'وقت الإلغاء' : 'Cancelled at'}</th>
+                                  <th className="px-5 py-4 text-start">{lang === 'ar' ? 'سبب الإلغاء' : 'Reason'}</th>
+                                  <th className="px-5 py-4 text-start">{lang === 'ar' ? 'العميل' : 'Customer'}</th>
+                                  <th className="px-5 py-4 text-center">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+                                  <th className="px-5 py-4 text-end">{lang === 'ar' ? 'القيمة' : 'Amount'}</th>
+                               </tr></thead>
+                               <tbody className="divide-y divide-border/30">{refunds.map((r: any, i: number) => {
+                                  const createdAt = r.createdAt ? new Date(r.createdAt) : null;
+                                  const cancelledAt = r.cancelledAt || r.refundedAt ? new Date(r.cancelledAt || r.refundedAt) : null;
+                                  const locale = lang === 'ar' ? 'ar-EG' : 'en-GB';
+                                  return <tr key={r.id || i} className="hover:bg-elevated/40 transition-colors align-top">
+                                     <td className="px-5 py-4 font-mono font-black text-main" dir="ltr">#{r.orderNumber || String(r.id || '').slice(0, 8)}</td>
+                                     <td className="px-5 py-4 font-bold text-main">{r.orderType || '-'}</td>
+                                     <td className="px-5 py-4 text-muted"><span className="block whitespace-nowrap">{createdAt ? createdAt.toLocaleDateString(locale) : (r.businessDate || '-')}</span><span className="block whitespace-nowrap text-[10px]">{createdAt ? createdAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : ''}</span></td>
+                                     <td className="px-5 py-4 text-muted"><span className="block whitespace-nowrap">{cancelledAt ? cancelledAt.toLocaleDateString(locale) : '-'}</span><span className="block whitespace-nowrap text-[10px] font-bold text-rose-500">{cancelledAt ? cancelledAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : ''}</span></td>
+                                     <td className="px-5 py-4 min-w-[180px] whitespace-normal font-bold text-main">{r.cancelReason || r.refundReason || (lang === 'ar' ? 'لم يُسجل سبب' : 'No reason recorded')}</td>
+                                     <td className="px-5 py-4"><span className="block font-bold text-main">{r.customerName || '-'}</span>{r.customerPhone && <span className="block font-mono text-[10px] text-muted" dir="ltr">{r.customerPhone}</span>}</td>
+                                     <td className="px-5 py-4 text-center"><span className="inline-flex px-2 py-1 rounded-lg bg-rose-500/10 text-rose-500 text-[9px] font-black uppercase">{r.status || 'REFUNDED'}</span></td>
+                                     <td className="px-5 py-4 font-mono font-black text-rose-500 text-end whitespace-nowrap" dir="ltr">{Number(r.total || r.amount || r.refundAmount || 0).toLocaleString()} {currencySymbol}</td>
+                                  </tr>;
+                               })}</tbody>
+                            </table>
+                         </div>
                         {refunds.length === 0 && <p className="text-center text-muted py-16">{t.no_data}</p>}
                      </div>
                   </div>
@@ -336,16 +367,17 @@ export const SalesReports = ({ state }: any) => {
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800"><h3 className="text-lg font-black text-main">{t.cancelled_order_log}</h3></div>
                         <div className="responsive-table">
                            <table className="w-full text-xs">
-                              <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
-                                 <th className="px-8 py-5 text-left">#</th><th className="px-6 py-5 text-left">{t.type}</th><th className="px-6 py-5 text-left">{t.customer}</th><th className="px-6 py-5 text-right">{t.total}</th><th className="px-6 py-5 text-left">{t.reason}</th><th className="px-8 py-5 text-right">{t.when}</th>
+                              <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.12em]">
+                                 <th className="px-5 py-5 text-start">#</th><th className="px-5 py-5 text-start">{t.type}</th><th className="px-5 py-5 text-start">{lang === 'ar' ? 'تاريخ الطلب' : 'Order date'}</th><th className="px-5 py-5 text-start">{t.customer}</th><th className="px-5 py-5 text-end">{t.total}</th><th className="px-5 py-5 text-start">{t.reason}</th><th className="px-5 py-5 text-start">{lang === 'ar' ? 'وقت الإلغاء' : 'Cancelled at'}</th>
                               </tr></thead>
                               <tbody className="divide-y divide-border/30">
                                  {cancelledOrders.orders.map((row: any, idx: number) => (
                                     <tr key={idx} className="hover:bg-elevated/40 transition-colors">
                                        <td className="px-8 py-4 font-mono text-muted">{row.orderNumber}</td>
                                        <td className="px-6 py-4"><span className="px-2 py-1 bg-slate-500/10 rounded-lg text-[9px] font-black uppercase">{row.type}</span></td>
+                                       <td className="px-5 py-4 text-xs whitespace-nowrap">{row.createdAt ? new Date(row.createdAt).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US') : '—'}</td>
                                        <td className="px-6 py-4 text-xs">{row.customerName || '—'}</td>
-                                       <td className="px-6 py-4 font-mono font-bold text-rose-500 text-right">{row.total.toLocaleString()} {currencySymbol}</td>
+                                       <td className="px-5 py-4 font-mono font-bold text-rose-500 text-end whitespace-nowrap" dir="ltr">{row.total.toLocaleString()} {currencySymbol}</td>
                                        <td className="px-6 py-4 text-xs text-muted">{row.cancelReason || '—'}</td>
                                        <td className="px-8 py-4 font-mono text-[10px] text-muted text-right">{row.cancelledAt ? new Date(row.cancelledAt).toLocaleString() : '—'}</td>
                                     </tr>
@@ -359,7 +391,7 @@ export const SalesReports = ({ state }: any) => {
                {activeCategory === 'SALES' && activeSubReport === 'Cancelled Orders' && !cancelledOrders && (
                   <p className="text-center text-muted py-16">{t.no_data}</p>
                )}
-               {activeCategory === 'SALES' && activeSubReport === 'Sales by Source' && (
+                {activeCategory === 'SALES' && activeSubReport === 'Sales by Source' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {salesBySource.map((row, idx) => (
@@ -377,8 +409,24 @@ export const SalesReports = ({ state }: any) => {
                      </div>
                      {salesBySource.length === 0 && <p className="text-center text-muted py-16">{t.no_data}</p>}
                   </div>
-               )}
-               {activeCategory === 'SALES' && activeSubReport === 'Peak Hours Heatmap' && (
+                )}
+                {activeCategory === 'SALES' && activeSubReport === 'Dine-in Tables' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+                         <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                            <h3 className="text-lg font-black text-main">{lang === 'ar' ? 'أداء الطاولات' : 'Dine-in Table Performance'}</h3>
+                         </div>
+                         <div className="responsive-table">
+                            <table className="w-full text-xs">
+                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">{lang === 'ar' ? 'الطاولة' : 'Table'}</th><th className="px-4 py-5 text-left">{lang === 'ar' ? 'المنطقة' : 'Zone'}</th><th className="px-4 py-5 text-right">{t.orders}</th><th className="px-4 py-5 text-right">{t.revenue}</th><th className="px-4 py-5 text-right">{t.avg_ticket}</th><th className="px-4 py-5 text-right">{lang === 'ar' ? 'المدة' : 'Duration'}</th><th className="px-6 py-5 text-right">{lang === 'ar' ? 'الخصم' : 'Discount'}</th></tr></thead>
+                               <tbody className="divide-y divide-border/30">{dineInTables.map((row: any) => <tr key={row.tableId} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 font-black text-main">{row.tableName || row.tableId}</td><td className="px-4 py-4 text-muted">{row.zoneName || '—'}</td><td className="px-4 py-4 font-mono text-right">{row.orderCount}</td><td className="px-4 py-4 font-mono text-right">{row.revenue.toLocaleString()} {currencySymbol}</td><td className="px-4 py-4 font-mono text-right">{row.avgTicket} {currencySymbol}</td><td className="px-4 py-4 font-mono text-right">{row.avgDurationMinutes} min</td><td className="px-6 py-4 font-mono text-right">{row.totalDiscount.toLocaleString()} {currencySymbol} ({row.discountRate}%)</td></tr>)}</tbody>
+                            </table>
+                         </div>
+                      </div>
+                      {dineInTables.length === 0 && <p className="text-center text-muted py-16">{t.no_data}</p>}
+                   </div>
+                )}
+                {activeCategory === 'SALES' && activeSubReport === 'Peak Hours Heatmap' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8">
                         <h3 className="text-xl font-black text-main mb-6">{t.peak_hours_heatmap}</h3>

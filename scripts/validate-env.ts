@@ -32,6 +32,7 @@ const ENV_RULES: EnvRule[] = [
         validate: (v) => v.length >= 16
     },
     { key: 'AI_KEY_ENCRYPTION_SECRET', required: false, description: 'AI API key encryption secret', category: 'Security' },
+    { key: 'GROQ_API_KEY', required: false, description: 'Groq API key (gsk_...) for the smart assistant', category: 'AI' },
     {
         key: 'PRINT_GATEWAY_TOKEN', required: false, description: 'Print bridge auth token', category: 'Security',
         validate: value => value.length >= 32,

@@ -22,6 +22,7 @@ type StatusUpdatePayload = {
     notes?: string;
     expected_updated_at?: string;
     expectedUpdatedAt?: string;
+    approval_id?: number;
 };
 
 type IdempotentOptions = {

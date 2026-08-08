@@ -2,7 +2,7 @@ import { Branch, MenuCategory, Order, OrderItem, Printer } from '../types';
 import { generateReceiptHTML } from './receiptTemplate';
 import { generateKitchenTicketHTML } from './kitchenTicketTemplate';
 import { PrintJob, printService } from '../src/services/printService';
-import { findDefaultTemplate, findTemplateForPrinter, generateHtmlFromTemplate } from './templateReceiptGenerator';
+import { findDefaultTemplate, findTemplateForPrinter, generateHtmlFromTemplate, selectReceiptTemplate } from './templateReceiptGenerator';
 import { createImagePrintPayload } from './receiptImageRenderer';
 
 interface KitchenPrintParams {
@@ -307,19 +307,29 @@ export const printOrderReceipt = async ({
     branch,
     title,
 }: ReceiptPrintParams): Promise<void> => {
+    const resolveReceiptAssetUrl = (value?: string) => {
+        const source = String(value || '').trim();
+        if (!source || /^(data:|https?:|blob:)/i.test(source) || typeof window === 'undefined') return source;
+        try { return new URL(source, window.location.origin).href; } catch { return source; }
+    };
     const receiptBrandingByOrderType = settings?.receiptBrandingByOrderType || {};
     const override = receiptBrandingByOrderType?.[order.type] || {};
     const effectiveSettings = {
         ...settings,
-        receiptLogoUrl: override.logoUrl || settings?.receiptLogoUrl || '',
+        receiptLogoUrl: resolveReceiptAssetUrl(override.logoUrl || settings?.receiptLogoUrl || ''),
         receiptQrUrl: override.qrUrl || settings?.receiptQrUrl || '',
     };
     const primaryCashierPrinter = resolvePrimaryCashierPrinter(printers || [], order.branchId, settings);
 
     const receiptTitle = title || t.order_receipt || (lang === 'ar' ? '\u0625\u064A\u0635\u0627\u0644 \u0628\u064A\u0639' : 'Order Receipt');
 
-    const linkedTemplate = primaryCashierPrinter ? findTemplateForPrinter(primaryCashierPrinter.id, 'receipt') : null;
-    const activeReceiptTemplate = linkedTemplate || findDefaultTemplate('receipt');
+    const activeReceiptTemplate = selectReceiptTemplate({
+        templates: settings?.receiptTemplates,
+        defaultTemplateId: settings?.defaultReceiptTemplateId,
+        templateByOrderType: settings?.receiptTemplateByOrderType,
+        orderType: order.type,
+        printerId: primaryCashierPrinter?.id,
+    }) || findDefaultTemplate('receipt');
     const paperWidth = resolvePrinterPaperWidth(primaryCashierPrinter, activeReceiptTemplate);
     if (!primaryCashierPrinter) throw new Error('NO_CASHIER_PRINTER_CONFIGURED');
 

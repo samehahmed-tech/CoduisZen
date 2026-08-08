@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { db } from '../db';
-import { branches, users, userSessions } from '../../src/db/schema';
+import { branches, employees, users, userSessions } from '../../src/db/schema';
 import { INITIAL_ROLE_PERMISSIONS, UserRole } from '../../types';
 import { createSignedAuditLog } from '../services/auditService';
 import { isForeignKeyDeleteError, writeForeignKeyDeleteConflict } from '../utils/dbErrors';
@@ -105,6 +105,9 @@ export const createUser = async (req: Request, res: Response) => {
         const body = userBody(req.body || {});
         if (!body.name) return res.status(400).json({ error: 'USER_NAME_REQUIRED' });
         if (!isEmailLike(body.email)) return res.status(400).json({ error: 'VALID_EMAIL_REQUIRED' });
+        if (req.body.createEmployeeRecord && !body.assignedBranchId) {
+            return res.status(400).json({ error: 'EMPLOYEE_BRANCH_REQUIRED' });
+        }
         let passwordHash: string | undefined;
         let pinCodeHash: string | undefined;
         if (body.password) passwordHash = await bcrypt.hash(body.password, 10);
@@ -112,23 +115,50 @@ export const createUser = async (req: Request, res: Response) => {
             if (!/^\d{6}$/.test(body.pin)) return res.status(400).json({ error: 'PIN_MUST_BE_6_DIGITS' });
             pinCodeHash = await bcrypt.hash(body.pin, 10);
         }
-        const [created] = await db.insert(users).values({
-            id: body.id || crypto.randomUUID(),
-            name: body.name,
-            email: body.email,
-            role: body.role || UserRole.CASHIER,
-            permissions: body.permissions || INITIAL_ROLE_PERMISSIONS[(body.role || UserRole.CASHIER) as UserRole] || [],
-            assignedBranchId: body.assignedBranchId,
-            allowedBranches: body.allowedBranches || [],
-            isActive: body.isActive !== false,
-            managerPin: body.managerPin,
-            passwordHash,
-            pinCode: body.pin,
-            pinCodeHash,
-            pinLoginEnabled: Boolean(body.pin),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }).returning();
+        const created = await db.transaction(async (tx) => {
+            const [user] = await tx.insert(users).values({
+                id: body.id || crypto.randomUUID(),
+                name: body.name,
+                email: body.email,
+                role: body.role || UserRole.CASHIER,
+                permissions: body.permissions || INITIAL_ROLE_PERMISSIONS[(body.role || UserRole.CASHIER) as UserRole] || [],
+                assignedBranchId: body.assignedBranchId,
+                allowedBranches: body.allowedBranches || [],
+                isActive: body.isActive !== false,
+                managerPin: body.managerPin,
+                passwordHash,
+                pinCode: body.pin,
+                pinCodeHash,
+                pinLoginEnabled: Boolean(body.pin),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            }).returning();
+
+            if (req.body.createEmployeeRecord) {
+                await tx.insert(employees).values({
+                    id: crypto.randomUUID(),
+                    userId: user.id,
+                    branchId: body.assignedBranchId!,
+                    name: body.name,
+                    email: body.email,
+                    phone: req.body.phone,
+                    role: body.role || UserRole.CASHIER,
+                    departmentId: req.body.departmentId,
+                    jobTitleId: req.body.jobTitleId,
+                    employeeCode: req.body.employeeCode,
+                    attendanceCode: req.body.attendanceCode || req.body.employeeCode,
+                    nationalId: req.body.nationalId,
+                    basicSalary: Number(req.body.basicSalary ?? req.body.salary?.baseSalary ?? 0),
+                    hourlyRate: Number(req.body.hourlyRate || 0),
+                    emergencyContact: req.body.emergencyContact,
+                    bankAccount: req.body.bankAccount,
+                    joinedAt: req.body.employmentDate ? new Date(req.body.employmentDate) : new Date(),
+                    isActive: body.isActive !== false,
+                });
+            }
+
+            return user;
+        });
         await audit(req, 'USER_CREATED', { targetUserId: created.id, role: created.role }, 'User account created');
         res.status(201).json(mapUserResponse(created));
     } catch (error: any) {

@@ -25,7 +25,7 @@ interface ReceiptBlock {
     config: Record<string, any>;
 }
 
-interface ReceiptTemplate {
+export interface ReceiptTemplate {
     id: string;
     name: string;
     nameAr: string;
@@ -91,6 +91,30 @@ export const findLatestTemplate = (type: 'receipt' | 'kitchen'): ReceiptTemplate
     }
 };
 
+export const selectReceiptTemplate = ({
+    templates,
+    defaultTemplateId,
+    templateByOrderType,
+    orderType,
+    printerId,
+}: {
+    templates?: Array<Record<string, any>>;
+    defaultTemplateId?: string;
+    templateByOrderType?: Partial<Record<OrderType, string>>;
+    orderType: OrderType;
+    printerId?: string;
+}): ReceiptTemplate | null => {
+    const receiptTemplates = (Array.isArray(templates) ? templates : [])
+        .filter((template): template is ReceiptTemplate => template?.type === 'receipt' && Array.isArray(template?.blocks));
+    const typeTemplateId = templateByOrderType?.[orderType];
+    return receiptTemplates.find(template => template.id === typeTemplateId)
+        || receiptTemplates.find(template => template.id === defaultTemplateId)
+        || (printerId ? receiptTemplates.find(template => template.linkedPrinterIds?.includes(printerId)) : undefined)
+        || receiptTemplates.find(template => template.isDefault)
+        || receiptTemplates[0]
+        || null;
+};
+
 interface GenerateHtmlParams {
     template: ReceiptTemplate;
     order: Order;
@@ -144,7 +168,7 @@ const ar = {
     customer: '\u0627\u0644\u0639\u0645\u064a\u0644',
     address: '\u0627\u0644\u0639\u0646\u0648\u0627\u0646',
     item: '\u0627\u0644\u0635\u0646\u0641',
-    qty: '\u0627\u0644\u0643\u0645\u064a\u0629',
+    qty: '\u0639\u062f\u062f',
     price: '\u0627\u0644\u0633\u0639\u0631',
     total: '\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a',
     subtotal: '\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a',
@@ -157,7 +181,7 @@ const ar = {
     taxId: '\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0636\u0631\u064a\u0628\u064a',
 };
 
-const createQrDataUrl = (value: string, size: number): string => {
+export const createQrDataUrl = (value: string, size: number): string => {
     const svg = renderToStaticMarkup(React.createElement(QRCodeSVG as any, {
         value,
         size,
@@ -165,8 +189,9 @@ const createQrDataUrl = (value: string, size: number): string => {
         bgColor: '#FFFFFF',
         fgColor: '#000000',
         marginSize: 1,
+        xmlns: 'http://www.w3.org/2000/svg',
     }));
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
 export const generateHtmlFromTemplate = ({
@@ -357,7 +382,13 @@ export const generateHtmlFromTemplate = ({
                     summaryRows.length = 0;
                     pushSummary(Boolean(cfg.showSubtotal), 'Subtotal', ar.subtotal, totals.subtotal);
                     pushSummary(Boolean(cfg.showDiscount && totals.itemDiscountTotal > 0), 'Item Discounts', ar.itemDiscounts, -totals.itemDiscountTotal, 'discount-row');
-                    pushSummary(Boolean(cfg.showDiscount && totals.orderDiscountAmount > 0), `Discount ${order.discount || 0}%`, `${ar.discount} ${order.discount || 0}%`, -totals.orderDiscountAmount, 'discount-row');
+                    pushSummary(
+                        Boolean(cfg.showDiscount && totals.orderDiscountAmount > 0),
+                        `Discount (${totals.orderDiscountPercent}%)`,
+                        `${ar.discount} (${totals.orderDiscountPercent}%)`,
+                        -totals.orderDiscountAmount,
+                        'discount-row',
+                    );
                     pushSummary(Boolean(cfg.showTax), 'Tax', ar.tax, totals.tax);
                     pushSummary(Boolean(cfg.showTip && order.tipAmount && order.tipAmount > 0), 'Tip', ar.tip, order.tipAmount || 0);
                     return `
@@ -444,6 +475,7 @@ export const generateHtmlFromTemplate = ({
 <meta charset="UTF-8">
 <title>${escapeHtml(settings.restaurantName || 'Receipt')}</title>
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
     @page { margin: 0; size: ${widthMm}mm auto; }
     * { box-sizing: border-box; }
     body {
@@ -454,7 +486,7 @@ export const generateHtmlFromTemplate = ({
         color: #111;
         background: #fff;
         direction: ${dir};
-        font-family: Tahoma, Arial, "Segoe UI", sans-serif;
+        font-family: 'Cairo', Tahoma, Arial, sans-serif;
         font-size: ${fontSizePx}px;
         line-height: 1.38;
         font-weight: 800;
@@ -478,18 +510,18 @@ export const generateHtmlFromTemplate = ({
         font-weight: 800;
     }
     .order-meta {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.35fr);
         align-items: flex-start;
         gap: 4px;
         padding: 6px 0;
         border-bottom: 1px dashed #ccc;
     }
-    .meta-block { display: flex; flex-direction: column; gap: 2px; }
+    .meta-block { display: flex; min-width: 0; flex-direction: column; gap: 2px; text-align: ${textAlign}; }
     .meta-center { text-align: center; }
     .meta-end { text-align: ${textAlignEnd}; }
-    .meta-label { font-size: ${Math.max(fontSizePx - 4, 10)}px; color: #666; font-weight: 900; text-transform: uppercase; }
-    .meta-value, .meta-time { font-weight: 900; }
+    .meta-label { font-size: ${Math.max(fontSizePx - 4, 10)}px; color: #666; font-weight: 900; text-transform: uppercase; white-space: nowrap; }
+    .meta-value, .meta-time { display: block; font-weight: 900; white-space: nowrap; unicode-bidi: isolate; }
     .type-badge {
         display: inline-block;
         padding: 1px 4px;
@@ -520,22 +552,28 @@ export const generateHtmlFromTemplate = ({
         overflow-wrap: anywhere;
         word-break: normal;
     }
-    .col-item { width: 46%; text-align: ${textAlign}; }
-    .col-qty { width: 10%; text-align: center; }
-    .col-price { width: 22%; text-align: center; }
-    .col-total { width: 22%; text-align: ${textAlignEnd}; font-weight: 900; }
+        .col-item { width: 44%; text-align: ${textAlign}; }
+        .col-qty { width: 14%; text-align: center; }
+        .col-price { width: 20%; text-align: center; }
+        .col-total { width: 22%; text-align: ${textAlignEnd}; font-weight: 900; }
+    .items-table .col-qty, .items-table .col-price, .items-table .col-total {
+        direction: ltr;
+        unicode-bidi: isolate;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
     .item-name { display: block; font-weight: 900; font-size: ${fontSizePx + 2}px; line-height: 1.34; }
     .item-mod, .item-note { font-size: ${Math.max(fontSizePx - 2, 14)}px; color: #222; margin-top: 2px; line-height: 1.32; font-weight: 900; }
     .mod-price { color: #999; }
-    .summary-row td { padding: 4px 0; font-weight: 900; }
-    .summary-row td:last-child { text-align: ${textAlignEnd}; }
+    .summary-row td { padding: 4px 0; font-weight: 900; text-align: ${textAlign}; }
+    .summary-row td:last-child { text-align: ${textAlignEnd}; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
     .discount-row td { color: #111; }
     .money {
         display: inline-block;
         direction: ltr;
         unicode-bidi: isolate;
         white-space: nowrap;
-        font-family: Tahoma, Arial, sans-serif;
+        font-family: 'Cairo', Tahoma, Arial, sans-serif;
         font-weight: 800;
     }
     .money-compact {
@@ -557,6 +595,8 @@ export const generateHtmlFromTemplate = ({
     }
     .grand-total-label { padding-inline: 2px; }
     .grand-total-value { font-size: ${fontSizePx + 3}px; font-weight: 900; padding-inline: 2px; }
+    .grand-total-label { text-align: ${textAlign}; }
+    .grand-total-value { direction: ltr; unicode-bidi: isolate; white-space: nowrap; text-align: ${textAlignEnd}; }
     .payment-pill {
         display: inline-block;
         border: 1.5px solid #333;

@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { RouterProvider } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Wifi, WifiOff } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { router } from './routes';
@@ -9,14 +10,16 @@ import { setupApi } from './services/api/setup';
 import { socketService } from './services/socketService';
 import { useOrderStore } from './stores/useOrderStore';
 import { useInventoryStore } from './stores/useInventoryStore';
+import { useMenuStore } from './stores/useMenuStore';
 import { ToastProvider } from './components/common/ToastProvider';
 import { ConfirmProvider } from './components/common/ConfirmProvider';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { ThemeProvider } from './theme';
 import { auditService } from './services/auditService';
 import { aiIntelligenceService } from './services/aiIntelligenceService';
+import { eventBus } from './services/eventBus';
 import { ShiftManagementDrawer } from './components/finance/ShiftManagementDrawer';
-import { TableStatus } from './types';
+import { AuditEventType, TableStatus } from './types';
 
 const LoadingTips = [
   "💡 نصيحة: يعمل النظام بكفاءة تامة حتى عند انقطاع الإنترنت ويتم مزامنة البيانات لاحقاً عند الاتصال.",
@@ -127,15 +130,19 @@ const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
 });
 
 const App: React.FC = () => {
-  const { activeBranchId, isAuthenticated, logout, restoreSession, token } = useAuthStore(
+  const queryClient = useQueryClient();
+  const { activeBranchId, isAuthenticated, logout, restoreSession, token, fetchSettings, fetchPrinters } = useAuthStore(
     useShallow((state) => ({
       activeBranchId: state.settings.activeBranchId,
       isAuthenticated: state.isAuthenticated,
       logout: state.logout,
       restoreSession: state.restoreSession,
       token: state.token,
+      fetchSettings: state.fetchSettings,
+      fetchPrinters: state.fetchPrinters,
     }))
   );
+  const fetchMenu = useMenuStore((state) => state.fetchMenu);
   const { fetchOrders, fetchTables, updateTable, addOrderFromSocket, patchOrderStatus } = useOrderStore(
     useShallow((state) => ({
       fetchOrders: state.fetchOrders,
@@ -150,9 +157,36 @@ const App: React.FC = () => {
   const [setupStatus, setSetupStatus] = useState<'checking' | 'needs' | 'ready'>('checking');
   const lastSyncRef = useRef<string>(new Date().toISOString());
 
+  const invalidateDashboard = useEffectEvent(() => {
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  });
+
+  useEffect(() => {
+    const unsubscribeStatus = eventBus.on(AuditEventType.ORDER_STATUS_CHANGE, invalidateDashboard);
+    const unsubscribePlaced = eventBus.on(AuditEventType.POS_ORDER_PLACEMENT, invalidateDashboard);
+    return () => {
+      unsubscribeStatus();
+      unsubscribePlaced();
+    };
+  }, []);
+
   useEffect(() => {
     restoreSession();
   }, [restoreSession]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const refreshLiveConfiguration = () => {
+      if (!navigator.onLine || document.visibilityState === 'hidden') return;
+      void Promise.all([fetchSettings(), fetchPrinters(), fetchMenu()]);
+    };
+    const timer = window.setInterval(refreshLiveConfiguration, 30_000);
+    window.addEventListener('online', refreshLiveConfiguration);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('online', refreshLiveConfiguration);
+    };
+  }, [isAuthenticated, fetchSettings, fetchPrinters, fetchMenu]);
 
   useEffect(() => {
     let active = true;
@@ -197,6 +231,7 @@ const App: React.FC = () => {
   const handleOrderCreated = useEffectEvent((order: any) => {
     if (order?.id) {
       addOrderFromSocket(order);
+      invalidateDashboard();
     }
   });
 
@@ -206,6 +241,7 @@ const App: React.FC = () => {
       if (!patched && activeBranchId) {
         fetchOrders({ branch_id: activeBranchId, limit: 120 });
       }
+      invalidateDashboard();
     }
   });
 

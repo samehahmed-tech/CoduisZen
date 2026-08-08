@@ -71,11 +71,17 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
             setLoading(true);
             try {
                 const id = generateShiftId();
+                const openingBalanceNum = parseFloat(openingBalance);
+                if (!Number.isFinite(openingBalanceNum) || openingBalanceNum < 0) {
+                    showToast(isRTL ? 'يرجى إدخال رصيد افتتاحي صحيح' : 'Please enter a valid opening balance', 'error');
+                    setLoading(false);
+                    return;
+                }
                 const data = {
                     id,
                     branchId: settings.activeBranchId || 'b1',
                     userId: user?.id || 'u1',
-                    openingBalance: parseFloat(openingBalance),
+                    openingBalance: openingBalanceNum,
                 };
                 const res = await shiftsApi.open(data);
                 setShift(res);
@@ -90,6 +96,11 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
         const addAmount = (amount: number) => {
             const current = parseFloat(openingBalance) || 0;
             setOpeningBalance((current + amount).toString());
+        };
+
+        const isOpeningBalanceValid = (value: string): boolean => {
+            const num = parseFloat(value);
+            return Number.isFinite(num) && num >= 0;
         };
 
         return (
@@ -172,9 +183,9 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
                             ))}
                         </div>
 
-                        <button
+<button
                             onClick={handleOpenShift}
-                            disabled={loading || parseFloat(openingBalance) < 0}
+                            disabled={loading || !isOpeningBalanceValid(openingBalance)}
                             className="w-full py-4 lg:py-6 mt-auto bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-3xl font-black text-base lg:text-xl flex items-center justify-center gap-3 lg:gap-4 transition-all active:scale-[0.98] shadow-[0_8px_30px_rgba(var(--primary-rgb),0.3)]"
                         >
                             {loading ? (

@@ -9,14 +9,23 @@ import schedulingService from '../services/schedulingService';
 import shiftTaskService from '../services/shiftTaskService';
 import attendanceOpsService from '../services/attendanceOpsService';
 import hrExecutiveReportsService from '../services/hrExecutiveReportsService';
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
+import { scopeBranchQuery } from '../middleware/branchIsolation';
 import { db } from '../db';
-import { attendanceCorrections, attendanceExceptions, attendanceSessions, auditLogs, employeeCompensationItems, employeePayrollAssignments, employeeShiftAssignments, employees, leaveRequests, leaveTypes, managerApprovals, notifications, payrollCycles, payrollRuns, payslips, users } from '../../src/db/schema';
+import { attendanceCorrections, attendanceExceptions, attendanceSessions, auditLogs, bonusPenaltyRecords, departments, employeeCompensationItems, employeeLoans, employeePayrollAssignments, employeeShiftAssignments, employees, jobTitles, leaveRequests, leaveTypes, managerApprovals, notifications, payrollCycles, payrollRuns, payslips, users } from '../../src/db/schema';
 import { and, desc, eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 const router = Router();
 const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
+
+router.use((req: Request, res: Response, next: NextFunction) => {
+    if (['SUPER_ADMIN', 'OWNER'].includes(String(req.user?.role || '').toUpperCase())) return next();
+    return scopeBranchQuery(req, res, () => {
+        if (req.body && typeof req.body === 'object') req.body.branchId = req.effectiveBranchId;
+        return next();
+    });
+});
 
 const getScopedBranches = (req: Request) => {
     const role = String(req.user?.role || '').toUpperCase();
@@ -59,6 +68,54 @@ const loadScopedEmployee = async (req: Request, employeeId: string) => {
     }
     assertBranchScope(req, employee.branchId);
     return employee;
+};
+
+const loadScopedPayrollCycle = async (req: Request, cycleId: string) => {
+    const [cycle] = await db.select().from(payrollCycles).where(eq(payrollCycles.id, cycleId)).limit(1);
+    if (!cycle) {
+        const error: any = new Error('PAYROLL_CYCLE_NOT_FOUND');
+        error.status = 404;
+        throw error;
+    }
+    assertBranchScope(req, cycle.branchId);
+    return cycle;
+};
+
+const loadScopedLoan = async (req: Request, loanId: string) => {
+    const [loan] = await db.select().from(employeeLoans).where(eq(employeeLoans.id, loanId)).limit(1);
+    if (!loan) {
+        const error: any = new Error('LOAN_NOT_FOUND');
+        error.status = 404;
+        throw error;
+    }
+    assertBranchScope(req, loan.branchId);
+    return loan;
+};
+
+const loadScopedBonusPenalty = async (req: Request, recordId: string) => {
+    const [record] = await db.select().from(bonusPenaltyRecords).where(eq(bonusPenaltyRecords.id, recordId)).limit(1);
+    if (!record) {
+        const error: any = new Error('BONUS_PENALTY_NOT_FOUND');
+        error.status = 404;
+        throw error;
+    }
+    assertBranchScope(req, record.branchId);
+    return record;
+};
+
+const loadScopedDepartment = async (req: Request, departmentId: string) => {
+    const [department] = await db.select().from(departments).where(eq(departments.id, departmentId)).limit(1);
+    if (!department) throw Object.assign(new Error('DEPARTMENT_NOT_FOUND'), { status: 404 });
+    assertBranchScope(req, department.branchId);
+    return department;
+};
+
+const loadScopedJobTitle = async (req: Request, jobTitleId: string) => {
+    const [jobTitle] = await db.select().from(jobTitles).where(eq(jobTitles.id, jobTitleId)).limit(1);
+    if (!jobTitle) throw Object.assign(new Error('JOB_TITLE_NOT_FOUND'), { status: 404 });
+    if (jobTitle.departmentId) await loadScopedDepartment(req, jobTitle.departmentId);
+    else assertBranchScope(req, null);
+    return jobTitle;
 };
 
 const resolveCurrentEmployee = async (userId: string) => {
@@ -230,7 +287,7 @@ router.get('/self-service/overview', async (req: Request, res: Response) => {
                 grossPay: Number((item.payload as any)?.grossPay || (item.payload as any)?.summary?.grossPay || 0),
             })),
         });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 
 router.get('/executive-dashboard', async (req: Request, res: Response) => {
@@ -947,7 +1004,7 @@ router.get('/shift-assignments', async (req: Request, res: Response) => {
             req.query.employeeId ? String(req.query.employeeId) : undefined,
             req.query.branchId ? String(req.query.branchId) : undefined,
         ));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/shift-assignments', async (req: Request, res: Response) => {
     try { res.status(201).json(await hrExtendedService.assignShiftTemplate(req.body)); }
@@ -1027,7 +1084,7 @@ router.get('/payroll-rules', async (req: Request, res: Response) => {
             req.query.payrollProfileId ? String(req.query.payrollProfileId) : undefined,
             req.query.branchId ? String(req.query.branchId) : undefined,
         ));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/payroll-rules', async (req: Request, res: Response) => {
     try { res.status(201).json(await hrExtendedService.upsertPayrollRule(req.body)); }
@@ -1037,20 +1094,22 @@ router.post('/payroll-rules', async (req: Request, res: Response) => {
 // Payroll Calculation
 router.get('/payroll-cycles', async (req: Request, res: Response) => {
     try {
+        const branchId = resolveScopedBranchId(req, req.query.branchId ? String(req.query.branchId) : undefined) || undefined;
         const rows = await db.select().from(payrollCycles)
-            .where(req.query.branchId ? eq(payrollCycles.branchId, String(req.query.branchId)) : undefined)
+            .where(branchId ? eq(payrollCycles.branchId, branchId) : undefined)
             .orderBy(desc(payrollCycles.periodStart));
         res.json(rows);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/payroll-cycles', async (req: Request, res: Response) => {
     try {
-        if (!req.body.branchId || !req.body.periodStart || !req.body.periodEnd) {
+        const branchId = resolveScopedBranchId(req, req.body.branchId ? String(req.body.branchId) : undefined);
+        if (!branchId || !req.body.periodStart || !req.body.periodEnd) {
             return res.status(400).json({ error: 'BRANCH_AND_PERIOD_REQUIRED' });
         }
         const [created] = await db.insert(payrollCycles).output().values({
             id: req.body.id || makeId('CYC'),
-            branchId: String(req.body.branchId),
+            branchId,
             periodStart: new Date(req.body.periodStart),
             periodEnd: new Date(req.body.periodEnd),
             status: 'DRAFT',
@@ -1060,88 +1119,126 @@ router.post('/payroll-cycles', async (req: Request, res: Response) => {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 router.get('/payroll-calculate/:cycleId/preview', async (req: Request, res: Response) => {
-    try { res.json(await payrollCalculationService.previewCycle(String(req.params.cycleId))); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
+        res.json(await payrollCalculationService.previewCycle(String(req.params.cycleId)));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.post('/payroll-calculate/:cycleId', async (req: Request, res: Response) => {
-    try { res.status(201).json(await payrollCalculationService.calculateCycle(String(req.params.cycleId))); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
+        res.status(201).json(await payrollCalculationService.calculateCycle(String(req.params.cycleId)));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.get('/payroll-runs', async (req: Request, res: Response) => {
     try {
+        const branchId = resolveScopedBranchId(req, req.query.branchId ? String(req.query.branchId) : undefined) || undefined;
         const rows = await db.select().from(payrollRuns)
-            .where(req.query.branchId ? eq(payrollRuns.branchId, String(req.query.branchId)) : undefined)
+            .where(branchId ? eq(payrollRuns.branchId, branchId) : undefined)
             .orderBy(desc(payrollRuns.createdAt));
         res.json(rows);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 
 // Loans / Advances
 router.get('/loans', async (req: Request, res: Response) => {
     try {
+        const employeeId = req.query.employeeId ? String(req.query.employeeId) : undefined;
+        if (employeeId) await loadScopedEmployee(req, employeeId);
+        const branchId = resolveScopedBranchId(req, req.query.branchId ? String(req.query.branchId) : undefined) || undefined;
         res.json(await hrExtendedService.getEmployeeLoans({
-            employeeId: req.query.employeeId ? String(req.query.employeeId) : undefined,
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            employeeId,
+            branchId,
             status: req.query.status ? String(req.query.status) : undefined,
         }));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/loans', async (req: Request, res: Response) => {
-    try { res.status(201).json(await hrExtendedService.createEmployeeLoan({ ...req.body, requestedBy: req.user?.id || req.body.requestedBy })); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        const employee = await loadScopedEmployee(req, String(req.body.employeeId));
+        res.status(201).json(await hrExtendedService.createEmployeeLoan({
+            ...req.body,
+            branchId: employee.branchId,
+            requestedBy: req.user?.id || req.body.requestedBy,
+        }));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.put('/loans/:id/approve', async (req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.approveEmployeeLoan(String(req.params.id), req.user?.id || 'system', req.body.status || 'APPROVED')); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedLoan(req, String(req.params.id));
+        res.json(await hrExtendedService.approveEmployeeLoan(String(req.params.id), req.user?.id || 'system', req.body.status || 'APPROVED'));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.get('/loans/:id/installments', async (req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.getLoanInstallments(String(req.params.id))); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+        await loadScopedLoan(req, String(req.params.id));
+        res.json(await hrExtendedService.getLoanInstallments(String(req.params.id)));
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 
 // Persisted Leave Balances
 router.get('/leave-balances', async (req: Request, res: Response) => {
     try {
+        const employeeId = req.query.employeeId ? String(req.query.employeeId) : undefined;
+        if (employeeId) await loadScopedEmployee(req, employeeId);
         res.json(await hrExtendedService.getPersistedLeaveBalances(
-            req.query.employeeId ? String(req.query.employeeId) : undefined,
+            employeeId,
             req.query.year ? Number(req.query.year) : undefined,
+            resolveScopedBranchId(req) || undefined,
         ));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/leave-balances', async (req: Request, res: Response) => {
-    try { res.status(201).json(await hrExtendedService.upsertLeaveBalance(req.body)); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedEmployee(req, String(req.body.employeeId));
+        res.status(201).json(await hrExtendedService.upsertLeaveBalance(req.body));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 
 // Bonuses / Penalties
 router.get('/bonus-penalties', async (req: Request, res: Response) => {
     try {
+        const employeeId = req.query.employeeId ? String(req.query.employeeId) : undefined;
+        if (employeeId) await loadScopedEmployee(req, employeeId);
+        const branchId = resolveScopedBranchId(req, req.query.branchId ? String(req.query.branchId) : undefined) || undefined;
         res.json(await hrExtendedService.getBonusPenaltyRecords({
-            employeeId: req.query.employeeId ? String(req.query.employeeId) : undefined,
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            employeeId,
+            branchId,
             status: req.query.status ? String(req.query.status) : undefined,
             type: req.query.type ? String(req.query.type) : undefined,
         }));
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/bonus-penalties', async (req: Request, res: Response) => {
-    try { res.status(201).json(await hrExtendedService.createBonusPenaltyRecord({ ...req.body, requestedBy: req.user?.id || req.body.requestedBy })); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        const employee = await loadScopedEmployee(req, String(req.body.employeeId));
+        res.status(201).json(await hrExtendedService.createBonusPenaltyRecord({
+            ...req.body,
+            branchId: employee.branchId,
+            requestedBy: req.user?.id || req.body.requestedBy,
+        }));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.put('/bonus-penalties/:id/approve', async (req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.approveBonusPenaltyRecord(String(req.params.id), req.user?.id || 'system', req.body.status || 'APPROVED')); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedBonusPenalty(req, String(req.params.id));
+        res.json(await hrExtendedService.approveBonusPenaltyRecord(String(req.params.id), req.user?.id || 'system', req.body.status || 'APPROVED'));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 
 // Payroll Close
 router.get('/payroll-close/locks/:branchId', async (req: Request, res: Response) => {
-    try { res.json(await payrollCloseService.getLock(String(req.params.branchId))); }
-    catch (e: any) { res.status(500).json({ error: e.message }); }
+    try {
+        assertBranchScope(req, String(req.params.branchId));
+        res.json(await payrollCloseService.getLock(String(req.params.branchId)));
+    } catch (e: any) { res.status(e?.status || 500).json({ error: e.message }); }
 });
 router.post('/payroll-close/locks', async (req: Request, res: Response) => {
     try {
+        const branchId = resolveScopedBranchId(req, req.body.branchId ? String(req.body.branchId) : undefined);
+        if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' });
         res.status(201).json(await payrollCloseService.setLock({
-            branchId: req.body.branchId,
+            branchId,
             lockedThrough: new Date(req.body.lockedThrough),
             lockedBy: req.user?.id || req.body.lockedBy,
             reason: req.body.reason,
@@ -1149,15 +1246,20 @@ router.post('/payroll-close/locks', async (req: Request, res: Response) => {
     } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 router.get('/payroll-close/:cycleId/preview', async (req: Request, res: Response) => {
-    try { res.json(await payrollCloseService.previewCycle(String(req.params.cycleId))); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
+        res.json(await payrollCloseService.previewCycle(String(req.params.cycleId)));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.get('/payroll-compliance/:cycleId/summary', async (req: Request, res: Response) => {
-    try { res.json(await payrollComplianceService.getCycleSummary(String(req.params.cycleId), req.query)); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
+    try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
+        res.json(await payrollComplianceService.getCycleSummary(String(req.params.cycleId), req.query));
+    } catch (e: any) { res.status(e?.status || 400).json({ error: e.message }); }
 });
 router.get('/payroll-compliance/:cycleId/export', async (req: Request, res: Response) => {
     try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
         const template = String(req.query.template || 'eta_monthly_private');
         const format = String(req.query.format || 'csv').toLowerCase();
         const exported = await payrollComplianceService.exportCycle(String(req.params.cycleId), template, format, req.query);
@@ -1168,6 +1270,7 @@ router.get('/payroll-compliance/:cycleId/export', async (req: Request, res: Resp
 });
 router.post('/payroll-close/:cycleId/close', async (req: Request, res: Response) => {
     try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
         res.status(201).json(await payrollCloseService.closeCycle({
             cycleId: String(req.params.cycleId),
             closedBy: req.user?.id || req.body.closedBy,
@@ -1177,6 +1280,7 @@ router.post('/payroll-close/:cycleId/close', async (req: Request, res: Response)
 });
 router.post('/payroll-close/:cycleId/reopen', async (req: Request, res: Response) => {
     try {
+        await loadScopedPayrollCycle(req, String(req.params.cycleId));
         const reopenedBy = req.user?.id || req.body.reopenedBy;
         if (!reopenedBy || !req.body.reason) {
             return res.status(400).json({ error: 'REOPEN_REASON_REQUIRED' });
@@ -1353,30 +1457,53 @@ router.get('/payslips/:id/pdf', async (req: Request, res: Response) => {
 });
 
 // Departments
-router.get('/departments', async (_req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.getDepartments()); }
+router.get('/departments', async (req: Request, res: Response) => {
+    try {
+        const branchId = resolveScopedBranchId(req);
+        res.json(await hrExtendedService.getDepartments(branchId || undefined));
+    }
     catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 router.post('/departments', async (req: Request, res: Response) => {
-    try { res.status(201).json(await hrExtendedService.upsertDepartment(req.body, req.user?.id)); }
+    try {
+        const existing = req.body.id ? await loadScopedDepartment(req, String(req.body.id)) : null;
+        const branchId = resolveScopedBranchId(req, req.body.branchId ?? existing?.branchId);
+        res.status(201).json(await hrExtendedService.upsertDepartment({ ...req.body, branchId }, req.user?.id));
+    }
     catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 router.delete('/departments/:id', async (req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.deleteDepartment(String(req.params.id))); }
+    try {
+        await loadScopedDepartment(req, String(req.params.id));
+        res.json(await hrExtendedService.deleteDepartment(String(req.params.id)));
+    }
     catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 // Job Titles
-router.get('/job-titles', async (_req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.getJobTitles()); }
+router.get('/job-titles', async (req: Request, res: Response) => {
+    try {
+        const branchId = resolveScopedBranchId(req);
+        const scopedDepartments = await hrExtendedService.getDepartments(branchId || undefined);
+        res.json(await hrExtendedService.getJobTitles(branchId ? scopedDepartments.map((department) => department.id) : undefined));
+    }
     catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 router.post('/job-titles', async (req: Request, res: Response) => {
-    try { res.status(201).json(await hrExtendedService.upsertJobTitle(req.body, req.user?.id)); }
+    try {
+        const existing = req.body.id ? await loadScopedJobTitle(req, String(req.body.id)) : null;
+        const departmentId = req.body.departmentId ?? existing?.departmentId;
+        if (departmentId) await loadScopedDepartment(req, String(departmentId));
+        else if (getScopedBranches(req)) throw new Error('JOB_TITLE_DEPARTMENT_REQUIRED');
+        res.status(201).json(await hrExtendedService.upsertJobTitle({ ...req.body, departmentId }, req.user?.id));
+    }
     catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 router.delete('/job-titles/:id', async (req: Request, res: Response) => {
-    try { res.json(await hrExtendedService.deleteJobTitle(String(req.params.id))); }
+    try {
+        await loadScopedJobTitle(req, String(req.params.id));
+        res.json(await hrExtendedService.deleteJobTitle(String(req.params.id)));
+    }
     catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 

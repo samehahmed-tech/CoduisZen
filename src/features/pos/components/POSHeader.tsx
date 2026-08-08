@@ -62,7 +62,7 @@ const POSHeader: React.FC<POSHeaderProps> = React.memo(({
             {/* Left: Home + Mode + Context */}
             <div className="flex items-center gap-2 min-w-0">
                 {onHomeClick && (
-                    <button onClick={onHomeClick} className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-muted hover:text-primary hover:bg-primary/8 transition-all active:scale-90" title="Dashboard">
+                    <button onClick={onHomeClick} className="min-h-11 min-w-11 h-11 w-11 shrink-0 flex items-center justify-center rounded-lg text-muted hover:text-primary hover:bg-primary/8 transition-all active:scale-90" title="Dashboard" aria-label="Dashboard">
                         <Compass size={18} />
                     </button>
                 )}
@@ -79,16 +79,16 @@ const POSHeader: React.FC<POSHeaderProps> = React.memo(({
                 {activeMode === OrderType.DINE_IN && selectedTableId && (
                     <div className="flex items-center gap-1.5 h-7 px-2.5 bg-blue-500/8 rounded-lg text-[11px] font-bold text-blue-600 shrink-0 animate-in slide-in-from-left-2">
                         <span>{t.table} {selectedTableId}</span>
-                        <button onClick={onClearTable} className="w-4 h-4 rounded-full hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all">
-                            <X size={8} />
+                        <button onClick={onClearTable} className="min-w-8 min-h-8 w-8 h-8 rounded-full hover:bg-rose-500 hover:text-white flex items-center justify-center touch-target transition-all">
+                            <X size={14} />
                         </button>
                     </div>
                 )}
                 {activeMode === OrderType.DELIVERY && deliveryCustomer && (
                     <div className="flex items-center gap-1.5 h-7 px-2.5 bg-amber-500/8 rounded-lg text-[11px] font-bold text-amber-600 shrink-0 animate-in slide-in-from-left-2">
                         <span className="truncate max-w-[100px]">{deliveryCustomer.name}</span>
-                        <button onClick={onClearCustomer} className="w-4 h-4 rounded-full hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all">
-                            <X size={8} />
+                        <button onClick={onClearCustomer} className="min-w-8 min-h-8 w-8 h-8 rounded-full hover:bg-rose-500 hover:text-white flex items-center justify-center text-main transition-all">
+                            <X size={14} />
                         </button>
                     </div>
                 )}

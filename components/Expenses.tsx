@@ -15,6 +15,7 @@ import { financeApi } from '../services/api/finance';
 import { reportsApi } from '../services/api/reports';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToast } from './Toast';
+import { formatLocalDate } from '../utils/formatters';
 
 type AccountRow = {
   id: string;
@@ -40,11 +41,11 @@ type JournalRow = {
   status?: string;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => formatLocalDate(new Date());
 const monthStart = () => {
   const d = new Date();
   d.setDate(1);
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate(d);
 };
 
 const flattenAccounts = (accounts: AccountRow[]): AccountRow[] => {

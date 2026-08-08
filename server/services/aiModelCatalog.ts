@@ -32,3 +32,22 @@ export const getModelCandidates = (selected: string) => {
     const preferred = normalizeModel(selected);
     return [preferred, ...AI_FREE_MODELS.map((m) => m.id).filter((id) => id !== preferred)];
 };
+
+// Groq (api.groq.com) — fast OpenAI-compatible inference for the smart assistant.
+export const GROQ_MODEL_SETTING_KEY = 'aiGroqModel';
+export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+export const GROQ_MODELS = [
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile', provider: 'Groq' },
+    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant', provider: 'Groq' },
+    { id: 'openai/gpt-oss-120b', label: 'OpenAI GPT-OSS 120B', provider: 'Groq' },
+    { id: 'openai/gpt-oss-20b', label: 'OpenAI GPT-OSS 20B', provider: 'Groq' },
+] as const;
+
+const GROQ_MODEL_IDS: Set<string> = new Set(GROQ_MODELS.map((m) => m.id));
+
+export const normalizeGroqModel = (candidate?: string) => {
+    const model = String(candidate || '').trim();
+    if (!model || !GROQ_MODEL_IDS.has(model)) return DEFAULT_GROQ_MODEL;
+    return model;
+};

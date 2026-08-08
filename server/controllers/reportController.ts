@@ -5,6 +5,7 @@ import { eq, and, or, sql, gte, lte, inArray, desc, asc } from 'drizzle-orm';
 import PDFDocument from 'pdfkit';
 import { DELIVERED_STATUSES, DashboardScope, parseLocalDateRange, parseReportFilters, ReportGranularity, resolveScopedBranchId } from './report/reportUtils';
 import { generateHrTabularXlsx } from '../services/hrReportExportService';
+import { revenueEligibleOrder, revenueRecognizedOrder } from '../utils/orderRevenue';
 
 // Re-exports from domain-specific report modules
 export { getCashierSummary, getDailySales, getFiscalSummary, getFoodCostReport, getHourlySales, getOverview, getPaymentMethodSummary, getProfitDaily, getProfitSummary, getRefundsReport, getVatReport } from './report/salesReports';
@@ -43,15 +44,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             (${orders.businessDate} IS NOT NULL AND ${orders.businessDate} >= ${startDate} AND ${orders.businessDate} <= ${endDate})
             OR (${orders.businessDate} IS NULL AND ${orders.createdAt} >= ${start} AND ${orders.createdAt} <= ${end})
         )`;
-        const revenueRecognized = sql`(
-            ${orders.status} IN ('DELIVERED', 'COMPLETED')
-            OR exists (
-                select 1
-                from ${payments} p
-                where p.order_id = ${orders.id}
-                  and p.status = 'COMPLETED'
-            )
-        )`;
+        const revenueRecognized = revenueRecognizedOrder();
 
         const [overviewRows, paymentsMix, paidRevenueRows, uniqueCustomersRows, itemsSoldRows, opsStatusRows, orderTypeRows, trendRows, _allTopItemsRows, _allCategoryRows, _allBranchRows, _allTopCustomerRows, expenseRows, pendingExpenseRows, cogsRows] = await Promise.all([
             db.select({
@@ -77,7 +70,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     and(
                         branchId ? eq(orders.branchId, branchId) : undefined,
                         orderDateInRange,
-                        eq(payments.status, 'COMPLETED')
+                        eq(payments.status, 'COMPLETED'),
+                        revenueRecognized,
                     )
                 )
                 .groupBy(payments.method),
@@ -89,7 +83,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     and(
                         branchId ? eq(orders.branchId, branchId) : undefined,
                         orderDateInRange,
-                        eq(payments.status, 'COMPLETED')
+                        eq(payments.status, 'COMPLETED'),
+                        revenueRecognized,
                     )
                 ),
             db.select({
@@ -115,6 +110,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             db.select({
                 status: orders.status,
                 count: sql<number>`count(*)`,
+                value: sql<number>`coalesce(sum(${orders.total}), 0)`,
             }).from(orders).where(
                 and(
                     branchId ? eq(orders.branchId, branchId) : undefined,
@@ -287,7 +283,10 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             + Number(opsStatusRows.find(r => r.status === 'PREPARING')?.count || 0)
             + Number(opsStatusRows.find(r => r.status === 'READY')?.count || 0)
             + Number(opsStatusRows.find(r => r.status === 'OUT_FOR_DELIVERY')?.count || 0);
-        const cancelled = Number(opsStatusRows.find(r => r.status === 'CANCELLED')?.count || 0);
+        const cancelledRow = opsStatusRows.find(r => r.status === 'CANCELLED');
+        const cancelled = Number(cancelledRow?.count || 0);
+        const cancelledValue = Number(cancelledRow?.value || 0);
+        const totalPlacedOrders = opsStatusRows.reduce((sum, row) => sum + Number(row.count || 0), 0);
         const delivered = Number(opsStatusRows.find(r => r.status === 'DELIVERED')?.count || 0)
             + Number(opsStatusRows.find(r => r.status === 'COMPLETED')?.count || 0);
 
@@ -298,6 +297,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             totals: {
                 revenue: grossSales,
                 netRevenue: netSales,
+                taxTotal: Number(summary.taxTotal || 0),
                 expenses: approvedExpenses,
                 pendingExpenses,
                 cogs,
@@ -309,9 +309,10 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                 uniqueCustomers: Number(uniqueCustomersRows[0]?.uniqueCustomers || 0),
                 itemsSold: Number(itemsSoldRows[0]?.itemsSold || 0),
                 cancelled,
+                cancelledValue,
                 pending,
                 delivered,
-                cancelRate: orderCount > 0 ? (cancelled / orderCount) * 100 : 0,
+                cancelRate: totalPlacedOrders > 0 ? (cancelled / totalPlacedOrders) * 100 : 0,
             },
             trendData: trendRows.map((row) => ({
                 name: row.name,
@@ -802,14 +803,15 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 break;
             }
             case 'BRANCH_PERFORMANCE': {
+                const revenueEligible = revenueEligibleOrder();
                 const rows = await db.select({
                     branchName: branches.name, orderCount: sql<number>`count(*)`,
-                    revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-                    avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
-            cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
+                    revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
+                    avgTicket: sql<number>`coalesce(avg(case when ${revenueEligible} then ${orders.total} end), 0)`,
+                    cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
                 }).from(orders).innerJoin(branches, eq(orders.branchId, branches.id))
                     .where(and(gte(orders.createdAt, start), lte(orders.createdAt, end)))
-                    .groupBy(branches.name).orderBy(sql`sum(${orders.total}) desc`);
+                    .groupBy(branches.name).orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
                 lines.push('Branch,Orders,Revenue,Avg Ticket,Cancelled');
                 rows.forEach(r => lines.push([`"${r.branchName}"`, r.orderCount, Number(r.revenue).toFixed(2), Number(r.avgTicket).toFixed(2), r.cancelledCount].join(',')));
                 break;
@@ -1010,13 +1012,14 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                 break;
             }
             case 'BRANCH_PERFORMANCE': {
+                const revenueEligible = revenueEligibleOrder();
                 const rows = await db.select({
                     branchName: branches.name, orderCount: sql<number>`count(*)`,
-                    revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-                    avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+                    revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
+                    avgTicket: sql<number>`coalesce(avg(case when ${revenueEligible} then ${orders.total} end), 0)`,
                 }).from(orders).innerJoin(branches, eq(orders.branchId, branches.id))
                     .where(and(gte(orders.createdAt, start), lte(orders.createdAt, end)))
-                    .groupBy(branches.name).orderBy(sql`sum(${orders.total}) desc`);
+                    .groupBy(branches.name).orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
                 doc.fontSize(12).text('Branch Performance', { underline: true }); doc.moveDown(0.5);
                 rows.forEach(r => { doc.text(`${r.branchName}: ${Number(r.revenue).toFixed(2)} LE | ${r.orderCount} orders | Avg ${Number(r.avgTicket).toFixed(2)} LE`); });
                 break;

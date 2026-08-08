@@ -1,6 +1,4 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: ['.env.local', '.env'] as any });
-
+import './config/loadEnv';
 import app from './app';
 import http from 'http';
 import { initSocket, closeSocket } from './socket';

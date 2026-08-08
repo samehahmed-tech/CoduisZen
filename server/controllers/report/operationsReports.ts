@@ -3,6 +3,7 @@ import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, branches, drivers } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
+import { revenueEligibleOrder } from '../../utils/orderRevenue';
 
 export const getBranchPerformance = async (req: Request, res: Response) => {
     try {
@@ -10,12 +11,13 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
 
+        const revenueEligible = revenueEligibleOrder();
         const rows = await db.select({
             branchId: orders.branchId,
             branchName: branches.name,
             orderCount: sql<number>`count(*)`,
-            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-            avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+            revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
+            avgTicket: sql<number>`coalesce(avg(case when ${revenueEligible} then ${orders.total} end), 0)`,
             cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
         })
             .from(orders)
@@ -25,7 +27,7 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
                 lte(orders.createdAt, end),
             ))
             .groupBy(orders.branchId, branches.name)
-            .orderBy(sql`sum(${orders.total}) desc`);
+            .orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
 
         res.json(rows.map(r => ({
             ...r,

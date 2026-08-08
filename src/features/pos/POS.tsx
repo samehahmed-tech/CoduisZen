@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingBag, X, LogOut, SlidersHorizontal, ArrowUpDown, LayoutGrid, Grid2x2, Plus, UtensilsCrossed, Truck, MapPin, Keyboard, UserPlus, Phone, Smartphone } from 'lucide-react';
 import {
    Order, OrderItem, OrderStatus, Table, PaymentMethod,
-   OrderType, Customer, PaymentRecord, RestaurantMenu,
+   OrderType, Customer, PaymentRecord, RestaurantMenu, UserRole,
    MenuCategory, AppPermission, RecipeIngredient, WarehouseType, JournalEntry, TableStatus, MenuItem
 } from '@/types';
 import { parseScaleBarcode } from '@/src/utils/barcodeParser';
@@ -33,6 +33,7 @@ import TakeawayNameModal from './components/TakeawayNameModal';
 import POSToolbar from './components/POSToolbar';
 import POSItemsPanel from './components/POSItemsPanel';
 import RetailModePanel from './components/RetailModePanel';
+import { isPlatformDeliveryValid } from './platformDeliveryValidation';
 import CategorySidebar from './components/CategorySidebar';
 import SeatModal from './components/SeatModal';
 import CourseModal from './components/CourseModal';
@@ -59,6 +60,9 @@ import { useInventoryStore } from '@/stores/useInventoryStore';
 import { useFinanceStore } from '@/stores/useFinanceStore';
 
 import { generateOrderId, generateInternalId } from '@/src/utils/idGenerator';
+import { buildOrderPayment } from './orderPayment';
+import { isBelowTableMinimumSpend } from '../../utils/tableMinimumSpend';
+import { findActiveTableOrder } from '../../../utils/tableOrder';
 
 const createCartId = () => generateInternalId();
 
@@ -111,11 +115,16 @@ const POS: React.FC = () => {
    const loadTableOrder = useOrderStore(state => state.loadTableOrder);
    const fetchTables = useOrderStore(state => state.fetchTables);
    const updateTableStatus = useOrderStore(state => state.updateTableStatus);
+   const resetTable = useOrderStore(state => state.resetTable);
    const updateOrderStatus = useOrderStore(state => state.updateOrderStatus);
    const tableDrafts = useOrderStore(state => state.tableDrafts);
    const saveTableDraft = useOrderStore(state => state.saveTableDraft);
    const loadTableDraft = useOrderStore(state => state.loadTableDraft);
    const clearTableDraft = useOrderStore(state => state.clearTableDraft);
+
+   useEffect(() => {
+      if (activeOrderType === OrderType.KIOSK) setOrderMode(OrderType.TAKEAWAY);
+   }, [activeOrderType, setOrderMode]);
 
    const menus = useMenuStore(state => state.menus);
    const categories = useMenuStore(state => state.categories);
@@ -163,7 +172,7 @@ const POS: React.FC = () => {
    const [posMode, setPosMode] = useState<'grid' | 'retail'>('grid');
    const [editingItemId, setEditingItemId] = useState<string | null>(null);
    const [noteInput, setNoteInput] = useState('');
-   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | string>(PaymentMethod.CASH);
    const [splitPayments, setSplitPayments] = useState<PaymentRecord[]>([]);
    const [showSplitModal, setShowSplitModal] = useState(false);
    const [showCalculator, setShowCalculator] = useState(false);
@@ -181,7 +190,14 @@ const POS: React.FC = () => {
    const [cartSearchQuery, setCartSearchQuery] = useState('');
    const [couponCode, setCouponCode] = useState('');
    const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-   const [approvalCallback, setApprovalCallback] = useState<{ fn: () => void; action: string } | null>(null);
+   const [pendingTableCoupon, setPendingTableCoupon] = useState<string | null>(null);
+   const lastCouponSubtotalRef = useRef<number | null>(null);
+   const [approvalCallback, setApprovalCallback] = useState<{
+      fn: (approval?: { id: number }) => void | Promise<void>;
+      action: string;
+      referenceId?: string;
+      credentialType?: 'pin' | 'password';
+   } | null>(null);
    const [showCustomerModal, setShowCustomerModal] = useState(false);
    const [newCustomer, setNewCustomer] = useState<{ name: string; phone: string; address: string; lat?: number; lng?: number; addressLabel?: string }>({ name: '', phone: '', address: '' });
    const [deliverySource, setDeliverySource] = useState('restaurant');
@@ -219,12 +235,19 @@ const POS: React.FC = () => {
    const { showModal } = useModal();
    const navigate = useNavigate();
 
-   const requestManagerApproval = useCallback((action: string, fn: () => void | Promise<void>) => {
+   const requestManagerApproval = useCallback((
+      action: string,
+      fn: (approval?: { id: number }) => void | Promise<void>,
+      referenceId?: string,
+      credentialType: 'pin' | 'password' = 'pin',
+   ) => {
       setApprovalCallback({
          action,
-         fn: async () => {
+          referenceId,
+          credentialType,
+         fn: async (approval) => {
             try {
-               await fn();
+               await fn(approval);
             } catch (error: any) {
                showToast(
                   getActionableErrorMessage(error, (settings.language || 'en') as 'en' | 'ar'),
@@ -234,7 +257,7 @@ const POS: React.FC = () => {
                setApprovalCallback(null);
             }
          }
-      });
+       });
       setShowApprovalModal(true);
    }, [showToast, settings.language]);
 
@@ -278,6 +301,8 @@ const POS: React.FC = () => {
       setSplitPayments([]);
       setPaymentMethod(PaymentMethod.CASH);
       setCouponCode('');
+      setPendingTableCoupon(null);
+      lastCouponSubtotalRef.current = null;
       clearCoupon();
       setActiveCategory('all');
 
@@ -500,6 +525,53 @@ const POS: React.FC = () => {
       return { cartSubtotal: subtotal, cartTotal: total, cartTax: tax, orderDiscountAmount };
    }, [safeActiveCart, discount, tipAmount, itemDiscountTotal, settings.taxRate, activeBranch?.taxRate]);
 
+   useEffect(() => {
+      const hasActiveTableOrder = activeOrderType === OrderType.DINE_IN
+         && !!selectedTableId
+         && Boolean(findActiveTableOrder(orders, tables, selectedTableId));
+      const code = String(pendingTableCoupon || (hasActiveTableOrder ? '' : activeCoupon) || '').trim().toUpperCase();
+      if (!code || cartSubtotal <= 0 || isApplyingCoupon || lastCouponSubtotalRef.current === cartSubtotal) return;
+
+      lastCouponSubtotalRef.current = cartSubtotal;
+      setIsApplyingCoupon(true);
+      applyCoupon({
+         code,
+         branchId,
+         orderType: activeOrderType,
+         subtotal: cartSubtotal,
+         customerId: deliveryCustomer?.id,
+      })
+         .then(() => {
+            setCouponCode(code);
+            setPendingTableCoupon(null);
+         })
+         .catch((couponError: any) => {
+            const reason = String(couponError?.code || couponError?.message || '');
+            clearCoupon();
+            if (reason.includes('MIN_SUBTOTAL_NOT_MET')) {
+               setPendingTableCoupon(code);
+               return;
+            }
+            setPendingTableCoupon(null);
+            showToast(getActionableErrorMessage(couponError, lang), 'error');
+         })
+         .finally(() => setIsApplyingCoupon(false));
+   }, [
+      pendingTableCoupon,
+      activeCoupon,
+      cartSubtotal,
+      isApplyingCoupon,
+      applyCoupon,
+      branchId,
+      activeOrderType,
+      selectedTableId,
+      orders,
+      deliveryCustomer?.id,
+      clearCoupon,
+      lang,
+      showToast,
+   ]);
+
    const cartQuery = useMemo(() => cartSearchQuery.trim().toLowerCase(), [cartSearchQuery]);
    const filteredCartItems = useMemo(() => {
       if (!cartQuery) return safeActiveCart;
@@ -612,11 +684,11 @@ const POS: React.FC = () => {
    const saveCurrentTableDraft = useCallback(() => {
       if (!selectedTableId) return;
       if (safeActiveCart.length > 0 || discount > 0) {
-         saveTableDraft(selectedTableId, safeActiveCart, discount);
+         saveTableDraft(selectedTableId, safeActiveCart, discount, activeCoupon);
       } else {
          clearTableDraft(selectedTableId);
       }
-   }, [safeActiveCart, discount, selectedTableId, saveTableDraft, clearTableDraft]);
+   }, [safeActiveCart, discount, activeCoupon, selectedTableId, saveTableDraft, clearTableDraft]);
 
    const switchToTable = useCallback((tableId: string) => {
       if (!tableId) return;
@@ -626,16 +698,26 @@ const POS: React.FC = () => {
          saveCurrentTableDraft();
       }
 
-      const activeOrder = orders.find(o => o.tableId === tableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
+      const activeOrder = findActiveTableOrder(orders, tables, tableId);
       if (activeOrder) {
          loadTableOrder(tableId);
          clearTableDraft(tableId);
+         setPendingTableCoupon(null);
+         setCouponCode(activeOrder.couponCode || '');
       } else if (tableDrafts[tableId]) {
          loadTableDraft(tableId);
-      } else {
-         clearCart();
-         setDiscount(0);
-      }
+         setPendingTableCoupon(null);
+         setCouponCode(tableDrafts[tableId].activeCoupon || '');
+         lastCouponSubtotalRef.current = null;
+       } else {
+          clearCart();
+          const table = tables.find(candidate => candidate.id === tableId);
+          const defaultCouponCode = String(table?.defaultCouponCode || '').trim().toUpperCase();
+          setCouponCode(defaultCouponCode);
+          setPendingTableCoupon(defaultCouponCode || null);
+          lastCouponSubtotalRef.current = null;
+          setDiscount(defaultCouponCode ? 0 : Math.min(100, Math.max(0, Number(table?.discount) || 0)));
+       }
 
       setSelectedTableId(tableId);
    }, [
@@ -647,9 +729,10 @@ const POS: React.FC = () => {
       loadTableOrder,
       loadTableDraft,
       clearTableDraft,
-      clearCart,
-      setDiscount
-   ]);
+       clearCart,
+       setDiscount,
+       tables
+    ]);
 
    const leaveTable = useCallback(() => {
       if (!selectedTableId) return;
@@ -673,7 +756,7 @@ const POS: React.FC = () => {
    const showMap = activeOrderType === OrderType.DINE_IN && !selectedTableId;
    const showCustomerSelect = activeOrderType === OrderType.DELIVERY && !deliveryCustomer;
 
-   const handleSetPaymentMethod = useCallback((method: PaymentMethod) => {
+   const handleSetPaymentMethod = useCallback((method: PaymentMethod | string) => {
       setPaymentMethod(method);
       const nextPrefs: Partial<Record<OrderType, PaymentMethod>> = {
          ...paymentPrefsRef.current,
@@ -904,24 +987,28 @@ const POS: React.FC = () => {
       }
    }, [safeActiveCart, handleUpdateQuantity]);
 
-   const handleQuickPay = useCallback(async () => {
-      handleSetPaymentMethod(PaymentMethod.CASH);
-      setTimeout(() => handleSubmitOrder(), 0);
-   }, [handleSetPaymentMethod]);
-
    const performCloseTable = async (tableId: string) => {
-       const activeOrder = orders.find(o => o.tableId === tableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
+       const activeOrder = findActiveTableOrder(orders, tables, tableId);
        try {
-          if (activeOrder) {
-             await updateOrderStatus(activeOrder.id, OrderStatus.COMPLETED);
-          } else {
-             await updateTableStatus(tableId, TableStatus.AVAILABLE);
-          }
+           if (activeOrder) {
+               await updateOrderStatus(activeOrder.id, OrderStatus.COMPLETED, undefined, undefined, {
+                  skipPrint: true,
+                  skipVersionCheck: true,
+               });
+               await fetchTables(branchId);
+               try {
+                  await printOrderReceipt({ order: activeOrder, printers, settings, currencySymbol, lang, t, branch: activeBranch });
+               } catch (printError) {
+                  showToast(getActionableErrorMessage(printError, lang), 'warning');
+               }
+           } else {
+               await updateTableStatus(tableId, TableStatus.AVAILABLE);
+           }
           clearTableDraft(tableId);
           setManagedTableId(null);
           showToast(t.table_closed || (lang === 'ar' ? 'تم إغلاق الترابيزة' : 'Table closed'), 'success');
-       } catch {
-          showToast(lang === 'ar' ? 'تعذر إغلاق الترابيزة' : 'Failed to close table', 'error');
+       } catch (error) {
+          showToast(getActionableErrorMessage(error, lang), 'error');
        }
    };
 
@@ -929,10 +1016,31 @@ const POS: React.FC = () => {
       await performCloseTable(tableId);
    };
 
+   const handleResetTable = (table: Table) => {
+      showModal({
+         title: lang === 'ar' ? 'تصفير الطاولة المعلقة' : 'Reset stuck table',
+         message: lang === 'ar'
+            ? `سيتم إلغاء أي أوردر نشط على ${table.name} وإرجاعها متاحة. هل تريد المتابعة؟`
+            : `Any active order on ${table.name} will be cancelled and the table will become available. Continue?`,
+         type: 'danger',
+         confirmText: lang === 'ar' ? 'تصفير الطاولة' : 'Reset table',
+         cancelText: t.cancel,
+         onConfirm: () => void resetTable(
+            table.id,
+            lang === 'ar' ? 'تصفير إداري لطاولة معلقة' : 'Admin reset for stuck table',
+         ).then(() => {
+            clearTableDraft(table.id);
+            if (selectedTableId === table.id) setSelectedTableId(null);
+            setManagedTableId(null);
+            showToast(lang === 'ar' ? 'تم تصفير الطاولة وإزالة التعليق' : 'Table reset successfully', 'success');
+         }).catch((error) => showToast(getActionableErrorMessage(error, lang), 'error')),
+      });
+   };
+
    const handleMergeTables = async (sourceTableId: string, targetTableId: string, itemCartIds: string[]) => {
       if (!sourceTableId || !targetTableId || sourceTableId === targetTableId) return;
 
-      const sourceOrder = orders.find(o => o.tableId === sourceTableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
+      const sourceOrder = findActiveTableOrder(orders, tables, sourceTableId);
       if (!sourceOrder) {
          showToast(lang === 'ar' ? 'لا يوجد طلب على الطاولة المصدر' : 'No active order on source table', 'error');
          return;
@@ -945,21 +1053,8 @@ const POS: React.FC = () => {
          return;
       }
 
-      const movingAll = idsToMove.length === sourceItemIds.length;
-      if (movingAll) {
-         await transferTable(sourceTableId, targetTableId);
-         clearTableDraft(sourceTableId);
-         setManagedTableId(null);
-         showToast(t.tables_merged || (lang === 'ar' ? 'تم دمج الترابيزات' : 'Tables merged'), 'success');
-         return;
-      }
-
       await transferItems(sourceTableId, targetTableId, idsToMove);
-      await updateTableStatus(targetTableId, TableStatus.OCCUPIED);
-
-      const remainingCount = (sourceOrder.items || []).filter(i => !idsToMove.includes(i.cartId)).length;
-      if (remainingCount === 0) {
-         await updateTableStatus(sourceTableId, TableStatus.AVAILABLE);
+      if (idsToMove.length === sourceItemIds.length) {
          clearTableDraft(sourceTableId);
       }
 
@@ -968,7 +1063,7 @@ const POS: React.FC = () => {
    };
 
    const handleTempBill = async (tableId: string) => {
-      const activeOrder = orders.find(o => o.tableId === tableId && o.status !== OrderStatus.DELIVERED);
+      const activeOrder = findActiveTableOrder(orders, tables, tableId);
       if (!activeOrder) return;
       try {
          await printOrderReceipt({
@@ -1004,7 +1099,7 @@ const POS: React.FC = () => {
       return notes.length > 0 ? notes.join('\n') : undefined;
    };
 
-   const buildDraftOrder = (withPayment: boolean): Order => ({
+   const buildDraftOrder = (withPayment: boolean, selectedPaymentMethod = paymentMethod): Order => ({
       id: generateOrderId(),
       type: activeOrderType,
       branchId: branchId,
@@ -1031,10 +1126,10 @@ const POS: React.FC = () => {
       tax: cartTax,
       total: cartTotal,
       createdAt: new Date(),
-      paymentMethod: withPayment ? paymentMethod : undefined,
+      paymentMethod: withPayment ? selectedPaymentMethod : undefined,
       notes: buildOrderNotes(),
       payments: withPayment
-         ? (paymentMethod === PaymentMethod.SPLIT ? splitPayments : [{ method: paymentMethod, amount: cartTotal }])
+         ? buildOrderPayment(selectedPaymentMethod, cartTotal, splitPayments).payments
          : [],
       syncStatus: 'PENDING'
    });
@@ -1048,6 +1143,8 @@ const POS: React.FC = () => {
       setSplitPayments([]);
       setPaymentMethod(PaymentMethod.CASH);
       setCouponCode('');
+      setPendingTableCoupon(null);
+      lastCouponSubtotalRef.current = null;
       clearCoupon();
    };
 
@@ -1093,6 +1190,17 @@ const POS: React.FC = () => {
 
    const handleSendKitchen = async () => {
       if (safeActiveCart.length === 0) return;
+      const selectedTable = tables.find(table => table.id === selectedTableId);
+      const minimumSpend = Math.max(0, Number(selectedTable?.minSpend) || 0);
+      if (activeOrderType === OrderType.DINE_IN && isBelowTableMinimumSpend(cartSubtotal, minimumSpend)) {
+         showToast(
+            lang === 'ar'
+               ? `الحد الأدنى للطلب على ${selectedTable?.name || 'الطاولة'} هو ${minimumSpend.toFixed(2)} ${currencySymbol}`
+               : `Minimum spend for ${selectedTable?.name || 'this table'} is ${minimumSpend.toFixed(2)} ${currencySymbol}`,
+            'error',
+         );
+         return;
+      }
       const submitKey = beginOrderSubmit('send');
       if (!submitKey) return;
       try {
@@ -1101,14 +1209,18 @@ const POS: React.FC = () => {
          const savedOrder = await placeOrder(draftOrder);
 
          if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
-            updateTableStatus(selectedTableId, TableStatus.OCCUPIED);
+             await updateTableStatus(selectedTableId, TableStatus.OCCUPIED, savedOrder.id);
             clearTableDraft(selectedTableId);
          }
 
-         // Run kitchen printing asynchronously
-         fireOrderToKitchen(savedOrder)
-            .catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ' : 'Order saved, but kitchen dispatch failed', 'error'));
-         resetAfterOrderCommit();
+          try {
+             await fireOrderToKitchen(savedOrder);
+          } catch {
+             resetAfterOrderCommit();
+             showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ' : 'Order saved, but kitchen dispatch failed', 'error');
+             return;
+          }
+          resetAfterOrderCommit();
          showToast(
             lang === 'ar'
                ? 'تم إرسال الطلب للمطبخ بنجاح'
@@ -1124,11 +1236,15 @@ const POS: React.FC = () => {
 
 
 
-   const handleSubmitOrder = async () => {
-      if (safeActiveCart.length === 0) return;
-      const submitKey = beginOrderSubmit('pay');
+    const handleSubmitOrder = async (selectedPaymentMethod = paymentMethod) => {
+       if (safeActiveCart.length === 0) return;
+       if (activeOrderType === OrderType.DINE_IN) {
+          showToast(lang === 'ar' ? 'أرسل الطلب للمطبخ، ثم أغلق الطاولة من خريطة الطاولات' : 'Send the order to kitchen, then close the table from the floor map', 'info');
+          return;
+       }
+       const submitKey = beginOrderSubmit('pay');
       if (!submitKey) return;
-      if (paymentMethod === PaymentMethod.SPLIT) {
+       if (selectedPaymentMethod === PaymentMethod.SPLIT) {
          const splitTotal = splitPayments.reduce((sum, p) => sum + p.amount, 0);
          if (Math.abs(splitTotal - cartTotal) > 0.01) {
             showToast(t.split_total_error, 'error');
@@ -1137,7 +1253,7 @@ const POS: React.FC = () => {
          }
       }
       try {
-         const draftOrder = buildDraftOrder(true);
+          const draftOrder = buildDraftOrder(true, selectedPaymentMethod);
          (draftOrder as any).clientSubmitKey = submitKey;
 
          // 1. Place Order in Store (Syncs with server which now handles inventory)
@@ -1147,15 +1263,6 @@ const POS: React.FC = () => {
                ? 'تم حفظ البيع، لكن مخزون بعض المكونات غير كاف.'
                : 'Sale saved, but some ingredient stock is insufficient.',
                'warning');
-         }
-
-         // Update Table Status to OCCUPIED if Dine-In
-         if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
-            updateTableStatus(selectedTableId, TableStatus.OCCUPIED);
-            clearTableDraft(selectedTableId);
-            setSelectedTableId(null);
-         } else if (activeOrderType === OrderType.DINE_IN) {
-            setSelectedTableId(null);
          }
 
          // 2. Record Finance Transactions (Keeping for now although this belongs to an event listener too)
@@ -1189,7 +1296,7 @@ const POS: React.FC = () => {
                branch: activeBranch
             }).catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة الإيصال' : 'Order saved, but receipt print failed', 'warning'));
           }
-          if (paymentMethod === PaymentMethod.CASH) {
+           if (selectedPaymentMethod === PaymentMethod.CASH) {
              await printService.triggerCashDrawer(branchId);
           }
          resetAfterOrderCommit();
@@ -1198,6 +1305,11 @@ const POS: React.FC = () => {
       } finally {
          endOrderSubmit();
       }
+   };
+
+   const handleQuickPay = async () => {
+      handleSetPaymentMethod(PaymentMethod.CASH);
+      await handleSubmitOrder(PaymentMethod.CASH);
    };
 
    const handleClearCart = () => {
@@ -1211,6 +1323,8 @@ const POS: React.FC = () => {
       setSplitPayments([]);
       setPaymentMethod(PaymentMethod.CASH);
       setCouponCode('');
+      setPendingTableCoupon(null);
+      lastCouponSubtotalRef.current = null;
       clearCoupon();
       if (selectedTableId) clearTableDraft(selectedTableId);
       showToast(lang === 'ar' ? 'تم تفريغ الطلب' : 'Cart cleared', 'success');
@@ -1218,6 +1332,9 @@ const POS: React.FC = () => {
 
    const handleVoidOrder = () => {
       if (safeActiveCart.length === 0) return;
+      const activeTableOrder = activeOrderType === OrderType.DINE_IN && selectedTableId
+         ? findActiveTableOrder(orders, tables, selectedTableId)
+         : undefined;
 
       showModal({
          title: t.confirm,
@@ -1226,15 +1343,36 @@ const POS: React.FC = () => {
          confirmText: t.confirm,
          cancelText: t.cancel,
          onConfirm: () => {
-            requestManagerApproval('VOID_ORDER', () => {
+            const cancelOrder = async (approval?: { id: number }) => {
+               if (activeTableOrder) {
+                  await updateOrderStatus(
+                     activeTableOrder.id,
+                     OrderStatus.CANCELLED,
+                     undefined,
+                     lang === 'ar' ? 'إلغاء أوردر صالة من نقطة البيع' : 'Dine-in order cancelled from POS',
+                     { skipVersionCheck: true, approvalId: approval?.id },
+                  );
+               }
                clearCart();
                setDeliveryCustomer(null);
                setSplitPayments([]);
                setPaymentMethod(PaymentMethod.CASH);
                setCouponCode('');
+               setPendingTableCoupon(null);
+               lastCouponSubtotalRef.current = null;
                clearCoupon();
                setSelectedTableId(null);
-            });
+               if (selectedTableId) clearTableDraft(selectedTableId);
+               showToast(lang === 'ar' ? 'تم إلغاء الطلب' : 'Order cancelled', 'success');
+            };
+            if (hasPermission(AppPermission.OP_VOID_ORDER)) {
+               void cancelOrder().catch(error => showToast(
+                  getActionableErrorMessage(error, lang as 'en' | 'ar'),
+                  'error',
+               ));
+            } else {
+               requestManagerApproval('VOID_ORDER', cancelOrder, activeTableOrder?.id);
+            }
          }
       });
    };
@@ -1315,13 +1453,15 @@ const POS: React.FC = () => {
                subtotal: cartSubtotal,
                customerId: deliveryCustomer?.id,
             });
+            lastCouponSubtotalRef.current = cartSubtotal;
+            setPendingTableCoupon(null);
             showToast(lang === 'ar' ? 'تم تطبيق الكوبون' : 'Coupon applied', 'success');
          } catch (error: any) {
             showToast(getActionableErrorMessage(error, lang), 'error');
          } finally {
             setIsApplyingCoupon(false);
          }
-      });
+       }, undefined, 'pin');
    };
 
    const modeShortcuts = useMemo(() => ([
@@ -1360,16 +1500,19 @@ const POS: React.FC = () => {
    };
 
    const handleUsePlatformDelivery = () => {
-      const platformOrderNo = externalOrderNumber.trim();
-      if (!platformOrderNo) {
-         showToast(lang === 'ar' ? 'اكتب رقم أوردر المنصة الأول' : 'Enter the platform order number first', 'error');
-         return;
-      }
-      const platformLabel = deliveryPlatforms.find((platform: any) => String(platform.id) === deliverySource)?.name
-         || (deliverySource === 'talabat' ? 'Talabat' : deliverySource);
-      const syntheticCustomer = {
+       const platformOrderNo = externalOrderNumber.trim();
+       if (!isPlatformDeliveryValid(platformOrderNo, platformDeliveryDraft)) {
+          showToast(
+             lang === 'ar'
+                ? 'كمّل رقم الأوردر واسم العميل وهاتف صحيح وعنوان التسليم'
+                : 'Complete the order number, customer name, valid phone, and delivery address',
+             'error'
+          );
+          return;
+       }
+       const syntheticCustomer = {
          id: '',
-         name: platformDeliveryDraft.customerName.trim() || `${platformLabel} #${platformOrderNo}`,
+          name: platformDeliveryDraft.customerName.trim(),
          phone: platformDeliveryDraft.customerPhone.trim(),
          address: platformDeliveryDraft.address.trim(),
       } as Customer;
@@ -1427,8 +1570,10 @@ const POS: React.FC = () => {
          <ManagerApprovalModal
             isOpen={showApprovalModal}
             onClose={() => { setShowApprovalModal(false); setApprovalCallback(null); }}
-            onApproved={() => approvalCallback?.fn()}
-            actionName={approvalCallback?.action || 'Operation Authorization'}
+             onApproved={(approval) => approvalCallback?.fn(approval)}
+             actionName={approvalCallback?.action || 'Operation Authorization'}
+              referenceId={approvalCallback?.referenceId}
+              credentialType={approvalCallback?.credentialType}
          />
 
          <HeldOrdersModal
@@ -1571,24 +1716,9 @@ const POS: React.FC = () => {
                         zones={zones}
                         orders={orders}
                         onSelectTable={(table) => {
-                           if (table.status === TableStatus.DIRTY) {
-                              showModal({
-                                 title: t.confirm,
-                                 message: t.mark_table_clean,
-                                 type: 'confirm',
-                                 confirmText: t.confirm,
-                                 cancelText: t.cancel,
-                                 onConfirm: () => updateTableStatus(table.id, TableStatus.AVAILABLE)
-                              });
-                              return;
-                           }
-                           if (
-                              table.status === TableStatus.OCCUPIED ||
-                              table.status === TableStatus.WAITING_FOOD ||
-                              table.status === TableStatus.READY_TO_PAY
-                           ) {
-                              setManagedTableId(table.id);
-                           } else {
+                            if (table.status !== TableStatus.AVAILABLE) {
+                               setManagedTableId(table.id);
+                            } else {
                               switchToTable(table.id);
                            }
                         }}
@@ -1597,7 +1727,9 @@ const POS: React.FC = () => {
                         }}
                         onTempBill={(table) => handleTempBill(table.id)}
                         onCloseTable={(table) => handleCloseTable(table.id)}
-                        onMergeTable={(table) => setManagedTableId(table.id)}
+                         onMergeTable={(table) => setManagedTableId(table.id)}
+                         onResetTable={handleResetTable}
+                         canResetTables={[UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER].includes(settings.currentUser?.role as UserRole)}
                         onUpdateOrderStatus={(orderId, status) => updateOrderStatus(orderId, status)}
                         lang={lang}
                         t={t}
@@ -1741,7 +1873,12 @@ const POS: React.FC = () => {
                            isApplyingCoupon={isApplyingCoupon}
                            onCouponCodeChange={setCouponCode}
                            onApplyCoupon={handleApplyCoupon}
-                           onClearCoupon={() => { setCouponCode(''); clearCoupon(); }}
+                           onClearCoupon={() => {
+                              setCouponCode('');
+                              setPendingTableCoupon(null);
+                              lastCouponSubtotalRef.current = null;
+                              clearCoupon();
+                           }}
                            onEditNote={(cartId, note) => { setEditingItemId(cartId); setNoteInput(note); }}
                            onEditSeat={(cartId, curSeat) => { setEditingSeatItemId(cartId); setSeatInput(curSeat); }}
                            onEditCourse={(cartId, curCourse) => { setEditingCourseItemId(cartId); setCourseInput(curCourse); }}
@@ -1765,7 +1902,8 @@ const POS: React.FC = () => {
                            isCartOpenMobile={isCartOpenMobile}
                            shouldShowCart={shouldShowCart}
                            cartPanelWidthClass={cartPanelWidthClass}
-                           splitPayments={splitPayments}
+                            splitPayments={splitPayments}
+                            customPaymentMethods={settings.customPaymentMethods}
                            deliveryPlatforms={deliveryPlatforms}
                            deliverySource={deliverySource}
                            onDeliverySourceChange={handleDeliverySourceChange}
@@ -1788,6 +1926,7 @@ const POS: React.FC = () => {
                lang={lang}
                t={t}
                splitPayments={splitPayments}
+               customPaymentMethods={settings.customPaymentMethods}
                onSetPayments={setSplitPayments}
                onAddPayment={(method) => {
                   const currentSplitSum = splitPayments.reduce((s, p) => s + p.amount, 0);
@@ -1808,15 +1947,18 @@ const POS: React.FC = () => {
                   lang={lang}
                   onClose={() => setManagedTableId(null)}
                   onCloseTable={handleCloseTable}
+                  onPrintBill={() => handleTempBill(managedTableId)}
+                  onResetTable={() => handleResetTable(tables.find(t => t.id === managedTableId)!)}
+                  canResetTable={[UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER].includes(settings.currentUser?.role as UserRole)}
                   onMergeTables={(targetId, itemIds) => handleMergeTables(managedTableId, targetId, itemIds)}
                   onEditOrder={() => {
                      switchToTable(managedTableId);
                      setManagedTableId(null);
                   }}
-                  onTransferTable={(targetId) => {
-                     transferTable(managedTableId, targetId);
-                     setManagedTableId(null);
-                  }}
+                   onTransferTable={async (targetId) => {
+                      await transferTable(managedTableId, targetId);
+                      setManagedTableId(null);
+                   }}
                   onTransferItems={async (targetId, itemIds) => {
                      await transferItems(managedTableId, targetId, itemIds);
                      setManagedTableId(null);

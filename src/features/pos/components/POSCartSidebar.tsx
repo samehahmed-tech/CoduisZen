@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Globe2, ShoppingBag, Store, Trash2, X } from 'lucide-react';
 import CartItem from './CartItem';
 import PaymentSummary from './PaymentSummary';
-import type { DeliveryPlatform, OrderItem, OrderType, PaymentMethod } from '@/types';
+import type { CustomPaymentMethod, DeliveryPlatform, OrderItem, OrderType, PaymentMethod } from '@/types';
+import { useConfirm } from '@/components/common/ConfirmProvider';
 
 interface POSCartSidebarProps {
     activeCart: OrderItem[];
@@ -25,8 +26,8 @@ interface POSCartSidebarProps {
     onSetCartWidth: (w: 'compact' | 'normal' | 'wide') => void;
     tipAmount: number;
     onSetTipAmount: (amount: number) => void;
-    paymentMethod: PaymentMethod;
-    onSetPaymentMethod: (m: PaymentMethod) => void;
+    paymentMethod: PaymentMethod | string;
+    onSetPaymentMethod: (m: PaymentMethod | string) => void;
     isPaymentPanelCollapsed: boolean;
     onTogglePaymentCollapsed: () => void;
     couponCode: string;
@@ -58,7 +59,8 @@ interface POSCartSidebarProps {
     isCartOpenMobile: boolean;
     shouldShowCart: boolean;
     cartPanelWidthClass: string;
-    splitPayments: { method: PaymentMethod; amount: number }[];
+    splitPayments: { method: PaymentMethod | string; amount: number }[];
+    customPaymentMethods?: CustomPaymentMethod[];
     deliveryPlatforms?: DeliveryPlatform[];
     deliverySource: string;
     onDeliverySourceChange: (source: string) => void;
@@ -78,7 +80,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
     onLeaveTable, onCloseCart, onFocusSearch, isSubmitting = false,
     tipAmount, onSetTipAmount,
     currencySymbol, isTouchMode, lang, t,
-    isCartOpenMobile, shouldShowCart, cartPanelWidthClass, splitPayments = [],
+    isCartOpenMobile, shouldShowCart, cartPanelWidthClass, splitPayments = [], customPaymentMethods = [],
     deliveryPlatforms = [], deliverySource, onDeliverySourceChange,
     externalOrderNumber, onExternalOrderNumberChange,
     orderNote, onOrderNoteChange
@@ -87,6 +89,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
     const hasCartItems = activeCart.length > 0;
     const isDelivery = String(activeOrderType) === 'DELIVERY';
     const activePlatforms = deliveryPlatforms.filter((platform: any) => platform.isActive !== false);
+    const { confirm } = useConfirm();
 
     return (
         <div
@@ -118,19 +121,27 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                         </div>
 
                         {/* Close — mobile */}
+                        <button onClick={onCloseCart} className="hidden max-lg:flex w-10 h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm">
+                            <X size={20} />
+                        </button>
+
+                        {/* Clear cart with confirm */}
                         <button
                             type="button"
-                            onClick={onClear}
+                            onClick={async () => {
+                                if (await confirm({
+                                    title: isAr ? 'تفريغ السلة' : 'Clear Cart',
+                                    message: isAr ? 'سيتم حذف جميع الأصناف من السلة. لا يمكن التراجع.' : 'All cart items will be removed. This cannot be undone.',
+                                    variant: 'danger',
+                                    confirmText: isAr ? 'تفريغ' : 'Clear',
+                                })) onClear();
+                            }}
                             disabled={!hasCartItems}
                             title={isAr ? 'تفريغ السلة' : 'Clear cart'}
                             aria-label={isAr ? 'تفريغ السلة' : 'Clear cart'}
                             className="flex w-10 h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm disabled:opacity-35 disabled:pointer-events-none"
                         >
                             <Trash2 size={18} />
-                        </button>
-
-                        <button onClick={onCloseCart} className="hidden max-lg:flex w-10 h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm">
-                            <X size={20} />
                         </button>
                     </div>
                 </div>
@@ -228,7 +239,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
             </div>
 
             {/* Payment Footer */}
-            <div className="shrink-0 border-t border-border/10 bg-card/95 backdrop-blur-md p-3 shadow-[0_-8px_22px_-18px_rgba(0,0,0,0.2)]">
+            <div className="pos-payment-footer min-h-0 overflow-y-auto overscroll-contain border-t border-border/10 bg-card/95 backdrop-blur-md p-3 shadow-[0_-8px_22px_-18px_rgba(0,0,0,0.2)]">
                 <PaymentSummary
                     subtotal={cartSubtotal} discount={discount} discountAmount={orderDiscountAmount} tax={cartTax} total={cartTotal}
                     currencySymbol={currencySymbol} paymentMethod={paymentMethod} onSetPaymentMethod={onSetPaymentMethod}
@@ -241,6 +252,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                     onApplyCoupon={onApplyCoupon} onClearCoupon={onClearCoupon} itemCount={cartStats.qty}
                     splitPayments={splitPayments}
                     activeOrderType={activeOrderType}
+                    customPaymentMethods={customPaymentMethods}
                 />
             </div>
         </div>

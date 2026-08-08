@@ -10,7 +10,7 @@ import { postPurchaseReceiptEntry } from '../services/financePostingService';
  */
 export const createPO = async (req: Request, res: Response) => {
     try {
-        const { id, supplierId, branchId, expectedDate, notes, items, createdBy } = req.body;
+        const { id, supplierId, branchId, targetWarehouseId, expectedDate, notes, items, createdBy } = req.body;
 
         if (!supplierId || !branchId || !items || items.length === 0) {
             return res.status(400).json({ error: 'supplierId, branchId, and items are required' });
@@ -24,6 +24,7 @@ export const createPO = async (req: Request, res: Response) => {
                 id: id || `PO-${Date.now()}`,
                 supplierId,
                 branchId,
+                targetWarehouseId: targetWarehouseId || null,
                 status: 'DRAFT',
                 expectedDate: expectedDate ? new Date(expectedDate) : null,
                 subtotal,
@@ -286,6 +287,7 @@ export const getPOById = async (req: Request, res: Response) => {
             id: purchaseOrderItems.id,
             itemId: purchaseOrderItems.itemId,
             itemName: inventoryItems.name,
+            unit: inventoryItems.unit,
             orderedQty: purchaseOrderItems.orderedQty,
             receivedQty: purchaseOrderItems.receivedQty,
             unitPrice: purchaseOrderItems.unitPrice,

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, orderItems, menuItems, menuCategories } from '../../../src/db/schema';
+import { orders, orderItems, menuItems, menuCategories, tables, floorZones } from '../../../src/db/schema';
 import { parseLocalDateRange, orderBusinessDateFilter } from './reportUtils';
 
 export const getSalesByOrderType = async (req: Request, res: Response) => {
@@ -367,32 +367,70 @@ export const getDineInTableAnalysis = async (req: Request, res: Response) => {
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const conditions: any[] = [
+        const tableConditions: any[] = [];
+        const orderConditions: any[] = [
             businessDateFilter,
             inArray(orders.status, deliveredStatuses),
             eq(orders.type, 'DINE_IN'),
             sql`${orders.tableId} is not null`,
         ];
-        if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
+        if (branchId && branchId !== 'undefined') {
+            tableConditions.push(eq(tables.branchId, branchId as string));
+            orderConditions.push(eq(orders.branchId, branchId as string));
+        }
 
-        const rows = await db.select({
+        const tableRows = await db.select({
+            tableId: tables.id,
+            tableName: tables.name,
+            zoneName: floorZones.name,
+            seats: tables.seats,
+            status: tables.status,
+            configuredDiscountPercent: tables.discount,
+            defaultCouponCode: tables.defaultCouponCode,
+            minSpend: tables.minSpend,
+            isVIP: tables.isVIP,
+            notes: tables.notes,
+        }).from(tables)
+            .leftJoin(floorZones, eq(tables.zoneId, floorZones.id))
+            .where(tableConditions.length ? and(...tableConditions) : undefined);
+
+        const metricRows = await db.select({
             tableId: orders.tableId,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
             avgDurationMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
+            totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
+            discountedOrderCount: sql<number>`coalesce(sum(case when ${orders.discount} > 0 then 1 else 0 end), 0)`,
+            discountRate: sql<number>`case when coalesce(sum(${orders.subtotal}), 0) = 0 then 0 else coalesce(sum(${orders.discount}), 0) * 100.0 / sum(${orders.subtotal}) end`,
         }).from(orders)
-            .where(and(...conditions))
-            .groupBy(orders.tableId)
-            .orderBy(sql`sum(${orders.total}) desc`);
+            .where(and(...orderConditions))
+            .groupBy(orders.tableId);
 
-        res.json(rows.map(r => ({
-            tableId: r.tableId,
-            orderCount: Number(r.orderCount),
-            revenue: Number(Number(r.revenue).toFixed(2)),
-            avgTicket: Number(Number(r.avgTicket).toFixed(2)),
-            avgDurationMinutes: Number(Number(r.avgDurationMinutes).toFixed(1)),
-        })));
+        const metricsByTableId = new Map(metricRows.map((row) => [row.tableId, row]));
+
+        res.json(tableRows.map((table) => {
+            const metrics = metricsByTableId.get(table.tableId);
+            return {
+                tableId: table.tableId,
+                tableName: table.tableName || table.tableId,
+                zoneName: table.zoneName || '',
+                seats: Number(table.seats || 0),
+                status: table.status === 'AVAILABLE' ? 'AVAILABLE' : 'OCCUPIED',
+                configuredDiscountPercent: Number(table.configuredDiscountPercent || 0),
+                defaultCouponCode: table.defaultCouponCode || '',
+                minSpend: Number(table.minSpend || 0),
+                isVIP: Boolean(table.isVIP),
+                notes: table.notes || '',
+                orderCount: Number(metrics?.orderCount || 0),
+                revenue: Number(Number(metrics?.revenue || 0).toFixed(2)),
+                avgTicket: Number(Number(metrics?.avgTicket || 0).toFixed(2)),
+                avgDurationMinutes: Number(Number(metrics?.avgDurationMinutes || 0).toFixed(1)),
+                totalDiscount: Number(Number(metrics?.totalDiscount || 0).toFixed(2)),
+                discountedOrderCount: Number(metrics?.discountedOrderCount || 0),
+                discountRate: Number(Number(metrics?.discountRate || 0).toFixed(1)),
+            };
+        }).sort((left, right) => right.revenue - left.revenue || left.tableName.localeCompare(right.tableName)));
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }

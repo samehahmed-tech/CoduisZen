@@ -1,12 +1,14 @@
 import React from 'react';
-import { Clock, CheckCircle, Volume2, VolumeX, MonitorPlay, AlertTriangle, Play, Truck, Settings, Flame, ChefHat, Sparkles, X, Plus, UtensilsCrossed, Search, Zap, Layers } from 'lucide-react';
+import { Clock, CheckCircle, Volume2, VolumeX, MonitorPlay, AlertTriangle, Play, Truck, Settings, Flame, ChefHat, Sparkles, X, UtensilsCrossed, Search, Zap, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrderStatus } from '../types';
-import { useKdsStore, KdsTicket } from '../stores/useKdsStore';
+import { advanceKdsTicketIdsOnce, compareKdsTicketPriority, hasNewKdsTicket, mergeKdsPriority, useKdsStore, KdsTicket } from '../stores/useKdsStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { formatDisplayId } from '../src/utils/idGenerator';
 import { socketService } from '../services/socketService';
 import { getTableDisplayName } from '../src/utils/tableDisplay';
+import { kdsApi } from '../services/api/kds';
+import { KDS_FALLBACK_POLL_MS, reconcileKdsPolling } from '../src/utils/kdsPolling';
 
 type Station = 'ALL' | string;
 type KdsDisplayMode = 'orders' | 'stations';
@@ -143,6 +145,7 @@ const mergeTicketsByOrder = (tickets: KdsTicket[]) => {
       existing.routingStations.push(ticket.routingStation);
     }
     existing.items.push(...ticketItems);
+    existing.priority = mergeKdsPriority([existing.priority, ticket.priority]);
     if (new Date(ticket.createdAt).getTime() < new Date(existing.createdAt).getTime()) {
       existing.createdAt = ticket.createdAt;
     }
@@ -253,7 +256,10 @@ const KDS: React.FC = () => {
   const [nowTick, setNowTick] = React.useState(Date.now());
   const [activeStatus, setActiveStatus] = React.useState<'ALL' | OrderStatus>('ALL');
   const [activeStations, setActiveStations] = React.useState<Set<Station>>(new Set(['ALL']));
-  const [soundMode, setSoundMode] = React.useState<'ALL' | 'OFF'>('ALL');
+  const [soundMode, setSoundMode] = React.useState<'ALL' | 'OFF'>(() => {
+    try { return localStorage.getItem('kds_sound_mode') === 'OFF' ? 'OFF' : 'ALL'; }
+    catch { return 'ALL'; }
+  });
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [showStationSettings, setShowStationSettings] = React.useState(false);
   const [pendingBump, setPendingBump] = React.useState<string | null>(null);
@@ -271,19 +277,28 @@ const KDS: React.FC = () => {
   const quickInputRef = React.useRef<HTMLInputElement>(null);
   const quickInputValueRef = React.useRef('');
   const [recentBumps, setRecentBumps] = React.useState<{id: string, ticketIds: string[], timeoutId: ReturnType<typeof setTimeout>}[]>([]);
-  const [completingOrderIds, setCompletingOrderIds] = React.useState<Set<string>>(new Set());
+  const completingOrderIdsRef = React.useRef<Set<string>>(new Set());
+  const knownTicketIdsRef = React.useRef<Set<string>>(new Set());
+  const lastUrgentAlertAtRef = React.useRef(0);
 
-  const [stations, setStations] = React.useState<StationConfig[]>(() => {
-    try {
-      const saved = localStorage.getItem('kds_stations');
-      return saved ? JSON.parse(saved) : DEFAULT_STATIONS;
-    } catch { return DEFAULT_STATIONS; }
-  });
+  const [stations, setStations] = React.useState<StationConfig[]>(DEFAULT_STATIONS);
 
-  const saveStations = React.useCallback((updated: StationConfig[]) => {
-    setStations(updated);
-    localStorage.setItem('kds_stations', JSON.stringify(updated));
-  }, []);
+  React.useEffect(() => {
+    let cancelled = false;
+    kdsApi.getMeta(activeBranchId || undefined)
+      .then(meta => {
+        if (cancelled) return;
+        const serverStations = (meta.stations || [])
+          .map(station => String(station.name || '').trim().toUpperCase())
+          .filter(Boolean)
+          .map(name => ({ name, keywords: [] }));
+        setStations(serverStations.length ? serverStations : DEFAULT_STATIONS);
+      })
+      .catch(() => {
+        if (!cancelled) setStations(DEFAULT_STATIONS);
+      });
+    return () => { cancelled = true; };
+  }, [activeBranchId]);
 
   React.useEffect(() => {
     quickInputValueRef.current = quickInput;
@@ -293,15 +308,44 @@ const KDS: React.FC = () => {
   React.useEffect(() => {
     const station = activeStations.has('ALL') ? undefined : Array.from(activeStations)[0];
     const params = { branchId: activeBranchId || undefined, station };
-    const handleKdsUpdate = () => {
-       fetchOrders(params);
-       if (soundMode === 'ALL') playNewOrderSound();
+    let cancelled = false;
+    let refreshInFlight = false;
+    let pollingTimer: number | null = null;
+    const refreshTickets = async (announceNewTickets: boolean) => {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      try {
+        await fetchOrders(params);
+        if (cancelled) return;
+        const nextTickets = useKdsStore.getState().tickets.filter((ticket) =>
+          (!activeBranchId || ticket.branchId === activeBranchId) &&
+          (!station || ticket.routingStation === station)
+        );
+        const hasNew = announceNewTickets && hasNewKdsTicket(knownTicketIdsRef.current, nextTickets);
+        knownTicketIdsRef.current = new Set(nextTickets.map((ticket) => ticket.id));
+        if (hasNew && soundMode === 'ALL') playNewOrderSound();
+      } finally {
+        refreshInFlight = false;
+      }
+    };
+    const handleKdsUpdate = () => { void refreshTickets(true); };
+    const handleConnectionChange = (connected: boolean) => {
+      pollingTimer = reconcileKdsPolling(
+        connected,
+        pollingTimer,
+        () => window.setInterval(() => { void refreshTickets(false); }, KDS_FALLBACK_POLL_MS),
+        timer => window.clearInterval(timer),
+      );
+      if (connected) void refreshTickets(false);
     };
 
-    fetchOrders(params);
     socketService.on('kds:update', handleKdsUpdate);
+    socketService.onConnectionChange(handleConnectionChange);
     return () => {
+       cancelled = true;
        socketService.off('kds:update', handleKdsUpdate);
+       socketService.offConnectionChange(handleConnectionChange);
+       if (pollingTimer !== null) window.clearInterval(pollingTimer);
     };
   }, [fetchOrders, soundMode, activeBranchId, activeStations]);
 
@@ -354,7 +398,7 @@ const KDS: React.FC = () => {
       (Date.now() - new Date(o.createdAt).getTime()) < MAX_AGE_MS
     );
     if (!activeStations.has('ALL')) base = base.filter(o => activeStations.has(o.routingStation));
-    return base.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return base.sort(compareKdsTicketPriority);
   }, [orders, activeStations, activeBranchId, nowTick]);
 
   const activeOrders = React.useMemo(() => {
@@ -364,7 +408,7 @@ const KDS: React.FC = () => {
     const filtered = activeStatus === 'ALL'
       ? displayRows
       : displayRows.filter(o => o.status === activeStatus);
-    return filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return filtered.sort(compareKdsTicketPriority);
   }, [activeTicketRows, activeStatus, displayMode]);
 
   const getElapsedMins = React.useCallback((createdAt: any) =>
@@ -374,8 +418,23 @@ const KDS: React.FC = () => {
   React.useEffect(() => {
     if (soundMode === 'OFF') return;
     const hasCritical = activeOrders.some(o => getElapsedMins(o.createdAt) >= SLA.critical && o.status !== OrderStatus.READY);
-    if (hasCritical) playUrgentAlertSound();
+    if (hasCritical && Date.now() - lastUrgentAlertAtRef.current >= 60_000) {
+      lastUrgentAlertAtRef.current = Date.now();
+      playUrgentAlertSound();
+    }
   }, [nowTick, soundMode, activeOrders, getElapsedMins]);
+
+  const toggleSoundMode = React.useCallback(() => {
+    setSoundMode((previous) => {
+      const next = previous === 'OFF' ? 'ALL' : 'OFF';
+      try { localStorage.setItem('kds_sound_mode', next); } catch {}
+      if (next === 'ALL') {
+        const audioContext = getAudioCtx();
+        if (audioContext.state === 'suspended') void audioContext.resume().catch(() => {});
+      }
+      return next;
+    });
+  }, []);
 
   const stationWorkload = React.useMemo(() => {
     const map: Record<string, number> = {};
@@ -389,11 +448,6 @@ const KDS: React.FC = () => {
   }, [activeTicketRows]);
 
   const advanceOrder = React.useCallback(async (order: any) => {
-    if (pendingBump !== order.id) {
-      setPendingBump(order.id);
-      setTimeout(() => setPendingBump(prev => prev === order.id ? null : prev), 1500);
-      return;
-    }
     setPendingBump(null);
     const ticketIds = Array.isArray(order.ticketIds) && order.ticketIds.length > 0
       ? order.ticketIds
@@ -416,33 +470,23 @@ const KDS: React.FC = () => {
         }, 8000);
         setRecentBumps(prev => [...prev, { id: order.id, ticketIds: idsToAdvance, timeoutId: tid }]);
     }
-  }, [orders, pendingBump, updateOrderStatus]);
+  }, [orders, updateOrderStatus]);
 
   const completeKitchenOrder = React.useCallback(async (order: any) => {
-    if (!order?.id || completingOrderIds.has(order.id)) return;
+    if (!order?.id || completingOrderIdsRef.current.has(order.id)) return;
     setPendingBump(null);
-    setCompletingOrderIds(prev => new Set(prev).add(order.id));
+    completingOrderIdsRef.current.add(order.id);
 
     const ticketIds = Array.isArray(order.ticketIds) && order.ticketIds.length > 0
       ? order.ticketIds
       : [order.primaryTicketId || order.id];
 
     try {
-      for (const ticketId of ticketIds) {
-        const ticket = orders.find(t => t.id === ticketId);
-        if (ticket?.status !== OrderStatus.READY) {
-          await updateOrderStatus(ticketId);
-        }
-        await updateOrderStatus(ticketId);
-      }
+      await advanceKdsTicketIdsOnce(ticketIds, updateOrderStatus);
     } finally {
-      setCompletingOrderIds(prev => {
-        const next = new Set(prev);
-        next.delete(order.id);
-        return next;
-      });
+      completingOrderIdsRef.current.delete(order.id);
     }
-  }, [completingOrderIds, orders, updateOrderStatus]);
+  }, [orders, updateOrderStatus]);
 
   const handleUndoBump = React.useCallback(async (id: string) => {
       const bump = recentBumps.find(b => b.id === id);
@@ -557,7 +601,7 @@ const KDS: React.FC = () => {
 
       switch (e.key) {
         case 'f': case 'F': toggleFullscreen(); break;
-        case 'm': case 'M': setSoundMode(p => p === 'OFF' ? 'ALL' : 'OFF'); break;
+        case 'm': case 'M': toggleSoundMode(); break;
         case 'ArrowDown':
           e.preventDefault();
           setHighlightedIdx(p => Math.min(p + 1, activeOrders.length - 1));
@@ -579,7 +623,7 @@ const KDS: React.FC = () => {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showStationSettings, toggleFullscreen, activeOrders, highlightedIdx, completeKitchenOrder, confirmQuickComplete]);
+  }, [showStationSettings, toggleFullscreen, activeOrders, highlightedIdx, completeKitchenOrder, confirmQuickComplete, toggleSoundMode]);
 
   return (
     <div
@@ -772,7 +816,7 @@ const KDS: React.FC = () => {
           )}
 
           <button
-            onClick={() => setSoundMode(soundMode === 'OFF' ? 'ALL' : 'OFF')}
+            onClick={toggleSoundMode}
             className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200"
             style={{
               borderRadius: 'var(--theme-radius-sm, 8px)',
@@ -808,7 +852,7 @@ const KDS: React.FC = () => {
               color: 'rgb(var(--text-muted))',
               border: '1px solid rgba(var(--border-color), 0.2)',
             }}
-            title={kdsText(isArabic, 'Configure stations', 'إعداد المحطات')}
+              title={kdsText(isArabic, 'View routing stations', 'عرض محطات التوجيه')}
           >
             <Settings size={14} />
           </button>
@@ -959,7 +1003,7 @@ const KDS: React.FC = () => {
             >
               <div className="flex justify-between items-center pb-4" style={{ borderBottom: '1px solid rgba(var(--border-color), 0.15)' }}>
                 <h3 className="flex items-center gap-2 uppercase tracking-wider" style={{ fontSize: 14, fontWeight: 900, color: 'rgb(var(--text-main))' }}>
-                  <Settings size={16} style={{ color: 'rgb(var(--primary))' }} /> {kdsText(isArabic, 'Station Config', 'إعداد المحطات')}
+                  <Settings size={16} style={{ color: 'rgb(var(--primary))' }} /> {kdsText(isArabic, 'Routing Stations', 'محطات التوجيه')}
                 </h3>
                 <button
                   onClick={() => setShowStationSettings(false)}
@@ -975,10 +1019,12 @@ const KDS: React.FC = () => {
                 </button>
               </div>
               <div className="space-y-2.5 overflow-y-auto pr-1" style={{ maxHeight: '60vh' }}>
-                {stations.map((s, i) => (
+                <p className="text-xs font-bold leading-relaxed text-muted">
+                  {kdsText(isArabic, 'Stations come from active printer routing for this branch.', 'المحطات تُقرأ من توجيه الطابعات الفعّال لهذا الفرع.')}
+                </p>
+                {stations.map((s) => (
                   <div
-                    key={i}
-                    className="space-y-2"
+                    key={s.name}
                     style={{
                       background: 'rgba(var(--bg-elevated), 0.5)',
                       borderRadius: 'var(--theme-radius, 12px)',
@@ -986,83 +1032,15 @@ const KDS: React.FC = () => {
                       border: '1px solid rgba(var(--border-color), 0.15)',
                     }}
                   >
-                    <div className="flex items-center justify-between">
-                      <input
-                        value={s.name}
-                        onChange={e => {
-                          const updated = [...stations];
-                          updated[i] = { ...s, name: e.target.value.toUpperCase() };
-                          saveStations(updated);
-                        }}
-                        className="bg-transparent outline-none uppercase transition-colors"
-                        style={{
-                          color: 'rgb(var(--text-main))',
-                          fontWeight: 900, fontSize: 13,
-                          borderBottom: '1px solid transparent',
-                          width: 128,
-                        }}
-                        onFocus={e => e.target.style.borderBottomColor = 'rgb(var(--primary))'}
-                        onBlur={e => e.target.style.borderBottomColor = 'transparent'}
-                      />
-                      <button
-                        onClick={() => saveStations(stations.filter((_, j) => j !== i))}
-                        className="uppercase transition-colors"
-                        style={{
-                          fontSize: 10, fontWeight: 900,
-                          color: 'rgb(var(--danger))',
-                          padding: '4px 8px',
-                          borderRadius: 'var(--theme-radius-sm, 6px)',
-                        }}
-                      >
-                        {kdsText(isArabic, 'Remove', 'حذف')}
-                      </button>
+                    <div className="flex items-center gap-2">
+                      <ChefHat size={15} style={{ color: 'rgb(var(--primary))' }} />
+                      <span className="uppercase" style={{ color: 'rgb(var(--text-main))', fontWeight: 900, fontSize: 13 }}>
+                        {s.name}
+                      </span>
                     </div>
-                    <input
-                      value={s.keywords.join(', ')}
-                      onChange={e => {
-                        const updated = [...stations];
-                        updated[i] = { ...s, keywords: e.target.value.split(',').map(k => k.trim().toLowerCase()).filter(Boolean) };
-                        saveStations(updated);
-                      }}
-                      className="w-full outline-none transition-colors"
-                      style={{
-                        background: 'rgb(var(--bg-app))',
-                        border: '1px solid rgba(var(--border-color), 0.2)',
-                        borderRadius: 'var(--theme-radius-sm, 8px)',
-                        padding: '8px 12px',
-                        fontSize: 12, fontWeight: 700,
-                        color: 'rgb(var(--text-muted))',
-                      }}
-                      placeholder={kdsText(isArabic, 'Keywords, comma separated', 'كلمات مفتاحية مفصولة بفواصل')}
-                    />
                   </div>
                 ))}
               </div>
-              <button
-                onClick={() => saveStations([...stations, { name: `STATION${stations.length + 1}`, keywords: [] }])}
-                className="w-full flex items-center justify-center gap-1.5 uppercase tracking-widest transition-all"
-                style={{
-                  padding: '10px 0',
-                  borderRadius: 'var(--theme-radius, 12px)',
-                  background: 'rgb(var(--primary))',
-                  color: 'white',
-                  fontSize: 10, fontWeight: 900,
-                  boxShadow: '0 4px 12px rgba(var(--primary), 0.25)',
-                }}
-              >
-                <Plus size={12} /> {kdsText(isArabic, 'Add Station', 'إضافة محطة')}
-              </button>
-              <button
-                onClick={() => saveStations(DEFAULT_STATIONS)}
-                className="w-full uppercase tracking-widest transition-colors"
-                style={{
-                  padding: '8px 0',
-                  fontSize: 10, fontWeight: 900,
-                  color: 'rgb(var(--text-muted))',
-                }}
-              >
-                {kdsText(isArabic, 'Reset to Defaults', 'استعادة الافتراضي')}
-              </button>
             </motion.div>
           </motion.div>
         )}
@@ -1129,9 +1107,10 @@ const KanbanColumn = React.memo(({
           onClick={onAction}
           className="flex items-center gap-1 uppercase tracking-wider active:scale-95 transition-all"
           style={{
-            padding: '6px 12px',
+            padding: '10px 16px',
             borderRadius: 'var(--theme-radius, 10px)',
-            fontSize: 9, fontWeight: 900,
+            fontSize: 12, fontWeight: 900,
+            minHeight: 44,
             background: `linear-gradient(135deg, rgb(var(${theme.token})), rgba(var(${theme.token}), 0.8))`,
             color: 'white',
             boxShadow: `0 4px 12px rgba(var(${theme.token}), 0.3)`,
@@ -1237,16 +1216,7 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, x: 50, scale: 0.96, transition: { duration: 0.2 } }}
       transition={{ type: 'spring', duration: 0.15 }}
-      onDoubleClick={() => advanceOrder(order)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          advanceOrder(order);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className="w-full text-left block overflow-hidden transition-all active:scale-[0.98] group backdrop-blur-xl cursor-pointer"
+      className="w-full text-left block overflow-hidden transition-all group backdrop-blur-xl"
       style={{
         borderRadius: 'var(--theme-radius, 12px)',
         background: cardBg,
@@ -1346,7 +1316,9 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
                   }}
                   className="shrink-0 flex items-center justify-center transition-all"
                   style={{
-                    width: 28, height: 28,
+                    width: 40, height: 40,
+                      minWidth: 40,
+                      minHeight: 40,
                     borderRadius: 'var(--theme-radius-sm, 6px)',
                     fontSize: 13, fontWeight: 900,
                     background: isDone ? 'rgb(var(--success))' : item.quantity > 1 ? 'rgba(var(--primary), 0.1)' : 'rgba(var(--bg-elevated), 0.6)',
@@ -1407,15 +1379,15 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
 
       {/* ?? Footer — Bump hint ?? */}
       <div className="px-3 pb-2">
-        <button
+<button
           type="button"
           onClick={markAllDone}
           disabled={pendingItemsCount === 0}
           className="w-full flex items-center justify-center gap-1.5 uppercase transition-all"
           style={{
-            minHeight: 34,
+            minHeight: 44,
             borderRadius: 'var(--theme-radius-sm, 8px)',
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 900,
             background: pendingItemsCount === 0 ? 'rgba(var(--success), 0.1)' : 'rgba(var(--success), 0.16)',
             color: pendingItemsCount === 0 ? 'rgba(var(--success), 0.7)' : 'rgb(var(--success))',
@@ -1431,8 +1403,10 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
         </button>
       </div>
 
-      <div
-        className="py-1.5 text-center uppercase transition-all"
+      <button
+        type="button"
+        onClick={() => advanceOrder(order)}
+        className="w-full min-h-11 py-1.5 text-center uppercase transition-all active:scale-[0.99]"
         style={{
           fontSize: 8, fontWeight: 900, letterSpacing: '0.2em',
           background: isPendingBump
@@ -1447,12 +1421,10 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
               : 'rgb(var(--text-muted))',
         }}
       >
-        {isPendingBump
-          ? kdsText(isArabic, 'Ready', 'جاهز')
-          : isReady
-            ? kdsText(isArabic, 'Double tap to deliver', 'اضغط مرتين للتسليم')
-            : kdsText(isArabic, 'Double tap to complete', 'اضغط مرتين للإنهاء')}
-      </div>
+        {isReady
+          ? kdsText(isArabic, 'Deliver order', 'تسليم الطلب')
+          : kdsText(isArabic, 'Complete order', 'إنهاء الطلب')}
+      </button>
     </motion.div>
   );
 });
@@ -1499,16 +1471,7 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                  onDoubleClick={() => completeOrder(order)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      completeOrder(order);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  className="cursor-pointer overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.98]"
+                  className="overflow-hidden transition-all hover:scale-[1.01]"
                   style={{
                     borderRadius: 'var(--theme-radius-lg, 16px)',
                     background: isReady ? 'rgba(var(--success), 0.08)' : urgency === 'critical' ? 'rgba(var(--danger), 0.06)' : 'rgba(var(--bg-card), 0.65)',
@@ -1660,13 +1623,19 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                   </div>
 
                   {/* ?? Footer ?? */}
-                  <div className="py-2 text-center uppercase" style={{
+                  <button
+                    type="button"
+                    onClick={() => completeOrder(order)}
+                    className="w-full min-h-11 py-2 text-center uppercase active:scale-[0.99]"
+                    style={{
                     fontSize: 9, fontWeight: 900, letterSpacing: '0.15em',
                     background: isReady ? 'rgba(var(--success), 0.1)' : 'rgba(var(--bg-elevated), 0.3)',
                     color: isReady ? 'rgb(var(--success))' : 'rgb(var(--text-muted))',
                   }}>
-                    {kdsText(isArabic, 'Double tap to complete', 'اضغط مرتين للإنهاء')}
-                  </div>
+                    {isReady
+                      ? kdsText(isArabic, 'Deliver order', 'تسليم الطلب')
+                      : kdsText(isArabic, 'Complete order', 'إنهاء الطلب')}
+                  </button>
                 </motion.div>
               );
             })}

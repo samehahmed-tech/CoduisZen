@@ -79,8 +79,16 @@ export enum PaymentMethod {
   SPLIT = 'SPLIT'
 }
 
+export interface CustomPaymentMethod {
+  id: string;
+  name: string;
+  nameAr?: string;
+  feePercentage?: number;
+  isActive?: boolean;
+}
+
 export interface PaymentRecord {
-  method: PaymentMethod;
+  method: PaymentMethod | string;
   amount: number;
 }
 
@@ -126,6 +134,7 @@ export interface ModifierOption {
   name: string;
   nameAr?: string;
   price: number;
+  isAvailable?: boolean;
   recipe?: RecipeIngredient[]; // Recipe for the specific modifier option
 }
 
@@ -308,6 +317,7 @@ export interface StockMovement {
 
 export interface OrderItem extends MenuItem {
   cartId: string;
+  sizeId?: string;
   quantity: number;
   notes?: string;
   seatNumber?: number;
@@ -357,7 +367,7 @@ export interface Order {
   freeDelivery?: boolean; // Call Center - free delivery flag
   isUrgent?: boolean; // Call Center - priority order flag
   createdAt: Date;
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: PaymentMethod | string;
   payments?: PaymentRecord[];
   notes?: string;
   tipAmount?: number;
@@ -388,6 +398,7 @@ export interface PurchaseOrder {
     itemId: string; // Link to InventoryItem
     itemName: string;
     quantity: number;
+    unit?: string;
     unitPrice: number;
     receivedQuantity?: number;
   }[];
@@ -497,6 +508,8 @@ export interface Table {
   zoneId?: string;
   shape?: 'square' | 'round' | 'rectangle';
   discount?: number;
+  defaultCouponCode?: string;
+  discountMode?: 'PERCENT' | 'COUPON';
   minSpend?: number;
   isVIP?: boolean;
   notes?: string;
@@ -1068,6 +1081,8 @@ export interface AppSettings {
   receiptQrUrl?: string;
   receiptBrandingByOrderType?: Partial<Record<OrderType, { logoUrl?: string; qrUrl?: string }>>;
   receiptTemplates?: Array<Record<string, any>>;
+  defaultReceiptTemplateId?: string;
+  receiptTemplateByOrderType?: Partial<Record<OrderType, string>>;
   primaryCashierPrinterId?: string;
   cashierReceiptCopies?: number;
   autoPrintReceipt?: boolean;
@@ -1097,6 +1112,7 @@ export interface AppSettings {
   customWallpaperUrl?: string;  // Data URL for user-uploaded wallpaper
   rolePermissionOverrides?: Record<string, AppPermission[]>;
   customRoles?: CustomRole[];
+  customPaymentMethods?: CustomPaymentMethod[];
 }
 
 export enum ProductionStatus {
@@ -1109,6 +1125,7 @@ export enum ProductionStatus {
 export interface ProductionOrder {
   id: string;
   targetItemId: string; // The composite item to produce
+  recipeId?: string; // Normalized recipe used for this batch, when available
   quantityRequested: number;
   quantityProduced: number;
   warehouseId: string; // The production warehouse/kitchen

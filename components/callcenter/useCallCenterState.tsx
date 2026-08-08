@@ -12,6 +12,7 @@ import { callCenterSupervisorApi, deliveryApi } from '../../services/api/deliver
 import { ordersApi } from '../../services/api/orders';
 import { customersApi } from '../../services/api/customers';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { formatLocalDate } from '../../utils/formatters';
 
 type AnyOrder = Record<string, any>;
 type AnyDriver = Record<string, any>;
@@ -122,13 +123,14 @@ export const useCallCenterState = () => {
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const currency = settings.currencySymbol || (lang === 'ar' ? 'ج.م' : 'EGP');
     const branchId = settings.activeBranchId || '';
+    const businessDate = branches.find(branch => branch.id === branchId)?.businessDate || formatLocalDate(new Date());
 
     /* ── State ──────────────────────────────────────────────────── */
     const [fromDate, setFromDate] = React.useState(() => {
-        const d = new Date(); d.setDate(d.getDate() - 1);
-        return d.toISOString().slice(0, 10);
+        const d = new Date(`${businessDate}T12:00:00`); d.setDate(d.getDate() - 1);
+        return formatLocalDate(d);
     });
-    const [toDate, setToDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+    const [toDate, setToDate] = React.useState(businessDate);
     const [selectedBranch, setSelectedBranch] = React.useState(branchId);
     const [orders, setOrders] = React.useState<AnyOrder[]>([]);
     const [drivers, setDrivers] = React.useState<AnyDriver[]>([]);

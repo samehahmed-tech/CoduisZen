@@ -108,12 +108,21 @@ const orderItemSchema = z.object({
     menu_item_id: z.string().min(1),
     name: z.string().optional(),
     price: z.number().min(0).optional(),
+    size_id: z.string().min(1).optional(),
+    sizeId: z.string().min(1).optional(),
     quantity: z.number().int().min(1).max(9999),
     notes: z.string().max(500).optional().nullable(),
     modifiers: z.array(z.object({
-        groupName: z.string(),
-        optionName: z.string(),
-        price: z.number().min(0),
+        id: z.string().min(1).optional(),
+        optionId: z.string().min(1).optional(),
+        groupId: z.string().min(1).optional(),
+        groupName: z.string().optional(),
+        optionName: z.string().optional(),
+        name: z.string().optional(),
+        nameAr: z.string().optional(),
+        price: z.number().min(0).optional(),
+    }).refine(modifier => Boolean(modifier.id || modifier.optionId || modifier.optionName), {
+        message: 'Modifier option reference is required',
     })).optional().default([]),
     // Legacy compat — accept cartId/selectedModifiers too
     cartId: z.string().optional(),
@@ -164,10 +173,10 @@ export const createOrderSchema = z.object({
     is_urgent: z.boolean().optional().nullable(),
     isCallCenterOrder: z.boolean().optional().nullable(),
     is_call_center_order: z.boolean().optional().nullable(),
-    paymentMethod: z.enum(['CASH', 'VISA', 'VODAFONE_CASH', 'INSTAPAY', 'SPLIT']).optional().nullable(),
-    payment_method: z.enum(['CASH', 'VISA', 'VODAFONE_CASH', 'INSTAPAY', 'SPLIT']).optional().nullable(),
+    paymentMethod: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,39}$/).optional().nullable(),
+    payment_method: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,39}$/).optional().nullable(),
     payments: z.array(z.object({
-        method: z.enum(['CASH', 'VISA', 'VODAFONE_CASH', 'INSTAPAY', 'SPLIT']),
+        method: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,39}$/),
         amount: z.number().min(0),
     })).optional(),
     couponCode: z.string().max(50).optional().nullable(),
@@ -182,6 +191,7 @@ export const updateOrderStatusSchema = z.object({
     expected_updated_at: z.string().optional(),
     expectedUpdatedAt: z.string().optional(),
     cancellationReason: z.string().max(500).optional(),
+    approval_id: z.coerce.number().int().positive().optional(),
 });
 
 // ============================================================================
@@ -262,6 +272,7 @@ export const createMenuItemSchema = menuItemBaseSchema.transform(normalizeMenuIt
 
 export const updateMenuItemSchema = menuItemBaseSchema.partial().extend({
     id: z.string().optional(),
+    restore: z.boolean().optional(),
 }).transform(normalizeMenuItemPayload);
 
 // ============================================================================
@@ -271,7 +282,7 @@ export const updateMenuItemSchema = menuItemBaseSchema.partial().extend({
 export const stockUpdateSchema = z.object({
     item_id: z.string().min(1),
     warehouse_id: z.string().min(1),
-    quantity: z.number().min(0, 'Quantity cannot be negative'),
+    quantity: z.number().finite('Quantity must be finite').min(0, 'Quantity cannot be negative'),
     type: z.enum(['TRANSFER', 'ADJUSTMENT', 'PURCHASE', 'SALE_CONSUMPTION', 'WASTE']),
     reason: z.string().max(500).optional(),
     actor_id: z.string().optional(),
@@ -296,6 +307,18 @@ export const updateSettingSchema = z.object({
     value: z.any(),
     category: z.string().max(100).optional(),
     updated_by: z.string().optional(),
+});
+
+export const directStockReceiptSchema = z.object({
+    warehouse_id: z.string().min(1),
+    supplier_id: z.string().min(1).optional(),
+    reference_id: z.string().min(1).max(200),
+    actor_id: z.string().optional(),
+    items: z.array(z.object({
+        item_id: z.string().min(1),
+        quantity: z.number().finite().positive(),
+        unit_cost: z.number().finite().positive(),
+    })).min(1),
 });
 
 // ============================================================================
@@ -323,6 +346,13 @@ export const createUserSchema = z.object({
     attendanceCode: optionalTrimmedString,
     employmentDate: optionalTrimmedString,
     salary: optionalSalarySchema,
+    createEmployeeRecord: z.boolean().optional().default(false),
+    basicSalary: z.number().min(0).optional(),
+    hourlyRate: z.number().min(0).optional(),
+    departmentId: optionalTrimmedString,
+    jobTitleId: optionalTrimmedString,
+    emergencyContact: optionalTrimmedString,
+    bankAccount: optionalTrimmedString,
 });
 
 export const updateUserSchema = createUserSchema.partial();
@@ -349,13 +379,13 @@ export const createJournalSchema = z.object({
 export const createRefundSchema = z.object({
     orderId: z.string().min(1, 'Order ID is required'),
     type: z.enum(['FULL', 'PARTIAL', 'ITEM']),
-    reason: z.string().min(1, 'Reason is required').max(1000),
-    amount: z.number().min(0).optional(),
+    reason: z.string().trim().min(1, 'Reason is required').max(1000),
+    reasonCategory: z.enum(['QUALITY', 'WRONG_ORDER', 'CUSTOMER_REQUEST', 'OVERCHARGE', 'OTHER']).default('OTHER'),
+    refundMethod: z.enum(['CASH', 'ORIGINAL_PAYMENT', 'STORE_CREDIT']).default('ORIGINAL_PAYMENT'),
+    customAmount: z.number().positive().optional(),
     items: z.array(z.object({
-        cartId: z.string(),
+        orderItemId: z.number().int().positive(),
         quantity: z.number().int().min(1),
-        reason: z.string().optional(),
+        reason: z.string().trim().max(500).optional(),
     })).optional(),
-    approvedBy: z.string().optional(),
-    notes: z.string().max(1000).optional(),
 });

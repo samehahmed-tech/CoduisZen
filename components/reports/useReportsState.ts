@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { reportsApi } from '../../services/api/reports';
+import { inventoryApi } from '../../services/api/inventory';
 import { UserRole } from '../../types';
 
 // ?? Types ??
@@ -64,6 +65,7 @@ export function useReportsState() {
    const [topExpenses, setTopExpenses] = useState<any[]>([]);
    const [expenseReport, setExpenseReport] = useState<any>(null);
    const [stockMovementLog, setStockMovementLog] = useState<any[]>([]);
+   const [stockCounts, setStockCounts] = useState<any[]>([]);
    const [wasteLoss, setWasteLoss] = useState<any>(null);
    const [reorderAlerts, setReorderAlerts] = useState<any[]>([]);
    const [expiringBatches, setExpiringBatches] = useState<any>(null);
@@ -220,6 +222,7 @@ export function useReportsState() {
                case 'Shift Profitability': { const r = await reportsApi.getShiftProfitability(params).catch(() => []); setShiftProfitData(r as any || []); break; }
                case 'COGS & Margin': { const r = await reportsApi.getFoodCost(params); setFoodCostData(r || []); break; }
                case 'Stock Movement': { const r = await reportsApi.getStockMovements(params).catch(() => []); setStockMovementLog(r as any || []); break; }
+               case 'Stock Counts': { const r = await inventoryApi.getStockCounts({ branchId: params.branchId, startDate: params.startDate, endDate: params.endDate, limit: 100 }).catch(() => []); setStockCounts(r || []); break; }
                case 'Waste/Loss Log': { const r = await reportsApi.getWasteLoss(params).catch(() => null); setWasteLoss(r as any); break; }
                case 'Reorder Alerts': { const r = await reportsApi.getReorderAlerts().catch(() => []); setReorderAlerts(r as any || []); break; }
                case 'Expiring Batches': { const r = await reportsApi.getExpiringBatches().catch(() => null); setExpiringBatches(r as any); break; }
@@ -349,7 +352,7 @@ export function useReportsState() {
       dailySales, profitDaily, overview, profitSummary, foodCostData,
       paymentSummary, vatReport, hourlySales, cashierSummary, refunds,
       integrity, trialBalance, profitAndLoss, topExpenses, expenseReport,
-      stockMovementLog, wasteLoss, reorderAlerts, expiringBatches,
+       stockMovementLog, stockCounts, wasteLoss, reorderAlerts, expiringBatches,
       payrollData, attendanceData, overtimeData,
       customerLTV, campaignROI,
       branchPerformance, orderPrepTime,

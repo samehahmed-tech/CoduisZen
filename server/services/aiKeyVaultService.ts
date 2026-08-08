@@ -2,27 +2,37 @@ import crypto from 'crypto';
 import { db } from '../db';
 import { settings } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
-import { AI_FREE_MODELS, AI_MODEL_SETTING_KEY, DEFAULT_FREE_MODEL, normalizeModel } from './aiModelCatalog';
+import { AI_FREE_MODELS, AI_MODEL_SETTING_KEY, DEFAULT_FREE_MODEL, normalizeModel, GROQ_MODELS, GROQ_MODEL_SETTING_KEY, DEFAULT_GROQ_MODEL, normalizeGroqModel } from './aiModelCatalog';
 
 type AiKeySource = 'DEFAULT' | 'CUSTOM';
-export type AiProvider = 'OPENROUTER' | 'OLLAMA';
+export type AiProvider = 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ';
 
 const AI_KEY_SOURCE_KEY = 'aiApiKeySource';
 const AI_KEY_ENCRYPTED_KEY = 'aiApiKeyEncrypted';
+const AI_GROQ_KEY_ENCRYPTED_KEY = 'aiGroqKeyEncrypted';
 const AI_PROVIDER_KEY = 'aiProvider';
 const AI_OLLAMA_MODEL_KEY = 'aiOllamaModel';
+const GPT4JS_PROVIDER = String(process.env.GPT4JS_PROVIDER || 'BlackBox').trim() || 'BlackBox';
+const GPT4JS_MODEL = String(process.env.GPT4JS_MODEL || '').trim();
 const CACHE_TTL_MS = 60_000;
 
 const OLLAMA_ENABLED = String(process.env.OLLAMA_ENABLED || 'false').trim().toLowerCase() === 'true';
 const OLLAMA_BASE_URL = String(process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').trim();
 const OLLAMA_MODEL_ENV = String(process.env.OLLAMA_MODEL || 'qwen2.5:7b-instruct').trim();
 
-let cache: { at: number; source: AiKeySource; encrypted: string; model: string; provider: AiProvider; ollamaModel: string } | null = null;
+let cache: { at: number; source: AiKeySource; encrypted: string; groqEncrypted: string; model: string; provider: AiProvider; ollamaModel: string; groqModel: string } | null = null;
 
 const readDefaultKey = () =>
     String(
         process.env.OPENROUTER_API_KEY ||
         process.env.VITE_OPENROUTER_API_KEY ||
+        '',
+    ).trim();
+
+const readDefaultGroqKey = () =>
+    String(
+        process.env.GROQ_API_KEY ||
+        process.env.VITE_GROQ_API_KEY ||
         '',
     ).trim();
 
@@ -67,25 +77,34 @@ const loadRaw = async () => {
     const now = Date.now();
     if (cache && now - cache.at < CACHE_TTL_MS) return cache;
 
-    const [sourceRow, encRow, modelRow, providerRow, ollamaModelRow] = await Promise.all([
+    const [sourceRow, encRow, modelRow, providerRow, ollamaModelRow, groqEncRow, groqModelRow] = await Promise.all([
         db.select().top(1).from(settings).where(eq(settings.key, AI_KEY_SOURCE_KEY)),
         db.select().top(1).from(settings).where(eq(settings.key, AI_KEY_ENCRYPTED_KEY)),
         db.select().top(1).from(settings).where(eq(settings.key, AI_MODEL_SETTING_KEY)),
         db.select().top(1).from(settings).where(eq(settings.key, AI_PROVIDER_KEY)),
         db.select().top(1).from(settings).where(eq(settings.key, AI_OLLAMA_MODEL_KEY)),
+        db.select().top(1).from(settings).where(eq(settings.key, AI_GROQ_KEY_ENCRYPTED_KEY)),
+        db.select().top(1).from(settings).where(eq(settings.key, GROQ_MODEL_SETTING_KEY)),
     ]);
 
-    const source = (String(sourceRow?.[0]?.value || 'DEFAULT').toUpperCase() === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT') as AiKeySource;
+    const requestedSource = String(sourceRow?.[0]?.value || 'DEFAULT').toUpperCase();
     const encrypted = String(encRow?.[0]?.value || '');
+    const groqEncrypted = String(groqEncRow?.[0]?.value || '');
     const model = normalizeModel(String(modelRow?.[0]?.value || DEFAULT_FREE_MODEL));
+    const groqModel = normalizeGroqModel(String(groqModelRow?.[0]?.value || DEFAULT_GROQ_MODEL));
 
     const providerRaw = String(providerRow?.[0]?.value || '').trim().toUpperCase();
-    const providerDefault: AiProvider = OLLAMA_ENABLED ? 'OLLAMA' : 'OPENROUTER';
-    const provider: AiProvider = (providerRaw === 'OLLAMA' || providerRaw === 'OPENROUTER') ? (providerRaw as AiProvider) : providerDefault;
+    const hasGroqKey = Boolean(groqEncrypted || readDefaultGroqKey());
+    let provider: AiProvider;
+    if (providerRaw === 'OPENROUTER') provider = 'OPENROUTER';
+    else if (providerRaw === 'GROQ') provider = 'GROQ';
+    else provider = hasGroqKey ? 'GROQ' : 'SYSTEM';
+    const keyedProvider = provider === 'OPENROUTER' || provider === 'GROQ';
+    const source = (keyedProvider && requestedSource === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT') as AiKeySource;
 
     const ollamaModel = String(ollamaModelRow?.[0]?.value || OLLAMA_MODEL_ENV).trim() || OLLAMA_MODEL_ENV;
 
-    cache = { at: now, source, encrypted, model, provider, ollamaModel };
+    cache = { at: now, source, encrypted, groqEncrypted, model, provider, ollamaModel, groqModel };
     return cache;
 };
 
@@ -109,8 +128,11 @@ export const aiKeyVaultService = {
     async getConfig() {
         const raw = await loadRaw();
         const defaultKey = readDefaultKey();
+        const defaultGroqKey = readDefaultGroqKey();
         const hasCustomKey = Boolean(raw.encrypted);
+        const hasCustomGroqKey = Boolean(raw.groqEncrypted);
         let maskedCustomKey: string | null = null;
+        let maskedCustomGroqKey: string | null = null;
         if (hasCustomKey) {
             try {
                 maskedCustomKey = maskKey(decrypt(raw.encrypted));
@@ -118,17 +140,29 @@ export const aiKeyVaultService = {
                 maskedCustomKey = null;
             }
         }
+        if (hasCustomGroqKey) {
+            try {
+                maskedCustomGroqKey = maskKey(decrypt(raw.groqEncrypted));
+            } catch {
+                maskedCustomGroqKey = null;
+            }
+        }
         return {
             provider: raw.provider,
             providerOptions: [
-                { id: 'OLLAMA', label: 'Local Ollama (Unlimited, Self-hosted)' },
-                { id: 'OPENROUTER', label: 'OpenRouter (Free-tier, Rate-limited)' },
+                { id: 'SYSTEM', label: 'System Copilot (Free, No Key)' },
+                { id: 'GROQ', label: 'Groq (Fast API)' },
             ],
             ollama: {
                 enabled: OLLAMA_ENABLED,
                 baseUrl: OLLAMA_BASE_URL,
                 model: raw.ollamaModel || OLLAMA_MODEL_ENV,
                 modelDefault: OLLAMA_MODEL_ENV,
+            },
+            groq: {
+                model: raw.groqModel || DEFAULT_GROQ_MODEL,
+                modelDefault: DEFAULT_GROQ_MODEL,
+                usingDefaultAvailable: Boolean(defaultGroqKey),
             },
             source: raw.source,
             hasCustomKey,
@@ -137,21 +171,31 @@ export const aiKeyVaultService = {
             model: raw.model,
             availableModels: AI_FREE_MODELS,
             defaultModel: DEFAULT_FREE_MODEL,
+            availableGroqModels: GROQ_MODELS,
+            defaultGroqModel: DEFAULT_GROQ_MODEL,
+            hasCustomGroqKey,
+            maskedCustomGroqKey,
         };
     },
 
-    async updateConfig(input: { source: AiKeySource; customKey?: string; model?: string; provider?: AiProvider; ollamaModel?: string }) {
-        const source = input.source === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT';
+    async updateConfig(input: { source: AiKeySource; customKey?: string; model?: string; provider?: AiProvider; ollamaModel?: string; groqModel?: string }) {
+        const requestedSource = input.source === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT';
         const current = await loadRaw();
         let encrypted = current.encrypted;
+        let groqEncrypted = current.groqEncrypted;
         const model = normalizeModel(input.model || current.model || DEFAULT_FREE_MODEL);
         const providerRaw = String(input.provider || current.provider || '').toUpperCase();
-        const provider: AiProvider = (providerRaw === 'OLLAMA' || providerRaw === 'OPENROUTER')
-            ? (providerRaw as AiProvider)
-            : (OLLAMA_ENABLED ? 'OLLAMA' : 'OPENROUTER');
+        const provider: AiProvider = providerRaw === 'OPENROUTER'
+            ? 'OPENROUTER'
+            : providerRaw === 'GROQ'
+                ? 'GROQ'
+                : 'SYSTEM';
+        const keyedProvider = provider === 'OPENROUTER' || provider === 'GROQ';
+        const source = keyedProvider ? requestedSource : 'DEFAULT';
         const ollamaModel = String(input.ollamaModel || current.ollamaModel || OLLAMA_MODEL_ENV).trim() || OLLAMA_MODEL_ENV;
+        const groqModel = normalizeGroqModel(input.groqModel || current.groqModel || DEFAULT_GROQ_MODEL);
 
-        if (source === 'CUSTOM') {
+        if (provider === 'OPENROUTER' && source === 'CUSTOM') {
             const next = String(input.customKey || '').trim();
             if (next) {
                 encrypted = encrypt(next);
@@ -161,10 +205,21 @@ export const aiKeyVaultService = {
             }
         }
 
+        if (provider === 'GROQ' && source === 'CUSTOM') {
+            const next = String(input.customKey || '').trim();
+            if (next) {
+                groqEncrypted = encrypt(next);
+                await upsert(AI_GROQ_KEY_ENCRYPTED_KEY, groqEncrypted);
+            } else if (!groqEncrypted) {
+                throw new Error('CUSTOM_AI_KEY_REQUIRED');
+            }
+        }
+
         await upsert(AI_KEY_SOURCE_KEY, source);
         await upsert(AI_MODEL_SETTING_KEY, model, 'ai_runtime');
         await upsert(AI_PROVIDER_KEY, provider, 'ai_runtime');
         await upsert(AI_OLLAMA_MODEL_KEY, ollamaModel, 'ai_runtime');
+        await upsert(GROQ_MODEL_SETTING_KEY, groqModel, 'ai_runtime');
         cache = null;
         return this.getConfig();
     },
@@ -176,6 +231,20 @@ export const aiKeyVaultService = {
             return decrypt(encrypted);
         }
         return defaultKey;
+    },
+
+    async resolveGroqKey(): Promise<string> {
+        const { source, groqEncrypted } = await loadRaw();
+        const defaultGroqKey = readDefaultGroqKey();
+        if (source === 'CUSTOM' && groqEncrypted) {
+            return decrypt(groqEncrypted);
+        }
+        return defaultGroqKey;
+    },
+
+    async resolveGroqModel(): Promise<string> {
+        const { groqModel } = await loadRaw();
+        return groqModel || DEFAULT_GROQ_MODEL;
     },
 
     async resolveProvider(): Promise<AiProvider> {
@@ -191,5 +260,8 @@ export const aiKeyVaultService = {
     async resolveOllamaModel(): Promise<string> {
         const { ollamaModel } = await loadRaw();
         return ollamaModel || OLLAMA_MODEL_ENV;
+    },
+    resolveGpt4jsConfig() {
+        return { provider: GPT4JS_PROVIDER, model: GPT4JS_MODEL };
     },
 };

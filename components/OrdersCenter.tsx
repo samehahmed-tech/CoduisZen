@@ -18,6 +18,7 @@ import {
     Phone,
     Printer,
     RefreshCw,
+    RotateCcw,
     Search,
     Send,
     ShoppingBag,
@@ -31,6 +32,7 @@ import { useOrderStore } from '../stores/useOrderStore';
 import { AppPermission, Order, OrderStatus, OrderType } from '../types';
 import { translations } from '../services/translations';
 import { ordersApi } from '../services/api/orders';
+import { refundApi } from '../services/api/refunds';
 import { useToast } from './Toast';
 import { apiRequest, getActionableErrorMessage } from '../services/api/core';
 import PageSkeleton from './common/PageSkeleton';
@@ -39,6 +41,7 @@ import { ManagerApprovalModal } from '../src/features/pos/components/ManagerAppr
 import { printOrderReceipt } from '../services/posPrintOrchestrator';
 import { socketService } from '../services/socketService';
 import { getTableDisplayName } from '../src/utils/tableDisplay';
+import { formatLocalDate } from '../utils/formatters';
 
 const normalizeOrder = (raw: any): Order => ({
     id: String(raw.id),
@@ -95,12 +98,22 @@ const OrdersCenter: React.FC = () => {
     const [branchFilter, setBranchFilter] = useState<string>(settings.activeBranchId || 'ALL');
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [showApprovalModal, setShowApprovalModal] = useState(false);
-    const [approvalAction, setApprovalAction] = useState<() => void>(() => {});
+    const [approvalAction, setApprovalAction] = useState<(approval?: { id: number }) => void>(() => {});
+    const [approvalReferenceId, setApprovalReferenceId] = useState<string | null>(null);
     const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
     const [pendingOrderAction, setPendingOrderAction] = useState<string | null>(null);
     const [voidModalOrderId, setVoidModalOrderId] = useState<string | null>(null);
     const [voidReason, setVoidReason] = useState('');
-    const [dateFilter, setDateFilter] = useState<string>('');
+    const [refundModalOrderId, setRefundModalOrderId] = useState<string | null>(null);
+    const [refundReason, setRefundReason] = useState('');
+    const [refundReasonCategory, setRefundReasonCategory] = useState<'QUALITY' | 'WRONG_ORDER' | 'CUSTOMER_REQUEST' | 'OVERCHARGE' | 'OTHER'>('CUSTOMER_REQUEST');
+    const [dateFilter, setDateFilter] = useState<string>(() => (
+        branches.find(branch => branch.id === settings.activeBranchId)?.businessDate
+        || formatLocalDate(new Date())
+    ));
+    const reviewOnlyCopy = isAr
+        ? 'هذا اليوم للمراجعة فقط. لا يمكن تعديل أو إلغاء أوردر بعد انتهاء يوم تشغيله.'
+        : 'This day is review-only. Orders cannot be changed or cancelled after their business day ends.';
 
     const copy = {
         title: isAr ? 'مركز الطلبات' : 'Orders Center',
@@ -144,6 +157,12 @@ const OrdersCenter: React.FC = () => {
         voidReasonPlaceholder: isAr ? 'مثال: العميل طلب الإلغاء' : 'Example: customer requested cancellation',
         cancel: isAr ? 'رجوع' : 'Cancel',
         confirmVoid: isAr ? 'تأكيد الإلغاء' : 'Confirm void',
+        refund: isAr ? 'طلب استرداد' : 'Request refund',
+        refundReasonTitle: isAr ? 'سبب استرداد الطلب' : 'Refund reason',
+        refundReasonHelp: isAr ? 'سيُرسل الطلب للموافقة قبل تنفيذ الاسترداد.' : 'The request will require approval before processing.',
+        refundReasonPlaceholder: isAr ? 'مثال: خطأ في الطلب أو شكوى جودة' : 'Example: wrong order or quality complaint',
+        refundCategory: isAr ? 'تصنيف السبب' : 'Reason category',
+        confirmRefund: isAr ? 'إرسال طلب الاسترداد' : 'Submit refund request',
     };
 
     const statusLabels: Record<string, { ar: string; en: string }> = {
@@ -218,7 +237,7 @@ const OrdersCenter: React.FC = () => {
         if (statusFilter !== 'ALL' && order.status !== statusFilter) return false;
         if (branchFilter !== 'ALL' && order.branchId !== branchFilter) return false;
         if (typeFilter !== 'ALL' && order.type !== typeFilter) return false;
-        if (dateFilter && new Date(order.createdAt).toISOString().split('T')[0] !== dateFilter) return false;
+        if (dateFilter && (order.businessDate || formatLocalDate(order.createdAt)) !== dateFilter) return false;
         return true;
     }, [branchFilter, dateFilter, statusFilter, typeFilter]);
 
@@ -276,6 +295,13 @@ const OrdersCenter: React.FC = () => {
     const selectedBranch = selectedOrder
         ? branches.find(branch => branch.id === selectedOrder.branchId)
         : branches.find(branch => branch.id === settings.activeBranchId);
+    const selectedOrderBusinessDate = selectedOrder
+        ? selectedOrder.businessDate || formatLocalDate(selectedOrder.createdAt)
+        : null;
+    const selectedBranchBusinessDate = selectedBranch?.businessDate || formatLocalDate(new Date());
+    const selectedOrderReadOnly = Boolean(
+        selectedOrderBusinessDate && selectedOrderBusinessDate !== selectedBranchBusinessDate,
+    );
     const selectedTableName = selectedOrder ? getTableDisplayName(selectedOrder) : '';
 
     const activeCount = orders.filter(order => ![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status)).length;
@@ -309,12 +335,15 @@ const OrdersCenter: React.FC = () => {
         }
     };
 
-    const executeVoidOrder = async (orderId: string, reason: string) => {
+    const executeVoidOrder = async (orderId: string, reason: string, approvalId?: number) => {
         if (pendingOrderAction) return;
         setPendingOrderAction(`${orderId}:VOID`);
         setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: OrderStatus.CANCELLED } : order));
         try {
-            await updateOrderStatus(orderId, OrderStatus.CANCELLED, undefined, reason.trim(), { skipVersionCheck: true });
+            await updateOrderStatus(orderId, OrderStatus.CANCELLED, undefined, reason.trim(), {
+                skipVersionCheck: true,
+                approvalId,
+            });
             showToast(isAr ? 'تم إلغاء الطلب' : 'Order cancelled', 'success');
             loadOrders();
         } catch (err: any) {
@@ -339,7 +368,9 @@ const OrdersCenter: React.FC = () => {
             return;
         }
         if (!hasPermission(AppPermission.OP_VOID_ORDER)) {
-            setApprovalAction(() => () => executeVoidOrder(voidModalOrderId, reason));
+            const orderId = voidModalOrderId;
+            setApprovalReferenceId(orderId);
+            setApprovalAction(() => approval => executeVoidOrder(orderId, reason, approval?.id));
             setShowApprovalModal(true);
             setVoidModalOrderId(null);
             setVoidReason('');
@@ -353,6 +384,41 @@ const OrdersCenter: React.FC = () => {
     const handleVoidOrder = (orderId: string) => {
         setVoidModalOrderId(orderId);
         setVoidReason('');
+    };
+
+    const closeRefundModal = () => {
+        if (pendingOrderAction) return;
+        setRefundModalOrderId(null);
+        setRefundReason('');
+        setRefundReasonCategory('CUSTOMER_REQUEST');
+    };
+
+    const submitRefundRequest = async () => {
+        if (!refundModalOrderId || pendingOrderAction) return;
+        const reason = refundReason.trim();
+        if (!reason) {
+            showToast(isAr ? 'سبب الاسترداد مطلوب' : 'Refund reason is required', 'error');
+            return;
+        }
+
+        setPendingOrderAction(`${refundModalOrderId}:REFUND`);
+        try {
+            await refundApi.requestRefund({
+                orderId: refundModalOrderId,
+                type: 'FULL',
+                reason,
+                reasonCategory: refundReasonCategory,
+                refundMethod: 'ORIGINAL_PAYMENT',
+            });
+            setRefundModalOrderId(null);
+            setRefundReason('');
+            setRefundReasonCategory('CUSTOMER_REQUEST');
+            showToast(isAr ? 'تم إرسال طلب الاسترداد للموافقة' : 'Refund request sent for approval', 'success');
+        } catch (err: any) {
+            showToast(getActionableErrorMessage(err, lang as any), 'error');
+        } finally {
+            setPendingOrderAction(null);
+        }
     };
 
     const handlePrintReceipt = async (order: Order) => {
@@ -470,14 +536,22 @@ const OrdersCenter: React.FC = () => {
                                     {copy.allDates}
                                 </button>
                             ) : (
-                                <button type="button" onClick={() => setDateFilter(new Date().toISOString().split('T')[0])} className="text-[10px] font-black text-muted hover:text-main">
+                                <button type="button" onClick={() => {
+                                    const activeBranch = branches.find(branch => branch.id === branchFilter);
+                                    setDateFilter(activeBranch?.businessDate || formatLocalDate(new Date()));
+                                }} className="text-[10px] font-black text-muted hover:text-main">
                                     {copy.today}
                                 </button>
                             )}
                         </div>
                         <div className="flex h-10 items-center gap-2 rounded-xl border border-border bg-elevated px-3">
                             <MapPin size={13} className="text-muted" />
-                            <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className="bg-transparent text-xs font-black text-main outline-none">
+                            <select value={branchFilter} onChange={e => {
+                                const nextBranchId = e.target.value;
+                                setBranchFilter(nextBranchId);
+                                const nextBranch = branches.find(branch => branch.id === nextBranchId);
+                                setDateFilter(nextBranch?.businessDate || formatLocalDate(new Date()));
+                            }} className="bg-transparent text-xs font-black text-main outline-none">
                                 <option value="ALL">{copy.allBranches}</option>
                                 {branches.map(branch => <option key={branch.id} value={branch.id}>{isAr ? branch.nameAr || branch.name : branch.name}</option>)}
                             </select>
@@ -659,7 +733,9 @@ const OrdersCenter: React.FC = () => {
                                 <div className="space-y-2">
                                     {selectedOrder.items.map((item, index) => {
                                         const cartId = item.cartId || `${selectedOrder.id}-${index}`;
-                                        const needsChecklist = selectedOrder.status === OrderStatus.READY && selectedOrder.type === OrderType.DELIVERY;
+                                        const needsChecklist = !selectedOrderReadOnly
+                                            && selectedOrder.status === OrderStatus.READY
+                                            && selectedOrder.type === OrderType.DELIVERY;
                                         const checked = checkedItems.has(cartId);
                                         return (
                                             <button
@@ -698,47 +774,67 @@ const OrdersCenter: React.FC = () => {
                         </div>
 
                         <div className="border-t border-border bg-card p-4">
+                            {selectedOrderReadOnly && (
+                                <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-black leading-5 text-amber-900">
+                                    {reviewOnlyCopy}
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-2">
                                 {selectedOrder.status === OrderStatus.PENDING && (
-                                    <button onClick={() => handleUpdateStatus(selectedOrder.id, OrderStatus.PREPARING)} disabled={Boolean(pendingOrderAction)} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-cyan-600 text-xs font-black text-white disabled:opacity-50">
+                                    <button onClick={() => handleUpdateStatus(selectedOrder.id, OrderStatus.PREPARING)} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-cyan-600 text-xs font-black text-white disabled:opacity-50">
                                         <Send size={15} />{copy.sendKitchen}
                                     </button>
                                 )}
                                 {selectedOrder.status === OrderStatus.PREPARING && (
-                                    <button onClick={() => handleUpdateStatus(selectedOrder.id, OrderStatus.READY)} disabled={Boolean(pendingOrderAction)} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 text-xs font-black text-white disabled:opacity-50">
+                                    <button onClick={() => handleUpdateStatus(selectedOrder.id, OrderStatus.READY)} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 text-xs font-black text-white disabled:opacity-50">
                                         <CheckSquare size={15} />{copy.markReady}
                                     </button>
                                 )}
                                 {selectedOrder.status === OrderStatus.READY && selectedOrder.type === OrderType.DELIVERY && (
                                     <button
                                         onClick={() => handleUpdateStatus(selectedOrder.id, OrderStatus.OUT_FOR_DELIVERY)}
-                                         disabled={Boolean(pendingOrderAction) || checkedItems.size !== selectedOrder.items.length}
+                                         disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly || checkedItems.size !== selectedOrder.items.length}
                                         className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 text-xs font-black text-white disabled:opacity-40"
                                     >
                                         <Bike size={15} />{copy.outDelivery}
                                     </button>
                                 )}
                                 {(selectedOrder.status === OrderStatus.OUT_FOR_DELIVERY || (selectedOrder.status === OrderStatus.READY && selectedOrder.type !== OrderType.DELIVERY)) && (
-                                     <button onClick={() => handleUpdateStatus(selectedOrder.id, OrderStatus.DELIVERED)} disabled={Boolean(pendingOrderAction)} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-xs font-black text-white disabled:opacity-50">
+                                     <button onClick={() => handleUpdateStatus(
+                                         selectedOrder.id,
+                                         selectedOrder.type === OrderType.DINE_IN ? OrderStatus.COMPLETED : OrderStatus.DELIVERED,
+                                     )} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-xs font-black text-white disabled:opacity-50">
                                         <Banknote size={15} />{copy.complete}
                                     </button>
                                 )}
                                 {(selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.PREPARING) && (
-                                     <button onClick={() => handleSendPaymentLink(selectedOrder)} disabled={Boolean(pendingOrderAction)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-xs font-black text-blue-700 disabled:opacity-50">
+                                     <button onClick={() => handleSendPaymentLink(selectedOrder)} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-xs font-black text-blue-700 disabled:opacity-50">
                                         <Link size={15} />{copy.payLink}
                                     </button>
                                 )}
                                 {getOrderAgeMins(selectedOrder.createdAt) >= 30 && ![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(selectedOrder.status) && (
-                                     <button onClick={() => handleApology(selectedOrder)} disabled={Boolean(pendingOrderAction)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-black text-orange-700 disabled:opacity-50">
+                                     <button onClick={() => handleApology(selectedOrder)} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 text-xs font-black text-orange-700 disabled:opacity-50">
                                         <MessageCircle size={15} />{copy.apology}
                                     </button>
                                 )}
                                  <button onClick={() => handlePrintReceipt(selectedOrder)} disabled={Boolean(pendingOrderAction)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-elevated text-xs font-black text-main disabled:opacity-50">
                                     <Printer size={15} />{copy.print}
                                 </button>
-                                 <button onClick={() => handleVoidOrder(selectedOrder.id)} disabled={Boolean(pendingOrderAction) || selectedOrder.status === OrderStatus.CANCELLED} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 text-xs font-black text-white disabled:opacity-50">
-                                    <Trash2 size={15} />{copy.void}
-                                </button>
+                                  <button
+                                    onClick={() => handleVoidOrder(selectedOrder.id)}
+                                    disabled={Boolean(pendingOrderAction)
+                                        || selectedOrderReadOnly
+                                        || [OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status)
+                                        || (selectedOrder.type !== OrderType.DINE_IN && [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(selectedOrder.status))}
+                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 text-xs font-black text-white disabled:opacity-50"
+                                  >
+                                     <Trash2 size={15} />{copy.void}
+                                 </button>
+                                 {[OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(selectedOrder.status) && hasPermission(AppPermission.OP_PROCESS_REFUND) && (
+                                     <button onClick={() => { setRefundModalOrderId(selectedOrder.id); setRefundReason(''); setRefundReasonCategory('CUSTOMER_REQUEST'); }} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-600 text-xs font-black text-white disabled:opacity-50">
+                                         <RotateCcw size={15} />{copy.refund}
+                                     </button>
+                                 )}
                             </div>
                         </div>
                     </>
@@ -754,9 +850,13 @@ const OrdersCenter: React.FC = () => {
 
             <ManagerApprovalModal
                 isOpen={showApprovalModal}
-                onClose={() => setShowApprovalModal(false)}
+                onClose={() => {
+                    setShowApprovalModal(false);
+                    setApprovalReferenceId(null);
+                }}
                 onApproved={approvalAction}
                 actionName="VOID_ORDER"
+                referenceId={approvalReferenceId || undefined}
             />
 
             {voidModalOrderId && (
@@ -772,6 +872,18 @@ const OrdersCenter: React.FC = () => {
                             </button>
                         </div>
                         <div className="p-5">
+                            <label className="mb-2 block text-xs font-black text-muted">{copy.refundCategory}</label>
+                            <select
+                                value={refundReasonCategory}
+                                onChange={event => setRefundReasonCategory(event.target.value as typeof refundReasonCategory)}
+                                className="mb-4 h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold text-main outline-none focus:border-primary"
+                            >
+                                <option value="CUSTOMER_REQUEST">{isAr ? 'طلب العميل' : 'Customer request'}</option>
+                                <option value="QUALITY">{isAr ? 'شكوى جودة' : 'Quality'}</option>
+                                <option value="WRONG_ORDER">{isAr ? 'طلب خاطئ' : 'Wrong order'}</option>
+                                <option value="OVERCHARGE">{isAr ? 'تحصيل زائد' : 'Overcharge'}</option>
+                                <option value="OTHER">{isAr ? 'أخرى' : 'Other'}</option>
+                            </select>
                             <textarea
                                 value={voidReason}
                                 onChange={event => setVoidReason(event.target.value)}
@@ -789,6 +901,41 @@ const OrdersCenter: React.FC = () => {
                             </button>
                             <button onClick={submitVoidOrder} disabled={Boolean(pendingOrderAction) || !voidReason.trim()} className="flex-1 rounded-xl bg-rose-600 py-3 text-xs font-black text-white disabled:opacity-50">
                                 {copy.confirmVoid}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {refundModalOrderId && (
+                <div className="fixed inset-0 z-[9997] flex items-center justify-center bg-black/60 p-4" onClick={closeRefundModal}>
+                    <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl" onClick={event => event.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+                            <div>
+                                <h3 className="text-base font-black text-main">{copy.refundReasonTitle}</h3>
+                                <p className="mt-1 text-sm font-semibold text-muted">{copy.refundReasonHelp}</p>
+                            </div>
+                            <button onClick={closeRefundModal} disabled={Boolean(pendingOrderAction)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-app text-muted hover:text-main disabled:opacity-50">
+                                <X size={17} />
+                            </button>
+                        </div>
+                        <div className="p-5">
+                            <textarea
+                                value={refundReason}
+                                onChange={event => setRefundReason(event.target.value)}
+                                rows={4}
+                                autoFocus
+                                maxLength={1000}
+                                placeholder={copy.refundReasonPlaceholder}
+                                className="w-full resize-none rounded-xl border border-border bg-app p-3 text-sm font-bold text-main outline-none focus:border-primary"
+                            />
+                        </div>
+                        <div className="flex gap-3 border-t border-border p-4">
+                            <button onClick={closeRefundModal} disabled={Boolean(pendingOrderAction)} className="flex-1 rounded-xl border border-border bg-app py-3 text-xs font-black text-muted hover:text-main disabled:opacity-50">
+                                {copy.cancel}
+                            </button>
+                            <button onClick={submitRefundRequest} disabled={Boolean(pendingOrderAction) || !refundReason.trim()} className="flex-1 rounded-xl bg-amber-600 py-3 text-xs font-black text-white disabled:opacity-50">
+                                {copy.confirmRefund}
                             </button>
                         </div>
                     </div>

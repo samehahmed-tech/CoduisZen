@@ -3,6 +3,7 @@ import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, shifts } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
+import { revenueEligibleOrder } from '../../utils/orderRevenue';
 
 export const getTipsReport = async (req: Request, res: Response) => {
     try {
@@ -99,11 +100,12 @@ export const getShiftSummary = async (req: Request, res: Response) => {
 
         // For each shift, get order stats
         const result = [];
+        const revenueEligible = revenueEligibleOrder();
         for (const shift of rows) {
             const shiftOrders = shift.shiftId ? await db.select({
                 orderCount: sql<number>`count(*)`,
-                revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-            cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
+                revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
+                cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
             }).from(orders).where(eq(orders.shiftId, shift.shiftId)) : [{ orderCount: 0, revenue: 0, cancelledCount: 0 }];
 
             const so = shiftOrders[0] || { orderCount: 0, revenue: 0, cancelledCount: 0 };

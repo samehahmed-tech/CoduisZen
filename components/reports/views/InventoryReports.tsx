@@ -3,10 +3,12 @@ import {
    BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, Cell, PieChart, Pie
 } from 'recharts';
 import {
-   DollarSign, TrendingUp, ShoppingBag, Calendar, Download, Printer,
+   DollarSign, TrendingUp, ShoppingBag, Calendar, Download, Printer, ClipboardCheck,
    ChevronDown, Filter, Target, Megaphone, Zap, Scale, Info, Users, Clock, Box, ShieldCheck, Activity, LineChart as ChartIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { inventoryApi } from '../../../services/api/inventory';
+import { printStockCountSession } from '../../../services/stockCountPrint';
 
 export const InventoryReports = ({ state }: any) => {
    const {
@@ -14,7 +16,7 @@ export const InventoryReports = ({ state }: any) => {
       dailySales, profitDaily, overview, profitSummary, foodCostData,
       paymentSummary, vatReport, hourlySales, cashierSummary, refunds,
       integrity, trialBalance, profitAndLoss, topExpenses,
-      stockMovementLog, wasteLoss, reorderAlerts, expiringBatches,
+       stockMovementLog, stockCounts, wasteLoss, reorderAlerts, expiringBatches,
       payrollData, attendanceData, overtimeData,
       customerLTV, campaignROI, branchPerformance, orderPrepTime,
       salesByOrderType, salesByItem, salesByCategory,
@@ -39,8 +41,17 @@ export const InventoryReports = ({ state }: any) => {
       journeyFunnelData, channelMixData, optimalPricingData,
       thirdPartyData, timeToFirstData,
       salesSeries, peakHoursLookup, peakHoursMaxOrders,
-      revenueByWeekdayMax, daypartRevenueMax
+       revenueByWeekdayMax, daypartRevenueMax, settings
    } = state;
+   const isAr = settings?.language !== 'en';
+   const printCount = async (id: string) => {
+      const count = await inventoryApi.getStockCount(id);
+      printStockCountSession(count, {
+         lang: settings?.language,
+         restaurantName: settings?.restaurantName,
+         currencySymbol: settings?.currencySymbol,
+      });
+   };
 
    return (
       <>
@@ -100,8 +111,8 @@ export const InventoryReports = ({ state }: any) => {
                                              <span className="px-3 py-1.5 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-inner inline-block animate-pulse">Loss Maker</span>
                                           ) : (
                                              <span className="px-3 py-1.5 bg-elevated text-muted border border-border/50 rounded-lg text-[9px] font-black uppercase tracking-widest inline-block">Standard</span>
-                                          )}
-                                       </td>
+                )}
+                                        </td>
                                     </tr>
                                  ))}
                               </tbody>
@@ -109,8 +120,57 @@ export const InventoryReports = ({ state }: any) => {
                         </div>
                      </div>
                   </div>
-               )}
-               {activeCategory === 'INVENTORY' && activeSubReport === 'Stock Movement' && (
+                )}
+                {activeCategory === 'INVENTORY' && activeSubReport === 'Stock Counts' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150" dir={isAr ? 'rtl' : 'ltr'}>
+                      <div className="overflow-hidden rounded-[2rem] border border-border/50 bg-card/80 shadow-xl">
+                         <div className="border-b border-border/50 bg-elevated/30 p-6">
+                            <h3 className="flex items-center gap-3 text-xl font-black text-main">
+                               <ClipboardCheck size={24} className="text-violet-500" />
+                               {isAr ? 'تقارير جلسات الجرد' : 'Stock Count Sessions'}
+                            </h3>
+                            <p className="mt-1 text-xs text-muted">{isAr ? 'راجع ملخص كل جلسة واطبع تفاصيلها كاملة.' : 'Review every session summary and print its full details.'}</p>
+                         </div>
+                         {stockCounts.length === 0 ? (
+                            <div className="p-16 text-center text-xs font-black text-muted">{isAr ? 'لا توجد جلسات جرد في الفترة المحددة' : 'No stock counts in this period'}</div>
+                         ) : (
+                            <div className="responsive-table">
+                               <table className="w-full border-collapse text-xs">
+                                  <thead><tr className="bg-elevated/20 text-[10px] font-black uppercase tracking-wider text-muted">
+                                     <th className="px-5 py-4 text-start">{isAr ? 'الجلسة' : 'Session'}</th>
+                                     <th className="px-5 py-4 text-start">{isAr ? 'التاريخ / المخزن' : 'Date / Warehouse'}</th>
+                                     <th className="px-4 py-4 text-center">{isAr ? 'النوع' : 'Type'}</th>
+                                     <th className="px-4 py-4 text-center">{isAr ? 'الحالة' : 'Status'}</th>
+                                     <th className="px-4 py-4 text-center">{isAr ? 'البنود' : 'Lines'}</th>
+                                     <th className="px-4 py-4 text-center">{isAr ? 'فروق' : 'Variances'}</th>
+                                     <th className="px-4 py-4 text-center">{isAr ? 'قيمة الفرق' : 'Variance Value'}</th>
+                                     <th className="px-5 py-4 text-center print:hidden">{isAr ? 'طباعة' : 'Print'}</th>
+                                  </tr></thead>
+                                  <tbody className="divide-y divide-border/30">
+                                     {stockCounts.map((count: any) => (
+                                        <tr key={count.id} className="hover:bg-violet-500/5">
+                                           <td className="px-5 py-4 font-black text-main">{count.id}</td>
+                                           <td className="px-5 py-4"><div className="font-bold text-main">{String(count.countDate || '').split('T')[0]}</div><div className="text-[10px] text-muted">{count.warehouseName || count.warehouseId || '-'}</div></td>
+                                           <td className="px-4 py-4 text-center font-bold">{count.type || '-'}</td>
+                                           <td className="px-4 py-4 text-center"><span className="rounded-full bg-violet-500/10 px-2.5 py-1 font-black text-violet-600">{count.status || '-'}</span></td>
+                                           <td className="px-4 py-4 text-center font-mono">{count.summary?.countedLines || 0}/{count.summary?.lines || 0}</td>
+                                           <td className="px-4 py-4 text-center font-mono font-black text-rose-500">{count.summary?.varianceLines || 0}</td>
+                                           <td className="px-4 py-4 text-center font-mono">{Number(count.summary?.varianceValue || 0).toLocaleString()} {settings?.currencySymbol || (isAr ? 'ج.م' : 'EGP')}</td>
+                                           <td className="px-5 py-4 text-center print:hidden">
+                                              <button type="button" onClick={() => void printCount(count.id)} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 font-black text-white hover:bg-violet-700">
+                                                 <Printer size={14} /> {isAr ? 'طباعة' : 'Print'}
+                                              </button>
+                                           </td>
+                                        </tr>
+                                     ))}
+                                  </tbody>
+                               </table>
+                            </div>
+                         )}
+                      </div>
+                   </div>
+                )}
+                {activeCategory === 'INVENTORY' && activeSubReport === 'Stock Movement' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="bg-card/80  rounded-[2.5rem] border border-border/50 shadow-2xl overflow-hidden">
                         <div className="p-8 border-b border-border/50 bg-elevated/30">

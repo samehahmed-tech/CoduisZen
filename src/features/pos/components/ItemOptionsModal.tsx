@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Plus, Minus, AlertCircle, DollarSign } from 'lucide-react';
 import { MenuItem, ItemSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { resolveItemOptionPrice } from '../itemOptionPricing';
 
 interface ItemOptionsModalProps {
     isOpen: boolean;
@@ -22,24 +23,29 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
     const [customPrice, setCustomPrice] = useState('');
     const priceInputRef = useRef<HTMLInputElement>(null);
 
-    // Open price = item with price 0 or isWeighted flag
-    const isOpenPrice = item ? (item.price === 0 || item.isWeighted) : false;
+    // A zero base price is valid for sized items; their selected size supplies the price.
+    const isOpenPrice = item ? (Boolean(item.isWeighted) || (item.price === 0 && !(item.sizes && item.sizes.length > 0))) : false;
 
     useEffect(() => {
         if (isOpen && item) {
             setQuantity(1);
             setSelectedSize(item.sizes && item.sizes.length > 0 ? item.sizes[0] || null : null);
             setSelectedMods({});
-            setCustomPrice(item.isWeighted ? '' : (item.price === 0 ? '' : String(item.price)));
+            setCustomPrice(item.isWeighted || (item.price === 0 && !(item.sizes && item.sizes.length > 0)) ? '' : String(item.price));
             // Auto-focus price input for open price items
-            if (item.price === 0 || item.isWeighted) {
+            if (item.isWeighted || (item.price === 0 && !(item.sizes && item.sizes.length > 0))) {
                 setTimeout(() => priceInputRef.current?.focus(), 300);
             }
         }
     }, [isOpen, item]);
 
     const parsedCustomPrice = parseFloat(customPrice) || 0;
-    const basePrice = isOpenPrice ? parsedCustomPrice : (selectedSize ? selectedSize.price : (item?.price || 0));
+    const basePrice = resolveItemOptionPrice({
+        itemPrice: item?.price || 0,
+        isOpenPrice,
+        customPrice: parsedCustomPrice,
+        selectedSizePrice: selectedSize?.price,
+    });
 
     const modsPrice = useMemo(() => {
         let total = 0;
@@ -88,15 +94,10 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
     const handleConfirm = () => {
         if (!isValid || !item) return;
         if (isOpenPrice && parsedCustomPrice <= 0) return;
-        const finalItem = { ...item };
-
-        // Apply open price
-        if (isOpenPrice) {
-            finalItem.price = parsedCustomPrice;
-        }
+        const finalItem = { ...item } as MenuItem & { sizeId?: string };
 
         if (selectedSize) {
-            finalItem.price = selectedSize.price;
+            finalItem.sizeId = selectedSize.id;
             if (lang === 'ar') {
                 finalItem.nameAr = `${item.nameAr || item.name} (${selectedSize.nameAr || selectedSize.name})`;
                 finalItem.name = `${item.name} (${selectedSize.name})`;
@@ -105,6 +106,7 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
                 finalItem.nameAr = `${item.nameAr || item.name} (${selectedSize.nameAr || selectedSize.name})`;
             }
         }
+        finalItem.price = basePrice;
 
         const finalMods: { groupName: string; optionName: string; price: number }[] = [];
         if (item.modifierGroups) {

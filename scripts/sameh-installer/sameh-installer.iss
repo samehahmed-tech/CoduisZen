@@ -1,4 +1,4 @@
-#define AppName "Final Setup"
+#define AppName "Codeuis Setup V2"
 #define AppVersion GetEnv("SAMEH_INSTALLER_VERSION")
 #define SourceRoot GetEnv("SAMEH_STAGE_DIR")
 #define OutputRoot GetEnv("SAMEH_OUTPUT_DIR")
@@ -13,7 +13,7 @@ DefaultDirName={autopf}\Sameh\RestoFlow ERP
 DefaultGroupName=Sameh Installer
 DisableProgramGroupPage=yes
 OutputDir={#OutputRoot}
-OutputBaseFilename=Final Setup
+OutputBaseFilename=Codeuis Setup V2
 Compression=lzma2/max
 SolidCompression=yes
 PrivilegesRequired=admin

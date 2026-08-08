@@ -5,9 +5,14 @@ export const approvalsApi = {
         apiRequest<any[]>(`/approvals${branchId ? `?branchId=${branchId}` : ''}`),
     create: (approval: any) =>
         apiRequest<any>('/approvals', { method: 'POST', body: JSON.stringify(approval) }),
-    verifyPin: (data: { branchId: string; pin: string; action: string }) =>
-        apiRequest<{ approved: boolean; managerId?: string; managerName?: string; error?: string }>(
+    verifyPin: (data: { branchId: string; pin: string; action: string; relatedId?: string }) =>
+        apiRequest<{ approved: boolean; managerId?: string; managerName?: string; approval?: { id: number }; error?: string }>(
             '/approvals/verify-pin',
+            { method: 'POST', body: JSON.stringify(data) }
+        ),
+    verifyPassword: (data: { branchId: string; password: string; action: string; relatedId?: string }) =>
+        apiRequest<{ approved: boolean; managerId?: string; managerName?: string; approval?: { id: number }; error?: string }>(
+            '/approvals/verify-password',
             { method: 'POST', body: JSON.stringify(data) }
         ),
 };

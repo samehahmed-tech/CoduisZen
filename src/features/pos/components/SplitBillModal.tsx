@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Calculator, Banknote, CreditCard, Smartphone, Landmark, Trash2 } from 'lucide-react';
-import { PaymentMethod, PaymentRecord } from '@/types';
+import { CustomPaymentMethod, PaymentMethod, PaymentRecord } from '@/types';
 import { useToast } from '@/components/Toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,10 +12,11 @@ interface SplitBillModalProps {
     lang: 'en' | 'ar';
     t: any;
     splitPayments: PaymentRecord[];
-    onAddPayment: (method: PaymentMethod) => void;
+    onAddPayment: (method: PaymentMethod | string) => void;
     onRemovePayment: (index: number) => void;
     onUpdateAmount: (index: number, amount: number) => void;
     onSetPayments: (payments: PaymentRecord[]) => void;
+    customPaymentMethods?: CustomPaymentMethod[];
 }
 
 const SplitBillModal: React.FC<SplitBillModalProps> = ({
@@ -30,6 +31,7 @@ const SplitBillModal: React.FC<SplitBillModalProps> = ({
     onRemovePayment,
     onUpdateAmount,
     onSetPayments,
+    customPaymentMethods = [],
 }) => {
     const [peopleCount, setPeopleCount] = useState(2);
     const { showToast } = useToast();
@@ -127,6 +129,7 @@ const SplitBillModal: React.FC<SplitBillModalProps> = ({
                                             {p.method === PaymentMethod.VISA && <CreditCard size={20} />}
                                             {p.method === PaymentMethod.VODAFONE_CASH && <Smartphone size={20} />}
                                             {p.method === PaymentMethod.INSTAPAY && <Landmark size={20} />}
+                                            {![PaymentMethod.CASH, PaymentMethod.VISA, PaymentMethod.VODAFONE_CASH, PaymentMethod.INSTAPAY].includes(p.method as PaymentMethod) && <CreditCard size={20} />}
                                         </div>
                                         <div className="flex-1 flex flex-col">
                                             <span className="text-[10px] font-black uppercase tracking-widest text-muted">
@@ -169,7 +172,14 @@ const SplitBillModal: React.FC<SplitBillModalProps> = ({
                                     { id: PaymentMethod.CASH, icon: Banknote, label: 'CASH' },
                                     { id: PaymentMethod.VISA, icon: CreditCard, label: 'VISA' },
                                     { id: PaymentMethod.VODAFONE_CASH, icon: Smartphone, label: 'V-CASH' },
-                                    { id: PaymentMethod.INSTAPAY, icon: Landmark, label: 'INSTA' }
+                                    { id: PaymentMethod.INSTAPAY, icon: Landmark, label: 'INSTA' },
+                                    ...customPaymentMethods
+                                        .filter(method => method.isActive !== false)
+                                        .map(method => ({
+                                            id: method.id,
+                                            icon: CreditCard,
+                                            label: isRTL ? method.nameAr || method.name : method.name,
+                                        })),
                                 ].map(m => (
                                     <button
                                         key={m.id} onClick={() => onAddPayment(m.id)}

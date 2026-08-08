@@ -4,9 +4,11 @@ type StatusCheckInput = {
     orderType?: string | null;
     notes?: string;
     userRole?: string;
+    userPermissions?: string[] | null;
     userBranchId?: string | null;
     orderBranchId?: string | null;
     allowedBranches?: string[] | null;
+    managerApproved?: boolean;
 };
 
 const BASE_TRANSITION_MAP: Record<string, string[]> = {
@@ -29,6 +31,7 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
     const userBranch = input.userBranchId ? String(input.userBranchId) : null;
     const orderBranch = input.orderBranchId ? String(input.orderBranchId) : null;
     const allowedBranches = Array.isArray(input.allowedBranches) ? input.allowedBranches : [];
+    const permissions = Array.isArray(input.userPermissions) ? input.userPermissions : [];
 
     if (!next) return { ok: false, code: 'STATUS_REQUIRED' };
     if (current === next) return { ok: true };
@@ -49,7 +52,10 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
     }
 
     if (next === 'CANCELLED' && current !== 'CANCELLED') {
-        if (!HIGH_RISK_ROLES.has(role) && role !== 'CALL_CENTER_AGENT') {
+        const canVoidOrder = HIGH_RISK_ROLES.has(role)
+            || permissions.includes('*')
+            || permissions.includes('OP_VOID_ORDER');
+        if (!canVoidOrder && role !== 'CALL_CENTER_AGENT' && !input.managerApproved) {
             return { ok: false, code: 'STATUS_TRANSITION_FORBIDDEN' };
         }
         if (!String(input.notes || '').trim()) {
@@ -59,9 +65,9 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
     }
 
     let allowed = [...(BASE_TRANSITION_MAP[current] || [])];
-    if (orderType === 'DINE_IN' && ['PENDING', 'PREPARING', 'READY'].includes(current)) {
+    if (orderType === 'DINE_IN' && ['PENDING', 'PREPARING'].includes(current)) {
         // ponytail: dine-in settlement can close the table from any active kitchen state; add finer payment gates if needed.
-        allowed = ['COMPLETED', 'CANCELLED'];
+        allowed = Array.from(new Set([...allowed, 'COMPLETED', 'CANCELLED']));
     } else if (['TAKEAWAY', 'PICKUP'].includes(orderType) && current === 'PENDING') {
         // ponytail: direct counter sales can skip kitchen/pickup screens; add per-order-type config only if needed.
         allowed = ['PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];

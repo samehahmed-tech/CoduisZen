@@ -209,7 +209,7 @@ const MenuProfitCenter: React.FC = () => {
         }
     };
 
-    const handleDragItemEnd = (result: DropResult) => {
+    const handleDragItemEnd = async (result: DropResult) => {
         if (!result.destination || selectedCategoryId === 'all') return;
 
         const itemsToReorder = Array.from(filteredItems);
@@ -224,8 +224,11 @@ const MenuProfitCenter: React.FC = () => {
             changes: { sortOrder: index }
         }));
 
-        // Optimize UI locally by telling Zustand to bulk update
-        bulkUpdateItems(updates);
+        try {
+            await bulkUpdateItems(updates);
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر حفظ ترتيب الأصناف' : 'Could not save item order'));
+        }
     };
 
     const handleSaveItem = async (item: MenuItem, categoryId: string, keepOpen?: boolean) => {
@@ -250,12 +253,24 @@ const MenuProfitCenter: React.FC = () => {
         updateMenuItem(selectedMenuId, item._categoryId, { ...item, isAvailable: !item.isAvailable });
     };
 
-    const handleDuplicate = (item: MenuItem & { _categoryId: string }) => {
-        duplicateItem(selectedMenuId, item._categoryId, item.id);
+    const handleDuplicate = async (item: MenuItem & { _categoryId: string }) => {
+        try {
+            await duplicateItem(selectedMenuId, item._categoryId, item.id);
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر نسخ الصنف' : 'Could not duplicate item'));
+        }
     };
 
-    const handleArchive = (item: MenuItem & { _categoryId: string }) => {
-        archiveItem(selectedMenuId, item._categoryId, item.id);
+    const handleArchive = async (item: MenuItem & { _categoryId: string }) => {
+        try {
+            if (item.archivedAt) {
+                await restoreItem(selectedMenuId, item._categoryId, item.id);
+            } else {
+                await archiveItem(selectedMenuId, item._categoryId, item.id);
+            }
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر تحديث حالة الصنف' : 'Could not update item status'));
+        }
     };
 
     const handleDelete = async (item: MenuItem & { _categoryId: string }) => {
@@ -268,16 +283,23 @@ const MenuProfitCenter: React.FC = () => {
             cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
             variant: 'danger',
         });
-        if (!ok) return;
-        deleteMenuItem(selectedMenuId, item._categoryId, item.id);
+        if (!ok) return false;
+        try {
+            await deleteMenuItem(selectedMenuId, item._categoryId, item.id);
+            return true;
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر حذف الصنف' : 'Could not delete item'));
+            return false;
+        }
     };
 
     const handleDeleteDrawerItem = async () => {
         if (!drawerItem || drawerItem.mode !== 'EDIT') return;
         const cat = categories.find(c => c.items.some(i => i.id === drawerItem.item.id));
         if (!cat) return;
-        await handleDelete({ ...drawerItem.item, _categoryId: cat.id });
-        setDrawerItem(null);
+        if (await handleDelete({ ...drawerItem.item, _categoryId: cat.id })) {
+            setDrawerItem(null);
+        }
     };
 
     const handleDeleteDrawerCategory = async () => {
@@ -292,18 +314,26 @@ const MenuProfitCenter: React.FC = () => {
             variant: 'danger',
         });
         if (!ok) return;
-        deleteCategory(selectedMenuId, drawerCategory.category.id);
-        setDrawerCategory(null);
+        try {
+            await deleteCategory(selectedMenuId, drawerCategory.category.id);
+            setDrawerCategory(null);
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر حذف المجموعة' : 'Could not delete section'));
+        }
     };
 
-    const handleBulkApply = (changes: Partial<MenuItem>) => {
+    const handleBulkApply = async (changes: Partial<MenuItem>) => {
         const updates = Array.from(selectedItemIds).map(id => {
             const item = allItems.find(i => i.id === id);
             return item ? { menuId: selectedMenuId, categoryId: item._categoryId, itemId: id, changes } : null;
         }).filter(Boolean) as any[];
-        bulkUpdateItems(updates);
-        setSelectedItemIds(new Set());
-        setMultiSelectMode(false);
+        try {
+            await bulkUpdateItems(updates);
+            setSelectedItemIds(new Set());
+            setMultiSelectMode(false);
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر حفظ التعديل الجماعي' : 'Could not save bulk changes'));
+        }
     };
 
     const handleQuickAdd = async () => {

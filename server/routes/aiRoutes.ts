@@ -32,16 +32,16 @@ router.get('/insights', aiOperationalRoles, getInsights);
 router.get('/forecast', aiOperationalRoles, getRevenueForecast);
 
 // POST chat orchestration
-router.post('/chat', aiOperationalRoles, chatAssistant);
+router.post('/chat', chatAssistant);
 
 // POST preview suggested action (guard + permission)
-router.post('/action-preview', aiOperationalRoles, previewAction);
+router.post('/action-preview', previewAction);
 
 // POST execute suggested action (guard + permission + audit)
-router.post('/action-execute', aiOperationalRoles, executeAction);
+router.post('/action-execute', executeAction);
 
 // Legacy alias for existing frontend paths
-router.post('/execute', aiOperationalRoles, executeAction);
+router.post('/execute', executeAction);
 
 // AI key management (server-side encrypted)
 router.get('/key-config', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER'), getAiKeyConfig);

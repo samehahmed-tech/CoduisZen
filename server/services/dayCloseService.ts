@@ -7,6 +7,7 @@ import { db } from '../db';
 import {
     orders,
     payments,
+    paymentSessions,
     branches,
     auditLogs,
     fiscalLogs,
@@ -26,12 +27,17 @@ import {
     journalLines,
     chartOfAccounts,
     costCenters,
+    tables,
 } from '../../src/db/schema';
 import { eq, and, gte, lte, desc, sql, like, or } from 'drizzle-orm';
 import { createSignedAuditLog } from './auditService';
 import { emailService } from './emailService';
 import { generateDayClosePDF } from './pdfService';
 import { sendWhatsAppText } from './whatsappService';
+import { getBusinessDateBounds } from '../utils/businessDate';
+import { revenueRecognizedOrder } from '../utils/orderRevenue';
+import { reconcilePaymentRows } from './paymentReconciliation';
+import { emitBranchEvent } from '../utils/socketEmit';
 
 // Day close status
 type DayCloseStatus = 'OPEN' | 'CLOSING' | 'CLOSED';
@@ -39,6 +45,17 @@ type DayCloseStatus = 'OPEN' | 'CLOSING' | 'CLOSED';
 const toSqlDate = (date: string | Date) => {
     const datePart = date instanceof Date ? date.toISOString().split('T')[0] : String(date).split('T')[0];
     return new Date(`${datePart}T00:00:00.000Z`);
+};
+
+const releaseBranchTables = async (branchId: string) => {
+    const branchTables = await db.select({ id: tables.id }).from(tables).where(eq(tables.branchId, branchId));
+    const now = new Date();
+    await db.update(tables)
+        .set({ status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null, updatedAt: now })
+        .where(eq(tables.branchId, branchId));
+    for (const table of branchTables) {
+        emitBranchEvent(branchId, 'table:status', { id: table.id, status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null });
+    }
 };
 
 interface DayCloseReadinessCheck {
@@ -179,14 +196,17 @@ interface EmailConfig {
 }
 
 export const dayCloseService = {
-    getDayBounds(date: string) {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
+    getDayBounds(date: string, timeZone = 'Africa/Cairo') {
+        return getBusinessDateBounds(date, timeZone);
+    },
 
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        return { startOfDay, endOfDay };
+    async getBranchDayBounds(branchId: string, date: string) {
+        const [branch] = await db.select({ timezone: branches.timezone })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+        if (!branch) throw new Error('BRANCH_NOT_FOUND');
+        return this.getDayBounds(date, branch.timezone || 'Africa/Cairo');
     },
 
     getOrderDateFilter(date: string, startOfDay: Date, endOfDay: Date) {
@@ -298,13 +318,13 @@ export const dayCloseService = {
      * Generate day close report for a branch
      */
     async generateReport(branchId: string, date: string): Promise<DayCloseReport> {
-        const { startOfDay, endOfDay } = this.getDayBounds(date);
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
         // Get branch info
         const [branch] = await db.select().from(branches).where(eq(branches.id, branchId));
 
         const dateFilter = this.getOrderDateFilter(date, startOfDay, endOfDay);
-        const revenueRecognized = sql`(${orders.status} IN ('COMPLETED', 'DELIVERED') OR exists (select 1 from ${payments} p where p.order_id = ${orders.id} and p.status = 'COMPLETED'))`;
+        const revenueRecognized = revenueRecognizedOrder();
 
         // SQL aggregation: sales summary (Item 14 — no in-memory reduce)
         const [salesAgg] = await db.select({
@@ -324,7 +344,8 @@ export const dayCloseService = {
         const totalDiscount = Number(salesAgg?.totalDiscount || 0);
 
         // SQL aggregation: payment breakdown
-        const paymentRows = await db.select({
+        const legacyPaymentRows = await db.select({
+            orderId: payments.orderId,
             method: payments.method,
             count: sql<number>`count(*)`,
             total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
@@ -335,7 +356,29 @@ export const dayCloseService = {
                 eq(payments.status, 'COMPLETED'),
                 dateFilter,
             ))
-            .groupBy(payments.method);
+            .groupBy(payments.orderId, payments.method);
+        let sessionPaymentRows: Array<{ orderId: string; method: string | null; count: number; total: number }> = [];
+        try {
+            sessionPaymentRows = await db.select({
+                orderId: paymentSessions.orderId,
+                method: paymentSessions.providerType,
+                count: sql<number>`count(*)`,
+                total: sql<number>`coalesce(sum(${paymentSessions.amount}), 0)`,
+            }).from(paymentSessions)
+                .innerJoin(orders, eq(paymentSessions.orderId, orders.id))
+                .where(and(
+                    eq(orders.branchId, branchId),
+                    eq(paymentSessions.status, 'confirmed'),
+                    dateFilter,
+                ))
+                .groupBy(paymentSessions.orderId, paymentSessions.providerType);
+        } catch {
+            // ponytail: legacy databases may not have payment_sessions yet.
+        }
+        const paymentRows = reconcilePaymentRows(
+            legacyPaymentRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+            sessionPaymentRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+        );
 
         // SQL aggregation: order type breakdown
         const orderTypeRows = await db.select({
@@ -367,7 +410,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .then(rows => rows[0]),
             db.select({
                 total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
@@ -375,7 +418,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'PENDING_APPROVAL'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'PENDING_APPROVAL'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .then(rows => rows[0]),
             db.select({
                 name: chartOfAccounts.name,
@@ -384,7 +427,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .groupBy(chartOfAccounts.name)
                 .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`)
                 .offset(0).fetch(10),
@@ -398,7 +441,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .orderBy(desc(journalEntries.date), desc(journalLines.id))
                 .offset(0).fetch(50),
         ]);
@@ -454,11 +497,7 @@ export const dayCloseService = {
     },
 
     async getFiscalHealth(branchId: string, date: string) {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
         const [submittedRows, pendingRows, failedRows, deadLettersRows] = await Promise.all([
             db.select().from(fiscalLogs).where(and(
@@ -495,10 +534,7 @@ export const dayCloseService = {
      * Sprint 3: Get finance exceptions health for a branch on a given date
      */
     async getFinanceHealth(branchId: string, date: string) {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
         const [pendingRows, resolvedRows] = await Promise.all([
             db.select({ count: sql<number>`count(*)` }).from(financeExceptions).where(and(
@@ -523,10 +559,7 @@ export const dayCloseService = {
      * Sprint 3: Get side effect failure count from domain_events for a date
      */
     async getSideEffectHealth(branchId: string, date: string) {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
         const failedEvents = await db.select({
             type: domainEvents.type,
@@ -551,7 +584,7 @@ export const dayCloseService = {
     },
 
     async getCloseReadiness(branchId: string, date: string): Promise<DayCloseReadiness> {
-        const { startOfDay, endOfDay } = this.getDayBounds(date);
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
         const [requireStockCount, openShiftRows, postedStockCountRows] = await Promise.all([
             getDayCloseRequireStockCount(),
@@ -607,7 +640,7 @@ export const dayCloseService = {
     },
 
     async generateOperationalSnapshot(branchId: string, date: string, report: DayCloseReport) {
-        const { startOfDay, endOfDay } = this.getDayBounds(date);
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
         const dateFilter = this.getOrderDateFilter(date, startOfDay, endOfDay);
 
         const [
@@ -770,7 +803,13 @@ export const dayCloseService = {
             overrideReason?: string; // Item 22: override with written reason
         }
     ) {
-        const [branch] = await db.select({ businessDate: branches.businessDate })
+        const existingClose = await this.getClosedReport(branchId, date);
+        if (existingClose) return existingClose;
+
+        const [branch] = await db.select({
+            businessDate: branches.businessDate,
+            timezone: branches.timezone,
+        })
             .from(branches)
             .where(eq(branches.id, branchId))
             .top(1);
@@ -782,18 +821,11 @@ export const dayCloseService = {
             throw error;
         }
 
-        const existingClose = await this.getClosedReport(branchId, date);
-        if (existingClose) {
-            const err = new Error('DAY_ALREADY_CLOSED');
-            (err as any).closedReport = existingClose;
-            throw err;
-        }
-
         const report = await this.generateReport(branchId, date);
         const fiscalHealth = await this.getFiscalHealth(branchId, date);
         const financeHealth = await this.getFinanceHealth(branchId, date);
         const sideEffectHealth = await this.getSideEffectHealth(branchId, date);
-        const { startOfDay, endOfDay } = this.getDayBounds(date);
+        const { startOfDay, endOfDay } = this.getDayBounds(date, branch.timezone || 'Africa/Cairo');
 
         // Collect all blocked reasons instead of throwing on first failure
         const blockedReasons: string[] = [];
@@ -897,9 +929,8 @@ export const dayCloseService = {
         } catch (error: any) {
             const errorNumber = Number(error?.number ?? error?.originalError?.info?.number);
             if (error?.code === '23505' || errorNumber === 2601 || errorNumber === 2627) {
-                const err = new Error('DAY_ALREADY_CLOSED');
-                (err as any).closedReport = await this.getClosedReport(branchId, date);
-                throw err;
+                const concurrentClose = await this.getClosedReport(branchId, date);
+                if (concurrentClose) return concurrentClose;
             }
             throw error;
         }
@@ -958,6 +989,26 @@ export const dayCloseService = {
         return report;
     },
 
+    async getShiftCashSummary(branchId: string, date: string) {
+        const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
+        const [row] = await db.select({
+            shiftCount: sql<number>`count(*)`,
+            expectedCash: sql<number>`coalesce(sum(${shifts.expectedBalance}), 0)`,
+            actualCash: sql<number>`coalesce(sum(${shifts.actualBalance}), 0)`,
+        }).from(shifts).where(and(
+            eq(shifts.branchId, branchId),
+            sql`(${shifts.openingTime} <= ${endOfDay} AND (${shifts.closingTime} IS NULL OR ${shifts.closingTime} >= ${startOfDay}))`,
+        ));
+        const expectedCash = Number(row?.expectedCash || 0);
+        const actualCash = Number(row?.actualCash || 0);
+        return {
+            shiftCount: Number(row?.shiftCount || 0),
+            expectedCash,
+            actualCash,
+            variance: actualCash - expectedCash,
+        };
+    },
+
     async setBusinessDate(branchId: string, businessDate: string, userId: string) {
         if (!isValidDateKey(businessDate)) throw new Error('INVALID_BUSINESS_DATE');
         if (businessDate > localDateKey()) throw new Error('FUTURE_BUSINESS_DATE_NOT_ALLOWED');
@@ -987,6 +1038,8 @@ export const dayCloseService = {
             branchId,
             payload: { from: branch.businessDate, to: businessDate },
         });
+
+        await releaseBranchTables(branchId);
         return { businessDate };
     },
 

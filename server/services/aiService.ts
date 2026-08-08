@@ -13,6 +13,26 @@ import { AI_FREE_MODELS, AI_MODEL_SETTING_KEY, DEFAULT_FREE_MODEL, getModelCandi
 const OLLAMA_BASE_URL = String(process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').trim();
 const OLLAMA_ENABLED = String(process.env.OLLAMA_ENABLED || 'false').trim().toLowerCase() === 'true';
 
+const querySystemCopilot = (prompt: string) => {
+    const total = prompt.match(/Total Revenue:\s*([\d.]+)/i)?.[1];
+    const count = prompt.match(/Order Count:\s*(\d+)/i)?.[1];
+    const average = prompt.match(/Average Ticket:\s*([\d.]+)/i)?.[1];
+    if (total || count || average) {
+        return `ملخص الأداء: ${count || 0} طلب، إجمالي مبيعات ${total || 0}، ومتوسط فاتورة ${average || 0}. راجع الطلبات المفتوحة والفروق قبل الإقفال، وراقب الأصناف الأعلى والأقل مبيعًا من التقارير.`;
+    }
+    return 'المساعد الداخلي يعمل بدون مفتاح API. افتح المساعد الذكي للحصول على إرشاد النظام والملخصات، أو اختر نموذجًا خارجيًا من الإعدادات للتحليل النصي الإضافي.';
+};
+
+const queryGpt4js = async (prompt: string, systemPrompt?: string) => {
+    const { default: GPT4js } = await import('gpt4js');
+    const config = aiKeyVaultService.resolveGpt4jsConfig();
+    const provider = GPT4js.createProvider(config.provider);
+    return String(await provider.chatCompletion([
+        { role: 'system', content: systemPrompt || 'You are an expert restaurant ERP assistant.' },
+        { role: 'user', content: prompt },
+    ], { provider: config.provider, ...(config.model ? { model: config.model } : {}), temperature: 0.3, stream: false }));
+};
+
 const queryOllama = async (prompt: string, systemPrompt?: string, model?: string) => {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 20_000);
@@ -44,12 +64,75 @@ const queryOllama = async (prompt: string, systemPrompt?: string, model?: string
     }
 };
 
+export const queryGroq = async (prompt: string, systemPrompt?: string, model?: string, apiKey?: string) => {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 30_000);
+    try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+                model: String(model || 'llama-3.3-70b-versatile').trim(),
+                messages: [
+                    {
+                        role: 'system',
+                        content: systemPrompt || 'You are an expert restaurant ERP assistant. Respond clearly in Arabic or English based on user language.',
+                    },
+                    { role: 'user', content: prompt },
+                ],
+                temperature: 0.3,
+                max_tokens: 1000,
+            }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data?.error?.message || `GROQ_ERROR_${response.status}`);
+        }
+        return String(data?.choices?.[0]?.message?.content || '');
+    } finally {
+        clearTimeout(t);
+    }
+};
+
 export const aiService = {
     /**
      * Core wrapper for OpenRouter requests
      */
-    async queryAI(prompt: string, systemPrompt?: string, useFallback = false) {
+    async queryAI(prompt: string, systemPrompt?: string, useFallback = false, allowGpt4js = true) {
         const provider = await aiKeyVaultService.resolveProvider();
+        if (provider === 'SYSTEM') return querySystemCopilot(prompt);
+        if (provider === 'GPT4JS' && allowGpt4js) {
+            try {
+                return await queryGpt4js(prompt, systemPrompt);
+            } catch (error: any) {
+                console.warn('[AI] GPT4js failed; falling back to current provider.', error?.message || error);
+                return this.queryAI(prompt, systemPrompt, useFallback, false);
+            }
+        }
+        if (provider === 'GROQ') {
+            try {
+                const groqKey = await aiKeyVaultService.resolveGroqKey();
+                if (!groqKey) throw new Error('GROQ_KEY_MISSING');
+                const groqModel = await aiKeyVaultService.resolveGroqModel();
+                return await queryGroq(prompt, systemPrompt, groqModel, groqKey);
+            } catch (error: any) {
+                console.warn('[AI] Groq failed; trying local Ollama if enabled.', error?.message || error);
+                if (OLLAMA_ENABLED) {
+                    try {
+                        const ollamaModel = await aiKeyVaultService.resolveOllamaModel();
+                        return await queryOllama(prompt, systemPrompt, ollamaModel);
+                    } catch {
+                        // keep original error below
+                    }
+                }
+                throw error;
+            }
+        }
         const activeKey = await aiKeyVaultService.resolveActiveKey();
 
         // Fully free option: local Ollama (works on any client device as long as backend can reach Ollama).

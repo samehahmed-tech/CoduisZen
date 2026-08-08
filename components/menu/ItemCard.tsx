@@ -1,7 +1,7 @@
 
 import React from 'react';
 import {
-    Eye, EyeOff, Edit3, Copy, Archive, Trash2,
+    Eye, EyeOff, Edit3, Copy, Archive, ArchiveRestore, Trash2,
     Flame, AlertTriangle, TrendingDown,
     CheckSquare, Square, ImageIcon, Package, Layers
 } from 'lucide-react';
@@ -138,7 +138,7 @@ const ItemCard: React.FC<Props> = ({
                 <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 rounded text-gray-400 hover:text-blue-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `تعديل ${itemName}` : `Edit ${itemName}`} title={lang === 'ar' ? 'تعديل' : 'Edit'}><Edit3 size={13} /></button>
                     <button onClick={(e) => { e.stopPropagation(); onDuplicate(); }} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-main hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}><Copy size={13} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="p-1.5 rounded text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`} title={lang === 'ar' ? 'أرشفة' : 'Archive'}><Archive size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="p-1.5 rounded text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>{item.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}</button>
                 </div>
             </div>
         );
@@ -277,8 +277,8 @@ const ItemCard: React.FC<Props> = ({
                     <button onClick={(e) => { e.stopPropagation(); onDuplicate(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}>
                         <Copy size={13} />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-amber-600 dark:hover:text-amber-500 rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`} title={lang === 'ar' ? 'أرشفة' : 'Archive'}>
-                        <Archive size={13} />
+                    <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-amber-600 dark:hover:text-amber-500 rounded-md flex justify-center items-center transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>
+                        {item.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-red-500 rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `حذف ${itemName}` : `Delete ${itemName}`} title={lang === 'ar' ? 'حذف' : 'Delete'}>
                         <Trash2 size={13} />

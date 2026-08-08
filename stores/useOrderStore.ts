@@ -8,6 +8,8 @@ import { syncService } from '../services/syncService';
 import { useAuthStore } from './useAuthStore';
 import { printOrderReceipt } from '../services/posPrintOrchestrator';
 import { translations } from '../services/translations';
+import { branchEntityCacheKey, fromBranchEntityCache, toBranchEntityCache } from '../src/utils/branchEntityCache';
+import { findActiveTableOrder } from '../utils/tableOrder';
 
 const isClientOnlyItemId = (value: unknown) => {
     const id = String(value || '').trim();
@@ -64,7 +66,7 @@ interface OrderState {
     activeOrderType: OrderType;
     heldOrders: HeldOrder[];
     activeCart: OrderItem[];
-    tableDrafts: Record<string, { cart: OrderItem[]; discount: number; updatedAt: number }>;
+    tableDrafts: Record<string, { cart: OrderItem[]; discount: number; activeCoupon: string | null; updatedAt: number }>;
     tables: Table[];
     zones: FloorZone[];
     isLoading: boolean;
@@ -80,10 +82,11 @@ interface OrderState {
     // Async Actions (API)
     fetchOrders: (params?: { status?: string; branch_id?: string; date?: string; limit?: number }) => Promise<void>;
     placeOrder: (order: Order) => Promise<Order>;
-    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean }) => Promise<void>;
+    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean; approvalId?: number }) => Promise<void>;
 
     fetchTables: (branchId: string) => Promise<void>;
-    updateTableStatus: (tableId: string, status: TableStatus) => Promise<void>;
+    updateTableStatus: (tableId: string, status: TableStatus, currentOrderId?: string) => Promise<void>;
+    resetTable: (tableId: string, reason?: string) => Promise<void>;
 
     // Local Actions
     setOrderMode: (mode: OrderType) => void;
@@ -96,7 +99,7 @@ interface OrderState {
     updateCartItemDiscount: (itemId: string, discount: number, discountType: 'percent' | 'flat') => void;
     setTipAmount: (amount: number) => void;
     clearCart: () => void;
-    saveTableDraft: (tableId: string, cart: OrderItem[], discount: number) => void;
+    saveTableDraft: (tableId: string, cart: OrderItem[], discount: number, activeCoupon?: string | null) => void;
     loadTableDraft: (tableId: string) => void;
     clearTableDraft: (tableId: string) => void;
     setDiscount: (amount: number) => void;
@@ -221,6 +224,7 @@ export const useOrderStore = create<OrderState>()(
                             serviceCharge: o.serviceCharge,
                             total: o.total,
                             discount: o.discount,
+                            couponCode: o.coupon_code || o.couponCode,
                             freeDelivery: o.free_delivery,
                             isUrgent: o.is_urgent,
                             paymentMethod: o.payment_method,
@@ -255,6 +259,8 @@ export const useOrderStore = create<OrderState>()(
                         const rawZones = await tablesApi.getZones(branchId);
                         const tables = rawTables.map((t: any) => ({
                             ...t,
+                            status: t.status === TableStatus.AVAILABLE ? TableStatus.AVAILABLE : TableStatus.OCCUPIED,
+                            defaultCouponCode: t.defaultCouponCode ?? t.default_coupon_code ?? undefined,
                             position: {
                                 x: t.position?.x ?? t.x ?? 0,
                                 y: t.position?.y ?? t.y ?? 0
@@ -269,12 +275,18 @@ export const useOrderStore = create<OrderState>()(
                             height: z.height ?? 1200
                         }));
                         set({ tables, zones, isLoading: false });
-                        await localDb.floorTables.bulkPut(tables.map((t: any) => ({ ...t, branchId, x: t.position?.x ?? t.x ?? 0, y: t.position?.y ?? t.y ?? 0 })));
-                        await localDb.floorZones.bulkPut(zones.map((z: any) => ({ ...z, branchId })));
+                        await localDb.floorTables.where('branchId').equals(branchId).delete();
+                        await localDb.floorZones.where('branchId').equals(branchId).delete();
+                        await localDb.floorTables.bulkPut(tables.map((t: any) => toBranchEntityCache({
+                            ...t,
+                            x: t.position?.x ?? t.x ?? 0,
+                            y: t.position?.y ?? t.y ?? 0,
+                        }, branchId)));
+                        await localDb.floorZones.bulkPut(zones.map((z: any) => toBranchEntityCache(z, branchId)));
                     } else {
                         const tables = (await localDb.floorTables.where('branchId').equals(branchId).toArray())
                             .map((t: any) => ({
-                                ...t,
+                                ...fromBranchEntityCache(t),
                                 position: {
                                     x: t.position?.x ?? t.x ?? 0,
                                     y: t.position?.y ?? t.y ?? 0
@@ -282,7 +294,8 @@ export const useOrderStore = create<OrderState>()(
                                 width: t.width ?? 100,
                                 height: t.height ?? 100
                             }));
-                        const zones = await localDb.floorZones.where('branchId').equals(branchId).toArray();
+                        const zones = (await localDb.floorZones.where('branchId').equals(branchId).toArray())
+                            .map((zone: any) => fromBranchEntityCache(zone));
                         set({ tables, zones, isLoading: false });
                     }
                 } catch (error: any) {
@@ -334,6 +347,7 @@ export const useOrderStore = create<OrderState>()(
                             name: item.name,
                             name_ar: item.nameAr || (item as any).name_ar || item.name,
                             price: item.price,
+                            size_id: item.sizeId || (item as any).size_id || undefined,
                             quantity: item.quantity,
                             notes: item.notes,
                             seat_number: item.seatNumber ?? item.seat_number ?? undefined,
@@ -376,6 +390,7 @@ export const useOrderStore = create<OrderState>()(
                         tax: savedOrder.tax ?? order.tax,
                         total: savedOrder.total ?? order.total,
                         discount: savedOrder.discount ?? order.discount,
+                        couponCode: savedOrder.coupon_code ?? savedOrder.couponCode ?? order.couponCode,
                         freeDelivery: savedOrder.free_delivery ?? order.freeDelivery,
                         isUrgent: savedOrder.is_urgent ?? order.isUrgent,
                         paymentMethod: savedOrder.payment_method ?? order.paymentMethod,
@@ -400,6 +415,7 @@ export const useOrderStore = create<OrderState>()(
                         orders: [normalizedOrder, ...state.orders],
                         activeCart: [],
                         discount: 0,
+                        activeCoupon: null,
                         isLoading: false
                     }));
 
@@ -418,8 +434,15 @@ export const useOrderStore = create<OrderState>()(
                     const previousStatus = current?.status;
                     const expectedUpdatedAt = options?.skipVersionCheck ? undefined : (current?.updatedAt ? new Date(current.updatedAt).toISOString() : undefined);
                     if (navigator.onLine) {
-                        await ordersApi.updateStatus(orderId, { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt }, { idempotencyKey: `${orderId}:${status}:${Date.now()}` });
+                        await ordersApi.updateStatus(orderId, {
+                            status,
+                            changed_by: changedBy,
+                            notes,
+                            expected_updated_at: expectedUpdatedAt,
+                            approval_id: options?.approvalId,
+                        }, { idempotencyKey: `${orderId}:${status}:${Date.now()}` });
                     } else {
+                        if (options?.approvalId) throw new Error('MANAGER_APPROVAL_REQUIRES_ONLINE');
                         await syncService.queue('orderStatus', 'UPDATE', {
                             id: orderId,
                             data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt }
@@ -522,17 +545,21 @@ export const useOrderStore = create<OrderState>()(
                 tipAmount: 0,
             }),
 
-            saveTableDraft: (tableId, cart, discount) => set((state) => ({
+            saveTableDraft: (tableId, cart, discount, activeCoupon = null) => set((state) => ({
                 tableDrafts: {
                     ...state.tableDrafts,
-                    [tableId]: { cart: [...cart], discount, updatedAt: Date.now() }
+                    [tableId]: { cart: [...cart], discount, activeCoupon, updatedAt: Date.now() }
                 }
             })),
 
             loadTableDraft: (tableId) => set((state) => {
                 const draft = state.tableDrafts[tableId];
                 if (!draft) return state;
-                return { activeCart: [...draft.cart], discount: draft.discount };
+                return {
+                    activeCart: [...draft.cart],
+                    discount: draft.discount,
+                    activeCoupon: draft.activeCoupon || null,
+                };
             }),
 
             clearTableDraft: (tableId) => set((state) => {
@@ -568,7 +595,8 @@ export const useOrderStore = create<OrderState>()(
             holdOrder: (order) => set((state) => ({
                 heldOrders: [...state.heldOrders, order],
                 activeCart: [],
-                discount: 0
+                discount: 0,
+                activeCoupon: null,
             })),
 
             recallOrder: (index) => set((state) => {
@@ -589,24 +617,64 @@ export const useOrderStore = create<OrderState>()(
                 tables: state.tables.map(t => t.id === id ? { ...t, ...updates } : t)
             })),
 
-            updateTableStatus: async (tableId, status) => {
+            updateTableStatus: async (tableId, status, currentOrderId) => {
+                const previousTable = get().tables.find((table) => table.id === tableId);
                 // Optimistic Update
                 set((state) => ({
-                    tables: state.tables.map(t => t.id === tableId ? { ...t, status } : t)
+                    tables: state.tables.map(t => t.id === tableId ? { ...t, status, currentOrderId } : t)
                 }));
                 try {
                     if (navigator.onLine) {
-                        await tablesApi.updateStatus(tableId, status);
+                        const saved = await tablesApi.updateStatus(tableId, {
+                            status,
+                            currentOrderId,
+                            branchId: useAuthStore.getState().settings.activeBranchId,
+                        });
+                        set((state) => ({ tables: state.tables.map(t => t.id === tableId ? { ...t, ...saved } : t) }));
                     } else {
-                        await syncService.queue('tableStatus', 'UPDATE', { id: tableId, status });
+                        await syncService.queue('tableStatus', 'UPDATE', {
+                            id: tableId,
+                            branchId: useAuthStore.getState().settings.activeBranchId,
+                            status, currentOrderId,
+                        });
                     }
-                    const existing = await localDb.floorTables.get(tableId);
+                    const branchId = useAuthStore.getState().settings.activeBranchId;
+                    const existing = branchId
+                        ? await localDb.floorTables.get(branchEntityCacheKey(branchId, tableId))
+                            || await localDb.floorTables.where('branchId').equals(branchId)
+                                .and((row: any) => (row.entityId || row.id) === tableId)
+                                .first()
+                        : null;
                     if (existing) {
-                        await localDb.floorTables.put({ ...existing, status });
+                        await localDb.floorTables.put(
+                            branchId
+                                ? { ...toBranchEntityCache(fromBranchEntityCache(existing) as any, branchId), status, currentOrderId }
+                                : { ...existing, status, currentOrderId },
+                        );
                     }
                 } catch (error) {
-                    set({ error: (error as any)?.code || (error as any)?.message || 'TABLE_STATUS_SYNC_FAILED' });
+                    set((state) => ({
+                        tables: state.tables.map((table) => table.id === tableId && previousTable
+                            ? { ...table, status: previousTable.status, currentOrderId: previousTable.currentOrderId }
+                            : table),
+                        error: (error as any)?.code || (error as any)?.message || 'TABLE_STATUS_SYNC_FAILED',
+                    }));
+                    throw error;
                 }
+            },
+
+            resetTable: async (tableId, reason) => {
+                const branchId = useAuthStore.getState().settings.activeBranchId;
+                const saved = await tablesApi.reset(tableId, reason, branchId);
+                set((state) => ({
+                    tables: state.tables.map((table) => table.id === tableId
+                        ? { ...table, status: TableStatus.AVAILABLE, currentOrderId: undefined, lockedByUserId: undefined }
+                        : table),
+                    orders: state.orders.map((order) => saved.resetOrderIds?.includes(order.id)
+                        ? { ...order, status: OrderStatus.CANCELLED, cancelReason: reason, cancelledAt: new Date() }
+                        : order),
+                }));
+                if (branchId) await get().fetchTables(branchId);
             },
 
             updateZones: (zones) => set({ zones }),
@@ -686,132 +754,119 @@ export const useOrderStore = create<OrderState>()(
             },
 
             transferTable: async (sourceId, targetId) => {
-                const state = get(); // Access current state
-                const sourceTable = state.tables.find(t => t.id === sourceId);
-                const targetTable = state.tables.find(t => t.id === targetId);
-
-                if (!sourceTable || !targetTable) return;
-
-                // Optimistic Update
-                set((state) => ({
-                    tables: state.tables.map(t => {
-                        if (t.id === sourceId) return { ...t, status: TableStatus.AVAILABLE, currentOrderTotal: 0 };
-                        if (t.id === targetId) return { ...t, status: TableStatus.OCCUPIED, currentOrderTotal: sourceTable.currentOrderTotal };
-                        return t;
-                    }),
-                    orders: state.orders.map(o => (o.tableId === sourceId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string)) ? { ...o, tableId: targetId } : o)
-                }));
-
-                // API Call (transactional on backend)
+                const branchId = useAuthStore.getState().settings.activeBranchId;
+                if (!branchId) throw new Error('BRANCH_SCOPE_REQUIRED');
+                if (!navigator.onLine) throw new Error('TABLE_MANAGEMENT_REQUIRES_ONLINE');
                 try {
-                    if (navigator.onLine) {
-                        await tablesApi.transfer({
-                            sourceTableId: sourceId,
-                            targetTableId: targetId,
-                            reference_id: `table-transfer:${sourceId}:${targetId}:${Date.now()}`,
-                        });
-                    } else {
-                        await tablesApi.updateStatus(sourceId, TableStatus.AVAILABLE);
-                        await tablesApi.updateStatus(targetId, TableStatus.OCCUPIED);
-                    }
+                    await tablesApi.transfer({
+                        sourceTableId: sourceId,
+                        targetTableId: targetId,
+                        branchId,
+                        reference_id: `table-transfer:${sourceId}:${targetId}:${Date.now()}`,
+                    });
+                    await get().fetchOrders({ branch_id: branchId, limit: 500 });
+                    await get().fetchTables(branchId);
                 } catch (error) {
-                    set({ error: (error as any)?.code || (error as any)?.message || 'TABLE_TRANSFER_FAILED' });
+                    set({
+                        error: (error as any)?.code || (error as any)?.message || 'TABLE_TRANSFER_FAILED'
+                    });
+                    throw error;
                 }
             },
 
             transferItems: async (sourceId, targetId, itemIds) => {
-                const snapshot = get();
-                const sourceOrder = snapshot.orders.find(o => o.tableId === sourceId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
-                const targetOrder = snapshot.orders.find(o => o.tableId === targetId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
-                if (!sourceOrder) return;
+                const state = get();
+                const branchId = useAuthStore.getState().settings.activeBranchId;
+                if (!branchId) throw new Error('BRANCH_SCOPE_REQUIRED');
+                if (!navigator.onLine) throw new Error('TABLE_MANAGEMENT_REQUIRES_ONLINE');
+                const sourceOrder = findActiveTableOrder(state.orders, state.tables, sourceId);
+                const targetOrder = findActiveTableOrder(state.orders, state.tables, targetId);
+                if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
                 const itemsToMove = sourceOrder.items.filter(i => itemIds.includes(i.cartId));
-                if (itemsToMove.length === 0) return;
-                const remainingItems = sourceOrder.items.filter(i => !itemIds.includes(i.cartId));
-
-                let newOrders = snapshot.orders.map(o => (o.id === sourceOrder.id ? { ...o, items: remainingItems } : o));
-                if (targetOrder) {
-                    newOrders = newOrders.map(o => (o.id === targetOrder.id ? { ...o, items: [...o.items, ...itemsToMove] } : o));
-                } else {
-                    const newOrder: Order = {
-                        ...sourceOrder,
-                        id: `transfer-${Date.now()}`,
-                        tableId: targetId,
-                        items: itemsToMove,
-                        createdAt: new Date(),
-                        payments: [],
-                        status: OrderStatus.PENDING
-                    };
-                    newOrders = [newOrder, ...newOrders];
-                }
-                set({ orders: newOrders });
+                if (itemsToMove.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
                 try {
-                    if (navigator.onLine) {
-                        const payloadItems = itemsToMove.map(i => ({ name: i.name, price: Number(i.price || 0), quantity: Number(i.quantity || 1) }));
-                        if (targetOrder) {
-                            await tablesApi.merge({
-                                sourceTableId: sourceId,
-                                targetTableId: targetId,
-                                items: payloadItems,
-                                reference_id: `table-merge:${sourceId}:${targetId}:${Date.now()}`,
-                            });
-                        } else {
-                            await tablesApi.split({
-                                sourceTableId: sourceId,
-                                targetTableId: targetId,
-                                items: payloadItems,
-                                reference_id: `table-split:${sourceId}:${targetId}:${Date.now()}`,
-                            });
-                        }
+                    const payloadItems = itemsToMove.map(i => ({
+                        id: i.cartId,
+                        name: i.name,
+                        price: Number(i.price || 0),
+                        quantity: Number(i.quantity || 1),
+                    }));
+                    if (targetOrder) {
+                        await tablesApi.merge({
+                            sourceTableId: sourceId,
+                            targetTableId: targetId,
+                            branchId,
+                            items: payloadItems,
+                            reference_id: `table-merge:${sourceId}:${targetId}:${Date.now()}`,
+                        });
+                    } else {
+                        await tablesApi.split({
+                            sourceTableId: sourceId,
+                            targetTableId: targetId,
+                            branchId,
+                            items: payloadItems,
+                            reference_id: `table-split:${sourceId}:${targetId}:${Date.now()}`,
+                        });
                     }
+                    await get().fetchOrders({ branch_id: branchId, limit: 500 });
+                    await get().fetchTables(branchId);
                 } catch (error) {
-                    set({ error: (error as any)?.code || (error as any)?.message || 'TABLE_ITEMS_TRANSFER_FAILED' });
+                    set({
+                        error: (error as any)?.code || (error as any)?.message || 'TABLE_ITEMS_TRANSFER_FAILED'
+                    });
+                    throw error;
                 }
             },
 
             splitTable: async (sourceId, targetId, itemIds) => {
                 const state = get();
-                const sourceOrder = state.orders.find(o => o.tableId === sourceId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
-                if (!sourceOrder) return;
+                const branchId = useAuthStore.getState().settings.activeBranchId;
+                if (!branchId) throw new Error('BRANCH_SCOPE_REQUIRED');
+                if (!navigator.onLine) throw new Error('TABLE_MANAGEMENT_REQUIRES_ONLINE');
+                const sourceOrder = findActiveTableOrder(state.orders, state.tables, sourceId);
+                if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
                 const itemsToMove = sourceOrder.items.filter(i => itemIds.includes(i.cartId));
-                const remainingItems = sourceOrder.items.filter(i => !itemIds.includes(i.cartId));
-
-                const newOrder: Order = {
-                    ...sourceOrder,
-                    id: `split-${Date.now()}`,
-                    tableId: targetId,
-                    items: itemsToMove,
-                    createdAt: new Date(),
-                };
-
-                set({
-                    orders: [newOrder, ...state.orders.map(o => o.id === sourceOrder.id ? { ...o, items: remainingItems } : o)],
-                    tables: state.tables.map(t => t.id === targetId ? { ...t, status: TableStatus.OCCUPIED } : t)
-                });
+                if (itemsToMove.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
                 try {
-                    if (navigator.onLine) {
-                        const payloadItems = itemsToMove.map(i => ({ name: i.name, price: Number(i.price || 0), quantity: Number(i.quantity || 1) }));
-                        await tablesApi.split({
-                            sourceTableId: sourceId,
-                            targetTableId: targetId,
-                            items: payloadItems,
-                            reference_id: `table-split:${sourceId}:${targetId}:${Date.now()}`,
-                        });
-                    }
+                    const payloadItems = itemsToMove.map(i => ({
+                        id: i.cartId,
+                        name: i.name,
+                        price: Number(i.price || 0),
+                        quantity: Number(i.quantity || 1),
+                    }));
+                    await tablesApi.split({
+                        sourceTableId: sourceId,
+                        targetTableId: targetId,
+                        branchId,
+                        items: payloadItems,
+                        reference_id: `table-split:${sourceId}:${targetId}:${Date.now()}`,
+                    });
+                    await get().fetchOrders({ branch_id: branchId, limit: 500 });
+                    await get().fetchTables(branchId);
                 } catch (error) {
-                    set({ error: (error as any)?.code || (error as any)?.message || 'TABLE_SPLIT_FAILED' });
+                    set({
+                        error: (error as any)?.code || (error as any)?.message || 'TABLE_SPLIT_FAILED'
+                    });
+                    throw error;
                 }
             },
 
             loadTableOrder: (tableId) => set((state) => {
-                const activeOrder = state.orders.find(o => o.tableId === tableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
+                const activeOrder = findActiveTableOrder(state.orders, state.tables, tableId);
                 if (activeOrder) {
-                    return { activeCart: activeOrder.items || [], discount: activeOrder.discount || 0 };
+                    const subtotal = Number(activeOrder.subtotal || 0);
+                    const discountAmount = Number(activeOrder.discount || 0);
+                    return {
+                        activeCart: activeOrder.items || [],
+                        discount: subtotal > 0 ? (discountAmount / subtotal) * 100 : 0,
+                        activeCoupon: activeOrder.couponCode || null,
+                    };
                 }
-                return { activeCart: [], discount: 0 };
+                return { activeCart: [], discount: 0, activeCoupon: null };
             }),
         }),
         { name: 'order-storage' }

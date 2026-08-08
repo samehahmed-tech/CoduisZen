@@ -45,7 +45,7 @@ export const ItemDrawer: React.FC<Props> = ({
   const [recipeIngredientId, setRecipeIngredientId] = useState("");
   const [recipeIngredientSearch, setRecipeIngredientSearch] = useState("");
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false);
-  const [recipeIngredientQty, setRecipeIngredientQty] = useState(0);
+  const [recipeIngredientQty, setRecipeIngredientQty] = useState('');
   const [selectedRecipeSizeId, setSelectedRecipeSizeId] = useState<string | null>(null);
 
   const recipeIngredientOptions = useMemo(() => {
@@ -117,7 +117,8 @@ export const ItemDrawer: React.FC<Props> = ({
   const removeModOption = (gId: string, oId: string) => update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? { ...g, options: g.options.filter(o => o.id !== oId) } : g) });
 
   const addRecipeIngredient = () => {
-    if (!recipeIngredientId || recipeIngredientQty <= 0) return;
+    const quantity = Number(recipeIngredientQty);
+    if (!recipeIngredientId || !Number.isFinite(quantity) || quantity < 0.001) return;
     const inv = inventory.find(i => i.id === recipeIngredientId);
     if (!inv) return;
     
@@ -137,9 +138,9 @@ export const ItemDrawer: React.FC<Props> = ({
       const foundIdx = ingredients.findIndex(r => (r.itemId || r.inventoryItemId) === recipeIngredientId);
       
       if (foundIdx >= 0) {
-        ingredients[foundIdx] = { ...ingredients[foundIdx], quantity: ingredients[foundIdx].quantity + recipeIngredientQty };
+        ingredients[foundIdx] = { ...ingredients[foundIdx], quantity: ingredients[foundIdx].quantity + quantity };
       } else {
-        ingredients.push({ itemId: recipeIngredientId, inventoryItemId: recipeIngredientId, quantity: recipeIngredientQty, unit: String(inv.unit) });
+        ingredients.push({ itemId: recipeIngredientId, inventoryItemId: recipeIngredientId, quantity, unit: String(inv.unit) });
       }
       
       updatedRecipes[targetRecipeIndex].ingredients = ingredients;
@@ -147,13 +148,13 @@ export const ItemDrawer: React.FC<Props> = ({
     } else {
       // Legacy flat format - convert to new format if size is selected, or keep flat if not
       if (selectedRecipeSizeId) {
-        update({ recipe: [{ sizeId: selectedRecipeSizeId, ingredients: [{ itemId: recipeIngredientId, quantity: recipeIngredientQty, unit: String(inv.unit) }] }] });
+        update({ recipe: [{ sizeId: selectedRecipeSizeId, ingredients: [{ itemId: recipeIngredientId, quantity, unit: String(inv.unit) }] }] });
       } else {
         const found = recipes.find(r => r.itemId === recipeIngredientId);
         if (found) {
-          update({ recipe: recipes.map(r => r.itemId === recipeIngredientId ? { ...r, quantity: r.quantity + recipeIngredientQty } : r) });
+          update({ recipe: recipes.map(r => r.itemId === recipeIngredientId ? { ...r, quantity: r.quantity + quantity } : r) });
         } else {
-          update({ recipe: [...recipes, { itemId: recipeIngredientId, quantity: recipeIngredientQty, unit: String(inv.unit) }] });
+          update({ recipe: [...recipes, { itemId: recipeIngredientId, quantity, unit: String(inv.unit) }] });
         }
       }
     }
@@ -161,7 +162,7 @@ export const ItemDrawer: React.FC<Props> = ({
     setRecipeIngredientId("");
     setRecipeIngredientSearch("");
     setRecipeSearchOpen(false);
-    setRecipeIngredientQty(0);
+    setRecipeIngredientQty('');
   };
 
   const removeRecipeIngredient = (id: string) => {
@@ -658,11 +659,14 @@ export const ItemDrawer: React.FC<Props> = ({
                               )}
                            </div>
                            <div className="w-full sm:w-40">
-                              <label className={subLabelCls}>{lang === 'ar' ? 'الكمية الصافية' : 'Net Qty'}</label>
-                              <input type="number" value={recipeIngredientQty || ""} onChange={e => setRecipeIngredientQty(parseFloat(e.target.value) || 0)} className={`${inputCls} h-12 font-bold`} placeholder="0.00" />
+                              <label className={subLabelCls}>
+                                {lang === 'ar' ? 'الكمية الصافية' : 'Net Qty'}
+                                {recipeIngredientId ? ` (${inventory.find(inv => inv.id === recipeIngredientId)?.unit || '-'})` : ''}
+                              </label>
+                               <input type="number" min="0.001" step="0.001" value={recipeIngredientQty} onChange={e => setRecipeIngredientQty(e.target.value)} className={`${inputCls} h-12 font-bold`} placeholder="0.000" />
                            </div>
                            <div className="flex items-end">
-                              <button onClick={addRecipeIngredient} disabled={!recipeIngredientId || recipeIngredientQty <= 0} className="h-12 px-8 glass-btn glass-btn-primary w-full sm:w-auto text-xs disabled:opacity-50 !rounded-xl">
+                               <button onClick={addRecipeIngredient} disabled={!recipeIngredientId || !Number.isFinite(Number(recipeIngredientQty)) || Number(recipeIngredientQty) < 0.001} className="h-12 px-8 glass-btn glass-btn-primary w-full sm:w-auto text-xs disabled:opacity-50 !rounded-xl">
                                 {lang === 'ar' ? 'ربط' : 'LINK'}
                               </button>
                            </div>
@@ -673,7 +677,7 @@ export const ItemDrawer: React.FC<Props> = ({
                              const ingredientId = ri.itemId || ri.inventoryItemId;
                              const inv = inventory.find(i => i.id === ingredientId);
                              return (
-                               <div key={ingredientId} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl bg-elevated border border-border/30 group">
+                                <div key={`${selectedRecipeSizeId || 'base'}-${ingredientId}`} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl bg-elevated border border-border/30 group">
                                  <div className="flex-1 flex flex-col justify-center">
                                     <p className="text-sm font-black text-main">{(lang === 'ar' ? inv?.nameAr || inv?.name : inv?.name) || ingredientId}</p>
                                     <p className="text-[10px] font-bold text-muted uppercase tracking-widest">
@@ -684,9 +688,15 @@ export const ItemDrawer: React.FC<Props> = ({
                                     <p className="text-sm font-black text-amber-500 w-20 text-right">{currency} {(inv ? inv.costPrice * ri.quantity : 0).toFixed(2)}</p>
                                     <input 
                                       type="number" 
-                                      value={ri.quantity} 
-                                      onChange={e => {
-                                        const val = parseFloat(e.target.value) || 0;
+                                      defaultValue={ri.quantity}
+                                      min="0.001"
+                                      step="0.001"
+                                      onBlur={e => {
+                                        const val = e.currentTarget.valueAsNumber;
+                                        if (!Number.isFinite(val) || val < 0.001) {
+                                          e.currentTarget.value = String(ri.quantity);
+                                          return;
+                                        }
                                         const recipes = Array.isArray(item.recipe) ? item.recipe : [];
                                         const isNewFormat = recipes.length > 0 && recipes[0].ingredients;
                                         

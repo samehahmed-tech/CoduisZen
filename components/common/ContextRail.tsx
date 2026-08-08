@@ -141,6 +141,27 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
     }, []);
 
     useEffect(() => {
+        const likelyNextPaths = Array.from(new Set(
+            filteredSections.flatMap((section) => section.items.map((item) => item.path))
+        )).filter((path) => path !== location.pathname).slice(0, 3);
+        if (likelyNextPaths.length === 0) return;
+
+        const preloadLikelyRoutes = () => likelyNextPaths.forEach(handlePreload);
+        const idleWindow = window as Window & {
+            requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+            cancelIdleCallback?: (id: number) => void;
+        };
+
+        if (idleWindow.requestIdleCallback) {
+            const idleId = idleWindow.requestIdleCallback(preloadLikelyRoutes, { timeout: 2500 });
+            return () => idleWindow.cancelIdleCallback?.(idleId);
+        }
+
+        const timeoutId = window.setTimeout(preloadLikelyRoutes, 1200);
+        return () => window.clearTimeout(timeoutId);
+    }, [filteredSections, handlePreload, location.pathname]);
+
+    useEffect(() => {
         let mounted = true;
         const refresh = async () => {
             try {
@@ -356,6 +377,7 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                                                     onClick={() => setMobileOpen(false)}
                                                     onMouseEnter={() => handlePreload(item.path)}
                                                     onPointerDown={() => handlePreload(item.path)}
+                                                    onFocus={() => handlePreload(item.path)}
                                                     className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item-active' : ''}`}
                                                     style={{ animationDelay: isOpen ? `${itemIdx * 30}ms` : '0ms' }}
                                                     title={lang === 'ar' ? item.labelAr : item.label}

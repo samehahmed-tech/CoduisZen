@@ -155,7 +155,7 @@ const Production: React.FC = () => {
     };
 
     const handleCompleteSubmit = async () => {
-        if (!orderToComplete || actualYield < 0) {
+        if (!orderToComplete || !Number.isFinite(actualYield) || actualYield < 0.001) {
             showToast(tr('Enter a valid produced quantity.', 'ادخل كمية إنتاج صحيحة.'), 'error');
             return;
         }
@@ -470,7 +470,17 @@ const Production: React.FC = () => {
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{tr('Target Yield Quantity', 'كمية الإنتاج المستهدفة')}</label>
                                 <div className="flex items-center gap-3">
-                                    <input type="number" min={1} className="flex-1 px-4 py-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-black text-xl text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-0 outline-none transition-colors tabular-nums" value={quantityRequested} onChange={(e) => setQuantityRequested(Number(e.target.value || 0))} />
+                                    <input
+                                        type="number"
+                                        min="0.001"
+                                        step="0.001"
+                                        className="flex-1 px-4 py-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-black text-xl text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-0 outline-none transition-colors tabular-nums"
+                                        defaultValue={quantityRequested}
+                                        onBlur={(e) => {
+                                            const quantity = e.currentTarget.valueAsNumber;
+                                            setQuantityRequested(Number.isFinite(quantity) && quantity >= 0.001 ? quantity : 0);
+                                        }}
+                                    />
                                     <span className="text-sm font-black text-slate-400 uppercase w-16">{selectedCompositeItem?.unit || tr('Unit', 'وحدة')}</span>
                                 </div>
                             </div>
@@ -564,10 +574,14 @@ const Production: React.FC = () => {
                                 <label className="block text-left text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{tr('Actual Yield Quantity', 'الكمية الفعلية المنتجة')}</label>
                                 <input
                                     type="number"
-                                    min={0}
+                                    min="0.001"
+                                    step="0.001"
                                     className="w-full px-6 py-4 rounded-xl border-2 border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/5 font-black text-2xl text-emerald-700 dark:text-emerald-400 focus:border-emerald-500 focus:ring-0 outline-none transition-colors tabular-nums text-center"
-                                    value={actualYield}
-                                    onChange={(e) => setActualYield(Number(e.target.value || 0))}
+                                    defaultValue={actualYield}
+                                    onBlur={(e) => {
+                                        const quantity = e.currentTarget.valueAsNumber;
+                                        setActualYield(Number.isFinite(quantity) && quantity >= 0.001 ? quantity : 0);
+                                    }}
                                 />
                             </div>
                         </div>

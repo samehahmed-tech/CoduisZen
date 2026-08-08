@@ -3,6 +3,7 @@ import { db } from '../db';
 import { orders, settings, branches } from '../../src/db/schema';
 import { and, eq, gte, lt, lte, or, sql, count, desc } from 'drizzle-orm';
 import { parseSettingJson, upsertSetting } from '../utils/settingsStore';
+import { revenueEligibleOrder } from '../utils/orderRevenue';
 
 type EscalationPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type EscalationStatus = 'OPEN' | 'RESOLVED';
@@ -559,6 +560,7 @@ export const getDailyOrderSummary = async (req: Request, res: Response) => {
         ];
         if (branchId) conditions.push(eq(orders.branchId, branchId));
 
+        const revenueEligible = revenueEligibleOrder();
         const summary = await db.select({
             status: orders.status,
             orderCount: count(),
@@ -571,21 +573,23 @@ export const getDailyOrderSummary = async (req: Request, res: Response) => {
         const hourly = await db.select({
             hour: sql<number>`DATEPART(hour, ${orders.createdAt})`,
             orderCount: count(),
-            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
         }).from(orders).where(and(...conditions)).groupBy(sql`DATEPART(hour, ${orders.createdAt})`).orderBy(sql`DATEPART(hour, ${orders.createdAt})`);
 
         // Agent breakdown with AHT
         const agentBreakdown = await db.select({
             agentId: orders.callCenterAgentId,
             orderCount: count(),
-            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
             cancelled: sql<number>`count(case when ${orders.status} = 'CANCELLED' then 1 end)`,
             delivered: sql<number>`count(case when ${orders.status} = 'DELIVERED' then 1 end)`,
             avgAhtMinutes: sql<number>`coalesce(avg(DATEDIFF(SECOND, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
         }).from(orders).where(and(...conditions)).groupBy(orders.callCenterAgentId);
 
         const totalOrders = summary.reduce((sum, s) => sum + Number(s.orderCount), 0);
-        const totalRevenue = summary.reduce((sum, s) => sum + Number(s.totalRevenue), 0);
+        const totalRevenue = summary
+            .filter(row => !['CANCELLED', 'REFUNDED', 'VOID'].includes(String(row.status)))
+            .reduce((sum, row) => sum + Number(row.totalRevenue), 0);
 
         res.json({
             date: targetDate.toISOString().slice(0, 10),

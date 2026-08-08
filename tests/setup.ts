@@ -20,12 +20,21 @@ const globalState = globalThis as typeof globalThis & {
 const state = (globalState.__restoflowTestDbState ??= {});
 
 const ensureTestDatabaseReady = async () => {
-    if (state.ready) return;
+    if (state.ready) {
+        const serverDb = await import('../server/db');
+        await serverDb.waitForDatabase();
+        state.db = serverDb.db;
+        return;
+    }
     if (!state.readyPromise) {
         state.readyPromise = (async () => {
             const serverDb = await import('../server/db');
             await serverDb.waitForDatabase();
             state.db = serverDb.db;
+            await state.db.execute(sql.raw(`
+                IF COL_LENGTH('dbo.purchase_orders', 'target_warehouse_id') IS NULL
+                    ALTER TABLE purchase_orders ADD target_warehouse_id nvarchar(255) NULL;
+            `));
             state.ready = true;
         })();
     }
@@ -117,6 +126,8 @@ const targetedCleanup = async () => {
     await deleteByPrefixes('warehouses', 'id').catch(() => undefined);
     await deleteByPrefixes('cost_centers', 'id').catch(() => undefined);
     await deleteByPrefixes('fiscal_periods', 'id').catch(() => undefined);
+    await deleteByTestBranches('tables').catch(() => undefined);
+    await deleteByTestBranches('floor_zones').catch(() => undefined);
 
     await db.execute(sql.raw(`
         DELETE FROM users

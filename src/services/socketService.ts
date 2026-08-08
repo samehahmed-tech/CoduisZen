@@ -51,6 +51,7 @@ class SocketService {
     private currentBranchId: string | null = null;
     private currentToken: string | null = null;
     private reconnectCallbacks: Set<() => void> = new Set();
+    private connectionCallbacks: Set<(connected: boolean) => void> = new Set();
     private _wasConnected = false;
 
     init(token: string) {
@@ -81,6 +82,10 @@ class SocketService {
                 });
             }
             this._wasConnected = true;
+            this.connectionCallbacks.forEach(cb => cb(true));
+        });
+        this.socket.on('disconnect', () => {
+            this.connectionCallbacks.forEach(cb => cb(false));
         });
     }
 
@@ -110,6 +115,15 @@ class SocketService {
         this.reconnectCallbacks.delete(callback);
     }
 
+    onConnectionChange(callback: (connected: boolean) => void) {
+        this.connectionCallbacks.add(callback);
+        callback(this.isConnected());
+    }
+
+    offConnectionChange(callback: (connected: boolean) => void) {
+        this.connectionCallbacks.delete(callback);
+    }
+
     isConnected(): boolean {
         return this.socket?.connected ?? false;
     }
@@ -121,6 +135,7 @@ class SocketService {
         this.currentToken = null;
         this._wasConnected = false;
         this.reconnectCallbacks.clear();
+        this.connectionCallbacks.clear();
     }
 }
 

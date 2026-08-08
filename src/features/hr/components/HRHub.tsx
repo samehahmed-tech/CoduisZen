@@ -269,7 +269,6 @@ export default function HRHub() {
     const t = (translations as any)[lang] || translations['en'];
     const navigate = useNavigate();
     const [employees, setEmployees] = useState<any[]>([]);
-    const [stats, setStats] = useState<any>({ totalHeadcount: 0, activeShifts: 0, exceptions: 0 });
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -476,19 +475,11 @@ export default function HRHub() {
             params.set('offset', String(page * pageSize));
             if (branchId) params.set('branchId', branchId);
             if (debouncedSearch) params.set('q', debouncedSearch);
-            const [employeesRes, exceptionsRes] = await Promise.all([
-                apiRequest<any>(`/hr/employees?${params.toString()}`),
-                apiRequest<any>(`/attendance-ops/exceptions/queue${branchId ? `?branchId=${branchId}` : ''}`)
-            ]);
+            const employeesRes = await apiRequest<any>(`/hr/employees?${params.toString()}`);
             const items = employeesRes?.items || [];
             const total = Number(employeesRes?.total || items.length || 0);
             setEmployees(items);
             setTotalEmployees(total);
-            setStats({
-                totalHeadcount: total,
-                activeShifts: Math.round(total * 0.4),
-                exceptions: exceptionsRes?.length || 0
-            });
             if (branchId) {
                 const expiring = await apiRequest<any[]>(`/hr-extended/employee-documents?branchId=${branchId}&expiringWithinDays=30`);
                 setExpiringDocuments(expiring || []);
@@ -1028,6 +1019,14 @@ export default function HRHub() {
             toast.error('اسم الموظف مطلوب');
             return;
         }
+        if (!editingEmployee && createForm.hasSystemAccess && !createForm.email.trim()) {
+            toast.error('البريد الإلكتروني مطلوب لإنشاء حساب دخول');
+            return;
+        }
+        if (!editingEmployee && createForm.hasSystemAccess && createForm.pin.trim() && !/^\d{6}$/.test(createForm.pin.trim())) {
+            toast.error('كود PIN يجب أن يكون 6 أرقام');
+            return;
+        }
 
         setIsCreating(true);
         try {
@@ -1063,6 +1062,7 @@ export default function HRHub() {
             } else if (createForm.hasSystemAccess) {
                 const userPayload: any = {
                     ...basePayload,
+                    createEmployeeRecord: true,
                     isActive: true,
                     allowedBranches: createForm.branchId ? [createForm.branchId] : [],
                     assignedBranchId: createForm.branchId,
@@ -1279,7 +1279,7 @@ export default function HRHub() {
                     className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
                 >
                     {[
-                        { label: 'إجمالي الموظفين', value: stats.totalHeadcount, helper: 'داخل نطاق التشغيل الحالي', icon: Users, tone: 'text-blue-600 bg-blue-500/10 border-blue-500/20' },
+                        { label: 'إجمالي الموظفين', value: totalEmployees, helper: 'داخل نطاق التشغيل الحالي', icon: Users, tone: 'text-blue-600 bg-blue-500/10 border-blue-500/20' },
                         { label: 'نشطون', value: employeeInsights.active, helper: 'جاهزون للتشغيل اليومي', icon: Activity, tone: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' },
                         { label: 'لهم حساب نظام', value: employeeInsights.withAccess, helper: 'يمكنهم الدخول للنظام', icon: Shield, tone: 'text-violet-600 bg-violet-500/10 border-violet-500/20' },
                         { label: 'بدون كود بصمة', value: employeeInsights.missingCode, helper: 'يحتاجون ربط على الماكينة', icon: AlertTriangle, tone: 'text-amber-600 bg-amber-500/10 border-amber-500/20' },
@@ -1663,7 +1663,7 @@ export default function HRHub() {
                                     <>
                                         <label className={formStep === 'access' ? '' : 'hidden'}>
                                             <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-muted">{t.hr_email}</span>
-                                            <input value={createForm.email} onChange={(e) => setCreateForm(prev => ({ ...prev, email: e.target.value }))} className="w-full rounded-2xl border border-border/40 bg-card px-4 py-3 text-sm font-bold outline-none transition-colors focus:border-border" placeholder="Optional login email" />
+                                            <input type="email" required value={createForm.email} onChange={(e) => setCreateForm(prev => ({ ...prev, email: e.target.value }))} className="w-full rounded-2xl border border-border/40 bg-card px-4 py-3 text-sm font-bold outline-none transition-colors focus:border-border" placeholder="بريد الدخول مطلوب" />
                                         </label>
                                         <label className={formStep === 'access' ? '' : 'hidden'}>
                                             <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-muted">{t.hr_pin}</span>

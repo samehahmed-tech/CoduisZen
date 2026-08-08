@@ -24,6 +24,7 @@ import { toast } from 'react-hot-toast';
 import DeliveryTrackingMap from '../../../components/common/DeliveryTrackingMap';
 import { defaultMapCenter } from '../../../components/common/googleMaps';
 import { estimateEta } from '../../../components/common/mapRouting';
+import { getCashToCollect } from './cashCollection';
 
 type DriverStatus = 'AVAILABLE' | 'BUSY' | 'OFFLINE' | 'RETURNING';
 
@@ -40,8 +41,6 @@ const statusClass: Record<DriverStatus, string> = {
     OFFLINE: 'bg-slate-500/15 text-slate-300 border-slate-400/30',
     RETURNING: 'bg-sky-500/15 text-sky-300 border-sky-400/30',
 };
-
-const getOrderTotal = (order: any) => Number(order.total || order.grandTotal || 0);
 
 const getOrderCreatedAt = (order: any) => {
     const raw = order.createdAt || order.created_at;
@@ -77,9 +76,7 @@ export const DriverDashboard: React.FC = () => {
     const activeOrders = assignments.filter((order: any) => [OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, 'ASSIGNED'].includes(order.status));
     const roadOrders = activeOrders.filter((order: any) => order.status === OrderStatus.OUT_FOR_DELIVERY);
     const readyOrders = activeOrders.filter((order: any) => order.status === OrderStatus.READY || order.status === 'ASSIGNED');
-    const collectedTotal = useMemo(() => assignments
-        .filter((order: any) => [OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status))
-        .reduce((sum, order) => sum + getOrderTotal(order), 0), [assignments]);
+    const collectedTotal = activeOrders.reduce((sum, order) => sum + getCashToCollect(order), 0);
 
     const branchMessages = useMemo(() => {
         if (readyOrders.length > 1) return ['استلم الطلبات الجاهزة مع بعض لو نفس المسار.', 'راجع الكاشير قبل الخروج لتأكيد التحصيل.'];
@@ -296,6 +293,7 @@ export const DriverDashboard: React.FC = () => {
                         const elapsed = getElapsedMinutes(order);
                         const isRoad = order.status === OrderStatus.OUT_FOR_DELIVERY;
                         const isLate = elapsed > 45;
+                        const cashToCollect = getCashToCollect(order);
                         const eta = estimateEta(
                             defaultMapCenter,
                             getDeliveryPoint(order),
@@ -316,8 +314,8 @@ export const DriverDashboard: React.FC = () => {
                                         </p>
                                     </div>
                                     <div className="rounded-2xl bg-white/10 px-3 py-2 text-center">
-                                        <div className="text-lg font-black">{getOrderTotal(order).toFixed(0)}</div>
-                                        <div className="text-[9px] font-bold text-slate-400">جنيه</div>
+                                        <div className="text-lg font-black">{cashToCollect.toFixed(0)}</div>
+                                        <div className="text-[9px] font-bold text-slate-400">{cashToCollect > 0 ? 'تحصيل نقدي' : 'مدفوع'}</div>
                                     </div>
                                 </div>
 
@@ -365,12 +363,12 @@ export const DriverDashboard: React.FC = () => {
                                         </a>
                                     )}
                                     {!isRoad ? (
-                                        <button onClick={() => updateOrderStatus(order.id, OrderStatus.OUT_FOR_DELIVERY)} className="col-span-2 flex h-13 items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 text-sm font-black text-white">
+                                        <button onClick={() => updateOrderStatus(order.id, OrderStatus.OUT_FOR_DELIVERY)} className="col-span-2 flex h-14 items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 text-sm font-black text-white">
                                             <Package size={18} /> استلمت وخرجت بالأوردر
                                         </button>
                                     ) : (
-                                        <button onClick={() => updateOrderStatus(order.id, OrderStatus.DELIVERED)} className="col-span-2 flex h-13 items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white">
-                                            <CheckCircle2 size={18} /> تم التوصيل والتحصيل
+                                        <button onClick={() => updateOrderStatus(order.id, OrderStatus.DELIVERED)} className="col-span-2 flex h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white">
+                                            <CheckCircle2 size={18} /> {cashToCollect > 0 ? 'تم التوصيل والتحصيل' : 'تم التوصيل'}
                                         </button>
                                     )}
                                 </div>

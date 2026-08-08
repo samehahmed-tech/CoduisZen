@@ -386,7 +386,7 @@ export const updateItem = async (req: Request, res: Response) => {
     try {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'ITEM_ID_REQUIRED' });
-        const { id: _, category_id, recipe, ...updateData } = req.body; // Prevent updating ID
+        const { id: _, category_id, recipe, restore, ...updateData } = req.body; // Prevent updating ID
         if (updateData.name) {
             const normalizedName = updateData.name.trim().toLowerCase();
             const [duplicateName] = await db.select({ id: menuItems.id })
@@ -426,6 +426,7 @@ export const updateItem = async (req: Request, res: Response) => {
             .set({
                 ...updateData,
                 categoryId: category_id || updateData.categoryId,
+                ...(restore ? { deletedAt: null } : {}),
                 updatedAt: new Date()
             })
             .output()

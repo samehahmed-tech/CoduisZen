@@ -1,10 +1,20 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { eq } from 'drizzle-orm';
 import { branches, users, userSessions } from '../src/db/schema';
 
 let app: any;
 let db: typeof import('../server/db')['db'];
+let cleanupIds: { branchId: string; userId: string; sessionId: string } | null = null;
+
+afterEach(async () => {
+    if (!db || !cleanupIds) return;
+    await db.delete(userSessions).where(eq(userSessions.id, cleanupIds.sessionId));
+    await db.delete(users).where(eq(users.id, cleanupIds.userId));
+    await db.delete(branches).where(eq(branches.id, cleanupIds.branchId));
+    cleanupIds = null;
+});
 
 const authHeader = (userId: string, sessionId: string, tokenId: string) => `Bearer ${jwt.sign({
     sub: userId,
@@ -29,6 +39,7 @@ describe('day close business date guard', () => {
         const userId = `test-day-close-date-user-${suffix}`;
         const sessionId = `test-day-close-date-session-${suffix}`;
         const tokenId = `test-day-close-date-token-${suffix}`;
+        cleanupIds = { branchId, userId, sessionId };
         const activeDate = '2026-07-10';
         const requestedDate = '2026-07-09';
 

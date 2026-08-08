@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
+import crypto from 'node:crypto';
 import { db, pool } from '../db';
-import { inventoryItems, inventoryStock, stockMovements, warehouses, auditLogs, orders, orderItems, recipes, recipeIngredients } from '../../src/db/schema';
-import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { inventoryItems, inventoryStock, stockMovements, warehouses, auditLogs, orders, orderItems, recipes, recipeIngredients, idempotencyKeys } from '../../src/db/schema';
+import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { isForeignKeyDeleteError, writeForeignKeyDeleteConflict } from '../utils/dbErrors';
 import { postInventoryAdjustmentEntry, postInventoryAdjustmentReversalEntry } from '../services/financePostingService';
@@ -9,6 +10,8 @@ import { getIO } from '../socket';
 import { inventoryBatches } from '../../src/db/schema';
 import { inventoryService } from '../services/inventoryService';
 import { createSignedAuditLog } from '../services/auditService';
+import { buildRequestHash } from '../services/idempotencyService';
+import { parseLocalDateRange } from './report/reportUtils';
 
 let inventorySchemaReady = false;
 
@@ -105,6 +108,67 @@ export const getInventoryItems = async (req: Request, res: Response) => {
     }
 };
 
+export const zeroInventoryQuantities = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.effectiveBranchId || getStringParam(req.body?.branchId);
+        const warehouseId = getStringParam(req.body?.warehouseId);
+        if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
+        if (req.body?.confirmation !== 'ZERO_STOCK') {
+            return res.status(400).json({ error: 'ZERO_STOCK_CONFIRMATION_REQUIRED' });
+        }
+
+        const scopedWarehouses = await db.select({ id: warehouses.id })
+            .from(warehouses)
+            .where(and(
+                eq(warehouses.branchId, branchId),
+                warehouseId ? eq(warehouses.id, warehouseId) : undefined,
+            ));
+        const warehouseIds = scopedWarehouses.map(row => row.id);
+        if (!warehouseIds.length) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND' });
+
+        const affected = await db.select().from(inventoryStock)
+            .where(inArray(inventoryStock.warehouseId, warehouseIds));
+        const nonZero = affected.filter(row => Number(row.quantity || 0) !== 0);
+        const actorId = req.user?.id || 'system';
+
+        await db.transaction(async (tx) => {
+            for (const row of nonZero) {
+                await tx.update(inventoryStock)
+                    .set({ quantity: 0, lastUpdated: new Date() })
+                    .where(eq(inventoryStock.id, row.id));
+                await tx.insert(stockMovements).values({
+                    itemId: row.itemId,
+                    fromWarehouseId: row.warehouseId,
+                    quantity: Math.abs(Number(row.quantity || 0)),
+                    type: 'ADJUSTMENT',
+                    reason: 'Full stock quantity reset',
+                    performedBy: actorId,
+                    referenceId: `ZERO-STOCK-${Date.now()}`,
+                    createdAt: new Date(),
+                });
+            }
+            await tx.update(inventoryBatches)
+                .set({ currentQty: 0, status: 'DEPLETED' })
+                .where(inArray(inventoryBatches.warehouseId, warehouseIds));
+        });
+
+        await createSignedAuditLog({
+            eventType: 'INVENTORY_QUANTITIES_ZEROED',
+            userId: req.user?.id,
+            branchId,
+            payload: {
+                warehouseId: warehouseId || null,
+                affectedRows: nonZero.length,
+                previousQuantity: nonZero.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
+            },
+        });
+        getIO().to(`branch:${branchId}`).emit('stock:updated', { reset: true, branchId, warehouseId });
+        res.json({ success: true, affectedRows: nonZero.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const createInventoryItem = async (req: Request, res: Response) => {
     try {
         await ensureInventorySchema();
@@ -114,26 +178,46 @@ export const createInventoryItem = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'name and unit are required' });
         }
         const id = body.id || `INV-${Date.now()}`;
+        const warehouseIds = Array.isArray(body.warehouse_ids)
+            ? Array.from(new Set(body.warehouse_ids.map(String).filter(Boolean))) as string[]
+            : [];
+        if (warehouseIds.length) {
+            const validWarehouses = await db.select({ id: warehouses.id }).from(warehouses).where(inArray(warehouses.id, warehouseIds));
+            if (validWarehouses.length !== warehouseIds.length) {
+                return res.status(400).json({ error: 'INVALID_WAREHOUSE_ASSIGNMENT' });
+            }
+        }
 
-        const [created] = await db.insert(inventoryItems).output().values({
-            id,
-            name: body.name,
-            nameAr: body.name_ar,
-            sku: body.sku || id,
-            barcode: body.barcode,
-            unit: body.unit,
-            category: body.category,
-            threshold: body.threshold,
-            costPrice: body.cost_price,
-            purchasePrice: body.purchase_price,
-            supplierId: body.supplier_id,
-            isAudited: body.is_audited,
-            auditFrequency: body.audit_frequency,
-            isComposite: body.is_composite,
-            bom: body.bom,
-            isActive: body.is_active !== false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+        const created = await db.transaction(async (tx) => {
+            const [item] = await tx.insert(inventoryItems).output().values({
+                id,
+                name: body.name,
+                nameAr: body.name_ar,
+                sku: body.sku || id,
+                barcode: body.barcode,
+                unit: body.unit,
+                category: body.category,
+                threshold: body.threshold,
+                costPrice: body.cost_price,
+                purchasePrice: body.purchase_price,
+                supplierId: body.supplier_id,
+                isAudited: body.is_audited,
+                auditFrequency: body.audit_frequency,
+                isComposite: body.is_composite,
+                bom: body.bom,
+                isActive: body.is_active !== false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            });
+            if (warehouseIds.length) {
+                await tx.insert(inventoryStock).values(warehouseIds.map(warehouseId => ({
+                    itemId: id,
+                    warehouseId,
+                    quantity: 0,
+                    lastUpdated: new Date(),
+                })));
+            }
+            return item;
         });
 
         res.status(201).json(created);
@@ -147,6 +231,15 @@ export const updateInventoryItem = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'ITEM_ID_REQUIRED' });
         const body = req.body || {};
+        const warehouseIds = Array.isArray(body.warehouse_ids)
+            ? Array.from(new Set(body.warehouse_ids.map(String).filter(Boolean))) as string[]
+            : null;
+        if (warehouseIds?.length) {
+            const validWarehouses = await db.select({ id: warehouses.id }).from(warehouses).where(inArray(warehouses.id, warehouseIds));
+            if (validWarehouses.length !== warehouseIds.length) {
+                return res.status(400).json({ error: 'INVALID_WAREHOUSE_ASSIGNMENT' });
+            }
+        }
 
         const updates: Record<string, any> = { updatedAt: new Date() };
         if (body.name !== undefined) updates.name = body.name;
@@ -165,10 +258,35 @@ export const updateInventoryItem = async (req: Request, res: Response) => {
         if (body.bom !== undefined) updates.bom = body.bom;
         if (body.is_active !== undefined) updates.isActive = body.is_active;
 
-        const [updated] = await db.update(inventoryItems)
-            .set(updates)
-            .output()
-            .where(eq(inventoryItems.id, id));
+        const updated = await db.transaction(async (tx) => {
+            const [item] = await tx.update(inventoryItems)
+                .set(updates)
+                .output()
+                .where(eq(inventoryItems.id, id));
+            if (!item || warehouseIds === null) return item;
+
+            const currentStocks = await tx.select().from(inventoryStock).where(eq(inventoryStock.itemId, id));
+            const selected = new Set(warehouseIds);
+            const removed = currentStocks.filter(stock => !selected.has(stock.warehouseId));
+            if (removed.some(stock => Number(stock.quantity || 0) !== 0)) {
+                throw new Error('WAREHOUSE_STOCK_NOT_EMPTY');
+            }
+            for (const stock of removed) {
+                await tx.delete(inventoryStock).where(eq(inventoryStock.id, stock.id));
+            }
+
+            const existingWarehouseIds = new Set(currentStocks.map(stock => stock.warehouseId));
+            const added = warehouseIds.filter(warehouseId => !existingWarehouseIds.has(warehouseId));
+            if (added.length) {
+                await tx.insert(inventoryStock).values(added.map(warehouseId => ({
+                    itemId: id,
+                    warehouseId,
+                    quantity: 0,
+                    lastUpdated: new Date(),
+                })));
+            }
+            return item;
+        });
 
         if (!updated) {
             return res.status(404).json({ error: 'Inventory item not found' });
@@ -187,6 +305,12 @@ export const updateInventoryItem = async (req: Request, res: Response) => {
 
         res.json(updated);
     } catch (error: any) {
+        if (error?.message === 'WAREHOUSE_STOCK_NOT_EMPTY') {
+            return res.status(409).json({
+                error: 'WAREHOUSE_STOCK_NOT_EMPTY',
+                message: 'Transfer or zero the warehouse quantity before removing the item assignment',
+            });
+        }
         res.status(500).json({ error: error.message });
     }
 };
@@ -374,6 +498,168 @@ export const updateStock = async (req: Request, res: Response) => {
             return writeForeignKeyDeleteConflict(res, 'stock adjustment', ['inventory_items', 'warehouses']);
         }
         res.status(500).json({ error: error.message });
+    }
+};
+
+export const receiveStockDirect = async (req: Request, res: Response) => {
+    const { warehouse_id, supplier_id, reference_id, actor_id, items } = req.body;
+    const scope = 'DIRECT_STOCK_RECEIPT';
+    const requestHash = buildRequestHash({ warehouse_id, supplier_id, items });
+    const now = new Date();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    let ownsClaim = false;
+
+    try {
+        const [existingClaim] = await db.select().top(1).from(idempotencyKeys).where(and(
+            eq(idempotencyKeys.key, reference_id),
+            eq(idempotencyKeys.scope, scope),
+        ));
+        if (existingClaim && existingClaim.expiresAt <= now) {
+            await db.delete(idempotencyKeys).where(and(
+                eq(idempotencyKeys.key, reference_id),
+                eq(idempotencyKeys.scope, scope),
+                lt(idempotencyKeys.expiresAt, now),
+            ));
+        } else if (existingClaim) {
+            if (existingClaim.requestHash !== requestHash) {
+                return res.status(409).json({ error: 'IDEMPOTENCY_KEY_PAYLOAD_CONFLICT' });
+            }
+            if (existingClaim.status === 'COMPLETED') {
+                return res.json({ success: true, referenceId: reference_id, idempotentReplay: true });
+            }
+            return res.status(409).json({ error: 'IDEMPOTENCY_KEY_IN_PROGRESS' });
+        }
+
+        try {
+            await db.insert(idempotencyKeys).values({
+                key: reference_id,
+                scope,
+                requestHash,
+                status: 'IN_PROGRESS',
+                expiresAt,
+                updatedAt: new Date(),
+            });
+            ownsClaim = true;
+        } catch {
+            return res.status(409).json({ error: 'IDEMPOTENCY_KEY_IN_PROGRESS' });
+        }
+
+        const [warehouse] = await db.select().top(1).from(warehouses).where(eq(warehouses.id, warehouse_id));
+        if (!warehouse) throw new Error('WAREHOUSE_NOT_FOUND');
+
+        const results = await db.transaction(async (tx) => {
+            const receiptResults = [];
+            for (const receiptItem of items as Array<{ item_id: string; quantity: number; unit_cost: number }>) {
+                const [item] = await tx.select().top(1).from(inventoryItems).where(eq(inventoryItems.id, receiptItem.item_id));
+                if (!item) throw new Error(`INVENTORY_ITEM_NOT_FOUND:${receiptItem.item_id}`);
+
+                const currentStocks = await tx.select().from(inventoryStock).where(eq(inventoryStock.itemId, receiptItem.item_id));
+                const oldTotalQty = currentStocks.reduce((sum, stock) => sum + Number(stock.quantity || 0), 0);
+                const quantity = Number(receiptItem.quantity);
+                const unitCost = Number(receiptItem.unit_cost);
+                const newTotalQty = oldTotalQty + quantity;
+                const newAverageCost = ((oldTotalQty * Number(item.costPrice || 0)) + (quantity * unitCost)) / newTotalQty;
+                const [warehouseStock] = currentStocks.filter(stock => stock.warehouseId === warehouse_id);
+                const newWarehouseQty = Number(warehouseStock?.quantity || 0) + quantity;
+                if (warehouseStock) {
+                    await tx.update(inventoryStock).set({
+                        quantity: sql`${inventoryStock.quantity} + ${quantity}`,
+                        lastUpdated: new Date(),
+                    }).where(eq(inventoryStock.id, warehouseStock.id));
+                } else {
+                    await tx.insert(inventoryStock).values({
+                        itemId: receiptItem.item_id,
+                        warehouseId: warehouse_id,
+                        quantity,
+                        lastUpdated: new Date(),
+                    });
+                }
+
+                await tx.update(inventoryItems).set({
+                    costPrice: newAverageCost,
+                    purchasePrice: unitCost,
+                    updatedAt: new Date(),
+                }).where(eq(inventoryItems.id, receiptItem.item_id));
+
+                await tx.insert(stockMovements).values({
+                    itemId: receiptItem.item_id,
+                    toWarehouseId: warehouse_id,
+                    quantity,
+                    unitCost,
+                    totalCost: quantity * unitCost,
+                    type: 'PURCHASE',
+                    referenceId: reference_id,
+                    reason: 'Direct stock receipt',
+                    performedBy: actor_id || 'system',
+                    createdAt: new Date(),
+                });
+
+                const expiryDate = new Date();
+                expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+                await tx.insert(inventoryBatches).values({
+                    id: `BATCH-DIRECT-${crypto.randomUUID()}`,
+                    itemId: receiptItem.item_id,
+                    warehouseId: warehouse_id,
+                    batchNumber: `${reference_id}-${receiptItem.item_id}`,
+                    expiryDate,
+                    receivedDate: new Date(),
+                    initialQty: quantity,
+                    currentQty: quantity,
+                    unitCost,
+                    supplierId: supplier_id || null,
+                    status: 'ACTIVE',
+                    createdAt: new Date(),
+                });
+
+                receiptResults.push({
+                    itemId: receiptItem.item_id,
+                    quantity: newWarehouseQty,
+                    totalQuantity: newTotalQty,
+                    costPrice: newAverageCost,
+                    purchasePrice: unitCost,
+                });
+            }
+
+            await tx.update(idempotencyKeys).set({
+                status: 'COMPLETED',
+                responseCode: 200,
+                resourceId: reference_id,
+                responseBody: JSON.stringify({ success: true, referenceId: reference_id, items: receiptResults }),
+                expiresAt,
+                updatedAt: new Date(),
+            }).where(and(
+                eq(idempotencyKeys.key, reference_id),
+                eq(idempotencyKeys.scope, scope),
+            ));
+
+            return receiptResults;
+        });
+        ownsClaim = false;
+
+        try {
+            if (warehouse.branchId) {
+                for (const item of results) {
+                    getIO().to(`branch:${warehouse.branchId}`).emit('stock:updated', {
+                        itemId: item.itemId,
+                        warehouseId: warehouse_id,
+                        quantity: item.quantity,
+                        type: 'PURCHASE',
+                    });
+                }
+            }
+        } catch {
+            // Socket delivery is best-effort; reconnect resync remains authoritative.
+        }
+
+        return res.json({ success: true, referenceId: reference_id, items: results });
+    } catch (error: any) {
+        if (ownsClaim) {
+            await db.delete(idempotencyKeys).where(and(
+                eq(idempotencyKeys.key, reference_id),
+                eq(idempotencyKeys.scope, scope),
+            ));
+        }
+        return res.status(500).json({ error: error.message });
     }
 };
 
@@ -629,15 +915,13 @@ export const getRecipeConsumption = async (req: Request, res: Response) => {
         };
         const limit = Number(req.query.limit || 100);
         const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : 100;
-        const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : null;
-        const endDate = req.query.endDate ? new Date(String(req.query.endDate)) : null;
-        if (endDate && !Number.isNaN(endDate.getTime())) {
-            endDate.setHours(23, 59, 59, 999);
-        }
+        const dateRange = req.query.startDate && req.query.endDate
+            ? parseLocalDateRange(String(req.query.startDate), String(req.query.endDate))
+            : null;
 
         const conditions: any[] = [eq(stockMovements.type, 'SALE_CONSUMPTION')];
-        if (startDate && !Number.isNaN(startDate.getTime())) conditions.push(gte(stockMovements.createdAt, startDate));
-        if (endDate && !Number.isNaN(endDate.getTime())) conditions.push(lte(stockMovements.createdAt, endDate));
+        if (dateRange) conditions.push(gte(stockMovements.createdAt, dateRange.start));
+        if (dateRange) conditions.push(lte(stockMovements.createdAt, dateRange.end));
         if (req.effectiveBranchId) conditions.push(eq(warehouses.branchId, req.effectiveBranchId));
 
         const rows = await db
@@ -673,8 +957,8 @@ export const getRecipeConsumption = async (req: Request, res: Response) => {
 
         if (rows.length === 0) {
             const orderConditions: any[] = [
-                gte(orders.createdAt, startDate && !Number.isNaN(startDate.getTime()) ? startDate : new Date(0)),
-                lte(orders.createdAt, endDate && !Number.isNaN(endDate.getTime()) ? endDate : new Date()),
+                gte(orders.createdAt, dateRange?.start || new Date(0)),
+                lte(orders.createdAt, dateRange?.end || new Date()),
                 sql`${orders.status} not in ('CANCELLED', 'VOID', 'REFUNDED')`,
             ];
             if (req.effectiveBranchId) orderConditions.push(eq(orders.branchId, req.effectiveBranchId));

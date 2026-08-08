@@ -81,8 +81,8 @@ const SettingsHub: React.FC = () => {
     const [maskedCustomAiKey, setMaskedCustomAiKey] = useState<string | null>(null);
     const [hasCustomAiKey, setHasCustomAiKey] = useState(false);
     const [usingDefaultAvailable, setUsingDefaultAvailable] = useState(false);
-    const [aiProvider, setAiProvider] = useState<'OLLAMA' | 'OPENROUTER'>('OPENROUTER');
-    const [providerOptions, setProviderOptions] = useState<Array<{ id: 'OPENROUTER' | 'OLLAMA'; label: string }>>([]);
+    const [aiProvider, setAiProvider] = useState<'SYSTEM' | 'OLLAMA' | 'OPENROUTER' | 'GPT4JS' | 'GROQ'>('SYSTEM');
+    const [providerOptions, setProviderOptions] = useState<Array<{ id: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ'; label: string }>>([]);
     const [ollamaEnabled, setOllamaEnabled] = useState(false);
     const [ollamaBaseUrl, setOllamaBaseUrl] = useState('');
     const [ollamaModel, setOllamaModel] = useState('');
@@ -90,6 +90,12 @@ const SettingsHub: React.FC = () => {
     const [aiModel, setAiModel] = useState('');
     const [defaultAiModel, setDefaultAiModel] = useState('');
     const [availableAiModels, setAvailableAiModels] = useState<Array<{ id: string; label: string; provider: string }>>([]);
+    const [groqModel, setGroqModel] = useState('');
+    const [groqModelDefault, setGroqModelDefault] = useState('');
+    const [availableGroqModels, setAvailableGroqModels] = useState<Array<{ id: string; label: string; provider: string }>>([]);
+    const [groqUsingDefaultAvailable, setGroqUsingDefaultAvailable] = useState(false);
+    const [hasCustomGroqKey, setHasCustomGroqKey] = useState(false);
+    const [maskedCustomGroqKey, setMaskedCustomGroqKey] = useState<string | null>(null);
     const [aiConfigLoading, setAiConfigLoading] = useState(false);
     const [aiConfigSaving, setAiConfigSaving] = useState(false);
 
@@ -128,6 +134,7 @@ const SettingsHub: React.FC = () => {
     // Payment methods
     const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
     const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+    const [paymentMethodForm, setPaymentMethodForm] = useState({ name: '', hasFeePercentage: false, feePercentage: '' });
 
     // Chart of Accounts
     const [accounts, setAccounts] = useState<any[]>([]);
@@ -147,7 +154,7 @@ const SettingsHub: React.FC = () => {
             try {
                 const config = await aiApi.getKeyConfig();
                 if (cancelled) return;
-                setAiProvider(config.provider || 'OPENROUTER');
+                setAiProvider(config.provider || 'SYSTEM');
                 setProviderOptions(config.providerOptions || []);
                 setOllamaEnabled(Boolean(config.ollama?.enabled));
                 setOllamaBaseUrl(String(config.ollama?.baseUrl || ''));
@@ -160,6 +167,12 @@ const SettingsHub: React.FC = () => {
                 setAiModel(config.model);
                 setDefaultAiModel(config.defaultModel);
                 setAvailableAiModels(config.availableModels || []);
+                setGroqModel(String(config.groq?.model || config.defaultGroqModel || ''));
+                setGroqModelDefault(String(config.groq?.modelDefault || config.defaultGroqModel || ''));
+                setAvailableGroqModels(config.availableGroqModels || []);
+                setGroqUsingDefaultAvailable(Boolean(config.groq?.usingDefaultAvailable));
+                setHasCustomGroqKey(Boolean(config.hasCustomGroqKey));
+                setMaskedCustomGroqKey(config.maskedCustomGroqKey || null);
             } catch (err: any) {
                 showToast(err?.message || tn('Failed to load AI settings', 'تعذر تحميل إعدادات الذكاء الاصطناعي'), 'error');
             } finally {
@@ -178,6 +191,7 @@ const SettingsHub: React.FC = () => {
             if (data.timeFormat) setTimeFormat(data.timeFormat);
             if (data.businessHours) { setBusinessHours(data.businessHours); setBusinessHoursLoaded(true); }
             if (data.notificationPreferences) { setNotifPrefs(data.notificationPreferences); setNotifPrefsLoaded(true); }
+            if (Array.isArray(data.customPaymentMethods)) updateSettings({ customPaymentMethods: data.customPaymentMethods });
         }).catch((err: any) => {
             showToast(err?.message || tn('Failed to load custom settings', 'تعذر تحميل الإعدادات المخصصة'), 'error');
         });
@@ -241,6 +255,51 @@ const SettingsHub: React.FC = () => {
         updateSettings({ [key]: value });
     };
 
+    const normalizePaymentMethodId = (value: string) =>
+        value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+
+    const handleAddPaymentMethod = () => {
+        const name = paymentMethodForm.name.trim();
+        const feePercentage = Number(paymentMethodForm.feePercentage);
+        const reserved = new Set(['CASH', 'VISA', 'VODAFONE_CASH', 'INSTAPAY', 'SPLIT']);
+        const existing = settings.customPaymentMethods || [];
+        if (!name) {
+            showToast(tn('Enter the payment method name', 'اكتب اسم طريقة الدفع'), 'error');
+            return;
+        }
+        if (paymentMethodForm.hasFeePercentage && (!Number.isFinite(feePercentage) || feePercentage <= 0 || feePercentage > 100)) {
+            showToast(tn('Enter a percentage from 0.01 to 100', 'اكتب نسبة من 0.01 إلى 100'), 'error');
+            return;
+        }
+        const baseId = normalizePaymentMethodId(name) || `CUSTOM_${Date.now().toString(36).toUpperCase()}`;
+        let id = baseId;
+        let suffix = 2;
+        while (reserved.has(id) || existing.some(method => method.id === id)) id = `${baseId}_${suffix++}`;
+        updateSettings({
+            customPaymentMethods: [...existing, {
+                id,
+                name,
+                nameAr: name,
+                feePercentage: paymentMethodForm.hasFeePercentage ? feePercentage : 0,
+                isActive: true,
+            }],
+        });
+        setPaymentMethodForm({ name: '', hasFeePercentage: false, feePercentage: '' });
+        showToast(tn('Payment method added. Save settings to apply.', 'تمت الإضافة. احفظ الإعدادات للتطبيق.'), 'success');
+    };
+
+    const handleRemovePaymentMethod = async (id: string) => {
+        const ok = await confirm({
+            title: tn('Remove payment method', 'حذف طريقة الدفع'),
+            message: tn('Existing orders and reports will keep their stored payment history.', 'الطلبات والتقارير القديمة ستحتفظ بسجل الدفع المحفوظ.'),
+            confirmText: tn('Remove', 'حذف'),
+            cancelText: tn('Cancel', 'إلغاء'),
+            variant: 'danger',
+        });
+        if (!ok) return;
+        updateSettings({ customPaymentMethods: (settings.customPaymentMethods || []).filter(method => method.id !== id) });
+    };
+
     const handleSaveSettings = async () => {
         if (isSettingsSaving) return;
         setIsSettingsSaving(true);
@@ -261,6 +320,7 @@ const SettingsHub: React.FC = () => {
             timeFormat,
             businessHours,
             notificationPreferences: notifPrefs,
+            customPaymentMethods: settings.customPaymentMethods || [],
         });
     };
 
@@ -469,14 +529,15 @@ const SettingsHub: React.FC = () => {
         setAiConfigSaving(true);
         try {
             const payload: any = {
-                source: aiKeySource,
+                source: aiProvider === 'OPENROUTER' || aiProvider === 'GROQ' ? aiKeySource : 'DEFAULT',
                 model: aiModel || defaultAiModel || undefined,
                 provider: aiProvider,
             };
             if (aiKeySource === 'CUSTOM' && customAiKey.trim()) payload.customKey = customAiKey.trim();
             if (aiProvider === 'OLLAMA') payload.ollamaModel = (ollamaModel || ollamaModelDefault || '').trim() || undefined;
+            if (aiProvider === 'GROQ') payload.groqModel = (groqModel || groqModelDefault || '').trim() || undefined;
             const config = await aiApi.updateKeyConfig(payload);
-            setAiProvider(config.provider || 'OPENROUTER');
+            setAiProvider(config.provider || 'SYSTEM');
             setProviderOptions(config.providerOptions || []);
             setOllamaEnabled(Boolean(config.ollama?.enabled));
             setOllamaBaseUrl(String(config.ollama?.baseUrl || ''));
@@ -489,6 +550,12 @@ const SettingsHub: React.FC = () => {
             setAiModel(config.model);
             setDefaultAiModel(config.defaultModel);
             setAvailableAiModels(config.availableModels || []);
+            setGroqModel(String(config.groq?.model || config.defaultGroqModel || ''));
+            setGroqModelDefault(String(config.groq?.modelDefault || config.defaultGroqModel || ''));
+            setAvailableGroqModels(config.availableGroqModels || []);
+            setGroqUsingDefaultAvailable(Boolean(config.groq?.usingDefaultAvailable));
+            setHasCustomGroqKey(Boolean(config.hasCustomGroqKey));
+            setMaskedCustomGroqKey(config.maskedCustomGroqKey || null);
             setCustomAiKey('');
             showToast(t('ai_config_saved'), 'success');
         } catch (err: any) {
@@ -1001,18 +1068,64 @@ const SettingsHub: React.FC = () => {
                     <div className="space-y-6">
                         <SectionHeader icon={CreditCard} title={tn('Payment Methods', 'طرق الدفع')} sub={tn('Configure payment methods & accounts', 'تكوين طرق الدفع والحسابات')} />
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {['CASH', 'VISA', 'VODAFONE_CASH', 'INSTAPAY'].map(method => (
-                                <div key={method} className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex flex-col gap-3 hover:border-emerald-500/30 transition-all">
+                            {[
+                                ...['CASH', 'VISA', 'VODAFONE_CASH', 'INSTAPAY'].map(id => ({ id, label: id.replace(/_/g, ' '), feePercentage: 0, custom: false })),
+                                ...(settings.customPaymentMethods || []).map(method => ({
+                                    id: method.id,
+                                    label: lang === 'ar' ? method.nameAr || method.name : method.name,
+                                    feePercentage: Number(method.feePercentage || 0),
+                                    custom: true,
+                                })),
+                            ].map(method => (
+                                <div key={method.id} className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex flex-col gap-3 hover:border-emerald-500/30 transition-all">
                                     <div className="flex items-center justify-between">
-                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${method === 'CASH' ? 'bg-emerald-500/10 text-emerald-500' : method === 'VISA' ? 'bg-blue-500/10 text-blue-500' : method === 'VODAFONE_CASH' ? 'bg-red-500/10 text-red-500' : 'bg-purple-500/10 text-purple-500'}`}>
+                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${method.id === 'CASH' ? 'bg-emerald-500/10 text-emerald-500' : method.id === 'VISA' ? 'bg-blue-500/10 text-blue-500' : method.id === 'VODAFONE_CASH' ? 'bg-red-500/10 text-red-500' : 'bg-purple-500/10 text-purple-500'}`}>
                                             <CreditCard size={18} />
                                         </div>
-                                        <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                                        {method.custom ? (
+                                            <button onClick={() => handleRemovePaymentMethod(method.id)} className="p-2 rounded-xl text-rose-500 hover:bg-rose-500/10" aria-label={tn('Remove', 'حذف')}>
+                                                <X size={14} />
+                                            </button>
+                                        ) : <span className="w-3 h-3 rounded-full bg-emerald-500" />}
                                     </div>
-                                    <p className="font-black text-xs text-main uppercase tracking-tight">{method.replace(/_/g, ' ')}</p>
-                                    <p className="text-[8px] text-muted font-bold">{tn('Active', 'نشط')}</p>
+                                    <p className="font-black text-xs text-main tracking-tight">{method.label}</p>
+                                    <div className="flex items-center gap-2 text-[9px] font-bold">
+                                        <span className="text-muted">{tn('Active', 'نشط')}</span>
+                                        {method.feePercentage > 0 && (
+                                            <span className="rounded-lg bg-amber-500/10 px-2 py-1 text-amber-600">
+                                                {tn('Fee', 'نسبة')} {method.feePercentage}%
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
+                        </div>
+                        <div className="space-y-3 rounded-3xl border border-border/20 bg-elevated/20 p-5">
+                            <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(10rem,0.55fr)_auto]">
+                                <label htmlFor="custom-payment-name" className="space-y-2">
+                                    <span className="block text-[10px] font-black text-muted">{tn('Payment method name', 'اسم طريقة الدفع')}</span>
+                                    <input id="custom-payment-name" value={paymentMethodForm.name} onChange={e => setPaymentMethodForm(form => ({ ...form, name: e.target.value }))} className={inputClass} placeholder={tn('Example: Talabat Pay', 'مثال: دفع طلبات')} />
+                                </label>
+                                <label className="flex h-[46px] cursor-pointer items-center gap-3 rounded-2xl border border-border/30 bg-card px-4 text-xs font-black text-main">
+                                    <input type="checkbox" checked={paymentMethodForm.hasFeePercentage} onChange={e => setPaymentMethodForm(form => ({ ...form, hasFeePercentage: e.target.checked, feePercentage: e.target.checked ? form.feePercentage : '' }))} className="h-4 w-4 accent-primary" />
+                                    {tn('Has percentage', 'عليها نسبة')}
+                                </label>
+                                {paymentMethodForm.hasFeePercentage ? (
+                                    <label htmlFor="custom-payment-fee" className="space-y-2">
+                                        <span className="block text-[10px] font-black text-muted">{tn('Percentage', 'قيمة النسبة')}</span>
+                                        <div className="relative">
+                                            <input id="custom-payment-fee" type="number" min="0.01" max="100" step="0.01" value={paymentMethodForm.feePercentage} onChange={e => setPaymentMethodForm(form => ({ ...form, feePercentage: e.target.value }))} className={`${inputClass} pe-9`} placeholder="0.00" />
+                                            <span className="pointer-events-none absolute end-4 top-1/2 -translate-y-1/2 text-xs font-black text-muted">%</span>
+                                        </div>
+                                    </label>
+                                ) : <div className="hidden md:block" />}
+                                <button onClick={handleAddPaymentMethod} className="h-[46px] cursor-pointer rounded-2xl bg-primary px-5 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-primary/90">
+                                    {tn('Add Method', 'إضافة طريقة')}
+                                </button>
+                            </div>
+                            <p className="text-[9px] font-bold text-muted">
+                                {tn('The internal code is generated automatically. The percentage is stored as a payment fee and does not increase the customer bill.', 'الكود الداخلي يتولد تلقائياً. النسبة تُحفظ كرسوم أو عمولة لطريقة الدفع ولا تزيد فاتورة العميل.')}
+                            </p>
                         </div>
                         <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-6">
                             <h4 className="font-black text-sm uppercase text-emerald-600 mb-2">{tn('Payment Account Mapping', 'ربط حسابات الدفع')}</h4>
@@ -1186,15 +1299,15 @@ const SettingsHub: React.FC = () => {
             case 'AI':
                 return (
                     <div className="space-y-6">
-                        <SectionHeader icon={Cpu} title={tn('AI Configuration', 'إعدادات الذكاء الاصطناعي')} sub={tn('LLM provider, model & API key', 'مزود النموذج والمفتاح')} />
+                        <SectionHeader icon={Cpu} title={tn('Smart Assistant', 'المساعد الذكي')} sub={tn('Choose the built-in copilot or an external API model', 'اختر مساعد النظام أو نموذجًا خارجيًا بمفتاح API')} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-6">
                                 <div>
                                     <label className={labelClass}>{tn('AI Provider', 'مزود الذكاء الاصطناعي')}</label>
                                     <div className="grid grid-cols-2 gap-3">
                                         {(providerOptions.length ? providerOptions : [
-                                            { id: 'OLLAMA', label: 'Local (Ollama)' },
-                                            { id: 'OPENROUTER', label: 'Cloud (OpenRouter)' },
+                                            { id: 'SYSTEM', label: 'System Copilot (Free)' },
+                                            { id: 'GROQ', label: 'Groq (Fast API)' },
                                         ]).map(p => (
                                             <button key={p.id} onClick={() => setAiProvider(p.id as any)}
                                                 className={`p-4 rounded-2xl border-2 transition-all text-center ${aiProvider === p.id ? 'border-cyan-500 bg-cyan-500/5 text-cyan-500' : 'border-border/30 text-muted hover:border-cyan-500/30'}`}
@@ -1237,16 +1350,61 @@ const SettingsHub: React.FC = () => {
                                         )}
                                     </div>
                                 )}
+                                {aiProvider === 'GROQ' && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button onClick={() => setAiKeySource('DEFAULT')} className={`p-4 rounded-2xl border-2 text-left transition-all ${aiKeySource === 'DEFAULT' ? 'border-cyan-500 bg-cyan-500/5' : 'border-border/30'}`}>
+                                                <p className="text-[10px] font-black uppercase text-main">{tn('Server Key', 'مفتاح الخادم')}</p>
+                                                <p className={`text-[8px] font-bold uppercase mt-1 ${groqUsingDefaultAvailable ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                    {groqUsingDefaultAvailable ? tn('Available', 'متاح') : tn('Exhausted', 'منتهي')}
+                                                </p>
+                                            </button>
+                                            <button onClick={() => setAiKeySource('CUSTOM')} className={`p-4 rounded-2xl border-2 text-left transition-all ${aiKeySource === 'CUSTOM' ? 'border-cyan-500 bg-cyan-500/5' : 'border-border/30'}`}>
+                                                <p className="text-[10px] font-black uppercase text-main">{tn('Custom Key', 'مفتاح مخصص')}</p>
+                                                <p className="text-[8px] text-muted font-bold uppercase mt-1">
+                                                    {hasCustomGroqKey ? tn('Stored', 'مخزن') : tn('Not Set', 'غير مضبوط')}
+                                                </p>
+                                            </button>
+                                        </div>
+                                        {aiKeySource === 'CUSTOM' && (
+                                            <input type="password" value={customAiKey} onChange={e => setCustomAiKey(e.target.value)} placeholder="gsk_..." className={inputClass} />
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-6">
+                                {aiProvider === 'SYSTEM' && (
+                                    <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-3xl">
+                                        <p className="text-sm font-black text-emerald-500">{tn('System Copilot', 'مساعد النظام')}</p>
+                                        <p className="text-xs text-muted font-bold mt-2 leading-6">{tn('Free, no API key, no installation. Guides users, summarizes loaded system data, and prepares protected actions for approval.', 'مجاني ولا يحتاج مفتاح أو تثبيت. يرشد المستخدم، يلخص بيانات النظام، ويجهز الإجراءات المحمية للمراجعة والتأكيد.')}</p>
+                                    </div>
+                                )}
+                                {aiProvider === 'GROQ' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className={labelClass}>{tn('Groq Model', 'نموذج Groq')}</label>
+                                            <select value={groqModel || groqModelDefault} onChange={e => setGroqModel(e.target.value)} className={inputClass}>
+                                                {(availableGroqModels.length ? availableGroqModels : [{ id: groqModelDefault || 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile', provider: 'Groq' }]).map(model => (
+                                                    <option key={model.id} value={model.id}>{model.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="p-6 bg-cyan-500/5 border border-cyan-500/20 rounded-3xl">
+                                            <p className="text-sm font-black text-cyan-500">{tn('Groq Assistant', 'مساعد Groq')}</p>
+                                            <p className="text-xs text-muted font-bold mt-2 leading-6">{tn('Fast external model that answers in Arabic/English, summarizes the whole system, and prepares protected actions for your approval.', 'نموذج خارجي سريع يرد بالعربية والإنجليزية، يلخص النظام بالكامل، ويجهز الإجراءات المحمية للمراجعة والتأكيد.')}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {aiProvider === 'OPENROUTER' && (
                                 <div>
                                     <label className={labelClass}>{tn('AI Model', 'نموذج الذكاء الاصطناعي')}</label>
-                                    <select value={aiModel || defaultAiModel} onChange={e => setAiModel(e.target.value)} disabled={aiProvider === 'OLLAMA'} className={inputClass}>
+                                    <select value={aiModel || defaultAiModel} onChange={e => setAiModel(e.target.value)} className={inputClass}>
                                         {(availableAiModels.length ? availableAiModels : [{ id: defaultAiModel || 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)', provider: 'Google' }]).map(model => (
                                             <option key={model.id} value={model.id}>{model.label}</option>
                                         ))}
                                     </select>
                                 </div>
+                                )}
                                 <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl flex flex-col gap-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center"><ShieldCheck size={18} /></div>

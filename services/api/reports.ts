@@ -27,7 +27,7 @@ export const reportsApi = {
     },
     getRefundsReport: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
-        return apiRequest<Array<{ orderNumber: number; total: number; cancelReason: string; cancelledAt: string; status: string }>>(`/reports/refunds?${query}`);
+        return apiRequest<Array<{ id: string; orderNumber: number; orderType: string; businessDate?: string; createdAt: string; customerName?: string; customerPhone?: string; total: number; cancelReason: string; cancelledAt: string; status: string }>>(`/reports/refunds?${query}`);
     },
     getOverview: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
@@ -54,6 +54,7 @@ export const reportsApi = {
             totals: {
                 revenue: number;
                 netRevenue: number;
+                taxTotal: number;
                 expenses: number;
                 pendingExpenses: number;
                 cogs: number;
@@ -65,6 +66,7 @@ export const reportsApi = {
                 uniqueCustomers: number;
                 itemsSold: number;
                 cancelled: number;
+                cancelledValue: number;
                 pending: number;
                 delivered: number;
                 cancelRate: number;
@@ -207,7 +209,7 @@ export const reportsApi = {
     },
     getDineInTableAnalysis: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
-        return apiRequest<Array<{ tableId: string; orderCount: number; revenue: number; avgTicket: number; avgDurationMinutes: number }>>(`/reports/dine-in-tables?${query}`);
+        return apiRequest<Array<{ tableId: string; tableName: string; zoneName: string; seats: number; status: string; configuredDiscountPercent: number; defaultCouponCode: string; minSpend: number; isVIP: boolean; notes: string; orderCount: number; revenue: number; avgTicket: number; avgDurationMinutes: number; totalDiscount: number; discountedOrderCount: number; discountRate: number }>>(`/reports/dine-in-tables?${query}`);
     },
     getPeakHoursHeatmap: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
@@ -339,7 +341,7 @@ export const reportsApi = {
     },
     getTableTurnover: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
-        return apiRequest<Array<{ tableId: string; totalOrders: number; turnsPerDay: number; revenue: number; revenuePerDay: number }>>(`/reports/table-turnover?${query}`);
+        return apiRequest<Array<{ tableId: string; tableName: string; zoneName: string; totalOrders: number; turnsPerDay: number; revenue: number; revenuePerDay: number }>>(`/reports/table-turnover?${query}`);
     },
     getWaitTime: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();

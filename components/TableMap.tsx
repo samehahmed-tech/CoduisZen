@@ -10,7 +10,6 @@ import {
     Layers,
     List,
     Clock,
-    CheckCircle2,
     Utensils,
     Wallet,
     Trash2,
@@ -18,7 +17,9 @@ import {
     ChevronRight,
     Sparkles,
     Timer,
-    Plus
+    Plus,
+    Tag,
+    StickyNote
 } from 'lucide-react';
 import { Table, TableStatus, FloorZone, Order, OrderStatus } from '../types';
 import VirtualGrid from './common/VirtualGrid';
@@ -33,6 +34,8 @@ interface TableMapProps {
     onTempBill: (table: Table) => void;
     onCloseTable: (table: Table) => void;
     onMergeTable: (table: Table) => void;
+    onResetTable?: (table: Table) => void;
+    canResetTables?: boolean;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus) => void;
     lang: 'en' | 'ar';
     t: any;
@@ -48,6 +51,8 @@ const TableMap: React.FC<TableMapProps> = ({
     onTempBill,
     onCloseTable,
     onMergeTable,
+    onResetTable,
+    canResetTables = false,
     onUpdateOrderStatus,
     lang,
     t,
@@ -61,36 +66,36 @@ const TableMap: React.FC<TableMapProps> = ({
         return [{ id: 'all', name: isAr ? 'جميع المناطق' : 'All Zones', color: '#6366f1' }, ...zones];
     }, [zones, isAr]);
 
-    const [activeZone, setActiveZone] = useState<string>(zones[0]?.id || 'all');
+    const [activeZone, setActiveZone] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'GRID' | 'COMPACT' | 'LIST'>('GRID');
 
     const tableTotals = useMemo(() => {
         const map: Record<string, number> = {};
         orders
-            .filter(o => o.tableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string))
+            .filter(o => tables.some(table => table.id === o.tableId && table.currentOrderId === o.id))
             .forEach(o => {
                 const key = o.tableId as string;
                 map[key] = (map[key] || 0) + (o.total || 0);
             });
         return map;
-    }, [orders]);
+    }, [orders, tables]);
 
     const activeOrderByTable = useMemo(() => {
         const map: Record<string, Order> = {};
-        const list = orders.filter(o => o.tableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string));
+        const list = orders.filter(o => tables.some(table => table.id === o.tableId && table.currentOrderId === o.id));
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         list.forEach(o => {
             const key = o.tableId as string;
             if (!map[key]) map[key] = o;
         });
         return map;
-    }, [orders]);
+    }, [orders, tables]);
 
     const tableSummaries = useMemo(() => {
         const map: Record<string, { items: number; total: number; status: OrderStatus; openedAt?: Date; lastActivity?: Date }> = {};
         orders
-            .filter(o => o.tableId && !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.status as string))
+            .filter(o => tables.some(table => table.id === o.tableId && table.currentOrderId === o.id))
             .forEach(o => {
                 const key = o.tableId as string;
                 const itemsCount = (o.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
@@ -114,19 +119,15 @@ const TableMap: React.FC<TableMapProps> = ({
                 }
             });
         return map;
-    }, [orders]);
+    }, [orders, tables]);
 
     const decoratedTables = useMemo(() => {
         return tables.map(table => {
             const activeOrder = activeOrderByTable[table.id];
             if (activeOrder) {
-                let status = TableStatus.OCCUPIED;
-                if (activeOrder.status === OrderStatus.READY) status = TableStatus.READY_TO_PAY;
-                else if ([OrderStatus.PENDING, OrderStatus.PREPARING].includes(activeOrder.status)) status = TableStatus.WAITING_FOOD;
-                
                 return {
                     ...table,
-                    status,
+                    status: TableStatus.OCCUPIED,
                     currentOrderTotal: tableTotals[table.id] || 0,
                 };
             }
@@ -150,7 +151,6 @@ const TableMap: React.FC<TableMapProps> = ({
         return {
             available: decoratedTables.filter(t => t.status === TableStatus.AVAILABLE).length,
             occupied: decoratedTables.filter(t => [TableStatus.OCCUPIED, TableStatus.WAITING_FOOD, TableStatus.READY_TO_PAY].includes(t.status)).length,
-            ready: decoratedTables.filter(t => t.status === TableStatus.READY_TO_PAY).length,
             total: decoratedTables.length,
             activeTotal: Object.values(tableTotals).reduce((a, b) => a + b, 0)
         };
@@ -180,70 +180,39 @@ const TableMap: React.FC<TableMapProps> = ({
             glow: 'shadow-indigo-500/10',
             label: isAr ? 'مشغولة' : 'Occupied'
         },
-        [TableStatus.WAITING_FOOD]: {
-            bg: 'bg-sky-500/5',
-            border: 'border-sky-500/20',
-            text: 'text-sky-600 dark:text-sky-400',
-            icon: 'bg-sky-500 text-white',
-            badge: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
-            glow: 'shadow-sky-500/10',
-            label: isAr ? 'انتظار الطعام' : 'Waiting Food'
-        },
-        [TableStatus.READY_TO_PAY]: {
-            bg: 'bg-teal-500/5',
-            border: 'border-teal-500/20',
-            text: 'text-teal-600 dark:text-teal-400',
-            icon: 'bg-teal-500 text-white',
-            badge: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
-            glow: 'shadow-teal-500/10',
-            label: isAr ? 'جاهزة للحساب' : 'Ready to Pay'
-        },
-        [TableStatus.RESERVED]: {
-            bg: 'bg-amber-500/5',
-            border: 'border-amber-500/20',
-            text: 'text-amber-600 dark:text-amber-400',
-            icon: 'bg-amber-500 text-white',
-            badge: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-            glow: 'shadow-amber-500/10',
-            label: isAr ? 'محجوزة' : 'Reserved'
-        },
-        [TableStatus.DIRTY]: {
-            bg: 'bg-rose-500/5',
-            border: 'border-rose-500/20',
-            text: 'text-rose-600 dark:text-rose-400',
-            icon: 'bg-rose-500 text-white',
-            badge: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
-            glow: 'shadow-rose-500/10',
-            label: isAr ? 'تحتاج تنظيف' : 'Needs Cleaning'
-        }
     };
 
     const TableCard = ({ table }: { table: Table }) => {
-        const theme = StatusTheme[table.status] || StatusTheme[TableStatus.AVAILABLE];
+        const theme = table.status === TableStatus.AVAILABLE
+            ? StatusTheme[TableStatus.AVAILABLE]
+            : StatusTheme[TableStatus.OCCUPIED];
         const summary = tableSummaries[table.id];
         const total = tableTotals[table.id] || 0;
         const elapsed = summary?.openedAt ? getElapsedMinutes(summary.openedAt) : null;
         const isUrgent = elapsed && elapsed > 25;
         const order = activeOrderByTable[table.id];
-        const isReadyToPay = table.status === TableStatus.READY_TO_PAY;
 
         return (
-            <div 
+            <div
+                dir={isAr ? 'rtl' : 'ltr'}
                 onClick={() => onSelectTable(table)}
-                className={`group flex flex-col h-full rounded-[2.5rem] border transition-all duration-150 relative overflow-hidden cursor-pointer ${theme.bg} ${theme.border} ${theme.glow} ${isUrgent ? 'ring-4 ring-rose-500/20 animate-pulse' : 'hover:scale-[1.02] hover:shadow-2xl hover:border-primary/40'}`}
+                className={`group flex flex-col h-full rounded-[2rem] border transition-all duration-150 relative overflow-hidden cursor-pointer ${theme.bg} ${theme.border} ${theme.glow} ${isUrgent ? 'ring-4 ring-rose-500/20 animate-pulse' : 'hover:shadow-2xl hover:border-primary/40'}`}
             >
                 {/* Status Indicator Bar */}
                 <div className={`absolute top-0 left-0 right-0 h-2 opacity-90 ${theme.icon} shadow-[0_2px_10px_rgba(0,0,0,0.1)]`} />
                 
-                <div className="p-5 flex-1 flex flex-col">
+                <div className="p-4 sm:p-5 flex-1 flex flex-col min-w-0">
                     {/* Header: Table Name & Stats */}
-                    <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-16 h-16 rounded-3xl flex items-center justify-center font-black text-2xl shadow-xl border-2 border-white/20 transition-transform group-hover:rotate-3 ${theme.icon}`}>
-                                {table.name}
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 mb-4">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/20 ${theme.icon}`}>
+                                <Users size={22} />
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
+                            <div className="min-w-0">
+                                <p title={table.name} className="mb-1 truncate text-base font-black text-main">
+                                    {table.name}
+                                </p>
+                                <div className="flex min-w-0 flex-wrap items-center gap-1.5 mb-1">
                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${theme.badge}`}>
                                         {theme.label}
                                     </span>
@@ -253,7 +222,7 @@ const TableMap: React.FC<TableMapProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-3 text-muted">
+                                <div className="flex flex-wrap items-center gap-2 text-muted">
                                     <div className="flex items-center gap-1.5 px-2 py-0.5 bg-elevated rounded-lg border border-border/30">
                                         <Users size={12} className="text-primary" />
                                         <span className="text-[11px] font-black tabular-nums">{table.seats}</span>
@@ -269,14 +238,39 @@ const TableMap: React.FC<TableMapProps> = ({
                         </div>
 
                         {total > 0 && (
-                            <div className="flex flex-col items-end">
+                            <div className={`flex min-w-0 max-w-[6.5rem] shrink-0 flex-col ${isAr ? 'items-start text-start' : 'items-end text-end'}`}>
                                 <span className="text-[9px] font-black text-muted uppercase tracking-tighter opacity-60">{isAr ? 'القيمة' : 'TOTAL'}</span>
-                                <span className={`text-lg font-black tabular-nums ${isReadyToPay ? 'text-teal-600 dark:text-teal-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                                    {currencySymbol}{total.toFixed(0)}
+                                <span className="w-full truncate text-base font-black tabular-nums text-indigo-600 dark:text-indigo-400" title={`${total.toFixed(2)} ${currencySymbol}`}>
+                                    {total.toFixed(0)} {currencySymbol}
                                 </span>
                             </div>
                         )}
                     </div>
+
+                    {(table.defaultCouponCode || Number(table.discount) > 0 || Number(table.minSpend) > 0 || table.notes) && (
+                        <div className="mb-4 flex flex-wrap gap-1.5">
+                            {table.defaultCouponCode ? (
+                                <span className="inline-flex max-w-full items-center gap-1 rounded-lg border border-violet-500/20 bg-violet-500/10 px-2 py-1 text-[10px] font-black text-violet-600">
+                                    <Tag size={11} />
+                                    <span className="truncate">{table.defaultCouponCode}</span>
+                                </span>
+                            ) : Number(table.discount) > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-black text-emerald-600">
+                                    <Percent size={11} /> {Number(table.discount)}%
+                                </span>
+                            ) : null}
+                            {Number(table.minSpend) > 0 && (
+                                <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-black text-amber-600">
+                                    <Wallet size={11} /> {isAr ? 'حد أدنى' : 'MIN'} {currencySymbol}{Number(table.minSpend).toFixed(0)}
+                                </span>
+                            )}
+                            {table.notes && (
+                                <span title={table.notes} className="inline-flex items-center gap-1 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[10px] font-black text-sky-600">
+                                    <StickyNote size={11} /> {isAr ? 'تعليمات' : 'NOTES'}
+                                </span>
+                            )}
+                        </div>
+                    )}
 
                     {/* Quick Item View / Tags */}
                     {summary?.items > 0 && (
@@ -296,10 +290,10 @@ const TableMap: React.FC<TableMapProps> = ({
                     )}
 
                     {/* Interactive Action Belt */}
-                    <div className="mt-auto pt-4 border-t border-border/10 flex items-center justify-between gap-3">
+                    <div className="mt-auto pt-4 border-t border-border/10 flex min-w-0 items-center justify-between gap-2">
                         {total > 0 ? (
                             <>
-                                <div className="flex gap-2">
+                                <div className="flex shrink-0 gap-2">
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); onTempBill(table); }}
                                         className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 text-muted border border-border shadow-sm hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center active:scale-95 group/btn"
@@ -307,6 +301,15 @@ const TableMap: React.FC<TableMapProps> = ({
                                     >
                                         <Wallet size={18} className="group-hover/btn:scale-110 transition-transform" />
                                     </button>
+                                    {canResetTables && onResetTable && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onResetTable(table); }}
+                                            className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/20 shadow-sm hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center active:scale-95"
+                                            title={isAr ? 'تصفير الطاولة وإلغاء التعليق' : 'Reset stuck table'}
+                                        >
+                                            <Trash2 size={17} />
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); onMergeTable(table); }}
                                         className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 text-muted border border-border shadow-sm hover:border-indigo-500/40 hover:text-indigo-500 hover:bg-indigo-500/5 transition-all flex items-center justify-center active:scale-95 group/btn"
@@ -317,7 +320,7 @@ const TableMap: React.FC<TableMapProps> = ({
                                 </div>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onResumeTable(table); }} 
-                                    className="flex-1 h-12 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-[0.15em] shadow-xl shadow-primary/30 hover:shadow-primary/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 overflow-hidden relative group/order"
+                                    className="flex-1 min-w-0 h-12 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-[0.08em] shadow-xl shadow-primary/30 hover:shadow-primary/40 active:scale-95 transition-all flex items-center justify-center gap-2 overflow-hidden relative group/order"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent translate-x-[-100%] group-hover/order:translate-x-[100%] transition-transform duration-700" />
                                     <span>{isAr ? 'تعديل' : 'MODIFY'}</span>
@@ -352,10 +355,6 @@ const TableMap: React.FC<TableMapProps> = ({
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
                             <span className="w-2 h-2 rounded-full bg-indigo-500" />
                             <span className="text-xs font-black text-indigo-700 dark:text-indigo-400 tabular-nums">{stats.occupied}</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-teal-500/10 border border-teal-500/20">
-                            <CheckCircle2 size={12} className="text-teal-600" />
-                            <span className="text-xs font-black text-teal-700 dark:text-teal-400 tabular-nums">{stats.ready}</span>
                         </div>
                         <div className="h-6 w-px bg-border/40 mx-1" />
                         <div className="flex items-center gap-2 px-3 py-1.5">
@@ -438,8 +437,8 @@ const TableMap: React.FC<TableMapProps> = ({
                 {filteredTables.length > 0 ? (
                     <VirtualGrid
                         itemCount={filteredTables.length}
-                        columnWidth={viewMode === 'GRID' ? 280 : 360}
-                        rowHeight={240}
+                        columnWidth={viewMode === 'GRID' ? 300 : 360}
+                        rowHeight={300}
                         gap={20}
                         className="h-full no-scrollbar"
                         renderItem={(index) => (

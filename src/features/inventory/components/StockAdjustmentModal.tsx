@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Save, AlertTriangle, Hash, Calculator } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Save, AlertTriangle, Calculator, ArrowRight } from 'lucide-react';
 import { InventoryItem, Warehouse } from '@/types';
+import { getStockAdjustmentPreview } from '@/services/stockAdjustment';
 
 interface StockAdjustmentModalProps {
     isOpen: boolean;
@@ -16,26 +17,43 @@ interface StockAdjustmentModalProps {
 const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({ isOpen, onClose, onSave, lang, items, warehouses, initialItem, initialWarehouse }) => {
     const [selectedItemId, setSelectedItemId] = useState(initialItem?.id || '');
     const [selectedWarehouseId, setSelectedWarehouseId] = useState(initialWarehouse?.id || '');
-    const [quantity, setQuantity] = useState<number>(0);
+    const [quantityInput, setQuantityInput] = useState('');
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
 
+    useEffect(() => {
+        if (!isOpen) return;
+        setSelectedItemId(initialItem?.id || '');
+        setSelectedWarehouseId(initialWarehouse?.id || '');
+        setReason('');
+    }, [isOpen, initialItem?.id, initialWarehouse?.id]);
+
+    const selectedItem = items.find(i => i.id === selectedItemId);
+    const currentQty = Number(selectedItem?.warehouseQuantities.find(wq => wq.warehouseId === selectedWarehouseId)?.quantity || 0);
+
+    useEffect(() => {
+        if (!isOpen || !selectedItemId || !selectedWarehouseId) {
+            setQuantityInput('');
+            return;
+        }
+        setQuantityInput(String(Number.isFinite(currentQty) ? currentQty : 0));
+    }, [isOpen, selectedItemId, selectedWarehouseId, currentQty]);
+
     if (!isOpen) return null;
+
+    const preview = getStockAdjustmentPreview(currentQty, quantityInput);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedItemId || !selectedWarehouseId) return;
+        if (!selectedItemId || !selectedWarehouseId || preview.newQuantity === null) return;
         setSaving(true);
         try {
-            await onSave(selectedItemId, selectedWarehouseId, quantity, reason);
+            await onSave(selectedItemId, selectedWarehouseId, preview.newQuantity, reason);
             onClose();
         } finally {
             setSaving(false);
         }
     };
-
-    const selectedItem = items.find(i => i.id === selectedItemId);
-    const currentQty = selectedItem?.warehouseQuantities.find(wq => wq.warehouseId === selectedWarehouseId)?.quantity || 0;
 
     return (
         <div className="fixed inset-0 bg-slate-900/60  flex items-center justify-center z-[110] p-4">
@@ -104,20 +122,40 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({ isOpen, onC
                                     <input
                                         required
                                         type="number"
+                                        min="0"
                                         step="0.001"
-                                        value={quantity}
-                                        onChange={e => setQuantity(Number(e.target.value))}
+                                        value={quantityInput}
+                                        onChange={e => setQuantityInput(e.target.value)}
+                                        aria-invalid={!preview.isValid}
                                         className="w-full pl-12 pr-4 py-3.5 card-primary border border-amber-200 dark:border-amber-900 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none transition-all font-bold"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'الفرق' : 'Difference'}</label>
-                                <div className={`px-4 py-3.5 rounded-2xl font-black flex items-center justify-center text-lg ${quantity - currentQty >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/30'}`}>
-                                    {quantity - currentQty > 0 ? '+' : ''}{quantity - currentQty}
+                                <div className={`px-4 py-3.5 rounded-2xl font-black flex items-center justify-center text-lg ${(preview.delta ?? 0) >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/30'}`}>
+                                    {preview.delta === null ? '—' : `${preview.delta > 0 ? '+' : ''}${preview.delta}`}
                                 </div>
                             </div>
                         </div>
+
+                        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-2xl border border-amber-200 dark:border-amber-900 flex items-center justify-between" aria-live="polite">
+                            <div>
+                                <p className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase">
+                                    {lang === 'ar' ? 'الكمية بعد الحفظ' : 'Quantity after saving'}
+                                </p>
+                                <p className="text-xs font-bold text-slate-500">{currentQty} {selectedItem?.unit}</p>
+                            </div>
+                            <ArrowRight className={lang === 'ar' ? 'rotate-180' : ''} size={20} />
+                            <span className="text-xl font-black text-amber-700 dark:text-amber-300">
+                                {preview.newQuantity === null ? '—' : preview.newQuantity} {selectedItem?.unit}
+                            </span>
+                        </div>
+                        {!preview.isValid && quantityInput !== '' && (
+                            <p className="text-xs font-bold text-rose-600">
+                                {lang === 'ar' ? 'أدخل كمية صحيحة تساوي صفر أو أكبر.' : 'Enter a finite quantity greater than or equal to zero.'}
+                            </p>
+                        )}
 
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'السبب' : 'Reason'}</label>
@@ -139,8 +177,8 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({ isOpen, onC
                             {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                         </button>
                         <button
-                            disabled={saving}
-                            onClick={handleSubmit}
+                            disabled={saving || !selectedItemId || !selectedWarehouseId || !preview.isValid}
+                            type="submit"
                             className="flex-1 py-4 bg-amber-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-amber-600 shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale transition-all"
                         >
                             <Save size={18} /> {saving ? (lang === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (lang === 'ar' ? 'تأكيد التسوية' : 'Confirm Adjustment')}

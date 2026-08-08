@@ -18,7 +18,8 @@ import { Order, OrderStatus, OrderType } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
 import { KdsTicket, useKdsStore } from '../stores/useKdsStore';
 import { useOrderStore } from '../stores/useOrderStore';
-import { apiRequestBlob } from '../services/api/core';
+import { apiRequestBlob, getActionableErrorMessage } from '../services/api/core';
+import { useToast } from './common/ToastProvider';
 import { formatDisplayId } from '../src/utils/idGenerator';
 import { socketService } from '../services/socketService';
 
@@ -363,6 +364,7 @@ export const PackingScreen: React.FC = () => {
     const { tickets, fetchTickets, handoverOrder } = useKdsStore();
     const { settings, branches } = useAuthStore();
     const { audioEnabled, enableAudio, speak } = useArabicOrderCallout();
+    const { error } = useToast();
     const [now, setNow] = useState(Date.now());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [pendingHandoverId, setPendingHandoverId] = useState<string | null>(null);
@@ -546,6 +548,8 @@ export const PackingScreen: React.FC = () => {
             announcedReadyIds.current.delete(order.id);
             setAnnouncementQueue((queue) => queue.filter((queuedOrder) => queuedOrder.id !== order.id));
             await Promise.all([fetchOrders({ limit: 120 }), fetchTickets({ includeServed: true })]);
+        } catch (handoverError) {
+            error(getActionableErrorMessage(handoverError, 'ar'));
         } finally {
             setPendingHandoverId(null);
         }
@@ -569,7 +573,7 @@ export const PackingScreen: React.FC = () => {
 
             <div className="relative flex min-h-screen flex-col">
                 <header className="shrink-0 border-b border-[rgba(var(--border-color),0.42)] bg-[rgba(var(--bg-card),0.64)] px-4 py-3 backdrop-blur-xl lg:px-7">
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col items-stretch justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
                         <div className="flex min-w-0 items-center gap-4">
                             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--theme-radius)] bg-[rgb(var(--primary))] text-white shadow-[0_18px_38px_rgba(37,99,235,0.22)]">
                                 <PackageCheck size={25} />
@@ -585,7 +589,7 @@ export const PackingScreen: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                             <div className="hidden min-w-[112px] rounded-[var(--theme-radius)] border border-[rgba(var(--border-color),0.38)] bg-[rgba(var(--bg-elevated),0.48)] px-4 py-2 text-left sm:block">
                                 <p className="text-lg font-black tabular-nums">{currentTime}</p>
                                 <p className="text-xs font-bold text-[rgb(var(--text-muted))]">{readyOrders.length} جاهز</p>

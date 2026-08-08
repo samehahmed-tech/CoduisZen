@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { generateHtmlFromTemplate } from '../services/templateReceiptGenerator';
+import { createQrDataUrl, generateHtmlFromTemplate, selectReceiptTemplate } from '../services/templateReceiptGenerator';
+import { OrderType } from '../types';
 
 const templateSource = readFileSync(resolve(process.cwd(), 'services/templateReceiptGenerator.ts'), 'utf8');
 const defaultReceiptSource = readFileSync(resolve(process.cwd(), 'services/receiptTemplate.ts'), 'utf8');
+const receiptDesignerSource = readFileSync(resolve(process.cwd(), 'components/ReceiptDesigner.tsx'), 'utf8');
 const rendererSource = readFileSync(resolve(process.cwd(), 'services/receiptImageRenderer.ts'), 'utf8');
 const bridgeSource = readFileSync(resolve(process.cwd(), 'hardware-bridge/index.js'), 'utf8');
 const { pngToEscPos } = createRequire(import.meta.url)('../hardware-bridge/png-raster.js') as {
@@ -13,6 +15,34 @@ const { pngToEscPos } = createRequire(import.meta.url)('../hardware-bridge/png-r
 };
 
 describe('2026-07 client thermal receipt regression', () => {
+    it('uses Cairo across generated receipts and the visual receipt preview', () => {
+        expect(templateSource).toContain("font-family: 'Cairo'");
+        expect(defaultReceiptSource).toContain("font-family: 'Cairo'");
+        expect(receiptDesignerSource).toContain("\"'Cairo', system-ui, sans-serif\"");
+    });
+    it('selects receipt defaults by order type before the general sales default', () => {
+        const templates = [
+            { id: 'general', type: 'receipt', isDefault: true, linkedPrinterIds: [], blocks: [] },
+            { id: 'dine-in', type: 'receipt', isDefault: false, linkedPrinterIds: [], blocks: [] },
+            { id: 'delivery', type: 'receipt', isDefault: false, linkedPrinterIds: ['printer-1'], blocks: [] },
+        ] as any[];
+
+        expect(selectReceiptTemplate({
+            templates,
+            defaultTemplateId: 'general',
+            templateByOrderType: { DINE_IN: 'dine-in' },
+            orderType: OrderType.DINE_IN,
+            printerId: 'printer-1',
+        })?.id).toBe('dine-in');
+        expect(selectReceiptTemplate({
+            templates,
+            defaultTemplateId: 'general',
+            templateByOrderType: {},
+            orderType: OrderType.TAKEAWAY,
+            printerId: 'printer-1',
+        })?.id).toBe('general');
+    });
+
     it('prints the grand total as black text on white instead of reverse black fill', () => {
         for (const receiptSource of [templateSource, defaultReceiptSource]) {
             const totalStart = receiptSource.indexOf('.grand-total {');
@@ -73,5 +103,13 @@ describe('2026-07 client thermal receipt regression', () => {
         expect(html).toContain('data:image/svg+xml');
         expect(html).toContain('@page { margin: 0; size: 80mm auto; }');
         expect(html).toContain('border-width: 5px');
+    });
+
+    it('creates a standalone QR image that thermal renderers can load', () => {
+        const encoded = createQrDataUrl('https://example.test/order/1', 88).split(',')[1];
+        const svg = Buffer.from(encoded, 'base64').toString('utf8');
+
+        expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
+        expect(svg).toContain('viewBox=');
     });
 });

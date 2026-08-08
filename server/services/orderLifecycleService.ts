@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { drivers, orderStatusHistory, orders, tables } from '../../src/db/schema';
+import { branches, dayCloseReports, drivers, kdsTickets, managerApprovals, orderStatusHistory, orders, tables } from '../../src/db/schema';
 import { evaluateOrderStatusUpdate } from './orderStatusPolicy';
 import { emitBranchEvent } from '../utils/socketEmit';
 import { webhookService } from './webhookService';
@@ -9,11 +9,13 @@ import { loyaltyService } from './loyaltyService';
 import { submitOrderToFiscal } from './fiscalSubmitService';
 import { sendWhatsAppText } from './whatsappService';
 import { whatsappAutomationService } from './whatsappAutomationService';
+import { getDateKeyInTimeZone } from '../utils/businessDate';
 
 type LifecycleUser = {
     role?: string | null;
     branchId?: string | null;
     allowedBranches?: string[] | null;
+    permissions?: string[] | null;
 };
 
 type TransitionInput = {
@@ -24,9 +26,19 @@ type TransitionInput = {
     user?: LifecycleUser;
     expectedUpdatedAt?: string;
     skipPolicy?: boolean;
+    approvalId?: number;
+    requireKitchenReady?: boolean;
 };
 
 const terminalStatuses = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED']);
+const kitchenReadyStatuses = new Set(['READY', 'SERVED', 'DELIVERED']);
+
+const lifecycleError = (code: string, status: number) => {
+    const error: any = new Error(code);
+    error.code = code;
+    error.status = status;
+    return error;
+};
 
 const getStatusPatch = (nextStatus: string, now: Date, notes?: string) => {
     const patch: Record<string, any> = { status: nextStatus, updatedAt: now };
@@ -74,7 +86,7 @@ const runPostTransitionEffects = (order: any, previousStatus: string, nextStatus
         }
 
         if (['COMPLETED', 'CANCELLED'].includes(nextStatus) && order.type === 'DINE_IN' && order.tableId) {
-            emitBranchEvent(branchId, 'table:status', { id: order.tableId, status: 'AVAILABLE' });
+        emitBranchEvent(branchId, 'table:status', { id: order.tableId, status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null });
         }
     }
 
@@ -114,14 +126,69 @@ export const transitionOrderStatus = async ({
     user,
     expectedUpdatedAt,
     skipPolicy = false,
+    approvalId,
+    requireKitchenReady = false,
 }: TransitionInput) => {
     const normalizedStatus = String(nextStatus || '').toUpperCase();
     const result = await db.transaction(async (tx) => {
         const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id, orderId));
         if (!currentOrder) {
-            const error: any = new Error('ORDER_NOT_FOUND');
-            error.status = 404;
-            throw error;
+            throw lifecycleError('ORDER_NOT_FOUND', 404);
+        }
+
+        if (String(currentOrder.status) === normalizedStatus) {
+            return { order: currentOrder, previousStatus: String(currentOrder.status), changed: false };
+        }
+
+        const [branch] = await tx.select({
+            businessDate: branches.businessDate,
+            timezone: branches.timezone,
+        }).top(1).from(branches).where(eq(branches.id, currentOrder.branchId));
+        if (!branch) throw lifecycleError('INVALID_BRANCH_REFERENCE', 400);
+
+        const timezone = branch.timezone || 'Africa/Cairo';
+        const orderBusinessDate = currentOrder.businessDate
+            || getDateKeyInTimeZone(currentOrder.createdAt || new Date(), timezone);
+        const activeBusinessDate = branch.businessDate
+            || getDateKeyInTimeZone(new Date(), timezone);
+        const [closedDay] = await tx.select({ id: dayCloseReports.id })
+            .top(1)
+            .from(dayCloseReports)
+            .where(and(
+                eq(dayCloseReports.branchId, currentOrder.branchId),
+                sql`${dayCloseReports.businessDate} = CAST(${orderBusinessDate} AS DATE)`,
+            ));
+        if (closedDay) throw lifecycleError('ORDER_BUSINESS_DAY_CLOSED', 409);
+        if (orderBusinessDate !== activeBusinessDate) throw lifecycleError('ORDER_HISTORY_READ_ONLY', 409);
+
+        if (requireKitchenReady) {
+            const tickets = await tx.select({ status: kdsTickets.status })
+                .from(kdsTickets)
+                .where(eq(kdsTickets.orderId, orderId));
+            if (tickets.length === 0) {
+                throw lifecycleError('KITCHEN_TICKETS_MISSING', 409);
+            }
+            if (tickets.some(ticket => !kitchenReadyStatuses.has(String(ticket.status)))) {
+                throw lifecycleError('KITCHEN_TICKETS_NOT_READY', 409);
+            }
+        }
+
+        let managerApproved = false;
+        if (normalizedStatus === 'CANCELLED' && approvalId) {
+            const [approval] = await tx.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, approvalId));
+            const details = approval?.details as Record<string, unknown> | null;
+            managerApproved = Boolean(
+                approval
+                && approval.actionType === 'VOID_ORDER'
+                && approval.relatedId === orderId
+                && approval.branchId === currentOrder.branchId
+                && details?.status === 'APPROVED'
+            );
+            if (!managerApproved) {
+                const error: any = new Error('MANAGER_APPROVAL_INVALID');
+                error.status = 403;
+                throw error;
+            }
         }
 
         if (!skipPolicy) {
@@ -133,7 +200,9 @@ export const transitionOrderStatus = async ({
                 userBranchId: user?.branchId || undefined,
                 orderBranchId: currentOrder.branchId,
                 allowedBranches: user?.allowedBranches,
+                userPermissions: user?.permissions,
                 orderType: currentOrder.type,
+                managerApproved,
             });
             if (!statusPolicy.ok) {
                 const policyCode = statusPolicy.code || 'INVALID_STATUS_TRANSITION';
@@ -154,10 +223,6 @@ export const transitionOrderStatus = async ({
             }
         }
 
-        if (String(currentOrder.status) === normalizedStatus) {
-            return { order: currentOrder, previousStatus: String(currentOrder.status), changed: false };
-        }
-
         const now = new Date();
         const [updatedOrder] = await tx.update(orders)
             .set(getStatusPatch(normalizedStatus, now, notes))
@@ -173,6 +238,12 @@ export const transitionOrderStatus = async ({
             createdAt: now,
         });
 
+        if (requireKitchenReady && normalizedStatus === 'DELIVERED') {
+            await tx.update(kdsTickets)
+                .set({ status: 'DELIVERED', updatedAt: now })
+                .where(eq(kdsTickets.orderId, orderId));
+        }
+
         if (terminalStatuses.has(normalizedStatus) && updatedOrder.driverId) {
             await tx.update(drivers)
                 .set({ status: 'AVAILABLE' })
@@ -181,7 +252,7 @@ export const transitionOrderStatus = async ({
 
         if (['COMPLETED', 'CANCELLED'].includes(normalizedStatus) && updatedOrder.type === 'DINE_IN' && updatedOrder.tableId) {
             await tx.update(tables)
-                .set({ status: 'AVAILABLE', currentOrderId: null, updatedAt: now })
+                .set({ status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null, updatedAt: now })
                 .where(eq(tables.id, updatedOrder.tableId));
         }
 

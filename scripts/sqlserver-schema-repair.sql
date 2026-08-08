@@ -1,4 +1,5 @@
 SET XACT_ABORT ON;
+SET QUOTED_IDENTIFIER ON;
 BEGIN TRANSACTION;
 
 IF OBJECT_ID(N'dbo.kds_tickets', N'U') IS NOT NULL
@@ -13,6 +14,31 @@ BEGIN
     END;
     IF COL_LENGTH('dbo.kds_tickets', 'target_time') IS NULL ALTER TABLE dbo.kds_tickets ADD target_time datetime2 NULL;
     IF COL_LENGTH('dbo.kds_tickets', 'bumped_at') IS NULL ALTER TABLE dbo.kds_tickets ADD bumped_at datetime2 NULL;
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns c
+        JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID('dbo.kds_tickets')
+          AND c.name = 'priority'
+          AND t.name <> 'nvarchar'
+    )
+    BEGIN
+        DECLARE @kdsPriorityDefault sysname;
+        SELECT @kdsPriorityDefault = dc.name
+        FROM sys.default_constraints dc
+        JOIN sys.columns c ON c.default_object_id = dc.object_id
+        WHERE c.object_id = OBJECT_ID('dbo.kds_tickets') AND c.name = 'priority';
+        IF @kdsPriorityDefault IS NOT NULL
+        BEGIN
+            DECLARE @dropKdsPriorityDefault nvarchar(max);
+            SET @dropKdsPriorityDefault = N'ALTER TABLE dbo.kds_tickets DROP CONSTRAINT ' + QUOTENAME(@kdsPriorityDefault);
+            EXEC sys.sp_executesql @dropKdsPriorityDefault;
+        END;
+        ALTER TABLE dbo.kds_tickets ALTER COLUMN priority nvarchar(255) NULL;
+        UPDATE dbo.kds_tickets
+        SET priority = CASE priority WHEN '1' THEN 'RUSH' WHEN '2' THEN 'REMAKE' ELSE 'NORMAL' END;
+        ALTER TABLE dbo.kds_tickets ADD CONSTRAINT df_kds_tickets_priority DEFAULT 'NORMAL' FOR priority;
+    END;
 END;
 
 IF OBJECT_ID(N'dbo.kds_ticket_items', N'U') IS NOT NULL
@@ -28,6 +54,12 @@ BEGIN
     IF COL_LENGTH('dbo.kds_ticket_items', 'quantity') IS NULL ALTER TABLE dbo.kds_ticket_items ADD quantity int NULL;
     IF COL_LENGTH('dbo.kds_ticket_items', 'modifiers_text') IS NULL ALTER TABLE dbo.kds_ticket_items ADD modifiers_text nvarchar(max) NULL;
     IF COL_LENGTH('dbo.kds_ticket_items', 'is_bumped') IS NULL ALTER TABLE dbo.kds_ticket_items ADD is_bumped bit NOT NULL CONSTRAINT df_kds_ticket_items_is_bumped DEFAULT 0;
+    IF COL_LENGTH('dbo.kds_ticket_items', 'ticket_id') IS NOT NULL
+       AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'ticket_id', 'AllowsNull') = 0
+        ALTER TABLE dbo.kds_ticket_items ALTER COLUMN ticket_id nvarchar(255) NULL;
+    IF COL_LENGTH('dbo.kds_ticket_items', 'order_item_id') IS NOT NULL
+       AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'order_item_id', 'AllowsNull') = 0
+        ALTER TABLE dbo.kds_ticket_items ALTER COLUMN order_item_id int NULL;
 END;
 
 IF OBJECT_ID(N'dbo.day_close_reports', N'U') IS NOT NULL
@@ -233,6 +265,32 @@ BEGIN
         ALTER TABLE dbo.loan_installments ALTER COLUMN installment_number int NULL;
 END;
 
+IF OBJECT_ID(N'dbo.payroll_locks', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.payroll_locks', 'locked_through') IS NULL
+        ALTER TABLE dbo.payroll_locks ADD locked_through datetime2 NULL;
+    IF COL_LENGTH('dbo.payroll_locks', 'created_at') IS NULL
+        ALTER TABLE dbo.payroll_locks ADD created_at datetime2 NULL CONSTRAINT df_payroll_locks_created DEFAULT GETDATE();
+    IF COL_LENGTH('dbo.payroll_locks', 'updated_at') IS NULL
+        ALTER TABLE dbo.payroll_locks ADD updated_at datetime2 NULL CONSTRAINT df_payroll_locks_updated DEFAULT GETDATE();
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.payroll_locks') AND name = N'employee_id' AND is_nullable = 0)
+        ALTER TABLE dbo.payroll_locks ALTER COLUMN employee_id nvarchar(255) NULL;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.payroll_locks') AND name = N'period_start' AND is_nullable = 0)
+        ALTER TABLE dbo.payroll_locks ALTER COLUMN period_start date NULL;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.payroll_locks') AND name = N'period_end' AND is_nullable = 0)
+        ALTER TABLE dbo.payroll_locks ALTER COLUMN period_end date NULL;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.payroll_locks') AND name = N'locked_by' AND is_nullable = 0)
+        ALTER TABLE dbo.payroll_locks ALTER COLUMN locked_by nvarchar(255) NULL;
+END;
+
+IF OBJECT_ID(N'dbo.employees', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.employees') AND name = N'employees_active_created_idx')
+        CREATE INDEX employees_active_created_idx ON dbo.employees(is_active, created_at DESC);
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.employees') AND name = N'employees_branch_active_created_idx')
+        CREATE INDEX employees_branch_active_created_idx ON dbo.employees(branch_id, is_active, created_at DESC);
+END;
+
 IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.attendance_raw_logs') AND name = N'uq_attendance_raw_logs_dedupe')
     ALTER TABLE dbo.attendance_raw_logs DROP CONSTRAINT uq_attendance_raw_logs_dedupe;
 ELSE IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.attendance_raw_logs') AND name = N'uq_attendance_raw_logs_dedupe')
@@ -257,4 +315,38 @@ BEGIN
     CREATE INDEX idx_orders_branch_date ON dbo.orders(branch_id, created_at);
 END;
 
+IF OBJECT_ID(N'dbo.tables', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.tables', 'discount_percent') IS NULL ALTER TABLE dbo.tables ADD discount_percent real NULL CONSTRAINT df_tables_discount_percent DEFAULT (0);
+    IF COL_LENGTH('dbo.tables', 'default_coupon_code') IS NULL ALTER TABLE dbo.tables ADD default_coupon_code nvarchar(255) NULL;
+    IF COL_LENGTH('dbo.tables', 'min_spend') IS NULL ALTER TABLE dbo.tables ADD min_spend real NULL CONSTRAINT df_tables_min_spend DEFAULT (0);
+    IF COL_LENGTH('dbo.tables', 'is_vip') IS NULL ALTER TABLE dbo.tables ADD is_vip bit NULL CONSTRAINT df_tables_is_vip DEFAULT (0);
+    IF COL_LENGTH('dbo.tables', 'notes') IS NULL ALTER TABLE dbo.tables ADD notes nvarchar(max) NULL;
+END;
+
+IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.purchase_orders', 'target_warehouse_id') IS NULL
+    ALTER TABLE dbo.purchase_orders ADD target_warehouse_id nvarchar(255) NULL;
+
+IF OBJECT_ID(N'dbo.leave_balances', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.leave_balances', N'entitled_days') IS NULL
+        ALTER TABLE dbo.leave_balances ADD entitled_days real NULL;
+    IF COL_LENGTH(N'dbo.leave_balances', N'carried_forward_days') IS NULL
+        ALTER TABLE dbo.leave_balances ADD carried_forward_days real NULL;
+    IF COL_LENGTH(N'dbo.leave_balances', N'adjustment_days') IS NULL
+        ALTER TABLE dbo.leave_balances ADD adjustment_days real NULL;
+END;
+
+IF OBJECT_ID(N'dbo.payroll_runs', N'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1 FROM sys.indexes
+       WHERE object_id = OBJECT_ID(N'dbo.payroll_runs')
+         AND name = N'payroll_runs_closed_cycle_unique_idx'
+   )
+    CREATE UNIQUE INDEX payroll_runs_closed_cycle_unique_idx
+        ON dbo.payroll_runs(cycle_id)
+        WHERE status = N'CLOSED';
+
 COMMIT TRANSACTION;
+GO

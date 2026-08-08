@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, orderItems, menuItems, branches, drivers } from '../../../src/db/schema';
+import { orders, orderItems, menuItems, branches, drivers, tables, floorZones } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
+import { revenueEligibleOrder } from '../../utils/orderRevenue';
 
 export const getKitchenPerformance = async (req: Request, res: Response) => {
     try {
@@ -176,11 +177,18 @@ export const getTableTurnoverRate = async (req: Request, res: Response) => {
 
         const rows = await db.select({
             tableId: orders.tableId,
+            tableName: tables.name,
+            zoneName: floorZones.name,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-        }).from(orders).where(and(...conditions)).groupBy(orders.tableId).orderBy(sql`count(*) desc`);
+        }).from(orders)
+            .leftJoin(tables, eq(orders.tableId, tables.id))
+            .leftJoin(floorZones, eq(tables.zoneId, floorZones.id))
+            .where(and(...conditions))
+            .groupBy(orders.tableId, tables.name, floorZones.name)
+            .orderBy(sql`count(*) desc`);
 
-        res.json(rows.map(r => ({ tableId: r.tableId, totalOrders: Number(r.orderCount), turnsPerDay: Number((Number(r.orderCount) / daysDiff).toFixed(1)), revenue: Number(Number(r.revenue).toFixed(2)), revenuePerDay: Number((Number(r.revenue) / daysDiff).toFixed(2)) })));
+        res.json(rows.map(r => ({ tableId: r.tableId, tableName: r.tableName || r.tableId, zoneName: r.zoneName || '', totalOrders: Number(r.orderCount), turnsPerDay: Number((Number(r.orderCount) / daysDiff).toFixed(1)), revenue: Number(Number(r.revenue).toFixed(2)), revenuePerDay: Number((Number(r.revenue) / daysDiff).toFixed(2)) })));
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -252,21 +260,21 @@ export const getBranchComparison = async (req: Request, res: Response) => {
         const { startDate, endDate } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+        const revenueEligible = revenueEligibleOrder();
 
         const rows = await db.select({
             branchId: orders.branchId,
             branchName: branches.name,
             orderCount: sql<number>`count(*)`,
-            revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-            avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
+            revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
+            avgTicket: sql<number>`coalesce(avg(case when ${revenueEligible} then ${orders.total} end), 0)`,
             cancelCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
-            totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
+            totalDiscount: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.discount} else 0 end), 0)`,
         }).from(orders)
             .leftJoin(branches, eq(orders.branchId, branches.id))
             .where(and(gte(orders.createdAt, start), lte(orders.createdAt, end)))
             .groupBy(orders.branchId, branches.name)
-            .orderBy(sql`sum(${orders.total}) desc`);
+            .orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
 
         const topBranch = rows.length > 0 ? rows[0] : null;
         res.json({

@@ -215,7 +215,13 @@ export const getRefundsReport = async (req: Request, res: Response) => {
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const refunds = await db.select({
+            id: orders.id,
             orderNumber: orders.orderNumber,
+            orderType: orders.type,
+            businessDate: orders.businessDate,
+            createdAt: orders.createdAt,
+            customerName: orders.customerName,
+            customerPhone: orders.customerPhone,
             total: orders.total,
             cancelReason: orders.cancelReason,
             cancelledAt: orders.cancelledAt,

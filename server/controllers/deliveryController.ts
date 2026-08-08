@@ -25,11 +25,11 @@ const DRIVER_STATUSES = new Set(['AVAILABLE', 'BUSY', 'BREAK', 'OFFLINE', 'RETUR
 
 const ensureDeliveryTelemetryTables = async () => {
     await db.execute(sql`
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'driver_telemetry')
-        CREATE TABLE driver_telemetry (
-            id nvarchar(255) PRIMARY KEY,
-            driver_id nvarchar(max) NOT NULL,
-            branch_id nvarchar(max),
+        IF OBJECT_ID(N'dbo.driver_telemetry', N'U') IS NULL
+        CREATE TABLE dbo.driver_telemetry (
+            id int IDENTITY(1,1) PRIMARY KEY,
+            driver_id nvarchar(255) NOT NULL,
+            branch_id nvarchar(255),
             lat real NOT NULL,
             lng real NOT NULL,
             speed_kmh real,
@@ -38,22 +38,22 @@ const ensureDeliveryTelemetryTables = async () => {
             altitude real,
             battery_level int,
             is_charging bit,
-            order_id nvarchar(max),
+            order_id nvarchar(255),
             created_at datetime2 DEFAULT GETDATE()
         )
     `);
     await db.execute(sql`
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'driver_telemetry_latest')
-        CREATE TABLE driver_telemetry_latest (
-            driver_id nvarchar(max) PRIMARY KEY,
-            branch_id nvarchar(max),
+        IF OBJECT_ID(N'dbo.driver_telemetry_latest', N'U') IS NULL
+        CREATE TABLE dbo.driver_telemetry_latest (
+            driver_id nvarchar(255) PRIMARY KEY,
+            branch_id nvarchar(255),
             lat real NOT NULL,
             lng real NOT NULL,
             speed_kmh real,
             accuracy real,
             heading real,
             battery_level int,
-            order_id nvarchar(max),
+            order_id nvarchar(255),
             updated_at datetime2 DEFAULT GETDATE()
         )
     `);

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { inventoryStock, stockMovements, inventoryItems, warehouses, productionOrders, productionOrderItems } from '../../src/db/schema';
+import { inventoryStock, stockMovements, inventoryItems, warehouses, productionOrders, productionOrderItems, recipes, recipeIngredients } from '../../src/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import { postProductionCompletionEntry } from '../services/financePostingService';
 import { getStringParam } from '../utils/request';
@@ -44,7 +44,7 @@ export const getProductionOrders = async (req: Request, res: Response) => {
     try {
         await ensureProductionTables();
         const status = getStringParam(req.query.status);
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
         
         let query = db.select().from(productionOrders).orderBy(desc(productionOrders.createdAt));
         const ordersRows = await query;
@@ -55,6 +55,7 @@ export const getProductionOrders = async (req: Request, res: Response) => {
             return {
                 id: o.id,
                 targetItemId: o.targetItemId,
+                recipeId: o.recipeId || undefined,
                 quantityRequested: o.expectedYield,
                 quantityProduced: o.actualYield || 0,
                 warehouseId: o.warehouseId,
@@ -87,7 +88,8 @@ export const getProductionOrders = async (req: Request, res: Response) => {
 export const createProductionOrder = async (req: Request, res: Response) => {
     try {
         await ensureProductionTables();
-        const { targetItemId, quantityRequested, warehouseId, actorId } = req.body || {};
+        const { targetItemId, quantityRequested, warehouseId } = req.body || {};
+        const actorId = req.user?.id || 'system';
         if (!targetItemId || !warehouseId || !quantityRequested || Number(quantityRequested) <= 0) {
             return res.status(400).json({ error: 'targetItemId, warehouseId, and quantityRequested are required' });
         }
@@ -96,18 +98,39 @@ export const createProductionOrder = async (req: Request, res: Response) => {
         if (!item) return res.status(404).json({ error: 'Target item not found' });
         const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, warehouseId));
         if (!warehouse) return res.status(404).json({ error: 'Warehouse not found' });
+        if (req.effectiveBranchId && warehouse.branchId !== req.effectiveBranchId) {
+            return res.status(403).json({ error: 'BRANCH_MISMATCH' });
+        }
 
         const qty = Number(quantityRequested);
-        const bom = Array.isArray(item.bom) ? item.bom : [];
-        if (bom.length === 0) return res.status(400).json({ error: 'Target item has no BOM' });
+        const [linkedRecipe] = await db.select().from(recipes).where(eq(recipes.inventoryItemId, targetItemId));
+        const linkedIngredients = linkedRecipe
+            ? await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, linkedRecipe.id))
+            : [];
+        const embeddedBom = Array.isArray(item.bom) ? item.bom : [];
+        if (linkedIngredients.length === 0 && embeddedBom.length === 0) {
+            return res.status(400).json({ error: 'Target item has no recipe or BOM' });
+        }
 
         const poId = `PROD-${Date.now()}`;
+        const recipeScale = qty / Math.max(Number(linkedRecipe?.yield || 1), 0.000001);
+        const sourceIngredients = linkedIngredients.length > 0 ? linkedIngredients : embeddedBom;
+        const productionIngredients = sourceIngredients.map((ingredient: any) => ({
+            productionOrderId: poId,
+            inventoryItemId: ingredient.inventoryItemId || ingredient.itemId,
+            requiredQty: Number(ingredient.quantity || 0) * (linkedIngredients.length > 0 ? recipeScale : qty),
+            unit: ingredient.unit || 'unit'
+        })).filter((ingredient: any) => ingredient.inventoryItemId && ingredient.requiredQty > 0);
+        if (productionIngredients.length === 0) {
+            return res.status(400).json({ error: 'Recipe or BOM has no valid ingredient quantities' });
+        }
         
         await db.transaction(async (tx) => {
             await tx.insert(productionOrders).values({
                 id: poId,
                 branchId: warehouse.branchId || undefined,
                 targetItemId,
+                recipeId: linkedRecipe?.id,
                 batchNumber: `B-${Date.now()}`,
                 batchSize: 1, 
                 expectedYield: qty,
@@ -117,16 +140,7 @@ export const createProductionOrder = async (req: Request, res: Response) => {
                 createdAt: new Date(),
             });
 
-            const itemsToInsert = bom.map((b: any) => ({
-                productionOrderId: poId,
-                inventoryItemId: b.inventoryItemId || b.itemId,
-                requiredQty: Number(b.quantity || 0) * qty,
-                unit: b.unit || 'unit'
-            })).filter((i: any) => i.inventoryItemId && i.requiredQty > 0);
-
-            if (itemsToInsert.length > 0) {
-                await tx.insert(productionOrderItems).values(itemsToInsert);
-            }
+            await tx.insert(productionOrderItems).values(productionIngredients);
         });
 
         res.status(201).json({ id: poId, status: 'PENDING' });
@@ -140,10 +154,11 @@ export const startProductionOrder = async (req: Request, res: Response) => {
         await ensureProductionTables();
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'PRODUCTION_ORDER_ID_REQUIRED' });
-        const actorId = req.body?.actorId || 'system';
+        const actorId = req.user?.id || 'system';
 
         const [order] = await db.select().from(productionOrders).where(eq(productionOrders.id, id));
         if (!order) return res.status(404).json({ error: 'Production order not found' });
+        if (req.effectiveBranchId && order.branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         if (order.status !== 'PLANNED' && order.status !== 'PENDING') {
             return res.status(400).json({ error: 'Only pending orders can be started' });
         }
@@ -192,13 +207,14 @@ export const completeProductionOrder = async (req: Request, res: Response) => {
         await ensureProductionTables();
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'PRODUCTION_ORDER_ID_REQUIRED' });
-        const actorId = req.body?.actorId || 'system';
+        const actorId = req.user?.id || 'system';
         const quantityProducedInput = Number(req.body?.quantityProduced || 0);
         
         const actualIngredientsInput = Array.isArray(req.body?.actualIngredientsConsumed) ? req.body.actualIngredientsConsumed : null;
 
         const [order] = await db.select().from(productionOrders).where(eq(productionOrders.id, id));
         if (!order) return res.status(404).json({ error: 'Production order not found' });
+        if (req.effectiveBranchId && order.branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         if (order.status !== 'IN_PROGRESS') return res.status(400).json({ error: 'Only in progress orders can be completed' });
 
         const quantityProduced = quantityProducedInput > 0 ? quantityProducedInput : Number(order.expectedYield || 0);
@@ -328,10 +344,11 @@ export const cancelProductionOrder = async (req: Request, res: Response) => {
         await ensureProductionTables();
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'PRODUCTION_ORDER_ID_REQUIRED' });
-        const actorId = req.body?.actorId || 'system';
+        const actorId = req.user?.id || 'system';
         
         const [order] = await db.select().from(productionOrders).where(eq(productionOrders.id, id));
         if (!order) return res.status(404).json({ error: 'Production order not found' });
+        if (req.effectiveBranchId && order.branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         
         if (order.status === 'COMPLETED') return res.status(400).json({ error: 'Completed orders cannot be cancelled' });
 

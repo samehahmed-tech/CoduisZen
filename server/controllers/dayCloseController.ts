@@ -21,14 +21,15 @@ export const getDayCloseReport = async (req: Request, res: Response) => {
         const closedReport = await dayCloseService.getClosedReport(branchId, date);
         if (closedReport) return res.json(closedReport);
 
-        const [report, fiscalHealth, financeHealth, sideEffectHealth, readiness] = await Promise.all([
+        const [report, fiscalHealth, financeHealth, sideEffectHealth, readiness, shiftCashSummary] = await Promise.all([
             dayCloseService.generateReport(branchId, date),
             dayCloseService.getFiscalHealth(branchId, date),
             dayCloseService.getFinanceHealth(branchId, date),
             dayCloseService.getSideEffectHealth(branchId, date),
             dayCloseService.getCloseReadiness(branchId, date),
+            dayCloseService.getShiftCashSummary(branchId, date),
         ]);
-        res.json({ ...report, fiscalHealth, financeHealth, sideEffectHealth, readiness });
+        res.json({ ...report, fiscalHealth, financeHealth, sideEffectHealth, readiness, shiftCashSummary });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

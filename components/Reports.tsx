@@ -40,7 +40,7 @@ type QuickRange = {
 type PendingOutput = {
    categoryId: string;
    reportName: string;
-   mode: 'view' | 'print' | 'pdf';
+   mode: 'view' | 'print' | 'pdf' | 'xlsx';
 } | null;
 
 const QUICK_RANGES: QuickRange[] = [
@@ -125,6 +125,28 @@ const coerceExcelValue = (value: string) => {
    return normalized;
 };
 
+export const extractRenderedReportRows = (node: HTMLElement | null, emptyLabel: string) => {
+   if (!node) return { metadataRows: [] as string[][], tableRows: [[emptyLabel]] };
+
+   const tables = Array.from(node.querySelectorAll('table'));
+   const table = tables.sort((a, b) => b.rows.length - a.rows.length)[0];
+   if (table) {
+      const tableRows = Array.from(table.rows)
+         .map((row) => Array.from(row.cells).map((cell) => (cell.textContent || '').trim()))
+         .filter((row) => row.some(Boolean));
+      if (tableRows.length) return { metadataRows: [] as string[][], tableRows };
+   }
+
+   const lines = (node.innerText || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+   return {
+      metadataRows: [] as string[][],
+      tableRows: [[emptyLabel], ...lines.map((line) => [line])],
+   };
+};
+
 const Reports: React.FC = () => {
    const navigate = useNavigate();
    const state = useReportsState();
@@ -191,8 +213,7 @@ const Reports: React.FC = () => {
       () => visibleReportCategories.reduce((sum, category) => sum + category.subReports.length, 0),
       [visibleReportCategories]
    );
-   const canExportActiveTable = isTabularExportSupported(activeSubReport);
-
+   const canExportActiveCsv = isTabularExportSupported(activeSubReport);
    const catalogCategories = searchQuery ? filteredCategories : visibleReportCategories;
    const displayCategoryLabel = isArabic ? getReportDisplayLabel(activeCategoryData?.label || '') : (activeCategoryData?.label || '');
    const displaySubReportLabel = isArabic ? getReportDisplayLabel(activeSubReport) : activeSubReport;
@@ -254,13 +275,15 @@ const Reports: React.FC = () => {
          reportViewportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
          if (pendingOutput.mode === 'print' || pendingOutput.mode === 'pdf') {
             openPrintableReport(pendingOutput.mode);
+         } else if (pendingOutput.mode === 'xlsx') {
+            void exportXlsx(pendingOutput.reportName);
          }
          setPendingOutput(null);
       }, 250);
       return () => window.clearTimeout(timer);
    }, [activeCategory, activeSubReport, isLoadingReport, pendingOutput]);
 
-   const selectReport = (categoryId: string, reportName: string, mode: 'view' | 'print' | 'pdf' = 'view') => {
+   const selectReport = (categoryId: string, reportName: string, mode: 'view' | 'print' | 'pdf' | 'xlsx' = 'view') => {
       setReportError(null);
       setActiveCategory(categoryId);
       setActiveSubReport(reportName);
@@ -312,22 +335,31 @@ const Reports: React.FC = () => {
    };
 
    const exportXlsx = async (reportName = activeSubReport) => {
-      if (!isTabularExportSupported(reportName)) {
-         setReportError(isArabic ? 'تصدير Excel غير متاح لهذا التقرير. استخدم PDF أو الطباعة.' : 'Excel export is not available for this report. Use PDF or print.');
+      if (reportName !== activeSubReport) {
+         const category = visibleReportCategories.find((item) => item.subReports.includes(reportName));
+         if (category) selectReport(category.id, reportName, 'xlsx');
          return;
       }
       setIsExporting(true);
       setReportError(null);
       try {
-         const csvBlob = await reportsApi.exportCsv({
-            branchId: activeBranchId,
-            startDate: appliedRange.start,
-            endDate: appliedRange.end,
-            reportType: getExportReportType(reportName),
-         });
-         const csvText = await csvBlob.text();
-         const rows = parseCsvRows(csvText);
-         const { metadataRows, tableRows } = splitCsvMetadata(rows);
+         let metadataRows: string[][] = [];
+         let tableRows: string[][] = [];
+         if (isTabularExportSupported(reportName)) {
+            const csvBlob = await reportsApi.exportCsv({
+               branchId: activeBranchId,
+               startDate: appliedRange.start,
+               endDate: appliedRange.end,
+               reportType: getExportReportType(reportName),
+            });
+            const csvText = await csvBlob.text();
+            ({ metadataRows, tableRows } = splitCsvMetadata(parseCsvRows(csvText)));
+         } else {
+            ({ metadataRows, tableRows } = extractRenderedReportRows(
+               printableRootRef.current,
+               isArabic ? 'بيانات التقرير' : 'Report data'
+            ));
+         }
          const headers = tableRows[0] || [];
          const bodyRows = tableRows.slice(1);
          const ExcelJS = await import('exceljs');
@@ -475,7 +507,7 @@ const Reports: React.FC = () => {
                      </div>
 
                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting || !canExportActiveTable} className="inline-flex items-center justify-center gap-2 rounded-lg border border-success/25 bg-success/10 px-3 py-2.5 text-xs font-black text-success transition hover:bg-success/15 disabled:opacity-60" title={canExportActiveTable ? 'Excel' : (isArabic ? 'Excel غير متاح لهذا التقرير' : 'Excel unavailable for this report')}>
+                        <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting} className="inline-flex items-center justify-center gap-2 rounded-lg border border-success/25 bg-success/10 px-3 py-2.5 text-xs font-black text-success transition hover:bg-success/15 disabled:opacity-60" title="Excel">
                            <FileSpreadsheet size={16} />
                            Excel
                         </button>
@@ -483,7 +515,7 @@ const Reports: React.FC = () => {
                            <FileText size={16} />
                            PDF
                         </button>
-                        <button onClick={() => exportCsv(activeSubReport)} disabled={isExporting || !canExportActiveTable} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-app px-3 py-2.5 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title={canExportActiveTable ? 'CSV' : (isArabic ? 'CSV غير متاح لهذا التقرير' : 'CSV unavailable for this report')}>
+                        <button onClick={() => exportCsv(activeSubReport)} disabled={isExporting || !canExportActiveCsv} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-app px-3 py-2.5 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title={canExportActiveCsv ? 'CSV' : (isArabic ? 'CSV غير متاح لهذا التقرير' : 'CSV unavailable for this report')}>
                            <Download size={16} />
                            CSV
                         </button>
@@ -589,7 +621,7 @@ const Reports: React.FC = () => {
                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-xs font-black text-muted"><CheckCircle2 size={15} />{isArabic ? 'الإخراج' : 'Output'}</div>
                   <div className="mt-2 text-lg font-black text-main">View / Print / PDF / Excel</div>
-                  <p className="text-xs font-semibold text-muted">{isArabic ? 'عرض وطباعة لكل التقارير، وتصدير جدولي للتقارير المدعومة' : 'view/print for all reports, tabular export where supported'}</p>
+                     <p className="text-xs font-semibold text-muted">{isArabic ? 'عرض وطباعة وPDF وExcel لكل التقارير' : 'view, print, PDF and Excel for every report'}</p>
                </div>
             </section>
 
@@ -598,7 +630,7 @@ const Reports: React.FC = () => {
                   <div>
                      <h2 className="text-xl font-black text-main">{isArabic ? 'كتالوج التقارير المنظم' : 'Organized Report Catalog'}</h2>
                      <p className="mt-1 text-sm font-semibold leading-6 text-muted">
-                        {isArabic ? 'كل تقرير يمكن عرضه أو طباعته بنفس الفترة. Excel/CSV متاح للتقارير الجدولية المدعومة.' : 'Every report can be viewed or printed using the selected range. Excel/CSV is available for supported tabular reports.'}
+                        {isArabic ? 'كل تقرير يمكن عرضه وطباعته وتصديره PDF أو Excel بنفس الفترة والفرع.' : 'Every report can be viewed, printed, and exported to PDF or Excel using the selected range and branch.'}
                      </p>
                   </div>
                   <div className="flex items-center gap-2 rounded-lg border border-border bg-app px-3 py-2 text-xs font-bold text-muted">
@@ -624,12 +656,11 @@ const Reports: React.FC = () => {
                            <div className="grid gap-2">
                               {category.subReports.map((report) => {
                                   const isCurrent = category.id === activeCategory && report === activeSubReport;
-                                  const canExportTable = isTabularExportSupported(report);
                                   return (
                                     <div key={report} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-3 py-2.5 transition ${isCurrent ? 'border-primary/35 bg-primary/10' : 'border-border bg-card hover:bg-elevated/60'}`}>
                                        <button onClick={() => selectReport(category.id, report)} className="min-w-0 text-start">
                                           <span className={`block text-xs font-black leading-5 ${isCurrent ? 'text-primary' : 'text-main'}`}>{isArabic ? getReportDisplayLabel(report) : report}</span>
-                                          <span className="block text-[10px] font-bold text-muted">{getExportReportType(report)}{!canExportTable ? ` · ${isArabic ? 'PDF فقط' : 'PDF only'}` : ''}</span>
+                                          <span className="block text-[10px] font-bold text-muted">{getExportReportType(report)} · Excel · PDF</span>
                                        </button>
                                        <div className="flex items-center gap-1">
                                           <button onClick={() => selectReport(category.id, report)} className="rounded-md p-2 text-muted transition hover:bg-elevated hover:text-main" title={isArabic ? 'عرض' : 'View'}>
@@ -638,7 +669,7 @@ const Reports: React.FC = () => {
                                           <button onClick={() => selectReport(category.id, report, 'print')} className="rounded-md p-2 text-primary transition hover:bg-primary/10" title={isArabic ? 'طباعة' : 'Print'}>
                                              <Printer size={15} />
                                           </button>
-                                           <button onClick={() => exportXlsx(report)} disabled={isExporting || !canExportTable} className="rounded-md p-2 text-success transition hover:bg-success/10 disabled:opacity-50" title={canExportTable ? 'Excel' : (isArabic ? 'Excel غير متاح لهذا التقرير' : 'Excel unavailable for this report')}>
+                                          <button onClick={() => exportXlsx(report)} disabled={isExporting} className="rounded-md p-2 text-success transition hover:bg-success/10 disabled:opacity-50" title="Excel">
                                              <FileSpreadsheet size={15} />
                                           </button>
                                           <button onClick={() => exportPdf(report)} disabled={isExporting} className="rounded-md p-2 text-danger transition hover:bg-danger/10 disabled:opacity-50" title="PDF">
@@ -683,7 +714,7 @@ const Reports: React.FC = () => {
                         </p>
                      </div>
                      <div className="flex flex-wrap items-center gap-2">
-                        <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting || !canExportActiveTable} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title={canExportActiveTable ? 'Excel' : (isArabic ? 'Excel غير متاح لهذا التقرير' : 'Excel unavailable for this report')}>Excel</button>
+                        <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title="Excel">Excel</button>
                         <button onClick={() => exportPdf(activeSubReport)} disabled={isExporting} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60">PDF</button>
                         <button onClick={() => openPrintableReport('print')} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated">{isArabic ? 'طباعة' : 'Print'}</button>
                      </div>

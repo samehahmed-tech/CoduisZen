@@ -1,5 +1,5 @@
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { spawnSync, spawn } = require('child_process');
@@ -249,6 +249,12 @@ function runSchemaDoctor() {
   }
 }
 
+function resetTablesAfterUpgrade() {
+  const reset = run(path.join(root, 'runtime', 'node.exe'), [path.join(root, 'runtime', 'reset-tables.cjs'), `--install-dir=${root}`]);
+  if (reset.status !== 0) throw new Error(`Table reset failed: ${publicError(reset.stderr || reset.stdout)}`);
+  return String(reset.stdout || '').trim();
+}
+
 function repairSystem() {
   const state = JSON.parse(fs.readFileSync(path.join(root, 'install-state.json'), 'utf8'));
   const repairs = restoreCriticalFiles(state.role);
@@ -343,6 +349,7 @@ async function install() {
     const schema = runSchemaDoctor();
     if (schema.warning) throw new Error(schema.warning);
     if (schema.missingTables?.length) throw new Error(`جداول ناقصة: ${schema.missingTables.slice(0, 20).join(', ')}`);
+    resetTablesAfterUpgrade();
     if (databaseCreated) createVerifiedBackup();
     const recoveryUsers = run(path.join(root, 'runtime', 'node.exe'), [path.join(root, 'runtime', 'create-recovery-admin.cjs')]);
     if (recoveryUsers.status !== 0) throw new Error(`Recovery users setup failed: ${publicError(recoveryUsers.stderr || recoveryUsers.stdout)}`);

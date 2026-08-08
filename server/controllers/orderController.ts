@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons } from '../../src/db/schema';
+import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, menuItemModifiers, modifierOptions, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons } from '../../src/db/schema';
 import { eq, and, desc, gte, lte, inArray, gt, sql } from 'drizzle-orm';
 import { inventoryService } from '../services/inventoryService';
 import { getStringParam } from '../utils/request';
@@ -21,6 +21,7 @@ import { nanoid } from 'nanoid';
 import { parseSettingJson, toSettingValue } from '../utils/settingsStore.js';
 import { calculateCouponDiscount } from '../services/couponPricing';
 import { allocateDailyOrderNumber } from '../services/orderNumberService';
+import { isBelowTableMinimumSpend } from '../../src/utils/tableMinimumSpend';
 
 const ORDER_CREATE_SCOPE = 'ORDER_CREATE';
 const ORDER_STATUS_UPDATE_SCOPE = 'ORDER_STATUS_UPDATE';
@@ -709,6 +710,33 @@ export const createOrder = async (req: Request, res: Response) => {
             });
         }
 
+        const isPaymentAttempt = Array.isArray(bodyData.payments) && bodyData.payments.length > 0;
+        if (orderData.type === 'DINE_IN' && orderData.tableId && isPaymentAttempt) {
+            const [table] = await db.select({
+                id: tables.id,
+                branchId: tables.branchId,
+                name: tables.name,
+                minSpend: tables.minSpend,
+            }).from(tables).where(eq(tables.id, orderData.tableId)).top(1);
+            if (!table || table.branchId !== orderData.branchId) {
+                if (idempotencyKey) await clearIdempotencyClaim();
+                return res.status(400).json({ error: 'INVALID_TABLE_REFERENCE', code: 'INVALID_TABLE_REFERENCE' });
+            }
+            if (isBelowTableMinimumSpend(orderData.subtotal, table.minSpend)) {
+                if (idempotencyKey) await clearIdempotencyClaim();
+                return res.status(409).json({
+                    error: 'TABLE_MINIMUM_SPEND_NOT_MET',
+                    code: 'TABLE_MINIMUM_SPEND_NOT_MET',
+                    details: {
+                        tableId: table.id,
+                        tableName: table.name,
+                        minimumSpend: Number(table.minSpend || 0),
+                        subtotal: Number(orderData.subtotal || 0),
+                    },
+                });
+            }
+        }
+
         // Authorization: Call Center Agents can only assign orders to their allowed branches.
         if (String(req.user?.role).toUpperCase() === 'CALL_CENTER_AGENT') {
             const allowedBranches = Array.isArray(req.user?.allowedBranches)
@@ -882,7 +910,9 @@ const [customerRecordForOrder] = await db
                 .select({
                     id: menuItems.id,
                     price: menuItems.price,
+                    sizes: menuItems.sizes,
                     isTaxExempt: menuItems.isTaxExempt,
+                    modifierGroups: menuItems.modifierGroups,
                 })
                 .from(menuItems)
                 .where(inArray(menuItems.id, menuItemIds))
@@ -896,6 +926,31 @@ const [customerRecordForOrder] = await db
                 message: `Menu item not found: ${missingMenuItemIds.join(', ')}`,
                 missingItemIds: missingMenuItemIds,
             });
+        }
+        const linkedModifierRows = menuItemIds.length > 0
+            ? await db.select({
+                menuItemId: menuItemModifiers.menuItemId,
+                optionId: modifierOptions.id,
+                price: modifierOptions.price,
+            })
+                .from(menuItemModifiers)
+                .innerJoin(modifierOptions, eq(modifierOptions.groupId, menuItemModifiers.modifierGroupId))
+                .where(inArray(menuItemModifiers.menuItemId, menuItemIds))
+            : [];
+        const modifierPricesByItem = new Map<string, Map<string, number>>();
+        for (const item of dbMenuItems) {
+            const prices = new Map<string, number>();
+            for (const group of Array.isArray(item.modifierGroups) ? item.modifierGroups : []) {
+                for (const option of Array.isArray(group?.options) ? group.options : []) {
+                    if (option?.id) prices.set(String(option.id), Number(option.price || 0));
+                }
+            }
+            modifierPricesByItem.set(item.id, prices);
+        }
+        for (const row of linkedModifierRows) {
+            const prices = modifierPricesByItem.get(row.menuItemId) || new Map<string, number>();
+            prices.set(String(row.optionId), Number(row.price || 0));
+            modifierPricesByItem.set(row.menuItemId, prices);
         }
         const sourceKey = String(orderData.deliverySource || '').trim().toLowerCase();
 const [sourcePlatform] = sourceKey
@@ -937,19 +992,38 @@ const [sourcePlatform] = sourceKey
             const processedItems = items.map((item: any) => {
                 const menuItemId = resolveOrderItemMenuItemId(item);
                 const dbItem = menuLookup.get(menuItemId || '');
-                const basePrice = Number(dbItem?.price ?? item.price ?? 0);
+                const sizeId = String(item?.sizeId || item?.size_id || '').trim();
+                const configuredSize = sizeId && Array.isArray(dbItem?.sizes)
+                    ? dbItem.sizes.find((size: any) => String(size?.id || '').trim() === sizeId)
+                    : undefined;
+                if (sizeId && !configuredSize) {
+                    throw appError(400, 'INVALID_ITEM_SIZE', 'Selected size is not available for this menu item.');
+                }
+                const basePrice = Number(configuredSize?.price ?? dbItem?.price ?? item.price ?? 0);
                 const price = platformPriceConfig
                     ? Number((basePrice * (1 + Number(platformPriceConfig.priceMarkupPercentage || 0) / 100) + Number(platformPriceConfig.priceMarkupFixed || 0)).toFixed(2))
                     : basePrice;
                 const isExempt = dbItem?.isTaxExempt || false;
+                const selectedModifiers = Array.isArray(item.modifiers) ? item.modifiers : [];
+                const allowedModifierPrices = modifierPricesByItem.get(menuItemId || '') || new Map<string, number>();
+                let modifierTotal = 0;
+                const canonicalModifiers = selectedModifiers.map((modifier: any) => {
+                    const optionId = String(modifier?.id || modifier?.optionId || '').trim();
+                    if (!optionId || !allowedModifierPrices.has(optionId)) {
+                        throw appError(400, 'INVALID_MODIFIER_OPTION', 'Selected modifier is not available for this menu item.');
+                    }
+                    const modifierPrice = Number(allowedModifierPrices.get(optionId) || 0);
+                    modifierTotal += modifierPrice;
+                    return { ...modifier, id: optionId, price: modifierPrice };
+                });
 
-                const lineSubtotal = price * item.quantity;
+                const lineSubtotal = (price + modifierTotal) * item.quantity;
                 const lineTax = isExempt ? 0 : parseFloat((lineSubtotal * configuredTaxRate).toFixed(2));
 
                 calculatedSubtotal += lineSubtotal;
                 calculatedTax += lineTax;
 
-                return { ...item, price, tax: lineTax };
+                return { ...item, price, modifiers: canonicalModifiers, tax: lineTax };
             });
 
             const subtotal = calculatedSubtotal;
@@ -1242,7 +1316,7 @@ const [createdOrExistingCustomer] = await tx
             // Auto-release table when DINE_IN order is paid/completed
             if (paidNow && newOrder.type === 'DINE_IN' && newOrder.tableId) {
                 await tx.update(tables)
-                    .set({ status: 'AVAILABLE' })
+                    .set({ status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null, updatedAt: new Date() })
                     .where(eq(tables.id, newOrder.tableId));
             }
 
@@ -1282,7 +1356,7 @@ const [createdOrExistingCustomer] = await tx
                     orderId: savedOrder.id
                 });
                 if (paidNow && savedOrder.type === 'DINE_IN' && savedOrder.tableId) {
-                    emitBranchEvent(branchId, 'table:status', { id: savedOrder.tableId, status: 'AVAILABLE' });
+                    emitBranchEvent(branchId, 'table:status', { id: savedOrder.tableId, status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null });
                 }
             }
         } catch {
@@ -1298,10 +1372,15 @@ const [createdOrExistingCustomer] = await tx
         }
 
         // ================== KDS DISPATCHING LOGIC ==================
-        // Smart Dispatch Protocol:
-        // TAKEAWAY/DELIVERY fire automatically on payment (isPaid). DINE_IN requires a manual explicit "Send" action (not fired here unless forced).
-        const isPosOrder = String(savedOrder.source || '').toLowerCase() === 'pos';
-        if (paidNow && savedOrder.type !== 'DINE_IN' && !isPosOrder) {
+        // Dine-in must reach KDS before the create response so the POS follow-up
+        // dispatch is an idempotent confirmation, not a race that can lose the ticket.
+        const isPosOrder = String(orderData.source || '').toLowerCase() === 'pos';
+        if (['DINE_IN', 'KIOSK'].includes(String(savedOrder.type))) {
+            await kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch((error) => {
+                console.error('[Orders] KDS auto-dispatch failed', savedOrder.id, error);
+                inventoryWarnings.push({ code: 'KDS_DISPATCH_FAILED', orderId: savedOrder.id });
+            });
+        } else if (paidNow && !isPosOrder) {
             kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
         }
         // POS prints the cashier receipt through the client orchestrator so its
@@ -1458,7 +1537,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     };
 
     try {
-        const { status, changed_by, notes } = req.body;
+        const { status, changed_by, notes, approval_id } = req.body;
         const expectedUpdatedAtRaw = req.body?.expected_updated_at || req.body?.expectedUpdatedAt;
         const nextStatus = String(status || '').toUpperCase();
         const orderId = getStringParam((req.params as any).id);
@@ -1494,12 +1573,14 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             orderId,
             nextStatus,
             notes,
-            changedBy: changed_by,
+            changedBy: changed_by || req.user?.id,
             expectedUpdatedAt: expectedUpdatedAtRaw,
+            approvalId: approval_id,
             user: {
                 role: req.user?.role,
                 branchId: req.user?.branchId,
                 allowedBranches: req.user?.allowedBranches,
+                permissions: req.user?.permissions,
             },
         });
 

@@ -114,10 +114,10 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                     <div className="flex h-8 shrink-0 items-center overflow-hidden rounded-xl border border-border/10 bg-elevated/40 shadow-inner">
                         <button
                             onClick={(event) => { event.stopPropagation(); onUpdateQuantity(item.cartId, -1); }}
-                            className="flex h-full w-8 items-center justify-center text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500 active:scale-90"
+                            className="flex h-full min-w-[44px] items-center justify-center text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500 active:scale-90"
                             title="Decrease quantity"
                         >
-                            <Minus size={13} strokeWidth={2.5} />
+                            <Minus size={16} strokeWidth={2.5} />
                         </button>
 
                         {editing ? (
@@ -150,10 +150,10 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
 
                         <button
                             onClick={(event) => { event.stopPropagation(); onUpdateQuantity(item.cartId, 1); }}
-                            className="flex h-full w-8 items-center justify-center text-muted transition-colors hover:bg-primary/10 hover:text-primary active:scale-90"
+                            className="flex h-full min-w-[44px] items-center justify-center text-muted transition-colors hover:bg-primary/10 hover:text-primary active:scale-90"
                             title="Increase quantity"
                         >
-                            <Plus size={13} strokeWidth={2.5} />
+                            <Plus size={16} strokeWidth={2.5} />
                         </button>
                     </div>
 
@@ -161,7 +161,7 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         {onEditItemDiscount && (
                             <button
                                 onClick={(event) => { event.stopPropagation(); onEditItemDiscount(item.cartId); }}
-                                className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
+                                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
                                     item.itemDiscount && item.itemDiscount > 0
                                         ? 'bg-success/10 text-success hover:bg-success/20'
                                         : 'text-muted hover:bg-success/10 hover:text-success'
@@ -173,7 +173,7 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         )}
                         <button
                             onClick={(event) => { event.stopPropagation(); onEditNote(item.cartId, item.notes || ''); }}
-                            className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
+                            className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${
                                 item.notes
                                     ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
                                     : 'text-muted hover:bg-primary/10 hover:text-primary'
@@ -184,7 +184,7 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         </button>
                         <button
                             onClick={(event) => { event.stopPropagation(); onRemove(item.cartId); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                            className="flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500"
                             title="Remove item"
                         >
                             <Trash2 size={13} />

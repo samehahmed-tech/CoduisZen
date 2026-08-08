@@ -1,6 +1,11 @@
 import { apiRequest } from './core'; // Bust Vite HMR Cache
 
 export const kdsApi = {
+    getMeta: (branchId?: string) => {
+        const suffix = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
+        return apiRequest<{ stations: Array<{ name: string }>; source: string }>(`/kds/meta${suffix}`);
+    },
+
     getTickets: (params?: { station?: string; branchId?: string; includeServed?: boolean }) => {
         const query = new URLSearchParams();
         if (params?.station) query.set('station', params.station);

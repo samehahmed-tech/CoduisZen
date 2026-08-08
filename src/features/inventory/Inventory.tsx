@@ -19,6 +19,8 @@ import { reportsApi } from '@/services/api/reports';
 import { inventoryApi } from '@/services/api/inventory';
 import { socketService } from '@/services/socketService';
 import { prepareInventoryExcelRows } from '@/services/inventoryExcelRows';
+import { printStockCountSession } from '@/services/stockCountPrint';
+import { formatLocalDate } from '@/utils/formatters';
 
 // Modals
 import ItemModal from './components/ItemModal';
@@ -336,7 +338,7 @@ const Inventory: React.FC = () => {
     if (editingItem) {
       await updateInventoryItem(item.id, {
         ...item,
-        warehouseQuantities: editingItem.warehouseQuantities,
+        warehouseQuantities: item.warehouseQuantities,
       });
       for (const row of item.warehouseQuantities || []) {
         const previousQuantity = editingItem.warehouseQuantities.find(value => value.warehouseId === row.warehouseId)?.quantity || 0;
@@ -346,7 +348,17 @@ const Inventory: React.FC = () => {
         }
       }
     } else {
-      await addInventoryItem({ ...item, warehouseQuantities: [] });
+      try {
+        await addInventoryItem(item);
+      } catch {
+        showToast(
+          lang === 'ar'
+            ? 'تعذر إنشاء الصنف؛ لم يتم تسجيل أي رصيد افتتاحي.'
+            : 'Item creation failed; no opening stock was recorded.',
+          'error',
+        );
+        return;
+      }
       for (const row of item.warehouseQuantities || []) {
         if (Number(row.quantity) > 0) {
           await updateStock(item.id, row.warehouseId, Number(row.quantity), 'ADJUSTMENT', 'Opening stock');
@@ -360,11 +372,25 @@ const Inventory: React.FC = () => {
   const exportInventoryTemplate = async () => {
     try {
       const XLSX = await import('xlsx');
-      const rows = (warehouses.length ? warehouses : [{ id: '', name: '', nameAr: '' } as Warehouse]).map(warehouse => ({
-        code: '', name_en: '', name_ar: '', unit: 'COUNT', category: '', barcode: '',
-        purchase_price: 0, cost_price: 0, alert_threshold: 0,
-        warehouse_id: warehouse.id, warehouse_name: displayWarehouseName(warehouse), opening_quantity: 0,
-      }));
+      const rows = inventory.flatMap(item => {
+        const quantities = item.warehouseQuantities.length
+          ? item.warehouseQuantities
+          : [{ warehouseId: '', quantity: 0 }];
+        return quantities.map(stock => ({
+          code: item.sku || item.id,
+          name_en: item.name,
+          name_ar: item.nameAr || '',
+          unit: item.unit,
+          category: item.category || '',
+          barcode: item.barcode || '',
+          purchase_price: item.purchasePrice || 0,
+          cost_price: item.costPrice || 0,
+          alert_threshold: item.threshold || 0,
+          warehouse_id: stock.warehouseId,
+          warehouse_name: displayWarehouseName(warehouseById.get(stock.warehouseId)),
+          opening_quantity: Number(stock.quantity || 0),
+        }));
+      });
       const guide = [
         { column: 'code', required: 'Yes', description: 'Unique item code / كود الصنف الفريد' },
         { column: 'name_en', required: 'Yes', description: 'English name / الاسم بالإنجليزية' },
@@ -455,18 +481,56 @@ const Inventory: React.FC = () => {
     supplierId?: string;
     items: { itemId: string; quantity: number; costPrice?: number }[];
   }) => {
-    const supplier = data.supplierId ? suppliers.find(s => s.id === data.supplierId) : null;
-    for (const receiptItem of data.items) {
-      const item = inventory.find(i => i.id === receiptItem.itemId);
-      if (!item) continue;
-      const currentQty = item.warehouseQuantities.find(wq => wq.warehouseId === data.warehouseId)?.quantity || 0;
-      const newQty = currentQty + Number(receiptItem.quantity || 0);
-      const reason = supplier
-        ? `Direct supplier receipt from ${supplier.name}`
-        : 'Direct supplier receipt';
-      await updateStock(receiptItem.itemId, data.warehouseId, newQty, 'PURCHASE', reason);
-    }
+    await inventoryApi.receiveStock({
+      warehouse_id: data.warehouseId,
+      supplier_id: data.supplierId,
+      reference_id: `DIRECT-${crypto.randomUUID()}`,
+      actor_id: settings.currentUser?.id,
+      items: data.items.map(item => ({
+        item_id: item.itemId,
+        quantity: Number(item.quantity),
+        unit_cost: Number(item.costPrice),
+      })),
+    });
     await Promise.all([fetchInventory(), fetchTransferMovements(100)]);
+  };
+
+  const handleZeroInventory = async () => {
+    const branchId = settings.activeBranchId || branches[0]?.id;
+    if (!branchId) return;
+    const ok = await confirm({
+      title: lang === 'ar' ? 'تصفير كميات المخزون؟' : 'Zero stock quantities?',
+      message: lang === 'ar'
+        ? 'سيتم جعل كل كميات مخازن الفرع صفراً مع الاحتفاظ بالأصناف وتسجيل حركة ومراجعة للعملية.'
+        : 'All branch warehouse quantities will become zero. Items stay; movements and audit are recorded.',
+      confirmText: lang === 'ar' ? 'تصفير الكميات' : 'Zero quantities',
+      cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const result = await inventoryApi.zeroStock({ branchId });
+    await fetchInventory();
+    showToast(
+      lang === 'ar' ? `تم تصفير ${result.affectedRows} رصيد مخزني.` : `Zeroed ${result.affectedRows} stock balances.`,
+      'success',
+    );
+  };
+
+  const handleZeroCountInputs = async () => {
+    const ok = await confirm({
+      title: lang === 'ar' ? 'تصفير الجرد الحالي؟' : 'Zero current count?',
+      message: lang === 'ar'
+        ? 'سيتم وضع الكمية المعدودة بصفر لكل بنود الجلسة الحالية. لن يتغير المخزون قبل اعتماد الجرد.'
+        : 'Every counted quantity becomes zero. Stock changes only after posting the count.',
+      confirmText: lang === 'ar' ? 'تصفير الجرد' : 'Zero count',
+      cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setCountSession((current: any) => ({
+      ...current,
+      items: (current?.items || []).map((item: any) => ({ ...item, countedQty: 0 })),
+    }));
   };
 
   const renderStockCount = () => (
@@ -484,13 +548,21 @@ const Inventory: React.FC = () => {
               {lang === 'ar' ? 'اختر المخزن للبدء في مراجعة الكميات الفعلية ومقارنتها بالنظام.' : 'Select a target warehouse to begin cross-referencing physical stock with system records.'}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] items-center justify-center gap-4 max-w-4xl mx-auto">
             <input
               type="date"
               value={selectedCountDate}
               onChange={(e) => setSelectedCountDate(e.target.value)}
               className="w-full px-6 py-4 bg-card/60  border border-border/30 rounded-2xl text-main font-black text-xs uppercase tracking-widest outline-none focus:border-violet-500/50 shadow-sm"
             />
+            <select
+              value={selectedCountType}
+              onChange={(e) => setSelectedCountType(e.target.value as 'DAILY' | 'MONTHLY')}
+              className="w-full px-6 py-4 bg-card/60 border border-border/30 rounded-2xl text-main font-black text-xs uppercase tracking-widest outline-none focus:border-violet-500/50 appearance-none shadow-sm"
+            >
+              <option value="DAILY">{lang === 'ar' ? 'جرد يومي' : 'Daily count'}</option>
+              <option value="MONTHLY">{lang === 'ar' ? 'جرد شهري' : 'Monthly count'}</option>
+            </select>
             <select
               value={selectedCountWarehouse}
               onChange={(e) => setSelectedCountWarehouse(e.target.value)}
@@ -502,7 +574,7 @@ const Inventory: React.FC = () => {
             <button
               onClick={handleStartCount}
               disabled={!selectedCountWarehouse || countLoading}
-              className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-violet-600/25 hover:opacity-90 disabled:opacity-40 transition-all active:scale-95 border-b-4 border-violet-800/40"
+              className="w-full px-10 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-violet-600/25 hover:opacity-90 disabled:opacity-40 transition-all active:scale-95 border-b-4 border-violet-800/40"
             >
               {countLoading ? '...' : (lang === 'ar' ? 'بدء الجرد' : 'START AUDIT')}
             </button>
@@ -519,20 +591,38 @@ const Inventory: React.FC = () => {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {countHistory.map((count) => (
-                  <button
+                  <div
                     key={count.id}
-                    type="button"
                     onClick={() => handleOpenCount(count.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') handleOpenCount(count.id);
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className="rounded-2xl border border-border/30 bg-card/60 p-4 text-left hover:border-violet-400/50 hover:bg-violet-500/5 transition-all"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-black text-main">{count.warehouseName || count.warehouseId}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted">{count.id} / {count.status}</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted">{count.id} / {count.type} / {count.status}</p>
                       </div>
-                      <span className="rounded-full bg-violet-100 px-3 py-1 text-[10px] font-black text-violet-700">
-                        {count.summary?.varianceLines || 0} {lang === 'ar' ? 'فرق' : 'variance'}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-violet-100 px-3 py-1 text-[10px] font-black text-violet-700">
+                          {count.summary?.varianceLines || 0} {lang === 'ar' ? 'فرق' : 'variance'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handlePrintCount(count.id);
+                          }}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/30 bg-card text-violet-600 hover:bg-violet-500 hover:text-white"
+                          title={lang === 'ar' ? 'طباعة جلسة الجرد' : 'Print stock count'}
+                          aria-label={lang === 'ar' ? 'طباعة جلسة الجرد' : 'Print stock count'}
+                        >
+                          <Printer size={16} />
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] font-black">
                       <div className="rounded-xl bg-elevated/60 p-2">
@@ -548,7 +638,7 @@ const Inventory: React.FC = () => {
                         <p>{Number(count.summary?.overQty || 0).toLocaleString()}</p>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -569,13 +659,28 @@ const Inventory: React.FC = () => {
                 Audit Session: {countSession.id?.slice(0, 8)} / {countSession.items?.length || 0} Assets
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => void handleZeroCountInputs()}
+                disabled={countLoading}
+                className="flex items-center gap-2 px-5 py-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all active:scale-95"
+              >
+                {lang === 'ar' ? 'تصفير الجرد' : 'ZERO COUNT'}
+              </button>
+              <button
+                onClick={() => void handlePrintCount()}
+                disabled={countLoading}
+                className="flex items-center gap-2 px-5 py-3.5 bg-card border border-border/30 rounded-xl text-violet-600 font-black text-[10px] uppercase tracking-widest hover:bg-violet-500 hover:text-white transition-all active:scale-95"
+              >
+                <Printer size={15} />
+                {lang === 'ar' ? 'طباعة الجرد' : 'PRINT COUNT'}
+              </button>
               <button
                 onClick={() => handleCompleteCount(false)}
                 disabled={countLoading}
-                className="px-6 py-3.5 bg-card border border-border/30 rounded-xl text-muted font-black text-[10px] uppercase tracking-widest hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 transition-all active:scale-95"
+                className="px-6 py-3.5 bg-card border border-border/30 rounded-xl text-muted font-black text-[10px] uppercase tracking-widest hover:bg-violet-500/10 hover:text-violet-500 hover:border-violet-500/30 transition-all active:scale-95"
               >
-                {lang === 'ar' ? 'إلغاء' : 'CANCEL'}
+                {lang === 'ar' ? 'حفظ كمسودة' : 'SAVE DRAFT'}
               </button>
               <button
                 onClick={() => handleCompleteCount(true)}
@@ -754,6 +859,7 @@ const Inventory: React.FC = () => {
   const [countLoading, setCountLoading] = useState(false);
   const [selectedCountWarehouse, setSelectedCountWarehouse] = useState('');
   const [selectedCountDate, setSelectedCountDate] = useState(dateOnly());
+  const [selectedCountType, setSelectedCountType] = useState<'DAILY' | 'MONTHLY'>('DAILY');
   const [countHistory, setCountHistory] = useState<any[]>([]);
   const [countError, setCountError] = useState<string | null>(null);
   const activeCountWarehouseName = useMemo(
@@ -797,8 +903,10 @@ const Inventory: React.FC = () => {
         branchId,
         warehouseId: selectedCountWarehouse,
         countDate: selectedCountDate,
-        type: 'DAILY',
-        remarks: lang === 'ar' ? 'جرد يومي' : 'Daily count',
+        type: selectedCountType,
+        remarks: selectedCountType === 'MONTHLY'
+          ? (lang === 'ar' ? 'جرد شهري' : 'Monthly count')
+          : (lang === 'ar' ? 'جرد يومي' : 'Daily count'),
         userId: settings.currentUser?.id,
       });
       const frozenSession = await inventoryApi.freezeStockCount(sessionResponse.id);
@@ -817,11 +925,32 @@ const Inventory: React.FC = () => {
       const count = await inventoryApi.getStockCount(id);
       setCountSession(count);
       if (count.warehouseId) setSelectedCountWarehouse(count.warehouseId);
-      if (count.countDate) setSelectedCountDate(count.countDate);
+      if (count.countDate) setSelectedCountDate(String(count.countDate).split('T')[0]);
+      if (count.type === 'DAILY' || count.type === 'MONTHLY') setSelectedCountType(count.type);
     } catch (e: any) {
       setCountError(e?.message || (lang === 'ar' ? 'تعذر فتح جلسة الجرد' : 'Failed to open stock count'));
     }
     setCountLoading(false);
+  };
+
+  const handlePrintCount = async (id?: string) => {
+    setCountLoading(true);
+    try {
+      setCountError(null);
+      const count = id && countSession?.id !== id
+        ? await inventoryApi.getStockCount(id)
+        : countSession;
+      if (!count) return;
+      printStockCountSession(count, {
+        lang,
+        restaurantName: settings.restaurantName,
+        currencySymbol: settings.currencySymbol,
+      });
+    } catch (e: any) {
+      setCountError(e?.message || (lang === 'ar' ? 'تعذرت طباعة جلسة الجرد' : 'Failed to print stock count'));
+    } finally {
+      setCountLoading(false);
+    }
   };
 
   const handleUpdateCountItem = (itemId: string, field: string, value: any) => {
@@ -836,13 +965,36 @@ const Inventory: React.FC = () => {
     if (!countSession) return;
     setCountLoading(true);
     try {
+      const counts = countSession.items
+        .filter((it: any) => (
+          (it.countedQty !== null && it.countedQty !== undefined)
+          || String(it.notes || '').trim()
+        ))
+        .map((it: any) => ({
+          itemId: it.itemId,
+          countedQty: it.countedQty === null || it.countedQty === undefined ? null : Number(it.countedQty),
+          notes: it.notes || '',
+        }));
       if (!apply) {
-          setCountSession(null); // Cancel
+          await inventoryApi.submitCount(countSession.id, counts, { finalize: false });
+          setCountSession(null);
+          await loadCountHistory();
+          showToast(lang === 'ar' ? 'تم حفظ مسودة الجرد.' : 'Stock count draft saved.', 'success');
       } else {
-        const counts = countSession.items
-          .filter((it: any) => it.countedQty !== null)
-          .map((it: any) => ({ itemId: it.itemId, countedQty: Number(it.countedQty), notes: it.notes || '' }));
-        await inventoryApi.submitCount(countSession.id, counts);
+        const incompleteCount = countSession.items.some(
+          (it: any) => it.countedQty === null || it.countedQty === undefined
+        );
+        if (incompleteCount) {
+          throw new Error(
+            lang === 'ar'
+              ? 'لا يمكن اعتماد الجرد قبل إدخال الكمية الفعلية لكل الأصناف.'
+              : 'Enter the physical quantity for every item before posting the count.'
+          );
+        }
+        await inventoryApi.submitCount(
+          countSession.id,
+          counts.filter((it: any) => it.countedQty !== null),
+        );
         await inventoryApi.postStockCount(countSession.id);
         setCountSession(null);
         await Promise.all([fetchInventory(), loadCountHistory()]);
@@ -858,9 +1010,9 @@ const Inventory: React.FC = () => {
   const [movementLoading, setMovementLoading] = useState(false);
   const [movementDateFrom, setMovementDateFrom] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
+    return formatLocalDate(d);
   });
-  const [movementDateTo, setMovementDateTo] = useState(() => new Date().toISOString().split('T')[0]);
+  const [movementDateTo, setMovementDateTo] = useState(() => formatLocalDate(new Date()));
 
   const loadMovements = async () => {
     setMovementLoading(true);
@@ -877,9 +1029,9 @@ const Inventory: React.FC = () => {
   const [consumptionLoading, setConsumptionLoading] = useState(false);
   const [consumptionDateFrom, setConsumptionDateFrom] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
+    return formatLocalDate(d);
   });
-  const [consumptionDateTo, setConsumptionDateTo] = useState(() => new Date().toISOString().split('T')[0]);
+  const [consumptionDateTo, setConsumptionDateTo] = useState(() => formatLocalDate(new Date()));
 
   const consumptionReportRows = useMemo(() => consumptionRows.map((row) => {
     const item = inventoryById.get(row.itemId);
@@ -1719,6 +1871,9 @@ const Inventory: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => void handleZeroInventory()} className="h-14 flex items-center justify-center gap-2 bg-rose-500/10 text-rose-500 px-5 rounded-2xl border border-rose-500/20 font-black text-[10px] uppercase tracking-widest">
+              <AlertTriangle size={17} /> {lang === 'ar' ? 'تصفير المخزون' : 'Zero stock'}
+            </button>
             <button type="button" onClick={exportInventoryTemplate} className="h-14 flex items-center justify-center gap-2 bg-card/60 text-emerald-500 px-5 rounded-2xl border border-border/30 font-black text-[10px] uppercase tracking-widest">
               <Download size={17} /> {lang === 'ar' ? 'قالب إكسل' : 'Excel template'}
             </button>

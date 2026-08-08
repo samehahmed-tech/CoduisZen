@@ -696,7 +696,7 @@ const CallCenter: React.FC = () => {
         w.document.write(`
             <html dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
             <head><title>${lang === 'ar' ? 'تقرير عميل' : 'Customer Report'}</title>
-            <style>body{font-family:'Tajawal',system-ui,sans-serif;padding:20px;max-width:360px;margin:0 auto}
+            <style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');body{font-family:'Cairo',system-ui,sans-serif;padding:20px;max-width:360px;margin:0 auto}
             h2{font-family:'Cairo',system-ui,sans-serif;border-bottom:2px solid #333;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin-top:8px}
             td{padding:4px 0;font-size:13px}td:last-child{font-family:'Cairo',system-ui,sans-serif;text-align:right;font-weight:bold}
             .section{margin:16px 0;padding:12px;background:#f5f5f5;border-radius:8px}

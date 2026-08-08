@@ -1,10 +1,16 @@
-import { Router, Request, Response } from 'express';
+import { NextFunction, Router, Request, Response } from 'express';
 import attendanceOpsService from '../services/attendanceOpsService';
+import { scopeBranchQuery } from '../middleware/branchIsolation';
 import { generateHrAttendancePDF } from '../services/pdfService';
 import { generateHrAttendanceXlsx, streamHrAttendanceXlsx } from '../services/hrReportExportService';
 import zktecoConnectorService, { DeviceSyncOptions } from '../services/zktecoConnectorService';
 
 const router = Router();
+
+router.use((req: Request, res: Response, next: NextFunction) => {
+    if (['SUPER_ADMIN', 'OWNER'].includes(String(req.user?.role || '').toUpperCase())) return next();
+    return scopeBranchQuery(req, res, next);
+});
 
 const parseDateInput = (value: unknown) => {
     if (!value) return undefined;
@@ -856,18 +862,4 @@ router.post('/devices/:id/set-time', async (req: Request, res: Response) => {
 });
 
 // ─── Attendance Sessions ────────────────────────────────────────────────
-router.get('/sessions', async (req: Request, res: Response) => {
-    try {
-        const branchId = req.query.branchId as string | undefined;
-        const status = req.query.status as string | undefined;
-        const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
-        const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
-        const employeeId = req.query.employeeId ? String(req.query.employeeId) : undefined;
-        const sessions = await attendanceOpsService.listSessions(branchId, status, startDate, endDate, employeeId);
-        res.json(sessions);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
 export default router;

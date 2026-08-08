@@ -5,7 +5,7 @@ import { Order, OrderStatus, OrderType } from '../types';
 import { useOrderStore } from '../stores/useOrderStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { formatDisplayId } from '../src/utils/idGenerator';
-import { apiRequestBlob } from '../services/api/core';
+import { apiRequestBlob, getActionableErrorMessage } from '../services/api/core';
 import { kdsApi } from '../services/api/kds';
 import LiveClock from './common/LiveClock';
 import { socketService } from '../services/socketService';
@@ -294,8 +294,8 @@ export const PickupScreen: React.FC = () => {
       clearQuickEntry(setQuickInput, quickInputValueRef);
       await refreshPickupOrders();
       success(isAr ? 'تم تسليم الطلب' : 'Order handed over');
-    } catch {
-      error(isAr ? 'تعذر تسليم الطلب. حاول مرة أخرى.' : 'Handover failed. Please try again.');
+    } catch (handoverError) {
+      error(getActionableErrorMessage(handoverError, isAr ? 'ar' : 'en'));
     } finally {
       setPendingHandoverIds(prev => {
         const next = new Set(prev);
@@ -366,13 +366,13 @@ export const PickupScreen: React.FC = () => {
     <div className="flex flex-col h-screen w-full bg-app text-main font-sans overflow-hidden">
       <div className="shrink-0 h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-indigo-500 shadow-lg shadow-emerald-500/20" />
 
-      <header className="shrink-0 flex items-center justify-between gap-4 px-6 py-4 bg-card/60 backdrop-blur-2xl border-b border-border/20 z-10 shadow-sm relative">
-        <div className="flex items-center gap-5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/20">
+      <header className="shrink-0 flex flex-col items-stretch justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:flex-row lg:items-center lg:gap-4 bg-card/60 backdrop-blur-2xl border-b border-border/20 z-10 shadow-sm relative">
+        <div className="flex items-center gap-3 sm:gap-5">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/20">
             <Package size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-black uppercase tracking-widest text-main">
+            <h1 className="text-xl sm:text-2xl font-black uppercase tracking-widest text-main">
               {isAr ? 'شاشة التسليم' : 'Expediter Pickup'}
             </h1>
             <p className="text-xs font-bold text-muted uppercase tracking-[0.2em] mt-0.5">
@@ -385,8 +385,8 @@ export const PickupScreen: React.FC = () => {
           <LiveClock />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:flex-nowrap">
+          <div className="relative min-w-[180px] flex-1 lg:flex-none">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               value={quickInput}
@@ -406,7 +406,7 @@ export const PickupScreen: React.FC = () => {
                 }
               }}
               placeholder={isAr ? 'رقم الأوردر ثم Enter' : 'Order # then Enter'}
-              className="h-12 w-56 rounded-2xl border border-border/30 bg-elevated/60 pl-10 pr-4 text-sm font-black text-main outline-none transition focus:border-emerald-500/60"
+              className="h-12 w-full rounded-2xl border border-border/30 bg-elevated/60 pl-10 pr-4 text-sm font-black text-main outline-none transition focus:border-emerald-500/60 lg:w-56"
               style={{ borderColor: matchedOrder ? 'rgba(16,185,129,0.65)' : undefined }}
             />
           </div>
@@ -448,7 +448,7 @@ export const PickupScreen: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden p-6 gap-6 relative z-0">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-6 gap-6 relative z-0">
         <AnimatePresence>
           {quickInput && (
             <motion.div
@@ -538,7 +538,7 @@ export const PickupScreen: React.FC = () => {
         </section>
 
         {preparingOrders.length > 0 && (
-          <section className="w-[400px] xl:w-[450px] shrink-0 flex flex-col bg-card/60 backdrop-blur-xl rounded-[2rem] border border-amber-500/20 shadow-2xl overflow-hidden relative">
+          <section className="w-full lg:w-[340px] xl:w-[450px] shrink-0 flex flex-col bg-card/60 backdrop-blur-xl rounded-[2rem] border border-amber-500/20 shadow-2xl overflow-hidden relative">
             <div className="px-6 py-4 border-b border-amber-500/10 bg-amber-500/10 flex items-center justify-between">
               <h2 className="text-sm font-black uppercase tracking-widest text-amber-600 flex items-center gap-2">
                 <Clock size={16} />

@@ -36,9 +36,10 @@ export const aiApi = {
         }),
     getKeyConfig: () =>
         apiRequest<{
-            provider: 'OPENROUTER' | 'OLLAMA';
-            providerOptions: Array<{ id: 'OPENROUTER' | 'OLLAMA'; label: string }>;
+            provider: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ';
+            providerOptions: Array<{ id: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ'; label: string }>;
             ollama: { enabled: boolean; baseUrl: string; model: string; modelDefault: string };
+            groq?: { model: string; modelDefault: string; usingDefaultAvailable: boolean };
             source: 'DEFAULT' | 'CUSTOM';
             hasCustomKey: boolean;
             maskedCustomKey: string | null;
@@ -46,12 +47,17 @@ export const aiApi = {
             model: string;
             defaultModel: string;
             availableModels: Array<{ id: string; label: string; provider: string }>;
+            availableGroqModels?: Array<{ id: string; label: string; provider: string }>;
+            defaultGroqModel?: string;
+            hasCustomGroqKey?: boolean;
+            maskedCustomGroqKey?: string | null;
         }>('/ai/key-config'),
-    updateKeyConfig: (data: { source: 'DEFAULT' | 'CUSTOM'; customKey?: string; model?: string; provider?: 'OPENROUTER' | 'OLLAMA'; ollamaModel?: string }) =>
+    updateKeyConfig: (data: { source: 'DEFAULT' | 'CUSTOM'; customKey?: string; model?: string; provider?: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ'; ollamaModel?: string; groqModel?: string }) =>
         apiRequest<{
-            provider: 'OPENROUTER' | 'OLLAMA';
-            providerOptions: Array<{ id: 'OPENROUTER' | 'OLLAMA'; label: string }>;
+            provider: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ';
+            providerOptions: Array<{ id: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ'; label: string }>;
             ollama: { enabled: boolean; baseUrl: string; model: string; modelDefault: string };
+            groq?: { model: string; modelDefault: string; usingDefaultAvailable: boolean };
             source: 'DEFAULT' | 'CUSTOM';
             hasCustomKey: boolean;
             maskedCustomKey: string | null;
@@ -59,6 +65,10 @@ export const aiApi = {
             model: string;
             defaultModel: string;
             availableModels: Array<{ id: string; label: string; provider: string }>;
+            availableGroqModels?: Array<{ id: string; label: string; provider: string }>;
+            defaultGroqModel?: string;
+            hasCustomGroqKey?: boolean;
+            maskedCustomGroqKey?: string | null;
         }>('/ai/key-config', {
             method: 'PUT',
             body: JSON.stringify(data),

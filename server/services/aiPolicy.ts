@@ -12,6 +12,8 @@ export const AI_ACTION_SPECS: Record<string, ActionSpec> = {
     UPDATE_MENU_PRICE: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
     CREATE_MENU_ITEM: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
     CREATE_MENU_CATEGORY: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
+    DELETE_MENU_ITEM: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
+    DELETE_MENU_CATEGORY: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
     UPDATE_MENU_CATEGORY: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
     CREATE_CUSTOMER: { permission: 'NAV_CRM', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
     CREATE_USER: { permission: 'CFG_MANAGE_USERS', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },

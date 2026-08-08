@@ -28,7 +28,6 @@
 @theme {
   --font-sans: "Tajawal", system-ui, sans-serif;
   --font-display: "Cairo", system-ui, sans-serif;
-
   /* Theme-aware colors mapped from variables */
   --color-primary: rgb(var(--primary));
   --color-primary-hover: rgb(var(--primary-hover));
@@ -319,4 +318,84 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   body { background: white !important; color: black !important; }
   .no-print, nav, aside, .sidebar { display: none !important; }
   .card-primary { box-shadow: none !important; border: 1px solid #e2e8f0 !important; break-inside: avoid; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   M0 Design System Utilities — additive layer
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * `.touch-target` — enforces WCAG 2.5.5 minimum 44px hit area on
+ * actionable controls. Applied via class rather than per-button
+ * resize so existing visual sizing can remain unchanged; the hit
+ * area extends to the padding box.
+ *
+ * Use on icon-only buttons, stepper +/- controls, numpad keys, etc.
+ * var(--touch-target-min) defaults to 44px; var(--touch-target-cozy)
+ * to 48px (apply via `.touch-target-cozy`).
+ */
+.touch-target {
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+}
+.touch-target-cozy {
+    min-width: var(--touch-target-cozy);
+    min-height: var(--touch-target-cozy);
+}
+
+/**
+ * `.pressable` — touch-behavior hardening for steppers, item cards,
+ * and any control whose text or +/- buttons can be long-pressed.
+ *
+ * `touch-action: manipulation` prevents double-tap-zoom on iOS Safari.
+ * `user-select: none` prevents accidental text selection on long press.
+ */
+.pressable {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+/**
+ * `.responsive-table` — canonical wrapper for any table that may
+ * overflow on phones/tablets. Replaces per-module bespoke `div
+ * overflow-x-auto` wrappers and guarantees `-webkit-overflow-scrolling`
+ * momentum scroll on iOS.
+ *
+ * Wrap like:
+ *   <div className="responsive-table"><table>…</table></div>
+ */
+.responsive-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--primary), 0.18) transparent;
+}
+.responsive-table table {
+    border-spacing: 0;
+}
+[dir='rtl'] .responsive-table th,
+[dir='rtl'] .responsive-table td {
+    text-align: start;
+}
+[dir='rtl'] .responsive-table .text-center {
+    text-align: center;
+}
+[dir='rtl'] .responsive-table .text-end,
+[dir='rtl'] .responsive-table .text-right {
+    text-align: end;
+}
+.responsive-table::-webkit-scrollbar {
+    height: 6px;
+}
+.responsive-table::-webkit-scrollbar-track {
+    background: transparent;
+}
+.responsive-table::-webkit-scrollbar-thumb {
+    background: rgba(var(--primary), 0.18);
+    border-radius: 99px;
+}
+.responsive-table::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--primary), 0.3);
 }

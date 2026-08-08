@@ -182,6 +182,9 @@ export const refundService = {
         if (data.branchId && order.branchId !== data.branchId) {
             throw new Error('FORBIDDEN_BRANCH_ACCESS');
         }
+        if (!['DELIVERED', 'COMPLETED'].includes(String(order.status))) {
+            throw new Error('ONLY_SETTLED_ORDERS_CAN_BE_REFUNDED');
+        }
 
         // Check refund window
         const orderDate = new Date(order.createdAt!);
@@ -192,11 +195,10 @@ export const refundService = {
 
         // Check for existing refund
         const existingRefunds = await readSetting<RefundRequest[]>(REFUND_KEY, []);
-        const existingActive = existingRefunds.find(r =>
-            r.orderId === data.orderId &&
-            (r.status === 'PENDING' || r.status === 'REQUESTED' || r.status === 'APPROVED' || r.status === 'PROCESSED')
-        );
-        if (existingActive && data.type === 'FULL') {
+        const countedStatuses = new Set<RefundStatus>(['PENDING', 'REQUESTED', 'APPROVED', 'PROCESSED']);
+        const countedRefunds = existingRefunds.filter(r => r.orderId === data.orderId && countedStatuses.has(r.status));
+        const alreadyRefundedAmount = countedRefunds.reduce((sum, refund) => sum + Number(refund.refundAmount || 0), 0);
+        if (data.type === 'FULL' && countedRefunds.length > 0) {
             throw new Error('An active refund already exists for this order');
         }
 
@@ -207,6 +209,7 @@ export const refundService = {
         if (data.type === 'FULL') {
             refundAmount = Number(order.total || 0);
         } else if (data.type === 'PARTIAL' && data.customAmount) {
+            if (!policy.allowPartialRefund) throw new Error('Partial refunds are not enabled');
             refundAmount = data.customAmount;
             if (refundAmount > Number(order.total || 0)) {
                 throw new Error('Refund amount exceeds order total');
@@ -220,7 +223,13 @@ export const refundService = {
             for (const item of data.items) {
                 const orderItem = orderItemsList.find(oi => oi.id === item.orderItemId);
                 if (!orderItem) throw new Error(`Order item ${item.orderItemId} not found`);
-                if (item.quantity > orderItem.quantity) throw new Error(`Refund quantity exceeds ordered quantity for ${orderItem.name}`);
+                const alreadyRefundedQuantity = countedRefunds
+                    .flatMap(refund => refund.items || [])
+                    .filter(refundItem => refundItem.orderItemId === item.orderItemId)
+                    .reduce((sum, refundItem) => sum + refundItem.quantity, 0);
+                if (item.quantity + alreadyRefundedQuantity > orderItem.quantity) {
+                    throw new Error(`Refund quantity exceeds ordered quantity for ${orderItem.name}`);
+                }
 
                 const itemRefundAmount = Number(orderItem.price || 0) * item.quantity;
                 refundAmount += itemRefundAmount;
@@ -237,9 +246,12 @@ export const refundService = {
         } else {
             throw new Error('Invalid refund type or missing data');
         }
+        if (alreadyRefundedAmount + refundAmount > Number(order.total || 0)) {
+            throw new Error('Cumulative refund amount exceeds order total');
+        }
 
         // Determine if auto-approved (below threshold)
-        const needsApproval = refundAmount > policy.maxRefundWithoutApproval;
+        const needsApproval = policy.requireManagerPin || refundAmount > policy.maxRefundWithoutApproval;
 
         const refund: RefundRequest = {
             id: `REF-${Date.now()}`,

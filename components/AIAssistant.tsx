@@ -13,6 +13,7 @@ import {
   Truck,
   User,
   X,
+  Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewState } from '../types';
@@ -49,6 +50,8 @@ const VALID_ACTION_TYPES = new Set([
   'UPDATE_MENU_PRICE',
   'CREATE_MENU_ITEM',
   'CREATE_MENU_CATEGORY',
+  'DELETE_MENU_ITEM',
+  'DELETE_MENU_CATEGORY',
   'UPDATE_MENU_CATEGORY',
   'CREATE_CUSTOMER',
   'CREATE_USER',
@@ -67,6 +70,10 @@ const normalizeActionType = (raw: any) => {
     CREATE_ITEM: 'CREATE_MENU_ITEM',
     ADD_CATEGORY: 'CREATE_MENU_CATEGORY',
     CREATE_CATEGORY: 'CREATE_MENU_CATEGORY',
+    DELETE_ITEM: 'DELETE_MENU_ITEM',
+    REMOVE_ITEM: 'DELETE_MENU_ITEM',
+    DELETE_CATEGORY: 'DELETE_MENU_CATEGORY',
+    REMOVE_CATEGORY: 'DELETE_MENU_CATEGORY',
     UPDATE_CATEGORY: 'UPDATE_MENU_CATEGORY',
     EDIT_MENU_ITEM: 'UPDATE_MENU_ITEM',
     CREATE_STAFF: 'CREATE_USER',
@@ -104,6 +111,10 @@ const pathMap: Partial<Record<ViewState, string>> = {
   KDS: '/kds',
   CALL_CENTER: '/call-center',
   DISPATCH: '/dispatch',
+  RECIPES: '/recipes',
+  PRINTERS: '/printers',
+  PRODUCTION: '/production',
+  PEOPLE: '/user-management',
 };
 
 const AIAssistant: React.FC = () => {
@@ -124,7 +135,7 @@ const AIAssistant: React.FC = () => {
 
   const copy = {
     title: isRtl ? 'المساعد الذكي' : 'AI Assistant',
-    subtitle: isRtl ? 'تحليل وتشغيل ERP مع موافقة قبل أي إجراء حساس' : 'ERP analysis and guided actions with approval gates',
+    subtitle: isRtl ? 'اسأل، حلّل، أو اطلب مهمة — التنفيذ بعد مراجعتك' : 'Ask, analyze, or request a task — execution waits for your approval',
     quickTitle: isRtl ? 'اختصارات سريعة' : 'Quick prompts',
     contextTitle: isRtl ? 'سياق النظام' : 'System context',
     pendingTitle: isRtl ? 'إجراءات تحتاج موافقة' : 'Actions awaiting approval',
@@ -210,14 +221,13 @@ const AIAssistant: React.FC = () => {
     };
   }, [orders, inventory, menuItems, accounts]);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      sender: 'ai',
-      text: t.ai_greeting || copy.subtitle,
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('restoflow-ai-conversation') || '[]');
+      if (Array.isArray(saved) && saved.length) return saved.slice(-30).map((message) => ({ ...message, timestamp: new Date(message.timestamp) }));
+    } catch { /* start a clean conversation */ }
+    return [{ id: 'welcome', sender: 'ai', text: t.ai_greeting || copy.subtitle, timestamp: new Date() }];
+  });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [pendingActions, setPendingActions] = useState<GuardedAIAction[]>([]);
@@ -227,6 +237,10 @@ const AIAssistant: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping, pendingActions.length]);
+
+  useEffect(() => {
+    sessionStorage.setItem('restoflow-ai-conversation', JSON.stringify(messages.slice(-30)));
+  }, [messages]);
 
   const requestAssistant = async (text: string) => {
     const clean = text.trim();
@@ -255,6 +269,7 @@ const AIAssistant: React.FC = () => {
           accounts,
           branches,
           settings,
+          history: messages.slice(-8).map((message) => ({ sender: message.sender, text: message.text })),
         },
       });
 
@@ -343,7 +358,7 @@ const AIAssistant: React.FC = () => {
 
   return (
     <aside
-      className="flex h-[100dvh] flex-col border-border bg-app text-main shadow-2xl"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-border bg-app text-main shadow-2xl"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <header className="border-b border-border bg-card px-5 py-4">
@@ -357,6 +372,19 @@ const AIAssistant: React.FC = () => {
               <p className="mt-1 text-xs font-bold leading-5 text-muted">{copy.subtitle}</p>
             </div>
           </div>
+          <button
+            onClick={() => {
+              const clean = [{ id: `welcome-${Date.now()}`, sender: 'ai' as const, text: t.ai_greeting || copy.subtitle, timestamp: new Date() }];
+              setMessages(clean);
+              setPendingActions([]);
+              sessionStorage.removeItem('restoflow-ai-conversation');
+            }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition hover:bg-elevated hover:text-main"
+            aria-label={isRtl ? 'محادثة جديدة' : 'New conversation'}
+            title={isRtl ? 'محادثة جديدة' : 'New conversation'}
+          >
+            <Trash2 size={16} />
+          </button>
           <button
             onClick={() => toggleAssistant(false)}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition hover:bg-elevated hover:text-rose-500"

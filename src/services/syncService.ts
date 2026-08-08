@@ -234,12 +234,12 @@ export const syncService = {
                 break;
             case 'tableStatus':
                 if (action === 'UPDATE') {
-                    return tablesApi.updateStatus(
-                        payload.id,
-                        payload.status,
-                        payload.currentOrderId,
-                        payload.reference_id || item.dedupeKey || item.id,
-                    );
+                    return tablesApi.updateStatus(payload.id, {
+                        status: payload.status,
+                        currentOrderId: payload.currentOrderId,
+                        reference_id: payload.reference_id || item.dedupeKey || item.id,
+                        branchId: payload.branchId,
+                    });
                 }
                 break;
             case 'tableLayout':
@@ -294,4 +294,3 @@ export const syncService = {
 };
 
 export default syncService;
-

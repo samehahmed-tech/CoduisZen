@@ -16,7 +16,7 @@ const OnlineStatus = lazy(() => import('./common/OnlineStatus'));
 const AIWidgetsRenderer = lazy(() => import('./common/AIWidgetsRenderer'));
 const AIAssistant = lazy(() => import('./AIAssistant'));
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Sparkles, X } from 'lucide-react';
 
 const localDateKey = () => {
     const value = new Date();
@@ -107,6 +107,7 @@ const MainLayout: React.FC = () => {
     }, []);
 
     const isAssistantOpen = useAIWidgetStore(state => state.isAssistantOpen);
+    const toggleAssistant = useAIWidgetStore(state => state.toggleAssistant);
 
     if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
 
@@ -190,12 +191,11 @@ const MainLayout: React.FC = () => {
                 )}
                 {isAssistantOpen && (
                     <motion.div
-                        initial={{ x: direction === 'rtl' ? -400 : 400, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: direction === 'rtl' ? -400 : 400, opacity: 0 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 right-0 z-[60] w-full md:w-[520px] lg:w-[620px] xl:w-[680px] shadow-2xl"
-                        style={{ [direction === 'rtl' ? 'left' : 'right']: 0 }}
+                        initial={{ opacity: 0, y: 18, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 14, scale: 0.97 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
+                        className="fixed bottom-4 left-3 right-3 z-[90] h-[calc(100dvh-24px)] sm:bottom-20 sm:left-5 sm:right-auto sm:h-[min(720px,calc(100dvh-104px))] sm:w-[440px]"
                     >
                         <Suspense fallback={null}>
                             <AIAssistant />
@@ -203,6 +203,26 @@ const MainLayout: React.FC = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {!isAssistantOpen && (
+                <motion.button
+                    type="button"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    whileHover={{ y: -2, scale: 1.03 }}
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => toggleAssistant(true)}
+                    className="fixed bottom-5 left-5 z-[80] flex h-14 items-center gap-2 rounded-2xl border border-cyan-300/30 bg-slate-950 px-4 text-white shadow-[0_18px_50px_rgba(8,145,178,0.28)] focus:outline-none focus-visible:ring-4 focus-visible:ring-cyan-400/30"
+                    aria-label={language === 'ar' ? 'فتح المساعد الذكي' : 'Open smart assistant'}
+                    title={language === 'ar' ? 'المساعد الذكي' : 'Smart assistant'}
+                >
+                    <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500 text-slate-950">
+                        <Sparkles size={19} />
+                        <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-slate-950 bg-emerald-400" />
+                    </span>
+                    <span className="hidden text-xs font-black sm:block">{language === 'ar' ? 'اسأل المساعد' : 'Ask Copilot'}</span>
+                </motion.button>
+            )}
 
             <Suspense fallback={null}>
                 <GlobalSearch />

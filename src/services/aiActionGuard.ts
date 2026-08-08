@@ -6,6 +6,8 @@ export type AIAction =
     | { type: 'UPDATE_MENU_PRICE'; itemId: string; price: number }
     | { type: 'CREATE_MENU_ITEM'; categoryId: string; data: any }
     | { type: 'CREATE_MENU_CATEGORY'; data: any }
+    | { type: 'DELETE_MENU_ITEM'; itemId: string }
+    | { type: 'DELETE_MENU_CATEGORY'; categoryId: string }
     | { type: 'UPDATE_MENU_CATEGORY'; categoryId: string; data: any }
     | { type: 'ANALYZE_MENU' }
     | { type: 'ANALYZE_INVENTORY' }
@@ -35,6 +37,8 @@ export const getActionPermission = (action: AIAction): AppPermission | undefined
         case 'CREATE_MENU_ITEM':
         case 'CREATE_MENU_CATEGORY':
         case 'UPDATE_MENU_CATEGORY':
+        case 'DELETE_MENU_ITEM':
+        case 'DELETE_MENU_CATEGORY':
             return AppPermission.CFG_EDIT_MENU_PRICING;
         case 'CREATE_CUSTOMER':
             return AppPermission.NAV_CRM;
@@ -183,6 +187,32 @@ export const guardAction = (action: AIAction, context: {
                 canExecute: true,
                 before: category,
                 after: { ...category, ...((action as any).data || {}) },
+                auditType: AuditEventType.SETTINGS_CHANGE,
+            };
+        }
+        case 'DELETE_MENU_ITEM': {
+            const item = context.menuItems.find((i: any) => i.id === (action as any).itemId);
+            return {
+                id, action,
+                label: `Delete menu item: ${item?.name || (action as any).itemId || ''}`,
+                permission,
+                canExecute: Boolean(item),
+                reason: item ? undefined : 'Item not found',
+                before: item || null,
+                after: null,
+                auditType: AuditEventType.SETTINGS_CHANGE,
+            };
+        }
+        case 'DELETE_MENU_CATEGORY': {
+            const category = context.categories.find((c: any) => c.id === (action as any).categoryId);
+            return {
+                id, action,
+                label: `Delete menu category: ${category?.name || (action as any).categoryId || ''}`,
+                permission,
+                canExecute: Boolean(category),
+                reason: category ? undefined : 'Category not found',
+                before: category || null,
+                after: null,
                 auditType: AuditEventType.SETTINGS_CHANGE,
             };
         }

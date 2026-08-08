@@ -47,10 +47,10 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
     return (
         <div className="pos-toolbar-slim shrink-0 border-b border-border/8 bg-card/50 backdrop-blur-sm px-2 md:px-3 flex items-center gap-1.5 z-20 overflow-x-auto no-scrollbar">
             {/* Mode Segments */}
-            <div className="flex items-center bg-elevated/50 rounded-lg p-0.5 shrink-0">
-                {modes.map(({ mode, icon: Icon, key, en, ar }) => {
+            <div className="flex items-center bg-elevated/50 rounded-lg p-0.5 shrink-0 pressable">
+                {modes.map(({ mode, key: modKey, icon: Icon, en, ar }) => {
                     const active = activeOrderType === mode;
-                    const label = isAr ? ((t as any)[key] || ar) : ((t as any)[key] || en);
+                    const label = active ? ((t as any)[modKey] || ar) : ((t as any)[modKey] || en);
                     return (
                         <button
                             key={mode}

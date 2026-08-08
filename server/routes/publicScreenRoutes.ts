@@ -236,26 +236,26 @@ router.post('/orders/:orderId/handover', async (req, res) => {
     try {
         const orderId = getParam(req.params.orderId);
         const [order] = await db
-            .select({ id: orders.id, branchId: orders.branchId, status: orders.status })
+            .select({ id: orders.id, branchId: orders.branchId, status: orders.status, type: orders.type })
             .from(orders)
             .where(eq(orders.id, orderId))
             .limit(1);
         if (!order) return res.status(404).json({ ok: false, code: 'ORDER_NOT_FOUND' });
-
-        if (!['COMPLETED', 'DELIVERED', 'CANCELLED'].includes(String(order.status))) {
-            await transitionOrderStatus({
-                orderId,
-                nextStatus: 'DELIVERED',
-                notes: 'Packing handover from public operator screen',
-                changedBy: 'public-packing-screen',
-                user: { role: 'SUPER_ADMIN' },
-                skipPolicy: true,
-            });
+        if (String(order.status) === 'CANCELLED') return res.status(409).json({ ok: false, code: 'ORDER_CANCELLED' });
+        if (['COMPLETED', 'DELIVERED'].includes(String(order.status))) return res.json({ ok: true });
+        if (!['TAKEAWAY', 'PICKUP', 'KIOSK'].includes(String(order.type))) {
+            return res.status(409).json({ ok: false, code: 'PACKING_HANDOVER_TYPE_INVALID' });
         }
 
-        await db.update(kdsTickets)
-            .set({ status: 'DELIVERED', updatedAt: new Date() })
-            .where(eq(kdsTickets.orderId, orderId));
+        await transitionOrderStatus({
+            orderId,
+            nextStatus: 'DELIVERED',
+            notes: 'Packing handover from public operator screen',
+            changedBy: 'public-packing-screen',
+            user: { role: 'SUPER_ADMIN' },
+            skipPolicy: true,
+            requireKitchenReady: true,
+        });
 
         emitRefresh(order.branchId, { orderId, status: 'DELIVERED' });
         return res.json({ ok: true });

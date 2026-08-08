@@ -19,6 +19,9 @@ const FIXTURES = {
     password: 'Test123!',
 };
 
+const localDateKey = (date = new Date()) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 describe('Core Order Flow E2E', () => {
     let testUserToken = '';
 
@@ -40,6 +43,9 @@ describe('Core Order Flow E2E', () => {
             address: 'Cairo',
             isActive: true,
         }).onConflictDoNothing();
+        await db.update(branches)
+            .set({ businessDate: localDateKey() })
+            .where(eq(branches.id, FIXTURES.branchId));
 
         await db.insert(costCenters).values({
             id: FIXTURES.costCenterId,
@@ -103,6 +109,16 @@ describe('Core Order Flow E2E', () => {
             printerIds: [],
             modifierGroups: [],
         }).onConflictDoNothing();
+        await db.update(menuItems).set({
+            modifierGroups: [{
+                id: 'test-modifier-group-e2e',
+                name: 'Extras',
+                nameAr: 'إضافات',
+                minSelection: 0,
+                maxSelection: 2,
+                options: [{ id: 'test-extra-cheese-e2e', name: 'Extra Cheese', nameAr: 'جبنة إضافية', price: 25 }],
+            }],
+        }).where(eq(menuItems.id, FIXTURES.itemId));
 
         const loginRes = await request(app)
             .post('/api/auth/login')
@@ -190,8 +206,47 @@ describe('Core Order Flow E2E', () => {
         expect(foundOrder.status).toBe('DELIVERED');
     });
 
+    it('prices modifiers from the saved menu and rejects unknown options', async () => {
+        const basePayload = {
+            type: 'KIOSK',
+            source: 'kiosk',
+            branchId: FIXTURES.branchId,
+            items: [{
+                menu_item_id: FIXTURES.itemId,
+                name: 'E2E Item',
+                quantity: 2,
+                price: 1,
+                modifiers: [{ id: 'test-extra-cheese-e2e', name: 'Tampered Name', price: 999 }],
+            }],
+            subtotal: 1,
+            tax: 0,
+            total: 1,
+        };
+
+        const validRes = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${testUserToken}`)
+            .send({ ...basePayload, id: `test-kiosk-modifier-${Date.now()}` });
+
+        expect(validRes.status).toBe(201);
+        expect(Number(validRes.body.subtotal)).toBe(350);
+        expect(Number(validRes.body.total)).toBeGreaterThanOrEqual(350);
+
+        const invalidRes = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${testUserToken}`)
+            .send({
+                ...basePayload,
+                id: `test-kiosk-invalid-modifier-${Date.now()}`,
+                items: [{ ...basePayload.items[0], modifiers: [{ id: 'not-linked-to-item', price: 0 }] }],
+            });
+
+        expect(invalidRes.status).toBe(400);
+        expect(invalidRes.body.code || invalidRes.body.error).toBe('INVALID_MODIFIER_OPTION');
+    });
+
     it('filters call-center order desk queries on the server by source, branch, and day range', async () => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateKey();
         const callCenterOrderId = `test-call-center-order-${Date.now()}`;
         const posOrderId = `test-pos-order-${Date.now()}`;
 
@@ -433,7 +488,7 @@ describe('Core Order Flow E2E', () => {
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateKey();
         const dashboardRes = await request(app)
             .get(`/api/reports/dashboard-kpis?branchId=${FIXTURES.branchId}&startDate=${today}&endDate=${today}&scope=DAILY`)
             .set('Authorization', `Bearer ${testUserToken}`);
@@ -621,7 +676,7 @@ describe('Core Order Flow E2E', () => {
         const ownShiftId = `test-dayclose-own-shift-${Date.now()}`;
         const otherBranchId = `test-dayclose-other-${Date.now()}`;
         const otherShiftId = `test-dayclose-shift-${Date.now()}`;
-        const businessDate = new Date().toISOString().slice(0, 10);
+        const businessDate = localDateKey();
 
         await db.insert(branches).values({
             id: ownBranchId,

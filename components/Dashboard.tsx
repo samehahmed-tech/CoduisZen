@@ -17,7 +17,7 @@ import {
   DollarSign, ShoppingBag, Users, TrendingUp, Sparkles, Package, Database,
   AlertCircle, AlertTriangle, Clock, Wallet, Building2,
   ArrowUpRight, ArrowDownRight, Zap, Target, UserCheck, Calendar, Filter, ChevronDown, CheckCircle2,
-  Activity, Star, Flame, Trophy, Eye, Briefcase, RefreshCcw, BrainCircuit, HeartHandshake, Scissors
+  Activity, Star, Flame, Trophy, Eye, Briefcase, RefreshCcw, BrainCircuit, HeartHandshake, Scissors, Ban, ReceiptText
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -52,10 +52,10 @@ const parseDateKey = (value: string) => {
 
 type DashboardPayload = {
   totals: {
-    revenue: number; netRevenue: number; expenses: number; pendingExpenses: number; cogs: number; netProfit: number;
+    revenue: number; netRevenue: number; taxTotal: number; expenses: number; pendingExpenses: number; cogs: number; netProfit: number;
     paidRevenue: number; discounts: number; orderCount: number;
     avgTicket: number; uniqueCustomers: number; itemsSold: number;
-    cancelled: number; pending: number; delivered: number; cancelRate: number;
+    cancelled: number; cancelledValue: number; pending: number; delivered: number; cancelRate: number;
   };
   trendData: Array<{ name: string; revenue: number; prevRevenue?: number }>;
   paymentBreakdown: Array<{ name: string; value: number }>;
@@ -75,7 +75,7 @@ type DashboardQueryResult = {
 };
 
 const EMPTY_PAYLOAD: DashboardPayload = {
-  totals: { revenue: 0, netRevenue: 0, expenses: 0, pendingExpenses: 0, cogs: 0, netProfit: 0, paidRevenue: 0, discounts: 0, orderCount: 0, avgTicket: 0, uniqueCustomers: 0, itemsSold: 0, cancelled: 0, pending: 0, delivered: 0, cancelRate: 0 },
+  totals: { revenue: 0, netRevenue: 0, taxTotal: 0, expenses: 0, pendingExpenses: 0, cogs: 0, netProfit: 0, paidRevenue: 0, discounts: 0, orderCount: 0, avgTicket: 0, uniqueCustomers: 0, itemsSold: 0, cancelled: 0, cancelledValue: 0, pending: 0, delivered: 0, cancelRate: 0 },
   trendData: [], paymentBreakdown: [], orderTypeBreakdown: [], categoryData: [], topItems: [], branchPerformance: [], topCustomers: []
 };
 
@@ -254,6 +254,7 @@ const Dashboard: React.FC = () => {
       return { current, previous, staff, shifts, reorderAlerts };
     },
     staleTime: 5 * 60_000,
+    refetchOnMount: 'always',
     placeholderData: keepPreviousData,
   });
 
@@ -420,7 +421,7 @@ const Dashboard: React.FC = () => {
         )}
 
         {/* ?? Row 1: High Level KPI's with Performance Tracking ?? */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4 lg:gap-6" aria-label={t.performance_reports}>
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8 gap-4 lg:gap-6" aria-label={t.performance_reports}>
           <MetricCard 
             label={t.total_revenue}
             value={payload.totals.revenue.toLocaleString()}
@@ -437,6 +438,18 @@ const Dashboard: React.FC = () => {
             delay={100}
           />
           <MetricCard
+            label={isAr ? 'الضريبة المحصلة' : 'Tax Collected'}
+            value={Number(payload.totals.taxTotal ?? 0).toLocaleString()}
+            subValue={currencySymbol}
+            icon={ReceiptText}
+            color="#0ea5e9"
+            lang={lang}
+            hasPermission={hasPermission}
+            permission={AppPermission.DATA_VIEW_REVENUE}
+            onClick={goToFinance}
+            delay={200}
+          />
+          <MetricCard
             label={isAr ? 'المصروفات' : 'Expenses'}
             value={payload.totals.expenses.toLocaleString()}
             subValue={currencySymbol}
@@ -446,7 +459,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
-            delay={200}
+            delay={300}
           />
           <MetricCard
             label={isAr ? 'صافي الربح' : 'Net Profit'}
@@ -459,7 +472,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
-            delay={300}
+            delay={400}
           />
           <MetricCard 
             label={t.order_volume}
@@ -472,7 +485,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             onClick={goToFinance}
             trendData={payload.trendData.map(d => d.revenue * 0.8)} // simulated shape
-            delay={400}
+            delay={500}
           />
           <MetricCard 
             label={t.avg_ticket}
@@ -485,7 +498,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             onClick={goToFinance}
             trendData={payload.trendData.map(d => d.revenue * 0.2 + 20)}
-            delay={500}
+            delay={600}
           />
           <MetricCard 
             label={t.active_staff}
@@ -496,7 +509,19 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             onClick={goToHR}
-            delay={600}
+            delay={700}
+          />
+          <MetricCard
+            label={isAr ? 'الطلبات الملغاة / قيمتها' : 'Cancelled / Value'}
+            value={`${payload.totals.cancelled} / ${payload.totals.cancelledValue.toLocaleString()}`}
+            subValue={currencySymbol}
+            icon={Ban}
+            color="#ef4444"
+            lang={lang}
+            hasPermission={hasPermission}
+            permission={AppPermission.DATA_VIEW_REVENUE}
+            onClick={goToFinance}
+            delay={800}
           />
         </section>
 

@@ -75,6 +75,26 @@ describe('order status lifecycle policy', () => {
         }
     });
 
+    it('keeps the normal kitchen lifecycle valid for dine-in orders', () => {
+        expect(evaluateOrderStatusUpdate({
+            currentStatus: 'PENDING',
+            nextStatus: 'PREPARING',
+            orderType: 'DINE_IN',
+            userRole: 'CASHIER',
+            userBranchId: 'BR-1',
+            orderBranchId: 'BR-1',
+        }).ok).toBe(true);
+
+        expect(evaluateOrderStatusUpdate({
+            currentStatus: 'PREPARING',
+            nextStatus: 'READY',
+            orderType: 'DINE_IN',
+            userRole: 'CASHIER',
+            userBranchId: 'BR-1',
+            orderBranchId: 'BR-1',
+        }).ok).toBe(true);
+    });
+
     it('allows direct takeaway and pickup orders to complete from POS payment', () => {
         for (const orderType of ['TAKEAWAY', 'PICKUP']) {
             expect(evaluateOrderStatusUpdate({
@@ -87,4 +107,35 @@ describe('order status lifecycle policy', () => {
             }).ok).toBe(true);
         }
     });
+
+    it('requires a reason and manager authority for cashier voids', () => {
+        const base = {
+            currentStatus: 'PENDING',
+            nextStatus: 'CANCELLED',
+            orderType: 'TAKEAWAY',
+            userRole: 'CASHIER',
+            userBranchId: 'BR-1',
+            orderBranchId: 'BR-1',
+        };
+
+        expect(evaluateOrderStatusUpdate({ ...base, notes: 'Guest cancelled' }).ok).toBe(false);
+        expect(evaluateOrderStatusUpdate({ ...base, managerApproved: true }).code).toBe('CANCELLATION_REASON_REQUIRED');
+        expect(evaluateOrderStatusUpdate({ ...base, notes: 'Guest cancelled', managerApproved: true }).ok).toBe(true);
+    });
+
+    it.each(['PENDING', 'PREPARING', 'READY', 'SERVED', 'DELIVERED', 'COMPLETED'])(
+        'honors dine-in void permission from %s',
+        currentStatus => {
+        expect(evaluateOrderStatusUpdate({
+            currentStatus,
+            nextStatus: 'CANCELLED',
+            orderType: 'DINE_IN',
+            notes: 'Guest cancelled',
+            userRole: 'CAPTAIN',
+            userPermissions: ['OP_VOID_ORDER'],
+            userBranchId: 'BR-1',
+            orderBranchId: 'BR-1',
+        }).ok).toBe(true);
+        },
+    );
 });

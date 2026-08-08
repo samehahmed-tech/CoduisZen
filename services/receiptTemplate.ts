@@ -5,6 +5,7 @@
 import { Order, OrderType, Branch, AppSettings } from '../types';
 import { calculateOrderTotalsFromOrder } from './orderTotals';
 import { getTableDisplayName } from '../src/utils/tableDisplay';
+import { createQrDataUrl } from './templateReceiptGenerator';
 
 interface ReceiptTemplateParams {
    order: Order;
@@ -47,6 +48,9 @@ export const generateReceiptHTML = ({
    const branchAddr = settings.branchAddress || branch?.address || '';
    const phone = settings.phone || branch?.phone || '';
    const taxId = (settings as any).taxRegistrationNumber || '';
+   const logoUrl = settings.receiptLogoUrl || '';
+   const qrValue = settings.receiptQrUrl || '';
+   const qrImageUrl = qrValue ? createQrDataUrl(qrValue, 88) : '';
 
    // Calculate totals
    const totals = calculateOrderTotalsFromOrder(order, settings);
@@ -104,7 +108,11 @@ export const generateReceiptHTML = ({
       summaryLines.push({ label: isAr ? 'خصومات الأصناف' : 'Item Discounts', value: `-${totalItemDiscounts.toFixed(2)}`, cls: 'discount-row' });
    }
    if (orderDiscount > 0) {
-      summaryLines.push({ label: isAr ? `خصم ${order.discount}%` : `Discount ${order.discount}%`, value: `-${orderDiscount.toFixed(2)}`, cls: 'discount-row' });
+      summaryLines.push({
+         label: isAr ? `خصم (${totals.orderDiscountPercent}%)` : `Discount (${totals.orderDiscountPercent}%)`,
+         value: `-${orderDiscount.toFixed(2)}`,
+         cls: 'discount-row',
+      });
    }
    summaryLines.push({ label: isAr ? 'الضريبة' : 'Tax', value: tax.toFixed(2), cls: '' });
    if (order.tipAmount && order.tipAmount > 0) {
@@ -161,7 +169,7 @@ export const generateReceiptHTML = ({
    * { margin: 0; padding: 0; box-sizing: border-box; }
 
    body {
-      font-family: Tahoma, Arial, 'Segoe UI', sans-serif;
+      font-family: 'Cairo', Tahoma, Arial, sans-serif;
       font-size: 15px;
       color: #1a1a1a;
       width: 76mm;
@@ -204,18 +212,20 @@ export const generateReceiptHTML = ({
    }
 
    /* Order Meta */
-   .order-meta {
-      display: flex;
-      justify-content: space-between;
+    .order-meta {
+       display: grid;
+       grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.35fr);
       align-items: flex-start;
       gap: 4px;
       padding: 6px 0;
       border-bottom: 1px dashed #ccc;
    }
-   .meta-block {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
+    .meta-block {
+       display: flex;
+       min-width: 0;
+       flex-direction: column;
+       gap: 1px;
+       text-align: ${align};
    }
    .meta-label {
       font-size: 10px;
@@ -224,9 +234,12 @@ export const generateReceiptHTML = ({
       letter-spacing: 0.8px;
       color: #999;
    }
-   .meta-value {
-      font-weight: 700;
-      font-size: 15px;
+    .meta-value {
+       display: block;
+       font-weight: 700;
+       font-size: 15px;
+       white-space: nowrap;
+       unicode-bidi: isolate;
    }
    .type-badge {
       display: inline-block;
@@ -239,6 +252,13 @@ export const generateReceiptHTML = ({
       font-weight: 900;
       line-height: 1.25;
       min-width: 56px;
+   }
+   .receipt-logo {
+      display: block;
+      max-width: 42mm;
+      max-height: 18mm;
+      object-fit: contain;
+      margin: 0 auto 5px;
    }
 
    /* Customer Info */
@@ -272,10 +292,16 @@ export const generateReceiptHTML = ({
       padding: 4px 0;
       border-bottom: 2px solid #222;
    }
-   .col-item { text-align: ${align}; width: 44%; }
-   .col-qty  { text-align: center; width: 10%; }
-   .col-price { text-align: center; width: 23%; }
-   .col-total { text-align: ${alignEnd}; width: 23%; font-weight: 800; }
+    .col-item { text-align: ${align}; width: 44%; }
+    .col-qty  { text-align: center; width: 14%; }
+    .col-price { text-align: center; width: 20%; }
+    .col-total { text-align: ${alignEnd}; width: 22%; font-weight: 800; }
+    .items-table .col-qty, .items-table .col-price, .items-table .col-total {
+       direction: ltr;
+       unicode-bidi: isolate;
+       white-space: nowrap;
+       font-variant-numeric: tabular-nums;
+    }
    .items-table td {
       padding: 5px 2px;
       border-bottom: 1px dashed #e5e5e5;
@@ -330,7 +356,8 @@ export const generateReceiptHTML = ({
       font-weight: 600;
       color: #444;
    }
-   .summary-line td:last-child { text-align: ${alignEnd}; }
+    .summary-line td:first-child { text-align: ${align}; }
+    .summary-line td:last-child { text-align: ${alignEnd}; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
    .discount-row td { color: #2e7d32; }
 
    /* Grand Total */
@@ -350,10 +377,14 @@ export const generateReceiptHTML = ({
       font-size: 16px;
       font-weight: 800;
    }
-   .grand-total-value {
-      font-size: 20px;
-      font-weight: 900;
-      letter-spacing: -0.5px;
+    .grand-total-value {
+       font-size: 20px;
+       font-weight: 900;
+       letter-spacing: -0.5px;
+       direction: ltr;
+       unicode-bidi: isolate;
+       white-space: nowrap;
+       text-align: ${alignEnd};
    }
 
    /* Payment */
@@ -387,6 +418,23 @@ export const generateReceiptHTML = ({
       border-top: 2px solid #111;
       margin-top: 8px;
    }
+   .qr-block {
+      text-align: center;
+      padding: 7px 0 3px;
+   }
+   .qr-image {
+      display: block;
+      width: 23mm;
+      height: 23mm;
+      margin: 0 auto;
+      image-rendering: pixelated;
+   }
+   .qr-caption {
+      margin-top: 2px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #555;
+   }
    .footer-thanks {
       font-size: 15px;
       font-weight: 800;
@@ -418,6 +466,7 @@ export const generateReceiptHTML = ({
 
    <!-- Header -->
    <div class="receipt-header">
+      ${logoUrl ? `<img class="receipt-logo" src="${logoUrl}" alt="logo">` : ''}
       <div class="restaurant-name">${restaurantName}</div>
       ${branchName ? `<div class="branch-name">${branchName}</div>` : ''}
       ${branchAddr ? `<div class="branch-info">${branchAddr}</div>` : ''}
@@ -453,7 +502,7 @@ export const generateReceiptHTML = ({
    <table class="items-table">
       <tr class="items-header">
         <td class="col-item">${isAr ? 'الصنف' : 'Item'}</td>
-        <td class="col-qty">${isAr ? 'الكمية' : 'Qty'}</td>
+         <td class="col-qty">${isAr ? 'عدد' : 'Qty'}</td>
         <td class="col-price">${isAr ? 'السعر' : 'Price'}</td>
         <td class="col-total">${isAr ? 'المبلغ' : 'Total'}</td>
       </tr>
@@ -478,6 +527,13 @@ export const generateReceiptHTML = ({
    <div class="payment-section">
       <span class="payment-pill">${isAr ? 'الدفع' : 'Paid'}: ${paymentMethodText}</span>
    </div>
+   ` : ''}
+
+   ${qrImageUrl ? `
+      <div class="qr-block">
+         <img class="qr-image" src="${qrImageUrl}" alt="QR">
+         <div class="qr-caption">${isAr ? 'امسح الكود' : 'Scan QR'}</div>
+      </div>
    ` : ''}
 
    <!-- Footer -->

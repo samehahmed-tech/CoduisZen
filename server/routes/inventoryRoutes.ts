@@ -8,20 +8,25 @@ import {
     getInventoryBatches,
     getInventoryItems,
     createInventoryItem,
-    updateInventoryItem
+    updateInventoryItem,
+    receiveStockDirect,
+    zeroInventoryQuantities,
 } from '../controllers/inventoryController';
 import { generateBarcodeLabels, previewBarcodeLabel } from '../controllers/barcodeLabelController';
 import { validate } from '../middleware/validate';
-import { stockUpdateSchema, stockTransferSchema } from '../middleware/validation';
+import { directStockReceiptSchema, stockUpdateSchema, stockTransferSchema } from '../middleware/validation';
 import { requireRoles } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
 const posAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER', 'CASHIER', 'WAITER');
 const managerAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER');
+const ownerAuth = requireRoles('SUPER_ADMIN', 'OWNER');
 
 router.post('/stock/update', posAuth, enforceBranch, validate(stockUpdateSchema), updateStock);
+router.post('/stock/receive', managerAuth, enforceBranch, validate(directStockReceiptSchema), receiveStockDirect);
 router.post('/stock/transfer', managerAuth, enforceBranch, validate(stockTransferSchema), transferStock);
+router.post('/stock/zero', ownerAuth, enforceBranch, zeroInventoryQuantities);
 router.get('/stock/transfers', managerAuth, enforceBranch, getTransferMovements);
 router.get('/stock/recipe-consumption', managerAuth, enforceBranch, getRecipeConsumption);
 router.get('/batches', managerAuth, enforceBranch, getInventoryBatches);

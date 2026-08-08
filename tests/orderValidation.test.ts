@@ -11,4 +11,13 @@ describe('order validation', () => {
         expect(createOrderSchema.parse({ ...baseOrder, type: 'تيك اواي' }).type).toBe('TAKEAWAY');
         expect(createOrderSchema.parse({ ...baseOrder, type: 'TAKE_AWAY' }).type).toBe('TAKEAWAY');
     });
+
+    it('preserves a selected size reference for zero-base-price items', () => {
+        const parsed = createOrderSchema.parse({
+            ...baseOrder,
+            type: 'DINE_IN',
+            items: [{ menu_item_id: 'item-1', quantity: 1, price: 0, size_id: 'large' }],
+        });
+        expect(parsed.items[0].size_id).toBe('large');
+    });
 });

@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToast } from './Toast';
 import { useConfirm } from './common/ConfirmProvider';
+import { AppSettings, OrderType } from '../types';
 
 // ?? Receipt Block Types ??
 
@@ -146,7 +147,7 @@ const createReceiptPresets = (): ReceiptTemplate[] => {
 
 const STORAGE_KEY = 'coduiszen_receipt_templates';
 const PRESET_VERSION_KEY = 'coduiszen_receipt_presets_version';
-const PRESET_VERSION = '2';
+const PRESET_VERSION = '3';
 
 const loadTemplates = (remoteTemplates?: ReceiptTemplate[]): ReceiptTemplate[] => {
     try {
@@ -194,6 +195,34 @@ const ReceiptDesigner: React.FC = () => {
     const [dragActive, setDragActive] = useState(false);
 
     const activeTemplate = templates.find(t => t.id === activeTemplateId) || templates[0];
+    const receiptTemplates = templates.filter(template => template.type === 'receipt');
+    const orderTypeOptions = [
+        { value: OrderType.DINE_IN, en: 'Dine-in', ar: 'الصالة' },
+        { value: OrderType.TAKEAWAY, en: 'Takeaway', ar: 'تيك أواي' },
+        { value: OrderType.DELIVERY, en: 'Delivery', ar: 'دليفري' },
+        { value: OrderType.PICKUP, en: 'Pickup', ar: 'استلام عميل' },
+        { value: OrderType.KIOSK, en: 'Kiosk', ar: 'كشك الطلب الذاتي' },
+    ];
+
+    const setDefaultReceiptTemplate = (templateId: string) => {
+        const next = templates.map(template => ({
+            ...template,
+            isDefault: template.type === 'receipt' ? template.id === templateId : template.isDefault,
+        }));
+        setTemplates(next);
+        saveTemplates(next);
+        updateSettings({ receiptTemplates: next, defaultReceiptTemplateId: templateId });
+        showToast(isAr ? 'تم تعيين شيك المبيعات الافتراضي' : 'Default sales receipt updated', 'success');
+    };
+
+    const setOrderTypeTemplate = (orderType: OrderType, templateId: string) => {
+        updateSettings({
+            receiptTemplateByOrderType: {
+                ...(settings.receiptTemplateByOrderType || {}),
+                [orderType]: templateId || undefined,
+            },
+        });
+    };
 
     const persistTemplates = useCallback((next: ReceiptTemplate[]) => {
         saveTemplates(next);
@@ -331,13 +360,19 @@ const ReceiptDesigner: React.FC = () => {
             variant: 'danger',
         });
         if (!ok) return;
-        setTemplates(prev => {
-            const next = prev.filter(t => t.id !== id);
-            if (next.length === 0) next.push(createDefaultTemplate('receipt'));
-            persistTemplates(next);
-            if (activeTemplateId === id) setActiveTemplateId(next[0].id);
-            return next;
+        const remainingTemplates = templates.filter(templateEntry => templateEntry.id !== id);
+        if (remainingTemplates.length === 0) remainingTemplates.push(createDefaultTemplate('receipt'));
+        const fallbackReceiptId = remainingTemplates.find(templateEntry => templateEntry.type === 'receipt')?.id;
+        const remainingMappings = Object.fromEntries(
+            Object.entries(settings.receiptTemplateByOrderType || {}).filter(([, templateId]) => templateId !== id),
+        ) as AppSettings['receiptTemplateByOrderType'];
+        setTemplates(remainingTemplates);
+        persistTemplates(remainingTemplates);
+        updateSettings({
+            defaultReceiptTemplateId: settings.defaultReceiptTemplateId === id ? fallbackReceiptId : settings.defaultReceiptTemplateId,
+            receiptTemplateByOrderType: remainingMappings,
         });
+        if (activeTemplateId === id) setActiveTemplateId(remainingTemplates[0].id);
         showToast(isAr ? 'تم حذف القالب' : 'Template deleted', 'success');
     };
 
@@ -855,6 +890,42 @@ const ReceiptDesigner: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {activeTemplate.type === 'receipt' && (
+                        <div className="p-4 bg-card border border-border rounded-2xl space-y-4">
+                            <div>
+                                <h4 className="text-[10px] font-black text-main uppercase tracking-[0.16em]">
+                                    {isAr ? 'قوالب البيع الافتراضية' : 'Sales receipt defaults'}
+                                </h4>
+                                <p className="mt-1 text-[9px] font-bold text-muted">
+                                    {isAr ? 'النوع الخاص يتغلب على الافتراضي العام.' : 'An order-type template overrides the general default.'}
+                                </p>
+                            </div>
+                            <label className="block space-y-1">
+                                <span className="text-[9px] font-black text-muted">{isAr ? 'الافتراضي العام' : 'General default'}</span>
+                                <select
+                                    value={settings.defaultReceiptTemplateId || receiptTemplates.find(template => template.isDefault)?.id || ''}
+                                    onChange={(event) => setDefaultReceiptTemplate(event.target.value)}
+                                    className="w-full rounded-xl border border-border bg-app p-2.5 text-[10px] font-black text-main outline-none focus:border-primary"
+                                >
+                                    {receiptTemplates.map(template => <option key={template.id} value={template.id}>{isAr ? template.nameAr : template.name}</option>)}
+                                </select>
+                            </label>
+                            {orderTypeOptions.map(option => (
+                                <label key={option.value} className="block space-y-1">
+                                    <span className="text-[9px] font-black text-muted">{isAr ? option.ar : option.en}</span>
+                                    <select
+                                        value={settings.receiptTemplateByOrderType?.[option.value] || ''}
+                                        onChange={(event) => setOrderTypeTemplate(option.value, event.target.value)}
+                                        className="w-full rounded-xl border border-border bg-app p-2.5 text-[10px] font-black text-main outline-none focus:border-primary"
+                                    >
+                                        <option value="">{isAr ? 'استخدام الافتراضي العام' : 'Use general default'}</option>
+                                        {receiptTemplates.map(template => <option key={template.id} value={template.id}>{isAr ? template.nameAr : template.name}</option>)}
+                                    </select>
+                                </label>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* ??? CENTER: Block Builder ??? */}
@@ -953,7 +1024,7 @@ const ReceiptDesigner: React.FC = () => {
                             <div
                                 dir={previewMode === 'rich' && isAr ? 'rtl' : 'ltr'}
                                 style={{
-                                    fontFamily: previewMode === 'raw' ? "'Courier New', Courier, monospace" : "'Tajawal', system-ui, sans-serif",
+                                    fontFamily: previewMode === 'raw' ? "'Courier New', Courier, monospace" : "'Cairo', system-ui, sans-serif",
                                     padding: '8px 12px',
                                     fontSize: previewMode === 'raw' ? (activeTemplate.paperWidth === '58mm' ? 9.5 : 10.5) : (activeTemplate.fontSize === 'small' ? 10 : activeTemplate.fontSize === 'large' ? 14 : 12),
                                     color: '#1a1a1a',

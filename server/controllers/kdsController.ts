@@ -8,6 +8,7 @@ import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import { transitionOrderStatus } from '../services/orderLifecycleService';
 import { enqueuePrintJob } from '../services/printQueueService';
+import { isKitchenRoutingPrinter, resolvePrinterRoutingStation } from '../services/kdsRouting';
 
 let kdsSchemaReady = false;
 
@@ -32,6 +33,32 @@ const ensureKdsSchema = async () => {
             CONSTRAINT fk_kds_tickets_order FOREIGN KEY (order_id) REFERENCES orders(id)
         );
 
+        IF EXISTS (
+            SELECT 1
+            FROM sys.columns c
+            JOIN sys.types t ON c.user_type_id = t.user_type_id
+            WHERE c.object_id = OBJECT_ID('dbo.kds_tickets')
+              AND c.name = 'priority'
+              AND t.name <> 'nvarchar'
+        )
+        BEGIN
+            DECLARE @kdsPriorityDefault sysname;
+            SELECT @kdsPriorityDefault = dc.name
+            FROM sys.default_constraints dc
+            JOIN sys.columns c ON c.default_object_id = dc.object_id
+            WHERE c.object_id = OBJECT_ID('dbo.kds_tickets') AND c.name = 'priority';
+            IF @kdsPriorityDefault IS NOT NULL
+            BEGIN
+                DECLARE @dropKdsPriorityDefault nvarchar(max);
+                SET @dropKdsPriorityDefault = N'ALTER TABLE dbo.kds_tickets DROP CONSTRAINT ' + QUOTENAME(@kdsPriorityDefault);
+                EXEC sys.sp_executesql @dropKdsPriorityDefault;
+            END;
+            ALTER TABLE dbo.kds_tickets ALTER COLUMN priority nvarchar(255) NULL;
+            UPDATE dbo.kds_tickets
+            SET priority = CASE priority WHEN '1' THEN 'RUSH' WHEN '2' THEN 'REMAKE' ELSE 'NORMAL' END;
+            ALTER TABLE dbo.kds_tickets ADD CONSTRAINT df_kds_tickets_priority DEFAULT 'NORMAL' FOR priority;
+        END;
+
         IF OBJECT_ID('kds_ticket_items', 'U') IS NULL
         CREATE TABLE kds_ticket_items (
             id int IDENTITY(1,1) NOT NULL,
@@ -51,6 +78,14 @@ const ensureKdsSchema = async () => {
         ALTER TABLE kds_ticket_items
             ADD is_bumped bit NOT NULL
                 CONSTRAINT df_kds_ticket_items_is_bumped DEFAULT 0;
+
+        IF COL_LENGTH('dbo.kds_ticket_items', 'ticket_id') IS NOT NULL
+           AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'ticket_id', 'AllowsNull') = 0
+        ALTER TABLE dbo.kds_ticket_items ALTER COLUMN ticket_id nvarchar(255) NULL;
+
+        IF COL_LENGTH('dbo.kds_ticket_items', 'order_item_id') IS NOT NULL
+           AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'order_item_id', 'AllowsNull') = 0
+        ALTER TABLE dbo.kds_ticket_items ALTER COLUMN order_item_id int NULL;
     `);
     kdsSchemaReady = true;
 };
@@ -59,15 +94,6 @@ const canAccessBranch = (req: Request, branchId?: string | null) => {
     if (!branchId) return false;
     if (String(req.user?.role || '').toUpperCase() === 'SUPER_ADMIN') return true;
     return req.effectiveBranchId === branchId || req.user?.branchId === branchId || (req.user?.allowedBranches || []).includes(branchId);
-};
-
-const normalizeStationName = (value?: string | null) => {
-    const normalized = String(value || '')
-        .trim()
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-    return normalized || 'KITCHEN';
 };
 
 const normalizePrinterIds = (value: unknown): string[] => {
@@ -142,6 +168,43 @@ const [order] = await db.select({ id: orders.id, status: orders.status }).top(1)
 };
 
 export const kdsController = {
+    async getMeta(req: Request, res: Response) {
+        try {
+            await ensureKdsSchema();
+            const branchId = req.effectiveBranchId;
+            if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
+
+            const [printerRows, ticketRows] = await Promise.all([
+                db.select({
+                    id: printers.id,
+                    name: printers.name,
+                    code: printers.code,
+                    role: printers.role,
+                    roles: printers.roles,
+                    stationId: printers.stationId,
+                }).from(printers).where(and(eq(printers.branchId, branchId), eq(printers.isActive, true))),
+                db.select({ routingStation: kdsTickets.routingStation })
+                    .from(kdsTickets)
+                    .where(and(
+                        eq(kdsTickets.branchId, branchId),
+                        notInArray(kdsTickets.status, ['DELIVERED', 'CANCELLED']),
+                    )),
+            ]);
+
+            const stations = Array.from(new Set([
+                ...printerRows.filter(isKitchenRoutingPrinter).map(resolvePrinterRoutingStation),
+                ...ticketRows.map(ticket => String(ticket.routingStation || '').trim().toUpperCase()).filter(Boolean),
+            ])).sort();
+
+            return res.json({
+                stations: (stations.length ? stations : ['KITCHEN']).map(name => ({ name })),
+                source: 'SERVER_ROUTING',
+            });
+        } catch (error: any) {
+            return res.status(500).json({ error: error?.message || 'KDS_META_FAILED' });
+        }
+    },
+
     // Polling endpoint for kitchen displays
     async getTickets(req: Request, res: Response) {
         try {
@@ -254,6 +317,7 @@ export const kdsController = {
                     tableId: orders.tableId,
                     tableName: tables.name,
                     kitchenNotes: orders.kitchenNotes,
+                    isUrgent: orders.isUrgent,
                     createdAt: orders.createdAt,
                 })
                 .top(1)
@@ -291,6 +355,7 @@ export const kdsController = {
                         code: printers.code,
                         role: printers.role,
                         roles: printers.roles,
+                        stationId: printers.stationId,
                         type: printers.type,
                         address: printers.address,
                     })
@@ -306,8 +371,7 @@ export const kdsController = {
                 const printerIds = itemPrinterIds.length ? itemPrinterIds : normalizePrinterIds(row.categoryPrinterIds);
                 const stations = printerIds.map((printerId) => {
                     const printer = printerById.get(printerId);
-                    const primaryRole = Array.isArray(printer?.roles) ? printer.roles.find(Boolean) : null;
-                    const station = normalizeStationName(printer?.code || primaryRole || printer?.role || printer?.name || printerId);
+                    const station = resolvePrinterRoutingStation(printer || { id: printerId });
                     const current = printerIdsByStation.get(station) || [];
                     current.push(printerId);
                     printerIdsByStation.set(station, Array.from(new Set(current)));
@@ -338,11 +402,13 @@ export const kdsController = {
                         orderId,
                         routingStation: station,
                         status: 'PENDING',
+                        priority: orderMeta?.isUrgent ? 'RUSH' : 'NORMAL',
                         createdAt: new Date()
                     });
 
                     const itemsToInsert = ticketsBuffer[station].map((item: any) => ({
                         kdsTicketId: ticketId,
+                        orderItemId: item.id,
                         menuItemId: String(item.menuItemId || item.menu_item_id || item.id),
                         itemName: item.nameAr || item.name_ar || item.name,
                         quantity: item.quantity,
@@ -402,6 +468,7 @@ export const kdsController = {
         } catch (error: any) {
             logger.error({ err: error, orderId }, 'Failed to dispatch KDS tickets');
             console.error(`[KDS] dispatchToKitchen failed for order ${orderId}:`, error);
+            throw error;
         }
     },
 
@@ -503,30 +570,30 @@ export const kdsController = {
             const orderId = getStringParam(req.params.orderId);
             if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
 
-            const [order] = await db.select({ id: orders.id, branchId: orders.branchId, status: orders.status })
+            const [order] = await db.select({ id: orders.id, branchId: orders.branchId, status: orders.status, type: orders.type })
                 .top(1)
                 .from(orders)
                 .where(eq(orders.id, orderId));
             if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
             if (!canAccessBranch(req, order.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
-
-            if (!['COMPLETED', 'DELIVERED', 'CANCELLED'].includes(String(order.status))) {
-                await transitionOrderStatus({
-                    orderId,
-                    nextStatus: 'DELIVERED',
-                    notes: 'Packing handover',
-                    changedBy: req.user?.id,
-                    user: {
-                        role: req.user?.role,
-                        branchId: req.user?.branchId,
-                        allowedBranches: req.user?.allowedBranches,
-                    },
-                });
+            if (String(order.status) === 'CANCELLED') return res.status(409).json({ error: 'ORDER_CANCELLED' });
+            if (['COMPLETED', 'DELIVERED'].includes(String(order.status))) return res.json({ success: true });
+            if (!['TAKEAWAY', 'PICKUP', 'KIOSK'].includes(String(order.type))) {
+                return res.status(409).json({ error: 'PACKING_HANDOVER_TYPE_INVALID' });
             }
 
-            await db.update(kdsTickets)
-                .set({ status: 'DELIVERED', updatedAt: new Date() })
-                .where(eq(kdsTickets.orderId, orderId));
+            await transitionOrderStatus({
+                orderId,
+                nextStatus: 'DELIVERED',
+                notes: 'Packing handover',
+                changedBy: req.user?.id,
+                user: {
+                    role: req.user?.role,
+                    branchId: req.user?.branchId,
+                    allowedBranches: req.user?.allowedBranches,
+                },
+                requireKitchenReady: true,
+            });
 
             const room = order.branchId ? `branch:${order.branchId}` : null;
             if (room) {

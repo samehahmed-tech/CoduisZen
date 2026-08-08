@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { stockCounts, stockCountLines, inventoryItems, inventoryStock, warehouses } from '../../src/db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
 import { GLService } from '../services/glService';
 import { getStringParam } from '../utils/request';
 
@@ -13,6 +13,8 @@ const toDateOnly = (value?: string | Date | null) => {
             : String(value).split('T')[0];
     return new Date(`${datePart}T00:00:00.000Z`);
 };
+
+const STOCK_COUNT_TYPES = new Set(['DAILY', 'MONTHLY', 'FULL', 'CYCLE']);
 
 const enrichCountLines = async (lines: any[]) => {
     if (lines.length === 0) return [];
@@ -42,13 +44,20 @@ export const getStockCounts = async (req: Request, res: Response) => {
         const branchId = (req.query.branchId as string) || (req as any).effectiveBranchId;
         const warehouseId = req.query.warehouseId as string | undefined;
         const countDate = req.query.date as string | undefined;
+        const startDate = req.query.startDate as string | undefined;
+        const endDate = req.query.endDate as string | undefined;
         const status = req.query.status as string | undefined;
         const limit = Math.max(1, Math.min(Number(req.query.limit || 30), 100));
 
         const conditions = [];
         if (branchId) conditions.push(eq(stockCounts.branchId, branchId));
         if (warehouseId) conditions.push(eq(stockCounts.warehouseId, warehouseId));
-        if (countDate) conditions.push(eq(stockCounts.countDate, toDateOnly(countDate)));
+        if (countDate) {
+            conditions.push(eq(stockCounts.countDate, toDateOnly(countDate)));
+        } else {
+            if (startDate) conditions.push(gte(stockCounts.countDate, toDateOnly(startDate)));
+            if (endDate) conditions.push(lte(stockCounts.countDate, toDateOnly(endDate)));
+        }
         if (status) conditions.push(eq(stockCounts.status, status));
 
         const rows = await db.select().from(stockCounts)
@@ -132,6 +141,10 @@ export const createStockCount = async (req: Request, res: Response) => {
         const { branchId, warehouseId, type, remarks, userId, scheduledDate, countDate } = req.body;
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         if (!warehouseId) return res.status(400).json({ error: 'WAREHOUSE_ID_REQUIRED' });
+        const normalizedType = String(type || 'FULL').toUpperCase();
+        if (!STOCK_COUNT_TYPES.has(normalizedType)) {
+            return res.status(400).json({ error: 'COUNT_TYPE_INVALID' });
+        }
 
         const [warehouse] = await db.select().top(1).from(warehouses).where(eq(warehouses.id, warehouseId));
         if (!warehouse) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND' });
@@ -146,13 +159,20 @@ export const createStockCount = async (req: Request, res: Response) => {
             warehouseId,
             countDate: toDateOnly(countDate || scheduledDate),
             status: 'DRAFT',
-            type: type || 'FULL',
+            type: normalizedType,
             remarks,
             createdBy: userId,
             scheduledDate: scheduledDate ? new Date(scheduledDate) : null
         });
 
-        res.status(201).json({ id: countId, branchId, warehouseId, countDate: toDateOnly(countDate || scheduledDate), status: 'DRAFT' });
+        res.status(201).json({
+            id: countId,
+            branchId,
+            warehouseId,
+            countDate: toDateOnly(countDate || scheduledDate),
+            status: 'DRAFT',
+            type: normalizedType,
+        });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -224,30 +244,40 @@ export const submitCount = async (req: Request, res: Response) => {
     try {
         const id = getStringParam(req.params.id);
         if (!id) return res.status(400).json({ error: 'COUNT_ID_REQUIRED' });
-        const { counts } = req.body; // { itemId, countedQty, notes }[]
+        const { counts, finalize = true } = req.body; // { itemId, countedQty, notes }[]
+        if (!Array.isArray(counts)) return res.status(400).json({ error: 'COUNTS_REQUIRED' });
 
         const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
+        if (count[0].status === 'POSTED') return res.status(409).json({ error: 'COUNT_ALREADY_POSTED' });
         
         await db.transaction(async (tx) => {
-            for (const itemCount of counts || []) {
+            for (const itemCount of counts) {
                 const existing = await tx.select().top(1).from(stockCountLines)
                     .where(and(eq(stockCountLines.countId, id), eq(stockCountLines.itemId, itemCount.itemId)));
                     
                 if (existing.length) {
                     const expected = existing[0].expectedQty || 0;
-                    const varianceQty = itemCount.countedQty - expected;
+                    const countedQty = itemCount.countedQty === null || itemCount.countedQty === undefined
+                        ? null
+                        : Number(itemCount.countedQty);
+                    if (countedQty !== null && (!Number.isFinite(countedQty) || countedQty < 0)) {
+                        throw new Error('COUNTED_QUANTITY_INVALID');
+                    }
+                    const varianceQty = countedQty === null ? null : countedQty - expected;
                     
                     await tx.update(stockCountLines)
-                        .set({ countedQty: itemCount.countedQty, varianceQty, notes: itemCount.notes })
+                        .set({ countedQty, varianceQty, notes: itemCount.notes || null })
                         .where(eq(stockCountLines.id, existing[0].id));
                 }
             }
             
-            await tx.update(stockCounts).set({ status: 'REVIEW' }).where(eq(stockCounts.id, id));
+            if (finalize !== false) {
+                await tx.update(stockCounts).set({ status: 'REVIEW' }).where(eq(stockCounts.id, id));
+            }
         });
 
-        res.json({ success: true, status: 'REVIEW' });
+        res.json({ success: true, status: finalize === false ? count[0].status : 'REVIEW' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -264,11 +294,16 @@ export const postStockCount = async (req: Request, res: Response) => {
         
         const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
+        if (count[0].status === 'POSTED') return res.status(409).json({ error: 'COUNT_ALREADY_POSTED' });
+        if (count[0].status !== 'REVIEW') return res.status(409).json({ error: 'COUNT_NOT_READY' });
         
         let totalVarianceValue = 0;
 
         await db.transaction(async (tx) => {
             const lines = await tx.select().from(stockCountLines).where(eq(stockCountLines.countId, id));
+            if (lines.length === 0 || lines.some((line) => line.countedQty === null || line.countedQty === undefined)) {
+                throw new Error('COUNT_INCOMPLETE');
+            }
             
             const { stockMovements, auditLogs } = await import('../../src/db/schema');
             const [warehouse] = count[0].warehouseId
@@ -357,6 +392,6 @@ export const postStockCount = async (req: Request, res: Response) => {
 
         res.json({ success: true, status: 'POSTED', varianceValue: totalVarianceValue });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(error?.message === 'COUNT_INCOMPLETE' ? 409 : 500).json({ error: error.message });
     }
 };

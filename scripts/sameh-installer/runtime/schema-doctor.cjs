@@ -10,6 +10,33 @@ const source = fs.readFileSync(path.join(root, 'database', 'schema.ts'), 'utf8')
 const sqlTypes = { nvarchar: 'nvarchar(max)', jsonText: 'nvarchar(max)', int: 'int', real: 'real', bit: 'bit', date: 'date', datetime2: 'datetime2' };
 const snake = name => name.replace(/[A-Z]/g, char => `_${char.toLowerCase()}`);
 const quote = name => `[${name.replace(/]/g, ']]')}]`;
+const repairKdsPriority = `
+IF EXISTS (
+  SELECT 1 FROM sys.columns c
+  JOIN sys.types t ON c.user_type_id = t.user_type_id
+  WHERE c.object_id = OBJECT_ID('dbo.kds_tickets') AND c.name = 'priority' AND t.name <> 'nvarchar'
+)
+BEGIN
+  DECLARE @defaultName sysname, @dropDefault nvarchar(max);
+  SELECT @defaultName = dc.name FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.default_object_id = dc.object_id
+  WHERE c.object_id = OBJECT_ID('dbo.kds_tickets') AND c.name = 'priority';
+  IF @defaultName IS NOT NULL
+  BEGIN
+    SET @dropDefault = N'ALTER TABLE dbo.kds_tickets DROP CONSTRAINT ' + QUOTENAME(@defaultName);
+    EXEC sys.sp_executesql @dropDefault;
+  END;
+  ALTER TABLE dbo.kds_tickets ALTER COLUMN priority nvarchar(255) NULL;
+  UPDATE dbo.kds_tickets SET priority = CASE priority WHEN '1' THEN 'RUSH' WHEN '2' THEN 'REMAKE' ELSE 'NORMAL' END;
+  ALTER TABLE dbo.kds_tickets ADD CONSTRAINT df_kds_tickets_priority DEFAULT 'NORMAL' FOR priority;
+END;`;
+const repairLegacyKdsTicketItems = `
+IF COL_LENGTH('dbo.kds_ticket_items', 'ticket_id') IS NOT NULL
+   AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'ticket_id', 'AllowsNull') = 0
+  ALTER TABLE dbo.kds_ticket_items ALTER COLUMN ticket_id nvarchar(255) NULL;
+IF COL_LENGTH('dbo.kds_ticket_items', 'order_item_id') IS NOT NULL
+   AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'order_item_id', 'AllowsNull') = 0
+  ALTER TABLE dbo.kds_ticket_items ALTER COLUMN order_item_id int NULL;`;
 
 function expectedSchema() {
   const expected = new Map();
@@ -31,6 +58,8 @@ async function repair() {
   const transaction = new mssql.Transaction(connection);
   await transaction.begin();
   try {
+    await new mssql.Request(transaction).batch(repairKdsPriority);
+    await new mssql.Request(transaction).batch(repairLegacyKdsTicketItems);
     const rows = (await new mssql.Request(transaction).query("SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo'")).recordset;
     const actual = new Map();
     for (const row of rows) {

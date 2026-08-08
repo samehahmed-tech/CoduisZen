@@ -343,6 +343,11 @@ CREATE TABLE tables (
     height              int             DEFAULT 100,
     shape               nvarchar(max)   DEFAULT 'rectangle',
     seats               int             DEFAULT 4,
+    discount_percent    real            DEFAULT 0,
+    default_coupon_code nvarchar(255),
+    min_spend           real            DEFAULT 0,
+    is_vip              bit             DEFAULT 0,
+    notes               nvarchar(max),
     status              nvarchar(max)   NOT NULL DEFAULT 'AVAILABLE',
     current_order_id    nvarchar(255),
     locked_by_user_id   nvarchar(255),
@@ -799,6 +804,7 @@ CREATE TABLE purchase_orders (
     id                  nvarchar(255)   NOT NULL,
     supplier_id         nvarchar(255)   NOT NULL,
     branch_id           nvarchar(255)   NOT NULL,
+    target_warehouse_id nvarchar(255),
     status              nvarchar(max)   DEFAULT 'DRAFT',
     expected_date       datetime2,
     subtotal            real            DEFAULT 0,
@@ -808,7 +814,8 @@ CREATE TABLE purchase_orders (
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_purchase_orders PRIMARY KEY (id),
     CONSTRAINT fk_purchase_orders_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
-    CONSTRAINT fk_purchase_orders_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
+    CONSTRAINT fk_purchase_orders_branch FOREIGN KEY (branch_id) REFERENCES branches(id),
+    CONSTRAINT fk_purchase_orders_target_warehouse FOREIGN KEY (target_warehouse_id) REFERENCES warehouses(id)
 );
 
 CREATE TABLE purchase_order_items (

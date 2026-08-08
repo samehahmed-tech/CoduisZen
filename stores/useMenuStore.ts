@@ -49,10 +49,10 @@ interface MenuState {
     deletePlatform: (id: string) => Promise<void>;
 
     // --- Profit Control Center Extensions ---
-    bulkUpdateItems: (updates: { menuId: string; categoryId: string; itemId: string; changes: Partial<MenuItem> }[]) => void;
-    archiveItem: (menuId: string, categoryId: string, itemId: string) => void;
-    restoreItem: (menuId: string, categoryId: string, itemId: string) => void;
-    duplicateItem: (menuId: string, categoryId: string, itemId: string) => MenuItem | null;
+    bulkUpdateItems: (updates: { menuId: string; categoryId: string; itemId: string; changes: Partial<MenuItem> }[]) => Promise<void>;
+    archiveItem: (menuId: string, categoryId: string, itemId: string) => Promise<void>;
+    restoreItem: (menuId: string, categoryId: string, itemId: string) => Promise<void>;
+    duplicateItem: (menuId: string, categoryId: string, itemId: string) => Promise<MenuItem | null>;
     addVersionEntry: (categoryId: string, itemId: string, entry: ItemVersionEntry) => void;
 }
 
@@ -449,15 +449,7 @@ export const useMenuStore = create<MenuState>()(
             deleteMenuItem: async (menuId, categoryId, itemId) => {
                 try {
                     if (navigator.onLine) {
-                        try {
-                            await menuApi.deleteItem(itemId);
-                        } catch (deleteError: any) {
-                            await menuApi.updateItem(itemId, {
-                                isAvailable: false,
-                                status: 'archived',
-                                archivedAt: new Date().toISOString(),
-                            });
-                        }
+                        await menuApi.deleteItem(itemId);
                     } else {
                         await syncService.queue('menuItem', 'DELETE', { id: itemId });
                     }
@@ -543,56 +535,87 @@ export const useMenuStore = create<MenuState>()(
 
             // ============ Profit Control Center Extensions ============
 
-            bulkUpdateItems: (updates) => set((state) => {
-                const cats = [...state.categories];
-                for (const u of updates) {
-                    const catIdx = cats.findIndex(c => c.id === u.categoryId);
-                    if (catIdx === -1) continue;
-                    const itemIdx = cats[catIdx].items.findIndex(i => i.id === u.itemId);
-                    if (itemIdx === -1) continue;
-                    cats[catIdx] = {
-                        ...cats[catIdx],
-                        items: cats[catIdx].items.map(i => i.id === u.itemId ? { ...i, ...u.changes } : i)
-                    };
+            bulkUpdateItems: async (updates) => {
+                for (const update of updates) {
+                    const item = get().categories
+                        .find(category => category.id === update.categoryId)
+                        ?.items.find(candidate => candidate.id === update.itemId);
+                    if (!item) continue;
+                    await get().updateMenuItem(
+                        update.menuId,
+                        update.categoryId,
+                        { ...item, ...update.changes },
+                    );
                 }
-                return { categories: cats };
-            }),
+            },
 
-            archiveItem: (menuId, categoryId, itemId) => set((state) => ({
-                categories: state.categories.map(c =>
-                    c.id === categoryId
-                        ? { ...c, items: c.items.map(i => i.id === itemId ? { ...i, archivedAt: new Date().toISOString(), isAvailable: false } : i) }
-                        : c
-                )
-            })),
+            archiveItem: async (menuId, categoryId, itemId) => {
+                const item = get().categories.find(c => c.id === categoryId)?.items.find(i => i.id === itemId);
+                if (!item) return;
+                const archivedAt = new Date().toISOString();
+                if (navigator.onLine) {
+                    await menuApi.deleteItem(itemId);
+                } else {
+                    await syncService.queue('menuItem', 'DELETE', { id: itemId });
+                }
+                const archivedItem = { ...item, archivedAt, isAvailable: false };
+                set((state) => ({
+                    categories: state.categories.map(c =>
+                        c.id === categoryId
+                            ? { ...c, items: c.items.map(i => i.id === itemId ? archivedItem : i) }
+                            : c
+                    )
+                }));
+                await localDb.menuItems.put({ ...archivedItem, categoryId, updatedAt: Date.now() });
+            },
 
-            restoreItem: (menuId, categoryId, itemId) => set((state) => ({
-                categories: state.categories.map(c =>
-                    c.id === categoryId
-                        ? { ...c, items: c.items.map(i => i.id === itemId ? { ...i, archivedAt: undefined, isAvailable: true } : i) }
-                        : c
-                )
-            })),
+            restoreItem: async (menuId, categoryId, itemId) => {
+                const item = get().categories.find(c => c.id === categoryId)?.items.find(i => i.id === itemId);
+                if (!item) return;
+                if (navigator.onLine) {
+                    await menuApi.restoreItem(itemId);
+                } else {
+                    await syncService.queue('menuItem', 'UPDATE', {
+                        id: itemId,
+                        restore: true,
+                        status: 'published',
+                        isAvailable: true,
+                    });
+                }
+                const restoredItem = { ...item, archivedAt: undefined, isAvailable: true };
+                set((state) => ({
+                    categories: state.categories.map(c =>
+                        c.id === categoryId
+                            ? { ...c, items: c.items.map(i => i.id === itemId ? restoredItem : i) }
+                            : c
+                    )
+                }));
+                await localDb.menuItems.put({ ...restoredItem, categoryId, updatedAt: Date.now() });
+            },
 
-            duplicateItem: (menuId, categoryId, itemId) => {
+            duplicateItem: async (menuId, categoryId, itemId) => {
                 const state = get();
                 const cat = state.categories.find(c => c.id === categoryId);
                 const item = cat?.items.find(i => i.id === itemId);
                 if (!item) return null;
+                const copyCount = state.categories
+                    .flatMap(category => category.items)
+                    .filter(candidate => candidate.name.startsWith(`${item.name} (Copy`))
+                    .length;
                 const newItem: MenuItem = {
                     ...item,
                     id: `item-${Date.now()}`,
-                    name: `${item.name} (Copy)`,
-                    nameAr: item.nameAr ? `${item.nameAr} (نسخة)` : undefined,
+                    name: `${item.name} (Copy${copyCount ? ` ${copyCount + 1}` : ''})`,
+                    nameAr: item.nameAr ? `${item.nameAr} (نسخة${copyCount ? ` ${copyCount + 1}` : ''})` : undefined,
                     sortOrder: (item.sortOrder || 0) + 1,
                     versionHistory: [],
+                    archivedAt: undefined,
                 };
-                set((state) => ({
-                    categories: state.categories.map(c =>
-                        c.id === categoryId ? { ...c, items: [...c.items, newItem] } : c
-                    )
-                }));
-                return newItem;
+                const previousIds = new Set(cat?.items.map(candidate => candidate.id));
+                await get().addMenuItem(menuId, categoryId, newItem);
+                return get().categories
+                    .find(category => category.id === categoryId)
+                    ?.items.find(candidate => !previousIds.has(candidate.id)) || null;
             },
 
             addVersionEntry: (categoryId, itemId, entry) => set((state) => ({

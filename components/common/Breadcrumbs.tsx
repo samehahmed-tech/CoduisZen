@@ -25,6 +25,18 @@ const PATH_MAP: Record<string, string> = {
     'settings': 'settings',
 };
 
+const HR_PATH_LABELS: Record<string, { ar: string; en: string }> = {
+    hr: { ar: 'الموظفون', en: 'Employees' },
+    'hr-guide': { ar: 'دليل الموارد البشرية', en: 'HR Guide' },
+    'hr-settings': { ar: 'إعدادات الأقسام', en: 'HR Settings' },
+    attendance: { ar: 'الحضور والانصراف', en: 'Attendance' },
+    payroll: { ar: 'الرواتب والأجور', en: 'Payroll' },
+    'biometric-devices': { ar: 'أجهزة البصمة', en: 'Biometric Devices' },
+    scheduling: { ar: 'جدولة الورديات', en: 'Scheduling' },
+    'shift-tasks': { ar: 'قوائم المهام', en: 'Shift Tasks' },
+    forensics: { ar: 'التدقيق والتحقيقات', en: 'Forensics' },
+};
+
 const Breadcrumbs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -79,8 +91,11 @@ const Breadcrumbs: React.FC = () => {
 
             // Try to translate the segment, otherwise capitalize
             let name = segment;
+            const hrLabel = HR_PATH_LABELS[segment];
             const mappedKey = PATH_MAP[segment];
-            if (mappedKey && (t as any)[mappedKey]) {
+            if (hrLabel) {
+                name = hrLabel[language];
+            } else if (mappedKey && (t as any)[mappedKey]) {
                 name = (t as any)[mappedKey];
             } else if (segment.length === 36 && segment.includes('-')) {
                 name = isRtl ? 'تفاصيل' : 'Details'; // UUID detection
@@ -105,13 +120,13 @@ const Breadcrumbs: React.FC = () => {
     return (
         <nav
             aria-label="Breadcrumb"
-            className={`px-4 sm:px-6 pt-4 pb-2 flex items-center gap-4 max-lg:ps-14 ${isRtl ? 'flex-row-reverse' : ''}`}
+            className={`px-4 sm:px-6 pt-4 pb-2 flex items-center gap-2 sm:gap-4 max-lg:ps-14 ${isRtl ? 'flex-row-reverse' : ''}`}
         >
             <div className={`workspace-breadcrumbs flex-1 min-w-0 flex flex-col gap-2 ${isRtl ? 'workspace-breadcrumbs-rtl' : ''}`}>
                 <div className={`flex flex-wrap items-center gap-3 ${isRtl ? 'flex-row' : ''}`}>
                     <div className="flex items-center gap-1.5 bg-elevated/40 border border-border/10 px-2.5 py-1 rounded-lg">
                         <MapPin size={14} className="text-primary" />
-                        <span className="text-[11px] sm:text-xs font-bold text-main">
+                        <span className="max-w-[82px] truncate text-[11px] font-bold text-main sm:max-w-none sm:text-xs">
                             {activeBranch?.name || (isRtl ? 'الفرع الرئيسي' : 'Main Branch')}
                         </span>
                     </div>
@@ -143,7 +158,7 @@ const Breadcrumbs: React.FC = () => {
                     </div>
                 </div>
 
-                <ol className={`flex items-center gap-1.5 sm:gap-2.5 w-full flex-wrap`}>
+                <ol className="hidden w-full flex-wrap items-center gap-1.5 sm:flex sm:gap-2.5">
                 {breadcrumbs.map((crumb, index) => {
                     const isFirst = index === 0;
 
@@ -178,7 +193,7 @@ const Breadcrumbs: React.FC = () => {
             </div>
 
             {/* Right Side: Communication & User Profile */}
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
                 {/* Messages & Notifications */}
                 <div className="flex items-center gap-1.5 p-1 bg-elevated/40 border border-border/10 rounded-xl relative">
                     <button 
@@ -248,13 +263,13 @@ const Breadcrumbs: React.FC = () => {
                         type="button"
                         aria-label={isRtl ? 'فتح قائمة المستخدم' : 'Open user menu'}
                         onClick={() => { setShowUserMenu(!showUserMenu); setShowMessagesPanel(false); setShowNotificationsPanel(false); }}
-                        className="flex items-center gap-2.5 bg-elevated/40 hover:bg-elevated border border-border/10 p-1.5 pr-3 rtl:pr-1.5 rtl:pl-3 rounded-xl transition-all shadow-sm group"
+                        className="group flex items-center gap-0 rounded-xl border border-border/10 bg-elevated/40 p-1.5 shadow-sm transition-all hover:bg-elevated sm:gap-2.5 sm:pr-3 sm:rtl:pl-3 sm:rtl:pr-1.5"
                     >
                         <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white font-bold text-[11px] shrink-0 overflow-hidden shadow-inner group-hover:scale-105 transition-transform">
                             {userInitials}
                             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card" />
                         </div>
-                        <div className="flex flex-col items-start min-w-0 pr-1 text-left rtl:text-right">
+                        <div className="hidden min-w-0 flex-col items-start pr-1 text-left rtl:text-right sm:flex">
                             <span className="text-xs font-bold text-main leading-none truncate max-w-[100px]">{currentUser?.name || 'User'}</span>
                             <span className="text-[9px] font-semibold text-muted/60 uppercase tracking-widest mt-1 truncate">{currentUser?.role}</span>
                         </div>

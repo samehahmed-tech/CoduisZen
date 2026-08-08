@@ -3,7 +3,7 @@ import { db } from '../db';
 import { managerApprovals, auditLogs, users, journalEntries, financeExceptions } from '../../src/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { GLService } from '../services/glService';
-import { findApproverByPin } from '../services/managerApprovalAuth';
+import { findApproverByPassword, findApproverByPin } from '../services/managerApprovalAuth';
 
 const normalizeApproval = (approval: typeof managerApprovals.$inferSelect) => {
     const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
@@ -12,7 +12,7 @@ const normalizeApproval = (approval: typeof managerApprovals.$inferSelect) => {
         id: String(approval.id),
         type: approval.actionType,
         referenceId: approval.relatedId,
-        status: details.status || (approval.reason === 'PIN Verified' ? 'APPROVED' : 'PENDING'),
+        status: details.status || (['PIN Verified', 'Password Verified'].includes(String(approval.reason)) ? 'APPROVED' : 'PENDING'),
         details,
         resolvedAt: details.resolvedAt,
         resolvedBy: details.resolvedBy,
@@ -136,10 +136,13 @@ export const getApprovals = async (req: Request, res: Response) => {
  */
 export const verifyManagerPin = async (req: Request, res: Response) => {
     try {
-        const { branchId, pin, action, approvalId } = req.body;
+        const { branchId, pin, password, action, approvalId, relatedId } = req.body;
+        const usePassword = typeof password === 'string';
+        const credential = usePassword ? password : pin;
+        const verificationReason = usePassword ? 'Password Verified' : 'PIN Verified';
 
-        if (!pin || (!branchId && !approvalId)) {
-            return res.status(400).json({ error: 'pin and branchId or approvalId are required' });
+        if (!credential || (!branchId && !approvalId)) {
+            return res.status(400).json({ error: `${usePassword ? 'password' : 'pin'} and branchId or approvalId are required` });
         }
 
         const [approval] = approvalId
@@ -161,8 +164,11 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
             managerPin: users.managerPin,
             pinCodeHash: users.pinCodeHash,
             pinLoginEnabled: users.pinLoginEnabled,
+            passwordHash: users.passwordHash,
         }).from(users).where(eq(users.isActive, true));
-        const validManager = await findApproverByPin(approvers, String(pin), effectiveBranchId);
+        const validManager = usePassword
+            ? await findApproverByPassword(approvers, String(password), effectiveBranchId)
+            : await findApproverByPin(approvers, String(pin), effectiveBranchId);
 
         if (validManager) {
             if (approval) {
@@ -197,7 +203,7 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                 const [updatedApproval] = await db.update(managerApprovals)
                     .set({
                         managerId: validManager.id,
-                        reason: 'PIN Verified',
+                        reason: verificationReason,
                         details: resolvedDetails,
                     })
                     .output()
@@ -209,7 +215,7 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                     userName: validManager.name,
                     userRole: validManager.role,
                     branchId: effectiveBranchId,
-                    reason: 'PIN Verified',
+                    reason: verificationReason,
                     payload: { approvalId: approval.id, relatedId: approval.relatedId, actionType: approval.actionType },
                     createdAt: new Date(),
                 });
@@ -222,11 +228,12 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                 });
             }
 
-            await db.insert(managerApprovals).values({
+            const [createdApproval] = await db.insert(managerApprovals).values({
                 managerId: validManager.id,
                 branchId: effectiveBranchId,
                 actionType: effectiveAction,
-                reason: 'PIN Verified',
+                relatedId: relatedId ? String(relatedId) : null,
+                reason: verificationReason,
                 details: {
                     status: 'APPROVED',
                     resolvedAt: new Date().toISOString(),
@@ -234,20 +241,23 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                     resolvedByName: validManager.name,
                 },
                 createdAt: new Date(),
-            });
+            }).output();
 
             res.json({
                 approved: true,
                 managerId: validManager.id,
-                managerName: validManager.name
+                managerName: validManager.name,
+                approval: normalizeApproval(createdApproval),
             });
         } else {
-            res.json({ approved: false, error: 'Invalid PIN or insufficient permissions' });
+            res.json({ approved: false, error: `Invalid manager ${usePassword ? 'password' : 'PIN'} or insufficient permissions` });
         }
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const verifyManagerPassword = verifyManagerPin;
 
 export const rejectApproval = async (req: Request, res: Response) => {
     try {

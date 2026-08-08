@@ -26,26 +26,14 @@ const RetailModePanel: React.FC<RetailModePanelProps> = ({
   const isRTL = lang === 'ar';
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep input focused automatically
+  // Focus input on mount and after successful scan
   useEffect(() => {
     const focusTimer = setTimeout(() => {
-        if (inputRef.current) {
-            inputRef.current.focus();
-        }
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }, 100);
     return () => clearTimeout(focusTimer);
-  }, []);
-  
-  // Re-focus on window click unless user is typing somewhere else
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-            inputRef.current?.focus();
-        }
-    };
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
   }, []);
 
   const recentlyScanned = cartItems.slice().reverse().slice(0, 8); // show last 8 items

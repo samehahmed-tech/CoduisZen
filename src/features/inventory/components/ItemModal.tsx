@@ -54,7 +54,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                 auditFrequency: 'DAILY',
                 isComposite: false,
                 bom: [],
-                warehouseQuantities: warehouses.map(w => ({ warehouseId: w.id, quantity: 0 }))
+                warehouseQuantities: warehouses.length === 1 ? [{ warehouseId: warehouses[0].id, quantity: 0 }] : []
             });
         }
     }, [initialItem, warehouses, isOpen]);
@@ -104,9 +104,17 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (warehouses.length > 0 && !formData.warehouseQuantities?.length) {
+            showError(lang === 'ar' ? 'اختر مخزنًا واحدًا على الأقل للصنف' : 'Select at least one warehouse for the item');
+            return;
+        }
         setSaving(true);
         try {
             await onSave(formData as InventoryItem);
+        } catch (error: any) {
+            showError(error?.code === 'WAREHOUSE_STOCK_NOT_EMPTY' || error?.message === 'WAREHOUSE_STOCK_NOT_EMPTY'
+                ? (lang === 'ar' ? 'انقل أو صفّر رصيد المخزن قبل إلغاء ربط الصنف به' : 'Transfer or zero this warehouse stock before removing the assignment')
+                : (error?.message || (lang === 'ar' ? 'تعذر حفظ الصنف' : 'Failed to save item')));
         } finally {
             setSaving(false);
         }
@@ -275,23 +283,42 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                     {warehouses.length > 0 && (
                         <section className="space-y-4">
                             <h4 className="flex items-center gap-2 text-xs font-black text-indigo-600 uppercase tracking-[0.2em]">
-                                <Package size={14} /> {lang === 'ar'
-                                    ? (initialItem ? 'الكمية الحالية حسب المخزن' : 'الرصيد الافتتاحي حسب المخزن')
-                                    : (initialItem ? 'Current quantity by warehouse' : 'Opening stock by warehouse')}
+                                <Package size={14} /> {lang === 'ar' ? 'توزيع الصنف على المخازن' : 'Warehouse assignment'}
                             </h4>
+                            <p className="text-xs font-bold text-slate-500">
+                                {lang === 'ar' ? 'حدد المخازن التي يتوفر بها الصنف، ثم أدخل رصيده في كل مخزن.' : 'Choose where this item is available, then enter its quantity in each warehouse.'}
+                            </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {warehouses.map((warehouse) => {
-                                    const quantity = formData.warehouseQuantities?.find(row => row.warehouseId === warehouse.id)?.quantity || 0;
-                                    return <label key={warehouse.id} className="space-y-1.5">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase">{lang === 'ar' ? warehouse.nameAr || warehouse.name : warehouse.name}</span>
-                                        <input type="number" min="0" step="0.001" value={quantity} onChange={(event) => setFormData({
-                                            ...formData,
-                                            warehouseQuantities: warehouses.map(row => ({
-                                                warehouseId: row.id,
-                                                quantity: row.id === warehouse.id ? Math.max(0, Number(event.target.value || 0)) : formData.warehouseQuantities?.find(value => value.warehouseId === row.id)?.quantity || 0,
-                                            })),
-                                        })} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
-                                    </label>;
+                                    const assignedRow = formData.warehouseQuantities?.find(row => row.warehouseId === warehouse.id);
+                                    const assigned = Boolean(assignedRow);
+                                    return <div key={warehouse.id} className={`rounded-2xl border p-4 transition ${assigned ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                                        <label className="flex cursor-pointer items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={assigned}
+                                                onChange={(event) => setFormData(current => ({
+                                                    ...current,
+                                                    warehouseQuantities: event.target.checked
+                                                        ? [...(current.warehouseQuantities || []), { warehouseId: warehouse.id, quantity: 0 }]
+                                                        : (current.warehouseQuantities || []).filter(row => row.warehouseId !== warehouse.id),
+                                                }))}
+                                                className="h-5 w-5 accent-indigo-600"
+                                            />
+                                            <span className="text-sm font-black text-slate-700 dark:text-slate-200">{lang === 'ar' ? warehouse.nameAr || warehouse.name : warehouse.name}</span>
+                                        </label>
+                                        {assigned && <label className="mt-3 block space-y-1.5">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase">
+                                                {initialItem ? (lang === 'ar' ? 'الكمية الحالية' : 'Current quantity') : (lang === 'ar' ? 'الرصيد الافتتاحي' : 'Opening quantity')}
+                                            </span>
+                                            <input type="number" min="0" step="0.001" value={assignedRow?.quantity || 0} onChange={(event) => setFormData(current => ({
+                                                ...current,
+                                                warehouseQuantities: (current.warehouseQuantities || []).map(row => row.warehouseId === warehouse.id
+                                                    ? { ...row, quantity: Math.max(0, Number(event.target.value || 0)) }
+                                                    : row),
+                                            }))} className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
+                                        </label>}
+                                    </div>;
                                 })}
                             </div>
                         </section>
@@ -376,9 +403,14 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                             </select>
                                             <input
                                                 type="number"
-                                                placeholder="Qty"
-                                                value={ing.quantity}
-                                                onChange={e => handleUpdateIngredient(idx, 'quantity', Number(e.target.value))}
+                                                min="0.001"
+                                                step="0.001"
+                                                placeholder="0.000"
+                                                defaultValue={ing.quantity}
+                                                onBlur={e => {
+                                                    const quantity = e.currentTarget.valueAsNumber;
+                                                    handleUpdateIngredient(idx, 'quantity', Number.isFinite(quantity) && quantity >= 0.001 ? quantity : 0);
+                                                }}
                                                 className="w-24 px-4 py-2.5 card-primary rounded-xl outline-none text-sm font-bold"
                                             />
                                             <span className="hidden sm:block text-xs font-black text-slate-400 w-12">{existingItems.find(i => i.id === ing.itemId)?.unit || '-'}</span>

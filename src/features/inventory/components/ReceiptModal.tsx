@@ -21,6 +21,14 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
     const [selectedSupplierId, setSelectedSupplierId] = useState('');
     const [receivedItems, setReceivedItems] = useState<{ itemId: string; quantity: number; costPrice: number }[]>([]);
     const [saving, setSaving] = useState(false);
+    const hasValidItems = receivedItems.length > 0 && receivedItems.every(item => (
+        item.itemId
+        && Number.isFinite(Number(item.quantity))
+        && Number(item.quantity) > 0
+        && Number.isFinite(Number(item.costPrice))
+        && Number(item.costPrice) > 0
+    ));
+    const canSave = Boolean(selectedWarehouseId) && hasValidItems && !saving;
 
     if (!isOpen) return null;
 
@@ -50,15 +58,14 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
     };
 
     const saveReceipt = async () => {
-        const validItems = receivedItems.filter(item => item.itemId && Number(item.quantity) > 0);
-        if (!selectedWarehouseId || validItems.length === 0) return;
+        if (!canSave) return;
 
         setSaving(true);
         try {
             await onSave({
                 warehouseId: selectedWarehouseId,
                 supplierId: selectedSupplierId || undefined,
-                items: validItems,
+                items: receivedItems,
             });
             setReceivedItems([]);
             setSelectedSupplierId('');
@@ -159,7 +166,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
                                         <input
                                             type="number"
                                             step="0.001"
-                                            min="0"
+                                            min="0.001"
                                             value={item.quantity}
                                             onChange={e => handleUpdateItem(idx, 'quantity', Number(e.target.value))}
                                             className="w-full px-4 py-2 card-primary rounded-xl outline-none text-sm font-bold"
@@ -170,7 +177,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
                                         <input
                                             type="number"
                                             step="0.01"
-                                            min="0"
+                                            min="0.01"
                                             value={item.costPrice}
                                             onChange={e => handleUpdateItem(idx, 'costPrice', Number(e.target.value))}
                                             className="w-full px-4 py-2 card-primary rounded-xl outline-none text-sm font-bold"
@@ -205,7 +212,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
                         {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                     </button>
                     <button
-                        disabled={saving || receivedItems.length === 0 || !selectedWarehouseId}
+                        disabled={!canSave}
                         onClick={saveReceipt}
                         className="flex-1 py-4 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale transition-all"
                     >

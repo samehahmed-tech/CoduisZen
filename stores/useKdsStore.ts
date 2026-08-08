@@ -27,6 +27,35 @@ export interface KdsTicket {
     items: KdsItem[];
 }
 
+export const compareKdsTicketPriority = (
+    a: Pick<KdsTicket, 'priority' | 'createdAt'>,
+    b: Pick<KdsTicket, 'priority' | 'createdAt'>,
+) => {
+    const priorityGroup = (priority: KdsTicket['priority']) => priority === 'RUSH' || priority === 'REMAKE' ? 0 : 1;
+    return priorityGroup(a.priority) - priorityGroup(b.priority)
+        || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+};
+
+export const mergeKdsPriority = (
+    priorities: Array<KdsTicket['priority'] | null | undefined>,
+): KdsTicket['priority'] => priorities.includes('REMAKE')
+    ? 'REMAKE'
+    : priorities.includes('RUSH')
+        ? 'RUSH'
+        : 'NORMAL';
+
+export const advanceKdsTicketIdsOnce = async (
+    ticketIds: string[],
+    advanceTicket: (ticketId: string) => Promise<void>,
+) => {
+    for (const ticketId of ticketIds) await advanceTicket(ticketId);
+};
+
+export const hasNewKdsTicket = (
+    knownTicketIds: ReadonlySet<string>,
+    tickets: Array<Pick<KdsTicket, 'id'>>,
+) => tickets.some((ticket) => !knownTicketIds.has(ticket.id));
+
 interface KdsStore {
     tickets: KdsTicket[];
     isLoading: boolean;

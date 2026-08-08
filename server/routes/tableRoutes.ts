@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getTables, getZones, saveLayout, updateTableStatus, transferTableOrder, splitTableOrder, mergeTableOrders } from '../controllers/tableController';
+import { getTables, getZones, saveLayout, updateTableStatus, resetTable, transferTableOrder, splitTableOrder, mergeTableOrders } from '../controllers/tableController';
 import { requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
@@ -12,6 +12,10 @@ const managerAuth = requireRoleOrPermission(
     ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CAPTAIN'],
     ['CFG_EDIT_FLOOR_PLAN']
 );
+const adminResetAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
+    []
+);
 
 router.get('/', posAuth, enforceBranch, getTables);
 router.get('/zones', posAuth, enforceBranch, getZones);
@@ -20,5 +24,6 @@ router.post('/transfer', posAuth, enforceBranch, transferTableOrder);
 router.post('/split', posAuth, enforceBranch, splitTableOrder);
 router.post('/merge', posAuth, enforceBranch, mergeTableOrders);
 router.put('/:id/status', posAuth, enforceBranch, updateTableStatus); // Sync status
+router.post('/:id/reset', adminResetAuth, enforceBranch, resetTable);
 
 export default router;

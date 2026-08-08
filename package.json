@@ -1,13 +1,13 @@
 {
   "name": "restoflow-erp",
   "private": true,
-  "version": "1.1.16",
+  "version": "1.1.34",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "lint": "node --max-old-space-size=8192 ./node_modules/eslint/bin/eslint.js .",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit",
-    "server": "npx tsx --watch server/index.ts",
+    "server": "tsx scripts/dev-env-init.ts && tsx --watch server/index.ts",
     "dev:all": "node -e \"const { dirname, resolve } = require('path'); const { pathToFileURL } = require('url'); const root = dirname((process.env.npm_package_json || '').replace(/^\\\\\\\\\\\\?\\\\/, '')); process.argv.push('--bridge'); import(pathToFileURL(resolve(root, 'scripts/run-dev-stack.mjs')).href);\"",
     "dev:full": "node -e \"const { dirname, resolve } = require('path'); const { pathToFileURL } = require('url'); const root = dirname((process.env.npm_package_json || '').replace(/^\\\\\\\\\\\\?\\\\/, '')); process.argv.push('--bridge'); import(pathToFileURL(resolve(root, 'scripts/run-dev-stack.mjs')).href);\"",
     "preview:all": "node -e \"const { dirname, resolve } = require('path'); const { pathToFileURL } = require('url'); const root = dirname((process.env.npm_package_json || '').replace(/^\\\\\\\\\\\\?\\\\/, '')); process.argv.push('--bridge'); import(pathToFileURL(resolve(root, 'scripts/run-preview-stack.mjs')).href);\"",
@@ -60,6 +60,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "framer-motion": "^12.35.2",
+    "gpt4js": "^1.7.8",
     "helmet": "^8.1.0",
     "html2canvas": "^1.4.1",
     "i18next": "^26.0.5",

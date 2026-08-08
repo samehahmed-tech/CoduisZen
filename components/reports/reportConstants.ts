@@ -6,7 +6,7 @@ import type { ReportCategory } from './useReportsState';
 export const REPORT_CATEGORIES: ReportCategory[] = [
    { id: 'SALES', label: 'Sales & Revenue', color: '#10b981', icon: DollarSign, subReports: ['Daily Sales', 'Hourly Trends', 'Payment Mix', 'Cashier Summary', 'Refunds', 'Sales by Order Type', 'Sales by Item', 'Sales by Category', 'Discounts', 'Cancelled Orders', 'Sales by Source', 'Peak Hours Heatmap', 'Modifier Sales', 'Avg Ticket Trend', 'Sales Comparison', 'Slow-Moving Items', 'Revenue by Weekday', 'Void Items Log', 'Menu Engineering', 'Daypart Analysis', 'Basket Analysis', 'Seasonality', 'Online vs Offline', 'Menu Cannibalization', 'Menu Item Lifecycle', 'Category Contribution', 'Time-to-First-Order'] },
    { id: 'FINANCE', label: 'Financials & VAT', color: '#f59e0b', icon: Scale, subReports: ['Z-Report / Fiscal', 'Profit & Loss (P&L)', 'Trial Balance', 'Expense Report', 'Top Expenses', 'Tips Report', 'Service Charge', 'Shift Summary', 'Food Cost % Trend', 'Cash Flow Forecast', 'Tax Compliance', 'Audit Trail', 'Break-Even Analysis', 'Payment Reconciliation', 'Shift Profitability'] },
-   { id: 'INVENTORY', label: 'Inventory & Supply', color: '#06b6d4', icon: Box, subReports: ['COGS & Margin', 'Stock Movement', 'Waste/Loss Log', 'Reorder Alerts', 'Expiring Batches', 'Actual vs Theoretical', 'Purchase History', 'Inventory Valuation', 'Supplier Price Tracking', 'Recipe Cost Alerts', 'ABC Classification', 'Optimal Pricing'] },
+   { id: 'INVENTORY', label: 'Inventory & Supply', color: '#06b6d4', icon: Box, subReports: ['COGS & Margin', 'Stock Counts', 'Stock Movement', 'Waste/Loss Log', 'Reorder Alerts', 'Expiring Batches', 'Actual vs Theoretical', 'Purchase History', 'Inventory Valuation', 'Supplier Price Tracking', 'Recipe Cost Alerts', 'ABC Classification', 'Optimal Pricing'] },
    { id: 'HR', label: 'HR & Payroll', color: '#0f766e', icon: Users, subReports: ['HR Executive Summary', 'Payroll Summary', 'Payroll Ledger', 'Attendance & Delays', 'Attendance Exceptions', 'Overtime Report', 'Staff Cost %', 'Sales per Labor Hour', 'Employee Productivity'] },
    { id: 'CRM', label: 'Customers & CRM', color: '#ec4899', icon: Megaphone, subReports: ['Customer LTV', 'Campaign ROI', 'Customer Retention', 'New vs Returning', 'Customer Frequency', 'Customer Churn', 'Loyalty Points', 'Promotion Impact', 'Customer Journey Funnel'] },
    { id: 'OPS', label: 'Operations', color: '#3b82f6', icon: Activity, subReports: ['Branch Performance', 'Order Preparation Time', 'Delivery Performance', 'Dine-in Tables', 'Kitchen Performance', 'Table Turnover', 'Wait Time', 'Driver Utilization', 'Branch Comparison', 'Delivery Zone Analytics', 'Delivery Cost vs Revenue', '3rd Party vs In-House'] },
@@ -65,6 +65,7 @@ export const REPORT_DISPLAY_LABELS: Record<string, string> = {
    'Shift Profitability': 'ربحية الورديات',
    'COGS & Margin': 'تكلفة البضاعة والهامش',
    'Stock Movement': 'حركة المخزون',
+   'Stock Counts': 'تقارير الجرد',
    'Waste/Loss Log': 'سجل الهدر والعجز',
    'Reorder Alerts': 'تنبيهات إعادة الطلب',
    'Expiring Batches': 'تشغيلات قرب الانتهاء',
@@ -120,7 +121,7 @@ export const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 export const getExportReportType = (sub: string): string => {
    const map: Record<string, string> = {
       'Trial Balance': 'TRIAL_BALANCE', 'Expense Report': 'EXPENSE_REPORT', 'Top Expenses': 'TOP_EXPENSES', 'Profit & Loss (P&L)': 'PROFIT_LOSS',
-      'Stock Movement': 'STOCK_MOVEMENTS', 'Waste/Loss Log': 'WASTE_LOSS', 'Reorder Alerts': 'REORDER_ALERTS',
+       'Stock Movement': 'STOCK_MOVEMENTS', 'Stock Counts': 'STOCK_COUNTS', 'Waste/Loss Log': 'WASTE_LOSS', 'Reorder Alerts': 'REORDER_ALERTS',
       'Expiring Batches': 'EXPIRING_BATCHES', 'HR Executive Summary': 'PAYROLL', 'Payroll Summary': 'PAYROLL', 'Payroll Ledger': 'PAYROLL', 'Attendance & Delays': 'ATTENDANCE',
       'Attendance Exceptions': 'ATTENDANCE', 'Overtime Report': 'OVERTIME', 'Customer LTV': 'CUSTOMER_LTV', 'Campaign ROI': 'CAMPAIGN_ROI',
       'Branch Performance': 'BRANCH_PERFORMANCE', 'Order Preparation Time': 'ORDER_PREP_TIME',
@@ -152,7 +153,10 @@ export const getExportReportType = (sub: string): string => {
       'Optimal Pricing': 'OPTIMAL_PRICING', '3rd Party vs In-House': 'THIRD_PARTY_VS_INHOUSE',
       'Time-to-First-Order': 'TIME_TO_FIRST_ORDER',
    };
-   return map[sub] || sub.toUpperCase().replace(/\s+/g, '_');
+   return map[sub] || sub
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
 };
 
 export const SUPPORTED_TABULAR_EXPORT_TYPES = new Set([

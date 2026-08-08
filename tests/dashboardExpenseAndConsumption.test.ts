@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { branches, inventoryItems, inventoryStock, stockMovements, userSessions, users, warehouses } from '../src/db/schema';
+import { branches, inventoryItems, inventoryStock, orders, stockMovements, userSessions, users, warehouses } from '../src/db/schema';
 import { COASeedService } from '../server/services/coaSeedService';
 import { GLService } from '../server/services/glService';
+import { dayCloseService } from '../server/services/dayCloseService';
 
 let app: any;
 let db: typeof import('../server/db')['db'];
+
+const localDateKey = (date = new Date()) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 const createAuthContext = async () => {
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -59,6 +63,31 @@ describe('dashboard expenses and recipe consumption regressions', () => {
         }
     });
 
+    it('returns collected tax as an independent dashboard total', async () => {
+        const { branchId, auth, suffix } = await createAuthContext();
+        const today = localDateKey();
+        await db.insert(orders).values({
+            id: `test-dashboard-tax-${suffix}`,
+            type: 'TAKEAWAY',
+            branchId,
+            status: 'COMPLETED',
+            subtotal: 100,
+            discount: 0,
+            tax: 14,
+            total: 114,
+            businessDate: today,
+            completedAt: new Date(),
+        });
+
+        const response = await request(app)
+            .get(`/api/reports/dashboard-kpis?branchId=${branchId}&startDate=${today}&endDate=${today}&scope=DAILY`)
+            .set('Authorization', auth);
+
+        expect(response.status).toBe(200);
+        expect(Number(response.body.totals.taxTotal)).toBe(14);
+        expect(Number(response.body.totals.revenue)).toBe(114);
+    });
+
     it('keeps stock COGS out of operating expenses on dashboard and expense report', async () => {
         const { branchId, userId, auth, suffix } = await createAuthContext();
         await GLService.postJournalEntry({
@@ -86,7 +115,7 @@ describe('dashboard expenses and recipe consumption regressions', () => {
             ],
         });
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateKey();
         const dashboard = await request(app)
             .get(`/api/reports/dashboard-kpis?branchId=${branchId}&startDate=${today}&endDate=${today}&scope=DAILY`)
             .set('Authorization', auth);
@@ -100,6 +129,11 @@ describe('dashboard expenses and recipe consumption regressions', () => {
         expect(expenses.status, JSON.stringify(expenses.body)).toBe(200);
         expect(expenses.body.rows).toHaveLength(1);
         expect(expenses.body.rows[0].referenceType).toBe('EXPENSE');
+
+        const dayClose = await dayCloseService.generateReport(branchId, today);
+        expect(dayClose.financeSummary.expenses).toBe(25);
+        expect(dayClose.financeSummary.topExpenses).toHaveLength(1);
+        expect(dayClose.financeSummary.topExpenses[0].total).toBe(25);
     });
 
     it('returns current stock across the branch even when an old deduction points at another warehouse', async () => {
@@ -122,7 +156,7 @@ describe('dashboard expenses and recipe consumption regressions', () => {
             createdAt: new Date(),
         });
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateKey();
         const response = await request(app)
             .get(`/api/inventory/stock/recipe-consumption?branchId=${branchId}&startDate=${today}&endDate=${today}`)
             .set('Authorization', auth);

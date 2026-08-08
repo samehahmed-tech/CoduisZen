@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { tables, floorZones, orders, orderItems, settings, branches } from '../../src/db/schema';
-import { eq } from 'drizzle-orm';
+import { tables, floorZones, orders, orderItems, orderStatusHistory, settings, branches } from '../../src/db/schema';
+import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import { logger } from '../utils/logger';
 import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
+import { createSignedAuditLog } from '../services/auditService';
+import { allocateDailyOrderNumber } from '../services/orderNumberService';
 
 const tableRefKey = (referenceId: string) => `tableOpRef:${referenceId}`;
 
@@ -30,10 +32,17 @@ const parseLayoutInt = (value: unknown, fallback: number) => {
     return Math.round(parsed);
 };
 
+const parseLayoutNumber = (value: unknown, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const parseLayoutText = (value: unknown, fallback: string) => {
     const text = String(value ?? '').trim();
     return text || fallback;
 };
+
+const normalizeCouponCode = (value: unknown) => String(value ?? '').trim().toUpperCase() || null;
 
 const normalizeTableShape = (value: unknown) => {
     const shape = parseLayoutText(value, 'square').toLowerCase();
@@ -43,7 +52,8 @@ const normalizeTableShape = (value: unknown) => {
 
 const normalizeTableStatus = (value: unknown) => {
     const status = parseLayoutText(value, 'AVAILABLE').toUpperCase();
-    if (['AVAILABLE', 'OCCUPIED', 'RESERVED', 'DIRTY', 'OUT_OF_SERVICE'].includes(status)) return status;
+    if (status === 'AVAILABLE') return 'AVAILABLE';
+    if (['OCCUPIED', 'RESERVED', 'DIRTY', 'OUT_OF_SERVICE'].includes(status)) return 'OCCUPIED';
     return 'AVAILABLE';
 };
 
@@ -67,6 +77,13 @@ const normalizeTableLayout = (table: any, branchId: string) => ({
     height: parseLayoutInt(table?.height, 100),
     shape: normalizeTableShape(table?.shape),
     seats: Math.max(1, parseLayoutInt(table?.seats, 4)),
+    discount: normalizeCouponCode(table?.defaultCouponCode)
+        ? 0
+        : Math.min(100, Math.max(0, parseLayoutNumber(table?.discount, 0))),
+    defaultCouponCode: normalizeCouponCode(table?.defaultCouponCode),
+    minSpend: Math.max(0, parseLayoutNumber(table?.minSpend, 0)),
+    isVIP: table?.isVIP === true,
+    notes: String(table?.notes ?? '').trim() || null,
     status: normalizeTableStatus(table?.status),
     updatedAt: new Date(),
 });
@@ -77,7 +94,10 @@ export const getTables = async (req: Request, res: Response) => {
         if (!branchId) return res.status(400).json({ error: 'Branch ID required' });
 
         const allTables = await db.select().from(tables).where(eq(tables.branchId, branchId));
-        res.json(allTables);
+        res.json(allTables.map((table) => ({
+            ...table,
+            status: normalizeTableStatus(table.status),
+        })));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -179,10 +199,15 @@ export const saveLayout = async (req: Request, res: Response) => {
                         width: table.width,
                         height: table.height,
                         shape: table.shape,
-                        seats: table.seats,
-                        name: table.name,
-                        zoneId: table.zoneId,
-                        updatedAt: new Date()
+                         seats: table.seats,
+                         name: table.name,
+                         zoneId: table.zoneId,
+                         discount: table.discount,
+                         defaultCouponCode: table.defaultCouponCode,
+                         minSpend: table.minSpend,
+                         isVIP: table.isVIP,
+                         notes: table.notes,
+                         updatedAt: new Date()
                     })
                         .where(eq(tables.id, table.id));
                 } else {
@@ -220,6 +245,10 @@ export const updateTableStatus = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'TABLE_ID_REQUIRED' });
         const { status, currentOrderId, reference_id } = req.body || {};
+        const normalizedStatus = String(status || '').toUpperCase();
+        if (!['AVAILABLE', 'OCCUPIED'].includes(normalizedStatus)) {
+            return res.status(400).json({ error: 'TABLE_STATUS_INVALID' });
+        }
 
         if (reference_id) {
             const replayKey = `tableStatusRef:${String(reference_id)}`;
@@ -234,7 +263,7 @@ export const updateTableStatus = async (req: Request, res: Response) => {
 
         const [updatedTable] = await db.update(tables)
             .set({
-                status,
+                status: normalizedStatus,
                 currentOrderId: currentOrderId || null,
                 updatedAt: new Date()
             })
@@ -277,14 +306,110 @@ export const updateTableStatus = async (req: Request, res: Response) => {
     }
 };
 
-const findActiveOrderByTable = async (tx: typeof db, tableId: string) => {
-    const rows = await tx.select().from(orders).where(eq(orders.tableId, tableId));
-    return rows.find((o) => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(String(o.status)));
+const emitTableReset = (branchId: string, tableId: string, orderIds: string[], changedAt: Date) => {
+    try {
+        const branchRoom = getIO().to(`branch:${branchId}`);
+        branchRoom.emit('table:status', { id: tableId, status: 'AVAILABLE', currentOrderId: null, resetOrderIds: orderIds });
+        orderIds.forEach((orderId) => branchRoom.emit('order:status', {
+            id: orderId,
+            status: 'CANCELLED',
+            updatedAt: changedAt.toISOString(),
+        }));
+    } catch {
+        // Reset is already committed; clients will receive canonical state on their next refresh.
+    }
 };
 
-const computeSubtotalFromItems = async (tx: typeof db, orderId: string) => {
-    const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-    return items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+export const resetTable = async (req: Request, res: Response) => {
+    try {
+        const id = getStringParam((req.params as any).id);
+        const branchId = req.effectiveBranchId;
+        const reason = String(req.body?.reason || 'Admin reset for a stuck table').trim().slice(0, 240);
+        if (!id || !branchId) return res.status(400).json({ error: 'TABLE_AND_BRANCH_REQUIRED' });
+
+        const [table] = await db.select().top(1).from(tables)
+            .where(and(eq(tables.id, id), eq(tables.branchId, branchId)));
+        if (!table) return res.status(404).json({ error: 'TABLE_NOT_FOUND' });
+
+        const activeOrders = await db.select({ id: orders.id }).from(orders).where(and(
+            eq(orders.branchId, branchId),
+            eq(orders.tableId, id),
+            notInArray(orders.status, ['DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED']),
+        ));
+        const orderIds = activeOrders.map((order) => order.id);
+        const now = new Date();
+
+        await db.transaction(async (tx) => {
+            if (orderIds.length > 0) {
+                await tx.update(orders).set({
+                    status: 'CANCELLED',
+                    cancelledAt: now,
+                    cancelReason: reason,
+                    updatedAt: now,
+                }).where(inArray(orders.id, orderIds));
+                await tx.insert(orderStatusHistory).values(orderIds.map((orderId) => ({
+                    orderId,
+                    status: 'CANCELLED',
+                    changedBy: req.user?.id,
+                    notes: reason,
+                    createdAt: now,
+                })));
+            }
+            await tx.update(tables).set({
+                status: 'AVAILABLE',
+                currentOrderId: null,
+                lockedByUserId: null,
+                updatedAt: now,
+            }).where(and(eq(tables.id, id), eq(tables.branchId, branchId)));
+        });
+
+        await createSignedAuditLog({
+            eventType: 'TABLE_FORCE_RESET',
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            branchId,
+            before: { status: table.status, currentOrderId: table.currentOrderId, activeOrderIds: orderIds },
+            after: { status: 'AVAILABLE', currentOrderId: null },
+            reason,
+        });
+
+        const payload = { id, status: 'AVAILABLE', currentOrderId: null, resetOrderIds: orderIds };
+        emitTableReset(branchId, id, orderIds, now);
+        res.json(payload);
+    } catch (error: any) {
+        logger.error({ error: error.message }, 'Failed to reset table');
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const TERMINAL_ORDER_STATUSES = ['DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED'];
+const money = (value: number) => Number(value.toFixed(2));
+
+const findActiveOrderByTable = async (tx: any, tableId: string, branchId: string) => {
+    const [table] = await tx.select({ currentOrderId: tables.currentOrderId, status: tables.status })
+        .from(tables)
+        .where(and(eq(tables.id, tableId), eq(tables.branchId, branchId)))
+        .top(1);
+    if (!table?.currentOrderId || String(table.status).toUpperCase() === 'AVAILABLE') return null;
+
+    const [order] = await tx.select().top(1).from(orders).where(and(
+        eq(orders.id, table.currentOrderId),
+        eq(orders.tableId, tableId),
+        eq(orders.branchId, branchId),
+        notInArray(orders.status, TERMINAL_ORDER_STATUSES),
+    ));
+    return order || null;
+};
+
+const assertTablePairInBranch = async (tx: any, sourceTableId: string, targetTableId: string, branchId: string) => {
+    const rows = await tx.select({ id: tables.id }).from(tables).where(and(
+        eq(tables.branchId, branchId),
+        inArray(tables.id, [sourceTableId, targetTableId]),
+    ));
+    const ids = new Set(rows.map((row: any) => String(row.id)));
+    if (!ids.has(sourceTableId)) throw new Error('SOURCE_TABLE_NOT_FOUND');
+    if (!ids.has(targetTableId)) throw new Error('TARGET_TABLE_NOT_FOUND');
 };
 
 const recalcOrderTotals = async (tx: any, orderId: string) => {
@@ -293,36 +418,27 @@ const recalcOrderTotals = async (tx: any, orderId: string) => {
 
     const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
     
-    let subtotal = 0;
-    let itemsTax = 0;
-    
-    for (const item of items) {
-        const linePrice = Number(item.price || 0);
-        const lineQty = Number(item.quantity || 0);
-        subtotal += linePrice * lineQty;
-        
-        // Use item tax if available, otherwise calculate 14%
-        if (item.tax !== undefined && item.tax !== null && item.tax !== 0) {
-            itemsTax += Number(item.tax);
-        } else {
-            itemsTax += parseFloat(((linePrice * lineQty) * 0.14).toFixed(2));
-        }
-    }
+    const subtotal = money(items.reduce(
+        (sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0,
+    ));
+    const itemsTax = money(items.reduce((sum: number, item: any) => sum + Number(item.tax || 0), 0));
 
     const discountAmount = Number(order.discount || 0);
     const netAmount = Math.max(0, subtotal - discountAmount);
     
     // Proportional tax reduction if discount exists
     const taxRatio = subtotal > 0 ? (netAmount / subtotal) : 0;
-    const tax = parseFloat((itemsTax * taxRatio).toFixed(2));
+    const tax = money(itemsTax * taxRatio);
 
     let serviceCharge = Number(order.serviceCharge || 0);
     if (order.type === 'DINE_IN' && subtotal > 0) {
         const [branchRecord] = await tx.select({ serviceCharge: branches.serviceCharge })
             .top(1).from(branches).where(eq(branches.id, order.branchId));
         
-        const serviceRate = branchRecord?.serviceCharge || 0.12;
-        serviceCharge = parseFloat((netAmount * serviceRate).toFixed(2));
+        const configuredRate = Math.max(0, Number(branchRecord?.serviceCharge ?? 0));
+        const serviceRate = configuredRate > 1 ? configuredRate / 100 : configuredRate;
+        serviceCharge = money(netAmount * serviceRate);
     }
 
     const total = netAmount + tax + serviceCharge + Number(order.deliveryFee || 0);
@@ -339,9 +455,9 @@ const recalcOrderTotals = async (tx: any, orderId: string) => {
 };
 
 const pickItemsToMove = async (
-    tx: typeof db,
+    tx: any,
     sourceOrderId: string,
-    selectedItems: Array<{ name?: string; price?: number; quantity?: number }>
+    selectedItems: Array<{ id?: string | number; name?: string; price?: number; quantity?: number }>
 ) => {
     const sourceItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, sourceOrderId));
     if (!selectedItems || selectedItems.length === 0) {
@@ -352,16 +468,19 @@ const pickItemsToMove = async (
     const picked: typeof sourceItems = [];
 
     for (const reqItem of selectedItems) {
+        const targetId = String(reqItem?.id ?? '').trim();
         const targetName = String(reqItem?.name || '').trim().toLowerCase();
         const targetPrice = Number(reqItem?.price || 0);
-        let neededQty = Math.max(1, Number(reqItem?.quantity || 1));
+        let neededQty = Number(reqItem?.quantity ?? 1);
+        if (!Number.isInteger(neededQty) || neededQty <= 0) throw new Error('INVALID_ITEM_QUANTITY');
 
         for (let i = 0; i < remaining.length && neededQty > 0; i += 1) {
             const candidate = remaining[i];
             if (!candidate) continue;
+            const sameId = targetId && String(candidate.id) === targetId;
             const sameName = String(candidate.name || '').trim().toLowerCase() === targetName;
             const samePrice = Number(candidate.price || 0) === targetPrice;
-            if (!sameName || !samePrice) continue;
+            if (targetId ? !sameId : (!sameName || !samePrice)) continue;
 
             const availableQty = Number(candidate.quantity || 0);
             if (availableQty <= 0) continue;
@@ -377,17 +496,67 @@ const pickItemsToMove = async (
                 remaining[i] = { ...candidate, quantity: availableQty - takeQty };
             }
         }
+        if (neededQty > 0) throw new Error('ORDER_ITEM_QUANTITY_UNAVAILABLE');
     }
 
     return picked;
 };
 
+const movePickedItems = async (tx: any, pickedItems: any[], targetOrderId: string) => {
+    for (const item of pickedItems) {
+        const [row] = await tx.select().top(1).from(orderItems).where(eq(orderItems.id, item.id));
+        if (!row) throw new Error('ORDER_ITEM_NOT_FOUND');
+
+        const existingQty = Number(row.quantity || 0);
+        const moveQty = Number(item.quantity || 0);
+        if (moveQty <= 0 || moveQty > existingQty) throw new Error('ORDER_ITEM_QUANTITY_UNAVAILABLE');
+
+        const movedTax = money((Number(row.tax || 0) / existingQty) * moveQty);
+        const nextQty = existingQty - moveQty;
+        if (nextQty === 0) {
+            await tx.delete(orderItems).where(eq(orderItems.id, row.id));
+        } else {
+            await tx.update(orderItems).set({
+                quantity: nextQty,
+                tax: money(Number(row.tax || 0) - movedTax),
+            }).where(eq(orderItems.id, row.id));
+        }
+
+        await tx.insert(orderItems).values({
+            orderId: targetOrderId,
+            menuItemId: row.menuItemId,
+            name: row.name,
+            nameAr: row.nameAr,
+            price: row.price,
+            cost: row.cost,
+            quantity: moveQty,
+            tax: movedTax,
+            notes: row.notes,
+            modifiers: row.modifiers as any,
+            status: row.status || 'PENDING',
+            seatNumber: row.seatNumber,
+            course: row.course,
+        });
+    }
+};
+
+const movedDiscountAmount = (order: any, pickedItems: any[]) => {
+    const subtotal = Math.max(0, Number(order.subtotal || 0));
+    if (subtotal === 0) return 0;
+    const movedSubtotal = pickedItems.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0,
+    );
+    return money(Number(order.discount || 0) * Math.min(1, movedSubtotal / subtotal));
+};
+
 export const transferTableOrder = async (req: Request, res: Response) => {
     try {
         const { sourceTableId, targetTableId, reference_id } = req.body || {};
+        const branchId = req.effectiveBranchId;
         const replayId = reference_id ? String(reference_id) : '';
-        if (!sourceTableId || !targetTableId) {
-            return res.status(400).json({ error: 'SOURCE_TARGET_REQUIRED' });
+        if (!sourceTableId || !targetTableId || !branchId) {
+            return res.status(400).json({ error: 'SOURCE_TARGET_BRANCH_REQUIRED' });
         }
         if (sourceTableId === targetTableId) {
             return res.status(400).json({ error: 'SOURCE_EQUALS_TARGET' });
@@ -398,10 +567,11 @@ export const transferTableOrder = async (req: Request, res: Response) => {
         }
 
         const result = await db.transaction(async (tx) => {
-            const sourceOrder = await findActiveOrderByTable(tx as any, String(sourceTableId));
+            await assertTablePairInBranch(tx, String(sourceTableId), String(targetTableId), branchId);
+            const sourceOrder = await findActiveOrderByTable(tx, String(sourceTableId), branchId);
             if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
-            const targetOrder = await findActiveOrderByTable(tx as any, String(targetTableId));
+            const targetOrder = await findActiveOrderByTable(tx, String(targetTableId), branchId);
             if (targetOrder) throw new Error('TARGET_TABLE_HAS_ACTIVE_ORDER');
 
             const [movedOrder] = await tx.update(orders).set({
@@ -413,13 +583,13 @@ export const transferTableOrder = async (req: Request, res: Response) => {
                 status: 'AVAILABLE',
                 currentOrderId: null,
                 updatedAt: new Date(),
-            }).where(eq(tables.id, String(sourceTableId)));
+            }).where(and(eq(tables.id, String(sourceTableId)), eq(tables.branchId, branchId)));
 
             await tx.update(tables).set({
                 status: 'OCCUPIED',
                 currentOrderId: movedOrder.id,
                 updatedAt: new Date(),
-            }).where(eq(tables.id, String(targetTableId)));
+            }).where(and(eq(tables.id, String(targetTableId)), eq(tables.branchId, branchId)));
 
             return { movedOrder };
         });
@@ -448,9 +618,10 @@ export const transferTableOrder = async (req: Request, res: Response) => {
 export const splitTableOrder = async (req: Request, res: Response) => {
     try {
         const { sourceTableId, targetTableId, items, reference_id } = req.body || {};
+        const branchId = req.effectiveBranchId;
         const replayId = reference_id ? String(reference_id) : '';
-        if (!sourceTableId || !targetTableId) {
-            return res.status(400).json({ error: 'SOURCE_TARGET_REQUIRED' });
+        if (!sourceTableId || !targetTableId || !branchId) {
+            return res.status(400).json({ error: 'SOURCE_TARGET_BRANCH_REQUIRED' });
         }
         if (sourceTableId === targetTableId) {
             return res.status(400).json({ error: 'SOURCE_EQUALS_TARGET' });
@@ -461,21 +632,31 @@ export const splitTableOrder = async (req: Request, res: Response) => {
         }
 
         const result = await db.transaction(async (tx) => {
-            const sourceOrder = await findActiveOrderByTable(tx as any, String(sourceTableId));
+            await assertTablePairInBranch(tx, String(sourceTableId), String(targetTableId), branchId);
+            const sourceOrder = await findActiveOrderByTable(tx, String(sourceTableId), branchId);
             if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
-            const targetOrder = await findActiveOrderByTable(tx as any, String(targetTableId));
+            const targetOrder = await findActiveOrderByTable(tx, String(targetTableId), branchId);
             if (targetOrder) throw new Error('TARGET_TABLE_HAS_ACTIVE_ORDER');
 
-            const pickedItems = await pickItemsToMove(tx as any, sourceOrder.id, Array.isArray(items) ? items : []);
+            const pickedItems = await pickItemsToMove(tx, sourceOrder.id, Array.isArray(items) ? items : []);
             if (pickedItems.length === 0) throw new Error('NO_ITEMS_SELECTED');
+
+            const [branch] = await tx.select({ businessDate: branches.businessDate }).top(1)
+                .from(branches).where(eq(branches.id, branchId));
+            const businessDate = sourceOrder.businessDate || branch?.businessDate;
+            if (!businessDate) throw new Error('BUSINESS_DATE_REQUIRED');
+            const orderNumber = await allocateDailyOrderNumber(tx, branchId, businessDate);
+            const movedDiscount = movedDiscountAmount(sourceOrder, pickedItems);
 
             const newOrderId = `split-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             const [newOrder] = await tx.insert(orders).output().values({
                 id: newOrderId,
+                parentOrderId: sourceOrder.id,
+                orderNumber,
                 type: sourceOrder.type,
                 source: sourceOrder.source,
-                branchId: sourceOrder.branchId,
+                branchId,
                 tableId: String(targetTableId),
                 customerId: sourceOrder.customerId,
                 customerName: sourceOrder.customerName,
@@ -484,7 +665,9 @@ export const splitTableOrder = async (req: Request, res: Response) => {
                 isCallCenterOrder: sourceOrder.isCallCenterOrder,
                 status: 'PENDING',
                 subtotal: 0,
-                discount: 0,
+                discount: movedDiscount,
+                discountType: sourceOrder.discountType,
+                discountReason: sourceOrder.discountReason,
                 tax: 0,
                 deliveryFee: 0,
                 serviceCharge: 0,
@@ -493,36 +676,17 @@ export const splitTableOrder = async (req: Request, res: Response) => {
                 isUrgent: sourceOrder.isUrgent,
                 notes: sourceOrder.notes,
                 syncStatus: sourceOrder.syncStatus || 'SYNCED',
+                businessDate,
+                shiftId: sourceOrder.shiftId,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
 
-            for (const item of pickedItems) {
-                // reduce quantity/delete from source rows
-            const [row] = await tx.select().top(1).from(orderItems).where(eq(orderItems.id, item.id));
-                if (!row) continue;
-                const existingQty = Number(row.quantity || 0);
-                const moveQty = Number(item.quantity || 0);
-                const nextQty = existingQty - moveQty;
-                if (nextQty <= 0) {
-                    await tx.delete(orderItems).where(eq(orderItems.id, row.id));
-                } else {
-                    await tx.update(orderItems).set({ quantity: nextQty }).where(eq(orderItems.id, row.id));
-                }
-
-                await tx.insert(orderItems).values({
-                    orderId: newOrder.id,
-                    menuItemId: item.menuItemId,
-                    name: item.name,
-                    nameAr: item.nameAr,
-                    price: item.price,
-                    quantity: moveQty,
-                    tax: item.tax ? parseFloat(((Number(item.tax) / existingQty) * moveQty).toFixed(2)) : parseFloat(((Number(item.price) * moveQty) * 0.14).toFixed(2)),
-                    notes: item.notes,
-                    modifiers: item.modifiers as any,
-                    status: 'PENDING',
-                });
-            }
+            await tx.update(orders).set({
+                discount: money(Number(sourceOrder.discount || 0) - movedDiscount),
+                updatedAt: new Date(),
+            }).where(eq(orders.id, sourceOrder.id));
+            await movePickedItems(tx, pickedItems, newOrder.id);
 
             const updatedSource = await recalcOrderTotals(tx as any, sourceOrder.id);
             const updatedTarget = await recalcOrderTotals(tx as any, newOrder.id);
@@ -531,7 +695,7 @@ export const splitTableOrder = async (req: Request, res: Response) => {
                 status: 'OCCUPIED',
                 currentOrderId: newOrder.id,
                 updatedAt: new Date(),
-            }).where(eq(tables.id, String(targetTableId)));
+            }).where(and(eq(tables.id, String(targetTableId)), eq(tables.branchId, branchId)));
 
             return { sourceOrder: updatedSource, targetOrder: updatedTarget };
         });
@@ -561,9 +725,10 @@ export const splitTableOrder = async (req: Request, res: Response) => {
 export const mergeTableOrders = async (req: Request, res: Response) => {
     try {
         const { sourceTableId, targetTableId, items, reference_id } = req.body || {};
+        const branchId = req.effectiveBranchId;
         const replayId = reference_id ? String(reference_id) : '';
-        if (!sourceTableId || !targetTableId) {
-            return res.status(400).json({ error: 'SOURCE_TARGET_REQUIRED' });
+        if (!sourceTableId || !targetTableId || !branchId) {
+            return res.status(400).json({ error: 'SOURCE_TARGET_BRANCH_REQUIRED' });
         }
         if (sourceTableId === targetTableId) {
             return res.status(400).json({ error: 'SOURCE_EQUALS_TARGET' });
@@ -574,63 +739,54 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
         }
 
         const result = await db.transaction(async (tx) => {
-            const sourceOrder = await findActiveOrderByTable(tx as any, String(sourceTableId));
+            await assertTablePairInBranch(tx, String(sourceTableId), String(targetTableId), branchId);
+            const sourceOrder = await findActiveOrderByTable(tx, String(sourceTableId), branchId);
             if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
-            const targetOrder = await findActiveOrderByTable(tx as any, String(targetTableId));
+            const targetOrder = await findActiveOrderByTable(tx, String(targetTableId), branchId);
             if (!targetOrder) throw new Error('TARGET_ORDER_NOT_FOUND');
 
-            const pickedItems = await pickItemsToMove(tx as any, sourceOrder.id, Array.isArray(items) ? items : []);
+            const pickedItems = await pickItemsToMove(tx, sourceOrder.id, Array.isArray(items) ? items : []);
             if (pickedItems.length === 0) throw new Error('NO_ITEMS_SELECTED');
-
-            for (const item of pickedItems) {
-                const [row] = await tx.select().top(1).from(orderItems).where(eq(orderItems.id, item.id));
-                if (!row) continue;
-                const existingQty = Number(row.quantity || 0);
-                const moveQty = Number(item.quantity || 0);
-                const nextQty = existingQty - moveQty;
-
-                if (nextQty <= 0) {
-                    await tx.delete(orderItems).where(eq(orderItems.id, row.id));
-                } else {
-                    await tx.update(orderItems).set({ quantity: nextQty }).where(eq(orderItems.id, row.id));
-                }
-
-                await tx.insert(orderItems).values({
-                    orderId: targetOrder.id,
-                    menuItemId: item.menuItemId,
-                    name: item.name,
-                    nameAr: item.nameAr,
-                    price: item.price,
-                    quantity: moveQty,
-                    tax: item.tax ? parseFloat(((Number(item.tax) / existingQty) * moveQty).toFixed(2)) : parseFloat(((Number(item.price) * moveQty) * 0.14).toFixed(2)),
-                    notes: item.notes,
-                    modifiers: item.modifiers as any,
-                    status: 'PENDING',
-                });
-            }
+            const movedDiscount = movedDiscountAmount(sourceOrder, pickedItems);
+            await tx.update(orders).set({
+                discount: money(Number(sourceOrder.discount || 0) - movedDiscount),
+                updatedAt: new Date(),
+            }).where(eq(orders.id, sourceOrder.id));
+            await tx.update(orders).set({
+                discount: money(Number(targetOrder.discount || 0) + movedDiscount),
+                updatedAt: new Date(),
+            }).where(eq(orders.id, targetOrder.id));
+            await movePickedItems(tx, pickedItems, targetOrder.id);
 
             const updatedSource = await recalcOrderTotals(tx as any, sourceOrder.id);
             const updatedTarget = await recalcOrderTotals(tx as any, targetOrder.id);
 
             if (!updatedSource || Number(updatedSource.subtotal || 0) <= 0) {
                 await tx.update(orders).set({
-                    status: 'DELIVERED',
+                    status: 'COMPLETED',
                     completedAt: new Date(),
                     updatedAt: new Date(),
                 }).where(eq(orders.id, sourceOrder.id));
+                await tx.insert(orderStatusHistory).values({
+                    orderId: sourceOrder.id,
+                    status: 'COMPLETED',
+                    changedBy: req.user?.id,
+                    notes: 'Merged into another table',
+                    createdAt: new Date(),
+                });
                 await tx.update(tables).set({
                     status: 'AVAILABLE',
                     currentOrderId: null,
                     updatedAt: new Date(),
-                }).where(eq(tables.id, String(sourceTableId)));
+                }).where(and(eq(tables.id, String(sourceTableId)), eq(tables.branchId, branchId)));
             }
 
             await tx.update(tables).set({
                 status: 'OCCUPIED',
                 currentOrderId: targetOrder.id,
                 updatedAt: new Date(),
-            }).where(eq(tables.id, String(targetTableId)));
+            }).where(and(eq(tables.id, String(targetTableId)), eq(tables.branchId, branchId)));
 
             const [freshSource] = await tx.select().top(1).from(orders).where(eq(orders.id, sourceOrder.id));
             const [freshTarget] = await tx.select().top(1).from(orders).where(eq(orders.id, targetOrder.id));
@@ -643,7 +799,8 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
                 const room = `branch:${branchId}`;
                 if (result.sourceOrder) getIO().to(room).emit('order:status', { id: result.sourceOrder.id, status: result.sourceOrder.status });
                 if (result.targetOrder) getIO().to(room).emit('order:status', { id: result.targetOrder.id, status: result.targetOrder.status });
-                getIO().to(room).emit('table:status', { id: sourceTableId, status: result.sourceOrder?.status === 'DELIVERED' ? 'AVAILABLE' : 'OCCUPIED', currentOrderId: result.sourceOrder?.status === 'DELIVERED' ? null : result.sourceOrder?.id });
+                const sourceClosed = result.sourceOrder?.status === 'COMPLETED';
+                getIO().to(room).emit('table:status', { id: sourceTableId, status: sourceClosed ? 'AVAILABLE' : 'OCCUPIED', currentOrderId: sourceClosed ? null : result.sourceOrder?.id });
                 getIO().to(room).emit('table:status', { id: targetTableId, status: 'OCCUPIED', currentOrderId: result.targetOrder?.id });
             }
         } catch {

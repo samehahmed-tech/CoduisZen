@@ -12,6 +12,10 @@ export const menuApi = {
     getItemById: (id: string) => apiRequest<any>(`/menu/items/${id}`),
     createItem: (item: any) => apiRequest<any>('/menu/items', { method: 'POST', body: JSON.stringify(item) }),
     updateItem: (id: string, item: any) => apiRequest<any>(`/menu/items/${id}`, { method: 'PUT', body: JSON.stringify(item) }),
+    restoreItem: (id: string) => apiRequest<any>(`/menu/items/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ restore: true, status: 'published', isAvailable: true }),
+    }),
     deleteItem: (id: string) => apiRequest<any>(`/menu/items/${id}`, { method: 'DELETE' }),
     getFullMenu: (availableOnly?: boolean) => apiRequest<any[]>(`/menu/full${availableOnly ? '?available_only=true' : ''}`),
     importItems: (payload: {

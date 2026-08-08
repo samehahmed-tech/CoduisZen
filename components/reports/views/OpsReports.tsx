@@ -39,8 +39,10 @@ export const OpsReports = ({ state }: any) => {
       journeyFunnelData, channelMixData, optimalPricingData,
       thirdPartyData, timeToFirstData,
       salesSeries, peakHoursLookup, peakHoursMaxOrders,
-      revenueByWeekdayMax, daypartRevenueMax
+       revenueByWeekdayMax, daypartRevenueMax, settings
    } = state;
+   const isAr = settings?.language !== 'en';
+   const currency = settings?.currencySymbol || (isAr ? 'ج.م' : 'EGP');
 
    return (
       <>
@@ -157,31 +159,54 @@ export const OpsReports = ({ state }: any) => {
                   <p className="text-center text-muted py-16">No delivery data available.</p>
                )}
                {activeCategory === 'OPS' && activeSubReport === 'Dine-in Tables' && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
-                        <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                           <h3 className="text-xl font-black text-main">Dine-in Table Analysis</h3>
-                           <p className="text-xs text-muted mt-1">Revenue and utilization per table</p>
-                        </div>
-                        <div className="responsive-table">
-                           <table className="w-full text-xs">
-                              <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
-                                 <th className="px-8 py-5 text-left">Table</th><th className="px-6 py-5 text-right">Orders</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-6 py-5 text-right">Avg Ticket</th><th className="px-8 py-5 text-right">Avg Duration</th>
-                              </tr></thead>
-                              <tbody className="divide-y divide-border/30">
-                                 {dineInTables.map((row, idx) => (
-                                    <tr key={idx} className="hover:bg-elevated/40 transition-colors">
-                                       <td className="px-8 py-4 text-xs font-black text-main">Table {row.tableId}</td>
-                                       <td className="px-6 py-4 font-mono text-right">{row.orderCount}</td>
-                                       <td className="px-6 py-4 font-mono font-bold text-right">{row.revenue.toLocaleString()} LE</td>
-                                       <td className="px-6 py-4 font-mono text-right">{row.avgTicket} LE</td>
-                                       <td className="px-8 py-4 font-mono text-right">{row.avgDurationMinutes} min</td>
-                                    </tr>
-                                 ))}
-                              </tbody>
-                           </table>
-                        </div>
-                        {dineInTables.length === 0 && <p className="text-center text-muted py-16">No dine-in data available.</p>}
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150" dir={isAr ? 'rtl' : 'ltr'}>
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+                         <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                            <h3 className="text-xl font-black text-main">{isAr ? 'التقرير التفصيلي للطاولات' : 'Detailed Dine-in Table Report'}</h3>
+                            <p className="text-xs text-muted mt-1">{isAr ? 'الإعدادات الثابتة والخصومات ونتائج التشغيل لكل طاولة.' : 'Table settings, discounts and operating results.'}</p>
+                         </div>
+                         <div className="responsive-table">
+                            <table className="w-full min-w-[1180px] text-xs">
+                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
+                                  <th className="px-5 py-5 text-start">{isAr ? 'الطاولة' : 'Table'}</th>
+                                  <th className="px-4 py-5 text-start">{isAr ? 'الإعدادات' : 'Settings'}</th>
+                                  <th className="px-4 py-5 text-start">{isAr ? 'تعليمات' : 'Notes'}</th>
+                                  <th className="px-4 py-5 text-end">{isAr ? 'الطلبات' : 'Orders'}</th>
+                                  <th className="px-4 py-5 text-end">{isAr ? 'الإيراد' : 'Revenue'}</th>
+                                  <th className="px-4 py-5 text-end">{isAr ? 'متوسط الفاتورة' : 'Avg Ticket'}</th>
+                                  <th className="px-4 py-5 text-end">{isAr ? 'خصم فعلي' : 'Actual Discount'}</th>
+                                  <th className="px-5 py-5 text-end">{isAr ? 'متوسط المدة' : 'Avg Duration'}</th>
+                               </tr></thead>
+                               <tbody className="divide-y divide-border/30">
+                                  {dineInTables.map((row, idx) => (
+                                     <tr key={idx} className="hover:bg-elevated/40 transition-colors">
+                                        <td className="px-5 py-4">
+                                           <div className="font-black text-main">{row.tableName || row.tableId}</div>
+                                           <div className="mt-1 text-[10px] text-muted">{row.zoneName || '—'} · {row.seats} {isAr ? 'كرسي' : 'seats'} · {row.status}</div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                           <div className="flex max-w-[260px] flex-wrap gap-1">
+                                              {row.isVIP && <span className="rounded-lg bg-amber-500/10 px-2 py-1 font-black text-amber-600">VIP</span>}
+                                              {row.defaultCouponCode
+                                                 ? <span className="rounded-lg bg-violet-500/10 px-2 py-1 font-black text-violet-600">{isAr ? 'كوبون' : 'Coupon'}: {row.defaultCouponCode}</span>
+                                                 : row.configuredDiscountPercent > 0
+                                                    ? <span className="rounded-lg bg-emerald-500/10 px-2 py-1 font-black text-emerald-600">{isAr ? 'خصم ثابت' : 'Fixed'} {row.configuredDiscountPercent}%</span>
+                                                    : <span className="text-muted">—</span>}
+                                              {row.minSpend > 0 && <span className="rounded-lg bg-sky-500/10 px-2 py-1 font-black text-sky-600">{isAr ? 'حد أدنى' : 'Min'} {row.minSpend} {currency}</span>}
+                                           </div>
+                                        </td>
+                                        <td className="max-w-[220px] px-4 py-4 text-muted"><div className="line-clamp-2" title={row.notes}>{row.notes || '—'}</div></td>
+                                        <td className="px-4 py-4 font-mono text-end">{row.orderCount}</td>
+                                        <td className="px-4 py-4 font-mono font-bold text-end">{row.revenue.toLocaleString()} {currency}</td>
+                                        <td className="px-4 py-4 font-mono text-end">{row.avgTicket} {currency}</td>
+                                        <td className="px-4 py-4 font-mono text-end">{row.totalDiscount.toLocaleString()} {currency}<div className="text-[9px] text-muted">{row.discountedOrderCount} {isAr ? 'طلب' : 'orders'} · {row.discountRate}%</div></td>
+                                        <td className="px-5 py-4 font-mono text-end">{row.avgDurationMinutes} {isAr ? 'د' : 'min'}</td>
+                                     </tr>
+                                  ))}
+                               </tbody>
+                            </table>
+                         </div>
+                         {dineInTables.length === 0 && <p className="text-center text-muted py-16">{isAr ? 'لا توجد طاولات.' : 'No tables available.'}</p>}
                      </div>
                   </div>
                )}
@@ -204,7 +229,7 @@ export const OpsReports = ({ state }: any) => {
                )}
                {activeCategory === 'OPS' && activeSubReport === 'Table Turnover' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Table Turnover Rate</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Table</th><th className="px-6 py-5 text-right">Orders</th><th className="px-6 py-5 text-right">Turns/Day</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-8 py-5 text-right">Rev/Day</th></tr></thead><tbody className="divide-y divide-border/30">{tableTurnoverData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.tableId}</td><td className="px-6 py-4 font-mono text-right">{r.totalOrders}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.turnsPerDay}</td><td className="px-6 py-4 font-mono text-right">{r.revenue.toLocaleString()} LE</td><td className="px-8 py-4 font-mono text-right">{r.revenuePerDay} LE</td></tr>)}</tbody></table></div></div>
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Table Turnover Rate</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Table</th><th className="px-4 py-5 text-left">Zone</th><th className="px-6 py-5 text-right">Orders</th><th className="px-6 py-5 text-right">Turns/Day</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-8 py-5 text-right">Rev/Day</th></tr></thead><tbody className="divide-y divide-border/30">{tableTurnoverData.map((r: any) => <tr key={r.tableId} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.tableName || r.tableId}</td><td className="px-4 py-4 text-muted">{r.zoneName || '—'}</td><td className="px-6 py-4 font-mono text-right">{r.totalOrders}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.turnsPerDay}</td><td className="px-6 py-4 font-mono text-right">{r.revenue.toLocaleString()} LE</td><td className="px-8 py-4 font-mono text-right">{r.revenuePerDay} LE</td></tr>)}</tbody></table></div></div>
                      {tableTurnoverData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
                )}

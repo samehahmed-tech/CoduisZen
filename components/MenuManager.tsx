@@ -131,7 +131,7 @@ const MenuManager: React.FC = () => {
   const [menuSettingsModal, setMenuSettingsModal] = useState<RestaurantMenu | null>(null);
 
   const [newIngredientId, setNewIngredientId] = useState('');
-  const [newIngredientQty, setNewIngredientQty] = useState<number>(0);
+  const [newIngredientQty, setNewIngredientQty] = useState('');
   const [selectedRecipeSizeId, setSelectedRecipeSizeId] = useState<string | null>(null);
 
   const selectedMenu = menus.find(m => m.id === selectedMenuId);
@@ -440,19 +440,20 @@ const MenuManager: React.FC = () => {
   }, [recipeModal, updateMenuItem, startTransition, selectedRecipeSizeId]);
 
   const addIngredientToTemp = () => {
-    if (!newIngredientId || newIngredientQty <= 0 || !recipeModal) return;
+    const quantity = Number(newIngredientQty);
+    if (!newIngredientId || !Number.isFinite(quantity) || quantity < 0.001 || !recipeModal) return;
     setRecipeModal(prev => {
       if (!prev) return null;
       const existingIdx = prev.tempRecipe.findIndex(ri => ri.itemId === newIngredientId);
       let nextRecipe = [...prev.tempRecipe];
       const inv = inventory.find(i => i.id === newIngredientId);
       const unit = String(inv?.unit || '');
-      if (existingIdx !== -1) nextRecipe[existingIdx] = { ...nextRecipe[existingIdx], quantity: nextRecipe[existingIdx].quantity + newIngredientQty };
-      else nextRecipe.push({ itemId: newIngredientId, quantity: newIngredientQty, unit });
+      if (existingIdx !== -1) nextRecipe[existingIdx] = { ...nextRecipe[existingIdx], quantity: nextRecipe[existingIdx].quantity + quantity };
+      else nextRecipe.push({ itemId: newIngredientId, quantity, unit });
       return { ...prev, tempRecipe: nextRecipe };
     });
     setNewIngredientId('');
-    setNewIngredientQty(0);
+    setNewIngredientQty('');
   };
 
   const toggleTarget = (type: 'branch' | 'platform', id: string) => {
@@ -1346,10 +1347,10 @@ const MenuManager: React.FC = () => {
                   </div>
                   <div className="group/qty space-y-2">
                     <label className="text-[9px] font-black text-muted uppercase tracking-[0.2em] ml-1 group-focus-within/qty:text-amber-500 transition-colors">Quantity</label>
-                    <input type="number" step="0.01" value={newIngredientQty || ''} onChange={(e) => setNewIngredientQty(parseFloat(e.target.value))} placeholder="0.00" className="w-full p-4.5 rounded-[1.2rem] bg-card/60  border border-border/20 outline-none text-sm font-black shadow-inner focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-main" />
+                    <input type="number" min="0.001" step="0.001" value={newIngredientQty} onChange={(e) => setNewIngredientQty(e.target.value)} placeholder="0.000" className="w-full p-4.5 rounded-[1.2rem] bg-card/60  border border-border/20 outline-none text-sm font-black shadow-inner focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-main" />
                   </div>
                 </div>
-                <button onClick={addIngredientToTemp} disabled={!newIngredientId || newIngredientQty <= 0} className="w-full py-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-gradient-to-r hover:from-amber-500 hover:to-orange-500 hover:text-white hover:border-amber-400/30 rounded-[1.2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none">Add To Recipe</button>
+                <button onClick={addIngredientToTemp} disabled={!newIngredientId || !Number.isFinite(Number(newIngredientQty)) || Number(newIngredientQty) < 0.001} className="w-full py-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-gradient-to-r hover:from-amber-500 hover:to-orange-500 hover:text-white hover:border-amber-400/30 rounded-[1.2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none">Add To Recipe</button>
               </div>
             </div>
 

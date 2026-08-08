@@ -6,6 +6,7 @@ export interface CalculatedOrderTotals {
     subtotal: number;
     itemDiscountTotal: number;
     orderDiscountAmount: number;
+    orderDiscountPercent: number;
     afterDiscount: number;
     taxRate: number;
     tax: number;
@@ -27,6 +28,7 @@ export const normalizeTaxRate = (value: TaxRateInput, fallback = 0.14) => {
 export const calculateOrderTotals = ({
     items,
     discountPercent = 0,
+    discountAmount,
     tipAmount = 0,
     taxRate,
     taxAmount,
@@ -36,6 +38,7 @@ export const calculateOrderTotals = ({
 }: {
     items: OrderItem[];
     discountPercent?: number;
+    discountAmount?: number | null;
     tipAmount?: number;
     taxRate?: TaxRateInput;
     taxAmount?: number | null;
@@ -60,7 +63,15 @@ export const calculateOrderTotals = ({
         return acc + (lineGross - lineDiscount);
     }, 0));
 
-    const orderDiscountAmount = roundMoney(subtotal * (Number(discountPercent || 0) / 100));
+    const orderDiscountAmount = roundMoney(Math.max(0, Math.min(
+        subtotal,
+        discountAmount == null
+            ? subtotal * (Number(discountPercent || 0) / 100)
+            : Number(discountAmount || 0),
+    )));
+    const orderDiscountPercent = subtotal > 0
+        ? roundMoney((orderDiscountAmount / subtotal) * 100)
+        : 0;
     const afterDiscount = roundMoney(subtotal - orderDiscountAmount);
     const normalizedTaxRate = normalizeTaxRate(taxRate);
     const resolvedTax = taxAmount != null
@@ -77,6 +88,7 @@ export const calculateOrderTotals = ({
         subtotal,
         itemDiscountTotal: roundMoney(itemDiscountTotal),
         orderDiscountAmount,
+        orderDiscountPercent,
         afterDiscount,
         taxRate: normalizedTaxRate,
         tax: resolvedTax,
@@ -90,7 +102,7 @@ export const calculateOrderTotals = ({
 export const calculateOrderTotalsFromOrder = (order: Partial<Order>, settings?: Partial<AppSettings>) =>
     calculateOrderTotals({
         items: order.items || [],
-        discountPercent: Number(order.discount || 0),
+        discountAmount: Number(order.discount || 0),
         tipAmount: Number(order.tipAmount || 0),
         taxRate: settings?.taxRate,
         taxAmount: order.tax,

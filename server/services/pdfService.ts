@@ -60,15 +60,22 @@ export const generateDayClosePDF = async (report: any, lang: 'ar' | 'en' = 'ar',
     const logoData = fs.existsSync(logoFile) ? `data:image/png;base64,${fs.readFileSync(logoFile).toString('base64')}` : '';
     const table = (headers: string[], rows: any[], cells: (row: any) => unknown[]) => `
         <table><thead><tr>${headers.map(h => `<th>${htmlEscape(h)}</th>`).join('')}</tr></thead><tbody>${
-            rows.length ? rows.map(row => `<tr>${cells(row).map(cell => `<td>${htmlEscape(cell)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${headers.length}" class="empty">${t.noData}</td></tr>`
+            rows.length ? rows.map(row => `<tr>${cells(row).map((cell, index) => `<td data-label="${htmlEscape(headers[index] || '')}">${htmlEscape(cell)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${headers.length}" class="empty">${t.noData}</td></tr>`
         }</tbody></table>`;
     const cards = [
         [t.orders, sales.totalOrders || 0, '#0f172a'], [t.gross, money(sales.totalRevenue), '#2563eb'], [t.discounts, money(sales.totalDiscount), '#f97316'], [t.tax, money(sales.totalTax), '#7c3aed'],
         [t.netSales, money(sales.netSales), '#059669'], [t.expenses, money(finance.expenses), '#dc2626'], [t.profit, money(finance.netProfit), safeNumber(finance.netProfit) >= 0 ? '#059669' : '#dc2626'], [t.avgOrder, money(sales.averageOrderValue), '#0f172a'],
     ].map(([label, value, color]) => `<div class="card"><div class="label">${htmlEscape(label)}</div><div class="value" style="color:${color}">${htmlEscape(value)}</div></div>`).join('');
-    const pageStyle = thermal ? '@page { size:80mm auto; margin:3mm; }' : '@page { size:A4 landscape; margin:9mm; }';
+    const pageStyle = thermal ? '@page { size:80mm auto; margin:0; }' : '@page { size:A4 landscape; margin:9mm; }';
     const thermalStyle = thermal ? `
-body{background:#fff}.hero{display:block;border-radius:0;padding:10px;margin-bottom:8px;box-shadow:none}.logo{width:42px;height:42px;border-radius:8px;float:${rtl ? 'left' : 'right'}}.hero h1{font-size:18px}.hero p,.meta{font-size:8px}.cards{grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}.card{border-radius:7px;padding:6px;min-height:48px;box-shadow:none}.label{font-size:7px}.value{font-size:12px;margin-top:3px}.grid{display:block}.section{border-radius:7px;padding:6px;margin-bottom:7px}.section h2{font-size:10px;margin-bottom:5px}table{table-layout:auto}th,td{font-size:6.5px;padding:4px 3px}.health{grid-template-columns:1fr 1fr;gap:4px}.chip{border-radius:6px;padding:5px}.chip b{font-size:11px}.chip span{font-size:6.5px}
+html,body{width:80mm;max-width:80mm;background:#fff;color:#000;font-size:10px;overflow:visible}
+body{margin:0;padding:2mm;width:80mm;max-width:80mm}
+.hero{display:block;background:#fff;color:#000;border:0;border-bottom:2px solid #000;border-radius:0;padding:4px 0 7px;margin-bottom:7px;box-shadow:none;text-align:center}
+.logo{width:34px;height:34px;border:0;border-radius:0;float:none;margin:0 auto 3px;padding:0}.hero h1{font-size:17px}.hero p{color:#000;font-size:9px}.meta{color:#000!important;font-size:8px;line-height:1.45}
+.cards{grid-template-columns:1fr 1fr;gap:4px;margin-bottom:7px}.card{border:1px solid #000;border-radius:0;padding:5px;min-height:44px;box-shadow:none}.label{color:#000;font-size:8px}.value{color:#000!important;font-size:12px;margin-top:2px}
+.grid{display:block}.section{border:1px solid #000;border-radius:0;padding:5px;margin-bottom:6px;box-shadow:none;break-inside:auto}.section h2{color:#000;font-size:11px;margin-bottom:4px;border-bottom:1px solid #000;padding-bottom:3px}
+table,thead,tbody,tr,th,td{display:block;width:100%}thead{display:none}table{border:0;table-layout:auto}tbody tr{padding:3px 0;border-bottom:1px dashed #777;break-inside:avoid}tbody tr:last-child{border-bottom:0}td{display:grid;grid-template-columns:minmax(0,38%) minmax(0,62%);gap:4px;border:0!important;background:#fff!important;font-size:8.5px;line-height:1.35;padding:2px 0;text-align:${rtl ? 'right' : 'left'};overflow-wrap:anywhere}td::before{content:attr(data-label);font-weight:900;color:#000}.empty{display:block;padding:8px;text-align:center}.empty::before{content:none}
+.health{grid-template-columns:1fr 1fr;gap:3px}.chip{background:#fff;border-color:#000;border-radius:0;padding:4px}.chip b{font-size:11px}.chip span{color:#000;font-size:7px}
 ` : '';
     const html = `<!doctype html><html lang="${lang}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8" /><style>
 ${pageStyle} *{box-sizing:border-box} body{margin:0;background:#eef3f8;color:#102033;direction:${rtl ? 'rtl' : 'ltr'};font-family:Tahoma,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}

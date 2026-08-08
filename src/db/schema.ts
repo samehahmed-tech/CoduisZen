@@ -665,6 +665,7 @@ export const purchaseOrders = mssqlTable('purchase_orders', {
     id: nvarchar('id').primaryKey(),
     supplierId: nvarchar('supplier_id').references(() => suppliers.id).notNull(),
     branchId: nvarchar('branch_id').references(() => branches.id).notNull(),
+    targetWarehouseId: nvarchar('target_warehouse_id').references(() => warehouses.id),
     status: nvarchar('status').default('DRAFT'), // DRAFT, SENT, PARTIAL, RECEIVED, CANCELLED
     expectedDate: datetime2('expected_date'),
     subtotal: real('subtotal').default(0),
@@ -1135,8 +1136,8 @@ export const drivers = mssqlTable('drivers', {
 
 export const driverTelemetry = mssqlTable('driver_telemetry', {
     id: int('id').identity().primaryKey(),
-    driverId: nvarchar('driver_id').references(() => drivers.id).notNull(),
-    branchId: nvarchar('branch_id').references(() => branches.id),
+    driverId: nvarchar('driver_id', { length: 255 }).references(() => drivers.id).notNull(),
+    branchId: nvarchar('branch_id', { length: 255 }).references(() => branches.id),
     lat: real('lat').notNull(),
     lng: real('lng').notNull(),
     speedKmh: real('speed_kmh'),
@@ -1145,7 +1146,7 @@ export const driverTelemetry = mssqlTable('driver_telemetry', {
     altitude: real('altitude'),
     batteryLevel: int('battery_level'), // driver device battery %
     isCharging: bit('is_charging'),
-    orderId: nvarchar('order_id'),       // current delivery order if any
+    orderId: nvarchar('order_id', { length: 255 }),       // current delivery order if any
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
 }, (table) => [
     index('idx_telemetry_driver').on(table.driverId),
@@ -1155,15 +1156,15 @@ export const driverTelemetry = mssqlTable('driver_telemetry', {
 
 // Latest telemetry per driver (materialized view-like, updated on each ping)
 export const driverTelemetryLatest = mssqlTable('driver_telemetry_latest', {
-    driverId: nvarchar('driver_id').references(() => drivers.id).primaryKey(),
-    branchId: nvarchar('branch_id').references(() => branches.id),
+    driverId: nvarchar('driver_id', { length: 255 }).references(() => drivers.id).primaryKey(),
+    branchId: nvarchar('branch_id', { length: 255 }).references(() => branches.id),
     lat: real('lat').notNull(),
     lng: real('lng').notNull(),
     speedKmh: real('speed_kmh'),
     accuracy: real('accuracy'),
     heading: real('heading'),
     batteryLevel: int('battery_level'),
-    orderId: nvarchar('order_id'),
+    orderId: nvarchar('order_id', { length: 255 }),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 });
 
@@ -1296,6 +1297,11 @@ export const tables = mssqlTable('tables', {
     height: int('height').default(100),
     shape: nvarchar('shape').default('rectangle'), // rectangle, circle, etc.
     seats: int('seats').default(4),
+    discount: real('discount_percent').default(0),
+    defaultCouponCode: nvarchar('default_coupon_code'),
+    minSpend: real('min_spend').default(0),
+    isVIP: bit('is_vip').default(false),
+    notes: nvarchar('notes'),
 
     // State Machine
     status: nvarchar('status').default('AVAILABLE').notNull(),
@@ -1345,6 +1351,8 @@ export const employees = mssqlTable('employees', {
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 }, (table) => [
     index('employees_branch_idx').on(table.branchId),
+    index('employees_active_created_idx').on(table.isActive, table.createdAt),
+    index('employees_branch_active_created_idx').on(table.branchId, table.isActive, table.createdAt),
 ]);
 
 export const employeeDocuments = mssqlTable('employee_documents', {
@@ -1425,6 +1433,7 @@ export const jobTitles = mssqlTable('job_titles', {
     id: nvarchar('id').primaryKey(),
     departmentId: nvarchar('department_id').references(() => departments.id),
     title: nvarchar('title').notNull(),
+    name: nvarchar('name').notNull(),
     nameAr: nvarchar('name_ar'),
     isActive: bit('is_active').default(true),
 });
@@ -2260,7 +2269,7 @@ index("employee_comp_items_employee_effective_idx").on(table.employeeId, table.e
 ]);
 
 export const leaveBalances = mssqlTable("leave_balances", {
-	id: int().identity().primaryKey().notNull(),
+	id: nvarchar().primaryKey().notNull(),
 	employeeId: nvarchar("employee_id").notNull(),
 	leaveTypeId: nvarchar("leave_type_id").notNull(),
 	year: int().notNull(),
@@ -2531,6 +2540,7 @@ export const payrollRuns = mssqlTable("payroll_runs", {
 	updatedAt: datetime2("updated_at").default(sql`GETDATE()`),
 }, (table) => [
 index("payroll_runs_cycle_idx").on(table.cycleId, table.status),
+uniqueIndex("payroll_runs_closed_cycle_unique_idx").on(table.cycleId).where(sql`${table.status} = 'CLOSED'`),
     foreignKey({
     columns: [table.branchId],
     foreignColumns: [branches.id],

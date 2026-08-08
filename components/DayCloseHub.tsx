@@ -6,6 +6,22 @@ import { shiftsApi } from '../services/api/shifts';
 import { settingsApi } from '../services/api/settings';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useFinanceStore } from '../stores/useFinanceStore';
+import { useConfirm } from './common/ConfirmProvider';
+
+export const buildDayCloseConfirmationMessage = (report: any, lang: string) => {
+    const isAr = lang === 'ar';
+    const sales = report?.salesSummary || {};
+    const cash = report?.shiftCashSummary || {};
+    const blockedCount = (report?.readiness?.checks || []).filter((check: any) => !check.passed).length;
+    return [
+        `${isAr ? 'الطلبات' : 'Orders'}: ${Number(sales.totalOrders || 0).toLocaleString()}`,
+        `${isAr ? 'الإيراد' : 'Revenue'}: ${Number(sales.totalRevenue || 0).toLocaleString()}`,
+        `${isAr ? 'النقدية المتوقعة' : 'Expected cash'}: ${Number(cash.expectedCash || 0).toLocaleString()}`,
+        `${isAr ? 'النقدية الفعلية' : 'Actual cash'}: ${Number(cash.actualCash || 0).toLocaleString()}`,
+        `${isAr ? 'الفرق' : 'Variance'}: ${Number(cash.variance || 0).toLocaleString()}`,
+        `${isAr ? 'عوائق الإغلاق' : 'Close blockers'}: ${blockedCount}`,
+    ].join('\n');
+};
 
 const todayLocalDate = () => {
     const d = new Date();
@@ -125,6 +141,7 @@ const DayCloseHub: React.FC = () => {
     const { settings, branches, fetchBranches, fetchSettings } = useAuthStore();
     const setShift = useFinanceStore((state) => state.setShift);
     const setIsShiftDrawerOpen = useFinanceStore((state) => state.setIsShiftDrawerOpen);
+    const { confirm } = useConfirm();
     const lang = settings.language || 'en';
     const currentUser = settings.currentUser;
     const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
@@ -266,6 +283,18 @@ const DayCloseHub: React.FC = () => {
             setError(lang === 'ar' ? 'هذا اليوم مقفول بالفعل ولا يمكن إقفاله مرة أخرى.' : 'This day is already closed and cannot be closed again.');
             return;
         }
+        if (!canClose) {
+            setError(lang === 'ar' ? 'راجع متطلبات الجاهزية قبل إغلاق اليوم.' : 'Resolve readiness requirements before closing the day.');
+            return;
+        }
+        const confirmed = await confirm({
+            title: lang === 'ar' ? `تأكيد إغلاق يوم ${date}` : `Confirm day close for ${date}`,
+            message: buildDayCloseConfirmationMessage(report, lang),
+            confirmText: lang === 'ar' ? 'إغلاق اليوم' : 'Close day',
+            cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
+            variant: 'danger',
+        });
+        if (!confirmed) return;
         setIsClosing(true);
         setError(null);
         setMessage(null);
