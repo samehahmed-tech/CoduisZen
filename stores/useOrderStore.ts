@@ -310,6 +310,29 @@ export const useOrderStore = create<OrderState>()(
                     const totalAmount = order.total + state.tipAmount; // Assuming totalAmount is calculated here
                     const activeMethod = order.payments?.[0]; // Assuming activeMethod is derived from payments
 
+                    const serializedItems = order.items.map((item) => {
+                        const menuItemId = resolveMenuItemId(item);
+                        if (!menuItemId) {
+                            throw new Error('INVALID_MENU_ITEM_REFERENCE');
+                        }
+                        return {
+                            menu_item_id: menuItemId,
+                            name: item.name,
+                            name_ar: item.nameAr || (item as any).name_ar || item.name,
+                            price: item.price,
+                            size_id: item.sizeId || (item as any).size_id || undefined,
+                            quantity: item.quantity,
+                            notes: item.notes,
+                            seat_number: item.seatNumber ?? item.seat_number ?? undefined,
+                            course: item.course ?? undefined,
+                            modifiers: (item.selectedModifiers || (item as any).modifiers || []).map((modifier: any) => ({
+                                ...modifier,
+                                id: modifier?.id || modifier?.optionId,
+                                optionId: modifier?.optionId || modifier?.id,
+                            })),
+                        };
+                    });
+
                     const payload = {
                         id: order.id,
                         type: normalizeOrderType(order.type),
@@ -342,18 +365,7 @@ export const useOrderStore = create<OrderState>()(
                         payments: order.payments,
                         notes: order.notes,
                         kitchen_notes: order.kitchenNotes,
-                        items: order.items.map(item => ({
-                            menu_item_id: resolveMenuItemId(item),
-                            name: item.name,
-                            name_ar: item.nameAr || (item as any).name_ar || item.name,
-                            price: item.price,
-                            size_id: item.sizeId || (item as any).size_id || undefined,
-                            quantity: item.quantity,
-                            notes: item.notes,
-                            seat_number: item.seatNumber ?? item.seat_number ?? undefined,
-                            course: item.course ?? undefined,
-                            modifiers: item.selectedModifiers,
-                        }))
+                        items: serializedItems
                     };
 
                     let savedOrder: any = order;
@@ -856,7 +868,19 @@ export const useOrderStore = create<OrderState>()(
             },
 
             loadTableOrder: (tableId) => set((state) => {
-                const activeOrder = findActiveTableOrder(state.orders, state.tables, tableId);
+                let activeOrder = findActiveTableOrder(state.orders, state.tables, tableId);
+                // Fallback: if the floor-plan registry is not loaded yet (e.g. in
+                // tests or before fetchTables resolves), still allow restoring a
+                // draft from an active order belonging to this table.
+                if (!activeOrder) {
+                    activeOrder = state.orders.find((order) =>
+                        order.tableId === tableId &&
+                        order.status !== OrderStatus.DELIVERED &&
+                        order.status !== OrderStatus.COMPLETED &&
+                        order.status !== OrderStatus.CANCELLED &&
+                        order.status !== OrderStatus.REFUNDED,
+                    );
+                }
                 if (activeOrder) {
                     const subtotal = Number(activeOrder.subtotal || 0);
                     const discountAmount = Number(activeOrder.discount || 0);

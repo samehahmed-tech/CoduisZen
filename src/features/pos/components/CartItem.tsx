@@ -115,7 +115,8 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         <button
                             onClick={(event) => { event.stopPropagation(); onUpdateQuantity(item.cartId, -1); }}
                             className="flex h-full min-w-[44px] items-center justify-center text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500 active:scale-90"
-                            title="Decrease quantity"
+                            title={lang === 'ar' ? 'تقليل الكمية' : 'Decrease quantity'}
+                            aria-label={lang === 'ar' ? `تقليل كمية ${displayName}` : `Decrease quantity for ${displayName}`}
                         >
                             <Minus size={16} strokeWidth={2.5} />
                         </button>
@@ -141,7 +142,8 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         ) : (
                             <button
                                 onClick={startEdit}
-                                title="Edit quantity"
+                                title={lang === 'ar' ? 'تعديل الكمية' : 'Edit quantity'}
+                                aria-label={lang === 'ar' ? `تعديل كمية ${displayName}` : `Edit quantity for ${displayName}`}
                                 className="flex h-full w-9 cursor-text items-center justify-center border-x border-border/10 text-[12px] font-black text-main tabular-nums transition-colors hover:text-primary"
                             >
                                 {item.quantity}
@@ -151,7 +153,8 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         <button
                             onClick={(event) => { event.stopPropagation(); onUpdateQuantity(item.cartId, 1); }}
                             className="flex h-full min-w-[44px] items-center justify-center text-muted transition-colors hover:bg-primary/10 hover:text-primary active:scale-90"
-                            title="Increase quantity"
+                            title={lang === 'ar' ? 'زيادة الكمية' : 'Increase quantity'}
+                            aria-label={lang === 'ar' ? `زيادة كمية ${displayName}` : `Increase quantity for ${displayName}`}
                         >
                             <Plus size={16} strokeWidth={2.5} />
                         </button>
@@ -166,7 +169,8 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                                         ? 'bg-success/10 text-success hover:bg-success/20'
                                         : 'text-muted hover:bg-success/10 hover:text-success'
                                 }`}
-                                title="Item discount"
+                                title={lang === 'ar' ? 'خصم الصنف' : 'Item discount'}
+                                aria-label={lang === 'ar' ? `تعديل خصم ${displayName}` : `Edit discount for ${displayName}`}
                             >
                                 <Tag size={13} />
                             </button>
@@ -178,14 +182,16 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                                     ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
                                     : 'text-muted hover:bg-primary/10 hover:text-primary'
                             }`}
-                            title="Item note"
+                            title={lang === 'ar' ? 'ملاحظة الصنف' : 'Item note'}
+                            aria-label={lang === 'ar' ? `تعديل ملاحظة ${displayName}` : `Edit note for ${displayName}`}
                         >
                             <Pencil size={13} />
                         </button>
                         <button
                             onClick={(event) => { event.stopPropagation(); onRemove(item.cartId); }}
                             className="flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-                            title="Remove item"
+                            title={lang === 'ar' ? 'حذف الصنف' : 'Remove item'}
+                            aria-label={lang === 'ar' ? `حذف ${displayName}` : `Remove ${displayName}`}
                         >
                             <Trash2 size={13} />
                         </button>

@@ -98,7 +98,7 @@ const ImageCard: React.FC<SharedCardProps & { compact: boolean }> = ({
 }) => {
     const isAr = lang === 'ar';
     const addLabel = isAr ? 'أضف' : 'Add';
-    const soldOutLabel = isAr ? 'نفد' : 'Sold out';
+    const unavailableLabel = isAr ? 'غير متاح الآن' : 'Unavailable now';
     const itemDescription = String(isAr ? ((item as any).descriptionAr || (item as any).description || '') : ((item as any).description || '')).trim();
     const quickInfo = itemDescription || (isAr ? 'إضافة سريعة للطلب مع تحكم مباشر في الكمية.' : 'Quick add with direct quantity control.');
     const tilt = use3DTilt(isAvailable);
@@ -135,7 +135,7 @@ const ImageCard: React.FC<SharedCardProps & { compact: boolean }> = ({
                 <div className="flex flex-col flex-1 items-center justify-start w-full">
                     {!isAvailable && (
                         <div className="mb-2 inline-flex self-center rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[10px] font-black text-rose-500 backdrop-blur-md">
-                            {soldOutLabel}
+                            {unavailableLabel}
                         </div>
                     )}
                     {item.isPopular && isAvailable && (

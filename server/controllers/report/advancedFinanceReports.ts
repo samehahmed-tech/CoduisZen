@@ -11,7 +11,11 @@ export const getTipsReport = async (req: Request, res: Response) => {
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-        const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses), sql`${orders.tipAmount} > 0`];
+        // Prefer businessDate (day-key) when present so results stay consistent
+        // with the Day Close module across timezones; createdAt acts as a fallback
+        // for legacy rows without a businessDate.
+        const orderDateCondition = sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`;
+        const conditions: any[] = [orderDateCondition, inArray(orders.status, deliveredStatuses), sql`${orders.tipAmount} > 0`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const [summary] = await db.select({
@@ -51,7 +55,8 @@ export const getServiceChargeReport = async (req: Request, res: Response) => {
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-        const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses), sql`${orders.serviceCharge} > 0`];
+        const orderDateCondition = sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`;
+        const conditions: any[] = [orderDateCondition, inArray(orders.status, deliveredStatuses), sql`${orders.serviceCharge} > 0`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const [summary] = await db.select({
@@ -82,7 +87,9 @@ export const getShiftSummary = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const conditions: any[] = [gte(shifts.openingTime, start), lte(shifts.openingTime, end)];
+        // Include shifts that overlap the selected day: opened within the window
+        // or still open (closingTime null) having opened before the window end.
+        const conditions: any[] = [sql`(${shifts.openingTime} >= ${start} and ${shifts.openingTime} <= ${end}) or (${shifts.closingTime} is null and ${shifts.openingTime} <= ${end})`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(shifts.branchId, branchId as string));
 
         const rows = await db.select({

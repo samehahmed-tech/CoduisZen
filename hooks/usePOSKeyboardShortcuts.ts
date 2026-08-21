@@ -85,6 +85,7 @@ export const usePOSKeyboardShortcuts = ({
       const tagName = target?.tagName;
       const isInput = tagName === 'INPUT';
       const isTextarea = tagName === 'TEXTAREA';
+      const isContentEditable = target?.isContentEditable === true;
 
       if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
          event.preventDefault();
@@ -92,22 +93,11 @@ export const usePOSKeyboardShortcuts = ({
          return;
       }
 
-      if (event.key === 'Enter' && cartHasItems) {
-         event.preventDefault();
-         onQuickPay();
-         return;
-      }
-
-      if (isInput || isTextarea) {
+      if (isInput || isTextarea || isContentEditable) {
          if (event.key === 'Escape') {
             target?.blur();
             if (showSplitModal) onDismissSplitModal();
             if (editingItemId) onClearEditingItem();
-         }
-
-         if (event.key === 'Enter' && !isTextarea) {
-            target?.blur();
-            if (cartHasItems) onSubmitOrder();
          }
 
          return;
@@ -146,6 +136,12 @@ export const usePOSKeyboardShortcuts = ({
             event.preventDefault();
             commitBufferedTableNumber();
          }
+      }
+
+      if (event.key === 'Enter' && cartHasItems) {
+         event.preventDefault();
+         onQuickPay();
+         return;
       }
 
       if (event.key === '/') {

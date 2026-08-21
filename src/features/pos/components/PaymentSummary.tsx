@@ -65,6 +65,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
     const [isCashDrawerOpen, setIsCashDrawerOpen] = useState(false);
     const amountTendered = Number(tenderedStr) || 0;
     const changeDue = amountTendered > 0 ? amountTendered - total : 0;
+    const isCashUnderpaid = paymentMethod === PaymentMethod.CASH && amountTendered > 0 && changeDue < -0.01;
     const [cashTakeawayFirstTap, setCashTakeawayFirstTap] = useState(false);
     const toggleSection = (section: 'methods' | 'tips' | 'coupon') => setOpenSection(p => p === section ? null : section);
 
@@ -73,6 +74,10 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
     }, [paymentMethod]);
 
     const handleSubmitClick = () => {
+        if (isCashUnderpaid) {
+            showToast(isAr ? 'المبلغ المستلم أقل من إجمالي الفاتورة' : 'The tendered amount is less than the order total.', 'error');
+            return;
+        }
         if (activeOrderType === 'TAKEAWAY' && paymentMethod === PaymentMethod.CASH && !isCashDrawerOpen) {
             if (!cashTakeawayFirstTap) {
                 setCashTakeawayFirstTap(true);
@@ -111,7 +116,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 icon: CreditCard,
             })),
     ];
-    const activeMethodLabel = methods.find(m => m.id === paymentMethod)?.label.split(' ')[0] || t.cash;
+    const activeMethodLabel = methods.find(m => m.id === paymentMethod)?.label || t.cash;
     const isOpenDineIn = activeOrderType === 'DINE_IN';
 
     return (
@@ -186,7 +191,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                             className={`pos-payment-method-option flex flex-col items-center justify-center py-3 px-1 rounded-xl transition-all duration-200 active:scale-95 ${paymentMethod === btn.id ? 'bg-primary text-white shadow-md' : 'bg-card border border-border/5 text-muted hover:text-main hover:border-primary/20'}`}
                         >
                             <btn.icon size={18} className={paymentMethod === btn.id ? 'opacity-90' : 'opacity-60'} />
-                            <span className="text-[9px] font-bold mt-1.5 truncate w-full text-center">{btn.label.split(' ')[0]}</span>
+                            <span className="text-[9px] font-bold mt-1.5 truncate w-full text-center" title={btn.label}>{btn.label}</span>
                         </button>
                     ))}
                 </div>
@@ -266,9 +271,9 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                                 {key}
                             </button>
                         ))}
-                        <button onClick={() => setTenderedStr(String(Math.ceil(total)))} className="pos-exact-cash h-11 bg-emerald-500 text-white rounded-lg active:scale-90 transition-all flex flex-col items-center justify-center shadow-md hover:bg-emerald-600 touch-target">
+                        <button onClick={() => setTenderedStr(total.toFixed(2))} className="pos-exact-cash h-11 bg-emerald-500 text-white rounded-lg active:scale-90 transition-all flex flex-col items-center justify-center shadow-md hover:bg-emerald-600 touch-target">
                             <span className="text-[10px] font-black uppercase tracking-wider">{isAr ? ar.exact : 'Exact'}</span>
-                            <span className="text-[11px] font-bold opacity-80 tabular-nums">{Math.ceil(total)}</span>
+                            <span className="text-[11px] font-bold opacity-80 tabular-nums">{total.toFixed(2)}</span>
                         </button>
                     </div>
 

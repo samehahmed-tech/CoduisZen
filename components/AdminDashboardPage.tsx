@@ -69,10 +69,20 @@ const AdminDashboardPage: React.FC = () => {
             setRows((prev) => prev.map((row) => row.branchId === data.branchId ? { ...row, ...data } : row));
             setLastUpdated(new Date());
         };
-        const refresh = () => mounted && loadData(mounted);
+        let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+        const refresh = () => {
+            if (!mounted) return;
+            if (refreshTimer) clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(() => {
+                refreshTimer = null;
+                if (mounted) void loadData(true);
+            }, 180);
+        };
 
         socketService.on('branch:performance', handleBranchUpdate);
         socketService.on('analytics:refresh', refresh);
+        socketService.on('order:status', refresh);
+        socketService.on('order:updated', refresh);
         socketService.onReconnect(refresh);
         const interval = setInterval(refresh, 60000);
 
@@ -80,6 +90,10 @@ const AdminDashboardPage: React.FC = () => {
             mounted = false;
             socketService.off('branch:performance', handleBranchUpdate);
             socketService.off('analytics:refresh', refresh);
+            socketService.off('order:status', refresh);
+            socketService.off('order:updated', refresh);
+            socketService.offReconnect(refresh);
+            if (refreshTimer) clearTimeout(refreshTimer);
             clearInterval(interval);
         };
     }, [token, activeBranchId, loadData]);

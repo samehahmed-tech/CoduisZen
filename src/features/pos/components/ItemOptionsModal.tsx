@@ -94,7 +94,7 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
     const handleConfirm = () => {
         if (!isValid || !item) return;
         if (isOpenPrice && parsedCustomPrice <= 0) return;
-        const finalItem = { ...item } as MenuItem & { sizeId?: string };
+        const finalItem = { ...item, menuItemId: item.id } as MenuItem & { sizeId?: string; menuItemId?: string };
 
         if (selectedSize) {
             finalItem.sizeId = selectedSize.id;
@@ -108,14 +108,14 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
         }
         finalItem.price = basePrice;
 
-        const finalMods: { groupName: string; optionName: string; price: number }[] = [];
+        const finalMods: { groupName: string; optionName: string; price: number; optionId?: string; id?: string }[] = [];
         if (item.modifierGroups) {
             for (const group of item.modifierGroups) {
                 const selectedSet = selectedMods[group.id];
                 if (!selectedSet) continue;
                 for (const optId of selectedSet) {
                     const opt = group.options.find(o => o.id === optId);
-                    if (opt) finalMods.push({ groupName: group.name, optionName: opt.name, price: opt.price });
+                    if (opt) finalMods.push({ groupName: group.name, optionName: opt.name, price: opt.price, optionId: opt.id, id: opt.id });
                 }
             }
         }

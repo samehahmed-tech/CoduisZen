@@ -27,13 +27,13 @@ export const apiCacheHeaders = (req: Request, res: Response, next: NextFunction)
         return next();
     }
 
-    // Reports/analytics — cache 60s (data doesn't change every second)
+    // Dashboard analytics must reflect order creation/cancellation immediately.
     if (
         path.includes('/reports') ||
         path.includes('/analytics') ||
         path.includes('/dashboard-kpis')
     ) {
-        res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+        res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate');
         return next();
     }
 
@@ -41,3 +41,6 @@ export const apiCacheHeaders = (req: Request, res: Response, next: NextFunction)
     res.setHeader('Cache-Control', 'private, no-cache');
     next();
 };
+
+export default apiCacheHeaders;
+

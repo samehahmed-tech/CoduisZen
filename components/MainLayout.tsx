@@ -204,7 +204,7 @@ const MainLayout: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {!isAssistantOpen && (
+            {isAssistantOpen && !isAssistantOpen && (
                 <motion.button
                     type="button"
                     initial={{ opacity: 0, scale: 0.8 }}

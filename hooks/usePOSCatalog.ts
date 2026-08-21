@@ -24,7 +24,6 @@ type UsePOSCatalogParams = {
     itemSort: 'smart' | 'name' | 'price_asc' | 'price_desc';
     itemUsageMap: Record<string, number>;
     lang: 'en' | 'ar';
-    nowTick: number;
     searchQuery: string;
     safeActiveCart: OrderItem[];
 };
@@ -39,7 +38,6 @@ export function usePOSCatalog({
     itemSort,
     itemUsageMap,
     lang,
-    nowTick,
     searchQuery,
     safeActiveCart,
 }: UsePOSCatalogParams) {
@@ -87,56 +85,18 @@ export function usePOSCatalog({
         return item.price;
     }, [activeOrderType, activePriceListId, branchId, normalizePriceListName, priceListKeywords]);
 
-    const isItemAvailableNow = useCallback((item: MenuItem, now: Date) => {
-        if (item.isAvailable === false) return false;
-
-        let days: string[] = [];
-        if (Array.isArray(item.availableDays)) {
-            days = item.availableDays;
-        } else if (typeof item.availableDays === 'string') {
-            try {
-                const parsed = JSON.parse(item.availableDays);
-                days = Array.isArray(parsed) ? parsed : [];
-            } catch {
-                days = [];
-            }
-        }
-
-        if (days.length > 0) {
-            const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()];
-            if (!days.includes(dayKey)) return false;
-        }
-
-        const toMinutes = (value?: string) => {
-            if (!value) return null;
-            const [hours, minutes] = value.split(':').map(Number);
-            if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-            return hours * 60 + minutes;
-        };
-
-        const from = toMinutes(item.availableFrom);
-        const to = toMinutes(item.availableTo);
-        if (from === null && to === null) return true;
-
-        const nowMinutes = now.getHours() * 60 + now.getMinutes();
-        if (from !== null && to !== null) {
-            if (from <= to) return nowMinutes >= from && nowMinutes <= to;
-            return nowMinutes >= from || nowMinutes <= to;
-        }
-        if (from !== null) return nowMinutes >= from;
-        if (to !== null) return nowMinutes <= to;
-        return true;
-    }, []);
+    // Availability is an explicit user-controlled state. Scheduling fields are
+    // retained as metadata and must not silently hide an item from the POS.
+    const isItemAvailableNow = useCallback((item: MenuItem) => item.isAvailable !== false, []);
 
     const indexedItems = useMemo<POSIndexedMenuItem[]>(() => {
-        const now = new Date(nowTick);
         return currentCategories.flatMap((category) =>
             (category.items || []).map((item) => ({
                 ...item,
                 displayCategory: lang === 'ar' ? (category.nameAr || category.name) : category.name,
                 displayName: lang === 'ar' ? (item.nameAr || item.name) : item.name,
                 resolvedPrice: resolveItemPrice(item),
-                isAvailable: isItemAvailableNow(item, now),
+                isAvailable: isItemAvailableNow(item),
                 searchBlob: [
                     item.name,
                     item.nameAr,
@@ -147,7 +107,7 @@ export function usePOSCatalog({
                 ].filter(Boolean).join(' ').toLowerCase(),
             })),
         );
-    }, [currentCategories, isItemAvailableNow, lang, nowTick, resolveItemPrice]);
+    }, [currentCategories, isItemAvailableNow, lang, resolveItemPrice]);
 
     const normalizedSearchQuery = useMemo(
         () => deferredSearchQuery.trim().toLowerCase(),

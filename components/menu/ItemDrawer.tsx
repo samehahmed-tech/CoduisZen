@@ -26,6 +26,7 @@ interface Props {
   onSave: (item: MenuItem, categoryId: string, duplicate?: boolean) => void;
   onClose: () => void;
   onDelete?: () => void;
+  onArchive?: () => void;
   lang: string;
   currency: string;
 }
@@ -33,7 +34,7 @@ interface Props {
 export const ItemDrawer: React.FC<Props> = ({
   item: initialItem, mode, categoryId: initialCategoryId,
   categories, printers, branches, inventory,
-  onSave, onClose, onDelete, lang, currency,
+  onSave, onClose, onDelete, onArchive, lang, currency,
 }) => {
   const { error } = useToast();
   const [item, setItem] = useState<MenuItem>({ ...initialItem });
@@ -414,6 +415,20 @@ export const ItemDrawer: React.FC<Props> = ({
                                    <option value="" disabled>Select Layer Category</option>
                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
+                             </div>
+                             <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/30 bg-elevated/30 p-4">
+                                <div>
+                                  <p className="text-xs font-black text-main">{lang === 'ar' ? 'ظهور الصنف في المنيو' : 'Item visibility'}</p>
+                                  <p className="mt-1 text-[10px] font-bold text-muted">{lang === 'ar' ? 'يظل الصنف فعالًا حتى تغيّر هذا الخيار بنفسك.' : 'Items stay active unless you change this setting.'}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => update({ isAvailable: item.isAvailable === false })}
+                                  aria-pressed={item.isAvailable !== false}
+                                  className={`shrink-0 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${item.isAvailable !== false ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}`}
+                                >
+                                  {item.isAvailable !== false ? (lang === 'ar' ? 'فعال' : 'Active') : (lang === 'ar' ? 'غير فعال' : 'Inactive')}
+                                </button>
                              </div>
                           </div>
                        </div>
@@ -948,8 +963,14 @@ export const ItemDrawer: React.FC<Props> = ({
                     {lang === 'ar' ? 'رجوع' : 'Cancel'}
                     </span>
                  </button>
+                 {onArchive && mode === "EDIT" && (
+                    <button type="button" onClick={onArchive} className="h-11 sm:h-12 px-3 sm:px-4 shrink-0 flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500 hover:text-white shadow-sm transition-all" aria-label={lang === 'ar' ? 'أرشفة الصنف' : 'Archive item'}>
+                       <Package size={16} />
+                       <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">{lang === 'ar' ? 'أرشفة' : 'Archive'}</span>
+                    </button>
+                 )}
                  {onDelete && mode === "EDIT" && (
-                    <button onClick={onDelete} className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white shadow-sm transition-all cursor-pointer">
+                    <button type="button" onClick={onDelete} className="h-11 w-11 sm:h-12 sm:w-12 shrink-0 flex items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white shadow-sm transition-all cursor-pointer" aria-label={lang === 'ar' ? 'حذف الصنف نهائيًا' : 'Permanently delete item'}>
                        <Trash2 size={18} />
                     </button>
                  )}

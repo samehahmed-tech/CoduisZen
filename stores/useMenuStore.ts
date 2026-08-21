@@ -105,7 +105,10 @@ export const useMenuStore = create<MenuState>()(
                                 categoryId: cat.id,
                                 category: cat.nameAr || cat.name_ar || cat.name,
                                 categoryAr: cat.nameAr || cat.name_ar || cat.name,
-                                isAvailable: item.isAvailable !== false && item.is_available !== false,
+                                // Existing items remain active unless the API explicitly marks them unavailable.
+                                isAvailable: item.isAvailable === undefined && item.is_available === undefined
+                                    ? true
+                                    : item.isAvailable !== false && item.is_available !== false,
                                 isPopular: item.isPopular || item.is_popular || false,
                                 preparationTime: item.preparationTime || item.preparation_time || 15,
                                 availableFrom: item.availableFrom || item.available_from,
@@ -323,6 +326,7 @@ export const useMenuStore = create<MenuState>()(
                         price: item.price,
                         image: item.image,
                         isAvailable: item.isAvailable !== false,
+                        status: item.archivedAt ? 'archived' : 'published',
                         isPopular: item.isPopular,
                         preparationTime: item.preparationTime,
                         availableFrom: item.availableFrom,
@@ -393,7 +397,9 @@ export const useMenuStore = create<MenuState>()(
                         description: item.description,
                         price: item.price,
                         image: item.image,
-                        isAvailable: item.isAvailable,
+                        // Never turn a legacy item off just because the field was omitted by an editor.
+                        isAvailable: item.isAvailable !== false,
+                        status: item.archivedAt ? 'archived' : 'published',
                         isPopular: item.isPopular,
                         preparationTime: item.preparationTime,
                         availableFrom: item.availableFrom,
@@ -553,12 +559,12 @@ export const useMenuStore = create<MenuState>()(
                 const item = get().categories.find(c => c.id === categoryId)?.items.find(i => i.id === itemId);
                 if (!item) return;
                 const archivedAt = new Date().toISOString();
-                if (navigator.onLine) {
-                    await menuApi.deleteItem(itemId);
-                } else {
-                    await syncService.queue('menuItem', 'DELETE', { id: itemId });
-                }
                 const archivedItem = { ...item, archivedAt, isAvailable: false };
+                if (navigator.onLine) {
+                    await menuApi.updateItem(itemId, { status: 'archived', archivedAt, isAvailable: false });
+                } else {
+                    await syncService.queue('menuItem', 'UPDATE', { id: itemId, status: 'archived', archivedAt, isAvailable: false });
+                }
                 set((state) => ({
                     categories: state.categories.map(c =>
                         c.id === categoryId

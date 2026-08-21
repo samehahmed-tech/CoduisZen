@@ -86,6 +86,7 @@ interface AuthState {
     hasPermission: (permission: AppPermission) => boolean;
     setActiveBranch: (branchId: string) => void;
     setBranches: (branches: Branch[]) => void;
+    setBranchBusinessDate: (branchId: string, businessDate: string) => void;
     setPrinters: (printers: Printer[]) => void;
     updateUsers: (users: User[]) => void;
     updatePrinters: (printers: Printer[]) => void;
@@ -732,11 +733,29 @@ export const useAuthStore = create<AuthState>()(
                 localDb.settings.put({ key: 'app', value: { ...get().settings, ...newSettings }, updatedAt: Date.now() }).catch(() => undefined);
             },
 
-            setActiveBranch: (branchId) => set((state) => ({
-                settings: { ...state.settings, activeBranchId: branchId }
-            })),
+            setActiveBranch: (branchId) => set((state) => {
+                const user = state.settings.currentUser;
+                const allowedBranchIds = new Set([
+                    user?.assignedBranchId,
+                    ...(user?.allowedBranches || []),
+                ].filter(Boolean) as string[]);
+                const isAllowed = user?.role === 'SUPER_ADMIN' || allowedBranchIds.has(branchId);
+                if (!isAllowed || !state.branches.some((branch) => branch.id === branchId)) return state;
+                return {
+                    settings: { ...state.settings, activeBranchId: branchId },
+                };
+            }),
 
             setBranches: (branches) => set({ branches }),
+            setBranchBusinessDate: (branchId, businessDate) => {
+                set((state) => ({
+                    branches: state.branches.map((branch) =>
+                        branch.id === branchId ? { ...branch, businessDate } : branch
+                    ),
+                }));
+                const branch = get().branches.find((item) => item.id === branchId);
+                if (branch) void localDb.branches.put(branch as any);
+            },
             setPrinters: (printers) => set({ printers }),
             updatePrinters: (printers) => set({ printers }),
             updateUsers: (users) => set({ users }),

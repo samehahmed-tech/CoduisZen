@@ -22,10 +22,10 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
         })
             .from(orders)
             .innerJoin(branches, eq(orders.branchId, branches.id))
-            .where(and(
-                gte(orders.createdAt, start),
-                lte(orders.createdAt, end),
-            ))
+            // Prefer businessDate (day-key) when present so branch performance
+            // stays consistent with Day Close across timezones; createdAt fallback
+            // for legacy rows.
+            .where(and(sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`))
             .groupBy(orders.branchId, branches.name)
             .orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
 
@@ -49,8 +49,7 @@ export const getOrderPrepTime = async (req: Request, res: Response) => {
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
 
         const conditions: any[] = [
-            gte(orders.createdAt, start),
-            lte(orders.createdAt, end),
+            sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`,
             inArray(orders.status, deliveredStatuses),
             sql`${orders.completedAt} is not null`,
         ];

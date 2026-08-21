@@ -46,7 +46,7 @@ export const reportsApi = {
         return apiRequest<Array<{ id: string; name: string; price: number; cost: number; margin: number; marginPercent: number; soldQty: number; soldRevenue: number }>>(`/reports/food-cost?${query}`);
     },
     getDashboardKpis: (params: { branchId?: string; startDate: string; endDate: string; scope?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ALL' }) => {
-        const query = new URLSearchParams(params as any).toString();
+        const query = new URLSearchParams({ ...(params as any), _ts: String(Date.now()) }).toString();
         return apiRequest<{
             branchId: string;
             scope: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ALL';

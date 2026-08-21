@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DateRangePicker } from 'react-date-range';
 import { useToast } from './Toast';
 
@@ -173,6 +173,7 @@ const Dashboard: React.FC = () => {
   // Imported from utils/clearData
 
   const { settings, hasPermission, branches } = useAuthStore();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const autonomousEngine = useAutonomousEngine();
   const { showToast } = useToast();
@@ -214,6 +215,12 @@ const Dashboard: React.FC = () => {
     else if (viewScope === 'MONTHLY') { 
       start.setDate(start.getDate() - 29); 
       start.setHours(0, 0, 0, 0); 
+      // Clamp comparison window to valid month-end days: setMonth on day 29-31
+      // can land on invalid dates (e.g. 31 Mar -> 3 Mar), shifting the window.
+      const maxDayPrevStart = new Date(start.getFullYear(), start.getMonth(), 0).getDate();
+      const maxDayPrevEnd = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+      compareStart.setDate(Math.min(compareStart.getDate(), maxDayPrevStart));
+      compareEnd.setDate(Math.min(compareEnd.getDate(), maxDayPrevEnd));
       compareStart.setMonth(start.getMonth() - 1);
       compareEnd.setMonth(end.getMonth() - 1);
     }
@@ -257,6 +264,49 @@ const Dashboard: React.FC = () => {
     refetchOnMount: 'always',
     placeholderData: keepPreviousData,
   });
+
+  useEffect(() => {
+    let mounted = true;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const refreshDashboard = () => {
+      if (!mounted) return;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        if (!mounted) return;
+        void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        void refetch();
+      }, 120);
+    };
+
+    const handleLocalOrdersChanged = () => refreshDashboard();
+    try {
+      const persistedChange = localStorage.getItem('restoflow:orders-changed');
+      if (persistedChange) {
+        const parsed = JSON.parse(persistedChange);
+        if (parsed?.changedAt && Date.now() - Number(parsed.changedAt) < 10 * 60_000) {
+          refreshDashboard();
+        }
+        localStorage.removeItem('restoflow:orders-changed');
+      }
+    } catch {
+      localStorage.removeItem('restoflow:orders-changed');
+    }
+    socketService.on('order:created', refreshDashboard);
+    socketService.on('order:status', refreshDashboard);
+    socketService.on('order:updated', refreshDashboard);
+    socketService.on('analytics:refresh', refreshDashboard);
+    window.addEventListener('restoflow:orders-changed', handleLocalOrdersChanged);
+    return () => {
+      mounted = false;
+      socketService.off('order:created', refreshDashboard);
+      socketService.off('order:status', refreshDashboard);
+      socketService.off('order:updated', refreshDashboard);
+      socketService.off('analytics:refresh', refreshDashboard);
+      window.removeEventListener('restoflow:orders-changed', handleLocalOrdersChanged);
+      if (refreshTimer) clearTimeout(refreshTimer);
+    };
+  }, [queryClient, refetch]);
 
   useEffect(() => {
     if (error) {
@@ -317,6 +367,23 @@ const Dashboard: React.FC = () => {
     CUSTOM: t.custom,
   };
 
+  // Legend labels for the comparison series — the comparison period changes per
+  // scope (same day last year / previous week / previous month / last year).
+  const comparisonLabel = useMemo(() => {
+    if (viewScope === 'DAILY') return isAr ? 'مقارنة بنفس اليوم من العام الماضي' : 'Same day last year';
+    if (viewScope === 'WEEKLY') return isAr ? 'مقارنة بالأسبوع الماضي' : 'Previous week';
+    if (viewScope === 'MONTHLY') return isAr ? 'مقارنة بالشهر الماضي' : 'Previous month';
+    if (viewScope === 'YEARLY') return isAr ? 'مقارنة بالعام الماضي' : 'Previous year';
+    return isAr ? 'مقارنة بالفترة السابقة' : 'Previous period';
+  }, [viewScope, isAr]);
+
+  // orderTypeBreakdown returns raw counts from the backend; show percentages.
+  const orderTypePercentData = useMemo(() => {
+    const total = payload.orderTypeBreakdown.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+    if (total <= 0) return payload.orderTypeBreakdown;
+    return payload.orderTypeBreakdown.map(e => ({ ...e, value: Number(((Number(e.value) || 0) / total * 100).toFixed(1)) }));
+  }, [payload.orderTypeBreakdown]);
+
   if (isLoading && !data) return <PageSkeleton />;
 
   return (
@@ -358,7 +425,7 @@ const Dashboard: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3">
             {/* Range Select */}
             <div className="flex bg-card/60  rounded-2xl border border-border/30 p-1">
-              {(['DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM'] as Scope[]).map(s => (
+              {(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM'] as Scope[]).map(s => (
                 <button
                   key={s}
                   onClick={() => setViewScope(s)}
@@ -413,15 +480,52 @@ const Dashboard: React.FC = () => {
                 <span className="opacity-90">{t.autonomous_insight_desc}</span>
               </p>
             </div>
-            <button className="relative z-10 h-12 px-8 rounded-xl bg-indigo-500 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-400 hover:shadow-[0_0_20px_rgba(99,102,241,0.5)] transition-all active:scale-95 flex items-center gap-2">
+            <button className="relative z-10 h-12 px-8 rounded-xl bg-indigo-500 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-400 hover:shadow-[0_0_20px_rgba(99,102,241,0.5)] transition-all active:scale-95 flex items-center gap-2" onClick={() => { showToast(t.reports || t.analytics || 'Reports', 'success'); navigate('/reports'); }}>
               <Sparkles size={16} />
               {t.apply_instant_fix}
             </button>
           </div>
         )}
 
-        {/* ?? Row 1: High Level KPI's with Performance Tracking ?? */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8 gap-4 lg:gap-6" aria-label={t.performance_reports}>
+        {/* Operational snapshot: an at-a-glance control surface before the detailed KPIs */}
+        <section className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr_1fr] gap-4 lg:gap-5" aria-label={isAr ? 'ملخص التشغيل' : 'Operational snapshot'}>
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-primary/20 bg-gradient-to-br from-primary/15 via-card/80 to-accent/10 p-5 lg:p-6 shadow-xl shadow-primary/5">
+            <div className="absolute -top-16 -right-12 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+            <div className="relative z-10 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">{isAr ? 'نبض الفرع الآن' : 'Branch pulse now'}</p>
+                <h2 className="mt-2 text-2xl lg:text-3xl font-black tracking-tight text-main">{isAr ? 'كل الأرقام المهمة في مكان واحد' : 'Your operation at a glance'}</h2>
+                <p className="mt-2 max-w-xl text-xs font-bold leading-5 text-muted">{isAr ? 'تابع الطلبات، فريق التشغيل، والتنبيهات قبل الانتقال للتفاصيل.' : 'Track orders, active staff, and risks before diving into the details.'}</p>
+              </div>
+              <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><Activity size={22} /></div>
+            </div>
+            <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigate('/orders')} className="rounded-xl bg-primary px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-primary/20 transition hover:-translate-y-0.5">{isAr ? 'مراجعة الطلبات' : 'Review orders'}</button>
+              <button type="button" onClick={() => navigate('/pickup')} className="rounded-xl border border-border/40 bg-card/70 px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-main transition hover:bg-elevated">{isAr ? 'شاشة التسليم' : 'Open delivery'}</button>
+            </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-amber-500/20 bg-amber-500/[0.07] p-5 lg:p-6 shadow-xl shadow-amber-500/5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">{isAr ? 'حالة الطلبات' : 'Order flow'}</p>
+              <ShoppingBag size={18} className="text-amber-500" />
+            </div>
+            <div className="mt-4 flex items-end justify-between gap-4">
+              <div><p className="text-3xl font-black tabular-nums text-main">{liveMetrics.orders.toLocaleString()}</p><p className="mt-1 text-[10px] font-bold text-muted">{isAr ? 'إجمالي الطلبات' : 'Total orders'}</p></div>
+              <div className="text-right"><p className="text-xl font-black tabular-nums text-amber-600">{liveMetrics.prep.toLocaleString()}</p><p className="mt-1 text-[10px] font-bold text-muted">{isAr ? 'قيد التحضير' : 'In preparation'}</p></div>
+            </div>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-amber-500/10"><div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400" style={{ width: `${liveMetrics.orders ? Math.min(100, (liveMetrics.prep / liveMetrics.orders) * 100) : 0}%` }} /></div>
+          </div>
+
+          <div className={`rounded-[1.75rem] border p-5 lg:p-6 shadow-xl ${criticalAlerts.length > 0 ? 'border-rose-500/20 bg-rose-500/[0.07] shadow-rose-500/5' : 'border-emerald-500/20 bg-emerald-500/[0.07] shadow-emerald-500/5'}`}>
+            <div className="flex items-center justify-between gap-3"><p className={`text-[10px] font-black uppercase tracking-[0.16em] ${criticalAlerts.length > 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{isAr ? 'الانتباه المطلوب' : 'Attention needed'}</p>{criticalAlerts.length > 0 ? <AlertTriangle size={18} className="text-rose-500" /> : <CheckCircle2 size={18} className="text-emerald-500" />}</div>
+            <div className="mt-4 flex items-end justify-between gap-4"><div><p className={`text-3xl font-black tabular-nums ${criticalAlerts.length > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{criticalAlerts.length}</p><p className="mt-1 text-[10px] font-bold text-muted">{isAr ? 'تنبيهات مخزون حرجة' : 'Critical stock alerts'}</p></div><div className="text-right"><p className="text-xl font-black tabular-nums text-main">{activeShifts.length}</p><p className="mt-1 text-[10px] font-bold text-muted">{isAr ? 'شفتات مفتوحة' : 'Open shifts'}</p></div></div>
+            <button type="button" onClick={() => navigate('/inventory')} className="mt-5 text-[10px] font-black uppercase tracking-widest text-primary hover:underline">{criticalAlerts.length > 0 ? (isAr ? 'راجع المخزون الآن' : 'Review inventory now') : (isAr ? 'المخزون مستقر' : 'Inventory is stable')}</button>
+          </div>
+        </section>
+
+        {/* Row 1: High Level KPI's with Performance Tracking */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5" aria-label={t.performance_reports}>
           <MetricCard 
             label={t.total_revenue}
             value={payload.totals.revenue.toLocaleString()}
@@ -600,7 +704,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-muted/40" />
-                  <span className="text-[10px] font-black uppercase text-muted">{t.last_year}</span>
+                  <span className="text-[10px] font-black uppercase text-muted">{comparisonLabel}</span>
                 </div>
               </div>
             </div>
@@ -636,7 +740,7 @@ const Dashboard: React.FC = () => {
                     contentStyle={{ backgroundColor: 'rgba(var(--color-card), 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(var(--color-border), 0.1)', borderRadius: '16px', padding: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
                     itemStyle={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}
                   />
-                  <Area type="monotone" dataKey="prevRevenue" name={t.last_year} stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="url(#colorPrev)" />
+                  <Area type="monotone" dataKey="prevRevenue" name={comparisonLabel} stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="url(#colorPrev)" />
                   <Area type="monotone" dataKey="revenue" name={t.current} stroke="rgb(var(--primary))" strokeWidth={4} fill="url(#colorCurrent)" animationDuration={2000} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -661,7 +765,7 @@ const Dashboard: React.FC = () => {
                 <button className="text-[10px] font-black uppercase text-primary hover:underline">{t.view_all}</button>
               </div>
               <div className="space-y-4">
-                {employees.sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0)).slice(0, 4).map((emp, i) => (
+                {employees.length > 0 ? employees.slice().sort((a, b) => ((b as any).totalSales || 0) - ((a as any).totalSales || 0)).slice(0, 4).map((emp, i) => (
                   <div key={emp.id} className="group flex items-center gap-4 p-4 rounded-[1.25rem] bg-elevated/30 border border-border/20 hover:bg-elevated/60 transition-all">
                     <div className="relative">
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center font-black text-primary border border-primary/20">
@@ -678,7 +782,18 @@ const Dashboard: React.FC = () => {
                       <p className="text-sm font-black text-emerald-500 tabular-nums">{((emp as any).totalSales || 0).toLocaleString()} <span className="text-[10px]">{currencySymbol}</span></p>
                     </div>
                   </div>
-                ))}
+                )) : null}
+                {employees.length > 0 && employees.every((e) => !(e as any).totalSales) && (
+                  <p className="text-[11px] font-bold text-muted text-center pt-2">
+                    {isAr ? 'يتم تتبع أداء المبيعات عبر ورديات الكاشير (إغلاق اليوم) — بيانات الأداء الفردي قيد التطوير' : 'Sales performance is tracked via cashier shifts (Day Close) — per-employee sales coming soon'}
+                  </p>
+                )}
+                {employees.length === 0 && (
+                  <div className="flex flex-col items-center justify-center p-6 text-muted border border-dashed border-border/40 rounded-xl bg-card/20">
+                    <UserCheck size={24} className="text-emerald-500/20 mb-2" />
+                    <p className="text-xs font-bold text-center">{isAr ? 'لا توجد بيانات للموظفين' : 'No staff data'}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -724,7 +839,7 @@ const Dashboard: React.FC = () => {
                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <PieChart>
                       <Pie
-                        data={payload.orderTypeBreakdown}
+                        data={orderTypePercentData}
                         innerRadius={60}
                         outerRadius={80}
                         paddingAngle={5}
@@ -739,7 +854,7 @@ const Dashboard: React.FC = () => {
                   </ResponsiveContainer>
                 </div>
                 <div className="space-y-4">
-                  {payload.orderTypeBreakdown.map((item, i) => (
+                  {orderTypePercentData.map((item, i) => (
                     <div key={item.name} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />

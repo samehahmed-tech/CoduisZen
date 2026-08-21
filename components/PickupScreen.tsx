@@ -170,7 +170,7 @@ const usePickupCallout = () => {
 };
 
 export const PickupScreen: React.FC = () => {
-  const { orders, fetchOrders } = useOrderStore();
+  const { orders, fetchOrders, isLoading: ordersLoading, error: ordersError } = useOrderStore();
   const { settings } = useAuthStore();
   const { success, error } = useToast();
   const lang = settings.language || 'en';
@@ -320,6 +320,7 @@ export const PickupScreen: React.FC = () => {
 
   useEffect(() => {
     const handleGlobalOrderKeys = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
@@ -366,16 +367,16 @@ export const PickupScreen: React.FC = () => {
     <div className="flex flex-col h-screen w-full bg-app text-main font-sans overflow-hidden">
       <div className="shrink-0 h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-indigo-500 shadow-lg shadow-emerald-500/20" />
 
-      <header className="shrink-0 flex flex-col items-stretch justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:flex-row lg:items-center lg:gap-4 bg-card/60 backdrop-blur-2xl border-b border-border/20 z-10 shadow-sm relative">
+      <header className="relative z-10 flex shrink-0 flex-col items-stretch justify-between gap-2 border-b border-border/20 bg-card/60 px-3 py-2 shadow-sm backdrop-blur-2xl sm:gap-3 sm:px-6 sm:py-4 lg:flex-row lg:items-center lg:gap-4">
         <div className="flex items-center gap-3 sm:gap-5">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/20">
-            <Package size={24} />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/20 sm:h-12 sm:w-12 sm:rounded-2xl">
+            <Package size={20} className="sm:h-6 sm:w-6" />
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black uppercase tracking-widest text-main">
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-black uppercase tracking-widest text-main sm:text-2xl">
               {isAr ? 'شاشة التسليم' : 'Expediter Pickup'}
             </h1>
-            <p className="text-xs font-bold text-muted uppercase tracking-[0.2em] mt-0.5">
+            <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-muted sm:text-xs sm:tracking-[0.2em]">
               {isAr ? 'الطلبات الجاهزة للاستلام' : 'Orders Ready For Handover'}
             </p>
           </div>
@@ -385,9 +386,9 @@ export const PickupScreen: React.FC = () => {
           <LiveClock />
         </div>
 
-        <div className="flex w-full flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:flex-nowrap">
-          <div className="relative min-w-[180px] flex-1 lg:flex-none">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:gap-3 lg:flex lg:w-auto lg:flex-nowrap">
+          <div className="relative min-w-0 lg:flex-none">
+            <Search size={16} className={`absolute top-1/2 -translate-y-1/2 text-muted ${isAr ? 'right-3' : 'left-3'}`} />
             <input
               value={quickInput}
               onChange={event => {
@@ -405,33 +406,35 @@ export const PickupScreen: React.FC = () => {
                   setQuickInput('');
                 }
               }}
+              aria-label={isAr ? 'رقم الأوردر للتسليم السريع' : 'Order number for quick handover'}
               placeholder={isAr ? 'رقم الأوردر ثم Enter' : 'Order # then Enter'}
-              className="h-12 w-full rounded-2xl border border-border/30 bg-elevated/60 pl-10 pr-4 text-sm font-black text-main outline-none transition focus:border-emerald-500/60 lg:w-56"
+              className={`h-10 w-full rounded-xl border border-border/30 bg-elevated/60 text-sm font-black text-main outline-none transition focus:border-emerald-500/60 sm:h-12 sm:rounded-2xl lg:w-56 ${isAr ? 'pr-10 pl-3' : 'pl-10 pr-3'}`}
               style={{ borderColor: matchedOrder ? 'rgba(16,185,129,0.65)' : undefined }}
             />
           </div>
 
-          <div className="flex flex-col items-end">
-            <span className="text-3xl font-black tabular-nums leading-none text-amber-500">{preparingOrders.length}</span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'قيد التحضير' : 'Preparing'}</span>
-          </div>
-
-          <div className="flex flex-col items-end mr-1">
-            <span className="text-3xl font-black tabular-nums leading-none text-emerald-500">{readyOrders.length}</span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'جاهز' : 'Ready'}</span>
-          </div>
-
-          {deliveryReadyOrders.length > 0 && (
+          <div className="col-span-2 flex items-center justify-end gap-3 sm:gap-4 lg:col-span-1">
             <div className="flex flex-col items-end">
-              <span className="text-3xl font-black tabular-nums leading-none text-sky-500">{deliveryReadyOrders.length}</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'دليفري' : 'Delivery'}</span>
+              <span className="text-2xl font-black tabular-nums leading-none text-amber-500 sm:text-3xl">{preparingOrders.length}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted sm:text-[10px]">{isAr ? 'قيد التحضير' : 'Preparing'}</span>
             </div>
-          )}
+            <div className="flex flex-col items-end">
+              <span className="text-2xl font-black tabular-nums leading-none text-emerald-500 sm:text-3xl">{readyOrders.length}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted sm:text-[10px]">{isAr ? 'جاهز' : 'Ready'}</span>
+            </div>
+            {deliveryReadyOrders.length > 0 && (
+              <div className="flex flex-col items-end">
+                <span className="text-2xl font-black tabular-nums leading-none text-sky-500 sm:text-3xl">{deliveryReadyOrders.length}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-muted sm:text-[10px]">{isAr ? 'دليفري' : 'Delivery'}</span>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={activateAudio}
-            className={`w-12 h-12 rounded-2xl border border-border/30 flex items-center justify-center transition-all shadow-sm active:scale-95 ${audioEnabled ? 'bg-emerald-500 text-white' : 'bg-elevated text-muted hover:text-main hover:bg-main/5'}`}
+            aria-label={isAr ? 'تفعيل صوت النداء' : 'Enable callout audio'}
+            className={`h-10 w-10 rounded-xl border border-border/30 flex items-center justify-center transition-all shadow-sm active:scale-95 sm:h-12 sm:w-12 sm:rounded-2xl ${audioEnabled ? 'bg-emerald-500 text-white' : 'bg-elevated text-muted hover:text-main hover:bg-main/5'}`}
             title={isAr ? 'تفعيل صوت النداء' : 'Enable callout audio'}
           >
             <Volume2 size={20} />
@@ -440,7 +443,8 @@ export const PickupScreen: React.FC = () => {
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="w-12 h-12 rounded-2xl bg-elevated border border-border/30 flex items-center justify-center text-muted hover:text-main hover:bg-main/5 transition-all shadow-sm active:scale-95"
+            aria-label={isFullscreen ? (isAr ? 'الخروج من ملء الشاشة' : 'Exit fullscreen') : (isAr ? 'ملء الشاشة' : 'Fullscreen')}
+            className="h-10 w-10 rounded-xl bg-elevated border border-border/30 flex items-center justify-center text-muted hover:text-main hover:bg-main/5 transition-all shadow-sm active:scale-95 sm:h-12 sm:w-12 sm:rounded-2xl"
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           >
             <MonitorPlay size={20} />
@@ -448,7 +452,7 @@ export const PickupScreen: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden p-6 gap-6 relative z-0">
+      <main aria-busy={ordersLoading} className="relative z-0 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-6 sm:p-6 lg:flex-row">
         <AnimatePresence>
           {quickInput && (
             <motion.div
@@ -464,7 +468,24 @@ export const PickupScreen: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <section className="flex-1 flex flex-col bg-card/40 backdrop-blur-sm rounded-[2rem] border border-border/20 shadow-lg overflow-hidden">
+        {ordersError && (
+          <div role="alert" className="absolute inset-x-3 top-3 z-40 flex items-center justify-between gap-3 rounded-2xl border border-rose-300/40 bg-rose-500/10 px-4 py-3 text-xs font-black text-rose-600 shadow-lg backdrop-blur-xl sm:inset-x-6">
+            <span>{getActionableErrorMessage(ordersError, isAr ? 'ar' : 'en')}</span>
+            <button type="button" onClick={() => refreshPickupOrders()} disabled={ordersLoading} className="shrink-0 rounded-lg border border-rose-300/50 px-3 py-2 transition hover:bg-rose-500/10 disabled:opacity-50">
+              {isAr ? 'إعادة المحاولة' : 'Retry'}
+            </button>
+          </div>
+        )}
+
+        {ordersLoading && orders.length > 0 && (
+          <div role="status" className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center">
+            <span className="rounded-b-xl border border-border/30 bg-card/95 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted shadow-sm">
+              {isAr ? 'جاري تحديث الطلبات...' : 'Refreshing orders...'}
+            </span>
+          </div>
+        )}
+
+        <section className="order-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/20 bg-card/40 shadow-lg backdrop-blur-sm sm:rounded-[2rem] lg:order-1">
           <div className="px-6 py-4 border-b border-emerald-500/20 bg-emerald-500/5 flex items-center justify-between shadow-inner">
             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-2">
               <Zap size={18} className="animate-pulse" />
@@ -475,18 +496,32 @@ export const PickupScreen: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 pb-28 custom-scrollbar sm:pb-4">
             <AnimatePresence>
-              {readyOrders.length === 0 && deliveryReadyOrders.length === 0 ? (
+              {ordersLoading && orders.length === 0 ? (
+                <motion.div role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-muted/60">
+                  <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-500/20 border-t-emerald-500" />
+                  <p className="text-sm font-black uppercase tracking-widest">{isAr ? 'جاري تحميل الطلبات...' : 'Loading orders...'}</p>
+                </motion.div>
+              ) : ordersError && orders.length === 0 ? (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center px-6 text-center text-muted/70">
+                  <Package size={64} className="mb-4 text-rose-500/60" />
+                  <p className="text-sm font-black uppercase tracking-widest">{isAr ? 'تعذر تحميل الطلبات' : 'Orders could not be loaded'}</p>
+                  <button type="button" onClick={() => refreshPickupOrders()} disabled={ordersLoading} className="mt-4 rounded-xl border border-border bg-elevated px-4 py-3 text-xs font-black text-main transition hover:bg-primary/10 disabled:opacity-50">
+                    {isAr ? 'إعادة المحاولة' : 'Retry loading'}
+                  </button>
+                </motion.div>
+              ) : readyOrders.length === 0 && deliveryReadyOrders.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-muted/60">
                   <CheckCircle2 size={64} className="mb-4 opacity-50" />
-                  <p className="text-sm font-black uppercase tracking-widest">{isAr ? 'لا توجد طلبات جاهزة' : 'All caught up! No pending orders.'}</p>
+                  <p className="text-sm font-black uppercase tracking-widest">{preparingOrders.length > 0 ? (isAr ? 'كل الطلبات الجاهزة تم تسليمها' : 'All ready orders are handed over') : (isAr ? 'لا توجد طلبات في قائمة التسليم' : 'No orders in the handover queue')}</p>
+                  {preparingOrders.length > 0 && <p className="mt-2 text-xs font-bold text-muted">{isAr ? `${preparingOrders.length} طلب قيد التحضير` : `${preparingOrders.length} order(s) still preparing`}</p>}
                 </motion.div>
               ) : (
                 <div className="space-y-5">
                   {readyOrders.length > 0 && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                      {readyOrders.map((order) => (
+                      {readyOrders.map((order, index) => (
                         <PickupCard
                           key={order.id}
                           order={order}
@@ -495,6 +530,7 @@ export const PickupScreen: React.FC = () => {
                           isAr={isAr}
                           elapsed={getElapsedMins(order.createdAt)}
                           isReady
+                          isNext={index === 0}
                           isCalling={callingOrderId === order.id}
                           isPending={pendingHandoverIds.has(order.id)}
                         />
@@ -516,7 +552,7 @@ export const PickupScreen: React.FC = () => {
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         {deliveryReadyOrders.map((order) => (
                           <PickupCard
-                            key={order.id}
+                          key={order.id}
                             order={order}
                             onCall={() => undefined}
                             onHandover={() => undefined}
@@ -538,7 +574,7 @@ export const PickupScreen: React.FC = () => {
         </section>
 
         {preparingOrders.length > 0 && (
-          <section className="w-full lg:w-[340px] xl:w-[450px] shrink-0 flex flex-col bg-card/60 backdrop-blur-xl rounded-[2rem] border border-amber-500/20 shadow-2xl overflow-hidden relative">
+          <section className="order-2 flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-amber-500/20 bg-card/60 shadow-2xl backdrop-blur-xl sm:rounded-[2rem] lg:order-2 lg:w-[340px] xl:w-[450px]">
             <div className="px-6 py-4 border-b border-amber-500/10 bg-amber-500/10 flex items-center justify-between">
               <h2 className="text-sm font-black uppercase tracking-widest text-amber-600 flex items-center gap-2">
                 <Clock size={16} />
@@ -549,7 +585,7 @@ export const PickupScreen: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 pb-28 custom-scrollbar space-y-3 sm:pb-4">
               {preparingOrders.map((order) => (
                 <PickupCard
                   key={order.id}
@@ -579,6 +615,7 @@ const PickupCard = React.memo(({
   isAr,
   elapsed,
   isReady,
+  isNext = false,
   isPreparing = false,
   isDeliveryReady = false,
   isCalling,
@@ -590,6 +627,7 @@ const PickupCard = React.memo(({
   isAr: boolean;
   elapsed: number;
   isReady: boolean;
+  isNext?: boolean;
   isPreparing?: boolean;
   isDeliveryReady?: boolean;
   isCalling: boolean;
@@ -663,12 +701,15 @@ const PickupCard = React.memo(({
         }
       }}
       role={isReady ? 'button' : undefined}
+      aria-label={isReady ? `${isAr ? 'تسليم الطلب' : 'Handover order'} ${formatDisplayId(order)} - ${customerLabel}` : undefined}
+      aria-disabled={isReady ? !canHandover : undefined}
       tabIndex={isReady ? 0 : undefined}
-      className={`relative flex flex-col overflow-hidden rounded-2xl border ${cardTone.border} ${isReady || isPreparing || isDeliveryReady ? 'bg-card' : 'bg-elevated/30 opacity-80'}`}
+      className={`relative flex flex-col overflow-hidden rounded-2xl border transition-shadow ${cardTone.border} ${isReady || isPreparing || isDeliveryReady ? 'bg-card' : 'bg-elevated/30 opacity-80'} ${isNext ? 'ring-2 ring-emerald-500/20 shadow-2xl' : ''}`}
       style={isReady ? { boxShadow: '0 14px 38px rgba(16,185,129,0.12), 0 2px 10px rgba(0,0,0,0.05)' } : isPreparing ? { boxShadow: '0 12px 30px rgba(245,158,11,0.1), 0 2px 10px rgba(0,0,0,0.04)' } : isDeliveryReady ? { boxShadow: '0 12px 30px rgba(14,165,233,0.1), 0 2px 10px rgba(0,0,0,0.04)' } : {}}
     >
       <div className={`flex items-start justify-between gap-3 border-b px-4 py-3 ${cardTone.header}`}>
         <div className="flex min-w-0 items-center gap-2">
+          {isNext && <span className="rounded-lg bg-emerald-500 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white">{isAr ? 'التالي' : 'NEXT'}</span>}
           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${cardTone.icon}`}>
             {typeIcon}
           </div>

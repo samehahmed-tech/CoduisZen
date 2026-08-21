@@ -138,7 +138,7 @@ const readinessCopy: Record<string, {
 
 const DayCloseHub: React.FC = () => {
     const navigate = useNavigate();
-    const { settings, branches, fetchBranches, fetchSettings } = useAuthStore();
+    const { settings, branches, fetchBranches, fetchSettings, setBranchBusinessDate } = useAuthStore();
     const setShift = useFinanceStore((state) => state.setShift);
     const setIsShiftDrawerOpen = useFinanceStore((state) => state.setIsShiftDrawerOpen);
     const { confirm } = useConfirm();
@@ -346,6 +346,7 @@ const DayCloseHub: React.FC = () => {
         setMessage(null);
         try {
             await dayCloseApi.updateBusinessDate(branchId, manualBusinessDate);
+            setBranchBusinessDate(branchId, manualBusinessDate);
             await fetchBranches();
             setDate(manualBusinessDate);
             setMessage(lang === 'ar' ? `تم تحديث تاريخ التشغيل إلى ${manualBusinessDate}.` : `Business date updated to ${manualBusinessDate}.`);

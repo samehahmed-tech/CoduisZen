@@ -885,12 +885,12 @@ const [customerRecordForOrder] = await db
         // Fetch only the columns needed for price/tax verification. Selecting the
         // full menu_items row makes order creation depend on unrelated menu schema
         // migrations such as branch/platform pricing columns.
+        const resolvedMenuItemIds = items.map(resolveOrderItemMenuItemId);
+        const invalidItemIndex = resolvedMenuItemIds.findIndex((id: unknown) => typeof id !== 'string' || id.length === 0);
         const menuItemIds: string[] = Array.from(new Set(
-            items
-                .map(resolveOrderItemMenuItemId)
-                .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0),
+            resolvedMenuItemIds.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0),
         ));
-        if (items.length > 0 && menuItemIds.length !== items.length) {
+        if (invalidItemIndex !== -1) {
             await clearIdempotencyClaim();
             return res.status(400).json({
                 error: 'INVALID_MENU_ITEM',
@@ -898,6 +898,7 @@ const [customerRecordForOrder] = await db
                 message: 'Every order item must reference an existing menu item.',
                 details: items.map((item: any, index: number) => ({
                     index,
+                    invalid: index === invalidItemIndex,
                     id: item?.id,
                     menu_item_id: item?.menu_item_id,
                     menuItemId: item?.menuItemId,

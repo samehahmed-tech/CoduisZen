@@ -44,11 +44,12 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
 
         const output = allBranches.map(branch => {
             const scopedOrders = branchOrders.filter(o => o.branchId === branch.id);
-            const revenue = scopedOrders.reduce((s, o) => s + Number(o.total || 0), 0);
-            const ordersCount = scopedOrders.length;
-            const avgTicket = ordersCount > 0 ? revenue / ordersCount : 0;
             const cancelled = scopedOrders.filter(o => String(o.status) === 'CANCELLED').length;
-            const activeOrders = scopedOrders.filter(o => !['DELIVERED', 'CANCELLED'].includes(String(o.status))).length;
+            const validSalesOrders = scopedOrders.filter(o => String(o.status) !== 'CANCELLED');
+            const revenue = validSalesOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+            const ordersCount = validSalesOrders.length;
+            const avgTicket = ordersCount > 0 ? revenue / ordersCount : 0;
+            const activeOrders = validSalesOrders.filter(o => !['DELIVERED'].includes(String(o.status))).length;
 
             const lowStock = stocks.filter(s => {
                 const bId = warehouseToBranch.get(s.warehouseId);

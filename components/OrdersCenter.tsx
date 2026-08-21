@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertCircle,
     Banknote,
@@ -107,6 +107,7 @@ const OrdersCenter: React.FC = () => {
     const [refundModalOrderId, setRefundModalOrderId] = useState<string | null>(null);
     const [refundReason, setRefundReason] = useState('');
     const [refundReasonCategory, setRefundReasonCategory] = useState<'QUALITY' | 'WRONG_ORDER' | 'CUSTOMER_REQUEST' | 'OVERCHARGE' | 'OTHER'>('CUSTOMER_REQUEST');
+    const loadRequestRef = useRef(0);
     const [dateFilter, setDateFilter] = useState<string>(() => (
         branches.find(branch => branch.id === settings.activeBranchId)?.businessDate
         || formatLocalDate(new Date())
@@ -211,6 +212,7 @@ const OrdersCenter: React.FC = () => {
     const getOrderAgeMins = (createdAt: string | Date) => Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
 
     const loadOrders = useCallback(async () => {
+        const requestId = ++loadRequestRef.current;
         setIsLoading(true);
         setError(null);
         try {
@@ -221,11 +223,11 @@ const OrdersCenter: React.FC = () => {
             if (dateFilter) params.date = dateFilter;
 
             const data = await ordersApi.getAll(params);
-            setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
+            if (requestId === loadRequestRef.current) setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
         } catch (err: any) {
-            setError(getActionableErrorMessage(err, lang as any));
+            if (requestId === loadRequestRef.current) setError(getActionableErrorMessage(err, lang as any));
         } finally {
-            setIsLoading(false);
+            if (requestId === loadRequestRef.current) setIsLoading(false);
         }
     }, [statusFilter, branchFilter, typeFilter, dateFilter, lang]);
 
@@ -276,6 +278,18 @@ const OrdersCenter: React.FC = () => {
         setCheckedItems(new Set());
     }, [selectedOrderId]);
 
+    useEffect(() => {
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            if (voidModalOrderId) closeVoidModal();
+            else if (refundModalOrderId) closeRefundModal();
+            else if (showApprovalModal) setShowApprovalModal(false);
+            else if (selectedOrderId) setSelectedOrderId(null);
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [refundModalOrderId, selectedOrderId, showApprovalModal, voidModalOrderId]);
+
     const filteredOrders = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         if (!q) return orders;
@@ -304,9 +318,15 @@ const OrdersCenter: React.FC = () => {
     );
     const selectedTableName = selectedOrder ? getTableDisplayName(selectedOrder) : '';
 
-    const activeCount = orders.filter(order => ![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status)).length;
-    const delayedCount = orders.filter(order => getOrderAgeMins(order.createdAt) >= 30 && ![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status)).length;
-    const deliveryCount = orders.filter(order => order.type === OrderType.DELIVERY).length;
+    const { activeCount, delayedCount, deliveryCount } = useMemo(() => {
+        const closedStatuses = [OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED];
+        return orders.reduce((counts, order) => {
+            if (!closedStatuses.includes(order.status)) counts.activeCount += 1;
+            if (getOrderAgeMins(order.createdAt) >= 30 && !closedStatuses.includes(order.status)) counts.delayedCount += 1;
+            if (order.type === OrderType.DELIVERY) counts.deliveryCount += 1;
+            return counts;
+        }, { activeCount: 0, delayedCount: 0, deliveryCount: 0 });
+    }, [orders]);
     const orderStatusOptions = useMemo(() => Array.from(new Set(Object.values(OrderStatus))), []);
 
     const toggleItemCheck = (cartId: string) => {
@@ -325,6 +345,9 @@ const OrdersCenter: React.FC = () => {
         setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
         try {
             await updateOrderStatus(orderId, newStatus, undefined, undefined, { skipVersionCheck: true });
+            window.dispatchEvent(new CustomEvent('restoflow:orders-changed', {
+                detail: { orderId, status: newStatus, changedAt: Date.now() },
+            }));
             showToast(isAr ? 'تم تحديث حالة الطلب' : 'Order status updated', 'success');
             loadOrders();
         } catch (err: any) {
@@ -344,6 +367,10 @@ const OrdersCenter: React.FC = () => {
                 skipVersionCheck: true,
                 approvalId,
             });
+            const changedAt = Date.now();
+            const changeDetail = { orderId, status: OrderStatus.CANCELLED, changedAt };
+            window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
+            localStorage.setItem('restoflow:orders-changed', JSON.stringify(changeDetail));
             showToast(isAr ? 'تم إلغاء الطلب' : 'Order cancelled', 'success');
             loadOrders();
         } catch (err: any) {
@@ -496,6 +523,7 @@ const OrdersCenter: React.FC = () => {
                                 <input
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
+                                    aria-label={copy.search}
                                     placeholder={copy.search}
                                     className={`h-10 w-full min-w-[220px] rounded-xl border border-border bg-elevated text-sm font-bold outline-none focus:border-primary xl:h-11 xl:min-w-[260px] ${isAr ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
                                 />
@@ -513,6 +541,7 @@ const OrdersCenter: React.FC = () => {
                             <button
                                 key={type}
                                 onClick={() => setTypeFilter(type)}
+                                aria-pressed={typeFilter === type}
                                 className={`h-9 shrink-0 rounded-xl px-3 text-xs font-black transition xl:h-10 xl:px-4 ${typeFilter === type ? 'bg-primary text-white' : 'border border-border bg-elevated text-muted hover:text-main'}`}
                             >
                                 {getTypeLabel(type)}
@@ -575,8 +604,11 @@ const OrdersCenter: React.FC = () => {
                 </div>
 
                 {error && (
-                    <div className="mx-5 mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
-                        {error}
+                    <div role="alert" className="mx-5 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                        <span>{error}</span>
+                        <button type="button" onClick={loadOrders} disabled={isLoading} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-black transition hover:bg-rose-100 disabled:opacity-50">
+                            {isAr ? 'إعادة المحاولة' : 'Retry'}
+                        </button>
                     </div>
                 )}
 
@@ -585,6 +617,11 @@ const OrdersCenter: React.FC = () => {
                         <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card text-muted">
                             <ClipboardCheck size={46} className="mb-3 opacity-50" />
                             <p className="text-sm font-black">{copy.noOrders}</p>
+                            {(searchQuery || statusFilter !== 'ALL' || typeFilter !== 'ALL' || branchFilter !== 'ALL' || dateFilter) && (
+                                <button type="button" onClick={() => { setSearchQuery(''); setStatusFilter('ALL'); setTypeFilter('ALL'); setBranchFilter('ALL'); setDateFilter(''); }} className="mt-3 rounded-lg border border-border bg-elevated px-3 py-2 text-xs font-black text-main transition hover:bg-primary/10">
+                                    {isAr ? 'مسح كل الفلاتر' : 'Clear all filters'}
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-3">
@@ -597,6 +634,7 @@ const OrdersCenter: React.FC = () => {
                                     <button
                                         key={order.id}
                                         onClick={() => setSelectedOrderId(order.id)}
+                                        aria-pressed={selected}
                                         className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border p-3 text-start transition xl:gap-4 xl:rounded-2xl xl:p-4 ${
                                             selected ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : delayed ? 'border-rose-300 bg-rose-50/60 hover:bg-rose-50' : 'border-border bg-card hover:bg-elevated'
                                         }`}
@@ -637,7 +675,21 @@ const OrdersCenter: React.FC = () => {
                 </div>
             </section>
 
-            <aside className={`fixed inset-y-0 z-50 flex w-full max-w-[520px] min-h-0 flex-col border-border bg-card shadow-2xl transition-transform md:relative md:translate-x-0 max-[1100px]:max-w-none max-[1100px]:basis-[42%] max-[1100px]:shrink-0 max-[1100px]:border-t max-[1100px]:border-r-0 max-[1100px]:border-l-0 ${isAr ? 'left-0 border-r' : 'right-0 border-l'} ${selectedOrder ? 'translate-x-0' : isAr ? '-translate-x-full md:translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
+            {selectedOrder && (
+                <button
+                    type="button"
+                    aria-label={isAr ? 'إغلاق تفاصيل الطلب' : 'Close order details'}
+                    onClick={() => setSelectedOrderId(null)}
+                    className="fixed inset-0 z-[90] cursor-default bg-slate-950/25 backdrop-blur-[1px]"
+                />
+            )}
+
+            <aside
+                role={selectedOrder ? 'dialog' : undefined}
+                aria-modal={selectedOrder ? true : undefined}
+                aria-label={selectedOrder ? copy.orderDetails : undefined}
+                className={`fixed inset-y-0 z-[100] flex w-full max-w-[520px] min-h-0 flex-col border-border bg-card shadow-2xl transition-transform duration-200 ${isAr ? 'left-0 border-r' : 'right-0 border-l'} ${selectedOrder ? 'translate-x-0' : `pointer-events-none ${isAr ? '-translate-x-full' : 'translate-x-full'}`}`}
+            >
                 {selectedOrder ? (
                     <>
                         <div className="shrink-0 border-b border-border px-4 py-3 xl:px-5 xl:py-4">
@@ -646,7 +698,7 @@ const OrdersCenter: React.FC = () => {
                                     <h2 className="text-lg font-black text-main">{copy.orderDetails}</h2>
                                     <p className="mt-1 text-xs font-bold text-muted">{formatDisplayId(selectedOrder)} - {getStatusLabel(selectedOrder.status)}</p>
                                 </div>
-                                <button onClick={() => setSelectedOrderId(null)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted transition hover:bg-rose-50 hover:text-rose-600">
+                                <button type="button" aria-label={isAr ? 'إغلاق تفاصيل الطلب' : 'Close order details'} onClick={() => setSelectedOrderId(null)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted transition hover:bg-rose-50 hover:text-rose-600">
                                     <X size={18} />
                                 </button>
                             </div>
@@ -773,7 +825,7 @@ const OrdersCenter: React.FC = () => {
                             </section>
                         </div>
 
-                        <div className="border-t border-border bg-card p-4">
+                        <div className="sticky bottom-0 z-10 border-t border-border bg-card/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md">
                             {selectedOrderReadOnly && (
                                 <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-black leading-5 text-amber-900">
                                     {reviewOnlyCopy}
@@ -823,9 +875,7 @@ const OrdersCenter: React.FC = () => {
                                   <button
                                     onClick={() => handleVoidOrder(selectedOrder.id)}
                                     disabled={Boolean(pendingOrderAction)
-                                        || selectedOrderReadOnly
-                                        || [OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status)
-                                        || (selectedOrder.type !== OrderType.DINE_IN && [OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(selectedOrder.status))}
+                                        || [OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(selectedOrder.status)}
                                     className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 text-xs font-black text-white disabled:opacity-50"
                                   >
                                      <Trash2 size={15} />{copy.void}
@@ -867,23 +917,12 @@ const OrdersCenter: React.FC = () => {
                                 <h3 className="text-base font-black text-main">{copy.voidReasonTitle}</h3>
                                 <p className="mt-1 text-sm font-semibold text-muted">{copy.voidReasonHelp}</p>
                             </div>
-                            <button onClick={closeVoidModal} disabled={Boolean(pendingOrderAction)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-app text-muted hover:text-main disabled:opacity-50">
+                            <button type="button" aria-label={isAr ? 'إغلاق نافذة الإلغاء' : 'Close cancellation dialog'} onClick={closeVoidModal} disabled={Boolean(pendingOrderAction)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-app text-muted hover:text-main disabled:opacity-50">
                                 <X size={17} />
                             </button>
                         </div>
                         <div className="p-5">
-                            <label className="mb-2 block text-xs font-black text-muted">{copy.refundCategory}</label>
-                            <select
-                                value={refundReasonCategory}
-                                onChange={event => setRefundReasonCategory(event.target.value as typeof refundReasonCategory)}
-                                className="mb-4 h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold text-main outline-none focus:border-primary"
-                            >
-                                <option value="CUSTOMER_REQUEST">{isAr ? 'طلب العميل' : 'Customer request'}</option>
-                                <option value="QUALITY">{isAr ? 'شكوى جودة' : 'Quality'}</option>
-                                <option value="WRONG_ORDER">{isAr ? 'طلب خاطئ' : 'Wrong order'}</option>
-                                <option value="OVERCHARGE">{isAr ? 'تحصيل زائد' : 'Overcharge'}</option>
-                                <option value="OTHER">{isAr ? 'أخرى' : 'Other'}</option>
-                            </select>
+                            <label className="mb-2 block text-xs font-black text-muted">{copy.voidReasonTitle}</label>
                             <textarea
                                 value={voidReason}
                                 onChange={event => setVoidReason(event.target.value)}
@@ -894,6 +933,7 @@ const OrdersCenter: React.FC = () => {
                                 className="w-full resize-none rounded-xl border border-border bg-app p-3 text-sm font-bold text-main outline-none focus:border-primary"
                             />
                             <div className="mt-2 text-end text-[11px] font-black text-muted">{voidReason.trim().length}/240</div>
+
                         </div>
                         <div className="flex gap-3 border-t border-border p-4">
                             <button onClick={closeVoidModal} disabled={Boolean(pendingOrderAction)} className="flex-1 rounded-xl border border-border bg-app py-3 text-xs font-black text-muted hover:text-main disabled:opacity-50">

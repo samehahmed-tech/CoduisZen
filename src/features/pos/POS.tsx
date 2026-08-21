@@ -66,10 +66,37 @@ import { findActiveTableOrder } from '../../../utils/tableOrder';
 
 const createCartId = () => generateInternalId();
 
+const isClientOnlyMenuItemId = (value: unknown) => {
+   const id = String(value || '').trim();
+   return !id || /^(cart|temp|local)[_-]/i.test(id);
+};
+
+const resolveBaseMenuItemId = (item: any) => {
+   const candidates = [item?.menuItemId, item?.menu_item_id, item?.menu_itemId, item?.itemId, item?.id];
+   return candidates
+      .map((value) => String(value || '').trim())
+      .find((value) => !isClientOnlyMenuItemId(value));
+};
+
 const hasSameSelectedModifiers = (
    left: { selectedModifiers?: { groupName: string; optionName: string; price: number }[] },
    right: { groupName: string; optionName: string; price: number }[] = []
-) => JSON.stringify(left.selectedModifiers || []) === JSON.stringify(right);
+) => {
+   const normalize = (mods: { groupName: string; optionName: string; price: number }[] = []) =>
+      mods
+         .map((modifier) => `${modifier.groupName}\u0000${modifier.optionName}\u0000${Number(modifier.price || 0)}`)
+         .sort();
+   return JSON.stringify(normalize(left.selectedModifiers)) === JSON.stringify(normalize(right));
+};
+
+const hasSameCartConfiguration = (
+   left: { id?: string; menuItemId?: string; sizeId?: string; selectedModifiers?: { groupName: string; optionName: string; price: number }[] },
+   right: { id?: string; menuItemId?: string; sizeId?: string; selectedModifiers?: { groupName: string; optionName: string; price: number }[] },
+) => {
+   const leftBaseId = left.menuItemId || left.id;
+   const rightBaseId = right.menuItemId || right.id;
+   return leftBaseId === rightBaseId && left.sizeId === right.sizeId && hasSameSelectedModifiers(left, right.selectedModifiers || []);
+};
 
 const POS: React.FC = () => {
    const POS_UI_PREFS_KEY = 'coduiszen_pos_ui_prefs_v1';
@@ -146,7 +173,7 @@ const POS: React.FC = () => {
    const isDarkMode = settings.isDarkMode;
    const isTouchMode = settings.isTouchMode;
    const currencySymbol = settings.currencySymbol;
-   const safeActiveCart = activeCart || [];
+   const rawActiveCart = activeCart || [];
    const previousBranchIdRef = useRef(branchId);
    const [currentPrintStationId, setCurrentPrintStationId] = useState(() => {
       try { return localStorage.getItem(POS_PRINT_STATION_KEY) || ''; } catch { return ''; }
@@ -306,7 +333,7 @@ const POS: React.FC = () => {
       clearCoupon();
       setActiveCategory('all');
 
-      if (safeActiveCart.length > 0) {
+      if (rawActiveCart.length > 0) {
          clearCart();
          showToast(
             lang === 'ar'
@@ -322,7 +349,7 @@ const POS: React.FC = () => {
             'success'
          );
       }
-   }, [activeBranch?.name, activeBranch?.nameAr, branchId, clearCart, clearCoupon, lang, safeActiveCart.length, showToast]);
+   }, [activeBranch?.name, activeBranch?.nameAr, branchId, clearCart, clearCoupon, lang, rawActiveCart.length, showToast]);
 
    useEffect(() => {
       const handleOnline = () => setIsOnline(true);
@@ -492,10 +519,51 @@ const POS: React.FC = () => {
       itemSort,
       itemUsageMap,
       lang,
-      nowTick,
       searchQuery,
-      safeActiveCart,
+      safeActiveCart: rawActiveCart,
    });
+
+   const safeActiveCart = useMemo(() => {
+      if (rawActiveCart.length === 0 || indexedItems.length === 0) return rawActiveCart;
+      const catalogById = new Map(indexedItems.map((catalogItem) => [String(catalogItem.id), catalogItem]));
+      return rawActiveCart.map((cartItem: any) => {
+         const candidateIds = [cartItem.menuItemId, cartItem.menu_item_id, cartItem.menu_itemId, cartItem.itemId, cartItem.id]
+            .map((value) => String(value || '').trim())
+            .filter((value) => value && !isClientOnlyMenuItemId(value));
+         const normalizeVariantName = (value: unknown) => String(value || '').trim().replace(/\s*\([^)]*\)\s*$/, '').toLocaleLowerCase();
+         const catalogItem = candidateIds.map((id) => catalogById.get(id)).find(Boolean)
+            || indexedItems.find((catalogItem) => {
+               const cartName = normalizeVariantName(cartItem.name || cartItem.nameAr);
+               return cartName && [catalogItem.name, catalogItem.nameAr].some((name) => normalizeVariantName(name) === cartName);
+            });
+         if (!catalogItem) return cartItem;
+         const normalizedModifiers = Array.isArray(cartItem.selectedModifiers)
+            ? cartItem.selectedModifiers.map((modifier: any) => {
+               const groupName = String(modifier?.groupName || '').trim();
+               const optionName = String(modifier?.optionName || '').trim();
+               const group = (catalogItem.modifierGroups || []).find((candidate: any) =>
+                  String(candidate?.name || '').trim() === groupName
+                  || String(candidate?.nameAr || '').trim() === groupName,
+               );
+               const option = group?.options?.find((candidate: any) =>
+                  String(candidate?.id || '').trim() === String(modifier?.optionId || modifier?.id || '').trim()
+                  || String(candidate?.name || '').trim() === optionName
+                  || String(candidate?.nameAr || '').trim() === optionName,
+               );
+               return option
+                  ? { ...modifier, id: String(option.id), optionId: String(option.id), price: Number(option.price || 0) }
+                  : modifier;
+            })
+            : cartItem.selectedModifiers;
+         return {
+            ...cartItem,
+            menuItemId: String(catalogItem.id),
+            name: cartItem.name || catalogItem.name,
+            nameAr: cartItem.nameAr || catalogItem.nameAr,
+            ...(normalizedModifiers ? { selectedModifiers: normalizedModifiers } : {}),
+         };
+      });
+   }, [indexedItems, rawActiveCart]);
 
    useEffect(() => {
       if (activeCategory === 'all') return;
@@ -839,21 +907,25 @@ const POS: React.FC = () => {
       selectedModifiers: { groupName: string; optionName: string; price: number }[] = [],
       quantity = 1,
    ) => {
-      const existingItem = safeActiveCart.find((cartItem) =>
-         cartItem.id === item.id && hasSameSelectedModifiers(cartItem, selectedModifiers)
-      );
+         const baseMenuItemId = resolveBaseMenuItemId(item);
+      const configuredItem = {
+         ...item,
+         ...(baseMenuItemId ? { menuItemId: baseMenuItemId } : {}),
+         selectedModifiers,
+      };
+      const existingItem = safeActiveCart.find((cartItem) => hasSameCartConfiguration(cartItem, configuredItem));
+      const safeQuantity = Math.max(1, Number(quantity) || 1);
 
-      if (existingItem && selectedModifiers.length === 0 && quantity === 1) {
-         updateCartItemQuantity(existingItem.cartId, 1);
+      if (existingItem) {
+         updateCartItemQuantity(existingItem.cartId, safeQuantity);
       } else {
-         for (let index = 0; index < quantity; index += 1) {
-            addToCart({
-               ...item,
-               cartId: createCartId(),
-               quantity: 1,
-               selectedModifiers,
-            });
-         }
+         addToCart({
+            ...item,
+            ...(baseMenuItemId ? { menuItemId: baseMenuItemId } : {}),
+            cartId: createCartId(),
+            quantity: safeQuantity,
+            selectedModifiers,
+         } as any);
       }
 
       setLastAddedItemId(item.id);
@@ -1207,6 +1279,10 @@ const POS: React.FC = () => {
          const draftOrder = buildDraftOrder(false);
          (draftOrder as any).clientSubmitKey = submitKey;
          const savedOrder = await placeOrder(draftOrder);
+         const changedAt = Date.now();
+         const changeDetail = { orderId: savedOrder.id, status: savedOrder.status, event: 'created', changedAt };
+         window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
+         localStorage.setItem('restoflow:orders-changed', JSON.stringify(changeDetail));
 
          if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
              await updateTableStatus(selectedTableId, TableStatus.OCCUPIED, savedOrder.id);
@@ -1257,7 +1333,11 @@ const POS: React.FC = () => {
          (draftOrder as any).clientSubmitKey = submitKey;
 
          // 1. Place Order in Store (Syncs with server which now handles inventory)
-         const savedOrder = await placeOrder(draftOrder);
+          const savedOrder = await placeOrder(draftOrder);
+         const changedAt = Date.now();
+         const changeDetail = { orderId: savedOrder.id, status: savedOrder.status, event: 'created', changedAt };
+         window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
+         localStorage.setItem('restoflow:orders-changed', JSON.stringify(changeDetail));
          if (savedOrder.warnings?.some(warning => warning.code === 'INSUFFICIENT_INVENTORY')) {
             showToast(lang === 'ar'
                ? 'تم حفظ البيع، لكن مخزون بعض المكونات غير كاف.'
@@ -1296,10 +1376,20 @@ const POS: React.FC = () => {
                branch: activeBranch
             }).catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة الإيصال' : 'Order saved, but receipt print failed', 'warning'));
           }
-           if (selectedPaymentMethod === PaymentMethod.CASH) {
-             await printService.triggerCashDrawer(branchId);
-          }
-         resetAfterOrderCommit();
+                      if (selectedPaymentMethod === PaymentMethod.CASH) {
+             try {
+               await printService.triggerCashDrawer(branchId);
+             } catch {
+               showToast(
+                 lang === 'ar'
+                   ? 'تم حفظ البيع، لكن تعذر فتح درج النقدية'
+                   : 'Sale saved, but the cash drawer could not be opened',
+                 'warning',
+               );
+             }
+           }
+           resetAfterOrderCommit();
+
       } catch (error: any) {
          showToast(getActionableErrorMessage(error, lang), 'error');
       } finally {

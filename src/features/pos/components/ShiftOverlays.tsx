@@ -8,6 +8,7 @@ import { useFinanceStore } from '@/stores/useFinanceStore';
 import { shiftsApi } from '@/services/api/shifts';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { translations } from '@/services/translations';
+import { getActionableErrorMessage } from '@/services/api/core';
 import { useToast } from '@/components/Toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateShiftId } from '@/src/utils/idGenerator';
@@ -20,11 +21,27 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
     const activeShift = useFinanceStore(state => state.activeShift);
     const setShift = useFinanceStore(state => state.setShift);
     const settings = useAuthStore(state => state.settings);
+    const branches = useAuthStore(state => state.branches);
+    const setActiveBranch = useAuthStore(state => state.setActiveBranch);
     const user = useAuthStore(state => state.settings.currentUser);
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const t = translations[lang] || translations.en;
     const { showToast } = useToast();
     const isRTL = lang === 'ar';
+    const allowedBranchIds = new Set([
+        user?.assignedBranchId,
+        ...(user?.allowedBranches || []),
+    ].filter(Boolean) as string[]);
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    const activeBranchIsAllowed = Boolean(
+        settings.activeBranchId &&
+        branches.some((branch) => branch.id === settings.activeBranchId) &&
+        (isSuperAdmin || allowedBranchIds.has(settings.activeBranchId)),
+    );
+    const resolvedBranchId = activeBranchIsAllowed
+        ? settings.activeBranchId
+        : branches.find((branch) => branch.id === user?.assignedBranchId)?.id
+            || branches.find((branch) => isSuperAdmin || allowedBranchIds.has(branch.id))?.id;
 
     const [openingBalance, setOpeningBalance] = useState('0');
     const [loading, setLoading] = useState(false);
@@ -33,7 +50,8 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
     useEffect(() => {
         let cancelled = false;
         const hydrateShift = async () => {
-            const activeBranchId = settings.activeBranchId;
+            const activeBranchId = resolvedBranchId;
+            if (activeBranchId && activeBranchId !== settings.activeBranchId) setActiveBranch(activeBranchId);
             if (!activeBranchId) {
                 if (!cancelled && activeShift) setShift(null);
                 setIsCheckingShift(false);
@@ -56,7 +74,7 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
         };
         hydrateShift();
         return () => { cancelled = true; };
-    }, [activeShift, settings.activeBranchId, setShift, user?.id]);
+    }, [activeShift, resolvedBranchId, setActiveBranch, setShift, settings.activeBranchId, user?.id]);
 
     if (isCheckingShift && !activeShift) {
         return (
@@ -77,9 +95,13 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
                     setLoading(false);
                     return;
                 }
+                if (!resolvedBranchId) {
+                    showToast(isRTL ? 'اختر فرعًا صالحًا قبل فتح الشيفت' : 'Select a valid branch before opening the shift', 'error');
+                    return;
+                }
                 const data = {
                     id,
-                    branchId: settings.activeBranchId || 'b1',
+                    branchId: resolvedBranchId,
                     userId: user?.id || 'u1',
                     openingBalance: openingBalanceNum,
                 };
@@ -87,7 +109,7 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
                 setShift(res);
                 onOpen();
             } catch (err) {
-                showToast(t.shift_open_failed || 'Failed to open shift', 'error');
+                showToast(getActionableErrorMessage(err, lang), 'error');
             } finally {
                 setLoading(false);
             }

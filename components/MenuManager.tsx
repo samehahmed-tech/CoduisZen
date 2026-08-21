@@ -36,7 +36,7 @@ const MenuManager: React.FC = () => {
   // Global State
   const {
     menus, categories, platforms, isLoading, error,
-    updateMenuItem, addMenuItem, deleteMenuItem,
+    updateMenuItem, addMenuItem, deleteMenuItem, archiveItem,
     addCategory, updateCategory, deleteCategory,
     addMenu, updateMenu, linkCategory, fetchMenu
   } = useMenuStore(
@@ -49,6 +49,7 @@ const MenuManager: React.FC = () => {
       updateMenuItem: state.updateMenuItem,
       addMenuItem: state.addMenuItem,
       deleteMenuItem: state.deleteMenuItem,
+      archiveItem: state.archiveItem,
       addCategory: state.addCategory,
       updateCategory: state.updateCategory,
       deleteCategory: state.deleteCategory,
@@ -528,9 +529,25 @@ const MenuManager: React.FC = () => {
       variant: 'danger',
     });
     if (!ok) return;
-    deleteMenuItem(itemModal.menuId, itemModal.categoryId, itemModal.item.id);
+    await deleteMenuItem(itemModal.menuId, itemModal.categoryId, itemModal.item.id);
     setItemModal(null);
   }, [confirm, deleteMenuItem, itemModal, lang]);
+
+  const handleArchiveItemFromDrawer = useCallback(async () => {
+    if (!itemModal || itemModal.mode !== 'EDIT') return;
+    const ok = await confirm({
+      title: lang === 'ar' ? 'أرشفة الصنف؟' : 'Archive item?',
+      message: lang === 'ar'
+        ? `سيختفي ${itemModal.item.nameAr || itemModal.item.name} من المنيو النشط ويمكن استعادته لاحقًا.`
+        : `${itemModal.item.name} will be hidden from the active menu and can be restored later.`,
+      confirmText: lang === 'ar' ? 'أرشفة' : 'Archive',
+      cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
+    await archiveItem(itemModal.menuId, itemModal.categoryId, itemModal.item.id);
+    setItemModal(null);
+  }, [archiveItem, confirm, itemModal, lang]);
 
   const handleDeleteItem = useCallback(async (menuId: string, categoryId: string, itemId: string) => {
     const category = categories.find(cat => cat.id === categoryId);
@@ -1105,14 +1122,15 @@ const MenuManager: React.FC = () => {
             currency={settings.currencySymbol || 'EGP'}
             onClose={() => setItemModal(null)}
             onDelete={itemModal.mode === 'EDIT' ? handleDeleteItemFromDrawer : undefined}
+            onArchive={itemModal.mode === 'EDIT' ? handleArchiveItemFromDrawer : undefined}
             onSave={async (nextItem, nextCategoryId, keepOpen) => {
               if (itemModal.mode === 'ADD') {
-                await addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, id: `item-${Date.now()}` });
+                await addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, id: `item-${Date.now()}`, isAvailable: nextItem.isAvailable !== false });
               } else if (nextCategoryId !== itemModal.categoryId) {
                 await deleteMenuItem(itemModal.menuId, itemModal.categoryId, itemModal.item.id);
-                await addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId });
+                await addMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId, isAvailable: nextItem.isAvailable !== false });
               } else {
-                await updateMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId });
+                await updateMenuItem(itemModal.menuId, nextCategoryId, { ...nextItem, categoryId: nextCategoryId, isAvailable: nextItem.isAvailable !== false });
               }
               if (keepOpen) {
                 setItemModal(prev => prev ? { ...prev, mode: 'ADD' } : null);

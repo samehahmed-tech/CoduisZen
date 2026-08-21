@@ -393,6 +393,12 @@ export const dayCloseService = {
 
         const expenseBranchFilter = branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined;
 
+        // journalEntries.date is a local-wall-time datetime2 column; comparing it as
+        // an instant (gte/lte) mis-aligns with the business date when the server
+        // timezone differs from UTC. Compare by formatted date-key instead, which
+        // is consistent with the businessDate pattern used for orders.
+        const entryDateKeyFilter = (d: string) => sql<string>`FORMAT(${journalEntries.date}, 'yyyy-MM-dd') = ${d}`;
+
         const [auditAgg, expenseAgg, pendingExpenseAgg, topExpenseRows, expenseRows] = await Promise.all([
             db.select({
             totalEvents: sql<number>`count(*)`,
@@ -410,7 +416,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(entryDateKeyFilter(date), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .then(rows => rows[0]),
             db.select({
                 total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
@@ -418,7 +424,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'PENDING_APPROVAL'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(entryDateKeyFilter(date), eq(journalEntries.status, 'PENDING_APPROVAL'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .then(rows => rows[0]),
             db.select({
                 name: chartOfAccounts.name,
@@ -427,7 +433,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(entryDateKeyFilter(date), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .groupBy(chartOfAccounts.name)
                 .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`)
                 .offset(0).fetch(10),
@@ -441,7 +447,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(gte(journalEntries.date, startOfDay), lte(journalEntries.date, endOfDay), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(entryDateKeyFilter(date), eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .orderBy(desc(journalEntries.date), desc(journalLines.id))
                 .offset(0).fetch(50),
         ]);

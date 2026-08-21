@@ -79,7 +79,20 @@ const notifyCustomer = (order: any, status: string) => {
 const runPostTransitionEffects = (order: any, previousStatus: string, nextStatus: string) => {
     const branchId = order.branchId;
     if (branchId) {
-        emitBranchEvent(branchId, 'order:status', { id: order.id, status: order.status, updatedAt: order.updatedAt });
+        emitBranchEvent(branchId, 'order:status', {
+            id: order.id,
+            status: order.status,
+            updatedAt: order.updatedAt,
+            cancelledAt: order.cancelledAt,
+            cancelReason: order.cancelReason,
+        });
+        if (nextStatus === 'CANCELLED') {
+            emitBranchEvent(branchId, 'analytics:refresh', {
+                reason: 'ORDER_CANCELLED',
+                orderId: order.id,
+                updatedAt: order.updatedAt,
+            });
+        }
 
         if (terminalStatuses.has(nextStatus) && order.driverId) {
             emitBranchEvent(branchId, 'driver:status', { id: order.driverId, status: 'AVAILABLE' });
