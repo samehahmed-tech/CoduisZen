@@ -1,0 +1,959 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   POS ZEN CARDS — Four menu-item card personalities for POS + Call Center.
+   01 Poster (comfortable) · 02 Rail (compact) · 03 Glass (ultra) · 04 Split (buttons)
+   Theme-aware (light/dark + theme engine), RTL-safe (logical properties),
+   touch-first (44px targets), reduced-motion guarded. Whole card adds.
+   State hooks: [data-selected] [data-highlighted] [data-available].
+   Type: Cairo everywhere (800 titles / 800 prices, tabular-nums, AR line-height).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.zen-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    font-family: "Cairo", system-ui, sans-serif;
+    --zen-spring: cubic-bezier(.22, 1, .36, 1);
+    --zen-snap: cubic-bezier(.34, 1.3, .5, 1);
+    transition: transform 180ms ease, box-shadow 250ms ease, border-color 200ms ease, background 200ms ease;
+}
+/* Shared readable type — one hierarchy everywhere: name 800 / price 800 tabular */
+.zen-card h3 {
+    font-family: "Cairo", system-ui, sans-serif;
+    font-weight: 800;
+    line-height: 1.6;
+    letter-spacing: 0;
+    text-wrap: balance;
+}
+.zen-card .price, .zen-card .rprice, .zen-card .gprice, .zen-card .ring-price {
+    font-family: "Cairo", system-ui, sans-serif;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+/* Arabic joins break with letter-spacing — kill it in RTL for micro-labels */
+[dir="rtl"] .zen-card .pmeta,
+[dir="rtl"] .zen-card .stamp,
+[dir="rtl"] .zen-card .sstamp,
+[dir="rtl"] .zen-card .gbadge,
+[dir="rtl"] .zen-card .status,
+[dir="rtl"] .zen-card .chips span,
+[dir="rtl"] .zen-card .zen-veil,
+[dir="rtl"] .zen-card .rprice small,
+[dir="rtl"] .zen-card .ring-price small { letter-spacing: 0; }
+
+.zen-card[data-available='false'] { cursor: not-allowed; }
+.zen-card[data-available='true'] { cursor: pointer; }
+.zen-card:active[data-available='true'] { transform: scale(.97); }
+/* Press flash — radial light at cursor, composes with tilt vars */
+.zen-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.35), transparent 65%);
+    opacity: 0;
+    transition: opacity 300ms ease;
+}
+.zen-card:active[data-available='true']::after { opacity: 1; transition-duration: 60ms; }
+.zen-card .zen-img { transition: filter 200ms ease, transform 240ms var(--zen-spring); }
+.zen-card:active[data-available='true'] .zen-img { filter: brightness(.88); }
+.zen-card:focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 3px; }
+.zen-card[data-highlighted='true'] { animation: zen-pulse 2s infinite cubic-bezier(.4, 0, .6, 1); }
+@keyframes zen-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(var(--primary), .35); }
+    50% { box-shadow: 0 0 0 8px rgba(var(--primary), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--primary), 0); }
+}
+.zen-card .zen-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Unavailable veil shared */
+.zen-veil {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .55);
+    font-size: 12px; font-weight: 800; letter-spacing: .18em;
+    color: #fecdd3; text-transform: uppercase;
+}
+.zen-card[data-available='false'] .zen-img { filter: grayscale(.7) brightness(.6); }
+
+/* ═══ 01 · MENU POSTER (editorial, warm paper) ═══ */
+.zen-poster {
+    border-radius: 20px;
+    background: linear-gradient(180deg, #f5eedd, #ece0c8);
+    color: #1c1917;
+    border: 1px solid rgba(0, 0, 0, .08);
+    box-shadow: 0 18px 44px -18px rgba(0, 0, 0, .5);
+    display: flex; flex-direction: column; height: 100%; min-height: 300px;
+}
+.dark .zen-poster {
+    background: linear-gradient(180deg, rgb(var(--bg-card)), rgb(var(--bg-app)));
+    color: rgb(var(--text-main));
+    border-color: rgba(var(--border-color), .7);
+}
+.zen-poster:hover[data-available='true'] { box-shadow: 0 28px 60px -18px rgba(0, 0, 0, .55); }
+.zen-poster[data-selected='true'] {
+    border-color: rgba(var(--primary), .65);
+    box-shadow: 0 0 0 2px rgba(var(--primary), .45), 0 18px 44px -18px rgba(0, 0, 0, .5);
+}
+.zen-poster .photo { height: 168px; position: relative; overflow: hidden; flex-shrink: 0; background: rgba(0,0,0,.08); }
+.zen-poster .photo::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(0deg, rgba(0,0,0,.55), transparent 60%);
+}
+.zen-poster .stamp {
+    position: absolute; z-index: 2; top: 12px; inset-inline-start: 12px;
+    border: 1px solid rgba(255,255,255,.6); background: rgba(10,10,10,.55);
+    backdrop-filter: blur(8px); color: #fff;
+    padding: 6px 10px; border-radius: 99px;
+    font-size: 11px; font-weight: 800; letter-spacing: .06em;
+    max-width: calc(100% - 70px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.zen-poster .qty-dot {
+    position: absolute; z-index: 2; top: 12px; inset-inline-end: 12px;
+    min-width: 32px; height: 32px; padding: 0 10px; border-radius: 99px;
+    display: none; align-items: center; justify-content: center;
+    background: rgb(var(--primary)); color: #fff; font-size: 14px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 6px 16px rgba(var(--primary), .45);
+}
+.zen-poster[data-selected='true'] .qty-dot { display: inline-flex; }
+.zen-poster .pbody { padding: 14px 16px 14px; display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.zen-poster .pmeta {
+    font-size: 11px; letter-spacing: .08em; font-weight: 800;
+    color: #8a7a5c; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dark .zen-poster .pmeta { color: rgb(var(--text-muted)); }
+.zen-poster h3 {
+    font-size: clamp(17px, 2vw, 20px); line-height: 1.6; margin: 6px 0 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.zen-poster .pfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; }
+.zen-poster .price { font-size: clamp(19px, 2.2vw, 22px); }
+.zen-poster .price small { font-size: 11px; opacity: .65; font-weight: 800; margin-inline-start: 4px; }
+.zen-poster .price-note { font-size: 13px; font-weight: 800; opacity: .7; }
+.zen-poster .add {
+    border: 0; background: #1c1917; color: #faf5ea;
+    min-height: 44px; padding: 0 18px; border-radius: 12px;
+    font-family: "Cairo", system-ui, sans-serif;
+    font-weight: 800; font-size: 13.5px; cursor: pointer; transition: transform 120ms ease, background 200ms ease;
+    white-space: nowrap;
+}
+.dark .zen-poster .add { background: rgb(var(--primary)); color: #fff; }
+.zen-poster .add:hover[data-available='true'] { background: rgb(var(--primary)); color: #fff; }
+.zen-poster .add:active { transform: scale(.95); }
+.zen-poster .add:disabled { opacity: .4; cursor: not-allowed; }
+.zen-poster .step { display: inline-flex; align-items: center; gap: 6px; background: #1c1917; border-radius: 12px; padding: 4px; }
+.dark .zen-poster .step { background: rgba(var(--text-main), .12); border: 1px solid rgba(var(--text-main), .15); }
+.zen-poster .step button {
+    width: 44px; height: 44px; border-radius: 9px; border: 0; cursor: pointer;
+    background: rgba(255,255,255,.14); color: #faf5ea; font-size: 17px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+}
+.dark .zen-poster .step button { background: rgba(var(--text-main), .12); color: rgb(var(--text-main)); }
+.zen-poster .step button:last-child { background: rgb(var(--primary)); color: #fff; }
+.zen-poster .step b { min-width: 26px; text-align: center; color: #faf5ea; font-size: 15px; font-variant-numeric: tabular-nums; }
+.dark .zen-poster .step b { color: rgb(var(--text-main)); }
+
+/* ═══ 02 · EDGE RAIL (dense operations row) ═══ */
+.zen-rail {
+    border-radius: 18px;
+    background: rgb(var(--bg-card));
+    border: 1px solid rgba(var(--border-color), .8);
+    box-shadow: 0 14px 34px -18px rgba(0, 0, 0, .5);
+    display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px;
+    padding: 12px; height: 100%; min-height: 148px;
+    color: rgb(var(--text-main));
+}
+.zen-rail:hover[data-available='true'] { border-color: rgba(var(--success), .4); }
+.zen-rail[data-selected='true'] { border-color: rgba(var(--success), .55); box-shadow: 0 0 0 2px rgba(var(--success), .3), 0 14px 30px -16px rgba(var(--success), .3); }
+.zen-rail .rimg { height: 100%; min-height: 124px; border-radius: 12px; overflow: hidden; position: relative; background: rgba(var(--text-main), .06); }
+.zen-rail .rqty {
+    position: absolute; inset-inline-end: 8px; top: 8px; z-index: 2;
+    min-width: 32px; height: 32px; padding: 0 10px; border-radius: 10px;
+    background: rgba(0,0,0,.78); border: 1px solid rgba(255,255,255,.25);
+    display: none; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums;
+}
+.zen-rail[data-selected='true'] .rqty { display: inline-flex; }
+.zen-rail .rinfo { display: flex; flex-direction: column; min-width: 0; }
+.zen-rail .status { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: rgb(var(--success)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zen-rail[data-available='false'] .status { color: rgb(var(--danger)); }
+.zen-rail h3 { font-size: clamp(15px, 1.8vw, 16.5px); line-height: 1.6; margin: 4px 0 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.zen-rail .sub { font-size: 12px; color: rgb(var(--text-muted)); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.zen-rail .rbottom { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding-top: 8px; }
+.zen-rail .rprice { font-size: clamp(18px, 2vw, 20px); line-height: 1.2; }
+.zen-rail .rprice small { display: block; font-size: 9px; color: rgb(var(--text-muted)); letter-spacing: .08em; font-weight: 800; }
+.zen-rail .rprice .cur { font-size: 11px; font-weight: 800; color: rgb(var(--text-muted)); }
+.zen-rail .rprice-note { font-size: 12.5px; font-weight: 800; color: rgb(var(--text-muted)); }
+.zen-rail .radd {
+    min-width: 44px; height: 44px; padding: 0 12px; border-radius: 13px; cursor: pointer;
+    border: 1px solid rgba(var(--success), .35); background: rgba(var(--success), .1);
+    color: rgb(var(--success)); font-size: 22px; font-weight: 800; line-height: 1;
+    display: flex; align-items: center; justify-content: center; transition: transform 120ms ease;
+    font-family: "Cairo", system-ui, sans-serif;
+}
+.zen-rail .radd:active { transform: scale(.9); }
+.zen-rail .radd:disabled { opacity: .35; cursor: not-allowed; }
+.zen-rail[data-selected='true'] .radd { background: rgb(var(--success)); color: #07120b; border-color: transparent; }
+.zen-rail .step { display: inline-flex; align-items: center; gap: 6px; }
+.zen-rail .step button {
+    width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
+    border: 1px solid rgba(var(--text-main), .15); background: rgba(var(--text-main), .05);
+    color: rgb(var(--text-main)); font-size: 16px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+}
+.zen-rail .step b { min-width: 24px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* ═══ 03 · GLASS TILE (premium translucent theme) ═══ */
+.zen-glass {
+    border-radius: 26px; padding: 12px;
+    background: rgba(var(--bg-card), .6);
+    border: 1px solid rgba(var(--text-main), .14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 24px 60px -24px rgba(0, 0, 0, .6);
+    backdrop-filter: blur(18px) saturate(1.3);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    display: flex; flex-direction: column; height: 100%; min-height: 330px;
+    color: rgb(var(--text-main));
+}
+.zen-glass[data-selected='true'] { border-color: rgba(var(--primary), .6); box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 2px rgba(var(--primary), .3), 0 24px 60px -20px rgba(var(--primary), .3); }
+.zen-glass .gmedia { height: 180px; border-radius: 18px; overflow: hidden; position: relative; flex-shrink: 0; background: rgba(var(--text-main), .06); }
+.zen-glass .gmedia::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(125deg, rgba(255,255,255,.14), transparent 30%, transparent 72%, rgba(255,255,255,.07));
+}
+.zen-glass .gbadge {
+    position: absolute; z-index: 2; top: 12px; inset-inline-start: 12px;
+    background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(12px); color: #fff;
+    padding: 6px 10px; border-radius: 99px;
+    font-size: 11px; font-weight: 800; letter-spacing: .04em;
+    max-width: calc(100% - 70px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.zen-glass .gqty {
+    position: absolute; z-index: 2; top: 12px; inset-inline-end: 12px;
+    min-width: 32px; height: 32px; padding: 0 10px; border-radius: 99px;
+    display: none; align-items: center; justify-content: center;
+    background: rgb(var(--primary)); color: #fff; font-size: 14px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.zen-glass[data-selected='true'] .gqty { display: inline-flex; }
+.zen-glass .gbody { padding: 12px 6px 4px; display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.zen-glass .gtop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.zen-glass h3 { font-size: clamp(16px, 2vw, 18px); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; min-width: 0; }
+.zen-glass .gprice { font-size: clamp(17px, 2vw, 19px); white-space: nowrap; }
+.zen-glass .gprice small { font-size: 11px; color: rgb(var(--text-muted)); font-weight: 800; }
+.zen-glass .gprice-note { font-size: 12.5px; font-weight: 800; color: rgb(var(--text-muted)); white-space: nowrap; }
+.zen-glass .gsub { font-size: 12px; color: rgb(var(--text-muted)); line-height: 1.6; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.zen-glass .chips { display: flex; gap: 6px; margin: 8px 0 10px; flex-wrap: nowrap; overflow: hidden; }
+.zen-glass .chips span {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .02em;
+    padding: 5px 10px; border-radius: 99px; white-space: nowrap;
+    background: rgba(var(--text-main), .06); border: 1px solid rgba(var(--text-main), .12);
+    color: rgb(var(--text-main));
+}
+.zen-glass .chips span:first-child { background: rgba(var(--primary), .12); border-color: rgba(var(--primary), .3); color: rgb(var(--primary)); }
+.zen-glass .gact {
+    width: 100%; min-height: 46px; border-radius: 14px; cursor: pointer;
+    border: 1px solid rgba(var(--primary), .4); background: rgba(var(--primary), .1);
+    color: rgb(var(--primary)); font-family: "Cairo", system-ui, sans-serif;
+    font-weight: 800; font-size: 14px; transition: transform 120ms ease, background 200ms ease;
+    margin-top: auto; padding: 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.zen-glass .gact:hover[data-available='true'] { background: rgb(var(--primary)); color: #fff; }
+.zen-glass .gact:active { transform: scale(.98); }
+.zen-glass .gact:disabled { opacity: .4; cursor: not-allowed; }
+.zen-glass[data-selected='true'] .gact { background: rgb(var(--primary)); border-color: transparent; color: #fff; }
+.zen-glass .gstep { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(var(--primary), .1); border: 1px solid rgba(var(--primary), .35); border-radius: 14px; padding: 4px; margin-top: auto; }
+.zen-glass .gstep button {
+    min-width: 46px; height: 46px; border-radius: 11px; border: 0; cursor: pointer;
+    background: rgba(var(--text-main), .1); color: rgb(var(--text-main));
+    font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+}
+.zen-glass .gstep button:last-child { background: rgb(var(--primary)); color: #fff; }
+.zen-glass .gstep b { font-size: 13.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ═══ 04 · SPLIT ACTION (bold signature, dark) ═══ */
+.zen-split {
+    border-radius: 24px; padding: 8px;
+    background: linear-gradient(180deg, #1b1b1f, #131315); color: #f2f2f2;
+    border: 1px solid rgba(255, 255, 255, .08);
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .8);
+    display: flex; flex-direction: column; height: 100%; min-height: 320px;
+    font-family: "Cairo", system-ui, sans-serif;
+}
+.zen-split:hover[data-available='true'] { border-color: rgba(var(--primary), .45); }
+.zen-split[data-selected='true'] { border-color: rgba(var(--primary), .65); box-shadow: 0 0 0 2px rgba(var(--primary), .4), 0 24px 60px -20px rgba(var(--primary), .35); }
+.zen-split .smedia { height: 186px; border-radius: 18px; overflow: hidden; position: relative; flex-shrink: 0; background: #222; }
+.zen-split .smedia::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(0deg, rgba(0,0,0,.6), transparent 55%); }
+.zen-split .ring-price {
+    position: absolute; inset-inline-end: 12px; bottom: 12px; z-index: 2;
+    min-width: 68px; height: 68px; padding: 0 10px; border-radius: 999px;
+    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    color: #fff;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    font-size: clamp(15px, 1.8vw, 17px); line-height: 1.3;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255,255,255,.3);
+    border: 1px solid rgba(255, 255, 255, .25);
+}
+.zen-split .ring-price small { font-size: 10px; display: block; font-weight: 800; opacity: .85; }
+.zen-split .ring-price-note { font-size: 11px; font-weight: 800; line-height: 1.4; padding: 0 4px; }
+.zen-split .sstamp {
+    position: absolute; z-index: 2; top: 12px; inset-inline-start: 12px;
+    background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(8px); color: #fff;
+    padding: 6px 10px; border-radius: 99px;
+    font-size: 11px; font-weight: 800; letter-spacing: .04em;
+    max-width: calc(100% - 70px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.zen-split .sqty {
+    position: absolute; z-index: 2; top: 12px; inset-inline-end: 12px;
+    min-width: 32px; height: 32px; padding: 0 10px; border-radius: 99px;
+    display: none; align-items: center; justify-content: center;
+    background: #fff; color: #17130b; font-size: 14px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.zen-split[data-selected='true'] .sqty { display: inline-flex; }
+.zen-split .sbody { padding: 12px 10px 8px; display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.zen-split h3 { font-size: clamp(17px, 2vw, 19px); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.zen-split .sdesc { font-size: 12px; color: rgba(255,255,255,.6); line-height: 1.6; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.zen-split .sactions { display: grid; grid-template-columns: minmax(0, 1fr) 52px; gap: 8px; margin-top: auto; padding-top: 10px; }
+.zen-split .sadd {
+    min-height: 46px; border: 0; border-radius: 13px; cursor: pointer;
+    background: #f4efe6; color: #161616; font-family: "Cairo", system-ui, sans-serif;
+    font-weight: 800; font-size: 14px;
+    transition: transform 120ms ease, background 200ms ease; padding: 0 10px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.zen-split .sadd:active { transform: scale(.97); }
+.zen-split .sadd:disabled { opacity: .4; cursor: not-allowed; }
+.zen-split[data-selected='true'] .sadd { background: rgb(var(--primary)); color: #fff; }
+.zen-split .splus {
+    border: 1px solid #393939; background: #202020; color: #fff;
+    border-radius: 13px; font-size: 22px; cursor: pointer; min-height: 46px; min-width: 52px;
+    display: flex; align-items: center; justify-content: center; transition: transform 120ms ease;
+    font-family: "Cairo", system-ui, sans-serif; font-weight: 800;
+}
+.zen-split .splus:active { transform: scale(.92); }
+.zen-split .splus:disabled { opacity: .35; cursor: not-allowed; }
+.zen-split[data-selected='true'] .splus { background: rgb(var(--primary)); color: #fff; border-color: transparent; }
+.zen-split .sstep { display: flex; align-items: center; gap: 4px; background: rgb(var(--primary)); border-radius: 13px; padding: 3px; min-height: 46px; }
+.zen-split .sstep button {
+    flex: 1; height: 44px; border-radius: 10px; border: 0; cursor: pointer;
+    background: rgba(255,255,255,.2); color: #fff; font-size: 18px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; min-width: 44px;
+}
+.zen-split .sstep b { min-width: 28px; text-align: center; color: #fff; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* ═══ Density compaction ═══ */
+body[data-mode='dense'] .zen-poster .photo { height: 132px; }
+body[data-mode='dense'] .zen-glass .gmedia { height: 150px; }
+body[data-mode='dense'] .zen-split .smedia { height: 150px; }
+body[data-mode='dense'] .zen-glass, body[data-mode='dense'] .zen-split { min-height: 300px; }
+
+/* ═══ Responsive — phones / narrow grids ═══ */
+@media (max-width: 640px) {
+    .zen-poster { min-height: 0; border-radius: 18px; }
+    .zen-poster .photo { height: 128px; }
+    .zen-poster .pbody { padding: 10px 12px 12px; }
+    .zen-poster h3 { font-size: 16px; }
+    .zen-poster .price { font-size: 18px; }
+    .zen-poster .add { padding: 0 14px; font-size: 13px; }
+    .zen-rail { grid-template-columns: 88px minmax(0, 1fr); gap: 10px; padding: 10px; min-height: 0; }
+    .zen-rail .rimg { min-height: 96px; }
+    .zen-rail h3 { font-size: 14.5px; }
+    .zen-rail .sub { display: none; }
+    .zen-rail .rprice { font-size: 17px; }
+    .zen-glass { min-height: 0; border-radius: 20px; }
+    .zen-glass .gmedia { height: 138px; }
+    .zen-glass h3 { font-size: 15.5px; }
+    .zen-glass .chips { display: none; }
+    .zen-glass .gsub { display: none; }
+    .zen-split { min-height: 0; }
+    .zen-split .smedia { height: 148px; }
+    .zen-split h3 { font-size: 16.5px; }
+    .zen-split .sdesc { display: none; }
+    .zen-split .ring-price { min-width: 60px; height: 60px; font-size: 14px; }
+}
+
+/* ═══ Touch: no hover lift on coarse pointers (press :active still works) ═══ */
+@media (pointer: coarse) {
+    .zen-poster:hover[data-available='true'],
+    .zen-glass:hover[data-available='true'] { transform: none; }
+    .zen-split:hover[data-available='true'] { transform: none; }
+    .zen-rail:hover[data-available='true'] { transform: none; }
+}
+
+/* ═══ Reduced motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+    .zen-card, .zen-card *, .zen-card::after { transition: none !important; animation: none !important; }
+    .zen-card:active[data-available='true'] { transform: none; }
+    .zen-card::after { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ZEN MOTION — tilt + parallax + fluid glare (driven by useZenTilt vars).
+   --rx/--ry card rotation · --px/--py unitless cursor offset (layers)
+   --mx/--my glare position · --lift hover rise · --zoom press/split zoom.
+   Lift/zoom ride vars so tilt + hover + press compose instead of clobbering.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.zen-tilt {
+    transform:
+        perspective(1100px)
+        rotateX(var(--rx, 0deg))
+        rotateY(var(--ry, 0deg))
+        translateY(var(--lift, 0px))
+        scale(var(--zoom, 1));
+    transition:
+        transform 220ms var(--zen-spring, cubic-bezier(.22, 1, .36, 1)),
+        box-shadow 250ms ease, border-color 200ms ease, background 200ms ease;
+}
+/* Press beats base .zen-card:active (higher specificity, later in file). */
+.zen-card.zen-tilt:active[data-available='true'],
+.zen-card.zen-tilt.is-pressed[data-available='true'] {
+    transform:
+        perspective(1100px)
+        rotateX(var(--rx, 0deg))
+        rotateY(var(--ry, 0deg))
+        translateY(var(--lift, 0px))
+        scale(.96);
+    transition-duration: 90ms;
+}
+/* Per-personality hover rise (Rail stays planted: ops stability). */
+.zen-card.zen-tilt:hover[data-available='true'] { --lift: -4px; }
+.zen-rail.zen-tilt:hover[data-available='true'] { --lift: 0px; }
+.zen-split.zen-tilt:hover[data-available='true'] { --lift: 0px; --zoom: 1.012; }
+.zen-split.zen-tilt:active[data-available='true'],
+.zen-split.zen-tilt.is-pressed[data-available='true'] { --zoom: .97; }
+
+/* Fluid travelling glare follows the cursor. */
+.zen-glare {
+    position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .26), transparent 62%);
+    mix-blend-mode: overlay; opacity: 0; transition: opacity 250ms ease;
+}
+.zen-card:hover .zen-glare { opacity: .9; }
+.zen-glass .zen-glare {
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .4), transparent 58%);
+}
+
+/* ── 01 Poster parallax: photo drifts, stamp + title float ── */
+.zen-poster.zen-tilt .photo .zen-img {
+    transform: scale(1.07) translate3d(calc(var(--px, 0) * -12px), calc(var(--py, 0) * -12px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+.zen-poster.zen-tilt .stamp {
+    transform: translate3d(calc(var(--px, 0) * 7px), calc(var(--py, 0) * 7px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+.zen-poster.zen-tilt h3 {
+    transform: translate3d(calc(var(--px, 0) * 5px), calc(var(--py, 0) * 5px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ── 02 Rail parallax: whisper-quiet thumb drift ── */
+.zen-rail.zen-tilt .rimg .zen-img {
+    transform: scale(1.06) translate3d(calc(var(--px, 0) * -5px), calc(var(--py, 0) * -5px), 0);
+    transition: transform 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ── 03 Glass parallax: media sinks, body floats, light travels ── */
+.zen-glass.zen-tilt .gmedia .zen-img {
+    transform: scale(1.08) translate3d(calc(var(--px, 0) * -10px), calc(var(--py, 0) * -10px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+.zen-glass.zen-tilt .gbody {
+    transform: translate3d(calc(var(--px, 0) * 5px), calc(var(--py, 0) * 5px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ── 04 Split parallax: media shifts, price ring pops at cursor ── */
+.zen-split.zen-tilt .smedia .zen-img {
+    transform: scale(1.06) translate3d(calc(var(--px, 0) * -8px), calc(var(--py, 0) * -8px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+.zen-split.zen-tilt .ring-price {
+    transform: translate3d(calc(var(--px, 0) * 10px), calc(var(--py, 0) * 10px), 0);
+    transition: transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ═══ Motion kill-switch: touch terminals + reduced motion stay static ═══ */
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+    .zen-tilt, .zen-card.zen-tilt:active[data-available='true'] { transform: none !important; }
+    .zen-card.zen-tilt.is-pressed[data-available='true'] { transform: scale(.97) !important; }
+    .zen-glare { display: none !important; }
+    .zen-tilt .zen-img, .zen-tilt h3, .zen-tilt .stamp,
+    .zen-tilt .gbody, .zen-tilt .ring-price { transform: none !important; }
+    .zen-card { animation: none !important; }
+}
+
+/* -------------------------------------------------------------------------
+   POS CARD FINISHING PASS
+   A shared glass language with four different personalities. The cards keep
+   their operational density, but now use theme tokens for the surface, edge,
+   focus, and action colors instead of fighting the active app theme.
+   ------------------------------------------------------------------------- */
+.zen-card {
+    --zen-surface: rgba(var(--bg-card), .72);
+    --zen-surface-strong: rgba(var(--bg-card), .92);
+    --zen-line: rgba(var(--border-color), .72);
+    --zen-accent: rgb(var(--primary));
+    --zen-accent-soft: rgba(var(--primary), .14);
+    --zen-shadow: 0 18px 42px -22px rgba(0, 0, 0, .62);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.zen-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,255,255,.34), transparent 32%, rgba(var(--primary), .28));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: .58;
+}
+
+.zen-card > .zen-glare { position: absolute; }
+.zen-card:hover[data-available='true'] { box-shadow: 0 26px 58px -24px rgba(var(--primary), .38), var(--zen-shadow); }
+.zen-card[data-selected='true'] { --zen-accent-soft: rgba(var(--primary), .2); }
+.zen-card[data-selected='true']::before { opacity: 1; background: linear-gradient(135deg, var(--zen-accent), rgba(var(--accent), .66), var(--zen-accent)); }
+.zen-card[data-selected='true']::after { opacity: .08; background: var(--zen-accent); }
+
+/* Poster: warm editorial glass, ideal for comfortable browsing. */
+.zen-poster {
+    background: linear-gradient(145deg, rgba(var(--bg-card), .86), rgba(var(--bg-elevated), .68));
+    border-color: var(--zen-line);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), var(--zen-shadow);
+}
+.zen-poster .pbody { background: linear-gradient(180deg, transparent, rgba(var(--primary), .035)); }
+.zen-poster .add, .zen-poster .step { box-shadow: 0 8px 18px rgba(var(--primary), .18); }
+.zen-poster .add:hover[data-available='true'] { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(var(--primary), .34); }
+
+/* Rail: stable, high-scan row for busy cashiers. */
+.zen-rail {
+    background: linear-gradient(135deg, rgba(var(--bg-card), .86), rgba(var(--primary), .035));
+    border-color: var(--zen-line);
+    box-shadow: inset 3px 0 0 rgba(var(--success), .72), var(--zen-shadow);
+}
+[dir='rtl'] .zen-rail { box-shadow: inset -3px 0 0 rgba(var(--success), .72), var(--zen-shadow); }
+.zen-rail:hover[data-available='true'] { box-shadow: inset 4px 0 0 rgb(var(--success)), 0 22px 44px -24px rgba(var(--success), .35); }
+[dir='rtl'] .zen-rail:hover[data-available='true'] { box-shadow: inset -4px 0 0 rgb(var(--success)), 0 22px 44px -24px rgba(var(--success), .35); }
+.zen-rail .radd { box-shadow: 0 8px 18px rgba(var(--success), .2); }
+
+/* Glass: the unmistakable frosted option, now with a theme-tinted edge. */
+.zen-glass {
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.18), transparent 38%),
+        linear-gradient(135deg, rgba(var(--primary), .09), rgba(var(--accent), .035) 60%),
+        rgba(var(--bg-card), .58);
+    border-color: rgba(255,255,255,.28);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 -1px 0 rgba(var(--primary), .16), 0 24px 60px -24px rgba(0,0,0,.58);
+    backdrop-filter: blur(24px) saturate(1.7);
+    -webkit-backdrop-filter: blur(24px) saturate(1.7);
+}
+.zen-glass .gmedia { box-shadow: inset 0 1px 0 rgba(255,255,255,.24); }
+.zen-glass .gact, .zen-glass .gstep { box-shadow: 0 8px 20px rgba(var(--primary), .16); }
+.zen-glass .gact:hover[data-available='true'] { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(var(--primary), .34); }
+
+/* Split: confident dark action card with a strong price anchor. */
+.zen-split {
+    background:
+        radial-gradient(circle at 82% 10%, rgba(var(--primary), .2), transparent 34%),
+        linear-gradient(160deg, rgba(34,35,43,.97), rgba(12,13,17,.98));
+    border-color: rgba(var(--primary), .22);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 24px 60px -24px rgba(0,0,0,.82);
+}
+.zen-split .sbody { background: linear-gradient(180deg, transparent, rgba(var(--primary), .08)); }
+.zen-split .sadd, .zen-split .splus { box-shadow: 0 9px 20px rgba(var(--primary), .25); }
+.zen-split .sadd:hover[data-available='true'], .zen-split .splus:hover[data-available='true'] { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(var(--primary), .45); }
+
+/* Small screens: preserve targets and reduce decorative motion, not clarity. */
+@media (max-width: 680px) {
+    .zen-card { border-radius: 18px; }
+    .zen-poster .photo, .zen-glass .gmedia, .zen-split .smedia { height: 148px; }
+    .zen-poster, .zen-glass, .zen-split { min-height: 276px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NO-IMAGE MODE — [data-has-image='false']: media collapses to a slim glass
+   bar (badges + qty stay visible), freed space goes to the data body:
+   roomier padding, 2-line descriptions, theme accent edge.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.zen-card[data-has-image='false'] .photo,
+.zen-card[data-has-image='false'] .gmedia,
+.zen-card[data-has-image='false'] .smedia {
+    height: 52px;
+    min-height: 52px;
+    background:
+        radial-gradient(circle at 20% 0%, rgba(var(--primary), .35), transparent 60%),
+        rgba(var(--text-main), .06);
+}
+.zen-card[data-has-image='false'] .photo::after,
+.zen-card[data-has-image='false'] .gmedia::after,
+.zen-card[data-has-image='false'] .smedia::after { display: none; }
+.zen-rail[data-has-image='false'] { grid-template-columns: 1fr; }
+.zen-rail[data-has-image='false'] .rimg { display: none; }
+/* Accent edge replaces the missing photo as the visual anchor */
+.zen-card[data-has-image='false']::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    inset-inline: 0;
+    height: 3px;
+    z-index: 6;
+    background: linear-gradient(90deg, rgb(var(--primary)), rgba(var(--primary), .05));
+}
+/* Data breathes: more room + longer descriptions */
+.zen-poster[data-has-image='false'] { min-height: 240px; }
+.zen-poster[data-has-image='false'] .pbody { padding-top: 16px; }
+.zen-glass[data-has-image='false'] { min-height: 270px; }
+.zen-split[data-has-image='false'] { min-height: 260px; }
+.zen-card[data-has-image='false'] .gsub,
+.zen-card[data-has-image='false'] .sdesc,
+.zen-card[data-has-image='false'] .sub { -webkit-line-clamp: 2; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODERN GLASS — deeper frost, top light-catch, gradient edge light.
+   Theme-driven (primary / text-main), works light + dark.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.zen-glass {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .02) 45%),
+        rgba(var(--bg-card), .6);
+    border: 1px solid rgba(255, 255, 255, .22);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .28),
+        inset 0 -1px 0 rgba(255, 255, 255, .06),
+        0 24px 60px -24px rgba(0, 0, 0, .6);
+    backdrop-filter: blur(22px) saturate(1.6);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+}
+.zen-rail {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, .07), transparent 50%),
+        rgb(var(--bg-card));
+    backdrop-filter: blur(14px) saturate(1.3);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+}
+.zen-poster {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .5),
+        0 18px 44px -18px rgba(0, 0, 0, .5);
+}
+.dark .zen-poster {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .1),
+        0 18px 44px -18px rgba(0, 0, 0, .6);
+}
+.zen-split {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, .09), transparent 40%),
+        linear-gradient(180deg, #1b1b1f, #131315);
+    border: 1px solid rgba(255, 255, 255, .14);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .14),
+        0 24px 60px -24px rgba(0, 0, 0, .8);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENTRANCE — staggered rise-in on mount (uses `translate` + `opacity` so it
+   never clobbers the tilt `transform`). Delay comes from --zen-i (ItemGrid).
+   Runs on touch too — this is the always-visible motion layer.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes zen-in {
+    from { opacity: 0; translate: 0 14px; }
+}
+.zen-card {
+    animation: zen-in 500ms var(--zen-spring, cubic-bezier(.22, 1, .36, 1)) backwards;
+    animation-delay: calc(var(--zen-i, 0) * 45ms);
+}
+/* Click pop — snappy tactile bounce on press (mouse + touch via .is-pressed) */
+@keyframes zen-pop {
+    0% { scale: 1; }
+    40% { scale: .965; }
+    100% { scale: 1; }
+}
+.zen-card.zen-tilt.is-pressed[data-available='true'] { animation: zen-pop 280ms var(--zen-spring); }
+
+/* -------------------------------------------------------------------------
+   FINAL POS POLISH
+   Keep the visual feedback obvious but short: cards are tools for a cashier,
+   not decorative tiles. This also makes the glass treatment work when the app
+   is running in the lite performance tier.
+   ------------------------------------------------------------------------- */
+.zen-card {
+    isolation: isolate;
+    transform-style: preserve-3d;
+    will-change: transform;
+    transition:
+        transform 180ms cubic-bezier(.22, 1, .36, 1),
+        box-shadow 180ms ease,
+        border-color 140ms ease;
+}
+.zen-card > * { position: relative; z-index: 1; }
+.zen-card > .zen-glare {
+    position: absolute;
+    z-index: 3;
+    inset: -35%;
+    opacity: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.28), transparent 28%);
+    mix-blend-mode: screen;
+    transition: opacity 180ms ease;
+}
+.zen-card:hover[data-available='true'] > .zen-glare,
+.zen-card.is-pressed[data-available='true'] > .zen-glare { opacity: .72; }
+
+@media (hover: hover) and (pointer: fine) {
+    .zen-card:hover[data-available='true'] {
+        transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-5px) scale(1.012);
+    }
+    .zen-card:hover[data-available='true'] .zen-img {
+        transform: scale(1.055) translate3d(calc(var(--px, 0) * -7px), calc(var(--py, 0) * -7px), 0);
+    }
+    .zen-card:focus-visible {
+        outline: 3px solid rgba(var(--primary), .5);
+        outline-offset: 3px;
+    }
+}
+
+/* The split variant has one clear action row in every state. */
+.zen-split .sactions { grid-template-columns: minmax(0, 1fr) 52px; align-items: stretch; }
+.zen-split .sstep { grid-column: 1 / -1; width: 100%; min-width: 0; }
+.zen-split .sstep b { flex: 1 1 auto; }
+.zen-split[data-selected='true'] .splus { display: none; }
+.zen-split[data-selected='true'] .sactions { grid-template-columns: 1fr; }
+
+/* Compact natural rows keep sparse menus calm and dense menus scannable. */
+.zen-card { min-height: clamp(238px, 30vh, 320px); }
+.zen-poster[data-has-image='false'] { min-height: 238px; }
+.zen-glass[data-has-image='false'], .zen-split[data-has-image='false'] { min-height: 252px; }
+.zen-card[data-has-image='false'] .pbody,
+.zen-card[data-has-image='false'] .gbody,
+.zen-card[data-has-image='false'] .sbody { justify-content: flex-start; }
+
+/* Prevent percentage-height cards from stretching to the grid's available row.
+   POS cards should size to their content; the grid may keep scrolling space
+   for many products, but that space must never become empty card chrome. */
+.zen-card,
+.zen-poster,
+.zen-rail,
+.zen-glass,
+.zen-split {
+    height: auto;
+    align-self: start;
+}
+
+/* Touch terminals still get a tactile press response without hover/tilt. */
+@media (pointer: coarse) {
+    .zen-card { transition: transform 120ms ease, box-shadow 160ms ease; }
+    .zen-card.is-pressed[data-available='true'] { transform: scale(.975); }
+    .zen-card.is-pressed[data-available='true']::after { opacity: .18; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .zen-card, .zen-card > .zen-glare { transition: none !important; }
+    .zen-card:hover[data-available='true'], .zen-card.is-pressed[data-available='true'] { transform: none !important; }
+}
+
+/* POS is a high-feedback workstation surface. Keep its intentional, short
+   interaction cues enabled even when the OS requests reduced motion; the rest
+   of the application continues to respect that accessibility preference. */
+@media (prefers-reduced-motion: reduce) {
+    .pos-items-panel .zen-card,
+    .pos-items-panel .zen-card *,
+    .pos-items-panel .zen-card::after,
+    .pos-items-panel .zen-card > .zen-glare {
+        transition-duration: 180ms !important;
+        transition-property: transform, opacity, filter, box-shadow, border-color, background !important;
+        animation-duration: 280ms !important;
+        animation-iteration-count: 1 !important;
+    }
+    .pos-items-panel .zen-card.zen-tilt:hover[data-available='true'],
+    .pos-items-panel .zen-card.zen-tilt.is-pressed[data-available='true'] {
+        transform: perspective(1100px)
+            rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+            translateY(var(--lift, 0px)) scale(var(--zoom, 1)) !important;
+    }
+    .pos-items-panel .zen-card.zen-tilt.is-pressed[data-available='true'] {
+        transform: perspective(1100px)
+            rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+            translateY(var(--lift, 0px)) scale(.96) !important;
+    }
+    .pos-items-panel .zen-glare { display: block !important; }
+}
+
+/* Final interaction polish: a clearer 3D lift and theme-colored glow without
+   turning the card into a distracting neon object. */
+@media (hover: hover) and (pointer: fine) {
+    .pos-items-panel .zen-card:hover[data-available='true'] {
+        transform: perspective(1050px)
+            rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+            translateY(-6px) scale(1.018);
+        box-shadow:
+            0 24px 50px -24px rgba(var(--primary), .58),
+            0 0 0 1px rgba(var(--primary), .28),
+            var(--zen-shadow, 0 18px 42px -22px rgba(0,0,0,.62));
+    }
+    .pos-items-panel .zen-card:hover[data-available='true']::after { opacity: .72; }
+    .pos-items-panel .zen-card:hover[data-available='true']::before { opacity: 1; }
+}
+
+/* Split is an action-first card: one clear CTA when empty, one full-width
+   stepper after adding. The old secondary plus button created duplicate
+   actions and made the footer look broken in narrow columns. */
+.pos-items-panel .zen-split .sactions,
+.pos-items-panel .zen-split[data-selected='true'] .sactions {
+    grid-template-columns: 1fr;
+}
+.pos-items-panel .zen-split .splus { display: none; }
+.pos-items-panel .zen-split .sadd,
+.pos-items-panel .zen-split .sstep { width: 100%; }
+.pos-items-panel .zen-split .smedia { height: 156px; }
+.pos-items-panel .zen-split { min-height: 286px; }
+
+/* Poster without an image: no decorative colored header. Let the product
+   information own the card, while keeping a small theme reflection for depth. */
+.pos-items-panel .zen-poster[data-has-image='false'] {
+    background:
+        radial-gradient(80% 55% at 100% 0%, rgba(var(--primary), .09), transparent 70%),
+        linear-gradient(180deg, rgba(var(--bg-card), .98), rgba(var(--bg-card), .88));
+}
+.pos-items-panel .zen-poster[data-has-image='false'] .photo { display: none; }
+.pos-items-panel .zen-poster[data-has-image='false'] .pbody {
+    padding: 22px 16px 14px;
+}
+.pos-items-panel .zen-poster[data-has-image='false'] .qty-dot {
+    display: inline-flex;
+    top: 12px;
+    inset-inline-end: 12px;
+}
+.pos-items-panel .zen-poster[data-has-image='false'] .pmeta { padding-inline-end: 42px; }
+.pos-items-panel .zen-poster[data-has-image='false'] .pfoot {
+    min-width: 0;
+    align-items: center;
+}
+.pos-items-panel .zen-poster .step {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+.pos-items-panel .zen-poster .step button {
+    flex: 0 0 44px;
+    width: 44px;
+}
+.pos-items-panel .zen-poster .step b { min-width: 24px; }
+
+/* Poster controls stay visually centered, while the price remains part of the same
+   compact action cluster instead of being pushed to the card edge. */
+.pos-items-panel .zen-poster .pfoot {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* One stable card frame for every POS personality. Content may differ, but the
+   scan rhythm must not: equal height, identical clipping, and a contained shadow
+   keep the grid aligned and preserve the rounded silhouette. */
+.pos-items-panel .zen-card {
+  height: clamp(286px, 34vh, 320px);
+  min-height: 0;
+  box-sizing: border-box;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 16px 34px -22px rgba(8, 15, 30, .72);
+}
+.pos-items-panel .zen-card .photo,
+.pos-items-panel .zen-card .rimg,
+.pos-items-panel .zen-card .gmedia,
+.pos-items-panel .zen-card .smedia {
+  border-radius: 0;
+}
+.pos-items-panel .zen-card:hover[data-available='true'] {
+  box-shadow:
+    0 22px 42px -24px rgba(var(--primary), .5),
+    0 0 0 1px rgba(var(--primary), .24);
+}
+
+/* Descriptions are secondary information in the cashier grid. Reserve one
+   predictable line so long Arabic text is truncated gracefully and never
+   pushes the action row outside the fixed card frame. */
+.pos-items-panel .zen-split .smedia { height: 132px; }
+.pos-items-panel .zen-split .sbody {
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 10px 6px;
+}
+.pos-items-panel .zen-split h3 {
+  max-height: 52px;
+  overflow: hidden;
+}
+.pos-items-panel .zen-split .sdesc {
+  height: 20px;
+  min-height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pos-items-panel .zen-split .sactions { flex-shrink: 0; }
+
+/* Content-independent layout contract for all four POS modes. The card frame
+   is fixed first; media and descriptions are allowed to yield before the
+   product name, price, and action controls. */
+.pos-items-panel .zen-card,
+.pos-items-panel .zen-poster,
+.pos-items-panel .zen-rail,
+.pos-items-panel .zen-glass,
+.pos-items-panel .zen-split {
+  height: 300px;
+  min-height: 300px;
+}
+.pos-items-panel .zen-poster .photo,
+.pos-items-panel .zen-glass .gmedia,
+.pos-items-panel .zen-split .smedia {
+  height: 118px;
+  flex: 0 0 118px;
+}
+.pos-items-panel .zen-poster .pbody,
+.pos-items-panel .zen-rail .rinfo,
+.pos-items-panel .zen-glass .gbody,
+.pos-items-panel .zen-split .sbody {
+  min-height: 0;
+  overflow: hidden;
+}
+.pos-items-panel .zen-poster h3,
+.pos-items-panel .zen-rail h3,
+.pos-items-panel .zen-glass h3,
+.pos-items-panel .zen-split h3 {
+  max-height: 52px;
+  overflow: hidden;
+}
+.pos-items-panel .zen-rail .sub,
+.pos-items-panel .zen-glass .gsub {
+  height: 20px;
+  min-height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pos-items-panel .zen-glass .chips {
+  height: 28px;
+  min-height: 28px;
+  margin-block: 5px 7px;
+}
+.pos-items-panel .zen-poster .pfoot,
+.pos-items-panel .zen-rail .rbottom,
+.pos-items-panel .zen-glass .gact,
+.pos-items-panel .zen-glass .gstep,
+.pos-items-panel .zen-split .sactions {
+  flex-shrink: 0;
+  margin-top: auto;
+}

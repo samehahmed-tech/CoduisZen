@@ -19,10 +19,19 @@ declare module 'express-serve-static-core' {
 }
 
 /**
- * Enforces branch isolation. 
- * - SUPER_ADMIN can specify any branchId via query/body/header.
+ * Roles that operate cross-branch by design (no stock of their own):
+ * the call center only distributes orders to branches and monitors them.
+ */
+export const isCrossBranchMonitor = (role: unknown) =>
+    ['SUPER_ADMIN', 'CALL_CENTER', 'CALL_CENTER_MANAGER'].includes(String(role || ''));
+
+/**
+ * Enforces branch isolation.
+ * - SUPER_ADMIN and the call-center roles can specify any branchId via
+ *   query/body/header (the call center distributes to + monitors all branches).
  * - Other roles are locked to their JWT branchId/allowedBranches.
- * - If no branchId is available, the request is rejected.
+ * - If no branchId is available, the request is rejected (except monitors,
+ *   which may run global queries).
  */
 export const enforceBranch = (req: Request, res: Response, next: NextFunction) => {
     const user = req.user;
@@ -30,8 +39,8 @@ export const enforceBranch = (req: Request, res: Response, next: NextFunction) =
         return res.status(401).json({ error: 'AUTH_REQUIRED' });
     }
 
-    // SUPER_ADMIN can operate on any branch via explicit parameter
-    if (user.role === 'SUPER_ADMIN') {
+    // Cross-branch monitors can operate on any branch via explicit parameter
+    if (isCrossBranchMonitor(user.role)) {
         const explicitBranch =
             (req.params?.branchId as string) ||
             (req.query.branchId as string) ||
@@ -44,7 +53,7 @@ export const enforceBranch = (req: Request, res: Response, next: NextFunction) =
         if (explicitBranch) {
             req.effectiveBranchId = explicitBranch;
         }
-        // SUPER_ADMIN can also access cross-branch (no filter) — allowed
+        // Monitors can also access cross-branch (no filter) — allowed
         return next();
     }
 
@@ -87,9 +96,25 @@ export const enforceBranch = (req: Request, res: Response, next: NextFunction) =
  */
 export const scopeBranchQuery = (req: Request, res: Response, next: NextFunction) => {
     enforceBranch(req, res, () => {
+        // Cross-branch monitors without an explicit branch run GLOBAL
+        // (all branches sales/reports) instead of their home branch.
+        if (isCrossBranchMonitor(req.user?.role)) {
+            const explicit =
+                (req.query.branchId as string) ||
+                (req.query.branch_id as string) ||
+                (req.body?.branchId as string) ||
+                (req.body?.branch_id as string) ||
+                (req.headers['x-branch-id'] as string);
+            if (!explicit) {
+                delete (req.query as any).branchId;
+                delete (req.query as any).branch_id;
+                req.effectiveBranchId = undefined;
+                return next();
+            }
+        }
         if (req.effectiveBranchId) {
             req.query.branchId = req.effectiveBranchId;
-        } else if (req.user?.role !== 'SUPER_ADMIN') {
+        } else if (req.user?.role !== 'SUPER_ADMIN' && !isCrossBranchMonitor(req.user?.role)) {
             return res.status(403).json({
                 error: 'BRANCH_SCOPE_REQUIRED',
                 message: 'A branch scope is required for this request.',

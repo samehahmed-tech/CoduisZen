@@ -35,6 +35,10 @@ const ensureTestDatabaseReady = async () => {
                 IF COL_LENGTH('dbo.purchase_orders', 'target_warehouse_id') IS NULL
                     ALTER TABLE purchase_orders ADD target_warehouse_id nvarchar(255) NULL;
             `));
+            await state.db.execute(sql.raw(`
+                IF COL_LENGTH('dbo.orders', 'scheduled_for') IS NULL
+                    ALTER TABLE orders ADD scheduled_for datetime2(3) NULL;
+            `));
             state.ready = true;
         })();
     }

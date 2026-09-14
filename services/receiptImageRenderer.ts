@@ -51,7 +51,7 @@ export const renderReceiptToImage = async (
             width: ${widthPx}px !important;
             max-width: ${widthPx}px !important;
             margin: 0 !important;
-            padding: ${widthPx <= 384 ? 5 : 6}px ${widthPx <= 384 ? 5 : 6}px 48px !important;
+            padding: ${widthPx <= 384 ? 5 : 6}px ${widthPx <= 384 ? 5 : 6}px 8px !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
             background: #fff !important;
@@ -115,6 +115,29 @@ export const renderReceiptToImage = async (
 
         if (frameDocument.fonts?.ready) {
             await frameDocument.fonts.ready;
+        }
+
+        // fonts.ready resolves immediately when no font load has STARTED yet
+        // (e.g. the @imported Cairo is still in flight on slow/offline links),
+        // snapshotting too early prints tofu boxes for Arabic. Explicitly pull
+        // the faces we print with — with a timeout so offline devices degrade
+        // to Tahoma/Arial (full Arabic coverage) instead of hanging.
+        try {
+            const fonts = frameDocument.fonts as unknown as {
+                load?: (font: string, text?: string) => Promise<unknown[]>;
+            };
+            if (fonts?.load) {
+                const sample = 'شكرا لزيارتكم 0123456789 Paid';
+                await Promise.race([
+                    Promise.all([
+                        fonts.load('800 23px Cairo', sample),
+                        fonts.load('900 23px Cairo', sample),
+                    ]),
+                    new Promise((resolve) => setTimeout(resolve, 2500)),
+                ]);
+            }
+        } catch {
+            // Fallback stack in the receipt CSS already covers Arabic.
         }
 
         // Render at a higher internal resolution, then normalize back to the

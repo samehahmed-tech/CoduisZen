@@ -109,6 +109,7 @@ export const closeDay = async (req: Request, res: Response) => {
             emailConfig,
             notes,
             enforceShiftsClosed,
+            autoCloseOpenShifts,
             overrideReason,
         } = req.body;
 
@@ -130,6 +131,7 @@ export const closeDay = async (req: Request, res: Response) => {
             emailConfig,
             notes,
             enforceShiftsClosed: Boolean(enforceShiftsClosed),
+            autoCloseOpenShifts: Boolean(autoCloseOpenShifts),
             overrideReason,
         });
 

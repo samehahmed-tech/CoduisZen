@@ -7,6 +7,7 @@ import {
    ChevronDown, Filter, Target, Megaphone, Zap, Scale, Info, Users, Clock, Box, ShieldCheck, Activity, LineChart as ChartIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 
 export const AiReports = ({ state }: any) => {
    const {
@@ -44,8 +45,31 @@ export const AiReports = ({ state }: any) => {
 
    return (
       <>
-               {activeCategory === 'AI' && activeSubReport === 'Daily Flash Report' && dailyFlashData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'AI' && activeSubReport === 'Daily Flash Report' && dailyFlashData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <ReportDataTable
+                            title="Flash by Type — table"
+                            data={dailyFlashData.byType || []}
+                            columns={[
+                               { key: 'type', label: 'Type' },
+                               { key: 'count', label: 'Orders', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                               { key: 'revenue', label: 'Revenue', align: 'right', sum: true, format: (v: any) => fmtMoney(v, 'LE') },
+                            ]}
+                            exportFilename="daily-flash-by-type"
+                            lang="en"
+                         />
+                         <ReportDataTable
+                            title="Flash Payments — table"
+                            data={dailyFlashData.paymentMix || []}
+                            columns={[
+                               { key: 'method', label: 'Method' },
+                               { key: 'total', label: 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, 'LE') },
+                            ]}
+                            exportFilename="daily-flash-payments"
+                            lang="en"
+                         />
+                      </div>
                      <div className="card-primary rounded-2xl border border-blue-200 dark:border-blue-800 p-5 shadow-lg bg-blue-50/30 dark:bg-blue-950/20">
                         <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Daily Flash - {dailyFlashData.date}</p>
                      </div>

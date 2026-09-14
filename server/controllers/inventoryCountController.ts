@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
+import crypto from 'node:crypto';
 import { db } from '../db';
-import { stockCounts, stockCountLines, inventoryItems, inventoryStock, warehouses } from '../../src/db/schema';
-import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
-import { GLService } from '../services/glService';
+import { stockCounts, stockCountLines, inventoryItems, inventoryStock, inventoryBatches, warehouses } from '../../src/db/schema';
+import { eq, and, desc, sql, gte, lte, asc } from 'drizzle-orm';
+import { postWastageEntry, postInventoryAdjustmentReversalEntry } from '../services/financePostingService';
 import { getStringParam } from '../utils/request';
 
 const toDateOnly = (value?: string | Date | null) => {
@@ -138,7 +139,8 @@ export const getStockCount = async (req: Request, res: Response) => {
  */
 export const createStockCount = async (req: Request, res: Response) => {
     try {
-        const { branchId, warehouseId, type, remarks, userId, scheduledDate, countDate } = req.body;
+        const { warehouseId, type, remarks, userId, scheduledDate, countDate } = req.body;
+        const branchId = req.effectiveBranchId || req.body.branchId;
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         if (!warehouseId) return res.status(400).json({ error: 'WAREHOUSE_ID_REQUIRED' });
         const normalizedType = String(type || 'FULL').toUpperCase();
@@ -148,6 +150,8 @@ export const createStockCount = async (req: Request, res: Response) => {
 
         const [warehouse] = await db.select().top(1).from(warehouses).where(eq(warehouses.id, warehouseId));
         if (!warehouse) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND' });
+        if (warehouse.isActive === false) return res.status(409).json({ error: 'WAREHOUSE_INACTIVE' });
+        if (req.effectiveBranchId && warehouse.branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         if (warehouse.branchId && warehouse.branchId !== branchId) {
             return res.status(400).json({ error: 'WAREHOUSE_BRANCH_MISMATCH' });
         }
@@ -188,6 +192,8 @@ export const freezeStockCount = async (req: Request, res: Response) => {
         
         const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
+        if (req.effectiveBranchId && count[0].branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
+        if (!['DRAFT', 'COUNTING'].includes(String(count[0].status || ''))) return res.status(409).json({ error: 'COUNT_NOT_READY_TO_FREEZE' });
         
         const lines = await db.transaction(async (tx) => {
             await tx.update(stockCounts)
@@ -250,6 +256,8 @@ export const submitCount = async (req: Request, res: Response) => {
         const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
         if (count[0].status === 'POSTED') return res.status(409).json({ error: 'COUNT_ALREADY_POSTED' });
+        if (!['FROZEN', 'COUNTING'].includes(String(count[0].status || ''))) return res.status(409).json({ error: 'COUNT_NOT_READY_TO_SUBMIT' });
+        if (req.effectiveBranchId && count[0].branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         
         await db.transaction(async (tx) => {
             for (const itemCount of counts) {
@@ -296,6 +304,7 @@ export const postStockCount = async (req: Request, res: Response) => {
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
         if (count[0].status === 'POSTED') return res.status(409).json({ error: 'COUNT_ALREADY_POSTED' });
         if (count[0].status !== 'REVIEW') return res.status(409).json({ error: 'COUNT_NOT_READY' });
+        if (req.effectiveBranchId && count[0].branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         
         let totalVarianceValue = 0;
 
@@ -347,6 +356,42 @@ export const postStockCount = async (req: Request, res: Response) => {
                         createdAt: new Date()
                     });
 
+                    const variance = Number(line.varianceQty || 0);
+                    if (variance < 0) {
+                        let remaining = Math.abs(variance);
+                        const batches = await tx.select().from(inventoryBatches).where(and(
+                            eq(inventoryBatches.itemId, line.itemId),
+                            eq(inventoryBatches.warehouseId, warehouse.id),
+                            sql`${inventoryBatches.currentQty} > 0`
+                        )).orderBy(asc(inventoryBatches.expiryDate));
+                        if (batches.reduce((sum, batch) => sum + Number(batch.currentQty || 0), 0) + 0.000001 < remaining) {
+                            throw new Error('COUNT_BATCH_QUANTITY_MISMATCH');
+                        }
+                        for (const batch of batches) {
+                            if (remaining <= 0.000001) break;
+                            const used = Math.min(remaining, Number(batch.currentQty || 0));
+                            const nextQty = Number(batch.currentQty || 0) - used;
+                            await tx.update(inventoryBatches).set({ currentQty: nextQty, status: nextQty <= 0.000001 ? 'DEPLETED' : batch.status }).where(eq(inventoryBatches.id, batch.id));
+                            remaining -= used;
+                        }
+                    } else if (variance > 0) {
+                        const expiry = new Date();
+                        expiry.setFullYear(expiry.getFullYear() + 1);
+                        await tx.insert(inventoryBatches).values({
+                            id: `BATCH-COUNT-${crypto.randomUUID()}`,
+                            itemId: line.itemId,
+                            warehouseId: warehouse.id,
+                            batchNumber: `COUNT-${id}-${line.itemId}`,
+                            expiryDate: expiry,
+                            receivedDate: new Date(),
+                            initialQty: variance,
+                            currentQty: variance,
+                            unitCost: Number(line.cost || 0),
+                            status: 'ACTIVE',
+                            createdAt: new Date(),
+                        });
+                    }
+
                     // Log Audit
                     await tx.insert(auditLogs).values({
                         eventType: 'INVENTORY_COUNT_ADJUSTMENT',
@@ -372,22 +417,12 @@ export const postStockCount = async (req: Request, res: Response) => {
         // If totalVarianceValue is negative, total stock value decreased (Wastage Expense DEBIT | Inventory Asset CREDIT)
         // If positive, stock value increased (Inventory Asset DEBIT | Inventory Gain CREDIT)
         if (Math.abs(totalVarianceValue) > 0) {
-            await GLService.postJournalEntry({
-                reference: id,
-                referenceType: 'MANUAL',
-                description: `Stock Count Variance for ${id}`,
-                branchId: count[0].branchId,
-                createdBy: userId || 'system',
-                lines: totalVarianceValue < 0 
-                ? [
-                    { accountCode: '5140', debit: Math.abs(totalVarianceValue), credit: 0 }, // Wastage Expense
-                    { accountCode: '1300', debit: 0, credit: Math.abs(totalVarianceValue) }  // Inventory Asset
-                ]
-                : [
-                    { accountCode: '1300', debit: Math.abs(totalVarianceValue), credit: 0 }, // Inventory Asset
-                    { accountCode: '4200', debit: 0, credit: Math.abs(totalVarianceValue) } // Other Income/Gain
-                ]
-            });
+            if (totalVarianceValue < 0) {
+                const posting = await postWastageEntry({ referenceId: id, amount: Math.abs(totalVarianceValue), branchId: count[0].branchId, userId: userId || 'system', reason: 'Stock count shortage' });
+                if (posting.status === 'failed') throw new Error(`STOCK_COUNT_FINANCE_EXCEPTION|${posting.reason}`);
+            } else {
+                await postInventoryAdjustmentReversalEntry({ referenceId: id, amount: Math.abs(totalVarianceValue), branchId: count[0].branchId, userId: userId || 'system', reason: 'Stock count surplus' });
+            }
         }
 
         res.json({ success: true, status: 'POSTED', varianceValue: totalVarianceValue });

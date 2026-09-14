@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Save, Package, Tag, Hash, DollarSign, Settings, Layers, Trash2, Plus, RefreshCw, Camera } from 'lucide-react';
 import { InventoryItem, InventoryUnit, RecipeIngredient, Warehouse } from '@/types';
 import BarcodeScanner from '@/components/common/BarcodeScanner';
@@ -24,6 +24,8 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
         sku: '',
         barcode: '',
         unit: InventoryUnit.COUNT,
+        purchaseUnit: InventoryUnit.COUNT,
+        purchaseUnitFactor: 1,
         category: '',
         costPrice: 0,
         purchasePrice: 0,
@@ -35,9 +37,55 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
         warehouseQuantities: []
     });
 
+    const safeWarehouses = useMemo(
+        () => (Array.isArray(warehouses) ? warehouses : []).filter((warehouse): warehouse is Warehouse => Boolean(warehouse?.id)),
+        [warehouses],
+    );
+    const safeExistingItems = useMemo(
+        () => (Array.isArray(existingItems) ? existingItems : []).filter((item): item is InventoryItem => Boolean(item?.id)),
+        [existingItems],
+    );
+
+    const parseArray = (value: unknown): unknown[] => {
+        if (Array.isArray(value)) return value;
+        if (typeof value !== 'string') return [];
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    };
+
+    const normalizeItem = (item: InventoryItem): InventoryItem => ({
+        ...item,
+        name: typeof item.name === 'string' ? item.name : '',
+        nameAr: typeof item.nameAr === 'string' ? item.nameAr : '',
+        unit: item.unit || InventoryUnit.COUNT,
+        category: typeof item.category === 'string' ? item.category : '',
+        threshold: Number.isFinite(Number(item.threshold)) ? Number(item.threshold) : 0,
+        costPrice: Number.isFinite(Number(item.costPrice)) ? Number(item.costPrice) : 0,
+        purchasePrice: Number.isFinite(Number(item.purchasePrice)) ? Number(item.purchasePrice) : 0,
+        purchaseUnit: item.purchaseUnit || item.unit,
+        purchaseUnitFactor: Number(item.purchaseUnitFactor || 1) > 0 ? Number(item.purchaseUnitFactor || 1) : 1,
+        bom: parseArray(item.bom).filter((ingredient): ingredient is RecipeIngredient => Boolean(
+            ingredient && typeof ingredient === 'object' && ('itemId' in ingredient)
+        )).map((ingredient) => ({
+            itemId: typeof ingredient.itemId === 'string' ? ingredient.itemId : '',
+            quantity: Number.isFinite(Number(ingredient.quantity)) ? Number(ingredient.quantity) : 0,
+            unit: typeof ingredient.unit === 'string' ? ingredient.unit : '',
+        })),
+        warehouseQuantities: parseArray(item.warehouseQuantities).filter((row: any): row is { warehouseId: string; quantity: number } => Boolean(
+            row && typeof row === 'object' && typeof row.warehouseId === 'string' && row.warehouseId
+        )).map((row) => ({
+            warehouseId: row.warehouseId,
+            quantity: Number.isFinite(Number(row.quantity)) ? Math.max(0, Number(row.quantity)) : 0,
+        })),
+    });
+
     useEffect(() => {
         if (initialItem) {
-            setFormData(initialItem);
+            setFormData(normalizeItem(initialItem));
         } else {
             setFormData({
                 id: generateInternalId(),
@@ -46,6 +94,8 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                 sku: '',
                 barcode: '',
                 unit: InventoryUnit.COUNT,
+                purchaseUnit: InventoryUnit.COUNT,
+                purchaseUnitFactor: 1,
                 category: '',
                 costPrice: 0,
                 purchasePrice: 0,
@@ -54,10 +104,10 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                 auditFrequency: 'DAILY',
                 isComposite: false,
                 bom: [],
-                warehouseQuantities: warehouses.length === 1 ? [{ warehouseId: warehouses[0].id, quantity: 0 }] : []
+                warehouseQuantities: safeWarehouses.length === 1 ? [{ warehouseId: safeWarehouses[0].id, quantity: 0 }] : []
             });
         }
-    }, [initialItem, warehouses, isOpen]);
+    }, [initialItem, safeWarehouses, isOpen]);
 
     const [scannerOpen, setScannerOpen] = useState(false);
     const [generatingBarcode, setGeneratingBarcode] = useState(false);
@@ -97,14 +147,25 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
     };
 
     const handleUpdateIngredient = (index: number, field: keyof RecipeIngredient, value: any) => {
-        const newBom = [...(formData.bom || [])];
-        newBom[index] = { ...newBom[index], [field]: value };
-        setFormData({ ...formData, bom: newBom });
+        setFormData((prev) => {
+            const newBom = [...(prev.bom || [])];
+            newBom[index] = { ...newBom[index], [field]: value };
+            return { ...prev, bom: newBom };
+        });
+    };
+
+    const handleSelectIngredientItem = (index: number, itemId: string) => {
+        const ref = safeExistingItems.find((i) => i.id === itemId);
+        setFormData((prev) => {
+            const newBom = [...(prev.bom || [])];
+            newBom[index] = { ...newBom[index], itemId, unit: ref?.unit || newBom[index]?.unit || '' };
+            return { ...prev, bom: newBom };
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (warehouses.length > 0 && !formData.warehouseQuantities?.length) {
+        if (safeWarehouses.length > 0 && !formData.warehouseQuantities?.length) {
             showError(lang === 'ar' ? 'اختر مخزنًا واحدًا على الأقل للصنف' : 'Select at least one warehouse for the item');
             return;
         }
@@ -112,6 +173,13 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
         try {
             await onSave(formData as InventoryItem);
         } catch (error: any) {
+            const errorCode = error?.code || error?.message;
+            if (errorCode === 'INACTIVE_WAREHOUSE_ASSIGNMENT') {
+                showError(lang === 'ar'
+                    ? 'لا يمكن ربط الصنف بمخزن غير نشط. أزل الربط أو فعّل المخزن أولاً.'
+                    : 'An item cannot be assigned to an inactive warehouse. Remove the link or reactivate the warehouse first.');
+                return;
+            }
             showError(error?.code === 'WAREHOUSE_STOCK_NOT_EMPTY' || error?.message === 'WAREHOUSE_STOCK_NOT_EMPTY'
                 ? (lang === 'ar' ? 'انقل أو صفّر رصيد المخزن قبل إلغاء ربط الصنف به' : 'Transfer or zero this warehouse stock before removing the assignment')
                 : (error?.message || (lang === 'ar' ? 'تعذر حفظ الصنف' : 'Failed to save item')));
@@ -220,7 +288,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'الوحدة' : 'Unit'}</label>
                                 <select
                                     value={formData.unit}
-                                    onChange={e => setFormData({ ...formData, unit: e.target.value as InventoryUnit })}
+                                    onChange={e => setFormData({ ...formData, unit: e.target.value as InventoryUnit, purchaseUnit: formData.purchaseUnit || e.target.value })}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold appearance-none"
                                 >
                                     {Object.values(InventoryUnit).map(u => (
@@ -238,6 +306,37 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold"
                                     placeholder="e.g. Vegetables, Meat..."
                                 />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/10">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'وحدة الشراء' : 'Purchase Unit'}</label>
+                                <select
+                                    value={formData.purchaseUnit || formData.unit}
+                                    onChange={e => setFormData({ ...formData, purchaseUnit: e.target.value })}
+                                    className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold appearance-none"
+                                >
+                                    {Object.values(InventoryUnit).map(u => (
+                                        <option key={u} value={u}>{u}</option>
+                                    ))}
+                                    <option value="CUSTOM">{lang === 'ar' ? 'وحدة مخصصة' : 'Custom Unit'}</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'معامل التحويل' : 'Conversion Factor'}</label>
+                                <input
+                                    type="number"
+                                    min="0.001"
+                                    step="0.001"
+                                    value={formData.purchaseUnitFactor || 1}
+                                    onChange={e => setFormData({ ...formData, purchaseUnitFactor: Math.max(0.001, Number(e.target.value || 1)) })}
+                                    className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold"
+                                />
+                            </div>
+                            <div className="flex items-end">
+                                <p className="w-full px-4 py-3 rounded-xl bg-white/80 dark:bg-slate-800 text-xs font-black text-emerald-700 dark:text-emerald-300">
+                                    1 {formData.purchaseUnit || formData.unit} = {Number(formData.purchaseUnitFactor || 1)} {formData.unit}
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -289,10 +388,11 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                 {lang === 'ar' ? 'حدد المخازن التي يتوفر بها الصنف، ثم أدخل رصيده في كل مخزن.' : 'Choose where this item is available, then enter its quantity in each warehouse.'}
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {warehouses.map((warehouse) => {
-                                    const assignedRow = formData.warehouseQuantities?.find(row => row.warehouseId === warehouse.id);
-                                    const assigned = Boolean(assignedRow);
-                                    return <div key={warehouse.id} className={`rounded-2xl border p-4 transition ${assigned ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                    {safeWarehouses.map((warehouse) => {
+                    const assignedRow = formData.warehouseQuantities?.find(row => row.warehouseId === warehouse.id);
+                    const assigned = Boolean(assignedRow);
+                    const inactive = warehouse.isActive === false;
+                    return <div key={warehouse.id} className={`rounded-2xl border p-4 transition ${inactive ? 'border-amber-400/60 bg-amber-50/60 dark:bg-amber-950/20' : assigned ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/20' : 'border-slate-200 dark:border-slate-700'}`}>
                                         <label className="flex cursor-pointer items-center gap-3">
                                             <input
                                                 type="checkbox"
@@ -305,7 +405,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                                 }))}
                                                 className="h-5 w-5 accent-indigo-600"
                                             />
-                                            <span className="text-sm font-black text-slate-700 dark:text-slate-200">{lang === 'ar' ? warehouse.nameAr || warehouse.name : warehouse.name}</span>
+                                            <span className="text-sm font-black text-slate-700 dark:text-slate-200">{lang === 'ar' ? warehouse.nameAr || warehouse.name : warehouse.name}{inactive && <span className="ml-2 text-[10px] text-amber-600">({lang === 'ar' ? 'غير نشط' : 'Inactive'})</span>}</span>
                                         </label>
                                         {assigned && <label className="mt-3 block space-y-1.5">
                                             <span className="text-[10px] font-black text-slate-400 uppercase">
@@ -393,12 +493,23 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                 <div key={idx} className="grid grid-cols-[minmax(0,1fr)_5rem_auto] sm:flex gap-2 sm:gap-3 items-center">
                                             <select
                                                 value={ing.itemId}
-                                                onChange={e => handleUpdateIngredient(idx, 'itemId', e.target.value)}
+                                                onChange={e => handleSelectIngredientItem(idx, e.target.value)}
                                                 className="flex-1 px-4 py-2.5 card-primary rounded-xl outline-none text-sm font-bold"
                                             >
                                                 <option value="">{lang === 'ar' ? 'اختر صنف...' : 'Select item...'}</option>
-                                                {existingItems.filter(i => i.id !== formData.id).map(item => (
-                                                    <option key={item.id} value={item.id}>{lang === 'ar' ? item.nameAr : item.name}</option>
+                                                {safeExistingItems.filter(i => i.id !== formData.id && i.isActive !== false).map(item => (
+                                                    <option key={item.id} value={item.id}>{lang === 'ar' ? item.nameAr || item.name : item.name}</option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                value={ing.unit || safeExistingItems.find(i => i.id === ing.itemId)?.unit || ''}
+                                                onChange={e => handleUpdateIngredient(idx, 'unit', e.target.value)}
+                                                className="w-24 px-2 py-2.5 card-primary rounded-xl outline-none text-sm font-bold"
+                                                title={lang === 'ar' ? 'وحدة المكون' : 'Ingredient unit'}
+                                            >
+                                                <option value="">{lang === 'ar' ? 'الوحدة' : 'Unit'}</option>
+                                                {Object.values(InventoryUnit).map(u => (
+                                                    <option key={u} value={u}>{u}</option>
                                                 ))}
                                             </select>
                                             <input
@@ -413,7 +524,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
                                                 }}
                                                 className="w-24 px-4 py-2.5 card-primary rounded-xl outline-none text-sm font-bold"
                                             />
-                                            <span className="hidden sm:block text-xs font-black text-slate-400 w-12">{existingItems.find(i => i.id === ing.itemId)?.unit || '-'}</span>
+                                            <span className="hidden sm:block text-xs font-black text-slate-400 w-12">{safeExistingItems.find(i => i.id === ing.itemId)?.unit || '-'}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveIngredient(idx)}

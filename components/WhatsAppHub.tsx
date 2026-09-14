@@ -56,6 +56,11 @@ const statusMeta = {
         tone: 'text-sky-700 bg-sky-50 border-sky-200',
         hint: 'امسح QR من واتساب على الموبايل مرة واحدة.',
     },
+    AUTHENTICATED: {
+        label: 'تم المسح — جاري التجهيز',
+        tone: 'text-violet-700 bg-violet-50 border-violet-200',
+        hint: 'الموبايل اتربط. تجهيز الجلسة ياخد من 10 لـ 60 ثانية — متعملش Scan تاني.',
+    },
     INITIALIZING: {
         label: 'جاري التهيئة',
         tone: 'text-amber-700 bg-amber-50 border-amber-200',
@@ -65,6 +70,11 @@ const statusMeta = {
         label: 'غير متصل',
         tone: 'text-rose-700 bg-rose-50 border-rose-200',
         hint: 'أعد تشغيل المحرك أو امسح الجلسة واظهر QR جديد.',
+    },
+    DISABLED: {
+        label: 'المحرك متوقف',
+        tone: 'text-slate-700 bg-slate-100 border-slate-300',
+        hint: 'فعّل WHATSAPP_PROVIDER=whatsapp-web.js وأعد تشغيل السيرفر ليظهر QR.',
     },
     AUTH_ERROR: {
         label: 'خطأ مصادقة',
@@ -111,6 +121,7 @@ export const WhatsAppHub = () => {
     const {
         statusData,
         qrCode,
+        qrUpdatedAt,
         inbox,
         escalations,
         automationConfig,
@@ -148,25 +159,52 @@ export const WhatsAppHub = () => {
         fetchAutomationConfig();
         fetchCustomers();
         subscribeSocket();
+        return () => {
+            unsubscribeSocket();
+        };
+    }, [fetchStatus, fetchInbox, fetchEscalations, fetchAutomationConfig, fetchCustomers, subscribeSocket, unsubscribeSocket]);
+
+    // Adaptive polling: fast (4s) through the whole linking flow — boot,
+    // scan wait, AND post-scan warmup — slow (15s) only once linked/stable.
+    // Slowing down while a QR is on screen is what stranded the page on a
+    // consumed QR when the ready event arrived mid socket-reconnect.
+    const currentStatus = statusData?.status || 'INITIALIZING';
+    const scanValue = qrCode || statusData?.qr || '';
+    const needsFastPoll = currentStatus !== 'READY' && currentStatus !== 'DISABLED';
+    useEffect(() => {
         const interval = setInterval(() => {
             fetchStatus(true);
             fetchInbox();
             fetchEscalations();
-        }, 15000);
-        return () => {
-            clearInterval(interval);
-            unsubscribeSocket();
-        };
-    }, [fetchStatus, fetchInbox, fetchEscalations, fetchAutomationConfig, fetchCustomers, subscribeSocket, unsubscribeSocket]);
+        }, needsFastPoll ? 4000 : 15000);
+        return () => clearInterval(interval);
+    }, [needsFastPoll, fetchStatus, fetchInbox, fetchEscalations]);
+
+    // Stuck-link watchdog: AUTHENTICATED with no READY for 75s+ means the
+    // session never warmed up (phone shows linked, page waits forever).
+    const [authenticatedSince, setAuthenticatedSince] = useState<number | null>(null);
+    const [nowTick, setNowTick] = useState(() => Date.now());
+    useEffect(() => {
+        if (currentStatus === 'AUTHENTICATED') {
+            setAuthenticatedSince((prev) => prev ?? Date.now());
+        } else {
+            setAuthenticatedSince(null);
+        }
+    }, [currentStatus]);
+    useEffect(() => {
+        if (currentStatus !== 'AUTHENTICATED') return;
+        const timer = window.setInterval(() => setNowTick(Date.now()), 5000);
+        return () => window.clearInterval(timer);
+    }, [currentStatus]);
+    const authStuckSec = authenticatedSince ? Math.max(0, Math.floor((nowTick - authenticatedSince) / 1000)) : 0;
 
     useEffect(() => {
         if (automationConfig) setConfigDraft({ ...defaultConfig, ...automationConfig });
     }, [automationConfig]);
 
-    const currentStatus = statusData?.status || 'INITIALIZING';
     const meta = statusMeta[currentStatus] || statusMeta.INITIALIZING;
     const isReady = currentStatus === 'READY';
-    const scanValue = qrCode || statusData?.qr || '';
+    const qrAgeSec = qrUpdatedAt ? Math.max(0, Math.floor((Date.now() - new Date(qrUpdatedAt).getTime()) / 1000)) : null;
 
     const chats = useMemo(() => {
         const grouped: Record<string, any[]> = {};
@@ -344,12 +382,43 @@ export const WhatsAppHub = () => {
                                         </div>
                                         <div className="mt-4 text-sm font-black">افتح واتساب من الموبايل وامسح الكود</div>
                                         <div className="mt-1 text-xs font-bold text-muted">Linked devices ثم Link a device</div>
+                                        <div className="mt-2 flex items-center justify-center gap-2 text-[11px] font-bold text-muted">
+                                            {qrAgeSec !== null && <span>QR جديد منذ {qrAgeSec} ثانية — يتجدد تلقائيًا</span>}
+                                            <button onClick={() => fetchStatus()} className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-black hover:bg-elevated">
+                                                <RefreshCw className="h-3 w-3" />
+                                                تحديث
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : isReady ? (
                                     <div className="text-center">
                                         <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-600" />
                                         <div className="mt-4 text-xl font-black text-emerald-700">الرقم مربوط وجاهز</div>
                                         <div className="mt-2 text-xs font-bold text-muted">تقدر تبعت حملات، رسائل أوردرات، وفيدباك.</div>
+                                    </div>
+                                ) : currentStatus === 'INITIALIZING' ? (
+                                    <div className="text-center">
+                                        <RefreshCw className="mx-auto h-16 w-16 animate-spin text-sky-600" />
+                                        <div className="mt-4 text-xl font-black">جاري تجهيز QR...</div>
+                                        <div className="mt-2 text-sm font-bold text-muted">المحرك بيشتغل (ياخد 10-30 ثانية أول مرة). الكود هيظهر هنا تلقائيًا — متدوسش تاني.</div>
+                                    </div>
+                                ) : currentStatus === 'AUTHENTICATED' ? (
+                                    <div className="text-center">
+                                        <CheckCircle2 className="mx-auto h-20 w-20 text-violet-600" />
+                                        <div className="mt-4 text-xl font-black text-violet-700">تم المسح! الموبايل اتربط</div>
+                                        <div className="mt-2 text-sm font-bold text-muted">جاري تجهيز الجلسة (10-60 ثانية) — متعملش Scan تاني ومتقفلش الصفحة.</div>
+                                        {authStuckSec > 75 ? (
+                                            <div className="mx-auto mt-4 max-w-sm rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                                                <div className="text-sm font-black text-amber-800">الجلسة اتأخرت أكتر من دقيقة — غالبًا علقت بعد الربط.</div>
+                                                <div className="mt-1 text-xs font-bold text-amber-700">دوس إعادة تشغيل المحرك وحاول Scan جديد.</div>
+                                                <button onClick={() => restartEngine()} disabled={isLoading} className="mt-3 inline-flex h-11 items-center gap-2 rounded-xl bg-amber-600 px-5 text-sm font-black text-white transition hover:bg-amber-700 disabled:opacity-60">
+                                                    <RotateCcw className="h-4 w-4" />
+                                                    إعادة تشغيل المحرك
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-3 text-xs font-bold text-muted">مستني التأكيد منذ {authStuckSec} ثانية…</div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="text-center">

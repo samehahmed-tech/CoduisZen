@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { pool } from '../db/index.js';
-import { pushJobToBridge } from './printerBridgeService.js';
+import { pushJobToBridge, getGatewayForPrinter } from './printerBridgeService.js';
 
 export interface EnqueuePrintJobInput {
     branchId: string;
@@ -75,8 +75,40 @@ export const claimNextPrintJob = async (params: {
     gatewayId: string;
     claimUnassigned: boolean;
     globalClaim?: boolean;
+    /** Windows printer names visible to this bridge (capability routing). */
+    printers?: string[];
 }) => {
     await ensureTable();
+
+    // Capability names come from the bridge (user-controlled) — escape single
+    // quotes before inlining into the IN (...) list.
+    const capablePrinters = Array.from(new Set(
+        (params.printers || [])
+            .map(name => String(name || '').trim().slice(0, 300))
+            .filter(Boolean),
+    )).map(name => name.replace(/'/g, "''"));
+
+    // Backward compatibility: a bridge without capability data keeps the
+    // legacy behavior (any unassigned job is claimable by anyone).
+    let capabilityClause = '';
+    if (capablePrinters.length > 0) {
+        const inList = capablePrinters.map(name => "N'" + name + "'").join(', ');
+        capabilityClause =
+            'AND (' +
+            'COALESCE(target_gateway_id, gateway_id) IS NOT NULL ' +
+            'OR printer_address IN (' + inList + ') ' +
+            'OR (' +
+            'created_at < DATEADD(SECOND, -30, GETDATE()) ' +
+            'AND NOT EXISTS (' +
+            'SELECT 1 FROM bridge_printers bp WITH (NOLOCK) ' +
+            'WHERE bp.printer_name = print_jobs.printer_address ' +
+            'AND bp.gateway_id <> $2 ' +
+            'AND bp.last_seen_at >= DATEADD(SECOND, -60, GETDATE())' +
+            ')' +
+            ')' +
+            ')';
+    }
+
     const { rows } = await pool.query(
         `UPDATE print_jobs
          SET status = CASE
@@ -96,7 +128,8 @@ export const claimNextPrintJob = async (params: {
               AND status = 'QUEUED'
               AND attempts < max_attempts
               AND (COALESCE(target_gateway_id, gateway_id) = $2
-                   OR ($3 = 1 AND COALESCE(target_gateway_id, gateway_id) IS NULL))
+                   OR ($3 = 1 AND COALESCE(target_gateway_id, gateway_id) IS NULL
+                       ${capabilityClause}))
             ORDER BY created_at ASC
          )
          UPDATE next_job
@@ -130,10 +163,17 @@ const resolvePrinterTarget = async (input: EnqueuePrintJobInput) => {
         };
     }
 
+    // Auto-bind: an unbound printer is routed to whichever gateway bridge
+    // registered its Windows name — no manual gateway configuration needed.
+    let autoGatewayId: string | null = null;
+    if (!printer.gateway_id && !printer.station_id) {
+        autoGatewayId = await getGatewayForPrinter(printer.address || input.printerAddress, input.branchId || null).catch(() => null);
+    }
+
     return {
         printerAddress: printer.address || input.printerAddress || null,
         printerType: printer.type || input.printerType || 'LOCAL',
-        targetGatewayId: input.targetGatewayId || printer.gateway_id || printer.station_id || null,
+        targetGatewayId: input.targetGatewayId || printer.gateway_id || printer.station_id || autoGatewayId || null,
     };
 };
 

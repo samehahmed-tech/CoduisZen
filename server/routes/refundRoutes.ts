@@ -8,6 +8,8 @@ import { enforceBranch, scopeBranchQuery } from '../middleware/branchIsolation';
 const router = Router();
 const refundRead = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR');
 const refundManage = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER_MANAGER');
+// Counter staff may REQUEST returns (approve/process stay restricted).
+const refundRequest = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER_MANAGER', 'CASHIER', 'WAITER', 'CAPTAIN', 'CALL_CENTER', 'CALL_CENTER_MANAGER');
 
 // Refund read
 router.get('/', refundRead, scopeBranchQuery, ctrl.getRefunds);
@@ -17,7 +19,7 @@ router.get('/:id', refundRead, enforceBranch, ctrl.getRefundById);
 
 // Refund mutations — restricted
 router.put('/policy', requireRoles('SUPER_ADMIN', 'OWNER'), ctrl.updateRefundPolicy);
-router.post('/', refundManage, enforceBranch, validate(createRefundSchema), ctrl.requestRefund);
+router.post('/', refundRequest, enforceBranch, validate(createRefundSchema), ctrl.requestRefund);
 router.put('/:id/approve', refundManage, enforceBranch, ctrl.approveRefund);
 router.put('/:id/reject', refundManage, enforceBranch, ctrl.rejectRefund);
 router.post('/:id/process', refundManage, enforceBranch, ctrl.processRefund);

@@ -1,8 +1,10 @@
 const fs = require('fs');
-const mssql = require('mssql');
 
 const connectionString = process.env.SQLSERVER_URL
     || 'Driver={ODBC Driver 18 for SQL Server};Server=(localdb)\\CoduisZen;Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;';
+const mssql = connectionString.includes('Driver=')
+    ? require('mssql/msnodesqlv8')
+    : require('mssql');
 
 const schemaSource = fs.readFileSync('src/db/schema.ts', 'utf8');
 const toSnakeCase = (name) => name.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
@@ -11,6 +13,7 @@ const sqlTypes = {
     jsonText: 'nvarchar(max)',
     int: 'int',
     real: 'real',
+    numeric: 'decimal(14,2)',
     bit: 'bit',
     date: 'date',
     datetime2: 'datetime2',
@@ -25,7 +28,7 @@ const parseExpectedColumns = () => {
     for (const [, table, body] of tables) {
         const columns = new Map();
         for (const line of body.split(/\r?\n/)) {
-            const property = line.match(/^\s*([A-Za-z_$][\w$]*):\s*(nvarchar|int|real|bit|date|datetime2|jsonText)\s*\((.*)$/);
+            const property = line.match(/^\s*([A-Za-z_$][\w$]*):\s*(nvarchar|int|real|numeric|bit|date|datetime2|jsonText)\s*\((.*)$/);
             if (!property) continue;
             const explicitName = property[3].match(/^\s*(?:'|")([^'"]+)(?:'|")/);
             columns.set(explicitName?.[1] || toSnakeCase(property[1]), sqlTypes[property[2]]);

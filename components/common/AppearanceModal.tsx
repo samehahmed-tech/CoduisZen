@@ -3,6 +3,8 @@ import {
     Check,
     ImagePlus,
     Languages,
+    LayoutDashboard,
+    LayoutGrid,
     MonitorSmartphone,
     Moon,
     Palette,
@@ -27,65 +29,65 @@ type PreviewPalette = {
 };
 
 const THEME_PREVIEW: Record<AppTheme, { light: PreviewPalette; dark: PreviewPalette; moodAr: string; moodEn: string }> = {
-    'mica-glass': {
-        moodAr: 'زجاج iOS',
-        moodEn: 'Liquid glass',
-        light: { primary: '#2563eb', accent: '#06b6d4', bg: '#e8f0f7', card: 'rgba(255,255,255,.68)', rail: 'rgba(248,251,253,.72)', text: '#0f172a', muted: '#64748b', border: 'rgba(148,163,184,.38)', button: 'linear-gradient(135deg,#2563eb,#06b6d4)' },
-        dark: { primary: '#60a5fa', accent: '#22d3ee', bg: '#07111f', card: 'rgba(18,25,40,.78)', rail: 'rgba(14,20,34,.82)', text: '#f1f5f9', muted: '#94a3b8', border: 'rgba(96,165,250,.18)', button: 'linear-gradient(135deg,#60a5fa,#22d3ee)' },
+    'aurora-glass': {
+        moodAr: 'زجاج شفاف',
+        moodEn: 'Frosted aurora',
+        light: { primary: '#4f46e5', accent: '#22d3ee', bg: '#eef1ff', card: '#ffffff', rail: '#f4f6ff', text: '#1e2044', muted: '#6e769b', border: '#d6dcf5', button: 'linear-gradient(135deg,#6366f1,#8b5cf6,#22d3ee)' },
+        dark: { primary: '#818cf8', accent: '#67e8f9', bg: '#090b1e', card: '#131734', rail: '#0c0f26', text: '#ebf0ff', muted: '#96a0c8', border: '#3a4060', button: 'linear-gradient(135deg,#818cf8,#8b5cf6,#22d3ee)' },
     },
-    'fluent-clean': {
-        moodAr: 'واضح ومهني',
-        moodEn: 'Clean Windows',
-        light: { primary: '#0067c0', accent: '#107cd8', bg: '#f3f7fb', card: '#ffffff', rail: '#f5f8fb', text: '#191f28', muted: '#606c7c', border: '#dae0e8', button: '#0067c0' },
-        dark: { primary: '#60c2ff', accent: '#7dd3fc', bg: '#111822', card: '#192230', rail: '#141d2a', text: '#f5f7fa', muted: '#a2aec1', border: '#374456', button: '#60c2ff' },
+    'midnight-command': {
+        moodAr: 'غرفة قيادة',
+        moodEn: 'Razor command',
+        light: { primary: '#2563eb', accent: '#2563eb', bg: '#f6f8fa', card: '#ffffff', rail: '#fafbfc', text: '#111827', muted: '#6b7280', border: '#e5e7eb', button: '#2563eb' },
+        dark: { primary: '#60a5fa', accent: '#60a5fa', bg: '#090a0e', card: '#11131a', rail: '#0c0d13', text: '#f0f2f7', muted: '#8c94a8', border: '#2a2e3a', button: '#2563eb' },
     },
-    'material-soft': {
-        moodAr: 'ناعم ومرن',
-        moodEn: 'Soft material',
-        light: { primary: '#544fc5', accent: '#0ea5e9', bg: '#fbf7ff', card: '#ffffff', rail: '#f4efff', text: '#1f1f28', muted: '#696774', border: '#e2dfec', button: 'linear-gradient(135deg,#544fc5,#0ea5e9)' },
-        dark: { primary: '#a78bfa', accent: '#38bdf8', bg: '#11101c', card: '#1b192a', rail: '#161524', text: '#f5f3ff', muted: '#afabc3', border: '#413c58', button: 'linear-gradient(135deg,#a78bfa,#38bdf8)' },
+    'neo-brutal': {
+        moodAr: 'جرأة جرافيكية',
+        moodEn: 'Bold graphic',
+        light: { primary: '#0f0f0f', accent: '#facc15', bg: '#fffcf2', card: '#ffffff', rail: '#fffaeb', text: '#0f0f0f', muted: '#5f5a50', border: '#0f0f0f', button: '#0f0f0f' },
+        dark: { primary: '#facc15', accent: '#facc15', bg: '#0c0c0c', card: '#181818', rail: '#101010', text: '#f5f5f5', muted: '#aaaaaa', border: '#f5f5f5', button: '#facc15' },
     },
-    'neumorphism-soft': {
-        moodAr: 'ملموس وودود',
-        moodEn: 'Tactile soft',
-        light: { primary: '#0e7490', accent: '#059669', bg: '#e8eff1', card: '#eef4f6', rail: '#e4ecef', text: '#1e292d', muted: '#5b6e76', border: '#cddade', button: 'linear-gradient(145deg,#0e7490,#059669)' },
-        dark: { primary: '#2dd4bf', accent: '#34d399', bg: '#141d21', card: '#1c272c', rail: '#182227', text: '#ecfdf5', muted: '#97abb1', border: '#374b52', button: 'linear-gradient(145deg,#2dd4bf,#34d399)' },
+    'soft-organic': {
+        moodAr: 'دفء مريح',
+        moodEn: 'Warm calm',
+        light: { primary: '#2e8b6d', accent: '#e8a87c', bg: '#fdf8f0', card: '#fffdf9', rail: '#faf3e9', text: '#44382c', muted: '#968470', border: '#ebdecb', button: 'linear-gradient(135deg,#2e8b6d,#3fa383)' },
+        dark: { primary: '#86c8aa', accent: '#f0be96', bg: '#201c1a', card: '#2c2724', rail: '#241f1c', text: '#f5ebde', muted: '#af9e8c', border: '#4b413a', button: 'linear-gradient(135deg,#3fa383,#2e8b6d)' },
     },
-    'flat-minimal': {
-        moodAr: 'مسطح وسريع',
-        moodEn: 'Flat minimal',
-        light: { primary: '#115e59', accent: '#2563eb', bg: '#fafafa', card: '#ffffff', rail: '#ffffff', text: '#18181b', muted: '#71717a', border: '#e4e4e7', button: '#115e59' },
-        dark: { primary: '#2dd4bf', accent: '#60a5fa', bg: '#121214', card: '#1b1b1e', rail: '#17171a', text: '#f4f4f5', muted: '#a1a1aa', border: '#3f3f46', button: '#2dd4bf' },
+    'editorial-luxury': {
+        moodAr: 'فخامة ورقية',
+        moodEn: 'Paper luxury',
+        light: { primary: '#784820', accent: '#801e28', bg: '#faf7f2', card: '#fffefb', rail: '#f7f3ec', text: '#1c1917', muted: '#7d7060', border: '#e4dac8', button: '#1c1917' },
+        dark: { primary: '#d4af69', accent: '#c8786e', bg: '#14110e', card: '#1e1a16', rail: '#181410', text: '#f0eade', muted: '#a59684', border: '#3e342a', button: '#d4af69' },
     },
-    'fintech-sharp': {
-        moodAr: 'دقيق وكثيف',
-        moodEn: 'Sharp finance',
-        light: { primary: '#0284c7', accent: '#0d9488', bg: '#f6f8fb', card: '#ffffff', rail: '#eef4f8', text: '#0f172a', muted: '#64748b', border: '#cbd5e1', button: 'linear-gradient(135deg,#0284c7,#0d9488)' },
-        dark: { primary: '#38bdf8', accent: '#2dd4bf', bg: '#080d17', card: '#0f172a', rail: '#0b1220', text: '#f1f5f9', muted: '#94a3b8', border: '#334155', button: 'linear-gradient(135deg,#38bdf8,#2dd4bf)' },
+    'terminal-ops': {
+        moodAr: 'كونسول عمليات',
+        moodEn: 'Ops console',
+        light: { primary: '#008246', accent: '#00a05a', bg: '#e8ece8', card: '#f6f9f6', rail: '#e2e7e2', text: '#121e16', muted: '#5a6e5f', border: '#c3cdc4', button: '#0c2b1a' },
+        dark: { primary: '#3cdc82', accent: '#3cdc82', bg: '#040c08', card: '#08140d', rail: '#040b06', text: '#c8e6d2', muted: '#6e967d', border: '#1c3726', button: '#3cdc82' },
     },
-    'cupertino-light': {
-        moodAr: 'مصقول وخفيف',
-        moodEn: 'Polished Apple',
-        light: { primary: '#007aff', accent: '#34c759', bg: '#f2f2f7', card: 'rgba(255,255,255,.88)', rail: 'rgba(249,249,251,.84)', text: '#1c1c1e', muted: '#6f6f75', border: '#d1d1d6', button: 'linear-gradient(180deg,#0a84ff,#007aff)' },
-        dark: { primary: '#0a84ff', accent: '#30d158', bg: '#121214', card: 'rgba(28,28,30,.9)', rail: 'rgba(24,24,26,.86)', text: '#f2f2f7', muted: '#aeaeb2', border: '#3a3a3c', button: 'linear-gradient(180deg,#409cff,#0a84ff)' },
+    'future-hud': {
+        moodAr: 'مركز مستقبلي',
+        moodEn: 'Future ops',
+        light: { primary: '#0284c7', accent: '#a855f7', bg: '#e4f0fa', card: '#ffffff', rail: '#e8f3fc', text: '#0c233c', muted: '#5f7896', border: '#b9d7eb', button: 'linear-gradient(100deg,#0284c7,#0369a1,#7c3aed)' },
+        dark: { primary: '#22d3ee', accent: '#e879f9', bg: '#050814', card: '#0c1226', rail: '#070b1a', text: '#dcebff', muted: '#829bbe', border: '#283c64', button: 'linear-gradient(100deg,#0891b2,#0284c7,#7c3aed)' },
     },
-    'monochrome-pro': {
-        moodAr: 'جرافيت صارم',
-        moodEn: 'Graphite pro',
-        light: { primary: '#27272a', accent: '#0e7490', bg: '#f7f7f8', card: '#ffffff', rail: '#fcfcfd', text: '#18181b', muted: '#52525b', border: '#d4d4d8', button: '#27272a' },
-        dark: { primary: '#f4f4f5', accent: '#67e8f9', bg: '#09090b', card: '#121214', rail: '#0e0e10', text: '#fafafa', muted: '#a1a1aa', border: '#3f3f46', button: '#f4f4f5' },
+    'bento-saas': {
+        moodAr: 'مرح جريء',
+        moodEn: 'Bold playful',
+        light: { primary: '#e11d48', accent: '#f59e0b', bg: '#fff5f3', card: '#ffffff', rail: '#fff0ed', text: '#2e161e', muted: '#96737d', border: '#f5d7d2', button: 'linear-gradient(135deg,#e11d48,#be1239)' },
+        dark: { primary: '#fb7185', accent: '#fbbf24', bg: '#160a0e', card: '#241218', rail: '#1a0b0f', text: '#ffeef0', muted: '#b9969e', border: '#48282f', button: 'linear-gradient(135deg,#e11d48,#9f1239)' },
     },
-    'warm-beige': {
-        moodAr: 'دافئ ومريح',
-        moodEn: 'Warm workspace',
-        light: { primary: '#92400e', accent: '#0d9488', bg: '#f8f2e8', card: '#fffaf3', rail: '#f3e7d6', text: '#2f231c', muted: '#78604d', border: '#e2d6c7', button: 'linear-gradient(135deg,#92400e,#0d9488)' },
-        dark: { primary: '#fb923c', accent: '#2dd4bf', bg: '#1b1612', card: '#261f1a', rail: '#201a16', text: '#fff7ed', muted: '#cab8a6', border: '#524438', button: 'linear-gradient(135deg,#fb923c,#2dd4bf)' },
+    'industrial-ops': {
+        moodAr: 'صلابة صناعية',
+        moodEn: 'Heavy-duty ops',
+        light: { primary: '#c2410c', accent: '#ca8a04', bg: '#eef0f2', card: '#ffffff', rail: '#e8eaed', text: '#181a1c', muted: '#697076', border: '#cdd2d7', button: 'linear-gradient(180deg,#d14e14,#b23c0a)' },
+        dark: { primary: '#fb923c', accent: '#fac83c', bg: '#0f1012', card: '#191b1e', rail: '#121316', text: '#ebedf0', muted: '#969ea5', border: '#3a3e44', button: 'linear-gradient(180deg,#e05a1a,#c2410c)' },
     },
-    'dark-elegant': {
-        moodAr: 'تنفيذي وفخم',
-        moodEn: 'Executive',
-        light: { primary: '#4f46e5', accent: '#0f766e', bg: '#f4f6f9', card: '#ffffff', rail: '#eef2f7', text: '#0f172a', muted: '#475569', border: '#cbd5e1', button: 'linear-gradient(135deg,#111827,#4f46e5)' },
-        dark: { primary: '#818cf8', accent: '#2dd4bf', bg: '#05080f', card: '#0d121e', rail: '#090d17', text: '#f8fafc', muted: '#94a3b8', border: '#1e293b', button: 'linear-gradient(135deg,#818cf8,#2dd4bf)' },
+    'premium-hospitality': {
+        moodAr: 'زمردي فاخر',
+        moodEn: 'Emerald luxury',
+        light: { primary: '#046307', accent: '#b08d20', bg: '#f5f0e1', card: '#fffdf6', rail: '#f0e9d5', text: '#201e16', muted: '#82735a', border: '#decda5', button: 'linear-gradient(135deg,#046307,#034d06)' },
+        dark: { primary: '#d4af37', accent: '#34d399', bg: '#0b120e', card: '#141e18', rail: '#0d1510', text: '#f2ecdc', muted: '#a59b82', border: '#303e32', button: 'linear-gradient(135deg,#0b5c40,#084a34)' },
     },
 };
 
@@ -110,7 +112,7 @@ const ThemePreview = memo(function ThemePreview({
     isActive: boolean;
     isDark: boolean;
 }) {
-    const preview = THEME_PREVIEW[theme.id] ?? THEME_PREVIEW['mica-glass'];
+    const preview = THEME_PREVIEW[theme.id] ?? THEME_PREVIEW['aurora-glass'];
     const p = isDark ? preview.dark : preview.light;
     const isFlat = theme.components.card.variant === 'flat';
     const radius = theme.shape.radiusLg;
@@ -176,7 +178,7 @@ const ThemeCard = memo(function ThemeCard({
     isArabic: boolean;
     onSelect: (id: AppTheme) => void;
 }) {
-    const preview = THEME_PREVIEW[theme.id] ?? THEME_PREVIEW['mica-glass'];
+    const preview = THEME_PREVIEW[theme.id] ?? THEME_PREVIEW['aurora-glass'];
     const p = isDark ? preview.dark : preview.light;
 
     return (
@@ -237,7 +239,7 @@ const AppearanceModal: React.FC<AppearanceModalProps> = ({ isOpen, onClose }) =>
         [settings.theme],
     );
 
-    const activePreview = THEME_PREVIEW[activeConfig.id] ?? THEME_PREVIEW['mica-glass'];
+    const activePreview = THEME_PREVIEW[activeConfig.id] ?? THEME_PREVIEW['aurora-glass'];
 
     const handleThemeSelect = useCallback(
         (id: AppTheme) => {
@@ -329,6 +331,40 @@ const AppearanceModal: React.FC<AppearanceModalProps> = ({ isOpen, onClose }) =>
                                 {isArabic ? 'اللغة' : 'Language'}
                             </span>
                             <span className="rounded-lg bg-card px-2 py-1 text-[10px] text-muted">{isArabic ? 'العربية' : 'English'}</span>
+                        </button>
+                    </div>
+
+                    <div className="mb-4 flex items-center gap-3">
+                        <h3 className="text-sm font-black text-main">{isArabic ? 'وضع العرض' : 'View mode'}</h3>
+                        <div className="h-px flex-1 bg-border/15" />
+                    </div>
+
+                    <div className="mb-6 grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => updateSettings({ layoutMode: 'classic' })}
+                            className={`flex items-center gap-3 rounded-2xl border p-3 text-start transition-colors ${settings.layoutMode !== 'tiles' ? 'border-primary bg-primary/10' : 'border-border/20 bg-elevated/30 hover:bg-elevated/60'}`}
+                        >
+                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${settings.layoutMode !== 'tiles' ? 'bg-primary text-white' : 'bg-elevated text-muted'}`}>
+                                <LayoutDashboard size={18} />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-sm font-black text-main">{isArabic ? 'الكلاسيكي' : 'Classic'}</span>
+                                <span className="block truncate text-[11px] font-bold text-muted">{isArabic ? 'قائمة جانبية' : 'Sidebar workspace'}</span>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => updateSettings({ layoutMode: 'tiles' })}
+                            className={`flex items-center gap-3 rounded-2xl border p-3 text-start transition-colors ${settings.layoutMode === 'tiles' ? 'border-primary bg-primary/10' : 'border-border/20 bg-elevated/30 hover:bg-elevated/60'}`}
+                        >
+                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${settings.layoutMode === 'tiles' ? 'bg-primary text-white' : 'bg-elevated text-muted'}`}>
+                                <LayoutGrid size={18} />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-sm font-black text-main">{isArabic ? 'بلاطات 3D' : 'Tiles 3D'}</span>
+                                <span className="block truncate text-[11px] font-bold text-muted">{isArabic ? 'شاشة ذكية تفاعلية' : 'Smart 3D launcher'}</span>
+                            </span>
                         </button>
                     </div>
 

@@ -1,0 +1,10 @@
+const p = require('path');
+const X = require(p.join(__dirname, '..', 'node_modules', 'xlsx'));
+const file = p.join(process.env.USERPROFILE, 'Desktop', 'استيراد-المخزون.xlsx');
+const b = X.readFile(file);
+const rows = X.utils.sheet_to_json(b.Sheets[b.SheetNames[0]], { defval: '' });
+console.log('sheet:', b.SheetNames[0], '| rows:', rows.length);
+console.log(JSON.stringify(rows[0]));
+console.log(JSON.stringify(rows[8]));
+const bad = rows.filter(r => !r.code || !r.name_ar || !r.name_en);
+console.log('invalid rows:', bad.length);

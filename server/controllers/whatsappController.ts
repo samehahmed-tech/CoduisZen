@@ -176,7 +176,9 @@ export const restartWhatsAppEngine = async (_req: Request, res: Response) => {
 export const resetWhatsAppSession = async (_req: Request, res: Response) => {
     try {
         await whatsappService.restart({ resetSession: true });
-        res.json({ ok: true, status: 'AWAITING_SCAN' });
+        // QR needs 10-30s of puppeteer boot — report INITIALIZING truthfully,
+        // the client polls aggressively until AWAITING_SCAN with qr arrives.
+        res.json({ ok: true, status: 'INITIALIZING' });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'WHATSAPP_RESET_FAILED' });
     }
@@ -222,6 +224,10 @@ export const saveWhatsAppAutomationConfig = async (req: Request, res: Response) 
 
 export const sendWhatsAppCampaign = async (req: Request, res: Response) => {
     try {
+        const status = await whatsappService.getStatus();
+        if (String((status as any)?.status || '').toUpperCase() === 'DISABLED') {
+            return res.status(503).json({ error: 'WHATSAPP_DISABLED', message: 'WhatsApp engine is disabled. Set WHATSAPP_PROVIDER=whatsapp-web.js and restart.' });
+        }
         const { targets, text, isMarketing } = req.body;
         if (!Array.isArray(targets) || !text) {
             return res.status(400).json({ error: 'Targets and text are required' });
@@ -237,8 +243,18 @@ export const sendWhatsAppCampaign = async (req: Request, res: Response) => {
 
 export const sendWhatsAppTest = async (req: Request, res: Response) => {
     try {
+        const status = await whatsappService.getStatus();
+        if (String((status as any)?.status || '').toUpperCase() === 'DISABLED') {
+            return res.status(503).json({ error: 'WHATSAPP_DISABLED', message: 'WhatsApp engine is disabled. Set WHATSAPP_PROVIDER=whatsapp-web.js and restart.' });
+        }
         const to = String(req.body?.to || '').trim();
         const text = String(req.body?.text || '').trim();
+        if (!to || !text) {
+            return res.status(400).json({ error: 'TO_AND_TEXT_REQUIRED', message: 'Phone number and message text are required.' });
+        }
+        if (String((status as any)?.status || '').toUpperCase() !== 'READY') {
+            return res.status(409).json({ error: 'WHATSAPP_NOT_READY', message: 'Link your phone first — scan the QR, then retry.', status: (status as any)?.status });
+        }
         const result = await sendWhatsAppText({ to, text });
         res.status(201).json({ ok: true, result });
     } catch (error: any) {

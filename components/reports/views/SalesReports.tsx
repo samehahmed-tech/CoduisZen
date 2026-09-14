@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { HOURS, WEEK_DAYS } from '../reportConstants';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { translations } from '../../../services/translations';
 
@@ -54,6 +55,20 @@ export const SalesReports = ({ state }: any) => {
       <>
                {activeCategory === 'SALES' && activeSubReport === 'Daily Sales' && (
                   <div className="space-y-8 animate-in slide-in-from-bottom-5 duration-700">
+                     <ReportDataTable
+                        title={t.daily_sales_overview}
+                        subtitle={lang === 'ar' ? 'جدول البيانات اليومية — للمراجعة المحاسبية' : 'Daily data table — for accounting review'}
+                        data={salesSeries}
+                        columns={[
+                           { key: 'name', label: lang === 'ar' ? 'اليوم' : 'Day' },
+                           { key: 'revenue', label: t.revenue, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'orders', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'cost', label: t.cost, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'profit', label: t.profit, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                        ]}
+                        exportFilename="daily-sales"
+                        lang={lang}
+                     />
                      <div className="bg-card/80  p-8 md:p-12 rounded-[3.5rem] border border-border/50 shadow-2xl relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
                         <h3 className="text-3xl font-black text-main mb-10 tracking-tighter uppercase flex items-center gap-4">
@@ -113,6 +128,24 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Payment Mix' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'مزيج المدفوعات — جدول المطابقة' : 'Payment Mix — reconciliation table'}
+                        subtitle={lang === 'ar' ? 'يجب أن يطابق إجمالي الورديات والمطابقة' : 'Must tie out to shift totals and reconciliation'}
+                        data={(paymentSummary || []).map((r: any) => {
+                           const total = Number(r.total || r.amount || 0);
+                           const count = Number(r.count || r.transactionCount || 0);
+                           const grand = (paymentSummary || []).reduce((s: number, x: any) => s + Number(x.total || x.amount || 0), 0);
+                           return { method: r.method || r.paymentMethod || 'UNKNOWN', count, total, pct: grand > 0 ? (total / grand) * 100 : 0 };
+                        })}
+                        columns={[
+                           { key: 'method', label: lang === 'ar' ? 'الطريقة' : 'Method' },
+                           { key: 'count', label: lang === 'ar' ? 'المعاملات' : 'Txns', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'total', label: lang === 'ar' ? 'الإجمالي' : 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'pct', label: '%', align: 'right', format: (v: any) => `${Number(v || 0).toFixed(1)}%` },
+                        ]}
+                        exportFilename="payment-mix"
+                        lang={lang}
+                     />
                      <div className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
                         <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 shadow-lg">
                            <h3 className="text-lg font-black text-main">Payment distribution</h3>
@@ -204,6 +237,21 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Sales by Order Type' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'المبيعات حسب النوع — جدول' : 'Sales by Order Type — table'}
+                        data={salesByOrderType}
+                        columns={[
+                           { key: 'orderType', label: lang === 'ar' ? 'النوع' : 'Type' },
+                           { key: 'orderCount', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'revenue', label: t.revenue, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'avgTicket', label: t.avg_ticket, align: 'right', format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'totalTax', label: t.tax, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'totalDiscount', label: t.discounts, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'percentage', label: '%', align: 'right', format: (v: any) => `${Number(v || 0).toFixed(1)}%` },
+                        ]}
+                        exportFilename="sales-by-order-type"
+                        lang={lang}
+                     />
                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {salesByOrderType.map((row, idx) => (
                            <div key={idx} className="card-primary rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg">
@@ -234,6 +282,19 @@ export const SalesReports = ({ state }: any) => {
                            <h3 className="text-xl font-black text-main">{t.sales_by_item}</h3>
                            <p className="text-xs text-muted mt-1">{t.ranked_by_revenue}</p>
                         </div>
+                        {salesByItem.length > 0 && (
+                           <div className="p-6 border-b border-border/20">
+                              <ResponsiveContainer width="100%" height={240}>
+                                 <BarChart data={[...salesByItem].sort((a: any, b: any) => Number(b.revenue || 0) - Number(a.revenue || 0)).slice(0, 10)} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                    <XAxis dataKey="itemName" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-18} dy={10} height={60} />
+                                    <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)} />
+                                    <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${currencySymbol}`, t.revenue]} />
+                                    <Bar dataKey="revenue" name={t.revenue} fill="#10b981" radius={[6, 6, 0, 0]} />
+                                 </BarChart>
+                              </ResponsiveContainer>
+                           </div>
+                        )}
                         <div className="responsive-table">
                            <table className="w-full text-xs">
                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
@@ -310,6 +371,19 @@ export const SalesReports = ({ state }: any) => {
                      </div>
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
                         <div className="p-8 border-b border-slate-100 dark:border-slate-800"><h3 className="text-lg font-black text-main">{t.discounts_by_reason}</h3></div>
+                        {discountAnalysis.byReason.length > 0 && (
+                           <div className="p-6 border-b border-border/20">
+                              <ResponsiveContainer width="100%" height={220}>
+                                 <BarChart data={[...discountAnalysis.byReason].sort((a: any, b: any) => Number(b.totalDiscount || 0) - Number(a.totalDiscount || 0)).slice(0, 8)} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                    <XAxis dataKey="reason" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-18} dy={10} height={60} />
+                                    <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)} />
+                                    <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${currencySymbol}`, t.total]} />
+                                    <Bar dataKey="totalDiscount" name={t.total} fill="#f43f5e" radius={[6, 6, 0, 0]} />
+                                 </BarChart>
+                              </ResponsiveContainer>
+                           </div>
+                        )}
                         <div className="responsive-table">
                            <table className="w-full text-xs">
                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
@@ -365,6 +439,19 @@ export const SalesReports = ({ state }: any) => {
                      )}
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800"><h3 className="text-lg font-black text-main">{t.cancelled_order_log}</h3></div>
+                        {cancelledOrders.byReason.length > 0 && (
+                           <div className="p-6 border-b border-border/20">
+                              <ResponsiveContainer width="100%" height={200}>
+                                 <BarChart data={[...cancelledOrders.byReason].sort((a: any, b: any) => Number(b.total || 0) - Number(a.total || 0)).slice(0, 8)} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                    <XAxis dataKey="reason" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} angle={-18} dy={10} height={60} />
+                                    <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)} />
+                                    <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${currencySymbol}`, t.total]} />
+                                    <Bar dataKey="total" name={t.total} fill="#fb923c" radius={[6, 6, 0, 0]} />
+                                 </BarChart>
+                              </ResponsiveContainer>
+                           </div>
+                        )}
                         <div className="responsive-table">
                            <table className="w-full text-xs">
                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.12em]">
@@ -393,6 +480,19 @@ export const SalesReports = ({ state }: any) => {
                )}
                 {activeCategory === 'SALES' && activeSubReport === 'Sales by Source' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'المبيعات حسب المصدر — جدول' : 'Sales by Source — table'}
+                        data={salesBySource}
+                        columns={[
+                           { key: 'source', label: lang === 'ar' ? 'المصدر' : 'Source' },
+                           { key: 'orderCount', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'revenue', label: t.revenue, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'avgTicket', label: t.avg_ticket, align: 'right', format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'percentage', label: '%', align: 'right', format: (v: any) => `${Number(v || 0).toFixed(1)}%` },
+                        ]}
+                        exportFilename="sales-by-source"
+                        lang={lang}
+                     />
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {salesBySource.map((row, idx) => (
                            <div key={idx} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg">
@@ -428,6 +528,29 @@ export const SalesReports = ({ state }: any) => {
                 )}
                 {activeCategory === 'SALES' && activeSubReport === 'Peak Hours Heatmap' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={t.peak_hours_heatmap}
+                        subtitle={lang === 'ar' ? 'كل الخلايا يوم × ساعة — قابلة للفرز والتصدير' : 'Every day × hour cell — sortable and exportable'}
+                        data={(() => {
+                           const rows: any[] = [];
+                           (WEEK_DAYS || []).forEach((day: string, di: number) => {
+                              (HOURS || []).forEach((hour: number) => {
+                                 const cell = (peakHoursLookup as any)?.get ? (peakHoursLookup as any).get(`${di}-${hour}`) : null;
+                                 if (cell && Number(cell.orderCount || 0) > 0) rows.push({ day, hour: `${hour}:00`, orders: cell.orderCount, revenue: cell.revenue });
+                              });
+                           });
+                           return rows;
+                        })()}
+                        columns={[
+                           { key: 'day', label: lang === 'ar' ? 'اليوم' : 'Day' },
+                           { key: 'hour', label: lang === 'ar' ? 'الساعة' : 'Hour' },
+                           { key: 'orders', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'revenue', label: t.revenue, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                        ]}
+                        pageSize={24}
+                        exportFilename="peak-hours"
+                        lang={lang}
+                     />
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8">
                         <h3 className="text-xl font-black text-main mb-6">{t.peak_hours_heatmap}</h3>
                         <div className="grid grid-cols-[auto_repeat(24,1fr)] gap-0.5 text-[8px]">
@@ -473,6 +596,23 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Sales Comparison' && salesComparisonData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'مقارنة المبيعات — جدول' : 'Sales Comparison — table'}
+                        data={[
+                           { metric: t.orders, current: salesComparisonData.current?.orderCount, compare: salesComparisonData.compare?.orderCount, change: salesComparisonData.change?.orderCount },
+                           { metric: t.revenue, current: salesComparisonData.current?.revenue, compare: salesComparisonData.compare?.revenue, change: salesComparisonData.change?.revenue },
+                           { metric: t.avg_ticket, current: salesComparisonData.current?.avgTicket, compare: salesComparisonData.compare?.avgTicket, change: salesComparisonData.change?.avgTicket },
+                           { metric: t.discounts, current: salesComparisonData.current?.totalDiscount, compare: salesComparisonData.compare?.totalDiscount, change: salesComparisonData.change?.totalDiscount },
+                        ]}
+                        columns={[
+                           { key: 'metric', label: lang === 'ar' ? 'المؤشر' : 'Metric', sortable: false },
+                           { key: 'current', label: t.current_period, align: 'right', sortable: false, format: (v: any) => fmtNum(v) },
+                           { key: 'compare', label: t.comparison_period, align: 'right', sortable: false, format: (v: any) => fmtNum(v) },
+                           { key: 'change', label: lang === 'ar' ? 'التغير %' : 'Change %', align: 'right', sortable: false, format: (v: any) => `${Number(v) > 0 ? '+' : ''}${Number(v || 0)}%` },
+                        ]}
+                        exportFilename="sales-comparison"
+                        lang={lang}
+                     />
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {['current', 'compare'].map(period => (<div key={period} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">{period === 'current' ? t.current_period : t.comparison_period}</p><p className="text-xs text-muted mb-3">{salesComparisonData[period]?.period}</p>{[{ l: t.orders, v: salesComparisonData[period]?.orderCount }, { l: t.revenue, v: `${salesComparisonData[period]?.revenue?.toLocaleString()} ${currencySymbol}` }, { l: t.avg_ticket, v: `${salesComparisonData[period]?.avgTicket} ${currencySymbol}` }].map((c, i) => (<div key={i} className="flex justify-between py-1 text-xs"><span className="text-muted">{c.l}</span><span className="font-black text-main">{c.v}</span></div>))}</div>))}
                      </div>
@@ -492,6 +632,18 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Revenue by Weekday' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'الإيراد حسب أيام الأسبوع — جدول' : 'Revenue by Weekday — table'}
+                        data={revenueByWeekday}
+                        columns={[
+                           { key: 'dayName', label: lang === 'ar' ? 'اليوم' : 'Day' },
+                           { key: 'orderCount', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'revenue', label: t.revenue, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'avgTicket', label: t.avg_ticket, align: 'right', format: (v: any) => fmtMoney(v, currencySymbol) },
+                        ]}
+                        exportFilename="revenue-by-weekday"
+                        lang={lang}
+                     />
                      <div className="grid grid-cols-7 gap-3">
                         {revenueByWeekday.map((r, i) => (
                            <div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-lg text-center">
@@ -533,8 +685,21 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Menu Engineering' && !menuEngineeringData && <p className="text-center text-muted py-16">{t.no_data}</p>}
 
-               {activeCategory === 'SALES' && activeSubReport === 'Daypart Analysis' && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'SALES' && activeSubReport === 'Daypart Analysis' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title={lang === 'ar' ? 'تحليل فترات اليوم — جدول' : 'Daypart Analysis — table'}
+                         data={daypartData}
+                         columns={[
+                            { key: 'name', label: lang === 'ar' ? 'الفترة' : 'Daypart' },
+                            { key: 'orderCount', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                            { key: 'revenue', label: t.revenue, align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                            { key: 'avgTicket', label: t.avg_ticket, align: 'right', format: (v: any) => fmtMoney(v, currencySymbol) },
+                            { key: 'percentage', label: '%', align: 'right', format: (v: any) => `${Number(v || 0).toFixed(1)}%` },
+                         ]}
+                         exportFilename="daypart-analysis"
+                         lang={lang}
+                      />
                      <div className="grid grid-cols-5 gap-3">{daypartData.map((d: any, i: number) => <div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg text-center"><p className="text-[10px] font-black uppercase text-muted">{d.name}</p><p className="text-xl font-black text-main mt-1">{d.revenue.toLocaleString()}</p><p className="text-[9px] text-muted">{d.orderCount} orders · {d.percentage}%</p><div className="mt-2 mx-auto w-8 bg-elevated/50 rounded-full" style={{ height: 50 }}><div className="w-8 rounded-full bg-blue-500" style={{ height: `${(d.revenue / daypartRevenueMax) * 100}%`, marginTop: `${100 - (d.revenue / daypartRevenueMax) * 100}%` }} /></div><p className="text-[9px] text-muted mt-1">Avg {d.avgTicket} LE</p></div>)}</div>
                      {daypartData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
@@ -557,9 +722,23 @@ export const SalesReports = ({ state }: any) => {
                      {onlineOfflineData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
                )}
-               {activeCategory === 'SALES' && activeSubReport === 'Menu Cannibalization' && cannibalizationData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {activeCategory === 'SALES' && activeSubReport === 'Menu Cannibalization' && cannibalizationData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title={lang === 'ar' ? 'تداخل الأصناف — جدول شامل' : 'Menu Cannibalization — full table'}
+                         data={[
+                            ...((cannibalizationData.declining || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'متراجع' : 'Declining', change: Number(r.qtyChangePercent || 0) }))),
+                            ...((cannibalizationData.growing || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'نامٍ' : 'Growing', change: Number(r.qtyChangePercent || 0) }))),
+                         ]}
+                         columns={[
+                            { key: 'itemName', label: t.item },
+                            { key: 'trend', label: lang === 'ar' ? 'الاتجاه' : 'Trend' },
+                            { key: 'change', label: lang === 'ar' ? 'تغير الكمية %' : 'Qty change %', align: 'right', format: (v: any) => `${Number(v) > 0 ? '+' : ''}${Number(v || 0)}%` },
+                         ]}
+                         exportFilename="menu-cannibalization"
+                         lang={lang}
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="card-primary rounded-[2rem] border border-rose-200 dark:border-rose-800 shadow-xl p-6 bg-rose-50/30 dark:bg-rose-950/20">
                            <h3 className="text-lg font-black text-rose-500 mb-4">Declining Items ({cannibalizationData.declining.length})</h3>
                            {cannibalizationData.declining.slice(0, 10).map((r: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-rose-100 dark:border-rose-900/30"><span className="font-black text-main">{r.itemName}</span><span className="font-mono text-rose-500">{r.qtyChangePercent}%</span></div>))}

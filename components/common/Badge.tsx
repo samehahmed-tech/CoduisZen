@@ -23,9 +23,9 @@ const COLORS: Record<string, string> = {
  *   <Badge color="rose" size="sm">Overdue</Badge>
  */
 const Badge: React.FC<BadgeProps> = ({ children, color = 'neutral', size = 'md' }) => {
-    const sizeClass = size === 'sm' ? 'px-1.5 py-0.5 text-[7px]' : 'px-2 py-0.5 text-[8px]';
+    const sizeClass = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs';
     return (
-        <span className={`inline-flex items-center ${sizeClass} ${COLORS[color]} border rounded-md font-black uppercase tracking-wider`}>
+        <span className={`theme-badge inline-flex items-center ${sizeClass} ${COLORS[color]} border rounded-lg font-bold leading-none`}>
             {children}
         </span>
     );

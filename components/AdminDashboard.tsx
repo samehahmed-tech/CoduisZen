@@ -13,18 +13,10 @@ import {
     TrendingDown,
     TrendingUp,
 } from 'lucide-react';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
+// Recharts streams in AFTER the header/KPIs/table shell has painted — it
+// must never block first content. Same charts, same containers, same data.
+const BranchComparisonChart = React.lazy(() => import('./AdminDashboardCharts').then((m) => ({ default: m.BranchComparisonChart })));
+const RiskDonutChart = React.lazy(() => import('./AdminDashboardCharts').then((m) => ({ default: m.RiskDonutChart })));
 
 type BranchPerformanceRow = {
     branchId: string;
@@ -163,22 +155,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang, rows, isLoading, 
                             <BarChart3 size={20} className="text-primary" />
                         </div>
                         <div className="h-[360px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 10, right: 10, left: isAr ? 10 : -10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.18)" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--color-muted)' }} tickLine={false} axisLine={false} interval={0} angle={rows.length > 4 ? -20 : 0} textAnchor={rows.length > 4 ? 'end' : 'middle'} height={60} />
-                                    <YAxis yAxisId="money" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--color-muted)' }} tickLine={false} axisLine={false} tickFormatter={(v) => Number(v) >= 1000 ? `${Math.round(Number(v) / 1000)}k` : String(v)} />
-                                    <YAxis yAxisId="count" orientation="right" tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--color-muted)' }} tickLine={false} axisLine={false} />
-                                    <Tooltip
-                                        formatter={(value: any, key: any) => key === 'revenue'
-                                            ? [money(Number(value || 0), lang), isAr ? 'الإيراد' : 'Revenue']
-                                            : [fmt(Number(value || 0)), isAr ? 'الطلبات' : 'Orders']}
-                                        contentStyle={{ background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 8, fontWeight: 800 }}
-                                    />
-                                    <Bar yAxisId="money" dataKey="revenue" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                                    <Bar yAxisId="count" dataKey="orders" fill="#10b981" radius={[6, 6, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            <React.Suspense fallback={<div className="h-full w-full animate-pulse rounded-lg bg-elevated/30" />}>
+                                <BranchComparisonChart data={chartData} lang={lang} isAr={isAr} rowsCount={rows.length} />
+                            </React.Suspense>
                         </div>
                     </div>
 
@@ -190,14 +169,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ lang, rows, isLoading, 
                             </div>
                             <div className="h-[210px]">
                                 {riskData.length ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={54} outerRadius={82} paddingAngle={4}>
-                                                {riskData.map((item) => <Cell key={item.name} fill={item.color} />)}
-                                            </Pie>
-                                            <Tooltip formatter={(value: any) => fmt(Number(value || 0))} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                    <React.Suspense fallback={<div className="h-full w-full animate-pulse rounded-lg bg-elevated/30" />}>
+                                        <RiskDonutChart data={riskData} />
+                                    </React.Suspense>
                                 ) : (
                                     <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border text-sm font-black text-muted">
                                         {isAr ? 'لا توجد مخاطر بارزة' : 'No visible risks'}

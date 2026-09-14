@@ -25,6 +25,9 @@ interface ReceiptBlock {
     config: Record<string, any>;
 }
 
+export type ReceiptStyleVariant = 'royal' | 'neo' | 'ledger' | 'express';
+export type ReceiptStyleVariantInput = ReceiptStyleVariant | 'classic' | 'compact' | 'bold';
+
 export interface ReceiptTemplate {
     id: string;
     name: string;
@@ -38,7 +41,7 @@ export interface ReceiptTemplate {
     linkedDepartments: string[];
     isDefault: boolean;
     createdAt: string;
-    styleVariant?: 'classic' | 'compact' | 'bold';
+    styleVariant?: ReceiptStyleVariantInput;
 }
 
 // ── Storage key (same as ReceiptDesigner) ──
@@ -134,11 +137,50 @@ const escapeHtml = (value: unknown): string =>
         .replace(/'/g, '&#39;');
 
 const looksMojibake = (value: unknown): boolean =>
-    /[ØÙÃÂ§«»]/.test(String(value || ''));
+    /(?:[ØÙ][^\s]|Ã|Â|ط[§±¨µ¦©®¯¹ھ]|ظ[„…‚])/u.test(String(value || ''));
+
+const legacyPairReplace = (text: string): string => text.replace(/ظ‚|ط§|ظ„|ظ…|ظˆ|ظٹ|ط¹|ط±|ط¨|طµ|ط®|ط¯|طھ|ط³|ط´|ط²/g, (pair) => ({
+    'ظ‚': 'ق', 'ط§': 'ا', 'ظ„': 'ل', 'ظ…': 'م', 'ظˆ': 'و', 'ظٹ': 'ي',
+    'ط¹': 'ع', 'ط±': 'ر', 'ط¨': 'ب', 'طµ': 'ص', 'ط®': 'خ', 'ط¯': 'د',
+    'طھ': 'ت', 'ط³': 'س', 'ط´': 'ش', 'ط²': 'ز',
+} as Record<string, string>)[pair] || pair);
+
+const latin1BytesToUtf8 = (text: string): string => {
+    const bytes = Uint8Array.from(text, (character) => character.charCodeAt(0) & 0xff);
+    return new TextDecoder('utf-8').decode(bytes);
+};
+
+const arabicRepairScore = (text: string): number => {
+    const arabic = (text.match(/[\u0600-\u06FF]/g) || []).length;
+    const broken = (text.match(/\uFFFD/g) || []).length;
+    const traces = looksMojibake(text) ? 1000 : 0;
+    return arabic - broken * 100 - traces;
+};
+
+const repairMojibake = (value: unknown): string => {
+    const raw = String(value ?? '');
+    if (!raw || !looksMojibake(raw)) return raw;
+    let best = legacyPairReplace(raw);
+    let bestScore = arabicRepairScore(best);
+    const rawScore = arabicRepairScore(raw);
+    if (rawScore > bestScore) {
+        best = raw;
+        bestScore = rawScore;
+    }
+    for (const candidate of [latin1BytesToUtf8(raw), latin1BytesToUtf8(latin1BytesToUtf8(raw))]) {
+        if (candidate.includes('\uFFFD')) continue;
+        const score = arabicRepairScore(candidate);
+        if (score > bestScore) {
+            best = candidate;
+            bestScore = score;
+        }
+    }
+    return best;
+};
 
 const cleanDisplayText = (value: unknown, fallback = ''): string => {
-    const text = String(value ?? '').trim();
-    if (!text || looksMojibake(text)) return fallback;
+    const text = repairMojibake(value).trim();
+    if (!text) return fallback;
     return text;
 };
 
@@ -181,17 +223,35 @@ const ar = {
     taxId: '\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0636\u0631\u064a\u0628\u064a',
 };
 
+const utf8ToBase64 = (value: string): string => {
+    // btoa throws on non-Latin1 input — encode as UTF-8 bytes first so Arabic
+    // (or any Unicode) inside the SVG can never drop the whole QR block.
+    if (typeof Buffer !== 'undefined') {
+        try {
+            return Buffer.from(value, 'utf8').toString('base64');
+        } catch { /* fall through to TextEncoder */ }
+    }
+    const bytes = new TextEncoder().encode(value);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+};
+
 export const createQrDataUrl = (value: string, size: number): string => {
-    const svg = renderToStaticMarkup(React.createElement(QRCodeSVG as any, {
-        value,
-        size,
-        level: 'M',
-        bgColor: '#FFFFFF',
-        fgColor: '#000000',
-        marginSize: 1,
-        xmlns: 'http://www.w3.org/2000/svg',
-    }));
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
+    try {
+        const svg = renderToStaticMarkup(React.createElement(QRCodeSVG as any, {
+            value,
+            size,
+            level: 'M',
+            bgColor: '#FFFFFF',
+            fgColor: '#000000',
+            marginSize: 1,
+            xmlns: 'http://www.w3.org/2000/svg',
+        }));
+        return `data:image/svg+xml;base64,${utf8ToBase64(svg)}`;
+    } catch {
+        return '';
+    }
 };
 
 export const generateHtmlFromTemplate = ({
@@ -210,10 +270,20 @@ export const generateHtmlFromTemplate = ({
     const paperWidth = template.paperWidth || '80mm';
     const widthMm = paperWidth === '58mm' ? 58 : 80;
     const bodyWidthMm = paperWidth === '58mm' ? 56 : 78;
-    const fontSizePx = template.fontSize === 'small' ? 17 : template.fontSize === 'large' ? 24 : 21;
-    const styleVariant = template.styleVariant || 'classic';
-    const isCompact = styleVariant === 'compact';
-    const isBold = styleVariant === 'bold';
+    const fontSizePx = template.fontSize === 'small' ? 19 : template.fontSize === 'large' ? 26 : 23;
+    // Legacy factory variants map onto the new design system so stored
+    // templates keep a polished look: classic→ledger, compact→express, bold→royal.
+    const LEGACY_VARIANT_MAP: Record<string, ReceiptStyleVariant> = {
+        classic: 'ledger',
+        compact: 'express',
+        bold: 'royal',
+    };
+    const rawVariant = String(template.styleVariant || 'royal');
+    const styleVariant: ReceiptStyleVariant = (['royal', 'neo', 'ledger', 'express'] as string[]).includes(rawVariant)
+        ? rawVariant as ReceiptStyleVariant
+        : LEGACY_VARIANT_MAP[rawVariant] || 'royal';
+    const isExpress = styleVariant === 'express';
+    const isRoyal = styleVariant === 'royal';
     const createdAt = order.createdAt ? new Date(order.createdAt) : new Date();
     const dateStr = createdAt.toLocaleDateString(isAr ? 'ar-EG' : 'en-GB', {
         day: '2-digit',
@@ -262,6 +332,11 @@ export const generateHtmlFromTemplate = ({
         .filter((block) => block.enabled)
         .map((block) => {
             const cfg = block.config || {};
+            // Template-wide discount visibility (totals block toggle, default ON).
+            // The fallback receipt always prints discounts, so the designer path
+            // must match unless the merchant explicitly hid them.
+            const totalsCfg = (template.blocks || []).find((b: any) => b?.type === 'totals')?.config || {};
+            const showDiscountAnywhere = (totalsCfg as any).showDiscount !== false;
 
             switch (block.type) {
                 case 'logo': {
@@ -269,7 +344,7 @@ export const generateHtmlFromTemplate = ({
                     if (!logoUrl || template.showLogo === false) return '';
                     return `
                         <div class="block logo-block">
-                            <img src="${escapeHtml(logoUrl)}" alt="logo" style="max-height:${Number(cfg.maxHeight || 60)}px;max-width:100%;object-fit:contain" />
+                            <img src="${escapeHtml(logoUrl)}" alt="logo" style="max-height:${Number(cfg.maxHeight || 120)}px;max-width:100%;object-fit:contain" />
                         </div>
                     `;
                 }
@@ -355,6 +430,7 @@ export const generateHtmlFromTemplate = ({
                                         </div>
                                     `).join('') : ''}
                                     ${cfg.showNotes && item.notes ? `<div class="item-note">${escapeHtml(cleanDisplayText(item.notes))}</div>` : ''}
+                                    ${showDiscountAnywhere && itemDiscount > 0 ? `<div class="item-discount">${isAr ? 'خصم' : 'Disc'}: -${Number(itemDiscount).toFixed(2)}</div>` : ''}
                                 </td>
                                 ${cfg.showQty ? `<td class="col-qty">${escapeHtml(item.quantity || 1)}</td>` : ''}
                                 ${cfg.showPrice ? `<td class="col-price">${formatAmountHtml(unitPrice)}</td>` : ''}
@@ -405,8 +481,15 @@ export const generateHtmlFromTemplate = ({
 
                 case 'payment': {
                     if (!order.paymentMethod) return '';
-                    const payment = paymentLabels[String(order.paymentMethod).toUpperCase()];
-                    const paymentText = payment ? pickText(payment.en, payment.ar) : escapeHtml(String(order.paymentMethod));
+                    // Normalize (trim/case) so custom/legacy method strings still
+                    // match; unknown methods go through mojibake repair instead
+                    // of printing raw bytes as garbage marks.
+                    const methodKey = String(order.paymentMethod).trim().toUpperCase();
+                    const payment = paymentLabels[methodKey];
+                    const paymentText = payment
+                        ? pickText(payment.en, payment.ar)
+                        : escapeHtml(cleanDisplayText(order.paymentMethod, ''));
+                    if (!paymentText) return '';
                     return `
                         <div class="block payment-section">
                             <span class="payment-pill">${pickText('Paid', ar.paid)}: ${paymentText}</span>
@@ -416,7 +499,7 @@ export const generateHtmlFromTemplate = ({
 
                 case 'qrCode': {
                     const qrValue = cfg.url || (settings as any).receiptQrUrl || '';
-                    const qrSize = Math.max(48, Math.min(180, Number(cfg.size || (template.paperWidth === '58mm' ? 64 : 82))));
+                    const qrSize = Math.max(48, Math.min(280, Number(cfg.size || (template.paperWidth === '58mm' ? 140 : 200))));
                     const directImageUrl = cfg.imageUrl || '';
                     const qrImageUrl = directImageUrl || (qrValue ? createQrDataUrl(qrValue, qrSize) : '');
                     if (!qrImageUrl) return '';
@@ -494,18 +577,18 @@ export const generateHtmlFromTemplate = ({
         print-color-adjust: exact;
     }
     img { display: block; margin: 0 auto; filter: grayscale(1) contrast(1.15); }
-    .block { margin: ${isCompact ? 2 : 5}px 0; }
+    .block { margin: ${isExpress ? 2 : 5}px 0; }
     .logo-block, .payment-section, .qr-block, .receipt-footer { text-align: center; }
-    .header-block { text-align: center; padding-bottom: ${isCompact ? 4 : 8}px; border-bottom: ${isBold ? 4 : 2}px solid #111; }
+    .header-block { text-align: center; padding-bottom: ${isExpress ? 4 : 8}px; border-bottom: ${isRoyal ? 4 : 2}px solid #111; }
     .restaurant-name { font-size: ${fontSizePx + 6}px; font-weight: 900; line-height: 1.2; }
     .branch-name { font-size: ${Math.max(fontSizePx - 1, 14)}px; font-weight: 900; color: #222; }
     .branch-info { font-size: ${Math.max(fontSizePx - 2, 13)}px; color: #333; font-weight: 900; }
     .receipt-title {
         text-align: center;
         padding: 6px 0;
-        border: ${isBold ? 3 : 1}px ${isBold ? 'solid' : 'dashed'} #111;
+        border: 1px dashed #111;
         border-radius: 4px;
-        background: ${isBold ? '#fff' : '#f5f5f5'};
+        background: #f5f5f5;
         font-size: ${fontSizePx + 1}px;
         font-weight: 800;
     }
@@ -520,7 +603,7 @@ export const generateHtmlFromTemplate = ({
     .meta-block { display: flex; min-width: 0; flex-direction: column; gap: 2px; text-align: ${textAlign}; }
     .meta-center { text-align: center; }
     .meta-end { text-align: ${textAlignEnd}; }
-    .meta-label { font-size: ${Math.max(fontSizePx - 4, 10)}px; color: #666; font-weight: 900; text-transform: uppercase; white-space: nowrap; }
+    .meta-label { font-size: ${Math.max(fontSizePx - 4, 10)}px; color: #444; font-weight: 900; text-transform: uppercase; white-space: nowrap; }
     .meta-value, .meta-time { display: block; font-weight: 900; white-space: nowrap; unicode-bidi: isolate; }
     .type-badge {
         display: inline-block;
@@ -543,7 +626,7 @@ export const generateHtmlFromTemplate = ({
         font-weight: 900;
         text-transform: uppercase;
         color: #777;
-        border-bottom: ${isBold ? 4 : 2}px solid #222;
+        border-bottom: 2px solid #222;
     }
     .items-table td {
         padding: 5px 2px;
@@ -564,6 +647,7 @@ export const generateHtmlFromTemplate = ({
     }
     .item-name { display: block; font-weight: 900; font-size: ${fontSizePx + 2}px; line-height: 1.34; }
     .item-mod, .item-note { font-size: ${Math.max(fontSizePx - 2, 14)}px; color: #222; margin-top: 2px; line-height: 1.32; font-weight: 900; }
+    .item-discount { font-size: ${Math.max(fontSizePx - 2, 14)}px; color: #111; margin-top: 2px; line-height: 1.32; font-weight: 900; }
     .mod-price { color: #999; }
     .summary-row td { padding: 4px 0; font-weight: 900; text-align: ${textAlign}; }
     .summary-row td:last-child { text-align: ${textAlignEnd}; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
@@ -583,9 +667,8 @@ export const generateHtmlFromTemplate = ({
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: ${isCompact ? 6 : 9}px 10px;
+        padding: ${isExpress ? 6 : 9}px 10px;
         border: 3px solid #111;
-        ${isBold ? 'border-width: 5px;' : ''}
         border-radius: 4px;
         background: #fff;
         color: #000;
@@ -607,7 +690,10 @@ export const generateHtmlFromTemplate = ({
         font-size: ${Math.max(fontSizePx - 2, 13)}px;
         font-weight: 900;
         line-height: 1.25;
-        white-space: nowrap;
+        /* Wrap instead of clipping: a clipped half-glyph at the 384px edge
+           rasterizes as garbage marks on thermal printers. */
+        white-space: normal;
+        overflow-wrap: anywhere;
         text-align: center;
         background: #fff;
         color: #111;
@@ -620,7 +706,7 @@ export const generateHtmlFromTemplate = ({
         object-fit: contain;
         image-rendering: pixelated;
     }
-    .qr-text { font-size: ${Math.max(fontSizePx - 3, 11)}px; color: #555; word-break: break-all; font-weight: 800; }
+    .qr-text { font-size: ${Math.max(fontSizePx - 3, 11)}px; color: #333; word-break: break-all; font-weight: 800; }
     .receipt-footer {
         padding-top: 8px;
         padding-bottom: 10px;
@@ -633,36 +719,55 @@ export const generateHtmlFromTemplate = ({
     .dashed-sep { border-top: 1px dashed #bbb; }
     .thick-sep { border-top: 2px solid #222; }
 
-    /* Classic ledger: familiar restaurant receipt with clear ruled sections. */
-    body.receipt-classic .header-block { border-top: 3px double #111; border-bottom: 3px double #111; padding: 8px 0; }
-    body.receipt-classic .receipt-title { border-left: 0; border-right: 0; border-radius: 0; background: #fff; }
-    body.receipt-classic .items-header td { border-top: 1px solid #111; border-bottom: 2px solid #111; }
+    /* ROYAL (default): inverted title band, hero order number, zebra rows,
+       framed total. Striking hierarchy, still calm to read. */
+    body.receipt-royal .header-block { border: 0; padding-bottom: 6px; border-bottom: 2px solid #111; }
+    body.receipt-royal .restaurant-name { font-size: ${fontSizePx + 8}px; letter-spacing: -0.5px; }
+    body.receipt-royal .receipt-title { background: #111; color: #fff; border: 0; border-radius: 0; font-size: ${fontSizePx + 4}px; letter-spacing: 1px; padding: 8px 4px; }
+    body.receipt-royal .order-meta { border: 3px solid #111; border-radius: 4px; padding: 6px 8px; }
+    body.receipt-royal .order-meta .meta-block:first-child .meta-value { font-size: ${fontSizePx + 10}px; line-height: 1.1; }
+    body.receipt-royal .items-header td { color: #111; border-top: 3px solid #111; border-bottom: 3px solid #111; }
+    body.receipt-royal .items-table tr:not(.items-header):nth-child(even) td { background: #eee; }
+    body.receipt-royal .item-name { font-size: ${fontSizePx + 3}px; }
+    body.receipt-royal .summary-table { border-top: 2px solid #111; }
+    body.receipt-royal .grand-total { border-width: 5px; padding: 10px; }
+    body.receipt-royal .receipt-footer { border-top: 3px double #111; }
+    body.receipt-royal .payment-pill { border-width: 2.5px; border-radius: 8px; }
 
-    /* Counter compact: dense, left/right aligned, minimal paper usage. */
-    body.receipt-compact { line-height: 1.22; }
-    body.receipt-compact .logo-block img { max-height: 40px !important; }
-    body.receipt-compact .header-block { text-align: ${textAlign}; border: 0; border-bottom: 1px solid #111; padding: 0 0 4px; }
-    body.receipt-compact .restaurant-name { font-size: ${fontSizePx + 3}px; }
-    body.receipt-compact .branch-info { display: inline; margin-inline-end: 8px; }
-    body.receipt-compact .order-meta { border-top: 1px solid #111; border-bottom: 1px solid #111; padding: 4px 0; }
-    body.receipt-compact .items-table td { padding-top: 3px; padding-bottom: 3px; border-bottom: 0; }
-    body.receipt-compact .items-table tr:not(.items-header):nth-child(even) td { background: #f0f0f0; }
-    body.receipt-compact .summary-table { border-top: 1px solid #111; }
-    body.receipt-compact .grand-total { border-width: 2px; margin-inline: 0; }
-    body.receipt-compact .receipt-footer { border-top: 1px dashed #111; padding-top: 5px; }
+    /* NEO: airy minimal. Hairline dividers, breathing room, soft total card. */
+    body.receipt-neo { line-height: 1.5; }
+    body.receipt-neo .header-block { border: 0; border-bottom: 1px solid #111; padding-bottom: 6px; }
+    body.receipt-neo .restaurant-name { font-size: ${fontSizePx + 5}px; font-weight: 800; }
+    body.receipt-neo .receipt-title { background: #fff; border: 1px solid #111; border-radius: 8px; }
+    body.receipt-neo .order-meta { border: 0; border-bottom: 1px dashed #999; }
+    body.receipt-neo .items-header td { color: #555; border: 0; border-bottom: 1px solid #111; }
+    body.receipt-neo .items-table td { border-bottom: 0; padding: 6px 2px; }
+    body.receipt-neo .items-table tr:not(.items-header) td { border-bottom: 1px dotted #bbb; }
+    body.receipt-neo .grand-total { border-radius: 10px; border-width: 2px; }
+    body.receipt-neo .receipt-footer { border-top: 1px solid #111; }
+    body.receipt-neo .payment-pill { border-radius: 12px; }
 
-    /* Bold ticket: order number and final amount dominate from arm's length. */
-    body.receipt-bold { border: 4px solid #111; padding: 2mm; }
-    body.receipt-bold .header-block { border: 0; padding-bottom: 3px; }
-    body.receipt-bold .restaurant-name { font-size: ${fontSizePx + 10}px; letter-spacing: -0.5px; }
-    body.receipt-bold .receipt-title { background: #111; color: #fff; border: 0; border-radius: 0; font-size: ${fontSizePx + 4}px; }
-    body.receipt-bold .order-meta { align-items: stretch; border: 3px solid #111; padding: 6px; }
-    body.receipt-bold .order-meta .meta-block:first-child .meta-value { font-size: ${fontSizePx + 10}px; line-height: 1; }
-    body.receipt-bold .items-header td { color: #111; border-top: 4px solid #111; border-bottom: 4px solid #111; }
-    body.receipt-bold .item-name { font-size: ${fontSizePx + 4}px; }
-    body.receipt-bold .grand-total { background: #111; color: #fff; border: 0; border-radius: 0; padding: 12px 8px; }
-    body.receipt-bold .grand-total-value { font-size: ${fontSizePx + 8}px; }
-    body.receipt-bold .payment-pill { border: 3px solid #111; border-radius: 0; }
+    /* LEDGER: formal ruled ledger. Double rules, calm sections, tabular figures. */
+    body.receipt-ledger .header-block { border-top: 3px double #111; border-bottom: 3px double #111; padding: 8px 0; }
+    body.receipt-ledger .receipt-title { border-left: 0; border-right: 0; border-radius: 0; background: #fff; border-top: 0; }
+    body.receipt-ledger .order-meta { border-top: 1px solid #111; border-bottom: 1px solid #111; }
+    body.receipt-ledger .items-header td { border-top: 1px solid #111; border-bottom: 2px solid #111; }
+    body.receipt-ledger .summary-table { border-top: 2px solid #111; }
+    body.receipt-ledger .receipt-footer { border-top: 3px double #111; }
+
+    /* EXPRESS: dense paper-saver for rush counters and 58mm rolls. */
+    body.receipt-express { line-height: 1.22; }
+    body.receipt-express .logo-block img { max-height: 44px !important; }
+    body.receipt-express .header-block { text-align: ${textAlign}; border: 0; border-bottom: 2px solid #111; padding: 0 0 4px; }
+    body.receipt-express .restaurant-name { font-size: ${fontSizePx + 3}px; }
+    body.receipt-express .branch-info { display: inline; margin-inline-end: 8px; }
+    body.receipt-express .receipt-title { padding: 4px 0; }
+    body.receipt-express .order-meta { border-top: 2px solid #111; border-bottom: 2px solid #111; padding: 4px 0; }
+    body.receipt-express .items-table td { padding-top: 3px; padding-bottom: 3px; border-bottom: 0; }
+    body.receipt-express .items-table tr:not(.items-header):nth-child(even) td { background: #f0f0f0; }
+    body.receipt-express .summary-table { border-top: 2px solid #111; }
+    body.receipt-express .grand-total { margin-inline: 0; padding: 6px 8px; }
+    body.receipt-express .receipt-footer { border-top: 1px dashed #111; padding-top: 5px; }
 </style>
 </head>
 <body class="receipt-${styleVariant}">${blockHtml}</body>

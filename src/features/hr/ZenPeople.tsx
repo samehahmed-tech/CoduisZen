@@ -144,6 +144,25 @@ const ZenPeople: React.FC = () => {
         setShowEmployeeModal(true);
     };
 
+    const handleDeleteEmployee = async (emp: Employee) => {
+        const ok = await confirm({
+            title: lang === 'ar' ? 'حذف موظف' : 'Delete Employee',
+            message: lang === 'ar'
+                ? `سيتم حذف "${emp.name || emp.id}" من قائمة الموظفين وإغلاق أي جلسة حضور مفتوحة. سجلات الحضور والرواتب والمحاسبة ستبقى محفوظة. هل تريد المتابعة؟`
+                : `Remove "${emp.name || emp.id}" from the employee roster? Any open attendance session will be closed, while attendance, payroll and accounting records stay preserved.`,
+            confirmText: lang === 'ar' ? 'حذف' : 'Delete',
+            variant: 'danger',
+        });
+        if (!ok) return;
+        try {
+            await hrApi.deleteEmployee(emp.id);
+            await fetchEmployees();
+            success(lang === 'ar' ? 'تم حذف الموظف' : 'Employee deleted');
+        } catch (e: any) {
+            showError(e.message);
+        }
+    };
+
     const handleApproveLeave = async (id: string) => {
         await hrExtendedApi.approveLeave(id);
         setLeaveRequests(await hrExtendedApi.getLeaveRequests({}));
@@ -365,6 +384,8 @@ const ZenPeople: React.FC = () => {
                                                         <button onClick={() => clockOut(emp.id)} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 text-[9px] font-black uppercase hover:bg-rose-500/20 transition-colors">Clock Out</button>
                                                     )}
                                                     <button onClick={() => openEditEmployee(emp)} className="p-1.5 text-muted hover:text-indigo-600 transition-all"><Eye size={14} /></button>
+                                                    <button onClick={() => handleDeleteEmployee(emp)} className="p-1.5 text-muted hover:text-rose-500 transition-all" title={lang === 'ar' ? 'حذف الموظف' : 'Delete employee'}><Trash2 size={14} /></button>
+                                                    <button onClick={() => handleDeleteEmployee(emp)} className="p-1.5 text-muted hover:text-rose-600 transition-all" title={lang === 'ar' ? 'حذف الموظف' : 'Delete Employee'}><Trash2 size={14} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -551,7 +572,7 @@ const ZenPeople: React.FC = () => {
                                                     e.stopPropagation();
                                                     const w = window.open('', '_blank', 'width=600,height=800');
                                                     if (!w) return;
-                                                    w.document.write(`<html><head><title>Payslip - ${emp.name || emp.id}</title><style>body{font-family:'Tajawal',system-ui,sans-serif;padding:40px;color:#1e293b}h1,h2{font-family:'Cairo',system-ui,sans-serif}h1{font-size:24px;margin:0}h2{font-size:16px;color:#6366f1;margin:4px 0 24px}.header{border-bottom:3px solid #6366f1;padding-bottom:16px;margin-bottom:24px}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0}.row:last-child{border-bottom:none}.label{color:#64748b;font-size:13px}.value{font-family:'Cairo',system-ui,sans-serif;font-weight:700;font-size:14px}.total{font-family:'Cairo',system-ui,sans-serif;font-size:20px;font-weight:900;color:#6366f1;border-top:3px solid #6366f1;margin-top:16px;padding-top:16px;text-align:right}.footer{margin-top:40px;font-size:11px;color:#94a3b8;text-align:center}@media print{body{padding:20px}}</style></head><body><div class='header'><h1>Coduis Zen ERP</h1><h2>Monthly Payslip</h2></div><div class='row'><span class='label'>Employee</span><span class='value'>${emp.name || emp.id}</span></div><div class='row'><span class='label'>Role</span><span class='value'>${emp.role || 'Staff'}</span></div><div class='row'><span class='label'>National ID</span><span class='value'>${emp.nationalId || '—'}</span></div><div class='row'><span class='label'>Bank Account</span><span class='value'>${emp.bankAccount || '—'}</span></div><div class='row'><span class='label'>Salary Type</span><span class='value'>${emp.salaryType || 'Monthly'}</span></div><div class='row'><span class='label'>Basic Salary</span><span class='value'>${(emp.salary || 0).toLocaleString()} LE</span></div><div class='row'><span class='label'>Social Insurance (11%)</span><span class='value'>-${((emp.salary || 0) * 0.11).toLocaleString()} LE</span></div><div class='row'><span class='label'>Tax Deduction (est.)</span><span class='value'>-${((emp.salary || 0) * 0.05).toLocaleString()} LE</span></div><div class='total'>Net Pay: ${((emp.salary || 0) * 0.84).toLocaleString()} LE</div><div class='footer'>Generated on ${new Date().toLocaleDateString()} · Coduis Zen ERP</div></body></html>`);
+                                                    w.document.write(`<html><head><title>Payslip - ${emp.name || emp.id}</title><style>body{font-family:'Cairo',system-ui,sans-serif;padding:40px;color:#1e293b}h1,h2{font-family:'Cairo',system-ui,sans-serif}h1{font-size:24px;margin:0}h2{font-size:16px;color:#6366f1;margin:4px 0 24px}.header{border-bottom:3px solid #6366f1;padding-bottom:16px;margin-bottom:24px}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0}.row:last-child{border-bottom:none}.label{color:#64748b;font-size:13px}.value{font-family:'Cairo',system-ui,sans-serif;font-weight:700;font-size:14px}.total{font-family:'Cairo',system-ui,sans-serif;font-size:20px;font-weight:900;color:#6366f1;border-top:3px solid #6366f1;margin-top:16px;padding-top:16px;text-align:right}.footer{margin-top:40px;font-size:11px;color:#94a3b8;text-align:center}@media print{body{padding:20px}}</style></head><body><div class='header'><h1>Coduis Zen ERP</h1><h2>Monthly Payslip</h2></div><div class='row'><span class='label'>Employee</span><span class='value'>${emp.name || emp.id}</span></div><div class='row'><span class='label'>Role</span><span class='value'>${emp.role || 'Staff'}</span></div><div class='row'><span class='label'>National ID</span><span class='value'>${emp.nationalId || '—'}</span></div><div class='row'><span class='label'>Bank Account</span><span class='value'>${emp.bankAccount || '—'}</span></div><div class='row'><span class='label'>Salary Type</span><span class='value'>${emp.salaryType || 'Monthly'}</span></div><div class='row'><span class='label'>Basic Salary</span><span class='value'>${(emp.salary || 0).toLocaleString()} LE</span></div><div class='row'><span class='label'>Social Insurance (11%)</span><span class='value'>-${((emp.salary || 0) * 0.11).toLocaleString()} LE</span></div><div class='row'><span class='label'>Tax Deduction (est.)</span><span class='value'>-${((emp.salary || 0) * 0.05).toLocaleString()} LE</span></div><div class='total'>Net Pay: ${((emp.salary || 0) * 0.84).toLocaleString()} LE</div><div class='footer'>Generated on ${new Date().toLocaleDateString()} · Coduis Zen ERP</div></body></html>`);
                                                     w.document.close();
                                                     setTimeout(() => w.print(), 300);
                                                 }}

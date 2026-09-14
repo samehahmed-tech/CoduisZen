@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { isDatabaseUnavailableError } from '../utils/dbErrors';
 
 type ErrorPayload = {
     code: string;
@@ -47,6 +48,26 @@ export const errorContractMiddleware = (req: Request, res: Response, next: NextF
     res.json = ((body?: any) => {
         if (res.statusCode < 400) {
             return originalJson(body);
+        }
+        // ── Restart/update safety net ──
+        // Controllers answer 500 with the raw driver error when the DB pool is
+        // down or draining (hotfix apply, watchdog restart, SQL reconnect).
+        // Surface those as 503 DATABASE_UNAVAILABLE (retryable) instead of 500,
+        // so the frontend retries with backoff instead of failing every widget
+        // at once — and never treats them as session-invalid. Only upgrades
+        // already-failing 500 responses whose error text matches transient DB
+        // signatures; success paths and real 500s are untouched.
+        if (res.statusCode === 500 && isDatabaseUnavailableError({ message: toMessage(body, toCode(body, 500)) })) {
+            res.statusCode = 503;
+            res.setHeader('Retry-After', '5');
+            return originalJson({
+                code: 'DATABASE_UNAVAILABLE',
+                error: 'DATABASE_UNAVAILABLE',
+                message: 'Database is reconnecting. Please retry in a few seconds.',
+                messageAr: 'قاعدة البيانات بتعيد الاتصال. حاول مرة أخرى بعد ثوانٍ.',
+                retryable: true,
+                requestId: req.requestId || 'unknown',
+            });
         }
         const normalized = normalizeErrorPayload(body, res.statusCode, req.requestId || 'unknown');
         return originalJson(normalized);

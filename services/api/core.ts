@@ -49,6 +49,8 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
     const code = String(error?.code || error?.message || '').toUpperCase();
     const fallback = lang === 'ar' ? 'حدث خطأ غير متوقع. حاول مرة أخرى.' : 'Unexpected error. Please try again.';
     const mapAr: Record<string, string> = {
+        DATABASE_UNAVAILABLE: 'السيرفر بيعيد الاتصال بقاعدة البيانات. استنى ثوانٍ وهتتحمل البيانات لوحدها.',
+        REQUEST_TIMEOUT: 'الطلب أخد وقت أطول من اللازم. حاول مرة أخرى.',
         ORDER_BUSINESS_DAY_CLOSED: 'يوم تشغيل هذا الطلب مغلق. الطلب متاح للمراجعة والطباعة فقط.',
         ORDER_HISTORY_READ_ONLY: 'هذا الطلب تابع ليوم تشغيل سابق ومتاح للمراجعة والطباعة فقط.',
         PACKING_HANDOVER_TYPE_INVALID: 'شاشة التسليم مخصصة لطلبات التيك أواي والاستلام والكشك فقط.',
@@ -98,8 +100,21 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
         TOO_MANY_LOGIN_ATTEMPTS: 'محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.',
         UNSUPPORTED_REPORT_EXPORT: 'تصدير CSV/Excel غير متاح لهذا التقرير. استخدم PDF أو الطباعة.',
         VALIDATION_ERROR: 'بعض البيانات غير صحيحة. راجع المدخلات.',
+        ACCOUNT_CODE_AND_NAME_REQUIRED: 'لازم تكتب كود الحساب (3 أرقام على الأقل) واسم الحساب.',
+        ACCOUNT_NAME_REQUIRED: 'اسم الحساب مطلوب.',
+        ACCOUNT_CODE_INVALID: 'كود الحساب لازم يكون أرقام من 3 لـ 12 خانة.',
+        ACCOUNT_TYPE_INVALID: 'نوع الحساب غير صحيح.',
+        ACCOUNT_CODE_ALREADY_EXISTS: 'كود الحساب مستخدم بالفعل لحساب آخر.',
+        ACCOUNT_HAS_CHILDREN_MOVE_OR_DEACTIVATE_CHILDREN_FIRST: 'انقل الحسابات الفرعية أو أرشفها أولًا قبل أرشفة الحساب الرئيسي.',
+        PARENT_ACCOUNT_INACTIVE: 'الحساب الأب مؤرشف. اختر حسابًا نشطًا.',
+        CHART_RESET_CONFIRMATION_REQUIRED: 'اكتب نص التأكيد الصحيح لبدء شجرة جديدة.',
+        ACTIVE_ACCOUNT_REQUIRED_FOR_POSTING_RULE: 'اختر حسابًا نشطًا لقاعدة الترحيل.',
+        ACTIVE_ACCOUNT_REQUIRED_FOR_PAYMENT_MAPPING: 'اختر حسابًا نشطًا لطريقة الدفع.',
+        ACTIVE_ACCOUNT_REQUIRED_FOR_TAX_MAPPING: 'اختر حسابًا نشطًا للحساب الضريبي.',
     };
     const mapEn: Record<string, string> = {
+        DATABASE_UNAVAILABLE: 'The server is reconnecting to the database. Data will load automatically in a few seconds.',
+        REQUEST_TIMEOUT: 'The request took too long. Please retry.',
         ORDER_BUSINESS_DAY_CLOSED: 'This order belongs to a closed business day and is available for review and printing only.',
         ORDER_HISTORY_READ_ONLY: 'This order belongs to a previous business day and is available for review and printing only.',
         PACKING_HANDOVER_TYPE_INVALID: 'Packing handover is only available for takeaway, pickup, and kiosk orders.',
@@ -150,6 +165,17 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
         TOO_MANY_LOGIN_ATTEMPTS: 'Too many attempts. Please wait and retry.',
         UNSUPPORTED_REPORT_EXPORT: 'CSV/Excel export is not available for this report. Use PDF or print.',
         VALIDATION_ERROR: 'Some fields are invalid. Please review your input.',
+        ACCOUNT_CODE_AND_NAME_REQUIRED: 'Account code (at least 3 digits) and account name are required.',
+        ACCOUNT_NAME_REQUIRED: 'Account name is required.',
+        ACCOUNT_CODE_INVALID: 'Account code must be 3 to 12 digits.',
+        ACCOUNT_TYPE_INVALID: 'Invalid account type.',
+        ACCOUNT_CODE_ALREADY_EXISTS: 'This account code is already used by another account.',
+        ACCOUNT_HAS_CHILDREN_MOVE_OR_DEACTIVATE_CHILDREN_FIRST: 'Move or archive the child accounts before archiving this parent account.',
+        PARENT_ACCOUNT_INACTIVE: 'The selected parent account is archived. Choose an active account.',
+        CHART_RESET_CONFIRMATION_REQUIRED: 'Enter the exact confirmation text to start a new chart.',
+        ACTIVE_ACCOUNT_REQUIRED_FOR_POSTING_RULE: 'Choose an active account for this posting rule.',
+        ACTIVE_ACCOUNT_REQUIRED_FOR_PAYMENT_MAPPING: 'Choose an active account for this payment method.',
+        ACTIVE_ACCOUNT_REQUIRED_FOR_TAX_MAPPING: 'Choose an active account for this tax mapping.',
     };
     const mapped = (lang === 'ar' ? mapAr : mapEn)[code];
     if (code === 'VALIDATION_ERROR' && Array.isArray(error?.details) && error.details.length > 0) {
@@ -206,30 +232,82 @@ const canAttemptTokenRefresh = (endpoint: string) => ![
 ].some((path) => endpoint.startsWith(path));
 
 let isRefreshing = false;
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<RefreshOutcome> | null = null;
 
-const tryRefreshToken = async (): Promise<string | null> => {
+// Tiny request cache: absorbs duplicate GETs fired by page mount + shell refresh.
+// Short TTL keeps operational screens fresh; every mutation clears it.
+const GET_CACHE_TTL_MS = 1500;
+const getCache = new Map<string, { expiresAt: number; value: unknown }>();
+const getInflight = new Map<string, Promise<unknown>>();
+export const clearApiCache = () => { getCache.clear(); };
+
+// ── Resilience: the backend can restart/reconnect (DB pool, watchdog).
+// GETs are safe to retry with backoff; mutations are never auto-retried.
+const REQUEST_TIMEOUT_MS = 30_000;
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [600, 1800];
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const isNetworkFailure = (error: any) =>
+    error instanceof TypeError
+    || /failed to fetch|networkerror|load failed|err_connection|econn|etimedout|network request failed/i.test(String(error?.message || error || ''));
+const isRetryableServiceError = (status: number, payload: any) =>
+    RETRYABLE_STATUS.has(status)
+    || String(payload?.code || payload?.error || '').toUpperCase() === 'DATABASE_UNAVAILABLE';
+
+type RefreshOutcome =
+    | { token: string; transient: false }
+    | { token: null; transient: boolean };
+
+// Refresh retry: the backend restarts briefly during hotfix apply / watchdog
+// recovery. A 5xx or network failure here means "server is busy", NOT "session
+// is dead" — so retry a couple of times, and only report a definitive failure
+// (400/401 = bad or revoked token) as session-invalid. Returning transient
+// keeps the cashier logged in; the request fails with a retryable error and
+// the next poll succeeds once the server is back.
+const REFRESH_RETRY_DELAYS_MS = [800, 2000];
+
+const tryRefreshToken = async (): Promise<RefreshOutcome> => {
     if (isRefreshing && refreshPromise) return refreshPromise;
     const refreshToken = getRefreshToken();
-    if (!refreshToken) return null;
+    if (!refreshToken) return { token: null, transient: false };
 
     isRefreshing = true;
     refreshPromise = (async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken }),
-            });
-            if (!response.ok) return null;
-            const data = await response.json();
-            if (data.token) {
-                setAuthToken(data.token);
-                return data.token as string;
+            for (let attempt = 0; ; attempt += 1) {
+                let response: Response;
+                try {
+                    response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refreshToken }),
+                    });
+                } catch (error) {
+                    if (attempt < REFRESH_RETRY_DELAYS_MS.length && isNetworkFailure(error)) {
+                        await sleep(REFRESH_RETRY_DELAYS_MS[attempt]);
+                        continue;
+                    }
+                    return { token: null, transient: true };
+                }
+                if (response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    if (data?.token) {
+                        setAuthToken(data.token);
+                        return { token: data.token as string, transient: false };
+                    }
+                    return { token: null, transient: false };
+                }
+                // Definitive: the token itself is missing/invalid/expired/revoked.
+                if (response.status === 400 || response.status === 401) {
+                    return { token: null, transient: false };
+                }
+                // Transient (5xx while restarting, 429, ...): back off and retry.
+                if (attempt < REFRESH_RETRY_DELAYS_MS.length) {
+                    await sleep(REFRESH_RETRY_DELAYS_MS[attempt]);
+                    continue;
+                }
+                return { token: null, transient: true };
             }
-            return null;
-        } catch {
-            return null;
         } finally {
             isRefreshing = false;
             refreshPromise = null;
@@ -244,6 +322,17 @@ export async function apiRequest<T>(
     options: RequestInit = {},
 ): Promise<T> {
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+    const method = String(options.method || 'GET').toUpperCase();
+    const cacheable = method === 'GET' && options.cache !== 'no-store';
+    const cacheKey = `${url}|${getAuthToken() || ''}`;
+    if (cacheable) {
+        const cached = getCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) return cached.value as T;
+        const pending = getInflight.get(cacheKey);
+        if (pending) return pending as Promise<T>;
+    } else if (method !== 'GET') {
+        clearApiCache();
+    }
 
     const authToken = getAuthToken();
     const config: RequestInit = {
@@ -255,15 +344,48 @@ export async function apiRequest<T>(
         },
     };
 
-    try {
-        const response = await fetch(url, config);
+    const requestPromise = (async () => {
+      const attemptRequest = async (attempt: number): Promise<T> => {
+      const timedOut = { value: false };
+      const timeoutController = new AbortController();
+      const callerSignal = (options as any)?.signal as AbortSignal | undefined;
+      const timer = setTimeout(() => { timedOut.value = true; timeoutController.abort(); }, REQUEST_TIMEOUT_MS);
+      if (callerSignal) {
+          if (callerSignal.aborted) timeoutController.abort();
+          else callerSignal.addEventListener('abort', () => timeoutController.abort(), { once: true });
+      }
+      try {
+        let response = await fetch(url, { ...config, signal: timeoutController.signal });
+
+        // A 304 carries no body — parsing it as JSON throws and wipes live
+        // lists (mail inbox, badges). Re-request with no-cache so the server
+        // must answer 200 with a real body instead of revalidating.
+        if (response.status === 304 && method === 'GET') {
+            const fresh = await fetch(url, {
+                ...config,
+                cache: 'no-store',
+                headers: {
+                    ...(config.headers as Record<string, string>),
+                    'Cache-Control': 'no-cache',
+                    Pragma: 'no-cache',
+                },
+            });
+            if (fresh.ok && fresh.status !== 304) {
+                response = fresh;
+            } else {
+                const cached = getCache.get(cacheKey);
+                if (cached && cached.expiresAt > Date.now()) return cached.value as T;
+                throw toAppApiError({ code: 'HTTP_304', message: 'Not modified' }, 304, endpoint);
+            }
+        }
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({ code: `HTTP_${response.status}`, message: 'Request failed' }));
 
             if (response.status === 401 && canAttemptTokenRefresh(endpoint)) {
-                const newToken = await tryRefreshToken();
-                if (newToken) {
+                const outcome = await tryRefreshToken();
+                if (outcome.token) {
+                    const newToken = outcome.token;
                     const retryResponse = await fetch(url, {
                         ...options,
                         headers: {
@@ -273,10 +395,36 @@ export async function apiRequest<T>(
                         },
                     });
                     if (retryResponse.ok) {
-                        return await retryResponse.json();
+                        const retryValue = await retryResponse.json();
+                        if (cacheable) getCache.set(cacheKey, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value: retryValue });
+                        return retryValue as T;
                     }
+                    // Refresh worked but retry still failed: only treat a
+                    // second 401 as session-invalid. Any other status (403/500/...)
+                    // must NOT log the cashier out mid-shift.
+                    if (retryResponse.status !== 401) {
+                        const retryError = await retryResponse.json().catch(() => ({ code: `HTTP_${retryResponse.status}`, message: 'Request failed' }));
+                        throw toAppApiError(retryError, retryResponse.status, endpoint);
+                    }
+                } else if (outcome.transient) {
+                    // Refresh failed because the server is restarting / busy
+                    // (5xx, timeout, connection reset) — the session itself is
+                    // NOT proven invalid. Keep tokens, fail retryably, and let
+                    // the next poll succeed. Never log out here.
+                    throw toAppApiError(
+                        { code: 'DATABASE_UNAVAILABLE', message: 'Server is restarting. Please retry in a few seconds.' },
+                        503,
+                        endpoint,
+                    );
                 }
                 handleUnauthorizedToken(endpoint);
+            }
+
+            // Backend restarting / DB reconnecting: back off and retry GETs
+            // instead of failing every widget on the screen at once.
+            if (method === 'GET' && attempt < RETRY_DELAYS_MS.length && isRetryableServiceError(response.status, error)) {
+                await sleep(RETRY_DELAYS_MS[attempt]);
+                return attemptRequest(attempt + 1);
             }
 
             const err = toAppApiError(error, response.status, endpoint);
@@ -289,10 +437,44 @@ export async function apiRequest<T>(
             throw err;
         }
 
-        return await response.json();
-    } catch (error: any) {
+        const value = await response.json();
+        if (cacheable) getCache.set(cacheKey, { expiresAt: Date.now() + GET_CACHE_TTL_MS, value });
+        return value as T;
+      } catch (error: any) {
+        // Aborted searches (typing fast in POS customer box) are normal —
+        // never surface them and never trigger logout flows.
+        if (error?.name === 'AbortError' || (options as any)?.signal?.aborted) {
+            if (timedOut.value && !(options as any)?.signal?.aborted) {
+                throw toAppApiError({ code: 'REQUEST_TIMEOUT', message: 'Request timed out. Please retry.' }, 408, endpoint);
+            }
+            const abortErr = new Error('Aborted') as AppApiError;
+            abortErr.name = 'AbortError';
+            abortErr.silent = true;
+            abortErr.endpoint = endpoint;
+            throw abortErr;
+        }
+        // Offline / connection refused / reset while the server restarts:
+        // retry GETs with backoff. Mutations are never auto-retried.
+        if (method === 'GET' && attempt < RETRY_DELAYS_MS.length && isNetworkFailure(error)) {
+            await sleep(RETRY_DELAYS_MS[attempt]);
+            return attemptRequest(attempt + 1);
+        }
         throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+      };
+      try {
+        return await attemptRequest(0);
+      } catch (error: any) {
+        throw error;
+      }
+    })();
+    if (cacheable) {
+        getInflight.set(cacheKey, requestPromise);
+        requestPromise.finally(() => getInflight.delete(cacheKey)).catch(() => {});
     }
+    return requestPromise;
 }
 
 export async function apiRequestBlob(

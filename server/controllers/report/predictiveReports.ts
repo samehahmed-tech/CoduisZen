@@ -415,11 +415,14 @@ export const getChannelMixTrend = async (req: Request, res: Response) => {
 
         const daily = await db.select({
             day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
-            source: orders.source,
+            // Channel key: a non-restaurant delivery_source (talabat, elmenus…)
+            // identifies the aggregator; otherwise the origin (pos, call_center).
+            // Both POS and call-center platform orders share this convention.
+            source: sql<string>`case when ${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant' then ${orders.deliverySource} else coalesce(${orders.source}, 'pos') end`,
             count: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`, orders.source)
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`, sql`case when ${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant' then ${orders.deliverySource} else coalesce(${orders.source}, 'pos') end`)
             .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
         res.json(daily.map(d => ({ day: d.day, source: d.source || 'pos', count: Number(d.count), revenue: Number(Number(d.revenue).toFixed(2)) })));
@@ -433,7 +436,7 @@ export const getOptimalPricing = async (_req: Request, res: Response) => {
             name: menuItems.name,
             price: menuItems.price,
             cost: menuItems.cost,
-        }).from(menuItems).where(sql`${menuItems.isAvailable} = true`);
+        }).from(menuItems).where(eq(menuItems.isAvailable, true));
 
         const result = items.map(item => {
             const price = Number(item.price) || 0;
@@ -457,16 +460,22 @@ export const getThirdPartyVsInHouse = async (req: Request, res: Response) => {
         const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), eq(orders.type, 'DELIVERY'), inArray(orders.status, ['DELIVERED', 'COMPLETED'])];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
+        // Split by WHO delivers (deliverySource), not by driver assignment:
+        // in-house = restaurant/own fleet, third-party = aggregator platform.
+        // (Driver-based split mislabels own-driver platform orders and
+        // unassigned in-house ones.)
+        const inHouseCond = and(...conditions, sql`(${orders.deliverySource} is null or ${orders.deliverySource} = 'restaurant')`);
+        const thirdPartyCond = and(...conditions, sql`(${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant')`);
         const inHouse = await db.select({
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgDeliveryMinutes: sql<number>`coalesce(avg(datediff(second, ${orders.createdAt}, ${orders.completedAt}) / 60.0), 0)`,
-        }).from(orders).where(and(...conditions, sql`${orders.driverId} is not null`));
+        }).from(orders).where(inHouseCond);
 
         const thirdParty = await db.select({
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
-        }).from(orders).where(and(...conditions, sql`${orders.driverId} is null`));
+        }).from(orders).where(thirdPartyCond);
 
         res.json({
             inHouse: { orderCount: Number(inHouse[0]?.orderCount || 0), revenue: Number(Number(inHouse[0]?.revenue || 0).toFixed(2)), avgDeliveryMinutes: Number(Number(inHouse[0]?.avgDeliveryMinutes || 0).toFixed(1)) },

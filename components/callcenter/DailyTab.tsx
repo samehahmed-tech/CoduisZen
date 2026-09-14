@@ -139,6 +139,7 @@ export const DailyTab = ({ state }: any) => {
                                                 <th>{lang === 'ar' ? 'مبيعات' : 'Revenue'}</th>
                                                 <th>{lang === 'ar' ? 'تم التوصيل' : 'Delivered'}</th>
                                                 <th>{lang === 'ar' ? 'ملغية' : 'Cancelled'}</th>
+                                                <th title={lang === 'ar' ? 'متوسط زمن المعالجة للدقائق' : 'Avg handle time, minutes'}>{lang === 'ar' ? 'متوسط الزمن' : 'Avg time'}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -151,6 +152,7 @@ export const DailyTab = ({ state }: any) => {
                                                         <td className="text-emerald-600 font-bold">{fmtMoney(a.revenue)}</td>
                                                         <td className="text-blue-600 font-bold">{fmt(a.delivered)}</td>
                                                         <td className="text-red-600 font-bold">{fmt(a.cancelled)}</td>
+                                                        <td className="font-bold">{fmtMins(Math.round(Number(a.avgAhtMinutes || 0)))}</td>
                                                     </tr>
                                                 );
                                             })}

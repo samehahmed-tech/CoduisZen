@@ -10,8 +10,10 @@ import {
   ModifierGroup, ModifierOption, ItemSize, PlatformPrice
 } from "../../types";
 import ImageUploader from "../common/ImageUploader";
+import { ItemImage } from "../../src/features/pos/components/ItemImage";
 import { barcodeApi } from "../../services/api/barcode";
 import { useToast } from "../common/ToastProvider";
+import { calculateModifierRecipeCost, calculateRecipeCost, getRecipeIngredients } from "../../utils/menuCost";
 
 type DrawerTab = "BASIC" | "SIZES" | "MODIFIERS" | "RECIPE" | "PRICING" | "PLATFORMS" | "SCHEDULE" | "PRINTERS" | "HISTORY";
 
@@ -113,84 +115,125 @@ export const ItemDrawer: React.FC<Props> = ({
   const updateModGroup = (id: string, c: Partial<ModifierGroup>) => update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === id ? { ...g, ...c } : g) });
   const removeModGroup = (id: string) => update({ modifierGroups: (item.modifierGroups || []).filter(g => g.id !== id) });
   
-  const addModOption = (gId: string) => update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? { ...g, options: [...g.options, { id: `opt-${Date.now()}`, name: "", price: 0 }] } : g) });
+  const addModOption = (gId: string) => update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? { ...g, options: [...g.options, { id: `opt-${Date.now()}`, name: "", price: 0, recipeEffect: "ADD", recipe: [] }] } : g) });
   const updateModOption = (gId: string, oId: string, c: Partial<ModifierOption>) => update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? { ...g, options: g.options.map(o => o.id === oId ? { ...o, ...c } : o) } : g) });
   const removeModOption = (gId: string, oId: string) => update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? { ...g, options: g.options.filter(o => o.id !== oId) } : g) });
+  const addModOptionRecipe = (gId: string, oId: string) => {
+    const first = inventory[0];
+    if (!first) return;
+    update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? {
+      ...g,
+      options: g.options.map(o => o.id === oId ? {
+        ...o,
+        recipeEffect: o.recipeEffect || "ADD",
+        recipe: [...(o.recipe || []), { itemId: first.id, inventoryItemId: first.id, quantity: 0.001, unit: String(first.unit) }]
+      } : o)
+    } : g) });
+  };
+  const updateModOptionRecipe = (gId: string, oId: string, index: number, changes: any) => {
+    update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? {
+      ...g,
+      options: g.options.map(o => o.id === oId ? {
+        ...o,
+        recipe: (o.recipe || []).map((r: any, i: number) => i === index ? { ...r, ...changes } : r)
+      } : o)
+    } : g) });
+  };
+  const removeModOptionRecipe = (gId: string, oId: string, index: number) => {
+    update({ modifierGroups: (item.modifierGroups || []).map(g => g.id === gId ? {
+      ...g,
+      options: g.options.map(o => o.id === oId ? { ...o, recipe: (o.recipe || []).filter((_, i) => i !== index) } : o)
+    } : g) });
+  };
 
-  const addRecipeIngredient = () => {
-    const quantity = Number(recipeIngredientQty);
-    if (!recipeIngredientId || !Number.isFinite(quantity) || quantity < 0.001) return;
-    const inv = inventory.find(i => i.id === recipeIngredientId);
-    if (!inv) return;
-    
-    const recipes = Array.isArray(item.recipe) ? item.recipe : [];
-    const isNewFormat = recipes.length > 0 && recipes[0].ingredients;
-    
-    if (isNewFormat) {
-      const updatedRecipes = [...recipes];
-      let targetRecipeIndex = updatedRecipes.findIndex(r => r.sizeId === selectedRecipeSizeId);
-      
-      if (targetRecipeIndex === -1) {
-        updatedRecipes.push({ sizeId: selectedRecipeSizeId, ingredients: [] });
-        targetRecipeIndex = updatedRecipes.length - 1;
-      }
-      
-      const ingredients = [...updatedRecipes[targetRecipeIndex].ingredients];
-      const foundIdx = ingredients.findIndex(r => (r.itemId || r.inventoryItemId) === recipeIngredientId);
-      
-      if (foundIdx >= 0) {
-        ingredients[foundIdx] = { ...ingredients[foundIdx], quantity: ingredients[foundIdx].quantity + quantity };
-      } else {
-        ingredients.push({ itemId: recipeIngredientId, inventoryItemId: recipeIngredientId, quantity, unit: String(inv.unit) });
-      }
-      
-      updatedRecipes[targetRecipeIndex].ingredients = ingredients;
-      update({ recipe: updatedRecipes });
-    } else {
-      // Legacy flat format - convert to new format if size is selected, or keep flat if not
-      if (selectedRecipeSizeId) {
-        update({ recipe: [{ sizeId: selectedRecipeSizeId, ingredients: [{ itemId: recipeIngredientId, quantity, unit: String(inv.unit) }] }] });
-      } else {
-        const found = recipes.find(r => r.itemId === recipeIngredientId);
-        if (found) {
-          update({ recipe: recipes.map(r => r.itemId === recipeIngredientId ? { ...r, quantity: r.quantity + quantity } : r) });
-        } else {
-          update({ recipe: [...recipes, { itemId: recipeIngredientId, quantity, unit: String(inv.unit) }] });
+    const addRecipeIngredient = () => {
+        const quantity = Number(recipeIngredientQty);
+        if (!recipeIngredientId || !Number.isFinite(quantity) || quantity < 0.001) return;
+        const inv = inventory.find(i => i.id === recipeIngredientId);
+        if (!inv) return;
+        
+        const recipes = Array.isArray(item.recipe) ? item.recipe : [];
+        const isNewFormat = recipes.length > 0 && recipes[0]?.ingredients;
+        
+        // Normalize to size-keyed entries, keeping any legacy flat list as the base recipe.
+        const normalize = (): { sizeId: string | null; ingredients: any[] }[] =>
+            isNewFormat
+                ? recipes.map((r: any) => ({ ...r, ingredients: [...r.ingredients] }))
+                : [{ sizeId: null, ingredients: recipes.filter((r: any) => !r.ingredients) }];
+        
+        const updatedRecipes = normalize();
+        let targetIndex = updatedRecipes.findIndex(r => r.sizeId === selectedRecipeSizeId);
+        
+        // No dedicated entry for this size yet? Start from the base BOM.
+        if (targetIndex === -1) {
+            const baseIndex = updatedRecipes.findIndex(r => !r.sizeId);
+            updatedRecipes.push({ sizeId: selectedRecipeSizeId, ingredients: baseIndex >= 0 ? [...updatedRecipes[baseIndex].ingredients] : [] });
+            targetIndex = updatedRecipes.length - 1;
         }
-      }
-    }
-    
-    setRecipeIngredientId("");
-    setRecipeIngredientSearch("");
-    setRecipeSearchOpen(false);
-    setRecipeIngredientQty('');
-  };
+        
+        const ingredients = [...updatedRecipes[targetIndex].ingredients];
+        const foundIdx = ingredients.findIndex((r: any) => (r.itemId || r.inventoryItemId) === recipeIngredientId);
+        
+        if (foundIdx >= 0) {
+            ingredients[foundIdx] = { ...ingredients[foundIdx], quantity };
+        } else {
+            ingredients.push({ itemId: recipeIngredientId, inventoryItemId: recipeIngredientId, quantity, unit: String(inv.unit) });
+        }
+        
+        updatedRecipes[targetIndex].ingredients = ingredients;
+        update({ recipe: updatedRecipes });
+        
+        setRecipeIngredientId("");
+        setRecipeIngredientSearch("");
+        setRecipeSearchOpen(false);
+        setRecipeIngredientQty('');
+    };
 
-  const removeRecipeIngredient = (id: string) => {
-    const recipes = Array.isArray(item.recipe) ? item.recipe : [];
-    const isNewFormat = recipes.length > 0 && recipes[0].ingredients;
-    
-    if (isNewFormat) {
-      update({ 
-        recipe: recipes.map(r => r.sizeId === selectedRecipeSizeId 
-          ? { ...r, ingredients: r.ingredients.filter((i: any) => (i.itemId || i.inventoryItemId) !== id) } 
-          : r) 
-      });
-    } else {
-      update({ recipe: recipes.filter(r => r.itemId !== id) });
-    }
-  };
+    const removeRecipeIngredient = (id: string) => {
+        const recipes = Array.isArray(item.recipe) ? item.recipe : [];
+        const isNewFormat = recipes.length > 0 && recipes[0]?.ingredients;
+        
+        const updatedRecipes = isNewFormat
+            ? recipes.map((r: any) => ({ ...r, ingredients: [...r.ingredients] }))
+            : [{ sizeId: null as string | null, ingredients: recipes.filter((r: any) => !r.ingredients) }];
+        
+        let targetIndex = updatedRecipes.findIndex(r => r.sizeId === selectedRecipeSizeId);
+        if (targetIndex === -1) {
+            // Inherited view: clone the base entry for this size, minus the removed ingredient.
+            const baseIndex = updatedRecipes.findIndex(r => !r.sizeId);
+            updatedRecipes.push({
+                sizeId: selectedRecipeSizeId,
+                ingredients: (baseIndex >= 0 ? [...updatedRecipes[baseIndex].ingredients] : [])
+                    .filter((i: any) => (i.itemId || i.inventoryItemId) !== id),
+            });
+        } else {
+            updatedRecipes[targetIndex].ingredients = updatedRecipes[targetIndex].ingredients
+                .filter((i: any) => (i.itemId || i.inventoryItemId) !== id);
+        }
+        update({ recipe: updatedRecipes });
+    };
 
-  const activeRecipeIngredients = () => {
-    const recipes = Array.isArray(item.recipe) ? item.recipe : [];
-    const isNewFormat = recipes.length > 0 && recipes[0].ingredients;
-    
-    if (isNewFormat) {
-      return recipes.find(r => r.sizeId === selectedRecipeSizeId)?.ingredients || [];
-    }
-    // Only show flat recipe if no size is selected or if we are in legacy mode
-    return selectedRecipeSizeId ? [] : recipes;
-  };
+    const activeRecipeIngredients = () => getRecipeIngredients(item.recipe, selectedRecipeSizeId);
+
+    const updateIngredientQuantity = (ingredientId: string, quantity: number) => {
+        const recipes = Array.isArray(item.recipe) ? item.recipe : [];
+        const isNewFormat = recipes.length > 0 && recipes[0]?.ingredients;
+        
+        const updatedRecipes = isNewFormat
+            ? recipes.map((r: any) => ({ ...r, ingredients: [...r.ingredients] }))
+            : [{ sizeId: null as string | null, ingredients: recipes.filter((r: any) => !r.ingredients) }];
+        
+        let targetIndex = updatedRecipes.findIndex(r => r.sizeId === selectedRecipeSizeId);
+        if (targetIndex === -1) {
+            const baseIndex = updatedRecipes.findIndex(r => !r.sizeId);
+            updatedRecipes.push({ sizeId: selectedRecipeSizeId, ingredients: baseIndex >= 0 ? [...updatedRecipes[baseIndex].ingredients] : [] });
+            targetIndex = updatedRecipes.length - 1;
+        }
+        updatedRecipes[targetIndex].ingredients = updatedRecipes[targetIndex].ingredients.map((i: any) =>
+            (i.itemId || i.inventoryItemId) === ingredientId ? { ...i, quantity } : i
+        );
+        update({ recipe: updatedRecipes });
+    };
 
   const toggleBadge = (id: string) => update({ dietaryBadges: item.dietaryBadges?.includes(id) ? item.dietaryBadges.filter(b => b !== id) : [...(item.dietaryBadges || []), id] });
   const toggleDay = (id: string) => update({ availableDays: item.availableDays?.includes(id) ? item.availableDays.filter(d => d !== id) : [...(item.availableDays || []), id] });
@@ -208,10 +251,8 @@ export const ItemDrawer: React.FC<Props> = ({
     }
   };
 
-  const recipeCost = activeRecipeIngredients().reduce((sum: number, r: any) => {
-    const inv = inventory.find(i => i.id === (r.itemId || r.inventoryItemId));
-    return sum + (inv ? inv.costPrice * r.quantity : 0);
-  }, 0);
+  const inventoryCosts = useMemo(() => new Map(inventory.map(inv => [inv.id, Number(inv.costPrice || 0)])), [inventory]);
+  const recipeCost = calculateRecipeCost(item.recipe, inventoryCosts, selectedRecipeSizeId);
 
   const tabs: { id: DrawerTab; icon: React.ElementType; en: string; ar: string }[] = [
     { id: "BASIC", icon: LayoutGrid, en: "Identity", ar: "الهوية العامة" },
@@ -329,14 +370,8 @@ export const ItemDrawer: React.FC<Props> = ({
                     <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-3 text-center">
                        {lang === 'ar' ? 'معاينة العميل' : 'Customer Preview'}
                     </p>
-                    <div className="aspect-[4/3] rounded-xl bg-card overflow-hidden relative border border-border/30">
-                        {item.image ? (
-                           <img src={item.image} className="w-full h-full object-cover" alt="Preview"/>
-                        ) : (
-                           <div className="absolute inset-0 flex items-center justify-center flex-col text-muted/30">
-                              <ImageIcon size={32} />
-                           </div>
-                        )}
+                     <div className="aspect-[4/3] rounded-xl bg-card overflow-hidden relative border border-border/30">
+                          <ItemImage src={item.image} name={item.name || ''} />
                         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
                            <p className="text-white font-black text-sm truncate">{item.name || "Product Name"}</p>
                            <p className="text-emerald-400 font-bold text-xs mt-0.5">{currency} {item.price || 0}</p>
@@ -364,10 +399,18 @@ export const ItemDrawer: React.FC<Props> = ({
                                 <label className={subLabelCls}>{lang === "ar" ? "الاسم التجاري" : "Display Name"}</label>
                                 <input type="text" value={item.name} onChange={e => update({ name: e.target.value })} className={`${inputCls} !text-sm h-11 uppercase`} placeholder="e.g. Classic Burger" />
                              </div>
-                             <div>
-                                <label className={subLabelCls}>{lang === "ar" ? "الاسم العربي" : "Arabic Name"}</label>
-                                <input type="text" value={item.nameAr || ""} onChange={e => update({ nameAr: e.target.value })} className={`${inputCls} !text-sm h-11 font-sans`} placeholder="مثال: برجر كلاسيك" dir="rtl" />
-                             </div>
+                              <div>
+                                 <label className={subLabelCls}>{lang === "ar" ? "الاسم العربي" : "Arabic Name"}</label>
+                                 <input type="text" value={item.nameAr || ""} onChange={e => update({ nameAr: e.target.value })} className={`${inputCls} !text-sm h-11 font-sans`} placeholder="مثال: برجر كلاسيك" dir="rtl" />
+                              </div>
+                              <div>
+                                 <label className={subLabelCls}>{lang === "ar" ? "وصف الصنف (يظهر عند قلب الكارت)" : "Description (shown on card flip)"}</label>
+                                 <textarea value={item.description || ""} onChange={e => update({ description: e.target.value })} className={`${inputCls} !text-sm min-h-[76px] py-3`} placeholder="e.g. Grilled daily, house spices…" dir="ltr" rows={3} maxLength={2000} />
+                              </div>
+                              <div>
+                                 <label className={subLabelCls}>{lang === "ar" ? "الوصف بالعربي" : "Arabic Description"}</label>
+                                 <textarea value={item.descriptionAr || ""} onChange={e => update({ descriptionAr: e.target.value })} className={`${inputCls} !text-sm min-h-[76px] py-3 font-sans`} placeholder="مثال: مشوي يومياً بخلطة البيت…" dir="rtl" rows={3} maxLength={2000} />
+                              </div>
                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                    <label className={subLabelCls}>SKU Code</label>
@@ -494,8 +537,8 @@ export const ItemDrawer: React.FC<Props> = ({
                               </div>
                               <div>
                                  <label className={subLabelCls}>{lang === 'ar' ? 'التكلفة (مربوطة بالريسبي)' : 'Cost (From Recipe)'}</label>
-                                 <div className={`${inputCls} h-10 bg-amber-500/5 !border-amber-500/20 text-amber-500 font-bold flex items-center justify-center text-sm cursor-not-allowed opacity-80`} title="Calculated from exact recipe costs">
-                                    {currency} {recipeCost.toFixed(2)}
+                              <div className={`${inputCls} h-10 bg-amber-500/5 !border-amber-500/20 text-amber-500 font-bold flex items-center justify-center text-sm cursor-not-allowed opacity-80`} title="Calculated from exact recipe costs">
+                                   {currency} {calculateRecipeCost(item.recipe, inventoryCosts, size.id).toFixed(2)}
                                  </div>
                               </div>
                            </div>
@@ -558,16 +601,80 @@ export const ItemDrawer: React.FC<Props> = ({
                              
                              <div className="p-4 sm:p-6 space-y-3 bg-card/10">
                                 {group.options.map((opt) => (
-                                   <div key={opt.id} className="flex flex-col sm:flex-row items-center gap-3 bg-elevated/50 p-2 pl-4 pr-2 rounded-2xl border border-border/30">
+                                   <div key={opt.id} className="bg-elevated/50 p-3 sm:p-4 rounded-2xl border border-border/30 space-y-3">
                                       <input type="text" value={opt.name} onChange={e => updateModOption(group.id, opt.id, { name: e.target.value })} className="flex-1 bg-transparent border-none text-sm font-bold text-main w-full focus:ring-0" placeholder="Option Name" />
                                       <div className="flex items-center gap-3 w-full sm:w-auto">
+                                         <select
+                                           value={opt.recipeEffect || 'ADD'}
+                                           onChange={e => updateModOption(group.id, opt.id, { recipeEffect: e.target.value === 'REMOVE' ? 'REMOVE' : 'ADD' })}
+                                           className="h-10 rounded-xl border border-border/40 bg-card px-3 text-[10px] font-black text-main outline-none focus:border-primary"
+                                           title={lang === 'ar' ? 'تأثير الاختيار على الوصفة' : 'Recipe effect'}
+                                         >
+                                           <option value="ADD">{lang === 'ar' ? 'يزود الريسبي' : 'Adds recipe'}</option>
+                                           <option value="REMOVE">{lang === 'ar' ? 'يشيل من الريسبي' : 'Removes recipe'}</option>
+                                         </select>
                                          <div className="relative">
                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-emerald-500/50">+</span>
                                            <input type="number" value={opt.price} onChange={e => updateModOption(group.id, opt.id, { price: parseFloat(e.target.value) || 0 })} className="w-28 h-10 pl-8 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-center font-black text-emerald-500 focus:outline-none" />
                                          </div>
+                                         <span className="text-[10px] font-black text-amber-500 whitespace-nowrap">
+                                           {lang === 'ar' ? 'تكلفة الريسبي' : 'Recipe cost'}: {currency} {calculateModifierRecipeCost(opt, inventoryCosts, selectedRecipeSizeId).toFixed(2)}
+                                         </span>
                                          <button onClick={() => removeModOption(group.id, opt.id)} className="w-10 h-10 flex items-center justify-center bg-rose-500/5 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all">
                                             <Minus size={14} />
                                          </button>
+                                      </div>
+                                      <div className="rounded-2xl border border-dashed border-border/40 bg-card/35 p-3 space-y-2">
+                                         <div className="flex items-center justify-between gap-3">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-muted">
+                                              {lang === 'ar' ? 'تأثير المخزون والتكلفة' : 'Inventory & Cost Effect'}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => addModOptionRecipe(group.id, opt.id)}
+                                              disabled={inventory.length === 0}
+                                              className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[10px] font-black disabled:opacity-50 flex items-center gap-1"
+                                            >
+                                              <Plus size={12} /> {lang === 'ar' ? 'مكون' : 'Ingredient'}
+                                            </button>
+                                         </div>
+                                         {(opt.recipe || []).length === 0 && (
+                                            <p className="text-[10px] font-bold text-muted">
+                                              {lang === 'ar' ? 'اتركها فاضية لو الاختيار سعر فقط. أضف مكونات لو الاختيار يؤثر على المخزون أو التكلفة.' : 'Leave empty for price-only choices. Add ingredients when this choice changes stock or cost.'}
+                                            </p>
+                                         )}
+                                         {(opt.recipe || []).map((ri: any, index: number) => {
+                                            const selectedInv = inventory.find(inv => inv.id === (ri.itemId || ri.inventoryItemId));
+                                            return (
+                                              <div key={`${opt.id}-ri-${index}`} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_72px_36px] gap-2 items-center">
+                                                <select
+                                                  value={ri.itemId || ri.inventoryItemId || ''}
+                                                  onChange={e => {
+                                                    const inv = inventory.find(item => item.id === e.target.value);
+                                                    updateModOptionRecipe(group.id, opt.id, index, { itemId: e.target.value, inventoryItemId: e.target.value, unit: String(inv?.unit || ri.unit || '') });
+                                                  }}
+                                                  className="h-10 rounded-xl border border-border/40 bg-app px-3 text-xs font-bold text-main outline-none focus:border-primary"
+                                                >
+                                                  {inventory.map(inv => <option key={inv.id} value={inv.id}>{lang === 'ar' ? inv.nameAr || inv.name : inv.name}</option>)}
+                                                </select>
+                                                <input
+                                                  type="number"
+                                                  min="0.001"
+                                                  step="0.001"
+                                                  value={ri.quantity || ''}
+                                                  onChange={e => updateModOptionRecipe(group.id, opt.id, index, { quantity: parseFloat(e.target.value) || 0 })}
+                                                  className="h-10 rounded-xl border border-border/40 bg-app px-3 text-xs font-black text-main outline-none focus:border-primary"
+                                                  placeholder="0.000"
+                                                />
+                                                <div className="h-10 rounded-xl border border-border/30 bg-elevated/40 px-3 flex items-center text-[10px] font-black text-muted">
+                                                  {selectedInv?.unit || ri.unit || '-'}
+                                                </div>
+                                                <button type="button" onClick={() => removeModOptionRecipe(group.id, opt.id, index)} className="h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white">
+                                                  <Trash2 size={14} />
+                                                </button>
+                                              </div>
+                                            );
+                                         })}
                                       </div>
                                    </div>
                                 ))}
@@ -712,18 +819,7 @@ export const ItemDrawer: React.FC<Props> = ({
                                           e.currentTarget.value = String(ri.quantity);
                                           return;
                                         }
-                                        const recipes = Array.isArray(item.recipe) ? item.recipe : [];
-                                        const isNewFormat = recipes.length > 0 && recipes[0].ingredients;
-                                        
-                                        if (isNewFormat) {
-                                          update({ 
-                                            recipe: recipes.map(r => r.sizeId === selectedRecipeSizeId 
-                                              ? { ...r, ingredients: r.ingredients.map((i: any) => (i.itemId || i.inventoryItemId) === ingredientId ? { ...i, quantity: val } : i) } 
-                                              : r) 
-                                          });
-                                        } else {
-                                          update({ recipe: recipes.map(r => r.itemId === ingredientId ? { ...r, quantity: val } : r) });
-                                        }
+                                        updateIngredientQuantity(ingredientId, val);
                                       }} 
                                       className="w-20 h-10 bg-card border border-border/50 text-center font-bold text-main rounded-xl focus:border-primary outline-none" 
                                     />
@@ -759,31 +855,65 @@ export const ItemDrawer: React.FC<Props> = ({
                           </div>
                         )}
                         {branches.map(branch => {
-                          const bp = item.branchPricing?.find(b => b.branchId === branch.id) || { branchId: branch.id, price: item.price };
+                          const branchEntries = (item.branchPricing || []).filter((b: any) => b.branchId === branch.id);
+                          const bp = branchEntries.find((b: any) => !b.channel) || { branchId: branch.id, price: item.price };
+                          const channelPrice = (ch: string) => branchEntries.find((b: any) => String(b.channel || '').toUpperCase() === ch)?.price ?? '';
+                          const setBranchPrice = (channel: string | undefined, raw: string) => {
+                            const val = parseFloat(raw);
+                            const current = item.branchPricing || [];
+                            const match = (b: any) => b.branchId === branch.id && String(b.channel || '').toUpperCase() === String(channel || '').toUpperCase();
+                            if (raw.trim() === '' || !Number.isFinite(val)) {
+                              // Clearing a channel override removes it (falls back to general price)
+                              update({ branchPricing: current.filter(b => !match(b)) });
+                              return;
+                            }
+                            const entry = channel ? { branchId: branch.id, channel, price: val } : { branchId: branch.id, price: val };
+                            update({
+                              branchPricing: current.some(match)
+                                ? current.map(b => match(b) ? { ...b, price: val } : b)
+                                : [...current, entry],
+                            });
+                          };
                           return (
-                            <div key={branch.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-elevated/40 border border-border/30 hover:border-primary/20 transition-colors">
+                            <div key={branch.id} className="flex flex-col gap-4 p-4 sm:p-5 rounded-2xl bg-elevated/40 border border-border/30 hover:border-primary/20 transition-colors">
+                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                               <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center font-black text-main">
                                    {branch.name.charAt(0)}
                                 </div>
-                                <h4 className="font-bold text-main text-sm">{branch.name}</h4>
+                                <div>
+                                  <h4 className="font-bold text-main text-sm">{branch.name}</h4>
+                                  <p className="text-[10px] font-bold text-muted">{lang === 'ar' ? 'عام + حسب القناة (فارغ = العام)' : 'General + per channel (empty = general)'}</p>
+                                </div>
                               </div>
                               <div className="w-full sm:w-40 relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary font-bold">{currency}</span>
-                                <input 
+                                <input
                                   type="number"
                                   value={bp.price}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    const current = item.branchPricing || [];
-                                    const updated = current.some(b => b.branchId === branch.id) 
-                                      ? current.map(b => b.branchId === branch.id ? { ...b, price: val } : b)
-                                      : [...current, { branchId: branch.id, price: val }];
-                                    update({ branchPricing: updated });
-                                  }}
+                                  onChange={e => setBranchPrice(undefined, e.target.value)}
                                   className={`${inputCls} !pl-10 h-11 !bg-card text-center font-black shadow-inner`}
                                 />
                               </div>
+                             </div>
+                             <div className="grid grid-cols-3 gap-3">
+                               {[
+                                 { id: 'DINE_IN', label: lang === 'ar' ? 'صالة' : 'Dine-in' },
+                                 { id: 'TAKEAWAY', label: lang === 'ar' ? 'تيك أواي' : 'Takeaway' },
+                                 { id: 'DELIVERY', label: lang === 'ar' ? 'دليفري' : 'Delivery' },
+                               ].map(ch => (
+                                 <div key={ch.id}>
+                                   <label className="block text-[9px] font-black uppercase tracking-widest text-muted mb-1 text-center">{ch.label}</label>
+                                   <input
+                                     type="number"
+                                     value={channelPrice(ch.id)}
+                                     placeholder={String(bp.price ?? '')}
+                                     onChange={e => setBranchPrice(ch.id, e.target.value)}
+                                     className={`${inputCls} h-10 !bg-card text-center font-bold text-sm shadow-inner`}
+                                   />
+                                 </div>
+                               ))}
+                             </div>
                             </div>
                           )
                         })}

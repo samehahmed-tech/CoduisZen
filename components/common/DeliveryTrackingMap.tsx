@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bike, MapPin, Navigation, Package, Search, Truck } from 'lucide-react';
-import { canUseGoogleMaps, defaultMapCenter, loadGoogleMaps, nominatimUrl, useOsmMaps } from './googleMaps';
-import { addOsmTileLayer, createLeafletIcon, loadLeaflet } from './leafletMaps';
+import { Bike, MapPin, Navigation, Package, Search, Truck, LocateFixed, RefreshCw } from 'lucide-react';
+import { defaultMapCenter, loadGoogleMaps, nominatimUrl, resetGoogleMapsLoader, shouldUseGoogleMaps, shouldUseOsmMaps } from './googleMaps';
+import { fetchOsrmRoute } from './mapRouting';
+import { addOsmTileLayer, createLeafletIcon, loadLeaflet, resetLeafletLoader } from './leafletMaps';
 
 export type DeliveryMapDriver = {
     id: string;
@@ -10,6 +11,7 @@ export type DeliveryMapDriver = {
     lat?: number;
     lng?: number;
     speedKmh?: number;
+    accuracyM?: number;
     lastSeenLabel?: string;
 };
 
@@ -33,6 +35,8 @@ type DeliveryTrackingMapProps = {
     heightClass?: string;
     showSearch?: boolean;
     selectedOrderId?: string;
+    /** Optional road route overlay (driver -> destination), drawn via free OSRM in OSM mode. */
+    route?: { from: { lat: number; lng: number }; to: { lat: number; lng: number } } | null;
 };
 
 const isValidPoint = (lat?: number, lng?: number) =>
@@ -66,7 +70,10 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     heightClass = 'min-h-[360px]',
     showSearch = true,
     selectedOrderId,
+    route = null,
 }) => {
+    const useGoogle = shouldUseGoogleMaps();
+    const useOsm = shouldUseOsmMaps();
     const isAr = lang === 'ar';
     const mapNodeRef = useRef<HTMLDivElement | null>(null);
     const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -79,13 +86,36 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     const [osmReady, setOsmReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [osmSearch, setOsmSearch] = useState('');
+    const [routePoints, setRoutePoints] = useState<Array<[number, number]>>([]);
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const [loadingMap, setLoadingMap] = useState(true);
+    const fittedOnceRef = useRef(false);
+    const followRef = useRef(true);
+
+    useEffect(() => {
+        let active = true;
+        if (!route || !isValidPoint(route.from.lat, route.from.lng) || !isValidPoint(route.to.lat, route.to.lng)) {
+            setRoutePoints([]);
+            return;
+        }
+        fetchOsrmRoute(route.from, route.to).then((r) => {
+            if (active) setRoutePoints(r && r.points.length > 1 ? r.points : []);
+        });
+        return () => { active = false; };
+    }, [route?.from.lat, route?.from.lng, route?.to.lat, route?.to.lng]);
 
     const validDrivers = useMemo(() => drivers.filter(driver => isValidPoint(driver.lat, driver.lng)), [drivers]);
     const validOrders = useMemo(() => orders.filter(order => isValidPoint(order.lat, order.lng)), [orders]);
 
     useEffect(() => {
-        if (!canUseGoogleMaps) return;
+        if (!useGoogle) return;
         let disposed = false;
+        // Reuse the existing map instance on retry (same DOM node).
+        if (mapRef.current && mapNodeRef.current) {
+            setReady(true);
+            return;
+        }
+        setReady(false);
 
         loadGoogleMaps()
             .then((google) => {
@@ -126,27 +156,43 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             markersRef.current.forEach(marker => marker.setMap(null));
             markersRef.current = [];
         };
-    }, []);
+    }, [loadAttempt]);
 
     useEffect(() => {
-        if (!useOsmMaps) return;
+        if (!useOsm) return;
         let disposed = false;
+        setLoadingMap(true);
+        setError(null);
+        setOsmReady(false);
         loadLeaflet()
             .then((L) => {
-                if (disposed || !mapNodeRef.current || leafletMapRef.current) return;
-                const map = L.map(mapNodeRef.current, { zoomControl: true }).setView([center.lat, center.lng], 13);
-                addOsmTileLayer(L, map);
-                leafletMapRef.current = map;
+                if (disposed || !mapNodeRef.current) return;
+                if (!leafletMapRef.current) {
+                    const map = L.map(mapNodeRef.current, { zoomControl: true }).setView([center.lat, center.lng], 13);
+                    addOsmTileLayer(L, map);
+                    map.on('dragstart', () => { followRef.current = false; });
+                    leafletMapRef.current = map;
+                }
                 setOsmReady(true);
-                setTimeout(() => map.invalidateSize(), 50);
+                setLoadingMap(false);
+                setTimeout(() => leafletMapRef.current?.invalidateSize(), 50);
             })
-            .catch(() => setError('OSM_LOAD_FAILED'));
+            .catch(() => {
+                if (!disposed) {
+                    setError('OSM_LOAD_FAILED');
+                    setLoadingMap(false);
+                }
+            });
         return () => {
             disposed = true;
             leafletMarkersRef.current.forEach(marker => marker.remove());
             leafletMarkersRef.current = [];
+            try { leafletMapRef.current?.remove(); } catch { /* already gone */ }
+            leafletMapRef.current = null;
+            fittedOnceRef.current = false;
+            followRef.current = true;
         };
-    }, []);
+    }, [loadAttempt]);
 
     useEffect(() => {
         if (!ready || !mapRef.current || !window.google?.maps) return;
@@ -180,6 +226,19 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             marker.addListener('click', () => info.open({ anchor: marker, map: mapRef.current }));
             markersRef.current.push(marker);
             bounds.extend(position);
+            if (Number.isFinite(driver.accuracyM) && driver.accuracyM! > 0) {
+                const circle = new google.maps.Circle({
+                    center: position,
+                    radius: Math.min(driver.accuracyM!, 500),
+                    strokeColor: getDriverColor(driver.status),
+                    strokeWeight: 1,
+                    strokeOpacity: 0.6,
+                    fillColor: getDriverColor(driver.status),
+                    fillOpacity: 0.12,
+                    map: mapRef.current,
+                });
+                markersRef.current.push(circle);
+            }
         });
 
         validOrders.forEach((order) => {
@@ -201,10 +260,22 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             bounds.extend(position);
         });
 
+        if (routePoints.length > 1) {
+            const line = new google.maps.Polyline({
+                path: routePoints.map(([lat, lng]) => ({ lat, lng })),
+                strokeColor: '#4f46e5',
+                strokeWeight: 5,
+                strokeOpacity: 0.85,
+                map: mapRef.current,
+            });
+            markersRef.current.push(line);
+            routePoints.forEach(([lat, lng]) => bounds.extend({ lat, lng }));
+        }
+
         const pointCount = 1 + validDrivers.length + validOrders.length;
         if (pointCount > 1) mapRef.current.fitBounds(bounds, 72);
         else mapRef.current.setCenter(center);
-    }, [ready, center.lat, center.lng, validDrivers, validOrders, selectedOrderId, isAr]);
+    }, [ready, center.lat, center.lng, validDrivers, validOrders, selectedOrderId, isAr, routePoints]);
 
     useEffect(() => {
         if (!osmReady || !leafletMapRef.current || !window.L) return;
@@ -225,6 +296,16 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                 .bindPopup(`<b>${driver.name}</b><br/>${driver.status || ''}<br/>${driver.speedKmh ? Math.round(driver.speedKmh) + ' km/h' : driver.lastSeenLabel || ''}`);
             leafletMarkersRef.current.push(marker);
             points.push([driver.lat!, driver.lng!]);
+            if (Number.isFinite(driver.accuracyM) && driver.accuracyM! > 0) {
+                const circle = L.circle([driver.lat!, driver.lng!], {
+                    radius: Math.min(driver.accuracyM!, 500),
+                    color: getDriverColor(driver.status),
+                    weight: 1,
+                    opacity: 0.6,
+                    fillOpacity: 0.12,
+                }).addTo(leafletMapRef.current);
+                leafletMarkersRef.current.push(circle);
+            }
         });
 
         validOrders.forEach((order) => {
@@ -235,14 +316,43 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             points.push([order.lat!, order.lng!]);
         });
 
-        if (points.length > 1) leafletMapRef.current.fitBounds(points, { padding: [40, 40] });
-        else leafletMapRef.current.setView([center.lat, center.lng], 13);
-    }, [osmReady, center.lat, center.lng, validDrivers, validOrders, selectedOrderId, isAr]);
+        if (routePoints.length > 1) {
+            const line = L.polyline(routePoints, { color: '#4f46e5', weight: 5, opacity: 0.85 }).addTo(leafletMapRef.current);
+            leafletMarkersRef.current.push(line);
+            routePoints.forEach((p) => points.push(p));
+        }
+
+        if (points.length > 1 && (!fittedOnceRef.current || followRef.current)) {
+            leafletMapRef.current.fitBounds(points, { padding: [40, 40] });
+            fittedOnceRef.current = true;
+        } else if (points.length <= 1 && !fittedOnceRef.current) {
+            leafletMapRef.current.setView([center.lat, center.lng], 13);
+            fittedOnceRef.current = true;
+        }
+    }, [osmReady, center.lat, center.lng, validDrivers, validOrders, selectedOrderId, isAr, routePoints]);
+
+    const recenter = () => {
+        followRef.current = true;
+        if (!leafletMapRef.current) return;
+        const pts: Array<[number, number]> = [[center.lat, center.lng]];
+        validDrivers.forEach((d) => { if (isValidPoint(d.lat, d.lng)) pts.push([d.lat!, d.lng!]); });
+        validOrders.forEach((o) => { if (isValidPoint(o.lat, o.lng)) pts.push([o.lat!, o.lng!]); });
+        routePoints.forEach((p) => pts.push(p));
+        if (pts.length > 1) leafletMapRef.current.fitBounds(pts, { padding: [40, 40] });
+        else leafletMapRef.current.setView([center.lat, center.lng], 14);
+    };
+
+    const retryLoad = () => {
+        resetLeafletLoader();
+        resetGoogleMapsLoader();
+        setError(null);
+        setLoadAttempt((n) => n + 1);
+    };
 
     const searchOsm = () => {
         const q = osmSearch.trim();
         if (!q || !leafletMapRef.current) return;
-        fetch(`${nominatimUrl}/search?format=json&limit=1&q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } })
+        fetch(`${nominatimUrl}/search?format=jsonv2&limit=1&countrycodes=eg&q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } })
             .then(res => res.json())
             .then((rows) => {
                 const first = Array.isArray(rows) ? rows[0] : null;
@@ -286,7 +396,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                         {subtitle || (isAr ? 'خريطة فعلية للطيارين وأماكن أوردرات الدليفري.' : 'Real map for drivers and delivery orders.')}
                     </p>
                 </div>
-                {showSearch && canUseGoogleMaps && (
+                {showSearch && useGoogle && (
                     <div className="relative w-full md:w-72">
                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
                         <input
@@ -296,7 +406,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                         />
                     </div>
                 )}
-                {showSearch && useOsmMaps && (
+                {showSearch && useOsm && (
                     <div className="relative flex w-full gap-2 md:w-80">
                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
                         <input
@@ -318,7 +428,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                 )}
             </div>
 
-            {canUseGoogleMaps && !error ? (
+            {useGoogle && !error ? (
                 <>
                     <div ref={mapNodeRef} className="absolute inset-0 z-0" />
                     {!ready && (
@@ -327,15 +437,42 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                         </div>
                     )}
                 </>
-            ) : useOsmMaps && !error ? (
+            ) : useOsm && !error ? (
                 <>
                     <div ref={mapNodeRef} className="absolute inset-0 z-0" />
-                    {!osmReady && (
+                    {loadingMap && (
                         <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/80 text-xs font-black text-muted backdrop-blur-sm">
                             {isAr ? 'جاري تحميل خريطة OpenStreetMap...' : 'Loading OpenStreetMap...'}
                         </div>
                     )}
+                    {osmReady && (
+                        <button
+                            type="button"
+                            onClick={recenter}
+                            className="absolute right-3 top-20 z-30 flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card/95 text-main shadow-lg backdrop-blur transition-transform active:scale-95"
+                            title={isAr ? 'توسيط على موقعي' : 'Center on me'}
+                        >
+                            <LocateFixed size={17} />
+                        </button>
+                    )}
                 </>
+            ) : error ? (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-card/95 p-6 text-center backdrop-blur-sm">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
+                        <MapPin size={24} />
+                    </div>
+                    <p className="max-w-xs text-xs font-black leading-6 text-main">
+                        {isAr ? 'تعذر تحميل الخريطة. تحقق من الإنترنت ثم حاول مجدداً.' : 'Map failed to load. Check your connection and retry.'}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={retryLoad}
+                        className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-black text-white shadow-lg transition-transform active:scale-95"
+                    >
+                        <RefreshCw size={14} />
+                        {isAr ? 'إعادة تحميل الخريطة' : 'Reload map'}
+                    </button>
+                </div>
             ) : (
                 <div className="absolute inset-0">
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.16)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.16)_1px,transparent_1px)] bg-[size:32px_32px]" />

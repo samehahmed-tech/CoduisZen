@@ -1,10 +1,32 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { roles, permissionDefinitions } from '../../src/db/schema';
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, or } from 'drizzle-orm';
 import { AppPermission, UserRole, INITIAL_ROLE_PERMISSIONS } from '../../types';
 
 const param = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
+
+// roles.permissions is nvarchar — the driver returns a string (JSON array or comma-joined).
+// Always normalize to a string[] before using array methods (.some/.includes/.map).
+const parsePerms = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) return parsed.filter((v): v is string => typeof v === 'string');
+            } catch { /* fall through to comma split */ }
+        }
+        return trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+};
+
+const serializePerms = (perms: unknown): string => JSON.stringify(parsePerms(perms));
+
+const mapRoleResponse = (r: any) => r ? { ...r, permissions: parsePerms(r.permissions) } : r;
 
 const PERMISSION_METADATA: { key: AppPermission; name: string; nameAr: string; category: string; categoryAr: string }[] = [
     { key: AppPermission.NAV_DASHBOARD, name: 'Dashboard', nameAr: 'لوحة التحكم', category: 'navigation', categoryAr: 'التنقل' },
@@ -80,12 +102,12 @@ async function migrateBuiltInRolePermissions() {
     for (const role of existingRoles) {
         const defaultPerms = INITIAL_ROLE_PERMISSIONS[role.name as UserRole];
         if (defaultPerms && defaultPerms.length > 0) {
-            const currentPerms = role.permissions && isAppPermission(role.permissions) ? role.permissions : [];
+            const currentPerms = parsePerms(role.permissions);
             const mergedPerms = Array.from(new Set([...currentPerms, ...defaultPerms]));
             const hasAllDefaults = defaultPerms.every((permission) => currentPerms.includes(permission));
-            if (!role.permissions || !isAppPermission(role.permissions) || !hasAllDefaults) {
+            if (!role.permissions || !isAppPermission(currentPerms) || !hasAllDefaults) {
                 await db.update(roles)
-                    .set({ permissions: mergedPerms as string[], updatedAt: new Date() })
+                    .set({ permissions: serializePerms(mergedPerms), updatedAt: new Date() })
                     .where(eq(roles.id, role.id));
             }
         }
@@ -113,7 +135,8 @@ async function migrateBuiltInRolePermissions() {
 }
 
 async function ensurePermissionDefinitions() {
-        const existing = await db.select({ key: permissionDefinitions.key }).top(1).from(permissionDefinitions);
+    // NOTE: mssql dialect uses .top(n) chained BEFORE .from() — .limit() does not exist here
+    const existing = await db.select({ key: permissionDefinitions.key }).top(1).from(permissionDefinitions);
     if (existing.length > 0) return;
     for (const perm of PERMISSION_METADATA) {
         await db.insert(permissionDefinitions).values({
@@ -134,7 +157,7 @@ export const getAllRoles = async (req: Request, res: Response) => {
         await ensurePermissionDefinitions();
         await migrateBuiltInRolePermissions();
         const allRoles = await db.select().from(roles).where(eq(roles.isActive, true)).orderBy(roles.priority);
-        res.json(allRoles);
+        res.json(allRoles.map(mapRoleResponse));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -144,9 +167,18 @@ export const getRole = async (req: Request, res: Response) => {
     try {
         const id = param(req.params.id);
         if (!id) return res.status(400).json({ error: 'ROLE_ID_REQUIRED' });
-        const [role] = await db.select().from(roles).where(eq(roles.id, id));
-        if (!role) return res.status(404).json({ error: 'ROLE_NOT_FOUND' });
-        res.json(role);
+        let [role] = await db.select().from(roles).where(or(eq(roles.id, id), eq(roles.name, id)));
+        if (!role) {
+            // auto-seed built-in role on read to eliminate ROLE_NOT_FOUND for direct GETs
+            const upper = String(id).toUpperCase().trim();
+            const isBuiltIn = (Object.values(UserRole) as string[]).includes(upper);
+            if (isBuiltIn) {
+                await migrateBuiltInRolePermissions();
+                [role] = await db.select().from(roles).where(or(eq(roles.id, id), eq(roles.name, upper)));
+            }
+            if (!role) return res.status(404).json({ error: 'ROLE_NOT_FOUND' });
+        }
+        res.json(mapRoleResponse(role));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -156,40 +188,105 @@ export const createRole = async (req: Request, res: Response) => {
     try {
         const { id, name, nameAr, permissions, color, icon, isSystem } = req.body;
         if (!id || !name) return res.status(400).json({ error: 'ROLE_ID_AND_NAME_REQUIRED' });
-        const [existing] = await db.select().from(roles).where(eq(roles.id, id));
+        const [existing] = await db.select().from(roles).where(or(eq(roles.id, id), eq(roles.name, name)));
         if (existing) return res.status(409).json({ error: 'ROLE_ALREADY_EXISTS' });
-        const [created] = await db.insert(roles).output().values({
+        try {
+            // NOTE: mssql dialect uses .output() (no .returning()); output() chains BEFORE .values() on insert
+            const [created] = await db.insert(roles).output().values({
             id,
             name,
             nameAr: nameAr || name,
-            permissions: permissions || [],
-            isSystem: isSystem ?? false,
-            isActive: true,
-            priority: 0,
-            color: color || '#6366f1',
-            icon: icon || 'user',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        });
-
-        res.status(201).json(created);
+            permissions: serializePerms(permissions || []),
+                isSystem: isSystem ?? false,
+                isActive: true,
+                priority: 0,
+                color: color || '#6366f1',
+                icon: icon || 'user',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            });
+            if (created) return res.status(201).json(mapRoleResponse(created));
+            const [fetched] = await db.select().from(roles).where(eq(roles.id, id));
+            return res.status(201).json(mapRoleResponse(fetched));
+        } catch (e: any) {
+            const msg = String(e?.message || e?.cause?.message || '');
+            const isDup = msg.includes('uq_roles_name') || msg.includes('uq_roles') || msg.includes('Violation of UNIQUE KEY') || String(e?.code) === '2627' || String(e?.code) === '23505';
+            if (isDup) return res.status(409).json({ error: 'ROLE_ALREADY_EXISTS', details: msg });
+            throw e;
+        }
     } catch (error: any) {
+        const msg = String(error?.message || error?.cause?.message || '');
+        const isDup = msg.includes('uq_roles_name') || msg.includes('Violation of UNIQUE KEY');
+        if (isDup && !String(error?.message).includes('ROLE_ALREADY_EXISTS')) {
+            return res.status(409).json({ error: 'ROLE_ALREADY_EXISTS', details: msg });
+        }
         res.status(500).json({ error: error.message });
     }
 };
 
 export const updateRole = async (req: Request, res: Response) => {
     try {
-        const id = param(req.params.id);
-        if (!id) return res.status(400).json({ error: 'ROLE_ID_REQUIRED' });
+        const rawId = param(req.params.id);
+        if (!rawId) return res.status(400).json({ error: 'ROLE_ID_REQUIRED' });
         const { name, nameAr, permissions, isActive, color, icon, priority } = req.body;
-        const [existing] = await db.select().from(roles).where(eq(roles.id, id));
-        if (!existing) return res.status(404).json({ error: 'ROLE_NOT_FOUND' });
+        let [existing] = await db.select().from(roles).where(or(eq(roles.id, rawId), eq(roles.name, rawId)));
+        if (!existing) {
+            // Auto-create missing role on update (fixes ROLE_NOT_FOUND for any role, built-in or custom)
+            const rawUpper = String(rawId).toUpperCase().trim();
+            const isBuiltIn = (Object.values(UserRole) as string[]).includes(rawUpper);
+            const defaultPerms = isBuiltIn ? (INITIAL_ROLE_PERMISSIONS[rawUpper as UserRole] || []) : [];
+            const normName = isBuiltIn ? rawUpper : String(rawId).trim();
+            const normId = normName.startsWith('role_') ? normName : `role_${normName.toLowerCase().replace(/\s+/g, '_')}`;
+            // avoid duplicate id/name — handle race / stale cache that caused uq_roles_name violation (CASHIER)
+            const [byNormId] = await db.select().from(roles).where(eq(roles.id, normId));
+            if (byNormId) {
+                existing = byNormId;
+            } else {
+                const [byNormName] = await db.select().from(roles).where(eq(roles.name, normName));
+                if (byNormName) {
+                    existing = byNormName;
+                } else {
+                    try {
+                        const [created] = await db.insert(roles).output().values({
+                            id: normId,
+                            name: normName,
+                            nameAr: nameAr || normName,
+                            permissions: serializePerms(permissions !== undefined ? permissions : defaultPerms),
+                            isSystem: isBuiltIn,
+                            isActive: true,
+                            priority: rawUpper === UserRole.SUPER_ADMIN ? 100 : 50,
+                            color: color || '#6366f1',
+                            icon: icon || 'user',
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                        });
+                        if (created) return res.json(mapRoleResponse(created));
+                        const [fetched] = await db.select().from(roles).where(eq(roles.id, normId));
+                        if (fetched) return res.json(mapRoleResponse(fetched));
+                        const [byName] = await db.select().from(roles).where(eq(roles.name, normName));
+                        if (byName) return res.json(mapRoleResponse(byName));
+                        return res.status(500).json({ error: 'ROLE_CREATE_FAILED' });
+                    } catch (e: any) {
+                        const msg = String(e?.message || e?.cause?.message || '');
+                        const isDup = msg.includes('uq_roles_name') || msg.includes('Violation of UNIQUE KEY') || String(e?.code) === '23505';
+                        if (isDup) {
+                            const [dupByName] = await db.select().from(roles).where(eq(roles.name, normName));
+                            if (dupByName) { existing = dupByName; }
+                            else {
+                                const [dupById] = await db.select().from(roles).where(eq(roles.id, normId));
+                                if (dupById) existing = dupById;
+                                else return res.status(409).json({ error: 'ROLE_ALREADY_EXISTS', details: msg });
+                            }
+                        } else throw e;
+                    }
+                }
+            }
+        }
         const [updated] = await db.update(roles)
             .set({
                 ...(name !== undefined && { name }),
                 ...(nameAr !== undefined && { nameAr }),
-                ...(permissions !== undefined && { permissions }),
+                ...(permissions !== undefined && { permissions: serializePerms(permissions) }),
                 ...(isActive !== undefined && { isActive }),
                 ...(color !== undefined && { color }),
                 ...(icon !== undefined && { icon }),
@@ -197,8 +294,10 @@ export const updateRole = async (req: Request, res: Response) => {
                 updatedAt: new Date(),
             })
             .output()
-            .where(eq(roles.id, id));
-        res.json(updated);
+            .where(eq(roles.id, existing.id));
+        if (updated) return res.json(mapRoleResponse(updated));
+        const [fetched] = await db.select().from(roles).where(eq(roles.id, existing.id));
+        res.json(mapRoleResponse(fetched));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -206,12 +305,12 @@ export const updateRole = async (req: Request, res: Response) => {
 
 export const deleteRole = async (req: Request, res: Response) => {
     try {
-        const id = param(req.params.id);
-        if (!id) return res.status(400).json({ error: 'ROLE_ID_REQUIRED' });
-        const [role] = await db.select().from(roles).where(eq(roles.id, id));
+        const rawId = param(req.params.id);
+        if (!rawId) return res.status(400).json({ error: 'ROLE_ID_REQUIRED' });
+        const [role] = await db.select().from(roles).where(or(eq(roles.id, rawId), eq(roles.name, rawId)));
         if (!role) return res.status(404).json({ error: 'ROLE_NOT_FOUND' });
         if (role.isSystem) return res.status(403).json({ error: 'CANNOT_DELETE_SYSTEM_ROLE' });
-        await db.delete(roles).where(eq(roles.id, id));
+        await db.delete(roles).where(eq(roles.id, role.id));
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

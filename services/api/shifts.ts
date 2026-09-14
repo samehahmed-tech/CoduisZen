@@ -3,6 +3,8 @@ import { apiRequest } from './core';
 export const shiftsApi = {
     getActive: (branchId: string) =>
         apiRequest<any>(`/shifts/active?branchId=${encodeURIComponent(branchId)}`),
+    getOpenShifts: (branchId: string) =>
+        apiRequest<any[]>(`/shifts/open-shifts?branchId=${encodeURIComponent(branchId)}`),
     getXReport: (shiftId: string, branchId?: string) => {
         const query = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
         return apiRequest<any>(`/shifts/${shiftId}/x-report${query}`);

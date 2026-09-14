@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useTransition } from 'react';
 import { ChevronDown, GitBranch, MapPin } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -20,6 +20,12 @@ const BranchContextSwitcher: React.FC<BranchContextSwitcherProps> = ({ variant =
     );
 
     const lang = (language || 'en') as 'en' | 'ar';
+    // Branch switches retrigger menu/tables/shift fetches + big re-renders —
+    // keep the select itself responsive by transitioning the store update.
+    const [, startBranchTransition] = useTransition();
+    const handleBranchChange = (branchId: string) => {
+        startBranchTransition(() => setActiveBranch(branchId));
+    };
     const isRtl = lang === 'ar';
     const displayBranchName = (branch?: { name?: string; nameAr?: string | null }) => {
         if (!branch) return '';
@@ -75,7 +81,7 @@ const BranchContextSwitcher: React.FC<BranchContextSwitcherProps> = ({ variant =
                     <select
                         id="sidebar-branch-switcher"
                         value={selectedValue}
-                        onChange={(event) => setActiveBranch(event.target.value)}
+                        onChange={(event) => handleBranchChange(event.target.value)}
                         disabled={!canSwitch}
                         className="sidebar-select pe-8"
                     >
@@ -109,7 +115,7 @@ const BranchContextSwitcher: React.FC<BranchContextSwitcherProps> = ({ variant =
                         <select
                             id="pos-branch-switcher"
                             value={selectedValue}
-                            onChange={(event) => setActiveBranch(event.target.value)}
+                            onChange={(event) => handleBranchChange(event.target.value)}
                             className="h-8 w-full truncate rounded-lg border border-border/20 bg-elevated/45 py-0 ps-8 pe-7 text-[11px] font-black text-main outline-none appearance-none cursor-pointer transition-colors hover:bg-elevated/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
                         >
                             {branchOptions.map((branch) => (
@@ -140,8 +146,8 @@ const BranchContextSwitcher: React.FC<BranchContextSwitcherProps> = ({ variant =
                     <select
                         id="topbar-branch-switcher"
                         value={selectedValue}
-                        onChange={(event) => setActiveBranch(event.target.value)}
-                        className="h-full min-w-0 flex-1 truncate bg-transparent py-0 ps-0 pe-5 text-[11px] font-black text-main outline-none appearance-none cursor-pointer"
+                            onChange={(event) => handleBranchChange(event.target.value)}
+                            className="h-full min-w-0 flex-1 truncate bg-transparent py-0 ps-0 pe-5 text-[11px] font-black text-main outline-none appearance-none cursor-pointer"
                     >
                         {branchOptions.map((branch) => (
                             <option key={branch.id} value={branch.id}>

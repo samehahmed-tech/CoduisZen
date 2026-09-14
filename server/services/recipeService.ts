@@ -6,6 +6,7 @@ import { db } from '../db';
 import { recipes, recipeVersions, recipeIngredients, inventoryItems, menuItems } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { canConvertUnits } from './unitConversion';
 
 export const recipeService = {
     /**
@@ -46,14 +47,14 @@ export const recipeService = {
         const newVersion = (recipe.version || 0) + 1;
         const versionId = nanoid();
 
-        // Insert version record
+        // Insert version record (nvarchar column — must store JSON, never a raw array)
         await db.insert(recipeVersions).values({
             id: versionId,
             recipeId,
             version: newVersion,
             yield: recipe.yield,
             instructions: recipe.instructions,
-            ingredientsSnapshot,
+            ingredientsSnapshot: JSON.stringify(ingredientsSnapshot),
             calculatedCost,
             changedBy: userId,
             changeReason,
@@ -219,8 +220,10 @@ export const recipeService = {
             if (ing.cost === null || ing.cost === 0) {
                 warnings.push(`Item ${ing.itemName} has zero or null cost`);
             }
-            if (ing.unit !== ing.inventoryItemUnit) {
-                warnings.push(`Unit mismatch for ${ing.itemName}: ingredient uses ${ing.unit}, inventory uses ${ing.inventoryItemUnit}`);
+            if (ing.unit !== ing.inventoryItemUnit && !canConvertUnits(ing.unit, ing.inventoryItemUnit)) {
+                errors.push(`Incompatible units for ${ing.itemName}: recipe uses ${ing.unit}, inventory uses ${ing.inventoryItemUnit}`);
+            } else if (ing.unit !== ing.inventoryItemUnit) {
+                warnings.push(`Unit will be converted for ${ing.itemName}: recipe ${ing.unit} -> inventory ${ing.inventoryItemUnit}`);
             }
         }
 

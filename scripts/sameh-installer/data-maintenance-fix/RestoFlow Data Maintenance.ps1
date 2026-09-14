@@ -52,14 +52,15 @@ Write-Host '2) Delete stock-count sessions and lines'
 Write-Host '3) Delete the full menu, recipes, and modifiers'
 Write-Host '4) Delete sales, payments, shifts, and related day-close reports'
 Write-Host '5) Delete all inventory item definitions and their dependent inventory data'
+Write-Host '6) Start a new inventory cycle: delete old movements, ledger, batches, and reset current quantities (keeps items, warehouses, recipes, and menu)'
 Write-Host '0) Exit without changes'
 $selection = (Read-Host 'Example: 1,2').Trim()
 if ($selection -eq '0') { Write-Host 'Cancelled. Nothing changed.'; exit 0 }
 
-$actionMap = @{ '1' = 'stock'; '2' = 'counts'; '3' = 'menu'; '4' = 'sales'; '5' = 'inventory-items' }
+$actionMap = @{ '1' = 'stock'; '2' = 'counts'; '3' = 'menu'; '4' = 'sales'; '5' = 'inventory-items'; '6' = 'inventory-cycle' }
 $selectedNumbers = @($selection -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($selectedNumbers.Count -eq 0 -or @($selectedNumbers | Where-Object { -not $actionMap.ContainsKey($_) }).Count -gt 0) {
-    throw 'Invalid selection. Use only 1,2,3,4,5 separated by commas.'
+    throw 'Invalid selection. Use only 1,2,3,4,5,6 separated by commas.'
 }
 $actions = @($selectedNumbers | ForEach-Object { $actionMap[$_] } | Select-Object -Unique)
 $actionsCsv = $actions -join ','
@@ -70,8 +71,9 @@ $inspection = $inspectionText | ConvertFrom-Json
 Write-Host "`nPreview:" -ForegroundColor Yellow
 $inspection.preview | ConvertTo-Json -Depth 5 | Write-Host
 Write-Host "`nA verified full database backup will be created before deletion." -ForegroundColor Yellow
-$confirmation = Read-Host 'Type DELETE to execute the selected operations'
-if ($confirmation -cne 'DELETE') { Write-Host 'Cancelled. Nothing changed.'; exit 0 }
+$confirmationToken = if ($actions -contains 'inventory-cycle') { 'RESET_INVENTORY_CYCLE' } else { 'DELETE' }
+$confirmation = Read-Host "Type $confirmationToken to execute the selected operations"
+if ($confirmation -cne $confirmationToken) { Write-Host 'Cancelled. Nothing changed.'; exit 0 }
 
 $logDir = Join-Path $InstallDir 'logs'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
@@ -89,7 +91,7 @@ try {
         $_.Name -eq 'node.exe' -and $_.CommandLine -and $_.CommandLine.IndexOf($InstallDir, [StringComparison]::OrdinalIgnoreCase) -ge 0
     } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
-    & $node $runner "--install-dir=$InstallDir" "--actions=$actionsCsv" --confirm=DELETE 2>&1 | Tee-Object -FilePath $log -Append
+    & $node $runner "--install-dir=$InstallDir" "--actions=$actionsCsv" "--confirm=$confirmationToken" 2>&1 | Tee-Object -FilePath $log -Append
     if ($LASTEXITCODE -ne 0) { throw 'Data maintenance failed. SQL transaction rolled back.' }
 
     Resume-SystemTasks $enabledTasks

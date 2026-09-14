@@ -69,7 +69,7 @@ const ZonesManager: React.FC = () => {
         const q = searchQuery.trim().toLowerCase();
         return zones.filter(zone => {
             const matchesSearch = !q || [zone.name, zone.nameAr].some(value => String(value || '').toLowerCase().includes(q));
-            const matchesBranch = branchFilter === 'all' || zone.branchId === branchFilter;
+            const matchesBranch = branchFilter === 'all' || !zone.branchId || zone.branchId === branchFilter;
             const matchesStatus =
                 statusFilter === 'all' ||
                 (statusFilter === 'active' ? zone.isActive !== false : zone.isActive === false);
@@ -107,7 +107,7 @@ const ZonesManager: React.FC = () => {
             id: zone.id,
             name: zone.name || '',
             nameAr: zone.nameAr || '',
-            branchId: zone.branchId || branches[0]?.id || '',
+            branchId: zone.branchId || '',
             deliveryFee: Number(zone.deliveryFee || 0),
             minOrderAmount: Number(zone.minOrderAmount || 0),
             estimatedTime: Number(zone.estimatedTime || 45),
@@ -118,8 +118,8 @@ const ZonesManager: React.FC = () => {
 
     const handleSubmit = async () => {
         if (isSaving) return;
-        if (!form.name.trim() || !form.branchId) {
-            showError(lang === 'ar' ? 'يرجى إكمال الحقول المطلوبة' : 'Please complete required fields');
+        if (!form.name.trim()) {
+            showError(lang === 'ar' ? 'اكتب اسم المنطقة' : 'Zone name is required');
             return;
         }
 
@@ -128,7 +128,8 @@ const ZonesManager: React.FC = () => {
             const payload = {
                 ...form,
                 name: form.name.trim(),
-                nameAr: form.nameAr.trim(),
+                nameAr: form.nameAr.trim() || null,
+                branchId: form.branchId.trim() || null,
                 deliveryFee: Math.max(0, Number(form.deliveryFee || 0)),
                 minOrderAmount: Math.max(0, Number(form.minOrderAmount || 0)),
                 estimatedTime: Math.max(1, Number(form.estimatedTime || 45)),
@@ -300,7 +301,7 @@ const ZonesManager: React.FC = () => {
                                                         <p className="mt-1 truncate text-xs font-bold text-muted">{zone.name}</p>
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="truncate text-sm font-black text-main">{branch?.nameAr || branch?.name || 'Unknown'}</p>
+                                                        <p className="truncate text-sm font-black text-main">{branch?.nameAr || branch?.name || (lang === 'ar' ? 'كل الفروع' : 'All branches')}</p>
                                                         <p className="mt-1 text-[11px] font-bold text-muted">{active ? (lang === 'ar' ? 'يظهر في الطلبات' : 'Available for orders') : (lang === 'ar' ? 'متوقف مؤقتا' : 'Temporarily off')}</p>
                                                     </div>
                                                     <p className="text-sm font-black text-emerald-600">{money(zone.deliveryFee)}</p>
@@ -374,8 +375,9 @@ const ZonesManager: React.FC = () => {
                                     </label>
 
                                     <label className="space-y-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'فرع التوصيل *' : 'Dispatch branch *'}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'فرع التوصيل (اختياري)' : 'Dispatch branch (optional)'}</span>
                                         <select value={form.branchId} onChange={e => setForm({ ...form, branchId: e.target.value })} className="h-11 w-full rounded-xl border border-border bg-elevated px-3 text-sm font-bold text-main outline-none focus:border-primary/60">
+                                            <option value="">{lang === 'ar' ? 'كل الفروع (عام)' : 'All branches (global)'}</option>
                                             {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.nameAr || branch.name}</option>)}
                                         </select>
                                     </label>

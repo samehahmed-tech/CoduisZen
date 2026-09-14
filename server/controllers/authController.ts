@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { buildOtpAuthUri, generateBase32Secret, verifyTotp } from '../services/totpService';
 import { validatePassword, getPasswordPolicyRules } from '../services/passwordPolicyService';
 import logger from '../utils/logger';
+import { writeDbError } from '../utils/dbErrors';
 
 const JWT_SECRET = requireEnv('JWT_SECRET');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
@@ -31,12 +32,16 @@ const parseJwtExpiryMs = (value: string): number => {
     return amount * 1000;
 };
 
-/** Parse a value that may be a JSON string (as stored by MSSQL nvarchar columns) or already an array/object */
+/** Parse a value that may be a JSON string or comma-joined string (as stored by MSSQL nvarchar columns) or already an array/object */
 const parseJsonField = <T>(value: any, fallback: T): T => {
     if (Array.isArray(value)) return value as unknown as T;
     if (value && typeof value === 'object') return value as unknown as T;
     if (typeof value === 'string' && value.trim()) {
-        try { return JSON.parse(value) as T; } catch { /* ignore */ }
+        const trimmed = value.trim();
+        try { return JSON.parse(trimmed) as T; } catch { /* ignore */ }
+        if (Array.isArray(fallback)) {
+            return trimmed.split(',').map((s) => s.trim()).filter(Boolean) as unknown as T;
+        }
     }
     return fallback;
 };
@@ -739,7 +744,10 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
 
         return res.json({ token: newToken, user: sanitizeUser(user) });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message });
+        // A DB outage during refresh (hotfix restart, pool reconnect) must be
+        // retryable (503 DATABASE_UNAVAILABLE) — never a session-killing 500.
+        // The frontend only logs out on 400/401 here.
+        return writeDbError(res, error);
     }
 };
 

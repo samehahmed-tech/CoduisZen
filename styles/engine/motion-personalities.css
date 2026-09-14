@@ -1,0 +1,99 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTION PERSONALITIES — per-theme entrance/exit/hover/press language.
+   Keyed by [data-theme] so the same component moves differently per world.
+   All GPU-friendly (transform/opacity). Global reduced-motion kill-switch
+   lives in interaction-system.css and always wins.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Shared stage: modal / drawer / popover / toast use theme duration+ease */
+.theme-modal-panel {
+    animation: theme-modal-in var(--theme-duration, 200ms) var(--theme-ease, ease) both;
+}
+.theme-drawer-panel { animation: theme-drawer-in var(--theme-duration, 200ms) var(--theme-ease, ease) both; }
+.theme-popover { animation: theme-pop-in var(--theme-duration, 200ms) var(--theme-ease, ease) both; transform-origin: top center; }
+.theme-toast { animation: theme-toast-in var(--theme-duration, 200ms) var(--theme-ease, ease) both; }
+
+@keyframes theme-modal-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+@keyframes theme-drawer-in { from { opacity: 0; transform: translateX(24px); } }
+[dir="rtl"] .theme-drawer-panel { animation-name: theme-drawer-in-rtl; }
+@keyframes theme-drawer-in-rtl { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes theme-pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+@keyframes theme-toast-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+
+/* ── Per-theme entrance accents ───────────────────────────────────────── */
+[data-theme='aurora-glass'] .theme-modal-panel { animation-name: aurora-modal-in; animation-duration: var(--theme-duration-slow, 480ms); }
+@keyframes aurora-modal-in { from { opacity: 0; transform: translateY(18px) scale(0.96); filter: blur(6px); } }
+
+[data-theme='midnight-command'] .theme-modal-panel,
+[data-theme='midnight-command'] .theme-popover,
+[data-theme='midnight-command'] .theme-toast { animation-duration: 120ms; }
+[data-theme='midnight-command'] .theme-modal-panel { animation-name: midnight-modal-in; }
+@keyframes midnight-modal-in { from { opacity: 0; transform: translateY(4px); } }
+
+[data-theme='neo-brutal'] .theme-modal-panel { animation-name: brutal-modal-in; animation-duration: 140ms; }
+@keyframes brutal-modal-in { from { opacity: 0; transform: translate(-6px, 6px); } }
+[data-theme='neo-brutal'] .theme-toast { animation-name: brutal-modal-in; animation-duration: 120ms; }
+[data-theme='neo-brutal'] .theme-btn-primary { transition-duration: 80ms; }
+
+[data-theme='soft-organic'] .theme-modal-panel { animation-name: organic-modal-in; animation-duration: var(--theme-duration-slow, 560ms); }
+@keyframes organic-modal-in { 0% { opacity: 0; transform: translateY(22px) scale(0.94); } 60% { opacity: 1; transform: translateY(-4px) scale(1.008); } 100% { opacity: 1; transform: none; } }
+
+[data-theme='editorial-luxury'] .theme-modal-panel { animation-name: editorial-modal-in; animation-duration: 450ms; }
+@keyframes editorial-modal-in { from { opacity: 0; transform: translateY(12px); } }
+
+[data-theme='terminal-ops'] .theme-modal-panel,
+[data-theme='terminal-ops'] .theme-popover,
+[data-theme='terminal-ops'] .theme-toast,
+[data-theme='terminal-ops'] .theme-drawer-panel { animation-duration: 90ms; animation-name: midnight-modal-in; }
+
+[data-theme='future-hud'] .theme-modal-panel { animation-name: hud-modal-in; }
+@keyframes hud-modal-in { from { opacity: 0; transform: translateX(-18px); } }
+[data-theme='future-hud'] .theme-toast { animation-name: hud-modal-in; }
+[data-theme='future-hud'] .theme-drawer-panel { animation-name: hud-modal-in; }
+
+[data-theme='bento-saas'] .theme-modal-panel { animation-name: bento-modal-in; }
+@keyframes bento-modal-in { 0% { opacity: 0; transform: translateY(14px) scale(0.97); } 60% { opacity: 1; transform: translateY(-2px) scale(1.004); } 100% { opacity: 1; transform: none; } }
+
+[data-theme='industrial-ops'] .theme-modal-panel { animation-name: brutal-modal-in; animation-duration: 160ms; }
+
+[data-theme='premium-hospitality'] .theme-modal-panel { animation-name: editorial-modal-in; animation-duration: 500ms; }
+
+/* ── Per-theme press / hover intensity ────────────────────────────────── */
+[data-theme='neo-brutal'] .theme-card:active { transform: translate(2px, 2px); }
+[data-theme='soft-organic'] .theme-icon-button:active { transform: scale(0.9); }
+[data-theme='terminal-ops'] .theme-btn-primary:active { transform: scale(0.98); box-shadow: 0 0 14px rgba(var(--primary), 0.5); }
+[data-theme='future-hud'] .theme-btn-primary:hover { box-shadow: 0 0 28px -2px rgba(var(--primary), 0.7); }
+[data-theme='industrial-ops'] .theme-card:active { transform: translateY(2px); }
+
+/* ── Status pulse language per theme (KDS / orders / dispatch) ────────── */
+[data-theme='terminal-ops'] [data-status="preparing"] [data-status-indicator],
+[data-theme='future-hud'] [data-status="preparing"] [data-status-indicator] {
+    animation-duration: 0.9s;
+}
+[data-theme='editorial-luxury'] [data-status="preparing"] [data-status-indicator],
+[data-theme='premium-hospitality'] [data-status="preparing"] [data-status-indicator] {
+    animation-duration: 2.2s;
+}
+[data-theme='neo-brutal'] [data-status="preparing"] [data-status-indicator],
+[data-theme='industrial-ops'] [data-status="preparing"] [data-status-indicator] {
+    animation: none;
+    box-shadow: 0 0 0 3px rgb(var(--accent));
+}
+
+/* ── Skeleton voice per theme ─────────────────────────────────────────── */
+[data-theme='neo-brutal'] .theme-skeleton { animation: none; background: rgba(var(--text-main), 0.08); border: 2px dashed rgba(var(--text-main), 0.3); }
+[data-theme='terminal-ops'] .theme-skeleton { animation-duration: 0.9s; }
+[data-theme='editorial-luxury'] .theme-skeleton,
+[data-theme='premium-hospitality'] .theme-skeleton { animation-duration: 2.2s; }
+[data-theme='future-hud'] .theme-skeleton {
+    background: linear-gradient(100deg, transparent 20%, rgba(var(--primary), 0.25) 50%, transparent 80%);
+    background-size: 220% 100%;
+}
+
+/* ── Page transition polish (route views fade/slide per theme cadence) ─── */
+@keyframes theme-page-in { from { opacity: 0; transform: translateY(6px); } }
+.page-enter, [data-page-enter] { animation: theme-page-in var(--theme-duration, 200ms) var(--theme-ease, ease) both; }
+[data-theme='future-hud'] .page-enter, [data-theme='future-hud'] [data-page-enter] { animation-name: hud-modal-in; }
+[data-theme='neo-brutal'] .page-enter, [data-theme='neo-brutal'] [data-page-enter],
+[data-theme='terminal-ops'] .page-enter, [data-theme='terminal-ops'] [data-page-enter],
+[data-theme='midnight-command'] .page-enter, [data-theme='midnight-command'] [data-page-enter] { animation: none; }

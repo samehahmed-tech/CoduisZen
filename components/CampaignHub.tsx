@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { campaignsApi, couponsApi, type ManagedCoupon } from '../services/api/campaigns';
+import { useWhatsAppStore } from '../stores/useWhatsAppStore';
+import { QRCodeSVG } from 'qrcode.react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from './common/ToastProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -39,8 +42,20 @@ const CampaignHub: React.FC = () => {
     const [chatbotGreeting, setChatbotGreeting] = useState('');
     const [fbToken, setFbToken] = useState('');
     const [ttToken, setTtToken] = useState('');
-    const [waNumber, setWaNumber] = useState('');
-    const [waConnected, setWaConnected] = useState(false);
+    const navigate = useNavigate();
+    // الحالة الحقيقية لواتساب — مربوطة بمحرك السيرفر عبر useWhatsAppStore (لا حالة وهمية محلية).
+    const {
+        statusData: waStatus,
+        qrCode: waQr,
+        isLoading: waLoading,
+        fetchStatus: fetchWaStatus,
+        restartEngine: restartWaEngine,
+        resetSession: resetWaSession,
+    } = useWhatsAppStore();
+    const waState = waStatus?.status || 'INITIALIZING';
+    const waQrValue = waQr || waStatus?.qr || '';
+    const waReady = waState === 'READY';
+    const waDisabled = waState === 'DISABLED';
     const [updatingCampaignId, setUpdatingCampaignId] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'DRAFT'>('ACTIVE');
     const [couponCode, setCouponCode] = useState('');
@@ -83,6 +98,7 @@ const CampaignHub: React.FC = () => {
 
     useEffect(() => {
         loadData();
+        fetchWaStatus();
     }, []);
 
     const createCampaign = async () => {
@@ -351,24 +367,65 @@ const CampaignHub: React.FC = () => {
                             <p className="text-[10px] font-bold text-muted">{tr('ربط وإرسال الحملات عبر واتساب', 'Connect and blast campaigns via WhatsApp')}</p>
                         </div>
                         <div className="ml-auto flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${waConnected ? 'bg-emerald-500' : 'bg-rose-400'}`} />
-                            <span className="text-[9px] font-black text-muted uppercase tracking-widest">{waConnected ? tr('متصل', 'Connected') : tr('غير متصل', 'Disconnected')}</span>
+                            <span className={`w-2 h-2 rounded-full ${waReady ? 'bg-emerald-500' : waDisabled ? 'bg-slate-400' : 'bg-rose-400'}`} />
+                            <span className="text-[9px] font-black text-muted uppercase tracking-widest">
+                                {waReady ? tr('متصل', 'Connected')
+                                    : waState === 'AWAITING_SCAN' ? tr('بانتظار المسح', 'Awaiting scan')
+                                    : waDisabled ? tr('المحرك متوقف', 'Engine disabled')
+                                    : waState === 'AUTH_ERROR' ? tr('خطأ مصادقة', 'Auth error')
+                                    : waState === 'DISCONNECTED' ? tr('غير متصل', 'Disconnected')
+                                    : tr('جاري التهيئة', 'Initializing')}
+                            </span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[9px] font-black text-muted uppercase tracking-wider mb-1.5 block">{tr('رقم واتساب', 'WhatsApp Number')}</label>
-                            <input type="text" value={waNumber} onChange={e => setWaNumber(e.target.value)}
-                                placeholder="+201234567890"
-                                className="w-full bg-card border border-border/40 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500/50" />
+                    {waDisabled ? (
+                        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs font-bold leading-6 text-amber-800">
+                            {tr(
+                                'محرك واتساب متوقف على السيرفر (WHATSAPP_PROVIDER=disabled). فعّله ثم أعد تشغيل السيرفر ليظهر QR.',
+                                'WhatsApp engine is disabled on the server (WHATSAPP_PROVIDER=disabled). Enable it and restart the server to get a QR.',
+                            )}
+                            {waStatus?.reason ? <span className="block mt-1 opacity-80">{waStatus.reason}</span> : null}
                         </div>
-                        <div className="flex items-end">
-                            <button onClick={() => { setWaConnected(!waConnected); success(waConnected ? tr('تم قطع الاتصال', 'Disconnected') : tr('تم الاتصال', 'Connected')); }}
-                                className={`w-full py-3 rounded-xl text-xs font-black border-2 flex items-center justify-center gap-2 transition-all ${waConnected ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'}`}>
-                                {waConnected ? <><Zap size={14} />{tr('قطع الاتصال', 'Disconnect')}</> : <><Zap size={14} />{tr('اتصال عبر QR', 'Connect via QR')}</>}
-                            </button>
+                    ) : waReady ? (
+                        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                            <div className="flex items-center gap-3">
+                                <span className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center"><MessageCircle size={18} /></span>
+                                <div>
+                                    <p className="text-sm font-black text-main">{tr('الرقم مربوط وجاهز', 'Number linked and ready')}</p>
+                                    <p className="text-[10px] font-bold text-muted ltr">{waStatus?.sessionName || waStatus?.provider || 'whatsapp-web.js'} • Queue {waStatus?.queueCount ?? 0}</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 md:ms-auto">
+                                <button onClick={() => fetchWaStatus()} disabled={waLoading} className="px-4 py-2.5 rounded-xl text-[11px] font-black border border-border bg-card hover:border-emerald-500/50 disabled:opacity-50">{tr('إعادة فحص', 'Recheck')}</button>
+                                <button onClick={() => navigate('/whatsapp')} className="px-4 py-2.5 rounded-xl text-[11px] font-black bg-emerald-600 text-white hover:bg-emerald-700">{tr('فتح مركز واتساب', 'Open WhatsApp Hub')}</button>
+                            </div>
                         </div>
-                    </div>
+                    ) : waQrValue ? (
+                        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-5 items-center rounded-2xl border border-border/40 bg-card p-4">
+                            <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-sm">
+                                <QRCodeSVG value={waQrValue} size={210} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-main">{tr('امسح QR من واتساب على الموبايل', 'Scan the QR from WhatsApp on your phone')}</p>
+                                <p className="mt-1 text-[11px] font-bold text-muted">{tr('واتساب ← الأجهزة المرتبطة ← ربط جهاز. الجلسة تُحفظ على السيرفر لمرة واحدة.', 'WhatsApp → Linked devices → Link a device. Session stays saved on the server.')}</p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <button onClick={() => fetchWaStatus()} disabled={waLoading} className="px-4 py-2.5 rounded-xl text-[11px] font-black border border-border bg-card hover:border-emerald-500/50 disabled:opacity-50">{tr('إعادة فحص', 'Recheck')}</button>
+                                    <button onClick={resetWaSession} disabled={waLoading} className="px-4 py-2.5 rounded-xl text-[11px] font-black border border-amber-500/40 bg-amber-500/10 text-amber-700 disabled:opacity-50">{tr('QR جديد', 'New QR')}</button>
+                                    <button onClick={() => navigate('/whatsapp')} className="px-4 py-2.5 rounded-xl text-[11px] font-black bg-emerald-600 text-white hover:bg-emerald-700">{tr('فتح مركز واتساب', 'Open WhatsApp Hub')}</button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-border/60 bg-elevated/30 p-5 text-center">
+                            <p className="text-sm font-black text-main">{tr('مفيش QR ظاهر حاليًا', 'No QR available right now')}</p>
+                            <p className="mt-1 text-[11px] font-bold text-muted">{waStatus?.reason || tr('المحرك يتهيأ أو الجلسة قديمة. اعمل إعادة ربط لإظهار كود جديد.', 'Engine is starting or session is stale. Reset to show a new code.')}</p>
+                            <div className="mt-3 flex flex-wrap justify-center gap-2">
+                                <button onClick={() => fetchWaStatus()} disabled={waLoading} className="px-4 py-2.5 rounded-xl text-[11px] font-black border border-border bg-card disabled:opacity-50">{tr('إعادة فحص', 'Recheck')}</button>
+                                <button onClick={restartWaEngine} disabled={waLoading} className="px-4 py-2.5 rounded-xl text-[11px] font-black border border-sky-500/40 bg-sky-500/10 text-sky-700 disabled:opacity-50">{tr('إعادة تشغيل المحرك', 'Restart engine')}</button>
+                                <button onClick={resetWaSession} disabled={waLoading} className="px-4 py-2.5 rounded-xl text-[11px] font-black bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50">{tr('إعادة ربط وإظهار QR', 'Reset & show QR')}</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, FileSpreadsheet, FileText, X } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Printer, X } from 'lucide-react';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { downloadHtmlPdf } from '../../services/reportPdf';
 
 type Column = {
     key: string;
@@ -13,6 +15,10 @@ interface ExportButtonProps {
     filename?: string;
     title?: string;
     className?: string;
+    /** Subtitle line under the title (range / branch / filters). */
+    subtitle?: string;
+    /** Totals row aligned to columns (first cell usually TOTAL label). */
+    totals?: (string | number)[];
 }
 
 const toCSV = (data: Record<string, any>[], columns: Column[]): string => {
@@ -44,9 +50,16 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     filename = 'export',
     title = 'Export Data',
     className = '',
+    subtitle,
+    totals,
 }) => {
     const [showMenu, setShowMenu] = useState(false);
+    const [isPdfBusy, setIsPdfBusy] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const settings = useAuthStore((s) => s.settings);
+    const restaurantName = settings.restaurantName || 'Coduis Zen';
+    const logoUrl = settings.receiptLogoUrl || '/logo.png';
+    const isArabic = (settings.language || 'en') !== 'en';
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -58,20 +71,75 @@ const ExportButton: React.FC<ExportButtonProps> = ({
 
     const exportCSV = () => {
         const csv = toCSV(data, columns);
-        downloadFile(csv, `${filename}_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
+        const totalsLine = totals && totals.length
+            ? '\n' + totals.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
+            : '';
+        downloadFile(csv + totalsLine, `${filename}_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv');
         setShowMenu(false);
     };
 
+    /** Direct designer-PDF download (no print dialog). Falls back to print window. */
+    const exportDirectPdf = async () => {
+        setIsPdfBusy(true);
+        try {
+            const headerCells = columns.map((c) => `<th>${c.label}</th>`).join('');
+            const bodyRows = data
+                .map(
+                    (row) =>
+                        `<tr>${columns
+                            .map((c) => {
+                                const val = c.format ? c.format(row[c.key]) : row[c.key] ?? '';
+                                return `<td>${val}</td>`;
+                            })
+                            .join('')}</tr>`
+                )
+                .join('');
+            const totalsRow =
+                totals && totals.length
+                    ? `<tfoot><tr>${totals.map((v) => `<td>${v ?? ''}</td>`).join('')}</tr></tfoot>`
+                    : '';
+            const metaLine = `${data.length} ${isArabic ? 'صف' : 'records'}`;
+            await downloadHtmlPdf(
+                `<table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>`,
+                {
+                    filename,
+                    title,
+                    restaurant: restaurantName,
+                    logoUrl,
+                    metaChips: subtitle ? [subtitle, metaLine] : [metaLine],
+                    isArabic,
+                    orientation: columns.length > 5 ? 'landscape' : 'portrait',
+                }
+            );
+        } catch {
+            exportHTML();
+            return;
+        } finally {
+            setIsPdfBusy(false);
+            setShowMenu(false);
+        }
+    };
     const exportHTML = () => {
+        const dir = isArabic ? 'rtl' : 'ltr';
+        const align = isArabic ? 'right' : 'left';
+        const exportedAt = new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-GB');
         const styles = `
             <style>
-                body { font-family: 'Tajawal', system-ui, sans-serif; margin: 2rem; }
-                h1 { font-family: 'Cairo', system-ui, sans-serif; font-size: 1.5rem; margin-bottom: 1rem; color: #1e293b; }
-                table { border-collapse: collapse; width: 100%; font-size: 12px; }
-                th { background: #1e293b; color: white; padding: 10px 14px; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
-                td { padding: 8px 14px; border-bottom: 1px solid #e2e8f0; }
-                tr:nth-child(even) { background: #f8fafc; }
-                .footer { margin-top: 2rem; font-size: 10px; color: #94a3b8; }
+                @page { size: A4 landscape; margin: 11mm 10mm 14mm 10mm; }
+                body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 0; color: #0f172a; direction: ${dir}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .hz { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #0f766e; padding-bottom: 14px; margin-bottom: 14px; }
+                .hz img { width: 52px; height: 52px; object-fit: contain; }
+                .hz h1 { font-size: 20px; margin: 0; color: #10243e; }
+                .hz .sub { font-size: 11px; color: #5b6b7d; font-weight: 700; margin-top: 4px; }
+                .meta { font-size: 10px; color: #64748b; font-weight: 700; margin-bottom: 10px; }
+                table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+                thead { display: table-header-group; }
+                tr { page-break-inside: avoid; }
+                th { background: #10243e; color: #fff; padding: 8px 10px; text-align: ${align}; font-size: 9pt; }
+                td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: ${align}; }
+                tbody tr:nth-child(even) { background: #f8fafc; }
+                tfoot td { background: #0f766e; color: #fff; font-weight: 900; padding: 9px 10px; }
+                .footer { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; border-top: 1px solid #dbe4ee; padding-top: 6px; font-size: 8.5pt; color: #64748b; font-weight: 700; }
             </style>
         `;
         const headerCells = columns.map(c => `<th>${c.label}</th>`).join('');
@@ -81,12 +149,18 @@ const ExportButton: React.FC<ExportButtonProps> = ({
                 return `<td>${val}</td>`;
             }).join('')}</tr>`
         ).join('');
+        const totalsRow = totals && totals.length
+            ? `<tfoot><tr>${totals.map(v => `<td>${v ?? ''}</td>`).join('')}</tr></tfoot>`
+            : '';
 
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>${styles}</head><body>
-            <h1>${title}</h1>
-            <p style="color:#64748b;font-size:11px;margin-bottom:1rem;">${data.length} records · exported ${new Date().toLocaleString()}</p>
-            <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>
-            <div class="footer">Generated by Coduis Zen · ${new Date().toISOString()}</div>
+        const html = `<!DOCTYPE html><html dir="${dir}"><head><meta charset="UTF-8"><title>${restaurantName} - ${title}</title>${styles}</head><body>
+            <div class="hz">
+                <img src="${logoUrl}" alt="${restaurantName}" onerror="this.style.display='none'" />
+                <div><h1>${restaurantName}</h1><div class="sub">${title}</div>${subtitle ? `<div class="sub">${subtitle}</div>` : ''}</div>
+            </div>
+            <div class="meta">${data.length} ${isArabic ? 'صف' : 'records'} · ${isArabic ? 'صُدّر' : 'exported'} ${exportedAt}</div>
+            <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
+            <div class="footer"><span>${restaurantName}</span><span>${exportedAt}</span></div>
         </body></html>`;
 
         const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
@@ -125,12 +199,21 @@ const ExportButton: React.FC<ExportButtonProps> = ({
                                 <p className="text-[8px] text-muted">Spreadsheet compatible</p>
                             </div>
                         </button>
+                        <button onClick={() => void exportDirectPdf()}
+                            disabled={isPdfBusy}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold text-main hover:bg-elevated/60 transition-colors text-left disabled:opacity-50">
+                            <FileText size={16} className="text-red-500" />
+                            <div>
+                                <p className="font-black text-[10px]">{isPdfBusy ? (isArabic ? 'جاري التجهيز...' : 'Building...') : 'PDF'}</p>
+                                <p className="text-[8px] text-muted">{isArabic ? 'تحميل مباشر بتصميم احترافي' : 'Direct designer download'}</p>
+                            </div>
+                        </button>
                         <button onClick={exportHTML}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold text-main hover:bg-elevated/60 transition-colors text-left">
-                            <FileText size={16} className="text-blue-500" />
+                            <Printer size={16} className="text-blue-500" />
                             <div>
-                                <p className="font-black text-[10px]">Print / PDF</p>
-                                <p className="text-[8px] text-muted">Print dialog for PDF</p>
+                                <p className="font-black text-[10px]">{isArabic ? 'طباعة' : 'Print'}</p>
+                                <p className="text-[8px] text-muted">{isArabic ? 'نافذة الطباعة' : 'Print dialog'}</p>
                             </div>
                         </button>
                     </div>

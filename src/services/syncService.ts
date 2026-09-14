@@ -7,6 +7,7 @@ import { tablesApi } from '../../services/api/tables';
 import { customersApi } from '../../services/api/customers';
 import { menuApi } from '../../services/api/menu';
 import { inventoryApi } from '../../services/api/inventory';
+import { deploymentApi } from '../../services/api/deployment';
 import { buildDedupeKey, computeNextAttempt } from './syncQueueUtils';
 
 const MAX_RETRIES = 10;
@@ -74,6 +75,7 @@ export const syncService = {
         this._isSyncing = true;
 
         try {
+            await this.pullCentralCommands().catch(() => undefined);
             const now = Date.now();
             const candidates = await localDb.syncQueue
                 .where('status')
@@ -114,6 +116,54 @@ export const syncService = {
             }
         } finally {
             this._isSyncing = false;
+        }
+    },
+
+    async getDeploymentSettings() {
+        const app = await localDb.settings.get('app');
+        return app?.value || {};
+    },
+
+    async pullCentralCommands() {
+        const config = await this.getDeploymentSettings();
+        if (config.deploymentMode !== 'BRANCH' || !config.deploymentCentralApiUrl || !config.deploymentSiteId || !config.deploymentSiteToken) return;
+        const result = await deploymentApi.pullCommandsAt(config.deploymentCentralApiUrl, config.deploymentSiteId, config.deploymentSiteToken);
+        for (const command of result.commands || []) {
+            try {
+                if (command.entity === 'menuCategory') {
+                    if (command.action === 'CREATE') await menuApi.createCategory(command.payload);
+                    if (command.action === 'UPDATE') await menuApi.updateCategory(command.payload.id, command.payload);
+                    if (command.action === 'DELETE') await menuApi.deleteCategory(command.payload.id);
+                } else if (command.entity === 'menuItem') {
+                    if (command.action === 'CREATE') await menuApi.createItem(command.payload);
+                    if (command.action === 'UPDATE') await menuApi.updateItem(command.payload.id, command.payload);
+                    if (command.action === 'DELETE') await menuApi.deleteItem(command.payload.id);
+                } else if (command.entity === 'inventoryItem') {
+                    if (command.action === 'CREATE') await inventoryApi.create(command.payload);
+                    if (command.action === 'UPDATE') await inventoryApi.update(command.payload.id, command.payload);
+                } else if (command.entity === 'warehouse' && command.action === 'CREATE') {
+                    await inventoryApi.createWarehouse(command.payload);
+                } else if (command.entity === 'settingsBulk') {
+                    await settingsApi.updateBulk(command.payload);
+                } else if (command.entity === 'branch' && command.action === 'UPDATE') {
+                    await branchesApi.update(command.payload.id, command.payload);
+                }
+                await deploymentApi.ackCommandAt(config.deploymentCentralApiUrl, config.deploymentSiteId, config.deploymentSiteToken, command.id);
+            } catch {
+                // Keep the command in the central queue for the next retry.
+                break;
+            }
+        }
+    },
+
+    async broadcastCentralCommand(entity: string, action: string, payload: any) {
+        const config = await this.getDeploymentSettings();
+        if (config.deploymentMode !== 'CENTRAL') return;
+        try {
+            await deploymentApi.queueCommand({ siteId: 'ALL_BRANCHES', entity, action, payload, policy: 'CENTRAL_MASTER' });
+        } catch {
+            // Central database remains authoritative; a branch will retry after
+            // the deployment command endpoint is available.
         }
     },
 

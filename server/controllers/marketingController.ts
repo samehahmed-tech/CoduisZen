@@ -76,5 +76,36 @@ export const marketingController = {
         } catch (error: any) {
             res.status(500).json({ error: error.message });
         }
+    },
+
+    async updateComplaint(req: Request, res: Response) {
+        try {
+            const id = getStringParam((req.params as any).id);
+            const { status, assignedTo, resolutionNotes, priority } = req.body || {};
+            if (!id) return res.status(400).json({ error: 'COMPLAINT_ID_REQUIRED' });
+            const patch: any = { updatedAt: new Date() };
+            if (status !== undefined) {
+                const s = String(status).toUpperCase();
+                if (!['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(s)) {
+                    return res.status(400).json({ error: 'INVALID_STATUS' });
+                }
+                patch.status = s;
+            }
+            if (assignedTo !== undefined) patch.assignedTo = String(assignedTo);
+            if (resolutionNotes !== undefined) patch.resolutionNotes = String(resolutionNotes);
+            if (priority !== undefined) {
+                const p = String(priority).toUpperCase();
+                if (!['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(p)) {
+                    return res.status(400).json({ error: 'INVALID_PRIORITY' });
+                }
+                patch.priority = p;
+            }
+            const [updated] = await db.update(customerComplaints).set(patch).output()
+                .where(eq(customerComplaints.id, id));
+            if (!updated) return res.status(404).json({ error: 'COMPLAINT_NOT_FOUND' });
+            res.json(updated);
+        } catch (error: any) {
+            res.status(500).json({ error: error.message });
+        }
     }
 };

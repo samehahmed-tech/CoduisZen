@@ -442,7 +442,7 @@ export const payrollCloseService = {
                     .set({ status: 'DEDUCTED', paidAt: new Date(), updatedAt: new Date() })
                     .where(and(
                         inArray(loanInstallments.loanId, branchLoans.map(loan => loan.id)),
-                        eq(loanInstallments.status, 'PENDING'),
+                        inArray(loanInstallments.status, ['PENDING', 'SCHEDULED']),
                         gte(loanInstallments.dueDate, cycle.periodStart),
                         lte(loanInstallments.dueDate, cycle.periodEnd),
                     ));

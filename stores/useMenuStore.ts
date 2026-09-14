@@ -196,6 +196,7 @@ export const useMenuStore = create<MenuState>()(
 
                     if (navigator.onLine) {
                         await menuApi.createCategory(payload);
+                        void syncService.broadcastCentralCommand?.('menuCategory', 'CREATE', payload);
                     } else {
                         await syncService.queue('menuCategory', 'CREATE', payload);
                     }
@@ -238,6 +239,7 @@ export const useMenuStore = create<MenuState>()(
 
                     if (navigator.onLine) {
                         await menuApi.updateCategory(category.id, payload);
+                        void syncService.broadcastCentralCommand?.('menuCategory', 'UPDATE', { id: category.id, ...payload });
                     } else {
                         await syncService.queue('menuCategory', 'UPDATE', { id: category.id, ...payload });
                     }
@@ -349,6 +351,7 @@ export const useMenuStore = create<MenuState>()(
                     if (navigator.onLine) {
                         const createdItem = await menuApi.createItem(payload);
                         savedItem = { ...item, ...createdItem };
+                        void syncService.broadcastCentralCommand?.('menuItem', 'CREATE', payload);
                     } else {
                         await syncService.queue('menuItem', 'CREATE', payload);
                     }
@@ -395,6 +398,7 @@ export const useMenuStore = create<MenuState>()(
                         name: item.name,
                         nameAr: item.nameAr,
                         description: item.description,
+                        descriptionAr: item.descriptionAr,
                         price: item.price,
                         image: item.image,
                         // Never turn a legacy item off just because the field was omitted by an editor.
@@ -419,6 +423,7 @@ export const useMenuStore = create<MenuState>()(
 
                     if (navigator.onLine) {
                         await menuApi.updateItem(item.id, payload);
+                        void syncService.broadcastCentralCommand?.('menuItem', 'UPDATE', { id: item.id, ...payload });
                     } else {
                         await syncService.queue('menuItem', 'UPDATE', { id: item.id, ...payload });
                     }
@@ -561,7 +566,7 @@ export const useMenuStore = create<MenuState>()(
                 const archivedAt = new Date().toISOString();
                 const archivedItem = { ...item, archivedAt, isAvailable: false };
                 if (navigator.onLine) {
-                    await menuApi.updateItem(itemId, { status: 'archived', archivedAt, isAvailable: false });
+                    await menuApi.deleteItem(itemId);
                 } else {
                     await syncService.queue('menuItem', 'UPDATE', { id: itemId, status: 'archived', archivedAt, isAvailable: false });
                 }

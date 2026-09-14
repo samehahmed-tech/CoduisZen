@@ -1,6 +1,8 @@
 import { db } from '../db';
-import { settings } from '../../src/db/schema';
-import { eq } from 'drizzle-orm';
+import { settings, chartOfAccounts } from '../../src/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { GLService } from './glService';
+import { resolveSystemAccountCode } from './financePostingService';
 
 export type FinanceAccount = {
     id: string;
@@ -34,6 +36,7 @@ export type FinanceReconciliation = {
     notes?: string;
     resolvedAt?: string;
     resolvedBy?: string;
+    branchId?: string;
 };
 
 export type FinancePeriodClose = {
@@ -162,46 +165,20 @@ export const financeEngine = {
         await writeSetting(LOCKED_THROUGH_KEY, dateIso, updatedBy || 'system');
     },
 
-    async postDoubleEntry(entry: Omit<FinanceJournalEntry, 'id' | 'date'> & { updatedBy?: string }) {
-        const accounts = await this.ensureChart();
-        const journal = await this.getJournal();
-        const lockedThrough = await this.getLockedThroughDate();
-
-        const debitAcc = accounts.find(a => a.code === entry.debitAccountCode);
-        const creditAcc = accounts.find(a => a.code === entry.creditAccountCode);
-        if (!debitAcc || !creditAcc) {
-            throw new Error('Invalid account code in journal entry');
-        }
-        const amount = Number(entry.amount || 0);
-        if (amount <= 0) throw new Error('Journal amount must be positive');
-        const entryDate = new Date();
-        if (lockedThrough && entryDate <= lockedThrough) {
-            throw new Error(`Period is locked through ${lockedThrough.toISOString()}`);
-        }
-
-        const created: FinanceJournalEntry = {
-            id: `JRN-${Date.now()}`,
-            date: entryDate.toISOString(),
+    async postDoubleEntry(entry: Omit<FinanceJournalEntry, 'id' | 'date'> & { updatedBy?: string; branchId?: string }) {
+        const result = await GLService.postJournalEntry({
+            reference: entry.referenceId || `MANUAL-${Date.now()}`,
+            referenceType: 'RECONCILIATION',
             description: entry.description,
-            amount,
-            debitAccountCode: entry.debitAccountCode,
-            creditAccountCode: entry.creditAccountCode,
-            referenceId: entry.referenceId,
-            source: entry.source,
-            metadata: entry.metadata,
-        };
-
-        const nextAccounts = accounts.map(acc => {
-            let balance = Number(acc.balance || 0);
-            if (acc.code === created.debitAccountCode) balance += amount;
-            if (acc.code === created.creditAccountCode) balance -= amount;
-            return { ...acc, balance };
+            createdBy: entry.updatedBy || 'system',
+            branchId: entry.branchId,
+            lines: [
+                { accountCode: entry.debitAccountCode, debit: Number(entry.amount || 0), credit: 0 },
+                { accountCode: entry.creditAccountCode, debit: 0, credit: Number(entry.amount || 0) },
+            ],
         });
-        const nextJournal = [created, ...journal];
-
-        await writeSetting(ACCOUNTS_KEY, nextAccounts, entry.updatedBy || 'system');
-        await writeSetting(JOURNAL_KEY, nextJournal, entry.updatedBy || 'system');
-        return created;
+        if (typeof result === 'string' || !(result as any)?.entryId) throw new Error('FINANCE_POSTING_FAILED');
+        return result;
     },
 
     async trialBalance() {
@@ -221,9 +198,11 @@ export const financeEngine = {
         };
     },
 
-    async getReconciliations() {
+    async getReconciliations(branchId?: string) {
         const rows = await readSetting<FinanceReconciliation[]>(RECONCILIATIONS_KEY, []);
-        return rows.sort((a, b) => new Date(b.statementDate).getTime() - new Date(a.statementDate).getTime());
+        return rows
+            .filter(row => !branchId || row.branchId === branchId)
+            .sort((a, b) => new Date(b.statementDate).getTime() - new Date(a.statementDate).getTime());
     },
 
     async createReconciliation(input: {
@@ -232,14 +211,18 @@ export const financeEngine = {
         statementBalance: number;
         notes?: string;
         updatedBy?: string;
+        branchId?: string;
+        bookBalance?: number;
     }) {
-        const rows = await this.getReconciliations();
-        const accounts = await this.ensureChart();
-        const account = accounts.find(a => a.code === input.accountCode);
+        const rows = await this.getReconciliations(input.branchId);
+        const [account] = await db.select({ code: chartOfAccounts.code, isActive: chartOfAccounts.isActive })
+            .from(chartOfAccounts)
+            .where(and(eq(chartOfAccounts.code, input.accountCode), eq(chartOfAccounts.isActive, true)))
+            .top(1);
         if (!account) throw new Error('Invalid account code');
 
         const statementBalance = Number(input.statementBalance || 0);
-        const bookBalance = Number(account.balance || 0);
+        const bookBalance = input.bookBalance !== undefined ? Number(input.bookBalance) : 0;
         const rec: FinanceReconciliation = {
             id: `REC-${Date.now()}`,
             accountCode: input.accountCode,
@@ -251,6 +234,7 @@ export const financeEngine = {
             notes: input.notes,
             resolvedAt: Math.abs(statementBalance - bookBalance) < 0.0001 ? new Date().toISOString() : undefined,
             resolvedBy: Math.abs(statementBalance - bookBalance) < 0.0001 ? (input.updatedBy || 'system') : undefined,
+            branchId: input.branchId,
         };
         await writeSetting(RECONCILIATIONS_KEY, [rec, ...rows], input.updatedBy || 'system');
         return rec;
@@ -262,8 +246,9 @@ export const financeEngine = {
         adjustmentAccountCode?: string;
         notes?: string;
         updatedBy?: string;
+        branchId?: string;
     }) {
-        const rows = await this.getReconciliations();
+        const rows = await this.getReconciliations(input.branchId);
         const idx = rows.findIndex(r => r.id === input.reconciliationId);
         if (idx === -1) throw new Error('Reconciliation not found');
         const rec = rows[idx];
@@ -272,7 +257,7 @@ export const financeEngine = {
         if (input.adjustWithJournal) {
             const abs = Math.abs(Number(rec.difference || 0));
             if (abs > 0) {
-                const offset = input.adjustmentAccountCode || '5110';
+                const offset = input.adjustmentAccountCode || await resolveSystemAccountCode('INVENTORY_ADJUSTMENT_DECREASE', 'DEBIT', '5110');
                 if (rec.difference > 0) {
                     await this.postDoubleEntry({
                         description: `Reconciliation adjustment ${rec.id}`,
@@ -283,6 +268,7 @@ export const financeEngine = {
                         source: 'RECONCILIATION_ADJUSTMENT',
                         metadata: { notes: input.notes || null },
                         updatedBy: input.updatedBy || 'system',
+                        branchId: input.branchId,
                     });
                 } else {
                     await this.postDoubleEntry({
@@ -294,6 +280,7 @@ export const financeEngine = {
                         source: 'RECONCILIATION_ADJUSTMENT',
                         metadata: { notes: input.notes || null },
                         updatedBy: input.updatedBy || 'system',
+                        branchId: input.branchId,
                     });
                 }
             }
@@ -320,7 +307,7 @@ export const financeEngine = {
         return periods.sort((a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime());
     },
 
-    async closePeriod(input: { periodStart: string; periodEnd: string; updatedBy?: string }) {
+    async closePeriod(input: { periodStart: string; periodEnd: string; updatedBy?: string; trialBalance?: { debit: number; credit: number; balanced: boolean } }) {
         const start = new Date(input.periodStart);
         const end = new Date(input.periodEnd);
         if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
@@ -332,7 +319,9 @@ export const financeEngine = {
         const overlap = periods.find(p => !(new Date(p.periodEnd) < start || new Date(p.periodStart) > end));
         if (overlap) throw new Error('Period overlaps with an existing closed period');
 
-        const tb = await this.trialBalance();
+        const tb = input.trialBalance
+            ? { totals: { debit: input.trialBalance.debit, credit: input.trialBalance.credit }, balanced: input.trialBalance.balanced }
+            : await this.trialBalance();
         const closed: FinancePeriodClose = {
             id: `PER-${Date.now()}`,
             periodStart: start.toISOString(),

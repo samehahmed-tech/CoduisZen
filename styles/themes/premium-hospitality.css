@@ -1,0 +1,88 @@
+/* THEME 10 · PREMIUM HOSPITALITY — emerald & gold: cream light / evening-forest dark */
+[data-theme='premium-hospitality'] {
+    --primary: 4, 99, 7;
+    --primary-hover: 3, 80, 6;
+    --secondary: 130, 115, 95;
+    --accent: 176, 141, 32;
+
+    --bg-app: 245, 240, 225;
+    --bg-card: 255, 253, 246;
+    --bg-sidebar: 240, 233, 213;
+    --bg-elevated: 252, 248, 236;
+    --bg-global: 245, 240, 225;
+
+    --text-main: 32, 30, 22;
+    --text-muted: 130, 115, 90;
+
+    --border-color: 222, 205, 165;
+    --border-subtle: 222 205 165 / 0.6;
+    --glass-bg: 255 253 246 / 0.85;
+
+    --success: 4, 120, 70;
+    --warning: 170, 120, 30;
+    --danger: 160, 40, 45;
+    --info: 60, 100, 130;
+
+    --theme-page-bg: radial-gradient(900px 320px at 50% -8%, rgba(176,141,32,0.16), transparent 60%), linear-gradient(180deg, #f7f1e2 0%, #eee2c8 100%);
+    --theme-card-bg: #fffdf6;
+    --theme-card-hover-bg: #faf3e2;
+    --theme-rail-bg: linear-gradient(180deg, #f2e7cf 0%, #e6d3ab 100%);
+    --theme-topbar-bg: rgba(255, 253, 246, 0.88);
+    --theme-table-head-bg: #efe2c4;
+    --theme-row-hover-bg: rgba(4, 99, 7, 0.05);
+    --theme-input-bg: #fffdf6;
+    --theme-button-bg: linear-gradient(135deg, #046307 0%, #034d06 100%);
+    --theme-active-bg: rgba(4, 99, 7, 0.09);
+    --theme-focus-ring: rgba(176, 141, 32, 0.45);
+    --theme-popup-bg: #fffdf6;
+
+    --chart-1: 4, 99, 7;
+    --chart-2: 176, 141, 32;
+    --chart-3: 200, 90, 60;
+    --chart-4: 60, 100, 130;
+    --chart-5: 130, 115, 80;
+    --chart-grid: 222 205 165 / 0.9;
+    --chart-tooltip-bg: #fffdf6;
+}
+
+.dark [data-theme='premium-hospitality'],
+[data-theme='premium-hospitality'].dark {
+    --primary: 212, 175, 55;
+    --primary-hover: 228, 192, 90;
+    --secondary: 175, 160, 140;
+    --accent: 52, 211, 153;
+
+    --bg-app: 11, 18, 14;
+    --bg-card: 20, 30, 24;
+    --bg-sidebar: 13, 21, 16;
+    --bg-elevated: 28, 40, 32;
+    --bg-global: 11, 18, 14;
+
+    --text-main: 242, 236, 220;
+    --text-muted: 165, 155, 130;
+
+    --border-color: 48, 62, 50;
+    --border-subtle: 212 175 55 / 0.16;
+    --glass-bg: 20 30 24 / 0.88;
+
+    --theme-page-bg: radial-gradient(900px 320px at 50% -8%, rgba(212,175,55,0.10), transparent 60%), radial-gradient(700px 280px at 85% 110%, rgba(52,211,153,0.06), transparent 60%), linear-gradient(180deg, #0d1510 0%, #080d0a 100%);
+    --theme-card-bg: #14211a;
+    --theme-card-hover-bg: #1c2d22;
+    --theme-rail-bg: linear-gradient(180deg, #0d1510 0%, #070b08 100%);
+    --theme-topbar-bg: rgba(20, 30, 24, 0.88);
+    --theme-table-head-bg: #070b08;
+    --theme-row-hover-bg: rgba(212, 175, 55, 0.09);
+    --theme-input-bg: #1c2d22;
+    --theme-button-bg: linear-gradient(135deg, #0b5c40 0%, #084a34 100%);
+    --theme-active-bg: rgba(212, 175, 55, 0.14);
+    --theme-focus-ring: rgba(212, 175, 55, 0.45);
+    --theme-popup-bg: #1c2d22;
+
+    --chart-1: 212, 175, 55;
+    --chart-2: 52, 211, 153;
+    --chart-3: 220, 150, 110;
+    --chart-4: 140, 170, 200;
+    --chart-5: 200, 185, 150;
+    --chart-grid: 48 62 50 / 0.9;
+    --chart-tooltip-bg: #1c2d22;
+}

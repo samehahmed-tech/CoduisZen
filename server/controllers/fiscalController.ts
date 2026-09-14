@@ -6,6 +6,7 @@ import { getStringParam, getNumberParam } from '../utils/request';
 import { submitOrderToFiscal } from '../services/fiscalSubmitService';
 import { etaService } from '../services/etaService';
 import { FISCAL_SELLER_ENV_KEYS } from '../services/fiscalService';
+import { writeDbError } from '../utils/dbErrors';
 
 const FISCAL_REQUIRED_ENV = [
     'ETA_BASE_URL',
@@ -250,6 +251,6 @@ export const getFiscalReadiness = async (req: Request, res: Response) => {
             alerts,
         });
     } catch (error: any) {
-        res.status(500).json({ error: error.message || 'FAILED_TO_GET_FISCAL_READINESS' });
+        return writeDbError(res, error);
     }
 };

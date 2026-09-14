@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
     Plus, UtensilsCrossed, Loader2, AlertCircle, X, Sparkles, DollarSign,
     ChevronRight
@@ -36,9 +37,30 @@ const MenuProfitCenter: React.FC = () => {
         addCategory, updateCategory, deleteCategory, reorderCategories,
         addMenu, updateMenu, linkCategory, fetchMenu,
         bulkUpdateItems, archiveItem, restoreItem, duplicateItem
-    } = useMenuStore();
+    } = useMenuStore(useShallow((state) => ({
+        menus: state.menus,
+        categories: state.categories,
+        platforms: state.platforms,
+        isLoading: state.isLoading,
+        error: state.error,
+        updateMenuItem: state.updateMenuItem,
+        addMenuItem: state.addMenuItem,
+        deleteMenuItem: state.deleteMenuItem,
+        addCategory: state.addCategory,
+        updateCategory: state.updateCategory,
+        deleteCategory: state.deleteCategory,
+        reorderCategories: state.reorderCategories,
+        addMenu: state.addMenu,
+        updateMenu: state.updateMenu,
+        linkCategory: state.linkCategory,
+        fetchMenu: state.fetchMenu,
+        bulkUpdateItems: state.bulkUpdateItems,
+        archiveItem: state.archiveItem,
+        restoreItem: state.restoreItem,
+        duplicateItem: state.duplicateItem,
+    })));
     const { inventory, fetchInventory } = useInventoryStore();
-    const { branches, printers, settings } = useAuthStore();
+    const { branches, printers, settings } = useAuthStore(useShallow((state) => ({ branches: state.branches, printers: state.printers, settings: state.settings })));
     const lang = settings.language;
     const { error: showError, info } = useToast();
     const { confirm } = useConfirm();

@@ -6,7 +6,7 @@
  */
 
 import { db } from '../db';
-import { orders, orderItems, payments, auditLogs, settings } from '../../src/db/schema';
+import { orders, orderItems, payments, auditLogs, settings, paymentMethodAccounts, chartOfAccounts } from '../../src/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { GLService } from './glService';
 import { submitOrderToFiscal } from './fiscalSubmitService';
@@ -327,6 +327,42 @@ export const refundService = {
         if (!refund) throw new Error('Refund not found');
         if (refund.status !== 'APPROVED') throw new Error('Refund is not approved');
 
+        const [order] = await db.select().from(orders).where(eq(orders.id, refund.orderId));
+        if (!order) throw new Error('Order not found for refund');
+
+        const originalMethod = String(order.paymentMethod || 'CASH').toUpperCase();
+        const refundMethod = refund.refundMethod === 'ORIGINAL_PAYMENT'
+            ? originalMethod
+            : String(refund.refundMethod || 'CASH').toUpperCase();
+        const paymentAccount = await db.select({ code: chartOfAccounts.code })
+            .from(paymentMethodAccounts)
+            .innerJoin(chartOfAccounts, eq(paymentMethodAccounts.accountId, chartOfAccounts.id))
+            .where(eq(paymentMethodAccounts.paymentMethod, refundMethod))
+            .top(1);
+        const cashAccount = paymentAccount[0]?.code || '1110';
+        const taxRatio = Number(order.total || 0) > 0
+            ? Number(order.tax || 0) * (Number(refund.refundAmount || 0) / Number(order.total || 0))
+            : 0;
+        const netRefund = Math.max(0, Number(refund.refundAmount || 0) - taxRatio);
+
+        // The finance entry must succeed before the refund becomes operationally
+        // processed. This prevents a successful refund with no GL entry.
+        const financeResult = await GLService.postJournalEntry({
+            reference: refund.id,
+            referenceType: 'REFUND',
+            description: `Refund ${refund.id} for Order #${refund.orderNumber}`,
+            branchId: refund.branchId,
+            createdBy: processedBy,
+            lines: [
+                { accountCode: '4100', debit: netRefund, credit: 0 },
+                ...(taxRatio > 0 ? [{ accountCode: '2210', debit: taxRatio, credit: 0 }] : []),
+                { accountCode: cashAccount, debit: 0, credit: Number(refund.refundAmount || 0) },
+            ],
+        });
+        if (!financeResult || typeof financeResult === 'string' || !(financeResult as any).entryId) {
+            throw new Error('REFUND_FINANCE_POSTING_FAILED');
+        }
+
         // 1. Update order status if full refund
         if (refund.type === 'FULL') {
             await db.update(orders)
@@ -350,25 +386,7 @@ export const refundService = {
             createdAt: new Date(),
         });
 
-        // 3. Post to finance (reverse the sale)
-        try {
-            await GLService.postJournalEntry({
-                reference: refund.id,
-                referenceType: 'REFUND',
-                description: `Refund ${refund.id} for Order #${refund.orderNumber}`,
-                branchId: refund.branchId,
-                createdBy: processedBy,
-                lines: [
-                    { accountCode: '4100', debit: refund.refundAmount, credit: 0 },
-                    { accountCode: '1110', debit: 0, credit: refund.refundAmount }
-                ]
-            });
-        } catch (finErr) {
-            // Log but don't block refund processing
-            log.error({ refundId: refund.id, orderId: refund.orderId, err: (finErr as any)?.message }, 'Finance posting failed for refund');
-        }
-
-        // 4. Record audit log
+        // 3. Record audit log
         await db.insert(auditLogs).values({
             eventType: 'REFUND_PROCESSED',
             userId: processedBy,
@@ -386,7 +404,7 @@ export const refundService = {
             createdAt: new Date(),
         });
 
-        // 5. Update refund status
+        // 4. Update refund status
         refund.status = 'PROCESSED';
         refund.processedAt = new Date().toISOString();
         refund.processedBy = processedBy;
@@ -395,7 +413,16 @@ export const refundService = {
 
         await writeSetting(REFUND_KEY, refunds, processedBy);
 
-        // 6. Trigger ETA fiscal submission for refund (Credit Note)
+        // 5. Claw back loyalty points awarded for this order (best-effort).
+        if (order.customerId) {
+            const { loyaltyService } = await import('./loyaltyService');
+            await loyaltyService.clawbackPoints(
+                String(order.customerId), Number(refund.refundAmount || order.total || 0),
+                String(order.id), refund.branchId,
+            ).catch(() => undefined);
+        }
+
+        // 5. Trigger ETA fiscal submission for refund (Credit Note)
         setTimeout(() => {
             submitOrderToFiscal(refund.orderId, {
                 isReturn: true,

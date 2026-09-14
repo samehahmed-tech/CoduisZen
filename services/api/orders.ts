@@ -51,6 +51,11 @@ export const ordersApi = {
             method: 'PUT',
             body: JSON.stringify(data),
         }),
+    updateItems: (id: string, data: { items: any[]; notes?: string; discount?: number; deliveryFee?: number; expectedUpdatedAt?: string; changedBy?: string; deliverySource?: string; paymentMethod?: string; deliveryAddress?: string; deliveryLat?: number; deliveryLng?: number; deliveryAddressLabel?: string; platformOrderId?: string; scheduledFor?: string }) =>
+        apiRequest<any>(`/orders/${id}/items`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
     validateCoupon: (data: { code: string; branchId?: string; orderType: string; subtotal: number; customerId?: string }) =>
         apiRequest<{
             valid: boolean;

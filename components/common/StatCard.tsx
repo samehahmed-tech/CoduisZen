@@ -1,6 +1,5 @@
 import React from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 interface StatCardProps {
     title: string;
@@ -35,10 +34,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, su
     const iconClass = iconColorMap[color] || iconColorMap.primary;
 
     return (
-        <motion.div
-            whileHover={{ y: -4, scale: 1.01 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-            className={`glass-1 relative group overflow-hidden ${compact ? 'p-4' : 'p-5'} border-border/10`}
+        <div
+            className={`glass-1 relative group overflow-hidden transition-transform duration-150 hover:-translate-y-1 ${compact ? 'p-4' : 'p-5'} border-border/10`}
         >
             {/* Background Decorative Glow */}
             <div className={`absolute -right-4 -top-4 w-24 h-24 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-500 ${iconClass.split(' ')[0]}`} />
@@ -72,7 +69,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, su
                     <Icon size={compact ? 16 : 18} />
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 };
 

@@ -51,7 +51,10 @@ export const healthService = {
         const freeMem = os.freemem();
         const memUsage = ((totalMem - freeMem) / totalMem) * 100;
         let whatsapp: HealthStatus['services']['whatsapp'] = { status: 'DISABLED', provider: 'disabled', configured: false };
-        if (String(process.env.ENABLE_WHATSAPP_WEB || '').toLowerCase() === 'true') {
+        const waProvider = String(process.env.WHATSAPP_PROVIDER ?? 'whatsapp-web.js').toLowerCase().trim();
+        const waEnabled = String(process.env.ENABLE_WHATSAPP_WEB || '').toLowerCase() === 'true'
+            || waProvider === 'openwa' || waProvider === 'web' || waProvider === 'whatsapp-web' || waProvider === 'whatsapp-web.js';
+        if (waEnabled) {
             try {
                 const current = await whatsappService.getStatus();
                 whatsapp = {

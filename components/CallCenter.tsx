@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
 import {
     Phone,
@@ -39,7 +40,6 @@ import {
     Ban,
     X,
     ChevronDown,
-    ChevronUp,
     Copy,
     ExternalLink,
     Sparkles,
@@ -53,16 +53,17 @@ import {
     ArrowUpRight,
     Building2,
     LayoutGrid,
+    Rows3,
+    Sparkles,
     List,
     Activity,
     Printer,
     FileText,
     CreditCard,
-    Grip,
-    Rows,
     Ticket,
     MonitorPlay,
-    Briefcase
+    Briefcase,
+    DollarSign
 } from 'lucide-react';
 import {
     OrderItem,
@@ -80,7 +81,7 @@ import { useOrderStore } from '../stores/useOrderStore';
 
 // Services
 import { translations } from '../services/translations';
-import { hasCashierPrinterConfigured, printKitchenTicketsByRouting, printOrderReceipt } from '../services/posPrintOrchestrator';
+import { printDriverTicket, printOrderReceipt } from '../services/posPrintOrchestrator';
 import { getActionableErrorMessage } from '../services/api/core';
 import { deliveryApi } from '../services/api/delivery';
 import { customersApi } from '../services/api/customers';
@@ -91,8 +92,14 @@ import ItemGrid from '../src/features/pos/components/ItemGrid';
 import CategoryTabs from '../src/features/pos/components/CategoryTabs';
 import CartItem from '../src/features/pos/components/CartItem';
 import NoteModal from '../src/features/pos/components/NoteModal';
+import ItemOptionsModal from '../src/features/pos/components/ItemOptionsModal';
 import { ManagerApprovalModal } from '../src/features/pos/components/ManagerApprovalModal';
 import AddressMapPicker from './common/AddressMapPicker';
+import DeliveryZonePicker from './common/DeliveryZonePicker';
+import { useRecipeAvailability } from './callcenter/useRecipeAvailability';
+import { MenuShortNotice, CartShortWarning } from './callcenter/RecipeWarningBanner';
+import { resolveBranchPrice } from '../utils/branchPricing';
+import { applyPlatformMarkup } from '../services/platformPricing';
 
 // ============================================================================
 // ?? INTELLIGENT CALL CENTER MODULE v2.0
@@ -103,7 +110,7 @@ import AddressMapPicker from './common/AddressMapPicker';
 const DriverAssignmentModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    onAssign: (driverId: string) => Promise<void> | void;
+    onAssign: (driverId: string, driverName?: string) => Promise<void> | void;
     branchId: string;
     orderId?: string;
     lang: 'en' | 'ar';
@@ -165,7 +172,7 @@ const DriverAssignmentModal: React.FC<{
                                     setAssigningDriverId(driver.id);
                                     setErrorMessage(null);
                                     try {
-                                        await onAssign(driver.id);
+                                        await onAssign(driver.id, driver.name || driver.fullName || 'Driver');
                                         onClose();
                                     } catch (error: any) {
                                         setErrorMessage(getActionableErrorMessage(error, lang));
@@ -201,7 +208,10 @@ const InlineCustomerRegistration: React.FC<{
     onSave: (customer: any) => Promise<void> | void;
     lang: 'en' | 'ar';
     zones: any[];
-}> = ({ isOpen, onClose, initialPhone, onSave, lang, zones }) => {
+    branchId?: string;
+    branches?: { id: string; name: string; nameAr?: string }[];
+    onZonesChange?: (zones: any[]) => void;
+}> = ({ isOpen, onClose, initialPhone, onSave, lang, zones, branchId, branches, onZonesChange }) => {
     const [form, setForm] = useState({
         name: '',
         phone: initialPhone,
@@ -229,12 +239,23 @@ const InlineCustomerRegistration: React.FC<{
 
     const handleSubmit = async () => {
         if (!form.name || !form.phone || !form.address) return;
+        // Egyptian mobile validation + zone required (drives branch + fee).
+        const digits = String(form.phone).replace(/\D/g, '').replace(/^002/, '').replace(/^2(?=01)/, '');
+        if (!/^01[0-9]{9}$/.test(digits)) {
+            setErrorMessage(lang === 'ar' ? 'رقم الهاتف يجب أن يكون موبايل مصري صحيح (01xxxxxxxxx)' : 'Phone must be a valid Egyptian mobile (01xxxxxxxxx)');
+            return;
+        }
+        if (!form.zoneId) {
+            setErrorMessage(lang === 'ar' ? 'اختيار المنطقة إجباري (يحدد الفرع والرسوم)' : 'Zone is required (drives branch and fee)');
+            return;
+        }
         setIsSaving(true);
         setErrorMessage(null);
         try {
             await onSave({
                 id: `CUS-${Date.now()}`,
                 ...form,
+                phone: digits,
                 source: 'call_center',
                 createdAt: new Date(),
                 visits: 0,
@@ -291,19 +312,17 @@ const InlineCustomerRegistration: React.FC<{
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="col-span-2 group">
-                                <label className="text-[9px] font-black uppercase text-muted tracking-[0.2em] mb-1.5 block group-focus-within:text-cyan-500 transition-colors">{lang === 'ar' ? 'المنطقة (تحديد الفرع والرسوم) *' : 'Delivery Zone (Auto Branch & Fee) *'}</label>
-                                <div className="relative group/select">
-                                    <select value={form.zoneId || ''} onChange={e => {
-                                        const selectedZone = zones.find(z => String(z.id) === String(e.target.value));
-                                        setForm({ ...form, zoneId: e.target.value, area: selectedZone ? selectedZone.name : '' });
-                                    }} className="w-full bg-elevated dark:bg-gray-800 rounded-xl py-3.5 pl-5 pr-10 text-sm font-bold outline-none border border-border/50 focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/10 transition-all text-main cursor-pointer appearance-none">
-                                        <option value="" disabled>{lang === 'ar' ? 'اختر المنطقة...' : 'Select delivery zone...'}</option>
-                                        {(zones || []).map((z: any) => (
-                                            <option key={z.id} value={z.id} className="bg-card text-main font-bold py-2">{z.nameAr || z.name}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown size={18} className="absolute top-1/2 -translate-y-1/2 right-4 text-muted pointer-events-none group-hover/select:text-cyan-500 transition-colors" />
-                                </div>
+                                <DeliveryZonePicker
+                                    zones={zones}
+                                    value={form.zoneId || ''}
+                                    branchId={branchId}
+                                    branches={branches}
+                                    lang={lang}
+                                    onZonesChange={onZonesChange}
+                                    onChange={(zoneId, selectedZone) => setForm({ ...form, zoneId, area: selectedZone ? (selectedZone.nameAr || selectedZone.name) : form.area })}
+                                    label={lang === 'ar' ? 'المنطقة (من السيستم + إضافة جديدة بسعر التوصيل) *' : 'Delivery Zone (system list + quick-add with fee) *'}
+                                    placeholder={lang === 'ar' ? 'اختر المنطقة...' : 'Select delivery zone...'}
+                                />
                             </div>
                             <div className="col-span-2 group">
                                 <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full bg-elevated/50 border border-cyan-500/30 rounded-[1.2rem] py-3.5 px-5 text-sm font-bold outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/20 transition-all text-main placeholder-cyan-500/50" placeholder={lang === 'ar' ? 'العنوان بالتفصيل *' : 'Street Address *'} />
@@ -341,7 +360,7 @@ const InlineCustomerRegistration: React.FC<{
                     <button onClick={onClose} className="flex-1 py-4 rounded-[1.2rem] border border-border/50 bg-elevated text-muted font-black tracking-[0.2em] text-[10px] uppercase hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/50 transition-all active:scale-95 shadow-sm">
                         {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                     </button>
-                    <button onClick={handleSubmit} disabled={!form.name || !form.phone || !form.address || isSaving} className="flex-1 py-4 rounded-[1.2rem] bg-gradient-to-r from-indigo-500 to-cyan-500 text-white font-black tracking-[0.2em] text-[10px] uppercase hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/25 active:scale-95 disabled:active:scale-100">
+                    <button onClick={handleSubmit} disabled={!form.name || !form.phone || !form.address || !form.zoneId || isSaving} className="flex-1 py-4 rounded-[1.2rem] bg-gradient-to-r from-indigo-500 to-cyan-500 text-white font-black tracking-[0.2em] text-[10px] uppercase hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/25 active:scale-95 disabled:active:scale-100">
                         {isSaving ? <RefreshCcw size={16} className="animate-spin" /> : <Save size={16} />} {lang === 'ar' ? 'حفظ وبدء الطلب' : 'Save & Start'}
                     </button>
                 </div>
@@ -353,6 +372,7 @@ const InlineCustomerRegistration: React.FC<{
 // Order Status Badge Component
 const OrderStatusBadge: React.FC<{ status: OrderStatus; lang: 'en' | 'ar' }> = ({ status, lang }) => {
     const config: Record<OrderStatus, { bg: string; text: string; border: string; icon: any; label: { en: string; ar: string } }> = {
+        [OrderStatus.SCHEDULED]: { bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-500', icon: Clock, label: { en: 'Scheduled', ar: 'مجدول' } },
         [OrderStatus.PENDING]: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-500', icon: Clock, label: { en: 'Pending', ar: 'معلق' } },
         [OrderStatus.PREPARING]: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-500', icon: ChefHat, label: { en: 'Preparing', ar: 'تحضير' } },
         [OrderStatus.READY]: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-500', icon: Package, label: { en: 'Ready', ar: 'جاهز' } },
@@ -374,14 +394,23 @@ const OrderStatusBadge: React.FC<{ status: OrderStatus; lang: 'en' | 'ar' }> = (
 const CallCenter: React.FC = () => {
     // --- Global State ---
     const { customers, addCustomer } = useCRMStore();
-    const { branches, settings, printers, hasPermission } = useAuthStore();
-    const { categories } = useMenuStore();
-    const { orders, placeOrder, discount, setDiscount, fetchOrders, updateOrderStatus } = useOrderStore();
+    const { branches, settings, printers, hasPermission } = useAuthStore(useShallow((state) => ({ branches: state.branches, settings: state.settings, printers: state.printers, hasPermission: state.hasPermission })));
+    const { categories, isLoading: isMenuLoading, error: menuError, fetchMenu, platforms: deliveryPlatforms, fetchPlatforms } = useMenuStore(useShallow((state) => ({ categories: state.categories, isLoading: state.isLoading, error: state.error, fetchMenu: state.fetchMenu, platforms: state.platforms, fetchPlatforms: state.fetchPlatforms })));
+    const { orders, placeOrder, discount, setDiscount, fetchOrders, updateOrderStatus, updateOrderItems } = useOrderStore(useShallow((state) => ({ orders: state.orders, placeOrder: state.placeOrder, discount: state.discount, setDiscount: state.setDiscount, fetchOrders: state.fetchOrders, updateOrderStatus: state.updateOrderStatus, updateOrderItems: state.updateOrderItems })));
     const navigate = useNavigate();
     const { showToast } = useToast();
 
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [approvalCallback, setApprovalCallback] = useState<{ fn: () => void; action: string } | null>(null);
+
+    // Ownership gate: agents edit/cancel their own pending orders; others'
+    // orders need OP_VOID_ORDER (manager). Server branch policy is backstop.
+    const canModifyCCOrder = (order: any) => {
+        if (hasPermission(AppPermission.OP_VOID_ORDER)) return true;
+        const mine = String(order.callCenterAgentId || order.call_center_agent_id || '');
+        const me = String((settings as any)?.currentUser?.id || '');
+        return Boolean(mine) && Boolean(me) && mine === me;
+    };
 
     const requestManagerApproval = useCallback((action: string, fn: () => void | Promise<void>) => {
         setApprovalCallback({
@@ -437,6 +466,29 @@ const CallCenter: React.FC = () => {
     const [showRegistrationModal, setShowRegistrationModal] = useState(false);
     const [cart, setCart] = useState<any[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || '');
+    // Order channel: DELIVERY (priced from the branch DELIVERY list, needs
+    // address + zone + fee) or TAKEAWAY/pickup (branch TAKEAWAY list, no
+    // address, no fee). Same channel rule as the server resolver.
+    const [orderChannel, setOrderChannel] = useState<'DELIVERY' | 'TAKEAWAY'>('DELIVERY');
+    // Unified sales channel: 'CALL' (restaurant / in-house) or a platform id
+    // from the menu store (same source of truth as POS: Talabat, Elmenus...).
+    // Old held orders may carry names ('TALABAT') — matching normalizes both.
+    const [orderSource, setOrderSource] = useState<string>('CALL');
+    const [externalRef, setExternalRef] = useState('');
+    // Per-order markup override: the agent (manager-approved flow) can adjust
+    // the platform % / fixed for THIS order only. null = follow platform config.
+    const [markupOverride, setMarkupOverride] = useState<{ pct: number; fixed: number } | null>(null);
+    // Payment + scheduling: cash/card/wallet and now vs scheduled datetime.
+    const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'WALLET'>('CASH');
+    const [scheduledFor, setScheduledFor] = useState('');
+    // Branch auto-pick: zone -> branch. Manual change sets the override flag
+    // so the agent sees a warning instead of a silent re-pick.
+    const [branchAuto, setBranchAuto] = useState(true);
+    const [branchManualOverride, setBranchManualOverride] = useState(false);
+    // Map modal: the address pin lives in an overlay (not inline) so the
+    // menu + cart keep full height. Auto-opens for a new delivery customer
+    // without a pin; closing it never reopens until the next customer.
+    const [mapModalOpen, setMapModalOpen] = useState(false);
     const [deliveryAddress, setDeliveryAddress] = useState('');
     const [deliveryPin, setDeliveryPin] = useState<{ lat?: number; lng?: number; label?: string }>({});
     const [activeCategory, setActiveCategory] = useState(categories[0]?.id || '');
@@ -458,28 +510,201 @@ const CallCenter: React.FC = () => {
     const [orderNotes, setOrderNotes] = useState('');
     const [urgentFlag, setUrgentFlag] = useState(false);
     const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+    // Real saved addresses (customerAddresses table via getById), replacing
+    // the old hardcoded Home/Work mock.
+    const [profileAddresses, setProfileAddresses] = useState<any[]>([]);
+    const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+    // Edit mode: a PENDING call-center order reloaded into the builder.
+    // Submit becomes "save edit" (same id, branch follows by consequence).
+    const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+    // Cancel flow: reason is mandatory (server policy), collected in-modal.
+    const [cancelTarget, setCancelTarget] = useState<any | null>(null);
+    const [cancelReason, setCancelReason] = useState('');
+    const [isCancelling, setIsCancelling] = useState(false);
+    const [confirmingReset, setConfirmingReset] = useState(false);
     const customerLookupRequestRef = React.useRef(0);
+    const itemSearchRef = React.useRef<HTMLInputElement | null>(null);
+
+    // Agent speed: the moment a customer is picked, focus lands on item
+    // search so selling starts with zero clicks (F2 jumps back anytime).
+    useEffect(() => {
+        if (selectedCustomer) {
+            const t = window.setTimeout(() => itemSearchRef.current?.focus(), 120);
+            return () => window.clearTimeout(t);
+        }
+    }, [selectedCustomer]);
+
+    // Fresh customer record (addresses + loyalty) whenever the profile opens.
+    useEffect(() => {
+        if (!showCustomerProfile || !selectedCustomer?.id) {
+            if (!showCustomerProfile) setProfileAddresses([]);
+            return;
+        }
+        let cancelled = false;
+        setIsLoadingAddresses(true);
+        customersApi.getById(selectedCustomer.id).then((full: any) => {
+            if (cancelled) return;
+            setProfileAddresses(Array.isArray(full?.addresses) ? full.addresses : []);
+            setSelectedCustomer((prev: any) => prev ? ({
+                ...prev,
+                visits: full?.visits ?? prev.visits,
+                loyaltyTier: full?.loyaltyTier ?? prev.loyaltyTier,
+                loyaltyPoints: full?.loyaltyPoints ?? prev.loyaltyPoints,
+            }) : prev);
+        }).catch(() => { /* keep cached customer */ })
+            .finally(() => { if (!cancelled) setIsLoadingAddresses(false); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showCustomerProfile, selectedCustomer?.id]);
+
+    const applyProfileAddress = (addr: any) => {
+        if (!addr) return;
+        if (addr.address) setDeliveryAddress(addr.address);
+        if (addr.lat && addr.lng) {
+            setDeliveryPin({ lat: Number(addr.lat), lng: Number(addr.lng), label: addr.label });
+        }
+        if (addr.zoneId) {
+            setSelectedZoneId(String(addr.zoneId));
+            const z = deliveryZones.find(dz => String(dz.id) === String(addr.zoneId));
+            if (z?.branchId) {
+                setSelectedBranchId(z.branchId);
+                setBranchManualOverride(false);
+            } else {
+                void autoBranchFromZoneId(String(addr.zoneId));
+            }
+        }
+        showToast(lang === 'ar' ? 'تم اختيار العنوان' : 'Address selected', 'success');
+    };
+
+    const saveCurrentAsAddress = async () => {
+        if (!selectedCustomer?.id) return;
+        if (!deliveryAddress.trim()) {
+            showToast(tr('اكتب العنوان أولاً ثم احفظه', 'Enter the address first, then save it'), 'warning');
+            return;
+        }
+        try {
+            const created = await customersApi.addAddress(selectedCustomer.id, {
+                label: deliveryPin.label || `${lang === 'ar' ? 'عنوان' : 'Address'} ${profileAddresses.length + 1}`,
+                address: deliveryAddress.trim(),
+                lat: deliveryPin.lat,
+                lng: deliveryPin.lng,
+                zoneId: selectedZoneId ? Number(selectedZoneId) : undefined,
+            });
+            setProfileAddresses(prev => [...prev, created]);
+            showToast(lang === 'ar' ? 'تم حفظ العنوان للعميل' : 'Address saved for customer', 'success');
+        } catch (error: any) {
+            showToast(getActionableErrorMessage(error, lang), 'error');
+        }
+    };
+
+    // Sync the current order address into the customer master record
+    // (primary address + pin + zone), so next call starts pre-filled.
+    const syncCustomerAddress = async () => {
+        if (!selectedCustomer?.id) return;
+        if (!deliveryAddress.trim()) {
+            showToast(tr('اكتب العنوان أولاً', 'Enter the address first'), 'warning');
+            return;
+        }
+        try {
+            const updated = await customersApi.update(selectedCustomer.id, {
+                address: deliveryAddress.trim(),
+                lat: deliveryPin.lat,
+                lng: deliveryPin.lng,
+                addressLabel: deliveryPin.label,
+                zoneId: selectedZoneId ? Number(selectedZoneId) : undefined,
+            });
+            setSelectedCustomer((prev: any) => prev ? ({ ...prev, ...(updated || {}) }) : prev);
+            showToast(lang === 'ar' ? 'تم حفظ العنوان في ملف العميل' : 'Address saved to customer file', 'success');
+        } catch (error: any) {
+            showToast(getActionableErrorMessage(error, lang), 'error');
+        }
+    };
+
+    // New delivery order without a pin yet -> open the map modal once so
+    // the driver gets an exact point. Never reopens on pin drags/edits.
+    useEffect(() => {
+        if (selectedCustomer && orderChannel === 'DELIVERY' && !deliveryPin.lat) setMapModalOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedCustomer]);
 
     useEffect(() => {
         if (!selectedBranchId && branches[0]?.id) setSelectedBranchId(branches[0].id);
     }, [branches, selectedBranchId]);
+
+    // The menu is the agent's selling tool: load it eagerly on mount instead
+    // of waiting for the background idle load, so items always appear.
+    useEffect(() => {
+        if (categories.length === 0 && !isMenuLoading) {
+            fetchMenu().catch(() => undefined);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Persist held orders to localStorage
     useEffect(() => {
         try { localStorage.setItem('cc_held_orders', JSON.stringify(heldOrders)); } catch { /* storage full */ }
     }, [heldOrders]);
 
-    // Load delivery zones
+    // Load delivery zones (branch zones + global zones)
+    // Platforms come from the menu store — same source of truth as POS.
     useEffect(() => {
-        deliveryApi.getZones().then(zones => {
-            setDeliveryZones(zones || []);
-            if (zones?.length) setSelectedZoneId(zones[0].id);
-        }).catch(() => { });
+        if ((deliveryPlatforms?.length || 0) === 0) fetchPlatforms().catch(() => undefined);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Channel change resets any per-order markup override.
+    useEffect(() => {
+        setMarkupOverride(null);
+    }, [orderSource]);
+
+    useEffect(() => {
+        let cancelled = false;
+        deliveryApi.getZones(selectedBranchId || undefined).then(zones => {
+            if (cancelled) return;
+            const list = zones || [];
+            setDeliveryZones(list);
+            setSelectedZoneId(prev => {
+                if (prev && list.some((z: any) => String(z.id) === String(prev))) return prev;
+                return list.length ? String(list[0].id) : '';
+            });
+        }).catch(() => { });
+        return () => { cancelled = true; };
+    }, [selectedBranchId]);
+
+    const handleZonePicked = useCallback((zoneId: string, zone?: any) => {
+        setSelectedZoneId(zoneId);
+        // Auto-link branch when the zone is tied to a specific branch.
+        if (zone?.branchId) {
+            setSelectedBranchId(String(zone.branchId));
+            setBranchManualOverride(false);
+        }
+    }, []);
+
+    const handleBranchChange = useCallback((branchId: string, auto = false) => {
+        setSelectedBranchId(branchId);
+        // Agent manually changed the auto-picked branch -> keep a visible flag.
+        setBranchManualOverride(!auto);
+    }, []);
+
+    // Customer zone -> auto branch: the saved zone may belong to a branch
+    // different from the currently selected one (zones list is per-branch),
+    // so resolve it against the global zone list once.
+    const autoBranchFromZoneId = useCallback(async (zoneId: string) => {
+        if (!zoneId || !branchAuto) return;
+        try {
+            const all = await deliveryApi.getZones(undefined);
+            const match = (all || []).find((z: any) => String(z.id) === String(zoneId));
+            if (match?.branchId) {
+                setSelectedBranchId(String(match.branchId));
+                setBranchManualOverride(false);
+            }
+        } catch { /* keep current branch */ }
+    }, [branchAuto]);
 
     // --- Order Tracking State ---
     const [trackingFilter, setTrackingFilter] = useState<'all' | OrderStatus>(OrderStatus.PENDING);
     const [trackingBranch, setTrackingBranch] = useState<string>('all');
+    const [trackingSearch, setTrackingSearch] = useState('');
     const [trackingView, setTrackingView] = useState<'grid' | 'list'>('grid');
     const [showDriverModal, setShowDriverModal] = useState(false);
     const [selectedTrackingOrder, setSelectedTrackingOrder] = useState<any>(null);
@@ -560,7 +785,9 @@ const CallCenter: React.FC = () => {
         return order.isCallCenterOrder === true || order.is_call_center_order === true || source === 'call_center';
     };
 
-    // --- Menu & Items ---
+    // --- Menu & Items (priced by the TARGET branch price list) ---
+    // The fulfilling branch owns revenue/tax/stock, so its branchPricing
+    // wins; base price applies when the branch has no entry.
     const allMenuItems = useMemo(() => categories.flatMap(cat => cat.items.map(item => ({ ...item, categoryId: cat.id }))), [categories]);
 
     useEffect(() => {
@@ -574,6 +801,128 @@ const CallCenter: React.FC = () => {
         return items;
     }, [allMenuItems, activeCategory, itemSearchQuery]);
 
+    // --- Silent platform pricing (Talabat-style, POS parity) ---
+    // Declared BEFORE catalog pricing because pricedItems + cart re-pricing
+    // consume platformMarkup. Customer-facing price INCLUDES the markup;
+    // basePrice keeps the pre-markup branch price for audit. Server recomputes
+    // with the exact same formula from deliverySource, so quote and save never
+    // drift. Modifiers + open/weighted prices are never marked up.
+    const normPlatformKey = (s: unknown) => String(s || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+    const activeCCPlatform = useMemo(() => {
+        const key = normPlatformKey(orderSource);
+        if (!key || key === 'call' || key === 'restaurant') return null;
+        return (deliveryPlatforms || []).find((p: any) =>
+            p && p.isActive !== false && (normPlatformKey(p.id) === key || normPlatformKey(p.name) === key),
+        ) || null;
+    }, [deliveryPlatforms, orderSource]);
+    // Server-recognized delivery source key (POS convention): platform id/name
+    // lowercase, or 'restaurant' for in-house call orders.
+    const platformDeliveryKey = activeCCPlatform ? String(activeCCPlatform.id).trim().toLowerCase() : 'restaurant';
+    const configMarkupPct = Number(activeCCPlatform?.priceMarkupPercentage || 0) || 0;
+    const configMarkupFixed = Number(activeCCPlatform?.priceMarkupFixed || 0) || 0;
+    const effMarkupPct = markupOverride ? markupOverride.pct : configMarkupPct;
+    const effMarkupFixed = markupOverride ? markupOverride.fixed : configMarkupFixed;
+    const platformMarkup = useMemo(() => {
+        if (!activeCCPlatform || activeCCPlatform.applyFeesToMenuPrice === false) return null;
+        if (!(effMarkupPct > 0) && !(effMarkupFixed > 0)) return null;
+        return { platformId: String(activeCCPlatform.id), pct: effMarkupPct, fixed: effMarkupFixed };
+    }, [activeCCPlatform, effMarkupPct, effMarkupFixed]);
+
+    // Visible lines: branch price first, then silent platform markup baked in
+    // (POS parity). basePrice = pre-markup branch price for audit; open/
+    // weighted items are never marked up. Zero-price simple items (no sizes/
+    // modifiers/open-price) are hidden: a "0 ج.م" card is a pricing gap.
+    const pricedItems = useMemo(
+        () => filteredItems
+            .map((i: any) => {
+                // menuBase = catalog price (stable across branch switches);
+                // basePrice = target-branch pre-markup price (audit + modal base).
+                const menuBase = Number(i?.price || 0);
+                const basePrice = resolveBranchPrice(i, selectedBranchId, orderChannel);
+                const isOpen = Boolean((i as any)?.isWeighted);
+                const price = (!isOpen && platformMarkup)
+                    ? applyPlatformMarkup(basePrice, platformMarkup.pct, platformMarkup.fixed)
+                    : basePrice;
+                return {
+                    ...i,
+                    menuBase,
+                    basePrice,
+                    price,
+                    platformId: (!isOpen && platformMarkup) ? platformMarkup.platformId : null,
+                    platformMarkup: (!isOpen && platformMarkup)
+                        ? Math.max(0, Math.round(((price - basePrice) + Number.EPSILON) * 100) / 100)
+                        : 0,
+                };
+            })
+            .filter((i: any) => {
+                const hasConfig = (Array.isArray(i?.sizes) && i.sizes.length > 0)
+                    || (Array.isArray(i?.modifierGroups) && i.modifierGroups.length > 0)
+                    || (i as any)?.isWeighted;
+                if (hasConfig) return true;
+                return Number(i?.basePrice || 0) > 0;
+            }),
+        [filteredItems, selectedBranchId, orderChannel, platformMarkup],
+    );
+
+    // Switching target branch/channel/platform re-prices the open cart
+    // (warn-only domain: quantities/notes/driver data untouched). Sized lines
+    // carry an absolute size price (server parity) and open-price lines are
+    // cashier-entered — both skip re-pricing. Server recomputes authoritatively.
+    useEffect(() => {
+        if (!selectedBranchId || cart.length === 0) return;
+        setCart((prev) => {
+            let changed = false;
+            const next = prev.map((line: any) => {
+                // Sized lines carry an absolute size price (server parity:
+                // a selected size wins over the branch list), so only
+                // base (unsized) lines follow branch/channel re-pricing.
+                if (String(line?.sizeId || line?.size_id || '').trim()) return line;
+                if (line?.isOpenPrice) return line;
+                const menuBase = Number(line?.menuBase ?? line?.basePrice ?? line?.price ?? 0);
+                const branchPrice = resolveBranchPrice({ ...line, price: menuBase }, selectedBranchId, orderChannel);
+                const isOpen = Boolean(line?.isWeighted);
+                const newPrice = (!isOpen && platformMarkup)
+                    ? applyPlatformMarkup(branchPrice, platformMarkup.pct, platformMarkup.fixed)
+                    : branchPrice;
+                const newMarkup = (!isOpen && platformMarkup)
+                    ? Math.max(0, Math.round(((newPrice - branchPrice) + Number.EPSILON) * 100) / 100)
+                    : 0;
+                if (Number(newPrice) !== Number(line?.price) || Number(newMarkup) !== Number(line?.platformMarkup || 0)) {
+                    changed = true;
+                    return {
+                        ...line,
+                        menuBase,
+                        basePrice: branchPrice,
+                        price: newPrice,
+                        platformId: (!isOpen && platformMarkup) ? platformMarkup.platformId : null,
+                        platformMarkup: newMarkup,
+                    };
+                }
+                return line;
+            });
+            return changed ? next : prev;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedBranchId, orderChannel, platformMarkup]);
+
+    // --- Recipe availability (WARN ONLY — never blocks the sale) ---
+    // Availability is computed against the TARGET branch (selectedBranchId)
+    // because deduction happens in that branch's warehouses server-side.
+    const availabilityIds = useMemo(() => {
+        const cartIds = cart.map((i: any) => String(i?.menuItemId || i?.menu_item_id || i?.id || '').trim()).filter(Boolean);
+        const visibleIds = filteredItems.slice(0, 40).map((i: any) => String(i?.id || '').trim()).filter(Boolean);
+        return Array.from(new Set([...cartIds, ...visibleIds]));
+    }, [cart, filteredItems]);
+    const { byItem: availabilityByItem } = useRecipeAvailability(selectedBranchId, availabilityIds);
+    const shortCartItems = useMemo(
+        () => cart.filter((i: any) => availabilityByItem[String(i?.menuItemId || i?.menu_item_id || i?.id || '')]?.short),
+        [cart, availabilityByItem],
+    );
+    const shortVisibleCount = useMemo(
+        () => filteredItems.filter((i: any) => availabilityByItem[String(i?.id || '')]?.short).length,
+        [filteredItems, availabilityByItem],
+    );
+
     // Customer's recent orders (last 5)
     const customerOrders = useMemo(() => {
         if (!selectedCustomer) return [];
@@ -585,10 +934,45 @@ const CallCenter: React.FC = () => {
 
     const reorderFromHistory = (order: any) => {
         if (!order.items?.length) return;
-        const newCart = order.items.map((item: any) => ({
-            ...item,
-            cartId: `reorder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        }));
+        // Re-price from the CURRENT target branch+channel+platform list
+        // (history prices may be stale); quantities/notes/configuration preserved.
+        // Sized lines keep their absolute size price (server parity).
+        const newCart = order.items.map((item: any) => {
+            const menuItemId = String(item?.menuItemId || item?.menu_item_id || item?.id || '');
+            const catalogMatch = allMenuItems.find((m: any) => String(m?.id) === menuItemId);
+            const sizeId = String(item?.sizeId || item?.size_id || '').trim();
+            const catalogSize = sizeId && Array.isArray((catalogMatch as any)?.sizes)
+                ? (catalogMatch as any).sizes.find((s: any) => String(s?.id || '').trim() === sizeId)
+                : undefined;
+            const branchPricing = (catalogMatch as any)?.branchPricing ?? (item as any)?.branchPricing;
+            const menuBase = catalogSize
+                ? Number(catalogSize.price || 0)
+                : Number((catalogMatch as any)?.price ?? item?.price ?? 0);
+            const basePrice = catalogSize
+                ? Number(catalogSize.price || 0)
+                : resolveBranchPrice({ price: menuBase, branchPricing }, selectedBranchId, orderChannel);
+            const isOpen = Boolean((catalogMatch as any)?.isWeighted || (item as any)?.isWeighted);
+            const price = (!sizeId && !isOpen && platformMarkup)
+                ? applyPlatformMarkup(basePrice, platformMarkup.pct, platformMarkup.fixed)
+                : basePrice;
+            return {
+                ...item,
+                menuItemId,
+                menuBase,
+                sizeId: sizeId || undefined,
+                size_id: sizeId || undefined,
+                basePrice,
+                branchPricing,
+                price,
+                platformId: (!sizeId && !isOpen && platformMarkup) ? platformMarkup.platformId : null,
+                platformMarkup: (!sizeId && !isOpen && platformMarkup)
+                    ? Math.max(0, Math.round(((price - basePrice) + Number.EPSILON) * 100) / 100)
+                    : 0,
+                selectedModifiers: Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : (Array.isArray(item?.modifiers) ? item.modifiers : []),
+                quantity: Number(item?.quantity || 1),
+                cartId: `reorder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            };
+        });
         setCart(prev => [...prev, ...newCart]);
         showToast(lang === 'ar' ? 'تم إضافة الطلب السابق للسلة' : 'Previous order added to cart', 'success');
     };
@@ -619,7 +1003,12 @@ const CallCenter: React.FC = () => {
         if (customer.zoneId) {
             setSelectedZoneId(String(customer.zoneId));
             const z = deliveryZones.find(dz => String(dz.id) === String(customer.zoneId));
-            if (z?.branchId) setSelectedBranchId(z.branchId);
+            if (z?.branchId) {
+                setSelectedBranchId(z.branchId);
+                setBranchManualOverride(false);
+            } else {
+                void autoBranchFromZoneId(String(customer.zoneId));
+            }
         }
     };
 
@@ -772,15 +1161,49 @@ const CallCenter: React.FC = () => {
         showToast(lang === 'ar' ? 'تم حفظ العميل في CRM' : 'Customer saved to CRM', 'success');
     };
 
-    // --- Cart Functions ---
-    const addToCart = (item: any) => {
-        const existingItem = cart.find(i => i.id === item.id);
+    // --- Cart Functions (configuration-aware: same item id with a different
+    // size/modifier set is a separate line, mirroring the POS cart) ---
+    const sameCartConfiguration = (a: any, b: any) => {
+        const menuId = (x: any) => String(x?.menuItemId || x?.menu_item_id || x?.id || '');
+        if (menuId(a) !== menuId(b)) return false;
+        if (String(a?.sizeId || a?.size_id || '') !== String(b?.sizeId || b?.size_id || '')) return false;
+        const norm = (mods: any[]) => (Array.isArray(mods) ? mods : [])
+            .map((m: any) => String(m?.id || m?.optionId || m?.optionName || ''))
+            .sort()
+            .join('|');
+        return norm(a?.selectedModifiers || a?.modifiers) === norm(b?.selectedModifiers || b?.modifiers);
+    };
+    const addToCart = (item: any, selectedModifiers: any[] = [], quantity = 1) => {
+        const line = {
+            ...item,
+            menuItemId: item?.menuItemId || item?.menu_item_id || item?.id,
+            selectedModifiers,
+        };
+        const existingItem = cart.find(i => sameCartConfiguration(i, line));
         if (existingItem) {
-            updateQuantity(existingItem.cartId, 1);
+            updateQuantity(existingItem.cartId, quantity);
         } else {
             const cartId = Math.random().toString(36).substr(2, 9);
-            setCart([...cart, { ...item, quantity: 1, cartId, notes: '' }]);
+            setCart([...cart, { ...line, quantity: Math.max(1, Number(quantity) || 1), cartId, notes: '' }]);
         }
+    };
+
+    // Item options (sizes / modifiers / open price): same modal as the POS.
+    // Grid items already carry the branch+channel price in `price`/`basePrice`,
+    // so the modal derives from the resolved base exactly once.
+    const [optionItem, setOptionItem] = useState<any | null>(null);
+    const handleGridAdd = (item: any) => {
+        if ((item?.sizes && item.sizes.length > 0) ||
+            (item?.modifierGroups && item.modifierGroups.length > 0) ||
+            item?.price === 0 || (item as any)?.isWeighted) {
+            setOptionItem(item);
+            return;
+        }
+        addToCart(item);
+    };
+    const handleConfirmItemOptions = (item: any, selectedModifiers: any[], qty: number) => {
+        addToCart(item, selectedModifiers, qty);
+        setOptionItem(null);
     };
 
     const updateQuantity = (cartId: string, delta: number) => {
@@ -790,22 +1213,44 @@ const CallCenter: React.FC = () => {
     const removeFromCart = (cartId: string) => setCart(cart.filter(i => i.cartId !== cartId));
     const updateCartItemNotes = (cartId: string, notes: string) => setCart(cart.map(i => i.cartId === cartId ? { ...i, notes } : i));
 
-    // --- Pricing ---
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountAmount = subtotal * (discount / 100);
-    const selectedZone = deliveryZones.find(z => z.id === selectedZoneId);
-    const deliveryFee = freeDelivery ? 0 : (selectedZone?.deliveryFee || 15);
-    const tax = (subtotal - discountAmount) * 0.14;
-    const total = subtotal - discountAmount + tax + deliveryFee;
-
-    // --- Hold Order ---
+    // --- Pricing (mirrors the server: target-branch DELIVERY list + the
+    // fulfilling branch's tax rate — never a hardcoded rate, so the quote
+    // the call center gives always matches what the branch saves) ---
+    // Modifier prices are per-unit on top of the unit price, rounded exactly
+    // like the server/POS so the quote never drifts on configured items.
+    const money = (value: number) => parseFloat(Number(value || 0).toFixed(2));
+    const lineModsPrice = (item: any) => (Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [])
+        .reduce((sum: number, mod: any) => sum + (Number(mod?.price) || 0), 0);
+    const subtotal = money(cart.reduce((sum, item) => sum + (((item.price || 0) + lineModsPrice(item)) * (item.quantity || 0)), 0));
+    const discountAmount = money(subtotal * (discount / 100));
+    const selectedZone = deliveryZones.find(z => String(z.id) === String(selectedZoneId));
+    // Takeaway/pickup has no zone and no delivery fee by definition.
+    const deliveryFee = orderChannel === 'TAKEAWAY' ? 0 : (freeDelivery ? 0 : Number(selectedZone?.deliveryFee ?? 15));
+    const targetBranchTaxRate = Number(branches.find((b: any) => b.id === selectedBranchId)?.taxRate ?? settings.taxRate ?? 14);
+    const effectiveTaxRate = Number.isFinite(targetBranchTaxRate) && targetBranchTaxRate >= 0 && targetBranchTaxRate <= 100 ? targetBranchTaxRate : 14;
+    const tax = money((subtotal - discountAmount) * (effectiveTaxRate / 100));
+    const total = money(subtotal - discountAmount + tax + deliveryFee);
+    // Totals-derived platform displays (need cart + total, so they live here).
+    const platformFeePct = Number((activeCCPlatform as any)?.feePercentage ?? (activeCCPlatform as any)?.fee_percentage ?? 0) || 0;
+    const platformMarkupTotal = money(cart.reduce((sum, line: any) => sum + (Number(line?.platformMarkup || 0) * Number(line?.quantity || 0)), 0));
+    const platformFeeAmount = money(total * (platformFeePct / 100));
+    // Platform SLA hint: aggregators must be confirmed fast.
+    const platformSlaMins = !activeCCPlatform ? 0 : normPlatformKey(activeCCPlatform.id) === 'talabat' || normPlatformKey(activeCCPlatform.name) === 'talabat' ? 5 : 10;
+    // --- Hold Order (new orders only — edits must be saved or discarded) ---
     const holdCurrentOrder = () => {
-        if (cart.length === 0) return;
+        if (cart.length === 0 || editingOrderId) return;
         setHeldOrders([...heldOrders, {
             id: `HOLD-${Date.now()}`,
             customer: selectedCustomer,
             cart: [...cart],
             items: [...cart],
+            channel: orderChannel,
+            source: orderSource,
+            markupOverride,
+            paymentMethod,
+            scheduledFor,
+            externalRef,
+            branchId: selectedBranchId,
             total,
             timestamp: new Date(),
             notes: orderNotes
@@ -819,6 +1264,13 @@ const CallCenter: React.FC = () => {
             setSelectedCustomer(order.customer);
             setCart(order.cart);
             setOrderNotes(order.notes);
+            if (order.channel === 'TAKEAWAY' || order.channel === 'DELIVERY') setOrderChannel(order.channel);
+            if (order.source) setOrderSource(order.source);
+            if (order.markupOverride !== undefined) setMarkupOverride(order.markupOverride);
+            if (order.paymentMethod) setPaymentMethod(order.paymentMethod);
+            if (order.scheduledFor !== undefined) setScheduledFor(order.scheduledFor);
+            if (order.externalRef !== undefined) setExternalRef(order.externalRef);
+            if (order.branchId) setSelectedBranchId(order.branchId);
             setHeldOrders(heldOrders.filter(o => o.id !== holdId));
         }
     };
@@ -836,6 +1288,121 @@ const CallCenter: React.FC = () => {
         setIsCallActive(false);
         setCallDuration(0);
         setCustomerSearched(false);
+        setExternalRef('');
+        setScheduledFor('');
+        setPaymentMethod('CASH');
+        setMarkupOverride(null);
+        setEditingOrderId(null);
+        setBranchManualOverride(false);
+    };
+
+    // --- Edit PENDING order: reload it into the builder (same id kept) ---
+    const startEditOrder = (order: any) => {
+        const phone = getOrderCustomerPhone(order);
+        const found = customers.find((c: any) =>
+            (order.customerId && String(c.id) === String(order.customerId)) || (phone && phone !== '-' && c.phone === phone));
+        const customer = found || {
+            id: order.customerId, name: getOrderCustomerName(order), phone: phone === '-' ? '' : phone,
+            address: getOrderDeliveryAddress(order),
+        };
+        setSelectedCustomer(customer);
+        setPhoneSearch(customer.phone || '');
+        setDeliveryAddress(order.deliveryAddress || order.delivery_address || '');
+        setDeliveryPin({
+            lat: order.deliveryLat ?? order.delivery_lat ?? (customer as any).lat ?? (customer as any).latitude,
+            lng: order.deliveryLng ?? order.delivery_lng ?? (customer as any).lng ?? (customer as any).longitude,
+            label: order.deliveryAddressLabel ?? order.delivery_address_label,
+        });
+        const branchId = getOrderBranchId(order);
+        if (branchId) {
+            setSelectedBranchId(branchId);
+            setBranchManualOverride(false);
+        }
+        const orderType = String(order.type || '').toUpperCase();
+        setOrderChannel(orderType === 'TAKEAWAY' || orderType === 'PICKUP' ? 'TAKEAWAY' : 'DELIVERY');
+        const ds = String(order.deliverySource || order.delivery_source || 'restaurant');
+        setOrderSource(ds.toLowerCase() === 'restaurant' ? 'CALL' : ds);
+        const pm = String(order.paymentMethod || order.payment_method || 'CASH').toUpperCase();
+        setPaymentMethod(pm === 'CARD' || pm === 'WALLET' ? pm as any : 'CASH');
+        setExternalRef(String(order.platformOrderId || order.platform_order_id || ''));
+        setScheduledFor(String(order.scheduledFor || order.scheduled_for || ''));
+        setFreeDelivery(Boolean(order.freeDelivery ?? order.free_delivery));
+        setUrgentFlag(Boolean(order.isUrgent ?? order.is_urgent));
+        setOrderNotes('');
+        setMarkupOverride(null);
+        const sub = Number(order.subtotal || 0);
+        const disc = Number(order.discount || 0);
+        setDiscount(sub > 0 && disc > 0 ? Math.min(100, (disc / sub) * 100) : 0);
+        // Re-price lines against the catalog (history prices may be stale),
+        // like reorder — server re-prices authoritatively on save anyway.
+        const lines = (order.items || []).map((item: any) => {
+            const menuItemId = String(item?.menuItemId || item?.menu_item_id || item?.id || '');
+            const catalogMatch = allMenuItems.find((m: any) => String(m?.id) === menuItemId);
+            const sizeId = String(item?.sizeId || item?.size_id || '').trim();
+            const menuBase = Number((catalogMatch as any)?.price ?? item?.price ?? 0);
+            const branchPricing = (catalogMatch as any)?.branchPricing;
+            const basePrice = sizeId
+                ? menuBase
+                : resolveBranchPrice({ price: menuBase, branchPricing }, branchId || selectedBranchId, orderType === 'TAKEAWAY' ? 'TAKEAWAY' : 'DELIVERY');
+            return {
+                ...item,
+                menuItemId,
+                menuBase,
+                sizeId: sizeId || undefined,
+                size_id: sizeId || undefined,
+                basePrice,
+                branchPricing,
+                price: Number(item?.price ?? basePrice ?? 0),
+                selectedModifiers: Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : (Array.isArray(item?.modifiers) ? item.modifiers : []),
+                quantity: Math.max(1, Number(item?.quantity || 1)),
+                cartId: `edit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                notes: item?.notes || '',
+            };
+        });
+        setCart(lines);
+        setCustomerSearched(true);
+        setEditingOrderId(order.id);
+        setActiveView('order');
+        showToast(lang === 'ar' ? `وضع التعديل للطلب #${order.id} — عدّل ثم احفظ` : `Editing order #${order.id} — adjust then save`, 'info');
+    };
+
+    // --- Cancel order with mandatory reason (server policy). Started orders
+    // are branch-locked by policy and must be cancelled at the branch. ---
+    const printTrackingReceipt = async (order: any) => {
+        try {
+            const branch = branches.find(b => b.id === getOrderBranchId(order));
+            await printOrderReceipt({
+                order, printers, settings,
+                currencySymbol: settings.currencySymbol, lang, t, branch,
+                title: t.order_receipt || (lang === 'ar' ? 'إيصال الطلب' : 'Order Receipt'),
+            });
+        } catch (error: any) {
+            showToast(getActionableErrorMessage(error, lang), 'error');
+        }
+    };
+    const confirmCancelOrder = async () => {
+        if (!cancelTarget || isCancelling) return;
+        if (!cancelReason.trim()) {
+            showToast(tr('اكتب سبب الإلغاء أولاً', 'Enter a cancellation reason first'), 'warning');
+            return;
+        }
+        setIsCancelling(true);
+        try {
+            await updateOrderStatus(
+                cancelTarget.id,
+                OrderStatus.CANCELLED,
+                (settings as any)?.currentUser?.id,
+                `${cancelReason.trim()} (كول سنتر)`,
+            );
+            showToast(lang === 'ar' ? 'تم إلغاء الطلب وإخطار الفرع والمطبخ' : 'Order cancelled — branch and kitchen notified', 'success');
+            setCancelTarget(null);
+            setCancelReason('');
+            await fetchOrders();
+        } catch (error: any) {
+            showToast(getActionableErrorMessage(error, lang), 'error');
+        } finally {
+            setIsCancelling(false);
+        }
     };
 
     // --- Submit Order ---
@@ -849,7 +1416,7 @@ const CallCenter: React.FC = () => {
             showToast(tr('اختار الفرع قبل إرسال الطلب', 'Select a branch before sending the order'), 'error');
             return;
         }
-        if (!deliveryAddress.trim()) {
+        if (orderChannel === 'DELIVERY' && !deliveryAddress.trim()) {
             showToast(tr('اكتب عنوان التوصيل قبل إرسال الطلب', 'Enter the delivery address before sending the order'), 'error');
             return;
         }
@@ -858,11 +1425,63 @@ const CallCenter: React.FC = () => {
             return;
         }
 
+        // --- Edit-save: same order id, branch follows by consequence ---
+        if (editingOrderId) {
+            setIsSubmittingOrder(true);
+            try {
+                const saved: any = await updateOrderItems(editingOrderId, {
+                    items: cart,
+                    notes: orderNotes.trim() || undefined,
+                    discount: discountAmount,
+                    deliveryFee,
+                    changedBy: (settings as any)?.currentUser?.id,
+                    deliverySource: platformDeliveryKey,
+                    paymentMethod,
+                    deliveryAddress: orderChannel === 'DELIVERY' ? deliveryAddress.trim() || undefined : undefined,
+                    deliveryLat: deliveryPin.lat,
+                    deliveryLng: deliveryPin.lng,
+                    deliveryAddressLabel: deliveryPin.label,
+                    platformOrderId: externalRef.trim() || undefined,
+                    scheduledFor: scheduledFor || undefined,
+                });
+                const invWarnings = Array.isArray(saved?.warnings)
+                    ? saved.warnings.filter((w: any) => w?.code === 'INSUFFICIENT_INVENTORY')
+                    : [];
+                if (invWarnings.length > 0) {
+                    showToast(lang === 'ar' ? 'تم حفظ التعديل مع تنبيه مخزون للفرع' : 'Edit saved with a stock warning for the branch', 'warning');
+                } else {
+                    showToast(lang === 'ar' ? 'تم حفظ التعديل وإخطار المطبخ والفرع' : 'Edit saved — kitchen and branch notified', 'success');
+                }
+                // Server re-enqueued branch print jobs on edit-dispatch, so no
+                // client reprint here (would double-print at the branch).
+                resetOrder();
+                await fetchOrders();
+            } catch (error: any) {
+                showToast(getActionableErrorMessage(error, lang), 'error');
+            } finally {
+                setIsSubmittingOrder(false);
+            }
+            return;
+        }
+        // Platform orders need the external platform number (POS parity:
+        // platformOrderId) so the branch can reconcile with the aggregator.
+        if (activeCCPlatform && !externalRef.trim()) {
+            showToast(tr('اكتب رقم طلب المنصة قبل الإرسال', 'Enter the platform order number before sending'), 'error');
+            return;
+        }
+        if (scheduledFor) {
+            const when = new Date(scheduledFor).getTime();
+            if (!Number.isFinite(when) || when < Date.now() - 60000) {
+                showToast(tr('وقت الجدولة لازم يكون في المستقبل', 'Scheduled time must be in the future'), 'error');
+                return;
+            }
+        }
+
         setIsSubmittingOrder(true);
         try {
             const newOrder: Order = {
                 id: `CC-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-                type: OrderType.DELIVERY,
+                type: orderChannel === 'TAKEAWAY' ? OrderType.TAKEAWAY : OrderType.DELIVERY,
                 branchId: selectedBranchId,
                 customerId: selectedCustomer?.id,
                 customerName: selectedCustomer?.name,
@@ -872,61 +1491,109 @@ const CallCenter: React.FC = () => {
                 deliveryLng: deliveryPin.lng ?? selectedCustomer?.lng ?? selectedCustomer?.longitude,
                 deliveryAddressLabel: deliveryPin.label ?? selectedCustomer?.addressLabel ?? selectedCustomer?.address_label,
                 isCallCenterOrder: true,
+                // POS convention: origin stays 'call_center', the aggregator key
+                // goes in deliverySource so the server applies the platform
+                // markup authoritatively + stores the audit columns.
+                source: 'call_center',
+                deliverySource: platformDeliveryKey,
+                platformOrderId: externalRef.trim() || undefined,
+                callCenterAgentId: (settings as any)?.currentUser?.id,
+                paymentMethod,
                 items: cart,
                 status: OrderStatus.PENDING,
                 subtotal,
                 tax,
+                deliveryFee,
                 total,
                 createdAt: new Date(),
-                notes: orderNotes,
+                notes: [
+                    orderNotes,
+                    scheduledFor ? `مجدول: ${new Date(scheduledFor).toLocaleString()}` : '',
+                    activeCCPlatform ? `قناة: ${activeCCPlatform.name} (+${effMarkupPct}% +${effMarkupFixed})` : 'قناة: مكالمة',
+                    markupOverride ? `تعديل نسبة المنصة يدوي: +${markupOverride.pct}% +${markupOverride.fixed}` : '',
+                    externalRef.trim() ? `رقم المنصة: ${externalRef.trim()}` : '',
+                    `دفع: ${paymentMethod}`,
+                    platformMarkupTotal > 0 ? `هامش المنصة المضمن: ${platformMarkupTotal.toFixed(2)}` : '',
+                    platformFeePct ? `عمولة المنصة ${platformFeePct}% (≈${platformFeeAmount.toFixed(2)})` : '',
+                ].filter(Boolean).join(' | '),
                 freeDelivery: freeDelivery,
                 isUrgent: urgentFlag,
-                discount: discount
+                discount: discount,
+                scheduledFor: scheduledFor || undefined,
             };
 
             const savedOrder = await placeOrder(newOrder);
             const activeBranch = branches.find(b => b.id === selectedBranchId);
+            // No client-side kitchen print: the server enqueues branch kitchen
+            // print jobs on dispatch (same as any order), so printing here too
+            // would double-print at the branch. Receipt stays: the operator
+            // needs a paper slip per order; failures stay non-blocking.
             try {
-                await printKitchenTicketsByRouting({
+                await printOrderReceipt({
                     order: savedOrder,
-                    categories,
                     printers,
-                    branchId: selectedBranchId,
-                    maxKitchenPrinters: settings.maxKitchenPrinters,
                     settings,
                     currencySymbol: settings.currencySymbol,
                     lang,
                     t,
-                    branch: activeBranch
+                    branch: activeBranch,
+                    title: t.order_receipt || (lang === 'ar' ? 'إيصال الطلب' : 'Order Receipt')
                 });
             } catch {
-                showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة تذكرة المطبخ' : 'Order saved, but kitchen ticket print failed', 'warning');
+                showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة الإيصال' : 'Order saved, but receipt print failed', 'warning');
             }
-            const shouldPrintOnSubmit = (settings.autoPrintReceiptOnSubmit ?? settings.autoPrintReceipt ?? false) === true
-                || hasCashierPrinterConfigured(printers, savedOrder.branchId, settings);
-            if (shouldPrintOnSubmit) {
-                try {
-                    await printOrderReceipt({
-                        order: savedOrder,
-                        printers,
-                        settings,
-                        currencySymbol: settings.currencySymbol,
-                        lang,
-                        t,
-                        branch: activeBranch,
-                        title: t.order_receipt || (lang === 'ar' ? 'إيصال الطلب' : 'Order Receipt')
-                    });
-                } catch {
-                    showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة الإيصال' : 'Order saved, but receipt print failed', 'warning');
-                }
-            }
+            // Warn-only inventory feedback: the sale is NEVER blocked, but the
+            // operator sees which items had insufficient recipe stock so the
+            // branch can be notified. Deduction already ran against the target
+            // branch's warehouses server-side.
+            const invWarnings = Array.isArray((savedOrder as any)?.warnings)
+                ? (savedOrder as any).warnings.filter((w: any) => w?.code === 'INSUFFICIENT_INVENTORY')
+                : [];
+            const driftWarning = Array.isArray((savedOrder as any)?.warnings)
+                ? (savedOrder as any).warnings.find((w: any) => w?.code === 'PRICE_QUOTE_DRIFT')
+                : undefined;
+            const invNames = invWarnings.slice(0, 3).map((w: any) => {
+                const found = cart.find((i: any) => String(i?.id) === String(w?.menuItemId));
+                return found?.name || String(w?.menuItemId || '').slice(0, 12);
+            }).join('، ');
             resetOrder();
             showToast(lang === 'ar' ? 'تم إرسال الطلب بنجاح' : 'Order sent successfully', 'success');
+            if (invWarnings.length > 0) {
+                showToast(
+                    lang === 'ar'
+                        ? `تنبيه مخزون (${activeBranch?.name || ''}): ${invNames} — تم إرسال الطلب للفرع وسيتم تنبيهه بالنواقص`
+                        : `Stock warning (${activeBranch?.name || ''}): ${invNames} — order sent, branch will be notified`,
+                    'warning',
+                );
+            }
+            // Quote integrity: the menu price moved between quote and save —
+            // the order is saved with server prices, both sides see the drift.
+            if (driftWarning) {
+                showToast(
+                    lang === 'ar'
+                        ? `تنبيه سعر: السعر اتحدث أثناء الطلب (${Number(driftWarning.clientTotal || 0).toFixed(2)} ← ${Number(driftWarning.serverTotal || 0).toFixed(2)}) — تم الحفظ بالسعر الجديد`
+                        : `Price notice: menu price moved during quoting (${Number(driftWarning.clientTotal || 0).toFixed(2)} → ${Number(driftWarning.serverTotal || 0).toFixed(2)}) — saved at new price`,
+                    'warning',
+                );
+            }
         } catch (error: any) {
             showToast(getActionableErrorMessage(error, lang), 'error');
         } finally {
             setIsSubmittingOrder(false);
         }
+    };
+
+    // Markup override needs a manager unless the agent holds OP_VOID_ORDER.
+    const applyMarkupOverride = (patch: { pct?: number; fixed?: number }) => {
+        const next = {
+            pct: patch.pct !== undefined ? Math.max(0, Number(patch.pct) || 0) : (markupOverride ? markupOverride.pct : configMarkupPct),
+            fixed: patch.fixed !== undefined ? Math.max(0, Number(patch.fixed) || 0) : (markupOverride ? markupOverride.fixed : configMarkupFixed),
+        };
+        if (hasPermission(AppPermission.OP_VOID_ORDER)) {
+            setMarkupOverride(next);
+            return;
+        }
+        requestManagerApproval('PLATFORM_MARKUP_OVERRIDE', () => setMarkupOverride(next));
     };
 
     // --- Keyboard Shortcuts ---
@@ -936,8 +1603,11 @@ const CallCenter: React.FC = () => {
             if (e.key === 'F2') { e.preventDefault(); document.getElementById('item-search')?.focus(); }
             if (e.key === 'F3') { e.preventDefault(); handleSubmitOrder(); }
             if (e.key === 'F4') { e.preventDefault(); holdCurrentOrder(); }
-            if (e.key === 'F5') { e.preventDefault(); resetOrder(); }
-            if (e.key === 'Escape') { resetOrder(); }
+            if (e.key === 'F5') { e.preventDefault(); if (selectedCustomer || cart.length > 0) setConfirmingReset(true); else resetOrder(); }
+            // Esc never wipes silently: confirm when a live order exists.
+            if (e.key === 'Escape') {
+                if (selectedCustomer || cart.length > 0) setConfirmingReset(true);
+            }
         };
         window.addEventListener('keydown', handleKeys);
         return () => window.removeEventListener('keydown', handleKeys);
@@ -956,8 +1626,29 @@ const CallCenter: React.FC = () => {
         if (trackingBranch !== 'all') {
             filtered = filtered.filter(o => getOrderBranchId(o) === trackingBranch);
         }
+        const q = trackingSearch.trim().toLowerCase();
+        if (q) {
+            filtered = filtered.filter(o =>
+                String(o.id || '').toLowerCase().includes(q)
+                || getOrderCustomerName(o).toLowerCase().includes(q)
+                || getOrderCustomerPhone(o).toLowerCase().includes(q)
+                || String((o as any).platformOrderId || (o as any).platform_order_id || '').toLowerCase().includes(q)
+                || getOrderDeliveryAddress(o).toLowerCase().includes(q),
+            );
+        }
         return filtered.sort((a, b) => getOrderCreatedAt(b).getTime() - getOrderCreatedAt(a).getTime());
-    }, [callCenterOrders, trackingFilter, trackingBranch]);
+    }, [callCenterOrders, trackingFilter, trackingBranch, trackingSearch]);
+
+    // Custody guard (mirrors server orderStatusPolicy): in-house delivery
+    // cannot close without an accountable driver; aggregators exempt.
+    const orderNeedsDriver = (order: any) => {
+        if (String(order.type || '').toUpperCase() !== 'DELIVERY') return false;
+        const source = String(order.deliverySource || order.delivery_source || '').trim().toLowerCase();
+        const origin = String(order.source || '').trim().toLowerCase();
+        const aggregator = (source && source !== 'restaurant') || origin.startsWith('platform:');
+        if (aggregator) return false;
+        return !String(order.driverId || order.driver_id || '').trim();
+    };
 
     // --- Stats ---
     const todayOrders = callCenterOrders.filter(o => getOrderCreatedAt(o).toDateString() === new Date().toDateString());
@@ -971,7 +1662,7 @@ const CallCenter: React.FC = () => {
     // ========================================================================
 
     return (
-        <div className="flex flex-col h-full w-full app-viewport overflow-hidden bg-app relative">
+        <div className="ops-fast flex flex-col h-full w-full app-viewport overflow-hidden bg-app relative">
 
             {/* PBX INCOMING CALL NOTIFICATION (Absolute Overlay) */}
             {incomingPBXCall && (
@@ -1308,8 +1999,8 @@ const CallCenter: React.FC = () => {
                         <div className="bg-card/95  border-b border-border/50 animate-in slide-in-from-top-2 duration-150 relative z-40 shrink-0">
                             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-cyan-500/5 to-indigo-500/5 pointer-events-none" />
 
-                            {/* ROW 1: Customer Identity + Quick Settings */}
-                            <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-3 lg:py-4 flex flex-wrap lg:flex-nowrap items-center gap-3 relative z-10">
+                            {/* ROW 1: Customer Identity + Quick Settings (compact single row) */}
+                            <div className="max-w-[1800px] mx-auto px-4 md:px-6 pt-2 pb-1.5 flex flex-wrap lg:flex-nowrap items-center gap-2 relative z-10">
 
                                 {/* Avatar + Name + Phone */}
                                 <div className="flex items-center gap-2.5 shrink-0 w-full lg:w-auto justify-between lg:justify-start">
@@ -1338,48 +2029,75 @@ const CallCenter: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Address (Editable) */}
-                                <div className="flex-1 min-w-[200px] w-full lg:w-auto group">
-                                    <div className="flex items-center gap-2 bg-elevated/50 px-3 py-2 rounded-xl border border-border/50 group-focus-within:border-indigo-500/50 transition-colors">
+                                {/* Address (slim) — delivery only; takeaway is branch pickup.
+                                    Pinning lives in a modal so the menu keeps full height. */}
+                                {orderChannel === 'DELIVERY' && (
+                                <div className="flex-1 min-w-[180px]">
+                                    <div className="flex items-center gap-2 bg-elevated/50 px-3 py-2 rounded-xl border border-border/50 focus-within:border-indigo-500/50 transition-colors">
                                         <MapPinned size={14} className="text-indigo-500 shrink-0" />
                                         <input
+                                            id="cc-address-input"
                                             type="text"
                                             value={deliveryAddress}
                                             onChange={(e) => setDeliveryAddress(e.target.value)}
-                                            className="flex-1 bg-transparent text-xs font-bold outline-none text-main placeholder-muted"
+                                            className="flex-1 min-w-0 bg-transparent text-xs font-bold outline-none text-main placeholder-muted"
                                             placeholder={lang === 'ar' ? 'ادخل العنوان...' : 'Delivery address...'}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setMapModalOpen(true)}
+                                            title={lang === 'ar' ? 'تثبيت النقطة على الخريطة' : 'Pin on map'}
+                                            className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${deliveryPin.lat ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20' : 'bg-amber-500/15 text-amber-600 border-amber-500/40 hover:bg-amber-500/25 animate-pulse'}`}
+                                        >
+                                            <Navigation size={12} />
+                                            {deliveryPin.lat ? (lang === 'ar' ? 'مثبتة' : 'Pinned') : (lang === 'ar' ? 'ثبت Pin' : 'Pin')}
+                                        </button>
                                     </div>
                                 </div>
-
-                                <div className="w-full">
-                                    <AddressMapPicker
-                                        lang={lang}
-                                        compact
-                                        value={{ address: deliveryAddress, lat: deliveryPin.lat, lng: deliveryPin.lng, label: deliveryPin.label }}
-                                        onChange={(pin) => {
-                                            setDeliveryAddress(pin.address);
-                                            setDeliveryPin({ lat: pin.lat, lng: pin.lng, label: pin.label });
-                                        }}
-                                    />
-                                </div>
+                                )}
 
                                 {/* Branch & Zone Settings */}
                                 <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-                                    {deliveryZones.length > 0 && (
-                                        <div className="relative min-w-[140px] shrink-0 flex-1 lg:flex-none group/select">
-                                            <select value={selectedZoneId} onChange={(e) => setSelectedZoneId(e.target.value)} className="w-full bg-elevated/80 dark:bg-gray-800  rounded-xl py-2 pl-3 pr-8 text-xs font-black outline-none border border-border/50 focus:border-indigo-500/50 hover:border-indigo-500/30 text-main transition-all text-ellipsis appearance-none shadow-sm cursor-pointer">
-                                                <option value="" disabled>{lang === 'ar' ? 'المنطقة...' : 'Zone...'}</option>
-                                                {deliveryZones.map(z => <option key={z.id} value={z.id} className="bg-card text-main font-bold py-2">{z.nameAr || z.name}</option>)}
-                                            </select>
-                                            <ChevronDown size={14} className="absolute top-1/2 -translate-y-1/2 right-3 text-muted pointer-events-none group-hover/select:text-indigo-500 transition-colors" />
+                                    {/* Channel: delivery vs takeaway — drives the branch price list */}
+                                    <div className="flex items-center bg-elevated/80 rounded-xl p-1 shrink-0 border border-border/50 shadow-sm">
+                                        <button
+                                            onClick={() => setOrderChannel('DELIVERY')}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${orderChannel === 'DELIVERY' ? 'bg-indigo-500 text-white shadow' : 'text-muted hover:text-main'}`}
+                                        >
+                                            <Bike size={13} /> {lang === 'ar' ? 'دليفري' : 'Delivery'}
+                                        </button>
+                                        <button
+                                            onClick={() => setOrderChannel('TAKEAWAY')}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${orderChannel === 'TAKEAWAY' ? 'bg-emerald-500 text-white shadow' : 'text-muted hover:text-main'}`}
+                                        >
+                                            <ShoppingBag size={13} /> {lang === 'ar' ? 'تيك أواي' : 'Takeaway'}
+                                        </button>
+                                    </div>
+                                    {orderChannel === 'DELIVERY' && deliveryZones.length > 0 && (
+                                        <div className="relative min-w-[200px] shrink-0 flex-1 lg:flex-none">
+                                            <DeliveryZonePicker
+                                                zones={deliveryZones}
+                                                value={selectedZoneId}
+                                                branchId={selectedBranchId}
+                                                branches={branches}
+                                                lang={lang}
+                                                compact
+                                                onZonesChange={setDeliveryZones}
+                                                onChange={handleZonePicked}
+                                                placeholder={lang === 'ar' ? 'المنطقة...' : 'Zone...'}
+                                            />
                                         </div>
                                     )}
                                     <div className="relative min-w-[140px] shrink-0 flex-1 lg:flex-none group/select">
-                                        <select value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)} className="w-full bg-elevated/80 dark:bg-gray-800  rounded-xl py-2 pl-3 pr-8 text-xs font-black outline-none border border-border/50 focus:border-indigo-500/50 hover:border-indigo-500/30 text-main transition-all text-ellipsis appearance-none shadow-sm cursor-pointer">
+                                        <select value={selectedBranchId} onChange={(e) => handleBranchChange(e.target.value)} className="w-full bg-elevated/80 dark:bg-gray-800  rounded-xl py-2 pl-3 pr-8 text-xs font-black outline-none border border-border/50 focus:border-indigo-500/50 hover:border-indigo-500/30 text-main transition-all text-ellipsis appearance-none shadow-sm cursor-pointer">
                                             {branches.map(b => <option key={b.id} value={b.id} className="bg-card text-main font-bold py-2">{b.name}</option>)}
                                         </select>
                                         <ChevronDown size={14} className="absolute top-1/2 -translate-y-1/2 right-3 text-muted pointer-events-none group-hover/select:text-indigo-500 transition-colors" />
+                                        {branchManualOverride && (
+                                            <span className="absolute -top-2 right-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest shadow">
+                                                {lang === 'ar' ? 'يدوي' : 'Manual'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1401,6 +2119,63 @@ const CallCenter: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* ROW 2 (slim): sales channel + platform extras. One select
+                                instead of 7 chips; override + external ref inline. */}
+                            <div className="max-w-[1800px] mx-auto px-4 md:px-6 pb-2.5 flex flex-wrap items-center gap-2 relative z-10">
+                                <div className="relative shrink-0">
+                                    <select
+                                        value={activeCCPlatform ? String(activeCCPlatform.id) : 'CALL'}
+                                        onChange={(e) => setOrderSource(e.target.value)}
+                                        className="bg-elevated/80 rounded-xl py-1.5 pl-3 pr-8 text-[11px] font-black outline-none border border-border/50 focus:border-indigo-500/50 text-main transition-all appearance-none shadow-sm cursor-pointer"
+                                    >
+                                        <option value="CALL" className="bg-card text-main font-bold">{lang === 'ar' ? 'مكالمة' : 'Call'}</option>
+                                        {(deliveryPlatforms || []).filter((p: any) => p?.isActive !== false).map((p: any) => (
+                                            <option key={p.id} value={String(p.id)} className="bg-card text-main font-bold">
+                                                {p.name} • +{Number(p.priceMarkupPercentage || 0)}%
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={13} className="absolute top-1/2 -translate-y-1/2 right-2.5 text-muted pointer-events-none" />
+                                </div>
+                                {activeCCPlatform && (
+                                    <>
+                                        <input
+                                            value={externalRef}
+                                            onChange={(e) => setExternalRef(e.target.value)}
+                                            placeholder={lang === 'ar' ? 'رقم طلب المنصة *' : 'Platform order # *'}
+                                            className="w-36 bg-elevated border border-border/50 rounded-xl py-1.5 px-3 text-[11px] font-bold outline-none focus:border-indigo-500/50 text-main placeholder-muted"
+                                        />
+                                        <div className="flex items-center gap-1 text-[10px] font-black text-muted">
+                                            <span className="hidden sm:inline">+% / +{lang === 'ar' ? 'ثابت' : 'fix'}</span>
+                                            <input
+                                                type="number" min={0} max={100} step={0.5}
+                                                title={lang === 'ar' ? 'نسبة الهامش لهذا الطلب' : 'This order markup %'}
+                                                value={markupOverride ? markupOverride.pct : configMarkupPct}
+                                                        onChange={(e) => applyMarkupOverride({ pct: Number(e.target.value) })}
+                                                className="w-14 bg-elevated border border-border/50 rounded-lg py-1 px-1.5 text-[11px] font-black outline-none focus:border-indigo-500/50 text-main"
+                                            />
+                                            <input
+                                                type="number" min={0} step={0.5}
+                                                title={lang === 'ar' ? 'هامش ثابت لهذا الطلب' : 'This order fixed markup'}
+                                                value={markupOverride ? markupOverride.fixed : configMarkupFixed}
+                                                        onChange={(e) => applyMarkupOverride({ fixed: Number(e.target.value) })}
+                                                className="w-14 bg-elevated border border-border/50 rounded-lg py-1 px-1.5 text-[11px] font-black outline-none focus:border-indigo-500/50 text-main"
+                                            />
+                                            {markupOverride && (
+                                                <button onClick={() => setMarkupOverride(null)} className="text-[9px] font-black text-muted hover:text-indigo-500 underline">
+                                                    {lang === 'ar' ? 'أسعار المنصة' : 'Platform rates'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {platformSlaMins > 0 && (
+                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-600">
+                                                <Timer size={11} />{lang === 'ar' ? `${platformSlaMins} دقائق` : `${platformSlaMins} min`}
+                                            </span>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
                             {/* End Row 1 Details */}
                         </div>
                     )}
@@ -1416,13 +2191,20 @@ const CallCenter: React.FC = () => {
                                     <div className="w-full px-4 md:px-6 py-2 border-b border-border/30 flex items-center justify-between gap-3 bg-elevated/30">
                                         <div className="relative flex-1 md:w-[320px]">
                                             <Search className={`absolute top-1/2 -translate-y-1/2 text-muted group-focus-within:text-indigo-500 transition-colors z-10 ${lang === 'ar' ? 'right-4' : 'left-4'}`} size={16} />
-                                            <input id="item-search" type="text" placeholder={lang === 'ar' ? 'بحث عن صنف...' : 'Search Item...'} className={`w-full bg-white dark:bg-gray-800 border border-border/50 rounded-xl py-2 ${lang === 'ar' ? 'pr-10 pl-4 text-right' : 'pl-10 pr-4'} text-sm font-bold outline-none focus:border-indigo-500/50 transition-all text-main placeholder-muted shadow-sm`} value={itemSearchQuery} onChange={(e) => setItemSearchQuery(e.target.value)} />
+                                            <input id="item-search" ref={itemSearchRef} type="text" placeholder={lang === 'ar' ? 'بحث عن صنف...' : 'Search Item...'} className={`w-full bg-white dark:bg-gray-800 border border-border/50 rounded-xl py-2 ${lang === 'ar' ? 'pr-10 pl-4 text-right' : 'pl-10 pr-4'} text-sm font-bold outline-none focus:border-indigo-500/50 transition-all text-main placeholder-muted shadow-sm`} value={itemSearchQuery} onChange={(e) => setItemSearchQuery(e.target.value)} />
+                                        </div>
+                                        {/* Price context: which list is currently applied */}
+                                        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-black uppercase tracking-widest text-indigo-500 shrink-0">
+                                            <DollarSign size={12} />
+                                            {orderChannel === 'TAKEAWAY' ? (lang === 'ar' ? 'أسعار تيك أواي' : 'Takeaway prices') : (lang === 'ar' ? 'أسعار دليفري' : 'Delivery prices')}
+                                            <span className="opacity-60">•</span>
+                                            <span className="max-w-[140px] truncate">{branches.find((b: any) => b.id === selectedBranchId)?.name || ''}</span>
                                         </div>
                                         <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl p-1 shrink-0 border border-border/50 shadow-sm">
-                                            <button onClick={() => setMenuDensity('comfortable')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'comfortable' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title="Comfortable"><LayoutGrid size={15} /></button>
-                                            <button onClick={() => setMenuDensity('compact')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'compact' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title="Compact"><Rows size={15} /></button>
-                                            <button onClick={() => setMenuDensity('buttons')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'buttons' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title="Compact List"><List size={15} /></button>
-                                            <button onClick={() => setMenuDensity('ultra')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'ultra' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title="Ultra Dense"><Grip size={15} /></button>
+                                            <button onClick={() => setMenuDensity('comfortable')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'comfortable' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'ملصق' : 'Poster'}><LayoutGrid size={15} /></button>
+                                            <button onClick={() => setMenuDensity('compact')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'compact' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'شريط' : 'Rail'}><Rows3 size={15} /></button>
+                                            <button onClick={() => setMenuDensity('ultra')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'ultra' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'زجاجي' : 'Glass'}><Sparkles size={15} /></button>
+                                            <button onClick={() => setMenuDensity('buttons')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'buttons' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'سبليت' : 'Split'}><Ticket size={15} /></button>
                                         </div>
                                     </div>
                                     {/* Category Scrolling Row */}
@@ -1432,7 +2214,42 @@ const CallCenter: React.FC = () => {
                                 </div>
 
                                 <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar bg-app/20">
-                                    <ItemGrid items={filteredItems} onAddItem={addToCart} currencySymbol={currencySymbol} isTouchMode={false} density={menuDensity} />
+                                    <MenuShortNotice count={shortVisibleCount} lang={lang} />
+                                    {isMenuLoading && categories.length === 0 ? (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                                            {Array.from({ length: 8 }).map((_, i) => (
+                                                <div key={i} className="h-28 rounded-2xl bg-elevated/60 border border-border/30 animate-pulse" />
+                                            ))}
+                                        </div>
+                                    ) : menuError && categories.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center text-center p-10 bg-card/20 border-2 border-dashed border-border/20 rounded-[2rem]">
+                                            <AlertCircle size={36} className="text-rose-500/60 mb-4" />
+                                            <h3 className="text-sm font-black text-main uppercase tracking-widest mb-2">
+                                                {lang === 'ar' ? 'تعذر تحميل المنيو' : 'Menu failed to load'}
+                                            </h3>
+                                            <p className="text-xs font-bold text-muted/70 max-w-[260px] mb-6">
+                                                {lang === 'ar' ? 'تحقق من الاتصال ثم أعد المحاولة' : 'Check connection and retry'}
+                                            </p>
+                                            <button
+                                                onClick={() => fetchMenu().catch(() => undefined)}
+                                                className="h-12 px-8 bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 active:scale-95 shadow-xl flex items-center gap-2"
+                                            >
+                                                <RefreshCcw size={15} />
+                                                {lang === 'ar' ? 'إعادة التحميل' : 'Retry'}
+                                            </button>
+                                        </div>
+                                    ) : pricedItems.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center text-center p-10 text-muted">
+                                            <ShoppingBag size={40} className="mb-4 opacity-30" />
+                                            <p className="text-sm font-black uppercase tracking-widest">
+                                                {itemSearchQuery
+                                                    ? (lang === 'ar' ? `لا نتائج لـ "${itemSearchQuery}"` : `No matches for "${itemSearchQuery}"`)
+                                                    : (lang === 'ar' ? 'لا توجد أصناف في المنيو' : 'No items in menu')}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <ItemGrid items={pricedItems} onAddItem={handleGridAdd} cartItems={cart} currencySymbol={currencySymbol} isTouchMode={false} density={menuDensity === 'buttons' ? 'buttons' : menuDensity === 'ultra' ? 'ultra' : menuDensity === 'compact' ? 'compact' : 'comfortable'} lang={lang} />
+                                    )}
                                 </div>
 
                                 {heldOrders.length > 0 && (
@@ -1457,12 +2274,13 @@ const CallCenter: React.FC = () => {
                             <div className="w-full h-[50vh] lg:h-auto lg:w-[360px] xl:w-[420px] shrink-0 bg-card/95  lg:border-l border-t lg:border-t-0 border-border flex flex-col shadow-2xl relative z-20">
                                 <div className="px-5 py-4 border-b border-border/50 flex justify-between items-center shrink-0 bg-gradient-to-r from-card to-elevated">
                                     <h3 className="text-base font-black text-main uppercase tracking-widest flex items-center gap-2.5">
-                                        <ShoppingBag size={18} className="text-indigo-500" /> {lang === 'ar' ? 'الطلب' : 'Current Order'}
+                                        <ShoppingBag size={18} className="text-indigo-500" /> {editingOrderId ? (lang === 'ar' ? `تعديل #${editingOrderId}` : `Editing #${editingOrderId}`) : (lang === 'ar' ? 'الطلب' : 'Current Order')}
                                     </h3>
                                     <span className="bg-indigo-500/10 text-indigo-500 px-3 py-1 rounded-full text-[10px] font-black tracking-widest border border-indigo-500/20">{cart.reduce((s, i) => s + i.quantity, 0)}</span>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 custom-scrollbar">
+                                    <CartShortWarning items={shortCartItems} lang={lang} />
                                     {cart.length === 0 ? (
                                         <div className="h-full flex flex-col items-center justify-center text-muted/50 p-6 text-center">
                                             <ShoppingBag size={48} className="mb-4 opacity-50 text-indigo-500/20" />
@@ -1474,37 +2292,66 @@ const CallCenter: React.FC = () => {
                                     ))}
                                 </div>
 
-                                {/* Order Add-ons (Notes, Discount, Priority) */}
-                                <div className="px-5 py-4 border-t border-border/50 space-y-4 bg-app/50 shrink-0">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button onClick={() => setFreeDelivery(!freeDelivery)} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${freeDelivery ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-elevated text-muted border border-border/50 hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/30'}`}>
-                                            <Bike size={14} /> {lang === 'ar' ? 'توصيل مجاني' : 'Free Delivery'}
-                                        </button>
-                                        <button onClick={() => setUrgentFlag(!urgentFlag)} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${urgentFlag ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/25' : 'bg-elevated text-muted border border-border/50 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30'}`}>
-                                            <Zap size={14} className={urgentFlag ? "animate-pulse" : ""} /> {lang === 'ar' ? 'فورى' : 'Urgent'}
+                                {/* Checkout extras (compact): payment + schedule + flags + notes.
+                                    Channel lives in the header (drives pricing). */}
+                                <div className="px-4 py-2.5 border-t border-border/50 space-y-2 bg-app/50 shrink-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="flex flex-1 items-center bg-elevated rounded-lg p-0.5 border border-border/50">
+                                            {(['CASH', 'CARD', 'WALLET'] as const).map(pm => (
+                                                <button key={pm} onClick={() => setPaymentMethod(pm)} className={`flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${paymentMethod === pm ? 'bg-emerald-500 text-white shadow' : 'text-muted hover:text-main'}`}>
+                                                    {pm === 'CASH' ? (lang === 'ar' ? 'كاش' : 'Cash') : pm === 'CARD' ? (lang === 'ar' ? 'شبكة' : 'Card') : (lang === 'ar' ? 'محفظة' : 'Wallet')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {orderChannel === 'DELIVERY' && (
+                                            <button onClick={() => setFreeDelivery(!freeDelivery)} title={lang === 'ar' ? 'توصيل مجاني' : 'Free delivery'} className={`p-2 rounded-lg border transition-all ${freeDelivery ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-elevated text-muted border-border/50 hover:text-emerald-500'}`}>
+                                                <Bike size={14} />
+                                            </button>
+                                        )}
+                                        <button onClick={() => setUrgentFlag(!urgentFlag)} title={lang === 'ar' ? 'فوري' : 'Urgent'} className={`p-2 rounded-lg border transition-all ${urgentFlag ? 'bg-rose-500 text-white border-rose-500' : 'bg-elevated text-muted border-border/50 hover:text-rose-500'}`}>
+                                            <Zap size={14} className={urgentFlag ? 'animate-pulse' : ''} />
                                         </button>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black uppercase tracking-widest text-muted px-1">{lang === 'ar' ? 'ملاحظات المطبخ والسائق' : 'Kitchen & Driver Notes'}</label>
-                                        <input type="text" placeholder={lang === 'ar' ? 'ملاحظات إضافية...' : 'Add notes...'} value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} className="w-full bg-elevated border-b-2 border-border/50 focus:border-indigo-500 bg-transparent py-2 px-2 text-sm font-bold text-main outline-none transition-colors placeholder-muted/50 rounded-t-lg" />
+                                    <div className="flex items-center gap-1.5">
+                                        <Clock size={13} className="text-muted shrink-0" />
+                                        <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} title={lang === 'ar' ? 'جدولة الطلب' : 'Schedule order'} className="flex-1 min-w-0 bg-elevated border border-border/50 rounded-lg py-1.5 px-2 text-[11px] font-bold outline-none focus:border-indigo-500/50 text-main" />
+                                        {scheduledFor && <button onClick={() => setScheduledFor('')} className="p-1.5 rounded-lg bg-elevated border border-border/50 text-muted hover:text-rose-500"><X size={12} /></button>}
+                                        <input type="text" placeholder={lang === 'ar' ? 'ملاحظات...' : 'Notes...'} value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} className="flex-1 min-w-0 bg-elevated border border-border/50 rounded-lg py-1.5 px-2 text-[11px] font-bold outline-none focus:border-indigo-500/50 text-main placeholder-muted" />
                                     </div>
                                 </div>
 
-                                {/* Pricing & Submit */}
-                                <div className="px-6 py-5 bg-card/90 border-t border-border/50 relative z-20">
-                                    <div className="space-y-1.5 mb-5">
+                                {/* Pricing & Submit (single CTA) */}
+                                <div className="px-5 py-4 bg-card/90 border-t border-border/50 relative z-20">
+                                    <div className="space-y-1 mb-3">
                                         <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-muted"><span>{lang === 'ar' ? 'الإجمالي الفرعي' : 'Subtotal'}</span><span className="text-main">{subtotal.toFixed(2)}</span></div>
+                                        <div className="flex justify-between items-center text-[11px] font-black tracking-widest uppercase text-muted">
+                                            <span>{lang === 'ar' ? 'خصم %' : 'Discount %'}</span>
+                                            <input
+                                                type="number" min={0} max={100} step={0.5}
+                                                value={discount}
+                                                onChange={(e) => {
+                                                    const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                                                    if (v > 0 && !hasPermission(AppPermission.OP_APPLY_DISCOUNT)) {
+                                                        requestManagerApproval('APPLY_DISCOUNT', () => setDiscount(v));
+                                                        return;
+                                                    }
+                                                    setDiscount(v);
+                                                }}
+                                                className="w-16 bg-elevated border border-border/50 rounded-lg py-0.5 px-1.5 text-[11px] font-black outline-none focus:border-emerald-500/50 text-main text-right"
+                                            />
+                                        </div>
                                         {discount > 0 && <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-emerald-500"><span>{lang === 'ar' ? 'خصم' : 'Discount'} ({discount}%)</span><span>-{discountAmount.toFixed(2)}</span></div>}
-                                        <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-muted"><span>{lang === 'ar' ? 'ضريبة' : 'Tax'} (14%)</span><span className="text-main">{tax.toFixed(2)}</span></div>
-                                        <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-muted"><span>{lang === 'ar' ? 'الدليفري' : 'Delivery'}</span><span className={freeDelivery ? 'text-emerald-500' : 'text-main'}>{freeDelivery ? (lang === 'ar' ? 'مجاني' : 'FREE') : deliveryFee.toFixed(2)}</span></div>
-                                        <div className="flex justify-between text-2xl font-black text-indigo-500 pt-3 border-t border-border/50 mt-2"><span>{lang === 'ar' ? 'الإجمالي' : 'Total'}</span><span>{total.toFixed(2)} <span className="text-sm font-bold opacity-50">{currencySymbol}</span></span></div>
+                                        <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-muted"><span>{lang === 'ar' ? 'ضريبة' : 'Tax'} ({effectiveTaxRate}%)</span><span className="text-main">{tax.toFixed(2)}</span></div>
+                                        <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-muted"><span>{orderChannel === 'TAKEAWAY' ? (lang === 'ar' ? 'استلام من الفرع' : 'Branch pickup') : (lang === 'ar' ? 'الدليفري' : 'Delivery')}</span><span className={freeDelivery ? 'text-emerald-500' : 'text-main'}>{freeDelivery ? (lang === 'ar' ? 'مجاني' : 'FREE') : deliveryFee.toFixed(2)}</span></div>
+                                        {platformMarkupTotal > 0 && <div className="flex justify-between text-[10px] font-bold text-indigo-500"><span>{lang === 'ar' ? `شامل هامش ${activeCCPlatform?.name}` : `Incl. ${activeCCPlatform?.name} markup`}</span><span>{platformMarkupTotal.toFixed(2)}</span></div>}
+                                        <div className="flex justify-between text-2xl font-black text-indigo-500 pt-2 border-t border-border/50 mt-1"><span>{lang === 'ar' ? 'الإجمالي' : 'Total'}</span><span>{total.toFixed(2)} <span className="text-sm font-bold opacity-50">{currencySymbol}</span></span></div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                             <button onClick={holdCurrentOrder} disabled={cart.length === 0 || isSubmittingOrder} className="h-14 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/30 disabled:opacity-30 disabled:pointer-events-none hover:bg-amber-500/20 transition-all flex items-center justify-center gap-2">
                                              <Pause size={16} /> {tr('تعليق (F4)', 'Hold (F4)')}
                                          </button>
                                          <button onClick={handleSubmitOrder} disabled={cart.length === 0 || isSubmittingOrder} className={`h-14 rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-2 transition-all ${cart.length === 0 || isSubmittingOrder ? 'bg-elevated text-muted cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-xl shadow-indigo-500/25 hover:opacity-90 active:scale-95'}`}>
-                                             {isSubmittingOrder ? <RefreshCcw size={16} className="animate-spin" /> : tr('إرسال (F3)', 'Send (F3)')} <ArrowRight size={16} />
+                                              {isSubmittingOrder ? <RefreshCcw size={16} className="animate-spin" /> : (editingOrderId ? tr('حفظ التعديل', 'Save edit') : tr('إرسال (F3)', 'Send (F3)'))} <ArrowRight size={16} />
                                          </button>
                                     </div>
                                 </div>
@@ -1549,36 +2396,45 @@ const CallCenter: React.FC = () => {
                                         ))}
                                     </div>
 
-                                    {/* Multiple Addresses Selector (Mock) */}
+                                    {/* Saved delivery addresses (real, from customerAddresses) */}
                                     <div className="bg-elevated/50 rounded-2xl border border-border/50 p-4">
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500 flex items-center gap-2">
                                                 <MapPin size={13} /> {lang === 'ar' ? 'عناوين التوصيل' : 'Delivery Addresses'}
+                                                {isLoadingAddresses && <RefreshCcw size={11} className="animate-spin" />}
                                             </h4>
-                                            <button className="text-[9px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 transition-colors">
-                                                {lang === 'ar' ? '+ إضافة' : '+ Add'}
+                                            <button onClick={() => { void saveCurrentAsAddress(); }} className="text-[9px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 transition-colors">
+                                                {lang === 'ar' ? '+ حفظ الحالي' : '+ Save current'}
                                             </button>
                                         </div>
                                         <div className="space-y-2">
-                                            {[
-                                                { id: 1, type: lang === 'ar' ? 'المنزل' : 'Home', icon: <Home size={14} />, address: selectedCustomer.address || '123 Main St, Appt 4B' },
-                                                { id: 2, type: lang === 'ar' ? 'العمل' : 'Work', icon: <Briefcase size={14} />, address: 'Tech Park, Office 201' }
-                                            ].map(addr => (
-                                                <button 
-                                                    key={addr.id} 
-                                                    onClick={() => setDeliveryAddress(addr.address)} 
-                                                    className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left ${deliveryAddress === addr.address ? 'bg-cyan-500/10 border-cyan-500/50 shadow-sm' : 'bg-card border-border/50 hover:border-cyan-500/20'}`}
-                                                >
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${deliveryAddress === addr.address ? 'bg-cyan-500 text-white shadow-sm' : 'bg-elevated text-muted'}`}>
-                                                        {addr.icon}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-black text-main">{addr.type}</p>
-                                                        <p className="text-[10px] text-muted font-bold truncate mt-0.5">{addr.address}</p>
-                                                    </div>
-                                                    {deliveryAddress === addr.address && <div className="w-2 h-2 rounded-full bg-cyan-500 shrink-0 mt-3 shadow-sm" />}
-                                                </button>
-                                            ))}
+                                            {profileAddresses.length === 0 && !isLoadingAddresses && (
+                                                <p className="text-[10px] font-bold text-muted text-center py-2">
+                                                    {lang === 'ar' ? 'لا عناوين محفوظة — احفظ العنوان الحالي بزر + حفظ الحالي' : 'No saved addresses — save the current one with + Save current'}
+                                                </p>
+                                            )}
+                                            {profileAddresses.map((addr: any) => {
+                                                const key = String(addr.id ?? addr.address);
+                                                const active = deliveryAddress && addr.address && deliveryAddress.trim() === String(addr.address).trim();
+                                                const label = String(addr.label || '');
+                                                const icon = /work|عمل/i.test(label) ? <Briefcase size={14} /> : /home|منزل|house/i.test(label) ? <Home size={14} /> : <MapPin size={14} />;
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => applyProfileAddress(addr)}
+                                                        className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all text-left ${active ? 'bg-cyan-500/10 border-cyan-500/50 shadow-sm' : 'bg-card border-border/50 hover:border-cyan-500/20'}`}
+                                                    >
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${active ? 'bg-cyan-500 text-white shadow-sm' : 'bg-elevated text-muted'}`}>
+                                                            {icon}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-black text-main">{addr.label || (lang === 'ar' ? 'عنوان' : 'Address')}</p>
+                                                            <p className="text-[10px] text-muted font-bold truncate mt-0.5">{addr.address}</p>
+                                                        </div>
+                                                        {active && <div className="w-2 h-2 rounded-full bg-cyan-500 shrink-0 mt-3 shadow-sm" />}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                     <div className="bg-elevated/50 rounded-2xl border border-border/50 p-4">
@@ -1642,8 +2498,8 @@ const CallCenter: React.FC = () => {
                                         <ShoppingBag size={14} /> {lang === 'ar' ? 'بدء طلب' : 'Start New Order'}
                                     </button>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => { setShowRegistrationModal(true); setShowCustomerProfile(false); }} className="py-2.5 bg-elevated border border-border/50 text-muted hover:text-indigo-500 hover:border-indigo-500/30 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5">
-                                            <Edit3 size={12} /> {lang === 'ar' ? 'تعديل' : 'Edit'}
+                                        <button onClick={() => { void syncCustomerAddress(); }} className="py-2.5 bg-elevated border border-border/50 text-muted hover:text-indigo-500 hover:border-indigo-500/30 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5">
+                                            <Edit3 size={12} /> {lang === 'ar' ? 'حفظ العنوان' : 'Save address'}
                                         </button>
                                         <button onClick={() => { handlePrintCustomerReport(); setShowCustomerProfile(false); }} className="py-2.5 bg-elevated border border-border/50 text-muted hover:text-emerald-500 hover:border-emerald-500/30 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5">
                                             <Printer size={12} /> {lang === 'ar' ? 'طباعة' : 'Print'}
@@ -1669,8 +2525,10 @@ const CallCenter: React.FC = () => {
                         <div className="flex bg-elevated rounded-[1.5rem] p-1.5 border border-border/50 shadow-inner">
                             {[
                                 { value: 'all', label: lang === 'ar' ? 'الكل' : 'All', count: callCenterOrders.length },
+                                { value: OrderStatus.SCHEDULED, label: lang === 'ar' ? 'مجدول' : 'Sched', count: callCenterOrders.filter(o => o.status === OrderStatus.SCHEDULED).length },
                                 { value: OrderStatus.PENDING, label: lang === 'ar' ? 'جديد' : 'New', count: pendingCount },
                                 { value: OrderStatus.PREPARING, label: lang === 'ar' ? 'تحضير' : 'Prep', count: preparingCount },
+                                { value: OrderStatus.READY, label: lang === 'ar' ? 'جاهز' : 'Ready', count: callCenterOrders.filter(o => o.status === OrderStatus.READY).length },
                                 { value: OrderStatus.OUT_FOR_DELIVERY, label: lang === 'ar' ? 'توصيل' : 'OFD', count: outForDeliveryCount },
                                 { value: OrderStatus.DELIVERED, label: lang === 'ar' ? 'تم' : 'Done', count: callCenterOrders.filter(o => o.status === OrderStatus.DELIVERED).length },
                             ].map(f => (
@@ -1682,6 +2540,16 @@ const CallCenter: React.FC = () => {
                         </div>
 
                         <div className="flex-1" />
+
+                        <div className="relative">
+                            <Search size={15} className={`absolute top-1/2 -translate-y-1/2 text-muted ${lang === 'ar' ? 'right-3' : 'left-3'}`} />
+                            <input
+                                value={trackingSearch}
+                                onChange={(e) => setTrackingSearch(e.target.value)}
+                                placeholder={lang === 'ar' ? 'بحث برقم/هاتف/منصة...' : 'Search id/phone/platform...'}
+                                className={`bg-elevated rounded-[1.2rem] py-3 px-4 text-xs font-bold outline-none border border-border/50 focus:border-indigo-500/50 text-main placeholder-muted shadow-sm w-48 ${lang === 'ar' ? 'pr-9' : 'pl-9'}`}
+                            />
+                        </div>
 
                         <select value={trackingBranch} onChange={(e) => setTrackingBranch(e.target.value)} className="bg-elevated rounded-[1.2rem] py-3.5 px-5 text-sm font-bold outline-none border border-border/50 focus:border-indigo-500/50 text-main transition-colors shadow-sm">
                             <option value="all">{lang === 'ar' ? 'كل الفروع' : 'All Branches'}</option>
@@ -1737,6 +2605,13 @@ const CallCenter: React.FC = () => {
                                                 <Building2 size={12} className="text-muted" />
                                                  <span className="text-[10px] font-black uppercase tracking-widest text-muted">{branches.find(b => b.id === getOrderBranchId(order))?.name || '-'}</span>
                                              </div>
+                                             <button
+                                                onClick={() => { void printTrackingReceipt(order); }}
+                                                title={lang === 'ar' ? 'طباعة الإيصال' : 'Print receipt'}
+                                                className="p-2 rounded-xl bg-elevated border border-border/50 text-muted hover:text-emerald-500 hover:border-emerald-500/30 transition-all active:scale-95"
+                                            >
+                                                <Printer size={14} />
+                                            </button>
                                              <span className="text-xl font-black text-main">{Number(order.total || 0).toFixed(2)} <span className="text-[10px] tracking-widest opacity-50">{currencySymbol}</span></span>
                                         </div>
 
@@ -1746,7 +2621,9 @@ const CallCenter: React.FC = () => {
                                                 <span className="text-[10px] font-black uppercase tracking-[0.2em]">{lang === 'ar' ? 'عاجل' : 'Urgent'}</span>
                                             </div>
                                         )}
-                                        {/* Action Buttons */}
+                                        {/* Action Buttons — branch follows by consequence:
+                                            dispatch/deliver advance, edit reloads PENDING
+                                            into the builder, cancel voids + notifies. */}
                                         <div className="mt-4 flex gap-2 relative z-10">
                                             {order.status === OrderStatus.READY && (
                                                 <button
@@ -1759,6 +2636,10 @@ const CallCenter: React.FC = () => {
                                             {order.status === OrderStatus.OUT_FOR_DELIVERY && (
                                                 <button
                                                     onClick={async () => {
+                                                        if (orderNeedsDriver(order)) {
+                                                            showToast(lang === 'ar' ? 'عين طيار أولاً — ممنوع إغلاق توصيل داخلي بدون طيار مسؤول' : 'Assign a driver first — in-house delivery cannot close without a driver', 'warning');
+                                                            return;
+                                                        }
                                                         try {
                                                             await updateOrderStatus(order.id, OrderStatus.DELIVERED);
                                                             showToast(lang === 'ar' ? 'تم تأكيد التوصيل' : 'Delivery confirmed', 'success');
@@ -1770,6 +2651,33 @@ const CallCenter: React.FC = () => {
                                                     className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:opacity-90 active:scale-95 transition-all shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2"
                                                 >
                                                     <CheckCircle size={14} /> {lang === 'ar' ? 'تم التوصيل' : 'Delivered'}
+                                                </button>
+                                            )}
+                                            {order.status === OrderStatus.OUT_FOR_DELIVERY && (
+                                                <button
+                                                    onClick={() => { setSelectedTrackingOrder(order); setShowDriverModal(true); }}
+                                                    title={lang === 'ar' ? 'إعادة تعيين طيار' : 'Reassign driver'}
+                                                    className="flex-1 py-3 bg-cyan-500/10 text-cyan-600 border border-cyan-500/30 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-cyan-500 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Truck size={14} /> {lang === 'ar' ? 'طيار' : 'Driver'}
+                                                </button>
+                                            )}
+                                            {[OrderStatus.PENDING, OrderStatus.SCHEDULED].includes(order.status) && isCallCenterOrderRecord(order) && (
+                                                <button
+                                                    onClick={() => { if (!canModifyCCOrder(order)) { showToast(lang === 'ar' ? 'الطلب يخص موظف آخر \u2014 التعديل للمشرف' : 'Order belongs to another agent \u2014 managers only', 'warning'); return; } startEditOrder(order); }}
+                                                    title={lang === 'ar' ? 'تعديل الأصناف قبل بدء التحضير' : 'Edit items before preparation starts'}
+                                                    className="flex-1 py-3 bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-500 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Edit3 size={14} /> {lang === 'ar' ? 'تعديل' : 'Edit'}
+                                                </button>
+                                            )}
+                                            {![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status) && (
+                                                <button
+                                                    onClick={() => { if (!canModifyCCOrder(order)) { showToast(lang === 'ar' ? 'الطلب يخص موظف آخر — الإلغاء للمشرف' : 'Order belongs to another agent — managers only', 'warning'); return; } setCancelTarget(order); setCancelReason(''); }}
+                                                    title={lang === 'ar' ? 'إلغاء الطلب (يلغي في المطبخ والفرع)' : 'Cancel order (cancels in kitchen and branch)'}
+                                                    className="flex-1 py-3 bg-rose-500/10 text-rose-500 border border-rose-500/30 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Ban size={14} /> {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                                                 </button>
                                             )}
                                         </div>
@@ -1807,6 +2715,10 @@ const CallCenter: React.FC = () => {
                                         {order.status === OrderStatus.OUT_FOR_DELIVERY && (
                                             <button
                                                 onClick={async () => {
+                                                    if (orderNeedsDriver(order)) {
+                                                        showToast(lang === 'ar' ? 'عين طيار أولاً — ممنوع إغلاق توصيل داخلي بدون طيار مسؤول' : 'Assign a driver first — in-house delivery cannot close without a driver', 'warning');
+                                                        return;
+                                                    }
                                                     try {
                                                         await updateOrderStatus(order.id, OrderStatus.DELIVERED);
                                                         showToast(lang === 'ar' ? 'تم تأكيد التوصيل' : 'Delivery confirmed', 'success');
@@ -1820,9 +2732,34 @@ const CallCenter: React.FC = () => {
                                                 <CheckCircle size={12} /> {lang === 'ar' ? 'تم التوصيل' : 'Delivered'}
                                             </button>
                                         )}
+                                        {[OrderStatus.PENDING, OrderStatus.SCHEDULED].includes(order.status) && isCallCenterOrderRecord(order) && (
+                                            <button
+                                                onClick={() => { if (!canModifyCCOrder(order)) { showToast(lang === 'ar' ? 'الطلب يخص موظف آخر — التعديل للمشرف' : 'Order belongs to another agent — managers only', 'warning'); return; } startEditOrder(order); }}
+                                                title={lang === 'ar' ? 'تعديل الأصناف قبل بدء التحضير' : 'Edit items before preparation starts'}
+                                                className="px-5 py-3 bg-indigo-500/10 text-indigo-500 border border-indigo-500/30 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-500 hover:text-white active:scale-95 transition-all relative z-10 flex items-center gap-2"
+                                            >
+                                                <Edit3 size={12} /> {lang === 'ar' ? 'تعديل' : 'Edit'}
+                                            </button>
+                                        )}
+                                        {![OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status) && (
+                                            <button
+                                                onClick={() => { if (!canModifyCCOrder(order)) { showToast(lang === 'ar' ? 'الطلب يخص موظف آخر — الإلغاء للمشرف' : 'Order belongs to another agent — managers only', 'warning'); return; } setCancelTarget(order); setCancelReason(''); }}
+                                                title={lang === 'ar' ? 'إلغاء الطلب (يلغي في المطبخ والفرع)' : 'Cancel order (cancels in kitchen and branch)'}
+                                                className="px-5 py-3 bg-rose-500/10 text-rose-500 border border-rose-500/30 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500 hover:text-white active:scale-95 transition-all relative z-10 flex items-center gap-2"
+                                            >
+                                                <Ban size={12} /> {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                                            </button>
+                                        )}
                                         <p className="text-2xl font-black text-main w-36 text-right relative z-10">
                                              {Number(order.total || 0).toFixed(2)} <span className="text-[10px] font-black uppercase tracking-widest opacity-50">{currencySymbol}</span>
                                         </p>
+                                        <button
+                                            onClick={() => { void printTrackingReceipt(order); }}
+                                            title={lang === 'ar' ? 'طباعة الإيصال' : 'Print receipt'}
+                                            className="p-2.5 rounded-xl bg-elevated border border-border/50 text-muted hover:text-emerald-500 hover:border-emerald-500/30 transition-all active:scale-95 relative z-10"
+                                        >
+                                            <Printer size={14} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -1839,15 +2776,153 @@ const CallCenter: React.FC = () => {
                 onSave={handleSaveNewCustomer}
                 lang={lang}
                 zones={deliveryZones || []}
+                branchId={selectedBranchId}
+                branches={branches}
+                onZonesChange={setDeliveryZones}
             />
+
+            {/* Map modal: full-size pinning (search + coords/Maps URL/Plus Code).
+                Auto-opens for a new delivery customer without a pin. */}
+            {mapModalOpen && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6">
+                    <div className="absolute inset-0 bg-black/60" onClick={() => setMapModalOpen(false)} />
+                    <div className="relative w-full max-w-3xl max-h-[90dvh] overflow-y-auto custom-scrollbar bg-card rounded-[1.5rem] border border-border/50 shadow-2xl animate-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border/50 sticky top-0 bg-card z-10">
+                            <div>
+                                <h3 className="text-sm font-black text-main uppercase tracking-widest">
+                                    {lang === 'ar' ? 'تثبيت عنوان التوصيل' : 'Pin delivery address'}
+                                </h3>
+                                <p className="text-[10px] font-bold text-muted mt-0.5">
+                                    {deliveryAddress || (lang === 'ar' ? 'ابحث أو الصق إحداثيات / رابط خرائط' : 'Search or paste coordinates / maps link')}
+                                </p>
+                            </div>
+                            <span className={`shrink-0 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${deliveryPin.lat ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/15 text-amber-600'}`}>
+                                {deliveryPin.lat ? (lang === 'ar' ? 'مثبتة' : 'Pinned') : (lang === 'ar' ? 'بدون Pin' : 'No pin')}
+                            </span>
+                        </div>
+                        <div className="p-4">
+                            <AddressMapPicker
+                                lang={lang}
+                                mapHeightClass="min-h-[340px]"
+                                value={{ address: deliveryAddress, lat: deliveryPin.lat, lng: deliveryPin.lng, label: deliveryPin.label }}
+                                onChange={(pin) => {
+                                    setDeliveryAddress(pin.address);
+                                    setDeliveryPin({ lat: pin.lat, lng: pin.lng, label: pin.label });
+                                }}
+                            />
+                        </div>
+                        <div className="px-5 pb-5 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setMapModalOpen(false)}
+                                className="flex-1 py-3 rounded-xl border border-border/50 bg-elevated text-muted font-black tracking-[0.15em] text-[10px] uppercase hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/50 transition-all active:scale-95"
+                            >
+                                {deliveryPin.lat ? (lang === 'ar' ? 'تم' : 'Done') : (lang === 'ar' ? 'تخطي — عنوان نصي' : 'Skip — text only')}
+                            </button>
+                            {deliveryPin.lat && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setMapModalOpen(false); document.getElementById('item-search')?.focus(); }}
+                                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 text-white font-black tracking-[0.15em] text-[10px] uppercase hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-indigo-500/25"
+                                >
+                                    {lang === 'ar' ? 'متابعة للأصناف' : 'Continue to items'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cancel modal: reason is mandatory (server policy) and travels
+                to the branch + kitchen + customer WhatsApp by consequence. */}
+            {cancelTarget && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6">
+                    <div className="absolute inset-0 bg-black/60" onClick={() => !isCancelling && setCancelTarget(null)} />
+                    <div className="relative w-full max-w-md bg-card rounded-[1.5rem] border border-border/50 shadow-2xl p-6 animate-in zoom-in-95 duration-150">
+                        <h3 className="text-base font-black text-main uppercase tracking-widest flex items-center gap-2">
+                            <Ban size={18} className="text-rose-500" />
+                            {lang === 'ar' ? `إلغاء الطلب #${cancelTarget.id}` : `Cancel order #${cancelTarget.id}`}
+                        </h3>
+                        <p className="text-[11px] font-bold text-muted mt-1.5 leading-5">
+                            {lang === 'ar'
+                                ? 'الإلغاء يسمع في المطبخ والفرع والطيار والعميل تلقائياً. الطلبات التي بدأ الفرع تحضيرها تُلغى من شاشة الفرع.'
+                                : 'Cancellation propagates to kitchen, branch, driver and customer automatically. Orders the branch started must be cancelled at the branch.'}
+                        </p>
+                        <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            rows={3}
+                            autoFocus
+                            placeholder={lang === 'ar' ? 'سبب الإلغاء * (يظهر للفرع)...' : 'Cancellation reason * (visible to branch)...'}
+                            className="mt-4 w-full bg-elevated border border-border/50 rounded-xl p-3 text-sm font-bold outline-none focus:border-rose-500/50 text-main placeholder-muted resize-none"
+                        />
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => !isCancelling && setCancelTarget(null)}
+                                disabled={isCancelling}
+                                className="py-3 rounded-xl border border-border/50 bg-elevated text-muted font-black tracking-[0.15em] text-[10px] uppercase hover:bg-rose-500/10 hover:text-rose-500 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                {lang === 'ar' ? 'تراجع' : 'Back'}
+                            </button>
+                            <button
+                                onClick={() => { void confirmCancelOrder(); }}
+                                disabled={isCancelling || !cancelReason.trim()}
+                                className="py-3 rounded-xl bg-rose-500 text-white font-black tracking-[0.15em] text-[10px] uppercase hover:bg-rose-600 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isCancelling ? <RefreshCcw size={14} className="animate-spin" /> : <Ban size={14} />}
+                                {lang === 'ar' ? 'تأكيد الإلغاء' : 'Confirm cancel'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reset confirm: Esc/F5 never wipe a live order silently. */}
+            {confirmingReset && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6">
+                    <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmingReset(false)} />
+                    <div className="relative w-full max-w-sm bg-card rounded-[1.5rem] border border-border/50 shadow-2xl p-6 animate-in zoom-in-95 duration-150">
+                        <h3 className="text-base font-black text-main uppercase tracking-widest">
+                            {lang === 'ar' ? 'مسح الطلب الحالي؟' : 'Discard current order?'}
+                        </h3>
+                        <p className="text-[11px] font-bold text-muted mt-1.5">
+                            {lang === 'ar' ? 'سيتم مسح العميل والسلة. استخدم تعليق (F4) للاحتفاظ به.' : 'Customer and cart will be cleared. Use Hold (F4) to keep it.'}
+                        </p>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                            <button onClick={() => setConfirmingReset(false)} className="py-3 rounded-xl border border-border/50 bg-elevated text-main font-black tracking-[0.15em] text-[10px] uppercase hover:border-indigo-500/40 transition-all active:scale-95">
+                                {lang === 'ar' ? 'تراجع' : 'Back'}
+                            </button>
+                            <button onClick={() => { setConfirmingReset(false); resetOrder(); }} className="py-3 rounded-xl bg-rose-500 text-white font-black tracking-[0.15em] text-[10px] uppercase hover:bg-rose-600 transition-all active:scale-95">
+                                {lang === 'ar' ? 'مسح' : 'Discard'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <DriverAssignmentModal
                 isOpen={showDriverModal}
                 onClose={() => setShowDriverModal(false)}
-                onAssign={async (driverId) => {
+                onAssign={async (driverId, driverName) => {
                     if (!selectedTrackingOrder?.id) return;
                     await deliveryApi.assign({ orderId: selectedTrackingOrder.id, driverId });
                     await fetchOrders();
+                    // Driver ticket (شيك الطيار) — non-blocking, assignment succeeded.
+                    try {
+                        const ticketBranchId = getOrderBranchId(selectedTrackingOrder);
+                        await printDriverTicket({
+                            order: selectedTrackingOrder,
+                            driverName: driverName || (lang === 'ar' ? 'طيار' : 'Driver'),
+                            printers,
+                            branchId: ticketBranchId,
+                            settings,
+                            currencySymbol: settings.currencySymbol,
+                            lang,
+                            branch: branches.find(b => b.id === ticketBranchId),
+                        });
+                    } catch {
+                        showToast(lang === 'ar' ? 'تم التعيين لكن تعذرت طباعة شيك الطيار' : 'Assigned, but the driver ticket failed to print', 'warning');
+                    }
                 }}
                 branchId={selectedTrackingOrder ? getOrderBranchId(selectedTrackingOrder) : ''}
                 orderId={selectedTrackingOrder?.id}
@@ -1869,6 +2944,18 @@ const CallCenter: React.FC = () => {
                 onClose={() => { setShowApprovalModal(false); setApprovalCallback(null); }}
                 onApproved={() => approvalCallback?.fn()}
                 actionName={approvalCallback?.action || 'Operation Authorization'}
+            />
+
+            {/* Sizes / modifiers / open price — same modal as the POS cashier,
+                with the same silent platform markup (open/weighted exempt). */}
+            <ItemOptionsModal
+                isOpen={!!optionItem}
+                item={optionItem}
+                onClose={() => setOptionItem(null)}
+                onConfirm={handleConfirmItemOptions}
+                currencySymbol={currencySymbol}
+                lang={lang}
+                platformMarkup={platformMarkup}
             />
         </div>
     );

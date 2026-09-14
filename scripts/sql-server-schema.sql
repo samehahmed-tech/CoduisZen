@@ -151,7 +151,7 @@ CREATE TABLE delivery_zones (
     id                  int             IDENTITY(1,1) NOT NULL,
     name                nvarchar(max)   NOT NULL,
     name_ar             nvarchar(max),
-    branch_id           nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255)   NULL,
     delivery_fee        real            DEFAULT 0,
     min_order_amount    real            DEFAULT 0,
     estimated_time      int             DEFAULT 45,
@@ -449,6 +449,7 @@ CREATE TABLE order_items (
     id                  int             IDENTITY(1,1) NOT NULL,
     order_id            nvarchar(255)   NOT NULL,
     menu_item_id        nvarchar(255),
+    size_id             nvarchar(150),
     name                nvarchar(max)   NOT NULL,
     name_ar             nvarchar(max),
     price               real            NOT NULL,
@@ -1284,6 +1285,7 @@ CREATE TABLE finance_exceptions (
     id                  nvarchar(255)   NOT NULL,
     reference           nvarchar(max),
     reference_type      nvarchar(max),
+    branch_id           nvarchar(255),
     payload             nvarchar(max),
     reason              nvarchar(max)   NOT NULL,
     status              nvarchar(max)   DEFAULT 'PENDING',
@@ -2946,8 +2948,132 @@ VALUES
 ('pr-cogs-credit', 'POS_SALE', 'SUBTOTAL', 'CREDIT', '1400', NULL, NULL, 1, 1);
 GO
 
+-- ============================================================================
+-- 16. P1 FINANCE SUPPORT TABLES
+-- ============================================================================
+IF OBJECT_ID('bank_accounts', 'U') IS NULL
+CREATE TABLE bank_accounts (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), name nvarchar(255), account_type nvarchar(100),
+    institution nvarchar(255), account_number nvarchar(255), account_id nvarchar(255), opening_balance decimal(14,2),
+    is_active bit DEFAULT 1, created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(),
+    CONSTRAINT pk_bank_accounts PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('account_transfers', 'U') IS NULL
+CREATE TABLE account_transfers (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), from_account_id nvarchar(255), to_account_id nvarchar(255),
+    amount decimal(14,2), reason nvarchar(max), status nvarchar(50), requested_by nvarchar(255), approved_by nvarchar(255),
+    completed_at datetime2, created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(),
+    CONSTRAINT pk_account_transfers PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('daily_pnl_snapshots', 'U') IS NULL
+CREATE TABLE daily_pnl_snapshots (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), business_date date, total_revenue decimal(14,2), total_discount decimal(14,2),
+    total_tax decimal(14,2), net_sales decimal(14,2), total_orders int, cogs decimal(14,2), food_cost_percent decimal(8,2),
+    labor_cost decimal(14,2), labor_cost_percent decimal(8,2), operating_expenses decimal(14,2), gross_profit decimal(14,2),
+    gross_margin_percent decimal(8,2), operating_income decimal(14,2), net_margin_percent decimal(8,2), status nvarchar(50),
+    finalized_by nvarchar(255), finalized_at datetime2, computed_at datetime2, updated_at datetime2 DEFAULT GETDATE(),
+    CONSTRAINT pk_daily_pnl_snapshots PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('cash_drawers', 'U') IS NULL
+CREATE TABLE cash_drawers (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), opened_by nvarchar(255), closed_by nvarchar(255), opened_at datetime2 DEFAULT GETDATE(),
+    closed_at datetime2, opening_cash decimal(14,2), closing_cash decimal(14,2), expected_cash decimal(14,2), total_sales_cash decimal(14,2),
+    total_refunds_cash decimal(14,2), total_payouts_cash decimal(14,2), total_collections_cash decimal(14,2), variance decimal(14,2),
+    status nvarchar(50), notes nvarchar(max), updated_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_cash_drawers PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('drawer_count_lines', 'U') IS NULL
+CREATE TABLE drawer_count_lines (
+    id int IDENTITY(1,1) NOT NULL, drawer_id nvarchar(255), count_type nvarchar(50), label nvarchar(255), face_value decimal(14,2),
+    quantity int, line_total decimal(14,2), counted_by nvarchar(255), created_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_drawer_count_lines PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('drawer_discrepancies', 'U') IS NULL
+CREATE TABLE drawer_discrepancies (
+    id nvarchar(255) NOT NULL, drawer_id nvarchar(255), branch_id nvarchar(255), cashier_id nvarchar(255), shift_id nvarchar(255),
+    variance decimal(14,2), direction nvarchar(50), resolution nvarchar(100), approved_by nvarchar(255), approved_at datetime2,
+    amount_paid decimal(14,2), notes nvarchar(max), resolved_at datetime2, created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(),
+    CONSTRAINT pk_drawer_discrepancies PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('gift_cards', 'U') IS NULL
+CREATE TABLE gift_cards (
+    id nvarchar(255) NOT NULL, code nvarchar(255), branch_id nvarchar(255), customer_id nvarchar(255), purchased_order_id nvarchar(255),
+    initial_amount decimal(14,2), balance decimal(14,2), status nvarchar(50), expires_at datetime2, created_by nvarchar(255), issued_by nvarchar(255),
+    created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_gift_cards PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('gift_card_transactions', 'U') IS NULL
+CREATE TABLE gift_card_transactions (
+    id nvarchar(255) NOT NULL, gift_card_id nvarchar(255), type nvarchar(50), amount decimal(14,2), balance_after decimal(14,2),
+    order_id nvarchar(255), created_by nvarchar(255), created_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_gift_card_transactions PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('supplier_invoice_matches', 'U') IS NULL
+CREATE TABLE supplier_invoice_matches (
+    id nvarchar(255) NOT NULL, supplier_invoice_id nvarchar(255), purchase_order_id nvarchar(255), grn_id nvarchar(255),
+    expected_total decimal(14,2), grn_total decimal(14,2), invoice_total decimal(14,2), quantity_variance decimal(14,2), price_variance decimal(14,2),
+    match_status nvarchar(50), review_status nvarchar(50), reviewed_by nvarchar(255), reviewed_at datetime2, notes nvarchar(max), review_notes nvarchar(max),
+    created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_supplier_invoice_matches PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('tip_pools', 'U') IS NULL
+CREATE TABLE tip_pools (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), shift_id nvarchar(255), pooled_amount decimal(14,2), payment_method nvarchar(50),
+    distribution_method nvarchar(50), status nvarchar(50), paid_out_at datetime2, allocated_by nvarchar(255), created_by nvarchar(255),
+    created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_tip_pools PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('tip_allocations', 'U') IS NULL
+CREATE TABLE tip_allocations (
+    id nvarchar(255) NOT NULL, tip_pool_id nvarchar(255), employee_id nvarchar(255), base_hours decimal(8,2), role_weight decimal(8,2),
+    allocated_amount decimal(14,2), paid_out bit DEFAULT 0, created_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_tip_allocations PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('treasury_vouchers', 'U') IS NULL
+CREATE TABLE treasury_vouchers (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), voucher_no int IDENTITY(1,1) NOT NULL, kind nvarchar(50),
+    category nvarchar(100), account_id nvarchar(255), amount decimal(14,2), supplier_id nvarchar(255), invoice_id nvarchar(255),
+    holder_user_id nvarchar(255), holder_name nvarchar(255), expense_account_code nvarchar(50), description nvarchar(max),
+    payment_method nvarchar(50), reference nvarchar(255), status nvarchar(50), requested_by nvarchar(255), approved_by nvarchar(255),
+    completed_at datetime2, created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(),
+    CONSTRAINT pk_treasury_vouchers PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('driver_cash_ledger', 'U') IS NULL
+CREATE TABLE driver_cash_ledger (
+    id int IDENTITY(1,1) NOT NULL, driver_id nvarchar(255) NOT NULL, branch_id nvarchar(255), order_id nvarchar(255),
+    type nvarchar(20) NOT NULL, amount real NOT NULL, balance_after real NOT NULL DEFAULT 0, created_by nvarchar(255),
+    notes nvarchar(max), created_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_driver_cash_ledger PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('driver_branch_checkins', 'U') IS NULL
+CREATE TABLE driver_branch_checkins (
+    id nvarchar(255) NOT NULL, driver_id nvarchar(255) NOT NULL, branch_id nvarchar(255), status nvarchar(20) NOT NULL DEFAULT 'REQUESTED',
+    requested_at datetime2 DEFAULT GETDATE(), decided_at datetime2, decided_by nvarchar(255), notes nvarchar(max),
+    CONSTRAINT pk_driver_branch_checkins PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('mail_messages', 'U') IS NULL
+CREATE TABLE mail_messages (
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), sender_id nvarchar(255) NOT NULL, subject nvarchar(max) NOT NULL,
+    body nvarchar(max) NOT NULL, priority nvarchar(50) DEFAULT 'NORMAL', is_broadcast bit DEFAULT 0, broadcast_scope nvarchar(50),
+    reply_to_message_id nvarchar(255), created_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_mail_messages PRIMARY KEY (id)
+);
+GO
+IF OBJECT_ID('mail_message_recipients', 'U') IS NULL
+CREATE TABLE mail_message_recipients (
+    id int IDENTITY(1,1) NOT NULL, message_id nvarchar(255) NOT NULL, user_id nvarchar(255) NOT NULL,
+    is_read bit DEFAULT 0, read_at datetime2, is_starred bit DEFAULT 0, is_archived bit DEFAULT 0,
+    CONSTRAINT pk_mail_message_recipients PRIMARY KEY (id)
+);
+GO
+
 PRINT N'Coduis Zen database created successfully.';
-PRINT N'139 tables created.';
+PRINT N'144 tables created.';
 PRINT N'Create the first administrator through the secure setup wizard.';
 PRINT N'Default branch: b1 - Main Branch';
 GO

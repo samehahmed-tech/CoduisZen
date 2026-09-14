@@ -14,15 +14,15 @@ interface SectionHeaderProps {
  *   <SectionHeader title="Recent Orders" icon={ShoppingBag} action={<ExportButton ... />} />
  */
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle, icon: Icon, action }) => (
-    <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-            {Icon && <Icon size={16} className="text-primary" />}
-            <div>
-                <h3 className="text-[11px] font-black text-muted uppercase tracking-[0.2em]">{title}</h3>
-                {subtitle && <p className="text-[8px] text-muted/60 font-bold mt-0.5">{subtitle}</p>}
+    <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-2.5 min-w-0">
+            {Icon && <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0"><Icon size={16} /></span>}
+            <div className="min-w-0">
+                <h3 className="ux-section-title truncate">{title}</h3>
+                {subtitle && <p className="ux-section-sub truncate">{subtitle}</p>}
             </div>
         </div>
-        {action && <div>{action}</div>}
+        {action && <div className="shrink-0">{action}</div>}
     </div>
 );
 

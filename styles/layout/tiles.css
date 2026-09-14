@@ -1,0 +1,645 @@
+/* ═══ TILES VIEW — Parallax Depth Cards interaction language ═══
+   Reference: perspective + layered translateZ + counter-moving background
+   + mouse spotlight + dynamic shadow + content reveal + smooth return.
+   - Tracking runs on rAF writing --rx/--ry/--gx/--gy/--px/--py (no re-render).
+   - `.is-in` (pointer down on card) = tight 130ms follow;
+     base 750ms cubic-bezier(0.23,1,0.32,1) = slow soft glide home.
+   - Depth layers: bg 0 → shade 12 → sub 20 → title 34 → icon 44 → count/badge 58.
+   - Colors stay theme-driven (rgb(var(--…)) + --tile-* accents). */
+
+.tiles-scope {
+    --tile-accent: var(--primary);
+}
+
+/* Aurora backdrop blobs */
+.tiles-aurora {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.tiles-aurora span {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(110px);
+    opacity: 0.5;
+    animation: tiles-drift 16s ease-in-out infinite alternate;
+    /* Aurora blobs are oversized + blurred: isolate them so the browser can
+       promote each to its own compositor layer (transform-only animation). */
+    will-change: transform;
+    contain: strict;
+}
+
+.tiles-aurora span:nth-child(1) {
+    width: 480px; height: 480px;
+    top: -160px; inset-inline-start: -120px;
+    background: rgba(var(--primary), 0.22);
+}
+
+.tiles-aurora span:nth-child(2) {
+    width: 420px; height: 420px;
+    top: 22%; inset-inline-end: -140px;
+    background: rgba(var(--accent), 0.16);
+    animation-delay: -6s;
+}
+
+.tiles-aurora span:nth-child(3) {
+    width: 380px; height: 380px;
+    bottom: -140px; inset-inline-start: 30%;
+    background: rgba(var(--primary), 0.12);
+    animation-delay: -11s;
+}
+
+.dark .tiles-aurora span { opacity: 0.65; }
+
+@keyframes tiles-drift {
+    from { transform: translate(0, 0) scale(1); }
+    to { transform: translate(60px, 40px) scale(1.15); }
+}
+
+/* ── Base tile ── */
+.tile-3d {
+    --rx: 0deg;
+    --ry: 0deg;
+    --gx: 50%;
+    --gy: 50%;
+    --px: 0;
+    --py: 0;
+
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.6rem;
+    border-radius: var(--theme-radius-lg, 20px);
+    padding: 1.05rem 1.05rem 0.95rem;
+    min-height: 150px;
+    text-align: start;
+    cursor: pointer;
+    overflow: hidden;
+
+    background:
+        linear-gradient(165deg, rgba(var(--bg-card), 0.94) 0%, rgba(var(--bg-card), 0.7) 100%);
+    backdrop-filter: blur(var(--theme-blur, 12px)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--theme-blur, 12px)) saturate(160%);
+    border: 1px solid rgba(var(--border-color), 0.55);
+    color: rgb(var(--text-main));
+
+    box-shadow:
+        var(--theme-shadow-card),
+        0 10px 25px -14px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+
+    transform:
+        perspective(1100px)
+        rotateX(var(--rx))
+        rotateY(var(--ry))
+        translateZ(0);
+    transform-style: preserve-3d;
+    will-change: transform;
+
+    /* Slow soft return glide (also the resting transition) */
+    transition:
+        transform 750ms cubic-bezier(0.23, 1, 0.32, 1),
+        box-shadow 400ms ease,
+        border-color 400ms ease;
+
+    animation: tile-rise var(--theme-duration-slow, 600ms) var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: var(--tile-delay, 0ms);
+}
+
+/* Tight follow while the pointer is engaged */
+.tile-3d.is-in {
+    transition:
+        transform 130ms ease-out,
+        box-shadow 400ms ease,
+        border-color 400ms ease;
+}
+
+/* Mouse spotlight (dynamic light) */
+.tile-3d::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: radial-gradient(
+        circle at var(--gx) var(--gy),
+        rgba(255, 255, 255, 0.12) 0%,
+        rgba(255, 255, 255, 0.04) 30%,
+        transparent 55%
+    );
+    opacity: 0;
+    transition: opacity 400ms ease;
+}
+
+.tile-3d > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Layer 0: parallax background (counter-moves, scaled to stay covered) ── */
+.tile-depth-bg {
+    position: absolute;
+    inset: -8%;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(130% 75% at 50% -12%, var(--tile-glow, rgba(var(--primary), 0.14)), transparent 62%),
+        linear-gradient(165deg, rgba(var(--bg-card), 0.35) 0%, transparent 70%);
+    transform:
+        translateZ(0px)
+        translate3d(calc(var(--px) * -16px), calc(var(--py) * -16px), 0)
+        scale(1.12);
+    will-change: transform;
+}
+
+/* ── Layer 1: hover readability shade (theme-aware, bottom-up) ── */
+.tile-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+        to bottom,
+        transparent 35%,
+        rgba(var(--bg-app), 0.28) 78%,
+        rgba(var(--bg-app), 0.5) 100%
+    );
+    opacity: 0;
+    transform: translateZ(12px);
+    transition: opacity 450ms ease;
+}
+
+/* ── Hover: tilt is var-driven; here come glow / shadow / reveal ── */
+@media (hover: hover) {
+    .tile-3d:hover {
+        border-color: var(--tile-border, rgba(var(--primary), 0.45));
+        box-shadow:
+            0 28px 60px -22px rgba(0, 0, 0, 0.45),
+            0 12px 28px -12px var(--tile-glow, rgba(var(--primary), 0.35)),
+            inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    }
+
+    .tile-3d:hover::before {
+        opacity: 1;
+    }
+
+    .tile-3d:hover .tile-shade {
+        opacity: 1;
+    }
+
+    .tile-3d:hover .tile-icon {
+        transform: translateZ(52px) scale(1.06);
+    }
+
+    .tile-3d:hover .tile-sub {
+        opacity: 1;
+        transform: translateZ(20px) translateY(0);
+    }
+
+    .tile-3d:hover .tile-pin,
+    .tile-pin[data-active='true'] {
+        opacity: 1;
+        transform: translateZ(50px) scale(1);
+    }
+}
+
+/* Pressed: sink slightly, keep tilt */
+.tile-3d:active {
+    transform:
+        perspective(1100px)
+        rotateX(var(--rx))
+        rotateY(var(--ry))
+        translateZ(-22px) scale(0.97);
+    transition: transform 90ms ease-out;
+}
+
+/* ── Hero tile: full-bleed mesh ── */
+.tile-3d--hero {
+    border-radius: var(--theme-radius-xl, 30px);
+    min-height: 230px;
+    padding: 1.4rem;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background:
+        radial-gradient(120% 90% at 85% 0%, rgba(255, 255, 255, 0.22), transparent 55%),
+        radial-gradient(100% 100% at 0% 100%, rgba(0, 0, 0, 0.28), transparent 60%),
+        linear-gradient(140deg, var(--tile-chip-from, rgb(var(--primary))) 0%, var(--tile-chip-to, rgb(var(--primary-hover, var(--primary)))) 100%);
+    box-shadow:
+        0 28px 60px -20px var(--tile-glow, rgba(var(--primary), 0.55)),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.tile-3d--hero .tile-depth-bg {
+    background:
+        radial-gradient(110% 70% at 80% 0%, rgba(255, 255, 255, 0.20), transparent 55%),
+        radial-gradient(90% 90% at 10% 100%, rgba(0, 0, 0, 0.30), transparent 60%);
+    transform:
+        translateZ(0px)
+        translate3d(calc(var(--px) * -22px), calc(var(--py) * -22px), 0)
+        scale(1.16);
+}
+
+.tile-3d--hero .tile-shade {
+    background: linear-gradient(
+        to bottom,
+        transparent 40%,
+        rgba(0, 0, 0, 0.18) 80%,
+        rgba(0, 0, 0, 0.38) 100%
+    );
+}
+
+.tile-3d--hero .tile-title { font-size: 1.15rem; color: #fff; }
+.tile-3d--hero .tile-sub { color: rgba(255, 255, 255, 0.82); }
+
+.tile-3d--hero .tile-icon {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 12px 26px -10px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+@media (hover: hover) {
+    .tile-3d--hero:hover .tile-icon {
+        transform: translateZ(60px) scale(1.06);
+    }
+}
+
+/* ── Leader tile: wide horizontal ── */
+.tile-3d--leader {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.9rem;
+    min-height: 108px;
+    border-radius: var(--theme-radius, 24px);
+}
+
+.tile-3d--leader .tile-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 17px;
+    flex-shrink: 0;
+}
+
+/* ── 3D content layers ── */
+.tile-icon {
+    transform: translateZ(44px);
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: linear-gradient(140deg, var(--tile-chip-from, rgb(var(--primary))), var(--tile-chip-to, rgb(var(--primary-hover, var(--primary)))));
+    box-shadow: 0 10px 22px -8px var(--tile-glow, rgba(var(--primary), 0.5)), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: transform 350ms var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.tile-3d--hero .tile-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 17px;
+    transform: translateZ(54px);
+}
+
+.tile-title {
+    transform: translateZ(34px);
+    font-weight: 900;
+    font-size: 0.92rem;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+}
+
+/* Secondary info: subtle at rest, rises + reveals on hover */
+.tile-sub {
+    transform: translateZ(20px) translateY(5px);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgb(var(--text-muted));
+    opacity: 0.62;
+    margin-top: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition:
+        opacity 350ms ease,
+        transform 350ms var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.tile-count {
+    transform: translateZ(58px);
+    font-variant-numeric: tabular-nums;
+    font-weight: 900;
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.tile-3d--hero .tile-count {
+    font-size: 2.1rem;
+    color: #fff;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.tile-chev {
+    transform: translateZ(30px);
+}
+
+/* ── Spark bars (real hourly orders, hero meta) ── */
+.spark-bars {
+    transform: translateZ(30px);
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 44px;
+}
+
+.spark-bar {
+    flex: 1;
+    min-width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.45));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: height 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Live badge + dot (top depth layer) ── */
+.tile-badge {
+    transform: translateZ(58px);
+    position: absolute;
+    top: 0.8rem;
+    inset-inline-end: 0.8rem;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(135deg, #f43f5e, #e11d48);
+    box-shadow: 0 6px 16px -4px rgba(244, 63, 94, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.tile-live-dot {
+    transform: translateZ(58px);
+    position: absolute;
+    top: 1rem;
+    inset-inline-end: 1rem;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #34d399;
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6);
+    animation: tile-ping 2.2s ease-out infinite;
+}
+
+/* ── Favorite pin ── */
+.tile-pin {
+    position: absolute;
+    bottom: 0.7rem;
+    inset-inline-end: 0.7rem;
+    z-index: 5;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgb(var(--text-muted));
+    background: rgba(var(--bg-elevated), 0.55);
+    border: 1px solid rgba(var(--border-color), 0.5);
+    opacity: 0;
+    transform: translateZ(50px) scale(0.85);
+    transition: opacity 200ms ease, transform 200ms ease, color 200ms ease;
+}
+
+.tile-pin[data-active='true'] {
+    opacity: 1;
+    transform: translateZ(50px) scale(1);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.45);
+}
+
+.tile-pin:hover { color: #fbbf24; }
+
+/* ── Widget cards (live stats / alerts) ── */
+.tile-widget {
+    border-radius: 26px;
+    padding: 1.15rem 1.2rem;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.7rem;
+    overflow: hidden;
+    position: relative;
+    isolation: isolate;
+    background:
+        linear-gradient(165deg, rgba(var(--bg-card), 0.94) 0%, rgba(var(--bg-card), 0.7) 100%);
+    backdrop-filter: blur(var(--theme-blur, 12px)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--theme-blur, 12px)) saturate(160%);
+    border: 1px solid rgba(var(--border-color), 0.55);
+    box-shadow: var(--theme-shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    animation: tile-rise var(--theme-duration-slow, 600ms) var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: var(--tile-delay, 0ms);
+}
+
+.tile-widget::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(130% 75% at 50% -12%, var(--tile-glow, rgba(var(--primary), 0.12)), transparent 62%);
+}
+
+.tile-widget > * { position: relative; z-index: 1; }
+
+/* ── Up-next suggestion rows ── */
+.upnext-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    width: 100%;
+    text-align: start;
+    border-radius: 20px;
+    padding: 0.8rem 0.95rem;
+    background: rgba(var(--bg-card), 0.72);
+    backdrop-filter: blur(var(--theme-blur, 12px));
+    -webkit-backdrop-filter: blur(var(--theme-blur, 12px));
+    border: 1px solid rgba(var(--border-color), 0.55);
+    box-shadow: var(--theme-shadow-card);
+    transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    animation: tile-rise var(--theme-duration-slow, 500ms) var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: var(--tile-delay, 0ms);
+}
+
+.upnext-row:hover {
+    transform: translateY(-2px) scale(1.005);
+    border-color: rgba(var(--primary), 0.4);
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.35), 0 8px 20px -10px rgba(var(--primary), 0.3);
+}
+
+.upnext-row:active { transform: scale(0.98); }
+
+/* ── Quick-action chips ── */
+.qa-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    border-radius: 999px;
+    padding: 0.65rem 1.1rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(140deg, var(--tile-chip-from, rgb(var(--primary))), var(--tile-chip-to, rgb(var(--primary-hover, var(--primary)))));
+    box-shadow: 0 12px 26px -10px var(--tile-glow, rgba(var(--primary), 0.5)), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+    animation: tile-rise var(--theme-duration-slow, 500ms) var(--theme-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: var(--tile-delay, 0ms);
+}
+
+.qa-chip:hover { transform: translateY(-2px) scale(1.04); }
+.qa-chip:active { transform: scale(0.95); }
+
+/* ── Focus visibility (theme ring) ── */
+.tile-3d:focus-visible,
+.tile-widget:focus-visible,
+.upnext-row:focus-visible,
+.qa-chip:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--theme-focus-ring, rgba(var(--primary), 0.3));
+}
+
+/* ── Entrance + ping ── */
+@keyframes tile-rise {
+    from { opacity: 0; transform: perspective(1100px) translateY(26px) scale(0.96); }
+    to { opacity: 1; transform: perspective(1100px) translateY(0) scale(1); }
+}
+
+@keyframes tile-ping {
+    0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+    70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+/* ── Section label ── */
+.tiles-section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgb(var(--text-muted));
+}
+
+.tiles-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(var(--border-color), 0.8), transparent);
+}
+
+[dir='rtl'] .tiles-section-label::after {
+    background: linear-gradient(-90deg, rgba(var(--border-color), 0.8), transparent);
+}
+
+/* ── Dark-mode depth ── */
+.dark .tile-3d {
+    background: linear-gradient(160deg, rgba(var(--bg-card), 0.95) 0%, rgba(var(--bg-app), 0.9) 100%);
+    box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@media (hover: hover) {
+    .dark .tile-3d:hover {
+        box-shadow: 0 34px 70px -20px rgba(0, 0, 0, 0.65), 0 14px 32px -12px var(--tile-glow, rgba(var(--primary), 0.4)), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+}
+
+.dark .tile-widget {
+    background: linear-gradient(160deg, rgba(var(--bg-card), 0.95) 0%, rgba(var(--bg-app), 0.9) 100%);
+}
+
+/* ── Touch: no hover tilt states; tap press still responds ── */
+@media (hover: none) {
+    .tile-3d { will-change: auto; }
+    .tile-sub { opacity: 1; transform: translateZ(20px) translateY(0); }
+    .tile-shade { display: none; }
+}
+
+/* ── Rendering cost control (same visuals, cheaper to paint) ──
+   Every tile/widget/row carries backdrop-filter + layered gradients. With
+   dozens on screen, offscreen ones must skip paint entirely:
+   content-visibility:auto defers rendering until near the viewport; the
+   entrance animation then plays on reveal (identical look, no layout shift
+   thanks to the intrinsic-size placeholder). */
+.tile-3d, .tile-widget {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 170px;
+}
+
+.upnext-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 70px;
+}
+
+/* ── Device-tier fallback (set once by App from deviceMemory / cores /
+   network / pointer — NOT screen width). Same design, cheaper paint:
+   near-opaque cards instead of per-tile backdrop blur, frozen aurora. */
+html[data-perf-tier='lite'] .tile-3d,
+html[data-perf-tier='lite'] .tile-widget,
+html[data-perf-tier='lite'] .upnext-row {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(var(--bg-card), 0.97);
+}
+
+html[data-perf-tier='lite'] .tile-3d--hero {
+    background:
+        radial-gradient(120% 90% at 85% 0%, rgba(255, 255, 255, 0.22), transparent 55%),
+        radial-gradient(100% 100% at 0% 100%, rgba(0, 0, 0, 0.28), transparent 60%),
+        linear-gradient(140deg, var(--tile-chip-from, rgb(var(--primary))) 0%, var(--tile-chip-to, rgb(var(--primary-hover, var(--primary)))) 100%);
+}
+
+html[data-perf-tier='lite'] .tiles-aurora span { animation: none; opacity: 0.3; }
+
+/* ── Small screens: same fallback regardless of tier — dozens of blurred
+   tiles are the top GPU cost on phones even on flagship hardware. */
+@media (max-width: 640px) {
+    .tile-3d, .tile-widget, .upnext-row {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(var(--bg-card), 0.97);
+    }
+    .tile-3d--hero {
+        background:
+            radial-gradient(120% 90% at 85% 0%, rgba(255, 255, 255, 0.22), transparent 55%),
+            radial-gradient(100% 100% at 0% 100%, rgba(0, 0, 0, 0.28), transparent 60%),
+            linear-gradient(140deg, var(--tile-chip-from, rgb(var(--primary))) 0%, var(--tile-chip-to, rgb(var(--primary-hover, var(--primary)))) 100%);
+    }
+    .tiles-aurora span { animation: none; opacity: 0.3; }
+}
+
+/* ── Reduced motion: static premium card, full content ── */
+@media (prefers-reduced-motion: reduce) {
+    .tile-3d, .tile-widget, .upnext-row, .qa-chip,
+    .tile-depth-bg, .tile-icon, .tile-sub {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+    .tile-sub { opacity: 1; }
+    .tile-live-dot, .tiles-aurora span { animation: none; }
+}

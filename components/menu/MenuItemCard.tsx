@@ -2,9 +2,10 @@
 import React, { memo } from 'react';
 import {
   Trash2, Eye, EyeOff, Scale,
-  Image as ImageIcon, Printer as PrinterIcon
+  Printer as PrinterIcon
 } from 'lucide-react';
 import { MenuItem } from '../../types';
+import { ItemImage } from '../../src/features/pos/components/ItemImage';
 
 interface MenuItemCardProps {
   item: MenuItem;
@@ -43,23 +44,13 @@ const MenuItemCard: React.FC<MenuItemCardProps> = memo(({
       </button>
 
       <div className={`mb-8 flex ${isWide ? 'justify-start gap-8 mt-12' : 'justify-center flex-col items-center mt-6'} relative z-10`}>
-        {item.image ? (
-          <div className={`relative ${isWide ? 'w-40 h-40' : 'w-48 h-48'}`}>
-            <img
+        <div className={`relative ${isWide ? 'w-40 h-40' : 'w-48 h-48'}`}>
+            <ItemImage
               src={item.image}
-              alt={item.name}
-              width={isWide ? 160 : 192}
-              height={isWide ? 160 : 192}
-              loading="lazy"
-              decoding="async"
-              className="relative w-full h-full object-cover rounded-[2.5rem] shadow-[0_10px_20px_rgba(0,0,0,0.3)] border border-border/30"
+              name={lang === 'ar' ? (item.nameAr || item.name) : item.name}
+              className="rounded-[2.5rem] shadow-[0_10px_20px_rgba(0,0,0,0.3)] border border-border/30"
             />
-          </div>
-        ) : (
-          <div className={`${isWide ? 'w-40 h-40' : 'w-48 h-48'} bg-elevated/30 rounded-[2.5rem] flex items-center justify-center text-muted group-hover:text-indigo-400 group-hover:bg-indigo-500/10 transition-colors border border-border/20 shadow-inner`}>
-            <ImageIcon size={64} className="opacity-40" />
-          </div>
-        )}
+        </div>
 
         <div className={`${isWide ? 'text-left flex-1 py-4' : 'text-center mt-8'}`}>
           <h5 className="font-black text-xl lg:text-2xl text-main mb-2 tracking-tight group-hover:text-indigo-400 transition-colors duration-150 drop-shadow-sm">{lang === 'ar' ? (item.nameAr || item.name) : item.name}</h5>

@@ -3,6 +3,7 @@ import { apiRequest } from './core';
 export const hrApi = {
     getEmployees: () => apiRequest<any[]>('/hr/employees'),
     upsertEmployee: (data: any) => apiRequest<any>('/hr/employees', { method: 'POST', body: JSON.stringify(data) }),
+    deleteEmployee: (id: string) => apiRequest<any>(`/hr/employees/${id}`, { method: 'DELETE' }),
     getAttendance: (params?: { employeeId?: string; branchId?: string }) => {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<any[]>(`/hr/attendance${query ? `?${query}` : ''}`);

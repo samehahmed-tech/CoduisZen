@@ -145,7 +145,10 @@ export const payrollComplianceService = {
             const annualSalaryTax = calculateAnnualTax(taxableAnnualIncome, config.annualTaxBrackets);
             const monthlySalaryTax = annualSalaryTax / 12;
             const employeeStatutoryDeductions = employeeInsurance + monthlySalaryTax + martyrsContribution;
-            const netAfterStatutory = Number(line.netPay || 0) - employeeStatutoryDeductions;
+            // Core netPay already folds statutory deductions (see
+            // payrollCalculationService) — this stays as the payable figure
+            // so ledger, payslip and bank file agree.
+            const netAfterStatutory = Number(line.netPay || 0);
             const baseCurrencyNet = Number(line.netPay || 0);
             const convertedNet = reportingCurrency === String(branch?.currency || 'EGP').toUpperCase()
                 ? baseCurrencyNet

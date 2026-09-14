@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Check, Minus, Plus, X } from 'lucide-react';
 import { MenuItem, ModifierOption } from '../../types';
+import { ItemImage } from '../../src/features/pos/components/ItemImage';
 
 interface KioskModifierModalProps {
   item: MenuItem;
@@ -67,8 +68,8 @@ const KioskModifierModal: React.FC<KioskModifierModalProps> = ({ item, onClose, 
     <div className="kiosk-modifier-overlay" role="dialog" aria-modal="true" aria-labelledby="kiosk-modifier-title">
       <section className="kiosk-modifier-panel">
         <header>
-          <div className="kiosk-modifier-product">
-            {item.image ? <img src={item.image} alt="" /> : null}
+            <div className="kiosk-modifier-product">
+              <ItemImage src={item.image} name={isAr ? item.nameAr || item.name : item.name} />
             <div>
               <p className="kiosk-eyebrow">{tr('Customize item', 'ظبط الصنف')}</p>
               <h2 id="kiosk-modifier-title">{isAr ? item.nameAr || item.name : item.name}</h2>

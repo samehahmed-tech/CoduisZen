@@ -29,10 +29,10 @@ const VARIANTS: Record<BadgeVariant, { bg: string; text: string; dot: string }> 
  */
 const StatusBadge: React.FC<StatusBadgeProps> = ({ label, variant = 'neutral', size = 'md', dot = false, pulse = false }) => {
     const style = VARIANTS[variant];
-    const sizeClass = size === 'sm' ? 'px-2 py-0.5 text-[8px]' : 'px-2.5 py-1 text-[9px]';
+    const sizeClass = size === 'sm' ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-xs';
 
     return (
-        <span className={`inline-flex items-center gap-1.5 ${sizeClass} ${style.bg} ${style.text} font-black uppercase tracking-wider rounded-lg`}>
+        <span className={`theme-badge inline-flex items-center gap-1.5 ${sizeClass} ${style.bg} ${style.text} font-bold leading-none rounded-lg`}>
             {dot && (
                 <span className="relative flex h-1.5 w-1.5">
                     {pulse && <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${style.dot} opacity-75`} />}
@@ -107,11 +107,11 @@ const StockLevelBadge: React.FC<StockLevelBadgeProps> = ({
         ? `${qty.toLocaleString(undefined, { maximumFractionDigits: 2 })}${unit ? ` ${unit}` : ''}`
         : '0';
     const style = VARIANTS[variant];
-    const sizeClass = size === 'sm' ? 'px-2 py-0.5 text-[8px]' : 'px-2.5 py-1 text-[9px]';
+    const sizeClass = size === 'sm' ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-xs';
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 ${sizeClass} ${style.bg} ${style.text} font-black uppercase tracking-wider rounded-lg`}
+            className={`theme-badge inline-flex items-center gap-1.5 ${sizeClass} ${style.bg} ${style.text} font-bold leading-none rounded-lg`}
         >
             <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${style.dot}`} />
             {showQty ? `${text} · ${qtyText}` : text}

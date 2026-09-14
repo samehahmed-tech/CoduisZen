@@ -4,6 +4,8 @@ import { managerApprovals, auditLogs, users, journalEntries, financeExceptions }
 import { eq, desc, and } from 'drizzle-orm';
 import { GLService } from '../services/glService';
 import { findApproverByPassword, findApproverByPin } from '../services/managerApprovalAuth';
+import { executeApprovedWastage } from './wastageController';
+import { writeDbError } from '../utils/dbErrors';
 
 const normalizeApproval = (approval: typeof managerApprovals.$inferSelect) => {
     const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
@@ -127,7 +129,7 @@ export const getApprovals = async (req: Request, res: Response) => {
         const approvals = await query.orderBy(desc(managerApprovals.createdAt)).offset(0).fetch(100);
         res.json(approvals.map(normalizeApproval));
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        return writeDbError(res, error);
     }
 };
 
@@ -192,8 +194,29 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                     }
                 }
 
+                let executionDetails: Record<string, any> = {};
+                if (approval.actionType === 'WASTAGE') {
+                    const wastageResult = await executeApprovedWastage({
+                        itemId: String(details.itemId || ''),
+                        warehouseId: String(details.warehouseId || ''),
+                        quantity: Number(details.quantity || 0),
+                        reason: String(details.reason || approval.reason || 'Wastage'),
+                        notes: details.notes || null,
+                        requestedBy: details.requestedBy,
+                        approvedBy: validManager.id,
+                        approvalId: approval.id,
+                    });
+                    executionDetails = {
+                        movementId: wastageResult.movement?.id ? String(wastageResult.movement.id) : null,
+                        costImpact: wastageResult.costImpact,
+                        unit: wastageResult.unit,
+                        executedAt: new Date().toISOString(),
+                    };
+                }
+
                 const resolvedDetails = {
                     ...details,
+                    ...executionDetails,
                     status: 'APPROVED',
                     resolvedAt: new Date().toISOString(),
                     resolvedBy: validManager.id,
@@ -309,6 +332,7 @@ export const rejectApproval = async (req: Request, res: Response) => {
 
         res.json(normalizeApproval(updatedApproval));
     } catch (error: any) {
+        if (String(error?.message || '').startsWith('INSUFFICIENT_STOCK')) return res.status(400).json({ error: error.message });
         res.status(500).json({ error: error.message });
     }
 };

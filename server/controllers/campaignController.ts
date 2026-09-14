@@ -201,11 +201,23 @@ const collectRecipientPhones = async (input: {
     const byCustomerIds = Array.isArray(input.customerIds) ? input.customerIds.map((id) => String(id).trim()).filter(Boolean) : [];
     let customerPhones: string[] = [];
     if (byCustomerIds.length > 0) {
-        const rows = await db.select({ phone: customers.phone }).from(customers).where(inArray(customers.id, byCustomerIds));
+        // Consent gate: only customers who did not opt out.
+        const rows = await db.select({ phone: customers.phone }).from(customers).where(and(
+            inArray(customers.id, byCustomerIds),
+            or(eq(customers.marketingOptIn, true), isNull(customers.marketingOptIn)),
+        ));
         customerPhones = rows.map((r) => normalizePhone(String(r.phone || ''))).filter(Boolean);
     }
     const unique = Array.from(new Set([...direct, ...customerPhones]));
     return unique.slice(0, 500); // MAX_DISPATCH_RECIPIENTS
+};
+
+const countConsentedAudience = async (): Promise<number> => {
+    const rows = await db.select({ phone: customers.phone }).from(customers).where(and(
+        or(eq(customers.marketingOptIn, true), isNull(customers.marketingOptIn)),
+        sql`${customers.phone} IS NOT NULL AND ${customers.phone} <> ''`,
+    ));
+    return rows.length;
 };
 
 export const dispatchCampaign = async (req: Request, res: Response) => {
@@ -223,12 +235,23 @@ export const dispatchCampaign = async (req: Request, res: Response) => {
         });
 
         if (recipientPhones.length === 0) {
-            // No explicit recipients means target customer records, capped for operator safety.
-            const allCust = await db.query.customers.findMany({ limit: 500 });
-            allCust.forEach(c => {
-                if (c.phone) recipientPhones.push(normalizePhone(c.phone));
+            if (dryRun) {
+                // Preview mode without recipients: report the consented
+                // audience size instead of blasting anyone.
+                const audience = await countConsentedAudience();
+                return res.json({
+                    ok: true, campaignId: campaign.id, method: campaign.type,
+                    dryRun: true, recipients: 0, sent: 0, failed: 0,
+                    simulated: Math.min(audience, 500), consentedAudience: audience,
+                    dispatchId: null,
+                });
+            }
+            // No silent fallback blast: SEND requires an explicit list.
+            return res.status(400).json({
+                error: 'CAMPAIGN_RECIPIENTS_REQUIRED',
+                code: 'CAMPAIGN_RECIPIENTS_REQUIRED',
+                message: 'Provide phones/customerIds explicitly — bulk fallback is disabled. Use DRY_RUN to preview the consented audience.',
             });
-            if (recipientPhones.length === 0) return res.status(400).json({ error: 'CAMPAIGN_RECIPIENTS_REQUIRED' });
         }
 
         const message = String(req.body?.message || campaign.content || `Offer from ${campaign.name}`).trim();

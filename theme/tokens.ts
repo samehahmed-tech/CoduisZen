@@ -96,6 +96,72 @@ export interface LayoutTokens {
     containerPadding: string;
 }
 
+/** Raw values. Themes may override these without changing components. */
+export interface PrimitiveTokens {
+    fontFamily: string;
+    fontDisplay: string;
+    fontMono: string;
+    fontSizeBase: string;
+    lineHeight: string;
+    focusRingWidth: string;
+    overlayOpacity: string;
+}
+
+/** Meaning-based values consumed by shared UI. */
+export interface SemanticTokens {
+    background: string;
+    backgroundSubtle: string;
+    surface: string;
+    surfaceRaised: string;
+    surfaceSunken: string;
+    surfaceOverlay: string;
+    surfaceHover: string;
+    surfaceActive: string;
+    textPrimary: string;
+    textSecondary: string;
+    textMuted: string;
+    textDisabled: string;
+    textInverse: string;
+    border: string;
+    borderSubtle: string;
+    borderStrong: string;
+    interactivePrimary: string;
+    interactiveHover: string;
+    interactiveActive: string;
+    statusSuccess: string;
+    statusWarning: string;
+    statusDanger: string;
+    statusInfo: string;
+    focus: string;
+    selection: string;
+}
+
+export interface InteractionTokens {
+    intensity: 'subtle' | 'standard' | 'expressive';
+    fast: string;
+    normal: string;
+    slow: string;
+    easeStandard: string;
+    easeEmphasized: string;
+    easeEnter: string;
+    easeExit: string;
+    hoverDistance: string;
+    pressScale: string;
+    hoverScale: string;
+}
+
+export interface EffectsTokens {
+    pageBackground: string;
+    cardBackground: string;
+    cardHoverBackground: string;
+    railBackground: string;
+    topbarBackground: string;
+    inputBackground: string;
+    tableHeaderBackground: string;
+    buttonBackground: string;
+    focusRing: string;
+}
+
 /* ═══════════════════════════════════════════════
    Master Theme Config — full UI personality
    ═══════════════════════════════════════════════ */
@@ -112,30 +178,34 @@ export interface ThemeConfig {
     spacing: SpacingTokens;
     components: ComponentTokens;
     layout: LayoutTokens;
+    primitives?: PrimitiveTokens;
+    semantic?: SemanticTokens;
+    interaction?: InteractionTokens;
+    effects?: EffectsTokens;
 }
 
-import { micaGlassTheme } from './themes/mica-glass';
-import { fluentCleanTheme } from './themes/fluent-clean';
-import { materialSoftTheme } from './themes/material-soft';
-import { neumorphismSoftTheme } from './themes/neumorphism-soft';
-import { flatMinimalTheme } from './themes/flat-minimal';
-import { fintechSharpTheme } from './themes/fintech-sharp';
-import { cupertinoLightTheme } from './themes/cupertino-light';
-import { monochromeProTheme } from './themes/monochrome-pro';
-import { warmBeigeTheme } from './themes/warm-beige';
-import { darkElegantTheme } from './themes/dark-elegant';
+import { auroraGlassTheme } from './themes/aurora-glass';
+import { midnightCommandTheme } from './themes/midnight-command';
+import { neoBrutalTheme } from './themes/neo-brutal';
+import { softOrganicTheme } from './themes/soft-organic';
+import { editorialLuxuryTheme } from './themes/editorial-luxury';
+import { terminalOpsTheme } from './themes/terminal-ops';
+import { futureHudTheme } from './themes/future-hud';
+import { bentoSaasTheme } from './themes/bento-saas';
+import { industrialOpsTheme } from './themes/industrial-ops';
+import { premiumHospitalityTheme } from './themes/premium-hospitality';
 
 export const THEME_REGISTRY: Record<AppTheme, ThemeConfig> = {
-    'mica-glass': micaGlassTheme,
-    'fluent-clean': fluentCleanTheme,
-    'material-soft': materialSoftTheme,
-    'neumorphism-soft': neumorphismSoftTheme,
-    'flat-minimal': flatMinimalTheme,
-    'fintech-sharp': fintechSharpTheme,
-    'cupertino-light': cupertinoLightTheme,
-    'monochrome-pro': monochromeProTheme,
-    'warm-beige': warmBeigeTheme,
-    'dark-elegant': darkElegantTheme
+    'aurora-glass': auroraGlassTheme,
+    'midnight-command': midnightCommandTheme,
+    'neo-brutal': neoBrutalTheme,
+    'soft-organic': softOrganicTheme,
+    'editorial-luxury': editorialLuxuryTheme,
+    'terminal-ops': terminalOpsTheme,
+    'future-hud': futureHudTheme,
+    'bento-saas': bentoSaasTheme,
+    'industrial-ops': industrialOpsTheme,
+    'premium-hospitality': premiumHospitalityTheme
 };
 
 export const THEME_LIST: ThemeConfig[] = Object.values(THEME_REGISTRY);

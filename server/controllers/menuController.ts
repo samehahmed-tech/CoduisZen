@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { inventoryItems, menuCategories, menuItems, recipeIngredients, recipes } from '../../src/db/schema';
-import { and, eq, or, sql } from 'drizzle-orm';
+import { calculateRecipeCost } from '../../utils/menuCost';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { pool } from '../db';
 import { dbCacheService } from '../services/dbCacheService';
@@ -271,41 +272,87 @@ export const getMenuItems = async (req: Request, res: Response) => {
     }
 };
 
+const normalizeIncomingRecipes = (recipesData: any) => {
+    if (!Array.isArray(recipesData) || recipesData.length === 0) return [];
+    // Size-keyed format: [{ sizeId, yield, instructions, ingredients: [...] }]
+    if (recipesData[0] && Array.isArray((recipesData[0] as any).ingredients)) {
+        return recipesData.map((r: any) => ({
+            sizeId: r.sizeId ?? null,
+            yield: Number(r.yield) > 0 ? Number(r.yield) : 1,
+            instructions: r.instructions || null,
+            ingredients: Array.isArray(r.ingredients) ? r.ingredients : [],
+        }));
+    }
+    // Legacy flat format: [{ itemId, quantity, unit }]
+    return [{ sizeId: null, yield: 1, instructions: null, ingredients: recipesData }];
+};
+
 const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
     const recipeColumns = await getTableColumns('recipes');
-    if (!recipeColumns.has('id') || !recipeColumns.has('menu_item_id')) return;
+    if (!recipeColumns.has('id') || !recipeColumns.has('menu_item_id')) return { recipes: [], baseCost: 0 };
 
-    const existingRecipes = await pool.query(
-        'select id from recipes where menu_item_id = $1',
-        [menuItemId],
-    );
-    const recipeIds = existingRecipes.rows.map((r) => r.id);
+    const normalizedRecipes = normalizeIncomingRecipes(recipesData);
 
-    if (recipeIds.length > 0) {
-        const ingredientColumns = await getTableColumns('recipe_ingredients');
-        if (ingredientColumns.has('recipe_id')) {
-            const rPlaceholders = recipeIds.map((_, i) => `$${i + 1}`).join(', ');
-            await pool.query(`delete from recipe_ingredients where recipe_id in (${rPlaceholders})`, recipeIds);
+    // Empty array => explicit clear request (only when caller really means it).
+    if (normalizedRecipes.length === 0 || (normalizedRecipes.length === 1 && normalizedRecipes[0].ingredients.length === 0 && !recipesData)) {
+        const existingRecipes = await pool.query('select id from recipes where menu_item_id = $1', [menuItemId]);
+        const recipeIds = existingRecipes.rows.map((r) => r.id);
+        if (recipeIds.length > 0) {
+            const ingredientColumns = await getTableColumns('recipe_ingredients');
+            if (ingredientColumns.has('recipe_id')) {
+                const placeholders = recipeIds.map((_, i) => `$${i + 1}`).join(', ');
+                await pool.query(`delete from recipe_ingredients where recipe_id in (${placeholders})`, recipeIds);
+            }
+            const placeholders = recipeIds.map((_, i) => `$${i + 1}`).join(', ');
+            await pool.query(`delete from recipes where id in (${placeholders})`, recipeIds);
         }
-        const rPlaceholders = recipeIds.map((_, i) => `$${i + 1}`).join(', ');
-        await pool.query(`delete from recipes where id in (${rPlaceholders})`, recipeIds);
+        await pool.query('update menu_items set cost = 0, updated_at = GETDATE() where id = $1', [menuItemId]).catch(() => {});
+        dbCacheService.invalidatePattern('menu:');
+        return { recipes: [], baseCost: 0 };
     }
 
-    if (!recipesData) return;
-
-    // Handle both old format (array of ingredients) and new format (array of recipe objects)
-    const normalizedRecipes = Array.isArray(recipesData) && recipesData.length > 0 && recipesData[0].ingredients 
-        ? recipesData 
-        : [{ sizeId: null, ingredients: Array.isArray(recipesData) ? recipesData : [] }];
-
+    // 1) Validate EVERYTHING first (no deletes yet — a bad row must never wipe the last good BOM).
+    const wantedIds = new Set<string>();
     for (const rData of normalizedRecipes) {
-        if (!rData.ingredients || rData.ingredients.length === 0) continue;
+        const y = Number(rData.yield);
+        if (rData.yield !== undefined && rData.yield !== null && (!Number.isFinite(y) || y <= 0)) throw new Error('RECIPE_YIELD_INVALID');
+        if (!Array.isArray(rData.ingredients) || rData.ingredients.length === 0) throw new Error('RECIPE_EMPTY_INGREDIENTS');
+        for (const ingredient of rData.ingredients) {
+            const ingredientId = ingredient.itemId || ingredient.inventoryItemId;
+            const quantity = Number(ingredient.quantity);
+            if (!ingredientId) throw new Error('RECIPE_INGREDIENT_ITEM_REQUIRED');
+            if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('RECIPE_INGREDIENT_QUANTITY_INVALID');
+            wantedIds.add(String(ingredientId));
+        }
+    }
+    if (wantedIds.size > 0) {
+        const ids = [...wantedIds];
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+        const found = await pool.query(`select id, is_active, cost_price, unit from inventory_items where id in (${placeholders})`, ids);
+        const foundMap = new Map(found.rows.map((r: any) => [String(r.id), r]));
+        for (const id of ids) {
+            const row = foundMap.get(id);
+            if (!row) throw new Error('RECIPE_INGREDIENT_ITEM_NOT_FOUND');
+            if (row.is_active === false || row.is_active === 0) throw new Error('RECIPE_INGREDIENT_ITEM_INACTIVE');
+        }
+        // Cost lookup for syncing menu_items.cost
+        var costByItem = new Map<string, number>(found.rows.map((r: any) => [String(r.id), Number(r.cost_price || 0)]));
+    }
 
-        const recipeId = `recipe-${menuItemId}-${rData.sizeId || 'base'}-${Date.now()}`;
+    // 2) Insert the NEW BOM first with fresh ids, then delete the old rows.
+    //    If any insert fails the old recipes are still intact.
+    const ingredientColumns = await getTableColumns('recipe_ingredients');
+    const newRecipeIds: string[] = [];
+    const stamp = Date.now().toString(36);
+    for (const rData of normalizedRecipes) {
+        const recipeId = `recipe-${menuItemId}-${rData.sizeId || 'base'}-${stamp}-${newRecipeIds.length}`;
         const recipeInsert: Record<string, any> = {
             id: recipeId,
             menu_item_id: menuItemId,
             size_id: rData.sizeId || null,
+            yield: Number(rData.yield) > 0 ? Number(rData.yield) : 1,
+            instructions: rData.instructions || null,
+            version: 1,
             created_at: new Date(),
             updated_at: new Date(),
         };
@@ -314,13 +361,14 @@ const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
             `insert into recipes (${recipeKeys.join(', ')}) values (${recipeKeys.map((_, i) => `$${i + 1}`).join(', ')})`,
             recipeKeys.map((key) => recipeInsert[key]),
         );
+        newRecipeIds.push(recipeId);
 
-        const ingredientColumns = await getTableColumns('recipe_ingredients');
         for (const ingredient of rData.ingredients) {
+            const quantity = Number(ingredient.quantity);
             const ingredientInsert: Record<string, any> = {
                 recipe_id: recipeId,
                 inventory_item_id: ingredient.itemId || ingredient.inventoryItemId,
-                quantity: ingredient.quantity,
+                quantity,
                 unit: ingredient.unit || 'unit',
             };
             const ingredientKeys = Object.keys(ingredientInsert).filter((key) => ingredientColumns.has(key));
@@ -330,6 +378,36 @@ const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
                 ingredientKeys.map((key) => ingredientInsert[key]),
             );
         }
+    }
+
+    // 3) New BOM is safely stored — now remove the old rows.
+    const existingRecipes = await pool.query('select id from recipes where menu_item_id = $1', [menuItemId]);
+    const oldIds = existingRecipes.rows.map((r) => r.id).filter((id: string) => !newRecipeIds.includes(id));
+    if (oldIds.length > 0) {
+        if (ingredientColumns.has('recipe_id')) {
+            const placeholders = oldIds.map((_, i) => `$${i + 1}`).join(', ');
+            await pool.query(`delete from recipe_ingredients where recipe_id in (${placeholders})`, oldIds);
+        }
+        const placeholders = oldIds.map((_, i) => `$${i + 1}`).join(', ');
+        await pool.query(`delete from recipes where id in (${placeholders})`, oldIds);
+    }
+
+    // 4) Sync base cost onto the menu item so cards/margins are correct even without a join.
+    try {
+        const base = normalizedRecipes.find((r: any) => !r.sizeId) || normalizedRecipes[0];
+        const y = Number(base?.yield) > 0 ? Number(base.yield) : 1;
+        let baseCost = 0;
+        for (const ing of base?.ingredients || []) {
+            const id = String(ing.itemId || ing.inventoryItemId);
+            baseCost += (costByItem!.get(id) || 0) * Number(ing.quantity || 0);
+        }
+        baseCost = baseCost / y;
+        await pool.query('update menu_items set cost = $1, updated_at = GETDATE() where id = $2', [baseCost, menuItemId]).catch(() => {});
+        dbCacheService.invalidatePattern('menu:');
+        return { recipes: normalizedRecipes, baseCost };
+    } catch {
+        dbCacheService.invalidatePattern('menu:');
+        return { recipes: normalizedRecipes, baseCost: 0 };
     }
 };
 
@@ -363,8 +441,19 @@ export const createItem = async (req: Request, res: Response) => {
             updatedAt: new Date(),
         });
 
-        if (recipe && item[0]) {
-            await saveRecipeForItem(item[0].id, recipe);
+        if (Array.isArray(recipe) && recipe.length > 0 && item[0]) {
+            try {
+                await saveRecipeForItem(item[0].id, recipe);
+            } catch (recipeError: any) {
+                const code = String(recipeError?.message || 'RECIPE_SAVE_FAILED');
+                dbCacheService.invalidatePattern('menu:');
+                return res.status(code.startsWith('RECIPE_') ? 422 : 500).json({
+                    code,
+                    message: code,
+                    messageAr: 'تم إنشاء الصنف لكن تعذر حفظ الوصفة.',
+                    item: item[0],
+                });
+            }
         }
 
         dbCacheService.invalidatePattern('menu:');
@@ -422,10 +511,12 @@ export const updateItem = async (req: Request, res: Response) => {
             }
             updateData.sku = updateData.sku.trim();
         }
+        const cleanUpdate: Record<string, any> = {};
+        for (const [k, v] of Object.entries(updateData)) if (v !== undefined) cleanUpdate[k] = v;
         const updated = await db.update(menuItems)
             .set({
-                ...updateData,
-                categoryId: category_id || updateData.categoryId,
+                ...cleanUpdate,
+                categoryId: category_id || (updateData as any).categoryId,
                 ...(restore ? { deletedAt: null } : {}),
                 updatedAt: new Date()
             })
@@ -434,8 +525,23 @@ export const updateItem = async (req: Request, res: Response) => {
 
         if (updated.length === 0) return res.status(404).json({ error: 'Item not found' });
 
-        if (recipe) {
-            await saveRecipeForItem(id, recipe);
+        // Only rewrite recipes when a non-empty payload arrives. Editors that
+        // are unaware of recipes send `[]`, which must never wipe saved
+        // size-specific BOMs.
+        if (Array.isArray(recipe) && recipe.length > 0) {
+            try {
+                await saveRecipeForItem(id, recipe);
+            } catch (recipeError: any) {
+                const code = String(recipeError?.message || 'RECIPE_SAVE_FAILED');
+                const status = code.startsWith('RECIPE_') ? 422 : 500;
+                dbCacheService.invalidatePattern('menu:');
+                return res.status(status).json({
+                    code,
+                    message: code,
+                    messageAr: 'تعذر حفظ الوصفة — راجع المكونات والكميات ثم حاول مجدداً.',
+                    item: updated[0],
+                });
+            }
         }
 
         const userId = (req as any).user?.id || 'system';
@@ -525,18 +631,24 @@ export const getFullMenu = async (req: Request, res: Response) => {
             // Get recipes and ingredients
             const recipeList = await readRecipesCompat();
             const ingredientList = await readRecipeIngredientsCompat();
+            const inventoryCostRows = await db.select({ id: inventoryItems.id, costPrice: inventoryItems.costPrice }).from(inventoryItems);
+            const inventoryCosts = new Map(inventoryCostRows.map((row) => [row.id, Number(row.costPrice || 0)]));
+            const ingredientsByRecipe = new Map<string, any[]>();
+            for (const ingredient of ingredientList) {
+                const list = ingredientsByRecipe.get(ingredient.recipeId) || [];
+                list.push({
+                    itemId: ingredient.inventoryItemId,
+                    inventoryItemId: ingredient.inventoryItemId,
+                    quantity: ingredient.quantity,
+                    unit: ingredient.unit,
+                    notes: ingredient.notes,
+                });
+                ingredientsByRecipe.set(ingredient.recipeId, list);
+            }
 
             const recipesByItem = new Map<string, any[]>();
             for (const r of recipeList) {
-                const rIngredients = ingredientList
-                    .filter(i => i.recipeId === r.id)
-                    .map(i => ({
-                        itemId: i.inventoryItemId,
-                        inventoryItemId: i.inventoryItemId,
-                        quantity: i.quantity,
-                        unit: i.unit,
-                        notes: i.notes
-                    }));
+                const rIngredients = ingredientsByRecipe.get(r.id) || [];
                 
                 if (!recipesByItem.has(r.menuItemId!)) {
                     recipesByItem.set(r.menuItemId!, []);
@@ -544,14 +656,24 @@ export const getFullMenu = async (req: Request, res: Response) => {
                 recipesByItem.get(r.menuItemId!)!.push({
                     id: r.id,
                     sizeId: r.sizeId,
+                    yield: Number(r.yield || 1),
+                    instructions: r.instructions || null,
                     ingredients: rIngredients
                 });
             }
 
-            const itemsWithRecipes = items.map(item => ({
-                ...item,
-                recipe: recipesByItem.get(item.id) || []
-            }));
+            const itemsWithRecipes = items.map(item => {
+                const recipe = recipesByItem.get(item.id) || [];
+                const sizes = Array.isArray(item.sizes)
+                    ? item.sizes.map((size: any) => ({ ...size, cost: calculateRecipeCost(recipe, inventoryCosts, size.id) }))
+                    : item.sizes;
+                return {
+                    ...item,
+                    sizes,
+                    cost: recipe.length ? calculateRecipeCost(recipe, inventoryCosts, null) : Number(item.cost || 0),
+                    recipe,
+                };
+            });
 
             return categories.map(cat => ({
                 ...cat,
@@ -713,6 +835,69 @@ export const approvePriceChange = async (req: Request, res: Response) => {
 };
 
 /**
+ * Copy a branch price list (branchPricing entries, all channels) from one
+ * branch to another — e.g. onboarding a new branch from an existing one.
+ * POST /api/menu/branch-pricing/copy { fromBranchId, toBranchId, overwrite? }
+ * Warn-only domain: skips items that already have a target entry unless
+ * overwrite=true. Audited per chain pricing accountability.
+ */
+export const copyBranchPricing = async (req: Request, res: Response) => {
+    try {
+        const fromBranchId = String(req.body?.fromBranchId || '').trim();
+        const toBranchId = String(req.body?.toBranchId || '').trim();
+        const overwrite = req.body?.overwrite === true;
+        if (!fromBranchId || !toBranchId) {
+            return res.status(400).json({ error: 'BRANCH_IDS_REQUIRED', code: 'BRANCH_IDS_REQUIRED' });
+        }
+        if (fromBranchId === toBranchId) {
+            return res.status(400).json({ error: 'SAME_BRANCH', code: 'SAME_BRANCH' });
+        }
+        const items = await db.select({ id: menuItems.id, branchPricing: menuItems.branchPricing }).from(menuItems);
+        let updatedItems = 0;
+        let copiedEntries = 0;
+        let skippedEntries = 0;
+        for (const item of items) {
+            const current: any[] = Array.isArray(item.branchPricing) ? item.branchPricing : [];
+            const source = current.filter((e: any) => String(e?.branchId ?? e?.branch_id ?? '') === fromBranchId);
+            if (source.length === 0) continue;
+            let next = [...current];
+            let changed = false;
+            for (const entry of source) {
+                const channel = entry?.channel ? String(entry.channel).toUpperCase() : undefined;
+                const idx = next.findIndex((e: any) =>
+                    String(e?.branchId ?? e?.branch_id ?? '') === toBranchId &&
+                    String(e?.channel || '').toUpperCase() === String(channel || '').toUpperCase());
+                const clone: any = { ...entry, branchId: toBranchId };
+                if (idx >= 0) {
+                    if (overwrite) { next[idx] = clone; changed = true; copiedEntries++; }
+                    else skippedEntries++;
+                } else {
+                    next.push(clone); changed = true; copiedEntries++;
+                }
+            }
+            if (changed) {
+                await db.update(menuItems).set({ branchPricing: next, updatedAt: new Date() }).where(eq(menuItems.id, item.id));
+                updatedItems++;
+            }
+        }
+        const userId = (req as any).user?.id;
+        await createSignedAuditLog({
+            eventType: 'MENU_BRANCH_PRICING_COPIED',
+            userId,
+            branchId: toBranchId,
+            payload: { fromBranchId, toBranchId, overwrite, updatedItems, copiedEntries, skippedEntries },
+            reason: 'Branch price list copied',
+            sourceDevice: req.headers['user-agent'] || 'unknown',
+            requestId: req.headers['x-request-id'] as string || `req-${Date.now()}`,
+        }).catch(() => undefined);
+        dbCacheService.invalidatePattern('menu:');
+        res.json({ updatedItems, copiedEntries, skippedEntries });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/**
  * Get items pending approval or with pending price changes
  * GET /api/menu/items/pending
  */
@@ -848,7 +1033,7 @@ const extensionAliases = {
     sku: ['sku', 'item_sku', 'item sku'],
     barcode: ['barcode', 'bar_code', 'bar code'],
     itemName: ['item_name', 'item name', 'name', 'product', 'product name'],
-    sizeName: ['size', 'size_name', 'size name', 'name'],
+    sizeName: ['size', 'size_name', 'size name', 'name', 'variant', 'variant name'],
     sizeNameAr: ['size_ar', 'size_name_ar', 'size arabic', 'name_ar'],
     groupName: ['group', 'group_name', 'modifier_group', 'modifier group'],
     groupNameAr: ['group_ar', 'group_name_ar', 'modifier_group_ar'],
@@ -858,6 +1043,7 @@ const extensionAliases = {
     maxSelection: ['max', 'max_selection', 'maximum'],
     ingredientId: ['ingredient_id', 'inventory_item_id', 'inventory id'],
     ingredientName: ['ingredient', 'ingredient_name', 'inventory_item', 'inventory name'],
+    sizeId: ['size_id', 'size id', 'variant_id', 'variant id'],
     quantity: ['qty', 'quantity'],
     unit: ['unit'],
     notes: ['notes', 'note'],
@@ -1257,11 +1443,23 @@ const attachMenuExtensionRows = async (
         }
 
         if (!options.dryRun) {
-            let [recipe] = await db.select().from(recipes).where(eq(recipes.menuItemId, item.id));
+            const requestedSizeId = getRowString(row, extensionAliases.sizeId);
+            const requestedSizeName = getRowString(row, extensionAliases.sizeName);
+            const itemSizes = Array.isArray((item as any).sizes) ? (item as any).sizes : [];
+            const matchedSize = itemSizes.find((size: any) =>
+                (requestedSizeId && String(size.id || '') === requestedSizeId) ||
+                (requestedSizeName && normalizeKey(size.name) === normalizeKey(requestedSizeName))
+            );
+            const sizeId = requestedSizeId || matchedSize?.id || null;
+            const recipeCondition = sizeId
+                ? and(eq(recipes.menuItemId, item.id), eq(recipes.sizeId, sizeId))
+                : and(eq(recipes.menuItemId, item.id), isNull(recipes.sizeId));
+            let [recipe] = await db.select().from(recipes).where(recipeCondition);
             if (!recipe) {
                 [recipe] = await db.insert(recipes).output().values({
-                    id: makeMenuId('recipe', item.id, index + 1),
+                    id: makeMenuId('recipe', `${item.id}-${sizeId || 'base'}`, index + 1),
                     menuItemId: item.id,
+                    sizeId,
                     yield: toNumber(getRowValue(row, extensionAliases.yield), 1),
                     instructions: getRowString(row, extensionAliases.instructions) || null,
                     createdAt: new Date(),
@@ -1269,15 +1467,27 @@ const attachMenuExtensionRows = async (
                 } as any);
             }
 
-            await db.insert(recipeIngredients).values({
-                recipeId: recipe.id,
-                inventoryItemId: ingredient.id,
+            const ingredientPayload = {
                 quantity,
                 unit: getRowString(row, extensionAliases.unit) || ingredient.unit || 'unit',
                 notes: getRowString(row, extensionAliases.notes) || null,
                 lastKnownCost: ingredient.costPrice || ingredient.purchasePrice || 0,
                 lastCostUpdate: new Date(),
-            } as any);
+            };
+            const [existingIngredient] = await db.select().from(recipeIngredients).where(and(
+                eq(recipeIngredients.recipeId, recipe.id),
+                eq(recipeIngredients.inventoryItemId, ingredient.id),
+            ));
+            if (existingIngredient) {
+                await db.update(recipeIngredients).set(ingredientPayload as any)
+                    .where(eq(recipeIngredients.id, existingIngredient.id));
+            } else {
+                await db.insert(recipeIngredients).values({
+                    recipeId: recipe.id,
+                    inventoryItemId: ingredient.id,
+                    ...ingredientPayload,
+                } as any);
+            }
         }
 
         results.updated++;
@@ -1285,7 +1495,7 @@ const attachMenuExtensionRows = async (
             rowNumber,
             sheet: 'Recipes',
             action: 'attach',
-            name: `${item.name} / ${ingredient.name}`,
+            name: `${item.name}${getRowString(row, extensionAliases.sizeName) ? ` / ${getRowString(row, extensionAliases.sizeName)}` : ''} / ${ingredient.name}`,
             itemId: item.id,
             sku: item.sku || undefined,
             barcode: item.barcode || undefined,

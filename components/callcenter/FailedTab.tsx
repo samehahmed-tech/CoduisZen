@@ -17,7 +17,7 @@ export const FailedTab = ({ state }: any) => {
         cancelledOrders, pendingOrders, escalatedOrderIds,
         detailOrder, customerProfile, isLoadingCustomer,
         branchHealthData, isLoadingBranchHealth, failedOrdersData, isLoadingFailedOrders,
-        retryingOrderId, dailySummary, isLoadingDailySummary, dailyReviewDate,
+        retryingOrderId, isRetryingAll, retryAllFailed, dailySummary, isLoadingDailySummary, dailyReviewDate,
         expandedSections, setExpandedSections,
         createEscalation, resolveEscalation, scanEscalations, saveCoachingNote,
         approveDiscountViolation, loadCustomer, retryOrder, loadFailedOrders, fmt, fmtMoney, fmtMins, timeAgo,
@@ -40,10 +40,16 @@ export const FailedTab = ({ state }: any) => {
                                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">{failedOrdersData.total}</span>
                                 )}
                             </h2>
+                            <div className="flex items-center gap-2">
+                            <button onClick={() => { void retryAllFailed(); }} disabled={isRetryingAll || isLoadingFailedOrders || !(failedOrdersData?.orders || []).length} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-black uppercase disabled:opacity-60 shadow transition">
+                                <RotateCcw size={12} className={isRetryingAll ? 'animate-spin' : ''} />
+                                {lang === 'ar' ? 'إعادة الكل' : 'Retry all'}
+                            </button>
                             <button onClick={loadFailedOrders} disabled={isLoadingFailedOrders} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black uppercase disabled:opacity-60 shadow transition">
                                 <RefreshCcw size={12} className={isLoadingFailedOrders ? 'animate-spin' : ''} />
                                 {lang === 'ar' ? 'تحديث' : 'Refresh'}
                             </button>
+                            </div>
                         </div>
 
                         <div className="text-xs text-slate-500 dark:text-slate-400 mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">

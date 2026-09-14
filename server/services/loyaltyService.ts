@@ -88,6 +88,62 @@ export const loyaltyService = {
     },
 
     /**
+     * Claw back points awarded for an order that was later cancelled or
+     * refunded. Floor at zero; tier recomputed down. Best-effort, logged.
+     */
+    async clawbackPoints(customerId: string, orderTotal: number, orderId: string, branchId?: string) {
+        try {
+            const pointsToRemove = Math.floor(Number(orderTotal || 0) * POINTS_PER_EGP);
+            if (pointsToRemove <= 0) return;
+
+            const [customer] = await db.select().top(1).from(customers).where(eq(customers.id, customerId));
+            if (!customer) return;
+
+            const currentPoints = Number(customer.loyaltyPoints || 0);
+            const removed = Math.min(currentPoints, pointsToRemove);
+            const newTotalPoints = currentPoints - removed;
+            const newTotalSpent = Math.max(0, Number(customer.totalSpent || 0) - Number(orderTotal || 0));
+
+            let newTier = 'Bronze';
+            if (newTotalPoints >= TIER_TRESHOLDS.PLATINUM) newTier = 'Platinum';
+            else if (newTotalPoints >= TIER_TRESHOLDS.GOLD) newTier = 'Gold';
+            else if (newTotalPoints >= TIER_TRESHOLDS.SILVER) newTier = 'Silver';
+
+            await db.transaction(async (tx) => {
+                await tx.update(customers)
+                    .set({
+                        loyaltyPoints: newTotalPoints,
+                        loyaltyTier: newTier,
+                        totalSpent: newTotalSpent,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(customers.id, customerId));
+
+                await tx.insert(loyaltyLedger).values({
+                    customerId: customerId,
+                    points: -removed,
+                    type: 'CLAWBACK',
+                    referenceId: `ORD-CLB-${orderId}`,
+                    notes: `Points clawed back for cancelled/refunded order ${orderId}`,
+                    createdAt: new Date(),
+                });
+
+                await tx.insert(auditLogs).values({
+                    eventType: 'LOYALTY_POINTS_CLAWBACK',
+                    userId: 'system',
+                    branchId,
+                    payload: { customerId, pointsRemoved: removed, newTotalPoints, orderId, newTier },
+                    createdAt: new Date(),
+                });
+            });
+
+            log.info({ customerId, pointsRemoved: removed, orderId }, 'Loyalty points clawed back');
+        } catch (error: any) {
+            log.error({ err: error.message, customerId, orderId }, 'Failed to claw back loyalty points');
+        }
+    },
+
+    /**
      * Redeem points for a discount.
      */
     async redeemPoints(customerId: string, points: number, branchId?: string) {

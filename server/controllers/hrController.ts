@@ -34,6 +34,26 @@ const validateEmployeeInput = async (data: any, branchId: string, creating: bool
     if (jobTitleId && (!jobTitle || (jobTitle.departmentId && jobTitle.departmentId !== departmentId))) {
         throw employeeInputError('INVALID_EMPLOYEE_JOB_TITLE');
     }
+
+    // Identity uniqueness: national id, employee/attendance codes, email and
+    // phone must not collide with another employee record.
+    const selfId = data.id ? String(data.id) : null;
+    const uniqueChecks: Array<{ column: any; value: unknown; code: string }> = [
+        { column: employees.nationalId, value: data.nationalId, code: 'DUPLICATE_NATIONAL_ID' },
+        { column: employees.employeeCode, value: data.employeeCode, code: 'DUPLICATE_EMPLOYEE_CODE' },
+        { column: employees.attendanceCode, value: data.attendanceCode, code: 'DUPLICATE_ATTENDANCE_CODE' },
+        { column: employees.email, value: data.email, code: 'DUPLICATE_EMPLOYEE_EMAIL' },
+        { column: employees.phone, value: data.phone, code: 'DUPLICATE_EMPLOYEE_PHONE' },
+    ];
+    for (const check of uniqueChecks) {
+        const value = String(check.value || '').trim();
+        if (!value) continue;
+        const [clash] = await db.select({ id: employees.id }).from(employees)
+            .where(eq(check.column, value)).limit(1);
+        if (clash && String(clash.id) !== selfId) {
+            throw employeeInputError(check.code);
+        }
+    }
 };
 
 // ============================================================================
@@ -161,6 +181,39 @@ export const upsertEmployee = async (req: Request, res: Response) => {
     }
 };
 
+export const deleteEmployee = async (req: Request, res: Response) => {
+    try {
+        const id = String(req.params.id);
+        const [existing] = await db.select().from(employees).where(eq(employees.id, id)).limit(1);
+        if (!existing) return res.status(404).json({ error: 'EMPLOYEE_NOT_FOUND' });
+        if (req.effectiveBranchId && existing.branchId !== req.effectiveBranchId) {
+            return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
+        }
+
+        await db.transaction(async (tx: any) => {
+            await tx.update(attendance)
+                .set({ clockOut: new Date(), status: 'AUTO_CLOSED' })
+                .where(and(
+                    eq(attendance.employeeId, id),
+                    sql`${attendance.clockOut} IS NULL`,
+                ));
+            await tx.update(employees)
+                .set({ isActive: false, updatedAt: new Date() })
+                .where(eq(employees.id, id));
+            if (existing.userId) {
+                await tx.update(users)
+                    .set({ isActive: false, updatedAt: new Date() })
+                    .where(eq(users.id, existing.userId));
+            }
+        });
+
+        res.json({ success: true, id });
+    } catch (error: any) {
+        logger.error({ err: error }, 'Error deleting employee');
+        res.status(500).json({ error: 'Failed to delete employee' });
+    }
+};
+
 // ============================================================================
 // Attendance
 // ============================================================================
@@ -193,6 +246,20 @@ export const clockIn = async (req: Request, res: Response) => {
         const actualBranchId = req.effectiveBranchId || branchId || emp.branchId;
         if (!actualBranchId || emp.branchId !== actualBranchId) {
             return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
+        }
+        if (emp.isActive === false) {
+            return res.status(403).json({ error: 'EMPLOYEE_INACTIVE' });
+        }
+        // No duplicate open sessions: one active punch per employee.
+        const openRecord = await db.query.attendance.findFirst({
+            where: and(
+                eq(attendance.employeeId, employeeId),
+                sql`${attendance.clockOut} IS NULL`,
+            ),
+            orderBy: (attendance, { desc }) => [desc(attendance.clockIn)],
+        });
+        if (openRecord) {
+            return res.status(409).json({ error: 'ALREADY_CLOCKED_IN', code: 'ALREADY_CLOCKED_IN', openSince: openRecord.clockIn });
         }
 
         const [record] = await db.insert(attendance).output().values({
@@ -331,88 +398,14 @@ export const getPayoutLedger = async (req: Request, res: Response) => {
 };
 
 export const executePayrollCycle = async (req: Request, res: Response) => {
-    try {
-        const body = req.body || {};
-        const startDate = new Date(body.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-        const endDate = new Date(body.endDate || new Date());
-
-        const targetBranchId = req.effectiveBranchId || body.branchId;
-        if (!targetBranchId) return res.status(400).json({ error: 'Branch is required' });
-
-        // Create cycle
-        const [cycle] = await db.insert(payrollCycles).output().values({
-                id: nanoid(),
-                branchId: targetBranchId,
-                periodStart: startDate,
-                periodEnd: endDate,
-                status: 'CLOSED',
-            });
-
-        // Get all employees
-        const allEmps = await db.query.employees.findMany({
-            where: and(eq(employees.isActive, true), eq(employees.branchId, targetBranchId))
-        });
-
-        const allAttendance = await db.query.attendance.findMany({
-            where: and(
-                gte(attendance.clockIn, startDate),
-                lte(attendance.clockIn, endDate),
-                eq(attendance.branchId, targetBranchId),
-            )
-        });
-
-        let cycleTotal = 0;
-
-        // Create payouts
-        for (const emp of allEmps) {
-            const scoped = allAttendance.filter(r => r.employeeId === emp.id && r.totalHours);
-            let amount = 0;
-            if (emp.hourlyRate && emp.hourlyRate > 0) {
-                const totalHours = scoped.reduce((sum, r) => sum + (r.totalHours || 0), 0);
-                amount = totalHours * emp.hourlyRate;
-            } else {
-                amount = (emp.basicSalary / 30) * scoped.length;
-            }
-
-            cycleTotal += amount;
-
-            await db.insert(payrollPayouts)
-                .values({
-                    id: nanoid(),
-                    cycleId: cycle.id,
-                    employeeId: emp.id,
-                    basicSalary: emp.basicSalary,
-                    netPay: amount || 0,
-                    status: 'POSTED'
-                });
-        }
-
-        // Update cycle total
-        const [updatedCycle] = await db.update(payrollCycles)
-            .set({ totalAmount: cycleTotal })
-            .output()
-            .where(eq(payrollCycles.id, cycle.id));
-
-        // Finance integration: Post Payroll to General Ledger
-        if (cycleTotal > 0) {
-            await GLService.postJournalEntry({
-                reference: cycle.id,
-                referenceType: 'PAYROLL',
-                description: `Payroll Run for period ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`,
-                lines: [
-                    { accountCode: '61000', debit: cycleTotal, credit: 0, description: 'Salaries Expense' },
-                    { accountCode: '21200', credit: cycleTotal, debit: 0, description: 'Accrued Payroll Liability' }
-                ],
-                branchId: targetBranchId
-            }).catch(e => logger.error({ err: e }, 'Failed to post payroll GL entry'));
-        }
-
-        res.status(201).json({
-            ...updatedCycle,
-            entries: allEmps.length
-        });
-    } catch (error: any) {
-        logger.error({ err: error }, 'Error executing payroll');
-        res.status(500).json({ error: 'Failed to execute payroll' });
-    }
+    // Legacy one-click payroll is DISABLED: it posted unaudited CLOSED/POSTED
+    // payouts with no blockers, loans, bonuses, tax, or idempotency (re-click
+    // = double pay + double GL). Use the governed engine instead:
+    // preview → calculate → close (hrExtended payroll cycle endpoints).
+    return res.status(410).json({
+        error: 'LEGACY_PAYROLL_DISABLED',
+        code: 'LEGACY_PAYROLL_DISABLED',
+        message: 'Use payroll preview → calculate → close instead of legacy execute.',
+    });
 };
+

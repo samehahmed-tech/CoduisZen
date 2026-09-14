@@ -4,6 +4,7 @@
  */
 
 import { db } from '../db';
+import logger from '../utils/logger';
 import {
     orders,
     payments,
@@ -15,6 +16,7 @@ import {
     financeExceptions,
     domainEvents,
     shifts,
+    users,
     dayCloseReports,
     stockMovements,
     inventoryStock,
@@ -23,11 +25,15 @@ import {
     refundRecords,
     settings,
     stockCounts,
+    driverCashLedger,
+    drivers,
     journalEntries,
     journalLines,
     chartOfAccounts,
     costCenters,
     tables,
+    kdsTickets,
+    orderStatusHistory,
 } from '../../src/db/schema';
 import { eq, and, gte, lte, desc, sql, like, or } from 'drizzle-orm';
 import { createSignedAuditLog } from './auditService';
@@ -58,6 +64,74 @@ const releaseBranchTables = async (branchId: string) => {
     }
 };
 
+const ACTIVE_ORDER_STATUSES = ['PENDING', 'PREPARING', 'READY', 'SERVED', 'OUT_FOR_DELIVERY'];
+
+/**
+ * Clears kitchen + pickup screens at day close: every open KDS ticket is
+ * delivered and every remaining operational order is finalized, so the next
+ * business day starts with empty displays and no stale 409 handover conflicts.
+ */
+const autoFinalizeOperationalOrders = async (branchId: string, userId: string) => {
+    const now = new Date();
+
+    const openTicketRows = await db.select({ id: kdsTickets.id })
+        .from(kdsTickets)
+        .where(and(
+            eq(kdsTickets.branchId, branchId),
+            sql`${kdsTickets.status} NOT IN ('DELIVERED', 'CANCELLED')`,
+        ));
+    if (openTicketRows.length > 0) {
+        await db.update(kdsTickets)
+            .set({ status: 'DELIVERED', updatedAt: now })
+            .where(and(
+                eq(kdsTickets.branchId, branchId),
+                sql`${kdsTickets.status} NOT IN ('DELIVERED', 'CANCELLED')`,
+            ));
+    }
+
+    const activeOrderRows = await db.select({ id: orders.id, type: orders.type, tableId: orders.tableId })
+        .from(orders)
+        .where(and(eq(orders.branchId, branchId), sql`${orders.status} IN ('PENDING', 'PREPARING', 'READY', 'SERVED', 'OUT_FOR_DELIVERY')`));
+
+    for (const order of activeOrderRows) {
+        const nextStatus = String(order.type || '').toUpperCase() === 'DINE_IN' ? 'COMPLETED' : 'DELIVERED';
+        await db.update(orders)
+            .set({
+                status: nextStatus,
+                ...(nextStatus === 'DELIVERED' ? { actualDeliveryTime: now } : {}),
+                ...(nextStatus === 'COMPLETED' ? { completedAt: now } : {}),
+                updatedAt: now,
+            })
+            .where(eq(orders.id, order.id));
+        await db.insert(orderStatusHistory).values({
+            orderId: order.id,
+            status: nextStatus,
+            changedBy: userId,
+            notes: 'Auto finalized on day close',
+            createdAt: now,
+        });
+        if (nextStatus === 'COMPLETED' && order.tableId) {
+            await db.update(tables)
+                .set({ status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null, updatedAt: now })
+                .where(eq(tables.id, order.tableId));
+        }
+        emitBranchEvent(branchId, 'order:status', { id: order.id, status: nextStatus });
+    }
+
+    if (openTicketRows.length > 0 || activeOrderRows.length > 0) {
+        emitBranchEvent(branchId, 'kds:update', { reason: 'DAY_CLOSE_FINALIZED' });
+        await createSignedAuditLog({
+            eventType: 'DAY_CLOSE_AUTO_FINALIZED_OPERATIONS',
+            userId,
+            branchId,
+            payload: {
+                clearedKdsTickets: openTicketRows.length,
+                finalizedOrders: activeOrderRows.map(order => order.id),
+            },
+        });
+    }
+};
+
 interface DayCloseReadinessCheck {
     code: string;
     passed: boolean;
@@ -70,6 +144,7 @@ interface DayCloseReadiness {
     canClose: boolean;
     checks: DayCloseReadinessCheck[];
     blockedReasons: string[];
+    openShifts?: Array<{ id: string; userId: string; userName: string; openingBalance: number; openingTime?: Date | string | null }>;
 }
 
 interface DayCloseReport {
@@ -86,6 +161,8 @@ interface DayCloseReport {
     salesSummary: {
         totalOrders: number;
         totalRevenue: number;
+        /** Collected revenue incl. tax/service/delivery (codebase convention: grossSales = sum(total)). */
+        grossSales: number;
         totalTax: number;
         totalDiscount: number;
         netSales: number;
@@ -105,6 +182,35 @@ interface DayCloseReport {
         count: number;
         total: number;
     }[];
+
+    // Call-center + channel breakdown (orders carry source + isCallCenterOrder).
+    // Day close stays per-branch (includes call-center), this split only
+    // explains how much of the branch day came from the call center vs POS
+    // vs each aggregator platform.
+    channelBreakdown?: {
+        source: string;
+        count: number;
+        total: number;
+    }[];
+    callCenterSummary?: {
+        orders: number;
+        revenue: number;
+        platformOrders: number;
+        platformRevenue: number;
+    };
+
+    // Cash physically in the drawer for orders excluded from revenue.
+    cancelledPaidSummary?: {
+        orders: number;
+        total: number;
+    };
+
+    // Pilot pocket cash (COLLECT minus SETTLE) — not in any drawer yet.
+    driverCashOutstanding?: Array<{
+        driverId: string;
+        driverName: string;
+        outstanding: number;
+    }>;
 
     // Audit Trail
     auditSummary: {
@@ -271,9 +377,13 @@ export const dayCloseService = {
             salesSummary: salesSnapshot.salesSummary || {
                 totalOrders: Number(closed.totalOrders || 0),
                 totalRevenue: Number(closed.totalRevenue || 0),
+                grossSales: Number(closed.totalRevenue || 0),
                 totalTax: 0,
                 totalDiscount: Number(closed.totalDiscounts || 0),
-                netSales: Number(closed.totalRevenue || 0) - Number(closed.totalDiscounts || 0),
+                // Legacy rows predate the merchandise-gross column: the stored
+                // total is already net of discount, so it must NOT be reduced
+                // a second time here.
+                netSales: Number(closed.totalRevenue || 0),
                 averageOrderValue: Number(closed.totalOrders || 0) > 0 ? Number(closed.totalRevenue || 0) / Number(closed.totalOrders || 0) : 0,
             },
             paymentBreakdown: paymentsSnapshot.byMethod || [],
@@ -326,10 +436,15 @@ export const dayCloseService = {
         const dateFilter = this.getOrderDateFilter(date, startOfDay, endOfDay);
         const revenueRecognized = revenueRecognizedOrder();
 
-        // SQL aggregation: sales summary (Item 14 — no in-memory reduce)
+        // SQL aggregation: sales summary (Item 14 — no in-memory reduce).
+        // NOTE: orders.total is stored NET of discount (see orderController:
+        // total = subtotal - discount + tax + service + delivery), so netSales
+        // must be derived from subtotal, never as totalRevenue - totalDiscount
+        // (that would subtract the discount twice).
         const [salesAgg] = await db.select({
             totalOrders: sql<number>`count(*)`,
             totalRevenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            grossMerchandise: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
             totalTax: sql<number>`coalesce(sum(${orders.tax}), 0)`,
             totalDiscount: sql<number>`coalesce(sum(${orders.discount}), 0)`,
         }).from(orders).where(and(
@@ -340,10 +455,17 @@ export const dayCloseService = {
 
         const totalOrders = Number(salesAgg?.totalOrders || 0);
         const totalRevenue = Number(salesAgg?.totalRevenue || 0);
+        const grossMerchandise = Number(salesAgg?.grossMerchandise || 0);
         const totalTax = Number(salesAgg?.totalTax || 0);
         const totalDiscount = Number(salesAgg?.totalDiscount || 0);
 
-        // SQL aggregation: payment breakdown
+        // SQL aggregation: payment breakdown.
+        // NOTE: unlike the sales summary, this intentionally counts payments of
+        // CANCELLED orders too (see cancelledRevenueFlow test): cancelling only
+        // patches the order status while its COMPLETED payment rows stay — the
+        // cash is physically in the drawer, so tender reconciliation must retain
+        // it. Revenue and payments therefore differ by cancelled-paid amounts
+        // by design; the audit/cancelled counts explain the gap.
         const legacyPaymentRows = await db.select({
             orderId: payments.orderId,
             method: payments.method,
@@ -390,6 +512,32 @@ export const dayCloseService = {
             revenueRecognized,
             dateFilter,
         )).groupBy(orders.type);
+
+        // SQL aggregation: channel/source breakdown (call-center vs POS vs
+        // each aggregator platform). A non-restaurant delivery_source
+        // (talabat, elmenus…) identifies the aggregator (POS convention);
+        // otherwise the origin: call_center, pos, …
+        const channelKey = sql<string>`case when ${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant' then ${orders.deliverySource} else coalesce(${orders.source}, 'UNKNOWN') end`;
+        const channelRows = await db.select({
+            source: channelKey,
+            count: sql<number>`count(*)`,
+            total: sql<number>`coalesce(sum(${orders.total}), 0)`,
+        }).from(orders).where(and(
+            eq(orders.branchId, branchId),
+            revenueRecognized,
+            dateFilter,
+        )).groupBy(channelKey);
+
+        const [callCenterAgg] = await db.select({
+            orders: sql<number>`sum(case when ${orders.isCallCenterOrder} = 1 then 1 else 0 end)`,
+            revenue: sql<number>`coalesce(sum(case when ${orders.isCallCenterOrder} = 1 then ${orders.total} else 0 end), 0)`,
+            platformOrders: sql<number>`sum(case when ${orders.isCallCenterOrder} = 1 and ${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant' then 1 else 0 end)`,
+            platformRevenue: sql<number>`coalesce(sum(case when ${orders.isCallCenterOrder} = 1 and ${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant' then ${orders.total} else 0 end), 0)`,
+        }).from(orders).where(and(
+            eq(orders.branchId, branchId),
+            revenueRecognized,
+            dateFilter,
+        ));
 
         const expenseBranchFilter = branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined;
 
@@ -455,6 +603,44 @@ export const dayCloseService = {
         const expenses = Number(expenseAgg?.total || 0);
         const pendingExpenses = Number(pendingExpenseAgg?.total || 0);
 
+        // Cancelled-but-paid money: revenue excludes CANCELLED orders while
+        // tender reconciliation intentionally keeps their COMPLETED payments
+        // (cash is physically in the drawer). Surface it as an explicit line
+        // so drawer-vs-revenue never needs manual explanation.
+        const [cancelledPaidAgg] = await db.select({
+            orders: sql<number>`count(distinct ${orders.id})`,
+            total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
+        }).from(payments)
+            .innerJoin(orders, eq(payments.orderId, orders.id))
+            .where(and(
+                eq(orders.branchId, branchId),
+                eq(payments.status, 'COMPLETED'),
+                eq(orders.status, 'CANCELLED'),
+                dateFilter,
+            ));
+
+        // Pilot cash in pockets: COLLECT minus SETTLE per driver for the day.
+        // This money is NOT in any drawer yet — surfaced so close reconciles it.
+        let driverCashRows: Array<{ driverId: string; driverName: string; outstanding: number }> = [];
+        try {
+            driverCashRows = await db.select({
+                driverId: driverCashLedger.driverId,
+                driverName: sql<string>`coalesce(max(${drivers.name}), max(${driverCashLedger.driverId}))`,
+                outstanding: sql<number>`coalesce(sum(case when ${driverCashLedger.type} = 'COLLECT' then ${driverCashLedger.amount} else -${driverCashLedger.amount} end), 0)`,
+            }).from(driverCashLedger)
+                .leftJoin(drivers, eq(drivers.id, driverCashLedger.driverId))
+                .where(and(
+                    eq(driverCashLedger.branchId, branchId),
+                    sql`cast(${driverCashLedger.createdAt} as date) = ${date}`,
+                ))
+                .groupBy(driverCashLedger.driverId);
+        } catch {
+            // Legacy databases may lack the ledger table.
+        }
+        const driverCashOutstanding = driverCashRows
+            .map(r => ({ driverId: String(r.driverId), driverName: String(r.driverName || r.driverId), outstanding: Number(r.outstanding || 0) }))
+            .filter(r => Math.abs(r.outstanding) > 0.005);
+
         return {
             date,
             branchId,
@@ -465,9 +651,10 @@ export const dayCloseService = {
             salesSummary: {
                 totalOrders,
                 totalRevenue,
+                grossSales: totalRevenue,
                 totalTax,
                 totalDiscount,
-                netSales: totalRevenue - totalDiscount,
+                netSales: grossMerchandise - totalDiscount,
                 averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
             },
             paymentBreakdown: paymentRows.map(r => ({
@@ -480,6 +667,22 @@ export const dayCloseService = {
                 count: Number(r.count),
                 total: Number(r.total),
             })),
+            channelBreakdown: channelRows.map(r => ({
+                source: r.source || 'UNKNOWN',
+                count: Number(r.count),
+                total: Number(r.total),
+            })),
+            callCenterSummary: {
+                orders: Number(callCenterAgg?.orders || 0),
+                revenue: Number(callCenterAgg?.revenue || 0),
+                platformOrders: Number(callCenterAgg?.platformOrders || 0),
+                platformRevenue: Number(callCenterAgg?.platformRevenue || 0),
+            },
+            cancelledPaidSummary: {
+                orders: Number(cancelledPaidAgg?.orders || 0),
+                total: Number(cancelledPaidAgg?.total || 0),
+            },
+            driverCashOutstanding,
             auditSummary: {
                 totalEvents: Number(auditAgg?.totalEvents || 0),
                 voidCount: Number(auditAgg?.voidCount || 0),
@@ -489,7 +692,9 @@ export const dayCloseService = {
             financeSummary: {
                 expenses,
                 pendingExpenses,
-                netProfit: totalRevenue - totalDiscount - expenses,
+                // totalRevenue is already net of discount — subtracting the
+                // discount again would understate profit by that amount.
+                netProfit: totalRevenue - expenses,
                 topExpenses: topExpenseRows.map(row => ({ name: row.name || 'Expense', total: Number(row.total || 0) })),
                 expenseRows: expenseRows.map(row => ({
                     date: row.date,
@@ -592,15 +797,26 @@ export const dayCloseService = {
     async getCloseReadiness(branchId: string, date: string): Promise<DayCloseReadiness> {
         const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
-        const [requireStockCount, openShiftRows, postedStockCountRows] = await Promise.all([
+        const [requireStockCount, openShiftDetails, openShiftRows, postedStockCountRows, warehouseRows] = await Promise.all([
             getDayCloseRequireStockCount(),
+            db.select({
+                id: shifts.id,
+                userId: shifts.userId,
+                openingBalance: shifts.openingBalance,
+                openingTime: shifts.openingTime,
+                userName: users.name,
+            })
+                .from(shifts)
+                .leftJoin(users, eq(shifts.userId, users.id))
+                .where(and(
+                    eq(shifts.branchId, branchId),
+                    eq(shifts.status, 'OPEN'),
+                )),
             db.select({ count: sql<number>`count(*)` })
                 .from(shifts)
                 .where(and(
                     eq(shifts.branchId, branchId),
                     eq(shifts.status, 'OPEN'),
-                    sql`${shifts.openingTime} <= ${endOfDay}`,
-                    sql`(${shifts.closingTime} IS NULL OR ${shifts.closingTime} >= ${startOfDay})`,
                 )),
             db.select({ count: sql<number>`count(*)` })
                 .from(stockCounts)
@@ -609,22 +825,35 @@ export const dayCloseService = {
                     eq(stockCounts.countDate, toSqlDate(date)),
                     eq(stockCounts.status, 'POSTED'),
                 )),
+            // Branches without warehouses (e.g. the call-center branch, which
+            // only distributes orders) hold no stock and need no count.
+            db.select({ count: sql<number>`count(*)` })
+                .from(warehouses)
+                .where(eq(warehouses.branchId, branchId)),
         ]);
 
         const openShiftCount = Number(openShiftRows[0]?.count || 0);
         const postedStockCount = Number(postedStockCountRows[0]?.count || 0);
+        const hasWarehouses = Number(warehouseRows[0]?.count || 0) > 0;
 
-        const checks: DayCloseReadinessCheck[] = [
+        const checks: (DayCloseReadinessCheck & { openShifts?: any[] })[] = [
             {
                 code: 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE',
                 passed: openShiftCount === 0,
                 blocking: true,
                 count: openShiftCount,
-                actionPath: '/attendance',
+                actionPath: '/finance',
+                openShifts: openShiftDetails.map(s => ({
+                    id: s.id,
+                    userId: s.userId,
+                    userName: s.userName || 'Unknown Operator',
+                    openingBalance: Number(s.openingBalance || 0),
+                    openingTime: s.openingTime,
+                })),
             },
         ];
 
-        if (requireStockCount) {
+        if (requireStockCount && hasWarehouses) {
             checks.push({
                 code: 'DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE',
                 passed: postedStockCount > 0,
@@ -632,6 +861,25 @@ export const dayCloseService = {
                 count: postedStockCount > 0 ? 0 : 1,
                 actionPath: '/inventory',
             });
+        }
+
+        // Fiscal visibility (warn-only, never blocks): failed/pending ETA
+        // submissions and dead letters would otherwise go unnoticed, since
+        // submission failures are swallowed upstream.
+        try {
+            const fiscal = await this.getFiscalHealth(branchId, date);
+            const fiscalOpen = Number(fiscal?.pending || 0) + Number(fiscal?.failed || 0) + Number(fiscal?.deadLettersPending || 0);
+            if (fiscalOpen > 0) {
+                checks.push({
+                    code: 'FISCAL_SUBMISSIONS_OPEN_FOR_DAY_CLOSE',
+                    passed: true,
+                    blocking: false,
+                    count: fiscalOpen,
+                    actionPath: '/fiscal',
+                });
+            }
+        } catch {
+            // Fiscal snapshot must never block readiness itself.
         }
 
         const blockedReasons = checks
@@ -642,6 +890,13 @@ export const dayCloseService = {
             canClose: blockedReasons.length === 0,
             checks,
             blockedReasons,
+            openShifts: openShiftDetails.map(s => ({
+                id: s.id,
+                userId: s.userId,
+                userName: s.userName || 'Unknown Operator',
+                openingBalance: Number(s.openingBalance || 0),
+                openingTime: s.openingTime,
+            })),
         };
     },
 
@@ -692,7 +947,9 @@ export const dayCloseService = {
                 variance: sql<number>`coalesce(sum(${shifts.actualBalance} - ${shifts.expectedBalance}), 0)`,
             }).from(shifts).where(and(
                 eq(shifts.branchId, branchId),
-                sql`(${shifts.openingTime} <= ${endOfDay} AND (${shifts.closingTime} IS NULL OR ${shifts.closingTime} >= ${startOfDay}))`,
+                // Keep the snapshot consistent with readiness: any still-open
+                // branch shift must remain visible, even if it started earlier.
+                sql`(${shifts.status} = 'OPEN' OR (${shifts.openingTime} <= ${endOfDay} AND (${shifts.closingTime} IS NULL OR ${shifts.closingTime} >= ${startOfDay})))`,
             )).groupBy(shifts.status),
 
             db.select({
@@ -792,6 +1049,91 @@ export const dayCloseService = {
                 },
             },
         };
+    },    async autoCloseBranchShifts(branchId: string, userId: string) {
+        const openShiftRows = await db.select()
+            .from(shifts)
+            .where(and(
+                eq(shifts.branchId, branchId),
+                eq(shifts.status, 'OPEN')
+            ));
+
+        for (const s of openShiftRows) {
+            try {
+                const paymentRows = await db.select({
+                    orderId: payments.orderId,
+                    method: payments.method,
+                    total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
+                }).from(payments)
+                    .innerJoin(orders, eq(payments.orderId, orders.id))
+                    .where(and(
+                        eq(orders.branchId, branchId),
+                        eq(orders.shiftId, s.id),
+                        eq(payments.status, 'COMPLETED')
+                    ))
+                    .groupBy(payments.orderId, payments.method);
+
+                const cashTotal = paymentRows
+                    .filter(row => row.method === 'CASH')
+                    .reduce((sum, row) => sum + Number(row.total || 0), 0);
+
+                // Terminal-confirmed cash (manual_cash sessions) is physical
+                // cash too — ignoring it understates expected drawer balance.
+                // Guarded against double count: orders that already carry a
+                // legacy COMPLETED CASH row are skipped (same dedup rule as
+                // reconcilePaymentRows).
+                let sessionCashTotal = 0;
+                try {
+                    const [sessionCash] = await db.select({
+                        total: sql<number>`coalesce(sum(case when not exists (select 1 from ${payments} p where p.order_id = ${paymentSessions.orderId} and p.method = 'CASH' and p.status = 'COMPLETED') then ${paymentSessions.amount} else 0 end), 0)`,
+                    }).from(paymentSessions)
+                        .innerJoin(orders, eq(paymentSessions.orderId, orders.id))
+                        .where(and(
+                            eq(orders.branchId, branchId),
+                            eq(orders.shiftId, s.id),
+                            eq(paymentSessions.status, 'confirmed'),
+                            eq(paymentSessions.providerType, 'manual_cash'),
+                        ));
+                    sessionCashTotal = Number(sessionCash?.total || 0);
+                } catch {
+                    // Legacy databases may not have payment_sessions yet.
+                }
+
+                const expectedBalance = Number(s.openingBalance || 0) + cashTotal + sessionCashTotal;
+
+                await db.update(shifts)
+                    .set({
+                        status: 'CLOSED',
+                        closingTime: new Date(),
+                        expectedBalance,
+                        actualBalance: expectedBalance,
+                        notes: [s.notes, `Auto-closed during Day Close by ${userId}`].filter(Boolean).join(' | '),
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(shifts.id, s.id));
+
+                await createSignedAuditLog({
+                    eventType: 'SHIFT_AUTO_CLOSED_ON_DAY_CLOSE',
+                    userId,
+                    branchId,
+                    payload: {
+                        shiftId: s.id,
+                        expectedBalance,
+                        openingTime: s.openingTime,
+                    },
+                });
+            } catch (err) {
+                await db.update(shifts)
+                    .set({
+                        status: 'CLOSED',
+                        closingTime: new Date(),
+                        expectedBalance: Number(s.openingBalance || 0),
+                        actualBalance: Number(s.openingBalance || 0),
+                        notes: [s.notes, `Auto-closed fallback during Day Close`].filter(Boolean).join(' | '),
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(shifts.id, s.id));
+            }
+        }
     },
 
     /**
@@ -806,11 +1148,24 @@ export const dayCloseService = {
             emailConfig?: EmailConfig;
             notes?: string;
             enforceShiftsClosed?: boolean;
+            autoCloseOpenShifts?: boolean;
             overrideReason?: string; // Item 22: override with written reason
         }
     ) {
         const existingClose = await this.getClosedReport(branchId, date);
-        if (existingClose) return existingClose;
+        if (existingClose) {
+            // Idempotent re-close: heal leftover operational data AND make sure
+            // the business date actually advanced. A partial first attempt
+            // (crash between report insert and date advance) used to leave the
+            // branch permanently stuck on the closed day.
+            try {
+                await autoFinalizeOperationalOrders(branchId, userId);
+            } catch (finalizeError) {
+                logger.warn({ err: finalizeError, branchId, date }, 'DAY_CLOSE_FINALIZE_HEAL_FAILED');
+            }
+            await this.ensureBusinessDateAdvanced(branchId, date);
+            return existingClose;
+        }
 
         const [branch] = await db.select({
             businessDate: branches.businessDate,
@@ -827,6 +1182,10 @@ export const dayCloseService = {
             throw error;
         }
 
+        if (options?.autoCloseOpenShifts || options?.overrideReason) {
+            await this.autoCloseBranchShifts(branchId, userId);
+        }
+
         const report = await this.generateReport(branchId, date);
         const fiscalHealth = await this.getFiscalHealth(branchId, date);
         const financeHealth = await this.getFinanceHealth(branchId, date);
@@ -840,53 +1199,61 @@ export const dayCloseService = {
         // on open shifts and the optional daily posted stock count.
 
         // === GATE 3: Open shifts ===
-        if (options?.enforceShiftsClosed) {
-            const openShifts = await db.select({ count: sql<number>`count(*)` })
-                .from(shifts)
-                .where(and(
-                    eq(shifts.branchId, branchId),
-                    eq(shifts.status, 'OPEN'),
-                    sql`${shifts.openingTime} <= ${endOfDay}`,
-                    sql`(${shifts.closingTime} IS NULL OR ${shifts.closingTime} >= ${startOfDay})`,
-                ));
-            if (Number(openShifts[0]?.count || 0) > 0) {
+        // This is mandatory: a business day cannot close while any branch
+        // shift is open, regardless of which client initiated the request.
+        const openShifts = await db.select({ count: sql<number>`count(*)` })
+            .from(shifts)
+            .where(and(
+                eq(shifts.branchId, branchId),
+                eq(shifts.status, 'OPEN'),
+            ));
+        if (Number(openShifts[0]?.count || 0) > 0) {
+            if (options?.autoCloseOpenShifts) {
+                await this.autoCloseBranchShifts(branchId, userId);
+            } else {
                 blockedReasons.push('OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE');
             }
         }
 
         if (await getDayCloseRequireStockCount()) {
-            const postedStockCount = await db.select({ count: sql<number>`count(*)` })
-                .from(stockCounts)
-                .where(and(
-                    eq(stockCounts.branchId, branchId),
-                    eq(stockCounts.countDate, toSqlDate(date)),
-                    eq(stockCounts.status, 'POSTED'),
-                ));
-            if (Number(postedStockCount[0]?.count || 0) === 0) {
-                blockedReasons.push('DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE');
+            // Warehouseless branches (call center) hold no stock: no count needed.
+            const warehouseCount = await db.select({ count: sql<number>`count(*)` })
+                .from(warehouses)
+                .where(eq(warehouses.branchId, branchId));
+            if (Number(warehouseCount[0]?.count || 0) > 0) {
+                const postedStockCount = await db.select({ count: sql<number>`count(*)` })
+                    .from(stockCounts)
+                    .where(and(
+                        eq(stockCounts.branchId, branchId),
+                        eq(stockCounts.countDate, toSqlDate(date)),
+                        eq(stockCounts.status, 'POSTED'),
+                    ));
+                if (Number(postedStockCount[0]?.count || 0) === 0) {
+                    blockedReasons.push('DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE');
+                }
             }
         }
 
-        // If there are blocked reasons, handle override or reject
         if (blockedReasons.length > 0) {
             if (!options?.overrideReason) {
-                const err = new Error('DAY_CLOSE_BLOCKED');
-                (err as any).blockedReasons = blockedReasons;
-                throw err;
+                const error = new Error('DAY_CLOSE_BLOCKED');
+                (error as any).blockedReasons = blockedReasons;
+                throw error;
             }
 
-            // Override allowed: log the override in audit trail
             await createSignedAuditLog({
                 eventType: 'DAY_CLOSE_OVERRIDE',
                 userId,
                 branchId,
                 payload: {
-                    date,
                     blockedReasons,
                     overrideReason: options.overrideReason,
                 },
             });
         }
+
+        // Final safety: ensure all open shifts in the branch are closed before saving the day close snapshot
+        await this.autoCloseBranchShifts(branchId, userId);
 
         // Mark as closed
         report.status = 'CLOSED';
@@ -962,6 +1329,14 @@ export const dayCloseService = {
             },
         });
 
+        // Clear kitchen + pickup screens so the next business day starts empty.
+        // Cleanup is best-effort: it must never fail an already-saved close.
+        try {
+            await autoFinalizeOperationalOrders(branchId, userId);
+        } catch (finalizeError) {
+            logger.warn({ err: finalizeError, branchId, date }, 'DAY_CLOSE_FINALIZE_FAILED');
+        }
+
         // Send email if configured
         if (options?.emailConfig) {
             await this.sendDayCloseEmail(report, options.emailConfig);
@@ -984,15 +1359,33 @@ export const dayCloseService = {
         }
 
         // Advance to next business date automatically
-        const nextDate = toSqlDate(date);
+        await this.ensureBusinessDateAdvanced(branchId, date);
+
+        return report;
+    },
+
+    /**
+     * Guarantees the branch business date is strictly AFTER the closed day.
+     * Called from both the fresh-close path and the idempotent re-close path
+     * so a partial close can never leave the branch stuck on a past date.
+     */
+    async ensureBusinessDateAdvanced(branchId: string, closedDate: string) {
+        const nextDate = toSqlDate(closedDate);
         nextDate.setUTCDate(nextDate.getUTCDate() + 1);
         const nextBusinessDate = nextDate.toISOString().split('T')[0];
-        
+
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+        const current = branch?.businessDate || '';
+        if (current >= nextBusinessDate) return nextBusinessDate; // already ahead
+
         await db.update(branches)
             .set({ businessDate: nextBusinessDate })
             .where(eq(branches.id, branchId));
-
-        return report;
+        logger.info({ branchId, from: current, to: nextBusinessDate }, 'BUSINESS_DATE_ADVANCED');
+        return nextBusinessDate;
     },
 
     async getShiftCashSummary(branchId: string, date: string) {

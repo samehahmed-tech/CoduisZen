@@ -17,6 +17,7 @@ import {
     Settings,
     Factory,
     Truck,
+    Bike,
     Megaphone,
     Clock,
     FileText,
@@ -41,9 +42,11 @@ import {
     Store,
     BadgeCheck,
     Receipt,
+    Vault,
     CalendarDays,
     ListTodo,
-    Navigation
+    Navigation,
+    Inbox
 } from 'lucide-react';
 import { AppPermission } from '../../types';
 
@@ -82,8 +85,7 @@ export const NAV_SECTIONS: NavSection[] = [
             { id: 'pos', path: '/pos', label: 'Point of Sale', labelAr: 'نقطة البيع', icon: ShoppingCart, permission: AppPermission.NAV_POS, keywords: 'cashier register receipt' },
             { id: 'orders', path: '/orders', label: 'Orders Center', labelAr: 'مركز الطلبات', icon: ClipboardCheck, permission: AppPermission.NAV_ORDERS, keywords: 'order list history' },
             { id: 'kds', path: '/kds', label: 'Kitchen Display', labelAr: 'شاشة المطبخ', icon: ChefHat, permission: AppPermission.NAV_KDS, keywords: 'kitchen station tickets' },
-            { id: 'pickup', path: '/pickup', label: 'Pickup Screen', labelAr: 'شاشة التسليم', icon: Monitor, permission: AppPermission.NAV_PICKUP, keywords: 'pickup customer display ready handover' },
-            { id: 'packing', path: '/packing', label: 'Packing Screen', labelAr: 'شاشة الاستلام', icon: Package, permission: AppPermission.NAV_PICKUP, keywords: 'pickup packing customer display ready orders' },
+            { id: 'pickup', path: '/pickup', label: 'Handover Screen', labelAr: 'شاشة التسليم', icon: Monitor, permission: AppPermission.NAV_PICKUP, keywords: 'pickup customer display ready handover' },
             { id: 'kiosk', path: '/kiosk', label: 'Self Ordering', labelAr: 'الطلب الذاتي', icon: UtensilsCrossed, permission: AppPermission.NAV_POS, keywords: 'kiosk self ordering customer' },
             { id: 'floor-designer', path: '/floor-designer', label: 'Tables & Floor', labelAr: 'الطاولات والصالة', icon: MapIcon, permission: AppPermission.NAV_FLOOR_PLAN, keywords: 'tables layout seating' },
             { id: 'refunds', path: '/refunds', label: 'Refunds', labelAr: 'المرتجعات', icon: RotateCcw, permission: AppPermission.NAV_REFUNDS, keywords: 'returns void' },
@@ -103,10 +105,12 @@ export const NAV_SECTIONS: NavSection[] = [
             { id: 'call-center-manager', path: '/call-center-manager', label: 'CC Manager', labelAr: 'إدارة الكول سنتر', icon: PieChart, permission: AppPermission.NAV_CALL_CENTER, keywords: 'supervisor monitor' },
             { id: 'crm', path: '/crm', label: 'Customers (CRM)', labelAr: 'العملاء (CRM)', icon: Users, permission: AppPermission.NAV_CRM, keywords: 'loyalty contacts' },
             { id: 'zones', path: '/zones', label: 'Delivery Zones', labelAr: 'المناطق والتسعير', icon: MapIcon, permission: AppPermission.NAV_CALL_CENTER, keywords: 'regions pricing' },
-            { id: 'dispatch', path: '/dispatch', label: 'Dispatch & Tracking', labelAr: 'الطيارين والتتبع', icon: Truck, permission: AppPermission.NAV_DISPATCH, keywords: 'drivers tracking' },
+            { id: 'dispatch', path: '/dispatch', label: 'Dispatch Handover', labelAr: 'تسليم الطيارين', icon: Truck, permission: AppPermission.NAV_DISPATCH, keywords: 'drivers tracking handover assign' },
+            { id: 'drivers', path: '/drivers', label: 'Pilots', labelAr: 'الطيارون', icon: Bike, permission: AppPermission.NAV_DISPATCH, keywords: 'pilots roster team drivers' },
             { id: 'driver-dashboard', path: '/driver', label: 'Driver Workspace', labelAr: 'صفحة الطيار', icon: Navigation, permission: AppPermission.NAV_DRIVER, keywords: 'driver mobile orders collection' },
             { id: 'platforms', path: '/platforms', label: 'Platforms', labelAr: 'التطبيقات والمنصات', icon: Globe, permission: AppPermission.NAV_PLATFORMS, keywords: 'integrations aggregators talabat' },
             { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', labelAr: 'واتساب', icon: MessageCircle, permission: AppPermission.NAV_WHATSAPP, keywords: 'messaging chat' },
+            { id: 'mail', path: '/mail', label: 'Staff Mail', labelAr: 'البريد الداخلي', icon: Inbox, permission: AppPermission.NAV_MAIL, keywords: 'mail inbox messages broadcast team' },
         ],
     },
     // 3. Menu & Recipes
@@ -134,6 +138,7 @@ export const NAV_SECTIONS: NavSection[] = [
         color: 'cyan',
         items: [
             { id: 'inventory-main', path: '/inventory', label: 'Stock Management', labelAr: 'إدارة المخزون', icon: Package, permission: AppPermission.NAV_INVENTORY, keywords: 'stock warehouse items' },
+            { id: 'stock-requests', path: '/stock-requests', label: 'Stock Requests', labelAr: 'الطلبيات المخزنية', icon: ClipboardCheck, permission: AppPermission.NAV_INVENTORY, keywords: 'branch orders central warehouse supply requests' },
             { id: 'production', path: '/production', label: 'Production', labelAr: 'الإنتاج', icon: Factory, permission: AppPermission.NAV_PRODUCTION, keywords: 'prep manufacturing' },
             { id: 'wastage', path: '/wastage', label: 'Wastage', labelAr: 'الهالك والهدر', icon: Trash2, permission: AppPermission.NAV_WASTAGE, keywords: 'loss spoilage' },
             { id: 'inventory-intel', path: '/inventory-intelligence', label: 'Intelligence', labelAr: 'ذكاء المخزون', icon: Brain, permission: AppPermission.NAV_INVENTORY, keywords: 'forecast reorder analytics' },
@@ -149,6 +154,7 @@ export const NAV_SECTIONS: NavSection[] = [
         color: 'amber',
         items: [
             { id: 'finance-hub', path: '/finance', label: 'Finance Hub', labelAr: 'المحاسبة', icon: DollarSign, permission: AppPermission.NAV_FINANCE, keywords: 'ledger accounting' },
+            { id: 'treasury', path: '/treasury', label: 'Treasury', labelAr: 'الخزينة', icon: Vault, permission: AppPermission.NAV_FINANCE, keywords: 'treasury cashbox deposits supplier payments custody vouchers خزينة توريد عهدة موردين' },
             { id: 'expenses', path: '/expenses', label: 'Expenses', labelAr: '\u0627\u0644\u0645\u0635\u0631\u0648\u0641\u0627\u062a', icon: Wallet, permission: AppPermission.NAV_FINANCE, keywords: 'expense petty cash spending maintenance utilities' },
             { id: 'reports', path: '/reports', label: 'Reports', labelAr: 'التقارير', icon: BarChart3, permission: AppPermission.NAV_REPORTS, keywords: 'analytics sales daily' },
             { id: 'fiscal', path: '/fiscal', label: 'E-Invoicing (ETA)', labelAr: 'الفاتورة الإلكترونية', icon: Receipt, permission: AppPermission.NAV_FISCAL, keywords: 'tax compliance eta' },
@@ -198,8 +204,7 @@ export const NAV_SECTIONS: NavSection[] = [
         color: 'slate',
         items: [
             { id: 'admin-dashboard', path: '/admin-dashboard', label: 'Admin Dashboard', labelAr: 'لوحة الإدارة', icon: LayoutDashboard, permission: AppPermission.NAV_ADMIN_DASHBOARD, keywords: 'admin overview' },
-            { id: 'user-management', path: '/user-management', label: 'User Management', labelAr: 'إدارة المستخدمين', icon: Shield, permission: AppPermission.NAV_USER_MANAGEMENT, keywords: 'users operators staff access accounts' },
-            { id: 'roles', path: '/roles', label: 'Access & Roles', labelAr: 'الصلاحيات والأدوار', icon: ShieldCheck, permission: AppPermission.NAV_USER_MANAGEMENT, keywords: 'users roles permissions security access' },
+            { id: 'user-management', path: '/user-management', label: 'Users & Roles', labelAr: 'المستخدمون والأدوار', icon: Shield, permission: AppPermission.NAV_USER_MANAGEMENT, keywords: 'users roles permissions security access accounts' },
             { id: 'settings', path: '/settings', label: 'Settings', labelAr: 'الإعدادات', icon: Settings, permission: AppPermission.NAV_SETTINGS, keywords: 'configuration' },
         ],
     },
@@ -236,7 +241,6 @@ export const CONTEXTUAL_NAV_MAP: Record<string, NavSection[]> = {
                 { id: 'kds-queue', path: '/kds', label: 'Order Queue', labelAr: 'قائمة الطلبات', icon: UtensilsCrossed, permission: AppPermission.NAV_KDS },
                 { id: 'kds-prep', path: '/kds#preparing', label: 'Preparing', labelAr: 'قيد التحضير', icon: ChefHat, permission: AppPermission.NAV_KDS },
                 { id: 'kds-ready', path: '/kds#ready', label: 'Ready Orders', labelAr: 'الطلبات الجاهزة', icon: CheckCircle, permission: AppPermission.NAV_KDS },
-                { id: 'packing-display', path: '/packing', label: 'Packing Display', labelAr: 'شاشة الاستلام', icon: Package, permission: AppPermission.NAV_PICKUP },
                 { id: 'kds-delayed', path: '/kds#delayed', label: 'Delayed Orders', labelAr: 'الطلبات المتأخرة', icon: AlertTriangle, permission: AppPermission.NAV_KDS },
             ]
         }

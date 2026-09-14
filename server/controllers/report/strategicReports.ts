@@ -35,20 +35,27 @@ export const getOnlineVsOfflineTrend = async (req: Request, res: Response) => {
         const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses)];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
+        // Online = digital origins (app/website/online) plus aggregator
+        // deliveries (deliverySource other than restaurant); everything else
+        // (pos, call_center in-house) counts as offline. Same channel rule
+        // as channel-mix, evaluated per row in JS for clarity.
         const rows = await db.select({
             day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
             source: orders.source,
+            deliverySource: orders.deliverySource,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`, orders.source)
+            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`, orders.source, orders.deliverySource)
             .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
 
-        const online = ['online', 'app', 'website'];
+        const onlineSources = ['online', 'app', 'website'];
         const dailyMap = new Map<string, { online: number; offline: number; onlineOrders: number; offlineOrders: number }>();
         for (const r of rows) {
             const d = dailyMap.get(r.day) || { online: 0, offline: 0, onlineOrders: 0, offlineOrders: 0 };
-            if (online.includes(r.source?.toLowerCase() || '')) { d.online += Number(r.revenue); d.onlineOrders += Number(r.orderCount); }
+            const ds = String((r as any).deliverySource || '').toLowerCase();
+            const isOnline = onlineSources.includes(String(r.source || '').toLowerCase()) || (ds !== '' && ds !== 'restaurant');
+            if (isOnline) { d.online += Number(r.revenue); d.onlineOrders += Number(r.orderCount); }
             else { d.offline += Number(r.revenue); d.offlineOrders += Number(r.orderCount); }
             dailyMap.set(r.day, d);
         }

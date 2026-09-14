@@ -2,7 +2,7 @@
  * POSToolbar — Slim mode switcher + context actions + quick pay
  */
 import React from 'react';
-import { UtensilsCrossed, ShoppingBag, MapPin, Truck, LayoutGrid, Zap, Plus, QrCode, Pause, Clock, User, List } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, MapPin, Truck, LayoutGrid, Zap, Plus, QrCode, Pause, Clock, User, List, Keyboard, Printer, RotateCcw } from 'lucide-react';
 import { OrderType } from '@/types';
 
 interface POSToolbarProps {
@@ -27,6 +27,8 @@ interface POSToolbarProps {
     orderName?: string;
     posMode?: 'grid' | 'retail';
     onTogglePosMode?: () => void;
+    onReprintLast?: () => void;
+    onOpenReturns?: () => void;
 }
 
 const modes = [
@@ -36,11 +38,50 @@ const modes = [
     { mode: OrderType.DELIVERY, icon: Truck, key: 'delivery', en: 'Delivery', ar: 'ديلفري' },
 ];
 
+const SHORTCUTS: Array<{ keys: string; en: string; ar: string }> = [
+    { keys: 'Enter', en: 'Quick pay', ar: 'دفع سريع' },
+    { keys: 'Ctrl+Enter', en: 'Send to kitchen', ar: 'إرسال للمطبخ' },
+    { keys: '/', en: 'Focus search', ar: 'البحث' },
+    { keys: 'Delete', en: 'Void order', ar: 'إلغاء الطلب' },
+    { keys: 'Alt+1…4', en: 'Order mode', ar: 'نوع الطلب' },
+    { keys: 'Alt+R', en: 'Recall held', ar: 'استدعاء معلق' },
+];
+
+const ShortcutCheatsheet: React.FC<{ isAr: boolean }> = ({ isAr }) => {
+    const [open, setOpen] = React.useState(false);
+    return (
+        <div className="relative shrink-0">
+            <button
+                onClick={() => setOpen((v) => !v)}
+                aria-label={isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard shortcuts'}
+                title={isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard shortcuts'}
+                className="flex items-center gap-1 px-2 h-7 rounded-lg text-muted hover:text-main bg-elevated/40 transition-colors active:scale-95"
+            >
+                <Keyboard size={12} />
+            </button>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+                    <div className="absolute end-0 top-9 z-50 w-56 rounded-xl border border-border bg-card p-2 shadow-2xl">
+                        {SHORTCUTS.map((s) => (
+                            <div key={s.keys} className="flex items-center justify-between gap-2 px-2 py-1.5 text-[10px]">
+                                <span className="font-bold text-main">{isAr ? s.ar : s.en}</span>
+                                <kbd className="rounded-md border border-border bg-elevated px-1.5 py-0.5 font-mono font-black text-muted" dir="ltr">{s.keys}</kbd>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 const POSToolbar: React.FC<POSToolbarProps> = ({
     activeOrderType, onSetOrderMode, lang, t, cartCount,
     onToggleCart, onShowTables, onShowCustomers, onNewCustomer, onQuickPay, onFocusSearch,
     hasCartItems, cartTotal, currencySymbol,
-    onHoldOrder, onRecallOrders, heldOrdersCount = 0, onSetOrderName, orderName, posMode, onTogglePosMode
+    onHoldOrder, onRecallOrders, heldOrdersCount = 0, onSetOrderName, orderName, posMode, onTogglePosMode,
+    onReprintLast, onOpenReturns
 }) => {
     const isAr = lang === 'ar';
 
@@ -134,6 +175,34 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
                 <span className="text-[9px] font-bold">{isAr ? 'ماسح' : 'Scanner'}</span>
             </div>
 
+            {/* Shortcuts cheatsheet */}
+            <ShortcutCheatsheet isAr={isAr} />
+
+            {/* Reprint last ticket */}
+            {onReprintLast && (
+                <button
+                    onClick={onReprintLast}
+                    aria-label={isAr ? 'إعادة طباعة آخر طلب' : 'Reprint last order'}
+                    title={isAr ? 'إعادة طباعة آخر طلب' : 'Reprint last order'}
+                    className="shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg text-muted hover:text-main bg-elevated/40 transition-colors active:scale-95"
+                >
+                    <Printer size={12} />
+                </button>
+            )}
+
+            {/* Counter return */}
+            {onOpenReturns && (
+                <button
+                    onClick={onOpenReturns}
+                    aria-label={isAr ? 'مرتجع' : 'Return'}
+                    title={isAr ? 'مرتجع / استرجاع' : 'Counter return'}
+                    className="shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg text-amber-600 hover:text-white bg-amber-500/10 hover:bg-amber-500 transition-colors active:scale-95"
+                >
+                    <RotateCcw size={12} />
+                    <span className="hidden md:inline text-[10px] font-bold">{isAr ? 'مرتجع' : 'Return'}</span>
+                </button>
+            )}
+
             {/* View Mode */}
             {onTogglePosMode && (
                 <button
@@ -154,9 +223,10 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
                         <span className="text-[10px] font-bold text-primary/60">{isAr ? 'الإجمالي' : 'Total'}</span>
                         <span className="text-sm font-black tabular-nums text-primary">{currencySymbol}{(cartTotal || 0).toFixed(2)}</span>
                     </div>
-                    <button onClick={onQuickPay} className="flex items-center gap-1 h-7 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold hover:shadow-md transition-all active:scale-95">
+                    <button onClick={onQuickPay} title={isAr ? 'دفع سريع (Enter)' : 'Quick pay (Enter)'} className="flex items-center gap-1 h-7 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold hover:shadow-md transition-all active:scale-95">
                         <Zap size={11} fill="currentColor" />
                         <span className="hidden sm:inline">{isAr ? 'سريع' : 'Quick'}</span>
+                        <kbd className="hidden lg:inline rounded border border-white/40 px-1 font-mono text-[8px] font-black opacity-80" dir="ltr">Enter</kbd>
                     </button>
                 </div>
             )}

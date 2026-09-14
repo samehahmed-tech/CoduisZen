@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useEffectEvent, useRef, useState } from 'react';
+import React, { memo, useEffect, useEffectEvent, useRef, useState, Suspense, lazy } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Wifi, WifiOff } from 'lucide-react';
@@ -11,15 +11,36 @@ import { socketService } from './services/socketService';
 import { useOrderStore } from './stores/useOrderStore';
 import { useInventoryStore } from './stores/useInventoryStore';
 import { useMenuStore } from './stores/useMenuStore';
+import { useFinanceStore } from './stores/useFinanceStore';
 import { ToastProvider } from './components/common/ToastProvider';
 import { ConfirmProvider } from './components/common/ConfirmProvider';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { ThemeProvider } from './theme';
 import { auditService } from './services/auditService';
+import { setRuntimeMapsConfig } from './components/common/googleMaps';
 import { aiIntelligenceService } from './services/aiIntelligenceService';
 import { eventBus } from './services/eventBus';
-import { ShiftManagementDrawer } from './components/finance/ShiftManagementDrawer';
 import { AuditEventType, TableStatus } from './types';
+
+// Shift drawer uses framer-motion — lazy so the motion runtime (~43KB) is not
+// part of the initial bundle. It renders nothing until a shift opens anyway.
+const ShiftManagementDrawer = lazy(() =>
+  import('./components/finance/ShiftManagementDrawer').then((m) => ({ default: m.ShiftManagementDrawer }))
+);
+
+// Mounts the lazy drawer chunk ONLY while it is actually open, so the
+// drawer code (and the motion runtime) is never fetched on routes that
+// don't need it. Local drawer state resets between opens via remount,
+// matching the fresh X-report load on every open.
+const ShiftDrawerOnDemand: React.FC = () => {
+  const isShiftDrawerOpen = useFinanceStore((s) => s.isShiftDrawerOpen);
+  if (!isShiftDrawerOpen) return null;
+  return (
+    <Suspense fallback={null}>
+      <ShiftManagementDrawer />
+    </Suspense>
+  );
+};
 
 const LoadingTips = [
   "💡 نصيحة: يعمل النظام بكفاءة تامة حتى عند انقطاع الإنترنت ويتم مزامنة البيانات لاحقاً عند الاتصال.",
@@ -30,8 +51,10 @@ const LoadingTips = [
   "🛡️ أمان وثقة: يتم حفظ نسخة احتياطية من جميع تغييراتك محلياً قبل مزامنتها مع الخوادم السحابية."
 ];
 
-const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
-  const currentUser = useAuthStore(state => state.settings?.currentUser);
+// Tip ticker isolated so its 4.5s interval re-renders ONLY this <p> — not the
+// whole backdrop-blur card (repainting large blur surfaces is the top jank
+// source on this screen). Visuals unchanged.
+const LoadingTip = memo(() => {
   const [currentTip, setCurrentTip] = useState(0);
 
   useEffect(() => {
@@ -42,9 +65,23 @@ const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
   }, []);
 
   return (
+    <p
+      key={currentTip}
+      className="text-slate-300 text-sm leading-relaxed font-semibold animate-in fade-in slide-in-from-bottom-2 duration-500 text-center relative z-10"
+    >
+      {LoadingTips[currentTip]}
+    </p>
+  );
+});
+
+const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
+  const currentUser = useAuthStore(state => state.settings?.currentUser);
+
+  return (
     <div className="min-h-screen relative overflow-hidden bg-[#020617] text-slate-100 flex items-center justify-center p-4 sm:p-6 selection:bg-indigo-500/30">
-      {/* Background Ambience */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Background Ambience — static: isolated in its own paint layer so it
+          never repaints with the card. Same gradients/opacity as before. */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none gpu" style={{ contain: 'strict' }}>
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15),transparent_60%)] blur-[100px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.1),transparent_60%)] blur-[100px]" />
         
@@ -56,7 +93,7 @@ const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
         
         {/* Left Side: Logo & Status */}
         <div className="flex flex-col items-center shrink-0">
-          <div className="relative group mb-6">
+          <div className="relative group mb-6 gpu">
             <div className="absolute -inset-8 bg-indigo-500/20 blur-[50px] rounded-full group-hover:bg-indigo-500/30 transition-all duration-700 delay-100" />
             <div className="relative w-32 h-32 rounded-3xl bg-white/[0.03] backdrop-blur-md border border-white/10 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] flex items-center justify-center overflow-hidden">
                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
@@ -98,9 +135,9 @@ const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
           </div>
 
           <div className="space-y-5 mb-8">
-            {/* Loading Bar */}
+            {/* Loading Bar — compositor-only sweep (same gradient + glow). */}
             <div className="h-1 w-full bg-slate-800/80 rounded-full overflow-hidden flex">
-              <div className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full w-full origin-left animate-pulse shadow-[0_0_15px_rgba(99,102,241,0.5)]"></div>
+              <div className="h-full w-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 shadow-[0_0_15px_rgba(99,102,241,0.5)] loading-bar-fill"></div>
             </div>
             
             {/* Activity Indicator */}
@@ -112,16 +149,11 @@ const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
 
           {/* Tips Carousel */}
           <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 min-h-[6rem] flex items-center justify-center relative overflow-hidden group shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)]">
-             {/* Decorative Accents */}
-             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-bl-full translate-x-1/2 -translate-y-1/2" />
-             <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-tr-full -translate-x-1/2 translate-y-1/2" />
-             
-             <p 
-                key={currentTip}
-                className="text-slate-300 text-sm leading-relaxed font-semibold animate-in fade-in slide-in-from-bottom-2 duration-500 text-center relative z-10"
-             >
-                {LoadingTips[currentTip]}
-             </p>
+              {/* Decorative Accents */}
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-bl-full translate-x-1/2 -translate-y-1/2" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-tr-full -translate-x-1/2 translate-y-1/2" />
+
+              <LoadingTip />
           </div>
         </div>
       </div>
@@ -157,8 +189,19 @@ const App: React.FC = () => {
   const [setupStatus, setSetupStatus] = useState<'checking' | 'needs' | 'ready'>('checking');
   const lastSyncRef = useRef<string>(new Date().toISOString());
 
+  // Debounced + coalesced: order bursts during rush used to trigger one
+  // dashboard invalidation PER event here, on top of the Dashboard's own
+  // coalesced refresh — doubling backend load. This only keeps the cache
+  // warm for the NEXT dashboard visit; the open Dashboard refreshes itself.
+  const dashboardInvalidationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const invalidateDashboard = useEffectEvent(() => {
-    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    if (document.visibilityState === 'hidden') return;
+    if (dashboardInvalidationTimer.current) return;
+    dashboardInvalidationTimer.current = setTimeout(() => {
+      dashboardInvalidationTimer.current = null;
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-secondary'] });
+    }, 2500);
   });
 
   useEffect(() => {
@@ -193,8 +236,16 @@ const App: React.FC = () => {
 
     const checkSetup = async () => {
       try {
-        const result = await setupApi.status();
+        // Never let a slow/hanging setup probe block first paint: after
+        // 3.5s fall through as ready; the router renders meanwhile and the
+        // redirect below still applies when the probe resolves.
+        const timeout = new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 3500));
+        const result = await Promise.race([setupApi.status(), timeout]);
         if (!active) return;
+        if (result === null) {
+          setSetupStatus('ready');
+          return;
+        }
 
         const needsSetup = !!result?.needsSetup;
         setSetupStatus(needsSetup ? 'needs' : 'ready');
@@ -220,9 +271,51 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    auditService.init();
-    aiIntelligenceService.init();
+    // Non-critical background services: audit event subscription + AI
+    // operational analysis. Deferred until the browser is idle so they never
+    // compete with first paint / interaction on the critical path.
+    const run = () => {
+      auditService.init();
+      aiIntelligenceService.init();
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(run, { timeout: 3000 });
+      return () => (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(idleId);
+    }
+    const timer = window.setTimeout(run, 1500);
+    return () => window.clearTimeout(timer);
   }, []);
+
+  // Device-aware quality tier: real hardware/network signals (not just screen
+  // width) decide whether expensive effects (backdrop blur, aurora drift,
+  // parallax) stay full or drop to cheap fallbacks. CSS reads
+  // `html[data-perf-tier='lite']`. Evaluated once — no re-render involved.
+  useEffect(() => {
+    try {
+      const nav = navigator as unknown as {
+        deviceMemory?: number;
+        hardwareConcurrency?: number;
+        connection?: { saveData?: boolean; effectiveType?: string };
+      };
+      const lowMemory = typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 4;
+      const fewCores = typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 4;
+      const conn = nav.connection;
+      const slowNetwork = !!conn && (conn.saveData === true || /^(slow-2g|2g|3g)$/.test(conn.effectiveType || ''));
+      const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(hover: none)').matches;
+      document.documentElement.dataset.perfTier = (lowMemory || fewCores || slowNetwork || coarsePointer) ? 'lite' : 'full';
+    } catch {
+      /* leave tier unset → full quality */
+    }
+  }, []);
+
+  // Runtime maps provider (Settings → Integrations → Maps). Beats build-time
+  // env so branches switch OSM/Google + key without a rebuild/redeploy.
+  const mapsProviderSetting = useAuthStore((s) => s.settings.mapsProvider);
+  const googleMapsKeySetting = useAuthStore((s) => s.settings.googleMapsKey);
+  const maptilerKeySetting = useAuthStore((s) => s.settings.maptilerKey);
+  useEffect(() => {
+    setRuntimeMapsConfig({ provider: mapsProviderSetting, googleKey: googleMapsKeySetting, maptilerKey: maptilerKeySetting });
+  }, [mapsProviderSetting, googleMapsKeySetting, maptilerKeySetting]);
 
   // ============ Socket Patch Handlers (Sprint 2 - Item 7) ============
   // Instead of full refetch on every event, we apply targeted patches.
@@ -312,7 +405,12 @@ const App: React.FC = () => {
     };
   }, [activeBranchId, handleOrderCreated, handleOrderStatus, handleReconnectCatchUp, handleSessionRevoked, handleTableStatus, handleTablesRefresh, isAuthenticated, token]);
 
-  if (isLoading || setupStatus === 'checking') {
+  // The router renders immediately: visitors without a session (the login
+  // page, order tracking) never wait behind init. The full LoadingScreen
+  // only shows while an existing session is still hydrating its shell data.
+  const hasStoredToken =
+    typeof window !== 'undefined' && Boolean(window.localStorage.getItem('auth_token'));
+  if ((isLoading || setupStatus === 'checking') && (isAuthenticated || hasStoredToken)) {
     return <LoadingScreen isConnected={isConnected} />;
   }
 
@@ -321,7 +419,7 @@ const App: React.FC = () => {
       <ThemeProvider>
         <ToastProvider>
           <ConfirmProvider>
-            <ShiftManagementDrawer />
+            <ShiftDrawerOnDemand />
             <RouterProvider router={router} />
           </ConfirmProvider>
         </ToastProvider>

@@ -15,6 +15,11 @@ export const buildDedupeKey = (entity: string, action: string, payload: any) => 
         || payload?.item_id
         || payload?.order_id
         || payload?.table_id;
+    // Status updates must not collapse: PENDING→PREPARING→READY queued
+    // offline would otherwise shrink to last-write-wins and skip history.
+    if (id && entity === 'orderStatus' && payload?.data?.status) {
+        return `${entity}:${action}:${id}:${String(payload.data.status).toUpperCase()}`;
+    }
     if (id) return `${entity}:${action}:${id}`;
     return `${entity}:${action}:${simpleHash(JSON.stringify(payload || {}))}`;
 };

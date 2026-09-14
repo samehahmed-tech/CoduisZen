@@ -100,7 +100,10 @@ export const getLaborEfficiency = async (req: Request, res: Response) => {
            FROM sales, labor
         `;
         const result = await db.execute(query);
-        res.json(result.rows[0] || { gross_sales: 0, total_payroll: 0, labor_cost_percent: 0 });
+        const laborRow = Array.isArray(result)
+            ? result[0]
+            : ((result as any)?.recordset?.[0] ?? (result as any)?.rows?.[0]);
+        res.json(laborRow || { gross_sales: 0, total_payroll: 0, labor_cost_percent: 0 });
     } catch (e: any) {
         res.status(500).json({ error: e.message });
     }

@@ -1,0 +1,185 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   FLUID MOTION ENGINE — codepen-inspired micro-motion, compositor-only
+   ───────────────────────────────────────────────────────────────────────────
+   Every animation here runs on transform/opacity ONLY (never layout/paint),
+   so it stays 60fps on low-end cashier hardware. Rest state of every
+   utility is pixel-identical to having no class at all.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Keyframes ── */
+
+/* Soft rise-in: the signature "fluid" enter (cards, list rows, panels). */
+@keyframes fluidRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Gentle pop: dialogs, toasts, floating panels, badges. */
+@keyframes fluidPop {
+  0% { opacity: 0; transform: scale(0.94) translateY(8px); }
+  60% { opacity: 1; transform: scale(1.01) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Sheen sweep: light glides across on hover (primary buttons, hero cards). */
+@keyframes fluidShine {
+  from { transform: translateX(-130%) skewX(-18deg); }
+  to { transform: translateX(240%) skewX(-18deg); }
+}
+
+/* Slow ambient float for decorative orbs/illustrations (never on content). */
+@keyframes fluidFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Barely-there glow breathing for live indicators. */
+@keyframes fluidBreathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* View-Transition morph: subtle zoom-fade between routes (native feel). */
+@keyframes vtZoomFade {
+  from { opacity: 0; transform: scale(0.985) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Utilities ── */
+
+/* Cascade children in with a stagger (grids, menus, KPI rows).
+   Delays capped: the whole wave finishes in ~200ms — lively, never laggy. */
+.fluid-stagger > * {
+  animation: fluidRise 0.22s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.fluid-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.fluid-stagger > *:nth-child(2) { animation-delay: 15ms; }
+.fluid-stagger > *:nth-child(3) { animation-delay: 30ms; }
+.fluid-stagger > *:nth-child(4) { animation-delay: 45ms; }
+.fluid-stagger > *:nth-child(5) { animation-delay: 60ms; }
+.fluid-stagger > *:nth-child(6) { animation-delay: 75ms; }
+.fluid-stagger > *:nth-child(7) { animation-delay: 90ms; }
+.fluid-stagger > *:nth-child(8) { animation-delay: 105ms; }
+.fluid-stagger > *:nth-child(9) { animation-delay: 120ms; }
+.fluid-stagger > *:nth-child(10) { animation-delay: 135ms; }
+.fluid-stagger > *:nth-child(11) { animation-delay: 150ms; }
+.fluid-stagger > *:nth-child(n+12) { animation-delay: 165ms; }
+
+/* Single rise-in (section shells, empty states). */
+.fluid-enter {
+  animation: fluidRise 0.24s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+/* Pop-in (floating buttons, badges, chips). */
+.fluid-pop {
+  animation: fluidPop 0.26s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+/* Hover sheen: add to primary CTAs / hero cards. Rest state untouched —
+   the light band only exists while hovering. */
+.fluid-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.fluid-shine::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 45%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: translateX(-130%) skewX(-18deg);
+  opacity: 0;
+}
+.fluid-shine:hover::after {
+  opacity: 1;
+  animation: fluidShine 0.7s ease-out;
+}
+
+/* Ambient float for decorative layers only. */
+.fluid-float {
+  animation: fluidFloat 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Live-dot breathing. */
+.fluid-breathe {
+  animation: fluidBreathe 2.2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* View-Transition morph: subtle zoom-fade between routes (native feel). */
+@keyframes vtFadeOut {
+  to { opacity: 0; }
+}
+
+/* ── View-Transitions polish (route morph, browser-driven) ── */
+::view-transition-old(root) {
+  animation: 160ms ease-out both vtFadeOut;
+}
+::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0.22, 0.9, 0.3, 1) both vtZoomFade;
+}
+
+/* ── Solid CTAs share the sheen (rest state identical) ──
+   Primary/danger/success buttons get the hover light-sweep for free —
+   same recipe as .fluid-shine, scoped to filled variants only. */
+.ux-btn-primary,
+.ux-btn-danger,
+.ux-btn-success {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.ux-btn-primary::after,
+.ux-btn-danger::after,
+.ux-btn-success::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 45%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: translateX(-130%) skewX(-18deg);
+  opacity: 0;
+}
+.ux-btn-primary:hover::after,
+.ux-btn-danger:hover::after,
+.ux-btn-success:hover::after {
+  opacity: 1;
+  animation: fluidShine 0.7s ease-out;
+}
+
+/* ── Safety rails ── */
+
+/* Reduced motion: everything becomes instant. */
+@media (prefers-reduced-motion: reduce) {
+  .fluid-stagger > *,
+  .fluid-enter,
+  .fluid-pop,
+  .fluid-float,
+  .fluid-breathe,
+  .fluid-shine:hover::after,
+  .ux-btn-primary:hover::after,
+  .ux-btn-danger:hover::after,
+  .ux-btn-success:hover::after {
+    animation: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+/* Lite tier: keep one-shot enters (they finish in ms), drop infinite
+   ambient loops that burn battery on weak devices. */
+html[data-perf-tier='lite'] .fluid-float,
+html[data-perf-tier='lite'] .fluid-breathe {
+  animation: none;
+}

@@ -18,6 +18,11 @@ export const menuApi = {
     }),
     deleteItem: (id: string) => apiRequest<any>(`/menu/items/${id}`, { method: 'DELETE' }),
     getFullMenu: (availableOnly?: boolean) => apiRequest<any[]>(`/menu/full${availableOnly ? '?available_only=true' : ''}`),
+    copyBranchPricing: (fromBranchId: string, toBranchId: string, overwrite?: boolean) =>
+        apiRequest<{ updatedItems: number; copiedEntries: number; skippedEntries: number }>('/menu/branch-pricing/copy', {
+            method: 'POST',
+            body: JSON.stringify({ fromBranchId, toBranchId, overwrite: overwrite === true }),
+        }),
     importItems: (payload: {
         rows?: Record<string, any>[];
         sizesRows?: Record<string, any>[];

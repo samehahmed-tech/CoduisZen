@@ -9,10 +9,10 @@ import {
     taxAccounts,
     financeExceptions
 } from '../../src/db/schema';
-import { eq, sql, sum } from 'drizzle-orm';
+import { eq, sql, sum, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
-export type ReferenceType = 'ORDER' | 'PAYMENT' | 'GRN' | 'WASTE' | 'MANUAL' | 'EXPENSE' | 'REFUND' | 'VOID' | 'SHIFT_CLOSE' | 'COGS' | 'PAYROLL' | 'WALLET_DEPOSIT' | 'WALLET_PAYMENT' | 'LOYALTY_REDEMPTION';
+    export type ReferenceType = 'ORDER' | 'PAYMENT' | 'GRN' | 'WASTE' | 'STOCK_COUNT' | 'MANUAL' | 'EXPENSE' | 'REFUND' | 'VOID' | 'SHIFT_CLOSE' | 'COGS' | 'COGS_REVERSAL' | 'PAYROLL' | 'PAYROLL_REVERSAL' | 'SUPPLIER_INVOICE' | 'RECONCILIATION' | 'WALLET_DEPOSIT' | 'WALLET_PAYMENT' | 'LOYALTY_REDEMPTION';
 
 export interface JournalLineInput {
     accountCode?: string;
@@ -83,11 +83,28 @@ export class GLService {
                     referenceType: input.referenceType,
                     payload: input,
                     reason,
+                    branchId: input.branchId,
                 });
                 return id;
             };
 
+            // Operational documents must be idempotent. A retry from a network
+            // timeout must never create a second sale, GRN, waste, or COGS entry.
+            if (input.reference && input.referenceType !== 'MANUAL') {
+                const existing = await tx.select({ id: journalEntries.id, status: journalEntries.status })
+                    .from(journalEntries)
+                    .where(and(
+                        eq(journalEntries.reference, input.reference),
+                        eq(journalEntries.referenceType, input.referenceType),
+                    ))
+                    .top(1);
+                if (existing.length) return { entryId: existing[0].id, status: existing[0].status, duplicate: true };
+            }
+
             // 1. Verify Trial Balance Equilibrium
+            if (input.lines.length < 2 || input.lines.some(line => !Number.isFinite(Number(line.debit)) || !Number.isFinite(Number(line.credit)) || Number(line.debit) < 0 || Number(line.credit) < 0)) {
+                return await pushToExceptionQueue('INVALID_JOURNAL_LINES');
+            }
             const totalDebit = input.lines.reduce((acc, line) => acc + (line.debit || 0), 0);
             const totalCredit = input.lines.reduce((acc, line) => acc + (line.credit || 0), 0);
 
@@ -101,6 +118,25 @@ export class GLService {
                 : input.date
                     ? new Date(input.date)
                     : new Date();
+            if (!Number.isFinite(currentDate.getTime())) {
+                return await pushToExceptionQueue('INVALID_JOURNAL_DATE');
+            }
+
+            const operationalReferences: ReferenceType[] = [
+                'ORDER', 'PAYMENT', 'GRN', 'WASTE', 'STOCK_COUNT', 'EXPENSE',
+                'REFUND', 'VOID', 'SHIFT_CLOSE', 'COGS', 'COGS_REVERSAL', 'PAYROLL', 'PAYROLL_REVERSAL', 'SUPPLIER_INVOICE', 'RECONCILIATION',
+            ];
+            if (operationalReferences.includes(input.referenceType) && !input.branchId) {
+                return await pushToExceptionQueue('BRANCH_REQUIRED_FOR_OPERATIONAL_ENTRY');
+            }
+
+            const closedPeriod = await tx.select({ id: fiscalPeriods.id })
+                .from(fiscalPeriods)
+                .where(sql`${fiscalPeriods.status} = 'CLOSED' AND ${fiscalPeriods.startDate} <= ${currentDate} AND ${fiscalPeriods.endDate} >= ${currentDate}`)
+                .top(1);
+            if (closedPeriod.length > 0) {
+                return await pushToExceptionQueue(`FISCAL_PERIOD_CLOSED|${closedPeriod[0].id}`);
+            }
             const periodId = await this.ensureOpenFiscalPeriod(tx, currentDate);
 
             // 3. Resolve Account IDs from Codes if necessary
@@ -109,6 +145,9 @@ export class GLService {
                     const accRow = await tx.select().top(1).from(chartOfAccounts).where(eq(chartOfAccounts.code, line.accountCode));
                     if (accRow.length === 0) {
                         return await pushToExceptionQueue(`ACCOUNT_NOT_FOUND|Code:${line.accountCode}`);
+                    }
+                    if (accRow[0].isActive === false) {
+                        return await pushToExceptionQueue(`ACCOUNT_INACTIVE|Code:${line.accountCode}`);
                     }
                     line.accountId = accRow[0].id;
                 }
@@ -227,6 +266,10 @@ export class GLService {
             if (!original || original.length === 0) throw new Error('Original Journal Entry not found');
 
             const lines = await tx.select().from(journalLines).where(eq(journalLines.journalEntryId, originalEntryId));
+            const firstCostCenter = lines.find(line => line.costCenterId)?.costCenterId;
+            const branch = firstCostCenter
+                ? await tx.select({ branchId: costCenters.branchId }).from(costCenters).where(eq(costCenters.id, firstCostCenter)).top(1)
+                : [];
 
             const newLines: JournalLineInput[] = lines.map(line => ({
                 accountId: line.accountId,
@@ -242,6 +285,7 @@ export class GLService {
                 description: `Reversal of Entry #${original[0].entryNumber}`,
                 lines: newLines,
                 createdBy,
+                branchId: branch[0]?.branchId || undefined,
             });
 
             // Mark original reversed

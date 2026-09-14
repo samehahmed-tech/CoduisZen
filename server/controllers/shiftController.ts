@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { shifts, orders, payments, paymentSessions } from '../../src/db/schema';
+import { shifts, orders, payments, paymentSessions, users, branches } from '../../src/db/schema';
 import { eq, and, sql, gte, desc } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { parseNonNegativeShiftAmount, requireShiftVarianceReason } from '../services/shiftReconciliation';
@@ -174,7 +174,79 @@ export const getActiveShift = async (req: Request, res: Response) => {
         ).orderBy(desc(shifts.openingTime)).offset(0).fetch(1);
 
         if (activeShift.length === 0) return res.status(404).json({ error: 'No active shift found' });
-        res.json(activeShift[0]);
+
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+
+        const shiftRecord = activeShift[0];
+        let isStale = false;
+
+        if (branch?.businessDate && shiftRecord.openingTime) {
+            const shiftDateStr = new Date(shiftRecord.openingTime).toISOString().split('T')[0];
+            if (shiftDateStr < branch.businessDate) {
+                isStale = true;
+            }
+        }
+
+        res.json({
+            ...shiftRecord,
+            isStale,
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const getOpenShifts = async (req: Request, res: Response) => {
+    try {
+        const branchId = getStringParam(req.query.branchId);
+        if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
+        if (!canAccessShiftBranch(req, branchId)) {
+            return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
+        }
+
+        const openShifts = await db.select({
+            id: shifts.id,
+            branchId: shifts.branchId,
+            userId: shifts.userId,
+            openingBalance: shifts.openingBalance,
+            status: shifts.status,
+            notes: shifts.notes,
+            openingTime: shifts.openingTime,
+            userName: users.name,
+            username: users.name,
+        })
+            .from(shifts)
+            .leftJoin(users, eq(shifts.userId, users.id))
+            .where(and(
+                eq(shifts.branchId, branchId),
+                eq(shifts.status, 'OPEN')
+            ))
+            .orderBy(desc(shifts.openingTime));
+
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+
+        const result = openShifts.map(s => {
+            let isStale = false;
+            if (branch?.businessDate && s.openingTime) {
+                const shiftDateStr = new Date(s.openingTime).toISOString().split('T')[0];
+                if (shiftDateStr < branch.businessDate) {
+                    isStale = true;
+                }
+            }
+            return {
+                ...s,
+                openingBalance: Number(s.openingBalance || 0),
+                isStale,
+            };
+        });
+
+        res.json(result);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

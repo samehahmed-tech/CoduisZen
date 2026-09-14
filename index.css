@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "tailwindcss";
 
 /* ═══ Theme Engine — Modular CSS Imports ═══ */
@@ -9,8 +8,9 @@
 @import "./styles/engine/density.css";
 @import "./styles/engine/theme-components.css";
 @import "./styles/engine/animations.css";
-@import "./styles/engine/theme-overrides.css";
 @import "./styles/engine/micro-interactions.css";
+@import "./styles/engine/interaction-system.css";
+@import "./styles/engine/motion-personalities.css";
 
 /* Layout: sidebar, topbar, neo-ui shell */
 @import "./styles/layout/sidebar.css";
@@ -18,6 +18,8 @@
 @import "./styles/layout/neo-ui.css";
 @import "./styles/layout/pos-responsive.css";
 @import "./styles/layout/pos-tilt-card.css";
+@import "./styles/layout/pos-zen-cards.css";
+@import "./styles/layout/tiles.css";
 
 /* Globals: glass tokens first, then premium, scrollbar, wallpaper */
 @import "./styles/globals/glass-surfaces.css";
@@ -25,8 +27,23 @@
 @import "./styles/globals/premium.css";
 @import "./styles/globals/wallpaper.css";
 
+/* Theme personality + operations layers LAST: their rules must beat layout
+   defaults (e.g. .workspace-rail in sidebar.css) so switching themes
+   visibly re-skins rail, page, topbar, cards and buttons. Wallpaper-mode
+   rules keep winning via higher specificity. */
+@import "./styles/engine/theme-overrides.css";
+@import "./styles/engine/theme-operations.css";
+
+/* UX Elevation LAST: unifies motion/hierarchy/a11y without changing identity. */
+@import "./styles/engine/ux-elevation.css";
+
+/* Fluid Motion AFTER elevation: compositor-only micro-motion utilities +
+   view-transition polish. Rest states identical; reduced-motion + lite-tier
+   guards live inside the file. */
+@import "./styles/engine/fluid-motion.css";
+
 @theme {
-  --font-sans: "Tajawal", system-ui, sans-serif;
+  --font-sans: "Cairo", system-ui, sans-serif;
   --font-display: "Cairo", system-ui, sans-serif;
   /* Theme-aware colors mapped from variables */
   --color-primary: rgb(var(--primary));
@@ -46,9 +63,9 @@
 }
 
 :root {
-  --font-body: "Tajawal", system-ui, sans-serif;
-  --font-arabic: "Tajawal", system-ui, sans-serif;
-  --font-latin: "Tajawal", system-ui, sans-serif;
+  --font-body: "Cairo", system-ui, sans-serif;
+  --font-arabic: "Cairo", system-ui, sans-serif;
+  --font-latin: "Cairo", system-ui, sans-serif;
   --font-display: "Cairo", system-ui, sans-serif;
   --font-heading: "Cairo", system-ui, sans-serif;
   --font-number: "Cairo", system-ui, sans-serif;
@@ -66,8 +83,15 @@
   --safe-left: env(safe-area-inset-left);
 }
 
-* {
-  font-family: var(--font-body, "Tajawal", system-ui, sans-serif) !important;
+html {
+  font-family: var(--font-body, "Cairo", system-ui, sans-serif);
+}
+
+/* NOTE (perf): the previous `* { font-family: ... !important }` forced a
+   full style recalc on EVERY DOM mutation. Inheritance renders identically
+   (no element sets a competing font) at a fraction of the cost. */
+body {
+  font-family: var(--font-body, "Cairo", system-ui, sans-serif);
 }
 
 body,
@@ -83,7 +107,7 @@ table,
 .sidebar-panel *,
 .sidebar-footer,
 .sidebar-footer * {
-  font-family: var(--font-body) !important;
+  font-family: inherit;
 }
 
 h1,
@@ -147,6 +171,35 @@ h6,
 }
 
 .animate-float { animation: float 6s ease-in-out infinite; }
+
+/* ── Shell transitions (CSS replacements for framer-motion) ──
+   MainLayout no longer pulls the ~43KB motion runtime into the initial
+   bundle. These keyframes reproduce the previous enter animations:
+   route fade+8px (120ms), banner rise 24px, assistant panel pop. */
+@keyframes routeEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes routeRise {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes routePop {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.route-enter { animation: routeEnter 120ms ease-out; }
+.route-rise { animation: routeRise 180ms ease-out; }
+.route-pop { animation: routePop 180ms ease-out; transform-origin: bottom left; }
+
+/* ── Browser View Transitions (React Router `viewTransition: true`) ──
+   Native-feel page morph handled by the browser. Kept deliberately short so
+   it composes with .route-enter instead of fighting it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 140ms;
+  animation-timing-function: ease-out;
+}
 
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.1s; }
@@ -259,6 +312,10 @@ h6,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
   }
   .card-primary:hover { transform: none !important; }
 }
@@ -398,4 +455,90 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .responsive-table::-webkit-scrollbar-thumb:hover {
     background: rgba(var(--primary), 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PERF UTILITIES (zero visual change on full-tier devices)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Skip offscreen rendering work for long lists/cards. Intrinsic size keeps
+   scrollbars stable while content is skipped. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
+/* Promote an animated element to its own compositor layer. */
+.gpu {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* ── Fluid feel (zero rest-state visual change) ──
+   Buttery in-app scrolling + opt-in press feedback for floating actions.
+   transform/opacity only — compositor-driven, no layout cost. */
+html {
+  scroll-behavior: smooth;
+}
+.press-fluid {
+  transition: transform 120ms ease-out;
+}
+.press-fluid:active {
+  transform: scale(0.97);
+}
+
+/* Transform-only loading bar sweep (same indigo→purple→emerald gradient as
+   the App loading screen). opacity/scaleX run on the compositor — no
+   layout/paint per frame, unlike animate-pulse width repaints. */
+@keyframes loadingSweep {
+  0% { transform: scaleX(0.1); opacity: 0.6; }
+  50% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(0.1); transform-origin: right; opacity: 0.6; }
+}
+.loading-bar-fill {
+  transform-origin: left;
+  animation: loadingSweep 1.4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* ── Lite tier (set by App via html[data-perf-tier]): same colors/layout,
+   cheap fallbacks. Kills the most expensive effects only — backdrop blur,
+   100px ambient blurs, noise overlays, long ambient drifts — which are the
+   top jank sources on ≤4GB / ≤4-core / 2G / touch-only devices. ── */
+html[data-perf-tier='lite'] .ambient-orb,
+html[data-perf-tier='lite'] .ambient-orb-primary,
+html[data-perf-tier='lite'] .ambient-orb-accent,
+html[data-perf-tier='lite'] .ambient-orb-secondary,
+html[data-perf-tier='lite'] .ambient-orb-glow {
+  animation: none;
+  filter: none;
+  opacity: 0.35;
+}
+html[data-perf-tier='lite'] .glass-1,
+html[data-perf-tier='lite'] .glass-2,
+html[data-perf-tier='lite'] .glass-3,
+html[data-perf-tier='lite'] .glass-4,
+html[data-perf-tier='lite'] .glass-field,
+html[data-perf-tier='lite'] .glass-tabs,
+html[data-perf-tier='lite'] .glass-btn-secondary {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-perf-tier='lite'] .ambient-noise::after,
+html[data-perf-tier='lite'] .glass-1::before,
+html[data-perf-tier='lite'] .glass-2::before,
+html[data-perf-tier='lite'] .glass-3::before,
+html[data-perf-tier='lite'] .glass-4::before {
+  display: none;
+}
+html[data-perf-tier='lite'] .animate-breathe,
+html[data-perf-tier='lite'] .animate-border-glow,
+html[data-perf-tier='lite'] .animate-mode-glow,
+html[data-perf-tier='lite'] .glass-shimmer:hover::after {
+  animation: none;
+}
+html[data-perf-tier='lite'] .theme-animate-stagger {
+  animation-duration: 0.15s;
+  animation-delay: 0ms;
 }

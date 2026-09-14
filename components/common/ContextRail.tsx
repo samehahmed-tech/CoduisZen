@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo, useEffect, useState, useRef, useCallback } from 'react';
+import React, { lazy, Suspense, useMemo, useEffect, useState, useRef, useCallback, useTransition } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
     Pin,
@@ -14,6 +14,7 @@ import {
     ChevronDown,
     Sparkles,
     ChevronRight,
+    LayoutGrid,
     Bell,
     Mail,
     Bot,
@@ -33,14 +34,14 @@ import BranchContextSwitcher from './BranchContextSwitcher';
 const PATH_LOADER_MAP: Record<string, string> = {
     '/': 'Dashboard', '/pos': 'POS', '/orders': 'OrdersCenter', '/kds': 'KDS',
     '/pickup': 'PickupScreen', '/kiosk': 'SelfOrderingKiosk',
-    '/packing': 'PackingScreen', '/floor-designer': 'FloorDesigner', '/refunds': 'RefundManager', '/day-close': 'DayCloseHub',
+    '/floor-designer': 'FloorDesigner', '/refunds': 'RefundManager', '/day-close': 'DayCloseHub',
     '/call-center': 'CallCenter', '/call-center-manager': 'CallCenterManager', '/crm': 'CRM',
-    '/zones': 'ZonesManager', '/dispatch': 'DispatchHub', '/driver': 'DriverDashboard', '/platforms': 'PlatformAggregator',
-    '/whatsapp': 'WhatsAppHub', '/menu': 'MenuManager', '/recipes': 'RecipeManager',
+    '/zones': 'ZonesManager', '/dispatch': 'DispatchHub', '/drivers': 'DriversHub', '/driver': 'DriverDashboard', '/platforms': 'PlatformAggregator',
+    '/whatsapp': 'WhatsAppHub', '/mail': 'MailHub', '/menu': 'MenuManager', '/recipes': 'RecipeManager',
     '/receipt-designer': 'ReceiptDesigner',
-    '/printers': 'PrinterManager', '/inventory': 'Inventory', '/production': 'Production',
+    '/printers': 'PrinterManager', '/inventory': 'Inventory', '/stock-requests': 'StockRequests', '/production': 'Production',
     '/wastage': 'WastageManager', '/inventory-intelligence': 'InventoryIntelligence',
-    '/finance': 'Finance', '/expenses': 'Expenses', '/reports': 'Reports', '/fiscal': 'FiscalHub',
+    '/finance': 'Finance', '/treasury': 'TreasuryHub', '/expenses': 'Expenses', '/reports': 'Reports', '/fiscal': 'FiscalHub',
     '/approvals': 'ApprovalCenter', '/user-management': 'UserManagement',
     '/forensics': 'ForensicsHub', '/franchise': 'FranchiseManager',
     '/marketing': 'CampaignHub', '/ai-assistant': 'AIAssistant', '/ai-insights': 'AIInsights',
@@ -57,7 +58,7 @@ interface ContextRailProps { onOpenCommand: () => void; }
 const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { branches, currentUser, hasPermission, isSidebarCollapsed, language, logout, toggleSidebar } = useAuthStore(
+    const { branches, currentUser, hasPermission, isSidebarCollapsed, language, logout, toggleSidebar, layoutMode, updateSettings } = useAuthStore(
         useShallow((state) => ({
             branches: state.branches,
             currentUser: state.settings.currentUser,
@@ -66,6 +67,8 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
             language: state.settings.language,
             logout: state.logout,
             toggleSidebar: state.toggleSidebar,
+            layoutMode: state.settings.layoutMode || 'classic',
+            updateSettings: state.updateSettings,
         }))
     );
     const setDiscount = useOrderStore((state) => state.setDiscount);
@@ -88,6 +91,15 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
     const navRef = useRef<HTMLElement>(null);
     const toggleAssistant = useAIWidgetStore(state => state.toggleAssistant);
+
+    // Route changes render heavy lazy pages — run them as a transition so the
+    // rail click (and any typing) stays responsive while the page reconciles.
+    // viewTransition hands the swap to the browser's View Transitions API
+    // (native-feel morph, automatic fallback where unsupported).
+    const [, startNavTransition] = useTransition();
+    const navigateTransition = useCallback((path: string) => {
+        startNavTransition(() => navigate(path, { viewTransition: true }));
+    }, [navigate]);
 
     const isRouteActive = useCallback((path: string) => {
         const [pathname, hash] = path.split('#');
@@ -141,23 +153,26 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
     }, []);
 
     useEffect(() => {
+        // Idle prefetch of likely-next routes — deliberately conservative:
+        // hover prefetch (above) already covers mouse users. Auto-prefetch
+        // waits until the app is long idle so it never competes with first
+        // paint/interaction, and stays off on data-saver / slow networks.
         const likelyNextPaths = Array.from(new Set(
             filteredSections.flatMap((section) => section.items.map((item) => item.path))
-        )).filter((path) => path !== location.pathname).slice(0, 3);
+        )).filter((path) => path !== location.pathname).slice(0, 2);
         if (likelyNextPaths.length === 0) return;
 
-        const preloadLikelyRoutes = () => likelyNextPaths.forEach(handlePreload);
-        const idleWindow = window as Window & {
-            requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-            cancelIdleCallback?: (id: number) => void;
+        const connection = (navigator as Navigator & {
+            connection?: { saveData?: boolean; effectiveType?: string };
+        }).connection;
+        if (connection?.saveData) return;
+        if (connection?.effectiveType === 'slow-2g' || connection?.effectiveType === '2g') return;
+
+        const preloadLikelyRoutes = () => {
+            if (document.visibilityState === 'hidden') return;
+            likelyNextPaths.forEach(handlePreload);
         };
-
-        if (idleWindow.requestIdleCallback) {
-            const idleId = idleWindow.requestIdleCallback(preloadLikelyRoutes, { timeout: 2500 });
-            return () => idleWindow.cancelIdleCallback?.(idleId);
-        }
-
-        const timeoutId = window.setTimeout(preloadLikelyRoutes, 1200);
+        const timeoutId = window.setTimeout(preloadLikelyRoutes, 10000);
         return () => window.clearTimeout(timeoutId);
     }, [filteredSections, handlePreload, location.pathname]);
 
@@ -246,7 +261,7 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                         <button
                             type="button"
                             className="sidebar-logomark shrink-0"
-                            onClick={() => navigate('/')}
+                            onClick={() => navigateTransition('/')}
                             aria-label={lang === 'ar' ? 'العودة للوحة القيادة' : 'Go to dashboard'}
                         >
                             <span>RF</span>
@@ -374,7 +389,15 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                                                 <NavLink
                                                     key={item.id}
                                                     to={item.path}
-                                                    onClick={() => setMobileOpen(false)}
+                                                    onClick={(event) => {
+                                                        // Same destination, same active styling — but the heavy
+                                                        // page render happens in a transition (no frozen click).
+                                                        // Modifier/middle clicks keep native new-tab behavior.
+                                                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                                                        event.preventDefault();
+                                                        setMobileOpen(false);
+                                                        navigateTransition(item.path);
+                                                    }}
                                                     onMouseEnter={() => handlePreload(item.path)}
                                                     onPointerDown={() => handlePreload(item.path)}
                                                     onFocus={() => handlePreload(item.path)}
@@ -451,6 +474,18 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                         >
                             <Bot size={14} />
                             <span className="text-xs font-bold uppercase tracking-widest">{lang === 'ar' ? 'المساعد' : 'AI Agent'}</span>
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                updateSettings({ layoutMode: layoutMode === 'tiles' ? 'classic' : 'tiles' });
+                                navigateTransition('/');
+                            }}
+                            className="w-full sidebar-text-block p-1.5 rounded-lg text-muted hover:text-main hover:bg-elevated transition-colors flex items-center justify-center gap-2"
+                            title={lang === 'ar' ? 'التبديل لوضع البلاطات' : 'Switch to tiles view'}
+                        >
+                            <LayoutGrid size={14} />
+                            <span className="text-xs font-semibold">{lang === 'ar' ? 'البلاطات' : 'Tiles'}</span>
                         </button>
 
                         <button

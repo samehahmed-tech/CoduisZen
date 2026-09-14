@@ -8,7 +8,7 @@ const installArg = process.argv.find(arg => arg.startsWith('--install-dir='));
 const root = installArg ? path.resolve(installArg.slice('--install-dir='.length)) : path.resolve(__dirname, '..');
 const sql = createRequire(path.join(root, 'runtime', 'database-backup.cjs'))('mssql/msnodesqlv8');
 
-const VALID_ACTIONS = new Set(['stock', 'counts', 'menu', 'sales', 'inventory-items']);
+const VALID_ACTIONS = new Set(['stock', 'counts', 'menu', 'sales', 'inventory-items', 'inventory-cycle']);
 const MENU_TABLES = [
   'recipe_ingredients', 'recipe_versions', 'recipes', 'menu_item_modifiers',
   'modifier_options', 'modifier_groups', 'item_daily_snapshots', 'menu_items', 'menu_categories'
@@ -37,7 +37,7 @@ function selectedActions() {
   const raw = process.argv.find(arg => arg.startsWith('--actions='))?.slice('--actions='.length) || '';
   const actions = [...new Set(raw.split(',').map(value => value.trim().toLowerCase()).filter(Boolean))];
   if (!actions.length || actions.some(action => !VALID_ACTIONS.has(action))) {
-    throw new Error('ACTIONS_REQUIRED: stock,counts,menu,sales,inventory-items');
+    throw new Error('ACTIONS_REQUIRED: stock,counts,menu,sales,inventory-items,inventory-cycle');
   }
   return actions;
 }
@@ -93,6 +93,15 @@ async function inspect(pool, existing, actions) {
       purchaseOrderLines: await tableSummary(pool, existing, 'purchase_order_items')
     };
   }
+  if (actions.includes('inventory-cycle')) {
+    preview.inventoryCycle = {
+      stockMovements: await tableSummary(pool, existing, 'stock_movements', 'quantity'),
+      inventoryLedger: await tableSummary(pool, existing, 'inventory_ledger', 'change'),
+      batchTransactions: await tableSummary(pool, existing, 'batch_transactions', 'quantity_used'),
+      inventoryBatches: await tableSummary(pool, existing, 'inventory_batches', 'current_qty'),
+      stockRows: await tableSummary(pool, existing, 'inventory_stock', 'quantity')
+    };
+  }
   return preview;
 }
 
@@ -112,6 +121,14 @@ async function resetStock(request, existing, changed) {
   if (existing.has('inventory_batches')) {
     const result = await request.query(`UPDATE dbo.inventory_batches SET current_qty = 0, status = 'DEPLETED' WHERE COALESCE(current_qty, 0) <> 0 OR status <> 'DEPLETED'`);
     changed.inventoryBatchRows = Number(result.rowsAffected[0] || 0);
+  }
+}
+
+async function resetInventoryCycle(request, existing, deleted, changed) {
+  await deleteTables(request, existing, ['batch_transactions', 'stock_movements', 'inventory_ledger', 'inventory_batches'], deleted);
+  if (existing.has('inventory_stock')) {
+    const result = await request.query(`UPDATE dbo.inventory_stock SET quantity = 0, last_updated = GETDATE() WHERE COALESCE(quantity, 0) <> 0`);
+    changed.inventoryCycleStockRows = Number(result.rowsAffected[0] || 0);
   }
 }
 
@@ -168,6 +185,7 @@ async function apply(pool, existing, actions) {
   const changed = {};
   try {
     if (actions.includes('stock')) await resetStock(request, existing, changed);
+    if (actions.includes('inventory-cycle')) await resetInventoryCycle(request, existing, deleted, changed);
     if (actions.includes('counts')) await deleteTables(request, existing, ['stock_count_lines', 'stock_counts'], deleted);
     if (actions.includes('sales')) {
       if (existing.has('orders')) await request.query(`UPDATE dbo.orders SET parent_order_id = NULL WHERE parent_order_id IS NOT NULL`);
@@ -203,7 +221,8 @@ async function main() {
       process.stdout.write(JSON.stringify({ ok: true, actions, preview }));
       return;
     }
-    if (!process.argv.includes('--confirm=DELETE')) throw new Error('Confirmation DELETE is required.');
+    const confirmation = actions.includes('inventory-cycle') ? '--confirm=RESET_INVENTORY_CYCLE' : '--confirm=DELETE';
+    if (!process.argv.includes(confirmation)) throw new Error(`Confirmation ${confirmation.slice(10)} is required.`);
     const changes = await apply(pool, existing, actions);
     process.stdout.write(JSON.stringify({ ok: true, mode: 'SELECTIVE_DATA_MAINTENANCE', actions, preview, ...changes }));
   } finally {

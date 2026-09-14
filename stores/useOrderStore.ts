@@ -6,7 +6,6 @@ import { tablesApi } from '../services/api/tables';
 import { localDb } from '../db/localDb';
 import { syncService } from '../services/syncService';
 import { useAuthStore } from './useAuthStore';
-import { printOrderReceipt } from '../services/posPrintOrchestrator';
 import { translations } from '../services/translations';
 import { branchEntityCacheKey, fromBranchEntityCache, toBranchEntityCache } from '../src/utils/branchEntityCache';
 import { findActiveTableOrder } from '../utils/tableOrder';
@@ -83,6 +82,7 @@ interface OrderState {
     fetchOrders: (params?: { status?: string; branch_id?: string; date?: string; limit?: number }) => Promise<void>;
     placeOrder: (order: Order) => Promise<Order>;
     updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean; approvalId?: number }) => Promise<void>;
+    updateOrderItems: (orderId: string, data: { items: any[]; notes?: string; discount?: number; deliveryFee?: number; changedBy?: string; deliverySource?: string; paymentMethod?: string; deliveryAddress?: string; deliveryLat?: number; deliveryLng?: number; deliveryAddressLabel?: string; platformOrderId?: string; scheduledFor?: string }) => Promise<any>;
 
     fetchTables: (branchId: string) => Promise<void>;
     updateTableStatus: (tableId: string, status: TableStatus, currentOrderId?: string) => Promise<void>;
@@ -157,6 +157,9 @@ const printCompletionReceiptIfNeeded = async (order: Order) => {
     const t = translations[lang] || translations.en;
     const branch = branches.find((b) => b.id === order.branchId);
 
+    // Print chain (receipt templates, html2canvas, react-dom/server) is heavy
+    // and only needed when actually printing — never on the critical path.
+    const { printOrderReceipt } = await import('../services/posPrintOrchestrator');
     await printOrderReceipt({
         order,
         printers,
@@ -195,7 +198,14 @@ export const useOrderStore = create<OrderState>()(
                 set({ isLoading: true, error: null });
                 try {
                     if (navigator.onLine) {
-                        const data = await ordersApi.getAll(params);
+                        const payload: any = await ordersApi.getAll(params);
+                        const data: any[] = Array.isArray(payload)
+                            ? payload
+                            : Array.isArray(payload?.data)
+                                ? payload.data
+                                : Array.isArray(payload?.orders)
+                                    ? payload.orders
+                                    : [];
                         const orders = data.map((o: any) => ({
                             id: o.id,
                             orderNumber: o.order_number || o.orderNumber,
@@ -233,6 +243,7 @@ export const useOrderStore = create<OrderState>()(
                             deliveryNotes: o.delivery_notes || o.deliveryNotes,
                             driverId: o.driver_id || o.driverId,
                             deliveryFee: o.delivery_fee || o.deliveryFee,
+                            scheduledFor: o.scheduled_for || o.scheduledFor,
                             createdAt: new Date(o.created_at || o.createdAt),
                             updatedAt: o.updated_at ? new Date(o.updated_at) : (o.updatedAt ? new Date(o.updatedAt) : undefined),
                             syncStatus: o.sync_status || 'SYNCED'
@@ -351,9 +362,11 @@ export const useOrderStore = create<OrderState>()(
                         delivery_lng: order.deliveryLng,
                         delivery_address_label: order.deliveryAddressLabel,
                         is_call_center_order: order.isCallCenterOrder,
+                        call_center_agent_id: (order as any).callCenterAgentId || (order as any).call_center_agent_id || undefined,
                         status: order.status || 'PENDING',
                         subtotal: order.subtotal,
                         discount: order.discount,
+                        discount_type: 'PERCENT',
                         couponCode: order.couponCode,
                         tax: order.tax,
                         total: totalAmount,
@@ -365,6 +378,7 @@ export const useOrderStore = create<OrderState>()(
                         payments: order.payments,
                         notes: order.notes,
                         kitchen_notes: order.kitchenNotes,
+                        scheduled_for: (order as any).scheduledFor || undefined,
                         items: serializedItems
                     };
 
@@ -410,6 +424,7 @@ export const useOrderStore = create<OrderState>()(
                         notes: savedOrder.notes ?? order.notes,
                         kitchenNotes: savedOrder.kitchen_notes ?? savedOrder.kitchenNotes ?? order.kitchenNotes,
                         deliveryNotes: savedOrder.delivery_notes ?? savedOrder.deliveryNotes ?? order.deliveryNotes,
+                        scheduledFor: savedOrder.scheduled_for ?? savedOrder.scheduledFor ?? (order as any).scheduledFor,
                         createdAt: new Date(savedOrder.created_at || savedOrder.createdAt || new Date()),
                         updatedAt: savedOrder.updated_at ? new Date(savedOrder.updated_at) : (savedOrder.updatedAt ? new Date(savedOrder.updatedAt) : undefined),
                         warnings: savedOrder.warnings || order.warnings,
@@ -452,7 +467,7 @@ export const useOrderStore = create<OrderState>()(
                             notes,
                             expected_updated_at: expectedUpdatedAt,
                             approval_id: options?.approvalId,
-                        }, { idempotencyKey: `${orderId}:${status}:${Date.now()}` });
+                        }, { idempotencyKey: `${orderId}:${status}` });
                     } else {
                         if (options?.approvalId) throw new Error('MANAGER_APPROVAL_REQUIRES_ONLINE');
                         await syncService.queue('orderStatus', 'UPDATE', {
@@ -501,6 +516,69 @@ export const useOrderStore = create<OrderState>()(
                         throw error;
                     }
                     set({ error: error?.code || error?.message || 'ORDER_STATUS_UPDATE_FAILED' });
+                    throw error;
+                }
+            },
+
+            updateOrderItems: async (orderId, data) => {
+                try {
+                    const current = get().orders.find(o => o.id === orderId);
+                    const serializedItems = (data.items || []).map((item: any) => {
+                        const menuItemId = resolveMenuItemId(item);
+                        if (!menuItemId) throw new Error('INVALID_MENU_ITEM_REFERENCE');
+                        return {
+                            menu_item_id: menuItemId,
+                            name: item.name,
+                            name_ar: item.nameAr || item.name_ar || item.name,
+                            price: item.price,
+                            size_id: item.sizeId || item.size_id || undefined,
+                            quantity: item.quantity,
+                            notes: item.notes,
+                            modifiers: (item.selectedModifiers || item.modifiers || []).map((modifier: any) => ({
+                                ...modifier,
+                                id: modifier?.id || modifier?.optionId,
+                                optionId: modifier?.optionId || modifier?.id,
+                            })),
+                        };
+                    });
+                    const saved: any = navigator.onLine
+                        ? await ordersApi.updateItems(orderId, {
+                            items: serializedItems,
+                            notes: data.notes,
+                            discount: data.discount,
+                            deliveryFee: data.deliveryFee,
+                            changedBy: data.changedBy,
+                            deliverySource: (data as any).deliverySource,
+                            paymentMethod: (data as any).paymentMethod,
+                            deliveryAddress: (data as any).deliveryAddress,
+                            deliveryLat: (data as any).deliveryLat,
+                            deliveryLng: (data as any).deliveryLng,
+                            deliveryAddressLabel: (data as any).deliveryAddressLabel,
+                            platformOrderId: (data as any).platformOrderId,
+                            scheduledFor: (data as any).scheduledFor,
+                            expectedUpdatedAt: current?.updatedAt ? new Date(current.updatedAt).toISOString() : undefined,
+                        })
+                        : (() => { throw new Error('ORDER_EDIT_REQUIRES_ONLINE'); })();
+                    const mergedItems = Array.isArray(saved?.items) && saved.items.length > 0 ? saved.items : data.items;
+                    set((state) => ({
+                        orders: state.orders.map(o => o.id === orderId
+                            ? {
+                                ...o, ...saved, items: mergedItems,
+                                subtotal: saved?.subtotal ?? o.subtotal,
+                                tax: saved?.tax ?? o.tax,
+                                total: saved?.total ?? o.total,
+                                discount: saved?.discount ?? o.discount,
+                                updatedAt: new Date(),
+                            } as any
+                            : o),
+                    }));
+                    const existing = await localDb.orders.get(orderId);
+                    if (existing) {
+                        await localDb.orders.put({ ...existing, ...saved, items: mergedItems, updatedAt: new Date() } as any);
+                    }
+                    return saved;
+                } catch (error: any) {
+                    set({ error: error?.code || error?.message || 'ORDER_ITEMS_UPDATE_FAILED' });
                     throw error;
                 }
             },

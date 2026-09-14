@@ -14,12 +14,21 @@ export const helmetMiddleware = helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://maps.googleapis.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
             mediaSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "wss:", "ws:", "http://localhost:3002", "http://127.0.0.1:3002"],
+            // Map/search/geo backends used by the app (tiles ride on <img>,
+            // which imgSrc already allows — these cover fetch/XHR + sockets).
+            connectSrc: [
+                "'self'", "wss:", "ws:", "http://localhost:3002", "http://127.0.0.1:3002",
+                "https://nominatim.openstreetmap.org",
+                "https://photon.komoot.io",
+                "https://api.maptiler.com",
+                "https://router.project-osrm.org",
+                "https://maps.googleapis.com",
+            ],
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
@@ -102,6 +111,10 @@ const CSRF_BYPASS_PREFIXES = [
     '/api/attendance-bridge',
     '/api/whatsapp',
     '/api/public-screens',
+    '/api/deployment/register',
+    '/api/deployment/heartbeat',
+    '/api/deployment/commands/pull',
+    '/api/deployment/commands/ack',
     '/iclock',
 ];
 

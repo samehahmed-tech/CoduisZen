@@ -5,11 +5,25 @@ export type PaymentAggregateRow = {
     count: number;
 };
 
+/**
+ * Card-brand aliases all mean "card terminal payment" in reports. Without
+ * this, one order paid via legacy 'CARD' + confirmed 'eft_pos' session would
+ * be counted under BOTH labels (double count). Mirrors the VISA-equivalence
+ * lookup already used by the shift X-report.
+ */
+const CARD_ALIASES = new Set(['CARD', 'CREDIT_CARD', 'DEBIT_CARD']);
+
+export const normalizePaymentMethod = (method: string | null | undefined) => {
+    const upper = String(method || 'UNKNOWN').toUpperCase();
+    if (CARD_ALIASES.has(upper)) return 'VISA';
+    return upper || 'UNKNOWN';
+};
+
 export const sessionProviderToPaymentMethod = (providerType: string | null | undefined) => {
     const provider = String(providerType || '').toLowerCase();
     if (provider === 'manual_cash') return 'CASH';
     if (provider === 'eft_pos') return 'VISA';
-    return provider.toUpperCase() || 'UNKNOWN';
+    return normalizePaymentMethod(provider) || 'UNKNOWN';
 };
 
 export const reconcilePaymentRows = (
@@ -18,7 +32,7 @@ export const reconcilePaymentRows = (
 ) => {
     const byOrderMethod = new Map<string, PaymentAggregateRow>();
     for (const row of legacyRows) {
-        const method = String(row.method || 'UNKNOWN').toUpperCase();
+        const method = normalizePaymentMethod(row.method);
         byOrderMethod.set(`${row.orderId}:${method}`, { ...row, method });
     }
     for (const row of sessionRows) {

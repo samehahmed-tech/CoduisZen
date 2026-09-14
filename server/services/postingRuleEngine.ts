@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { postingRules, paymentMethodAccounts, taxAccounts, chartOfAccounts } from '../../src/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 interface PostingRule {
     id: string;
@@ -34,7 +34,7 @@ export class PostingRuleEngine {
                 code: chartOfAccounts.code
             })
             .from(paymentMethodAccounts)
-            .innerJoin(chartOfAccounts, eq(paymentMethodAccounts.accountId, chartOfAccounts.id));
+            .innerJoin(chartOfAccounts, and(eq(paymentMethodAccounts.accountId, chartOfAccounts.id), eq(chartOfAccounts.isActive, true)));
             
             this.paymentMapCache = {};
             for (const r of rows) this.paymentMapCache[r.method] = r.code;
@@ -45,7 +45,7 @@ export class PostingRuleEngine {
                 code: chartOfAccounts.code
             })
             .from(taxAccounts)
-            .innerJoin(chartOfAccounts, eq(taxAccounts.accountId, chartOfAccounts.id));
+            .innerJoin(chartOfAccounts, and(eq(taxAccounts.accountId, chartOfAccounts.id), eq(chartOfAccounts.isActive, true)));
             
             this.taxMapCache = {};
             for (const r of rows) this.taxMapCache[r.type] = r.code;

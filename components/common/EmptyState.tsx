@@ -30,29 +30,29 @@ const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, action, 
     const Icon = icon || TYPE_ICONS[type] || Package;
 
     return (
-        <div className={`flex flex-col items-center justify-center text-center ${compact ? 'py-8 px-3' : 'py-16 px-4'}`}>
+        <div className="skeleton-reveal flex flex-col items-center justify-center text-center animate-in fade-in duration-150" role="status">
+        <div className={`flex flex-col items-center justify-center text-center w-full ${compact ? 'py-8 px-3' : 'py-16 px-4'}`}>
             {/* Premium icon container */}
             <div className="empty-state-icon">
-                <Icon size={compact ? 22 : 26} className="text-muted opacity-50" />
+                <Icon size={compact ? 24 : 30} className="text-primary" strokeWidth={1.75} />
             </div>
 
-            {/* Glow dot decoration */}
-            <div className="w-1.5 h-1.5 rounded-full bg-primary/30 mb-3 mx-auto" />
-
-            <h3 className={`font-black text-main mb-1 ${compact ? 'text-xs' : 'text-sm'}`}>{title}</h3>
+            <h3 className={`font-extrabold text-main mb-1.5 leading-snug ${compact ? 'text-sm' : 'text-base'}`}>{title}</h3>
             {subtitle && (
-                <p className={`text-muted max-w-xs leading-relaxed ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
+                <p className={`text-muted max-w-sm leading-relaxed ${compact ? 'text-xs' : 'text-sm'}`}>
                     {subtitle}
                 </p>
             )}
             {action && (
                 <button
                     onClick={action.onClick}
-                    className="mt-4 px-5 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/15 transition-all duration-150"
+                    data-interaction="press"
+                    className="ux-btn ux-btn-secondary mt-5 !min-h-[40px] text-xs"
                 >
                     {action.label}
                 </button>
             )}
+        </div>
         </div>
     );
 };

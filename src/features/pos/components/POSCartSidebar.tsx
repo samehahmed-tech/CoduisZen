@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Globe2, ShoppingBag, Store, Trash2, X } from 'lucide-react';
 import CartItem from './CartItem';
 import PaymentSummary from './PaymentSummary';
+import DeliveryZonePicker from '@/components/common/DeliveryZonePicker';
 import type { CustomPaymentMethod, DeliveryPlatform, OrderItem, OrderType, PaymentMethod } from '@/types';
-import { useConfirm } from '@/components/common/ConfirmProvider';
 
 interface POSCartSidebarProps {
     activeCart: OrderItem[];
@@ -68,6 +68,13 @@ interface POSCartSidebarProps {
     onExternalOrderNumberChange: (value: string) => void;
     orderNote: string;
     onOrderNoteChange: (value: string) => void;
+    branchId?: string;
+    branches?: { id: string; name: string; nameAr?: string }[];
+    deliveryZones?: any[];
+    selectedDeliveryZoneId?: string;
+    onDeliveryZoneChange?: (zoneId: string, zone?: any) => void;
+    onDeliveryZonesChange?: (zones: any[]) => void;
+    deliveryFee?: number;
 }
 
 const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
@@ -83,13 +90,14 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
     isCartOpenMobile, shouldShowCart, cartPanelWidthClass, splitPayments = [], customPaymentMethods = [],
     deliveryPlatforms = [], deliverySource, onDeliverySourceChange,
     externalOrderNumber, onExternalOrderNumberChange,
-    orderNote, onOrderNoteChange
+    orderNote, onOrderNoteChange,
+    branchId, branches = [], deliveryZones = [], selectedDeliveryZoneId = '',
+    onDeliveryZoneChange, onDeliveryZonesChange, deliveryFee = 0
 }) => {
     const isAr = lang === 'ar';
     const hasCartItems = activeCart.length > 0;
     const isDelivery = String(activeOrderType) === 'DELIVERY';
     const activePlatforms = deliveryPlatforms.filter((platform: any) => platform.isActive !== false);
-    const { confirm } = useConfirm();
 
     return (
         <div
@@ -125,17 +133,11 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                             <X size={20} />
                         </button>
 
-                        {/* Clear cart with confirm */}
+                        {/* Clear cart — single confirm lives in POS.handleClearCart
+                            (with item count); the sidebar just forwards. */}
                         <button
                             type="button"
-                            onClick={async () => {
-                                if (await confirm({
-                                    title: isAr ? 'تفريغ السلة' : 'Clear Cart',
-                                    message: isAr ? 'سيتم حذف جميع الأصناف من السلة. لا يمكن التراجع.' : 'All cart items will be removed. This cannot be undone.',
-                                    variant: 'danger',
-                                    confirmText: isAr ? 'تفريغ' : 'Clear',
-                                })) onClear();
-                            }}
+                            onClick={() => onClear()}
                             disabled={!hasCartItems}
                             title={isAr ? 'تفريغ السلة' : 'Clear cart'}
                             aria-label={isAr ? 'تفريغ السلة' : 'Clear cart'}
@@ -184,6 +186,27 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                                 placeholder={isAr ? 'رقم أوردر المنصة' : 'Platform order no.'}
                                 className="h-10 w-full rounded-lg border border-border/50 bg-card px-3 text-xs font-bold text-main outline-none placeholder:text-muted/50 focus:border-primary/70"
                             />
+                        )}
+                        {deliverySource === 'restaurant' && (
+                            <div>
+                                <DeliveryZonePicker
+                                    zones={deliveryZones}
+                                    value={selectedDeliveryZoneId}
+                                    branchId={branchId}
+                                    branches={branches}
+                                    lang={lang}
+                                    onZonesChange={onDeliveryZonesChange}
+                                    onChange={(zoneId, zone) => onDeliveryZoneChange?.(zoneId, zone)}
+                                    label={isAr ? 'المنطقة (سعر التوصيل تلقائي)' : 'Zone (auto delivery fee)'}
+                                    placeholder={isAr ? 'اختر المنطقة...' : 'Select zone...'}
+                                />
+                                {Number(deliveryFee || 0) > 0 && (
+                                    <p className="mt-1.5 flex items-center justify-between px-1 text-[11px] font-black text-muted">
+                                        <span>{isAr ? 'رسوم التوصيل' : 'Delivery fee'}</span>
+                                        <span className="text-emerald-600 tabular-nums">{Number(deliveryFee).toFixed(2)}</span>
+                                    </p>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}
@@ -242,6 +265,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
             <div className="pos-payment-footer min-h-0 overflow-y-auto overscroll-contain border-t border-border/10 bg-card/95 backdrop-blur-md p-3 shadow-[0_-8px_22px_-18px_rgba(0,0,0,0.2)]">
                 <PaymentSummary
                     subtotal={cartSubtotal} discount={discount} discountAmount={orderDiscountAmount} tax={cartTax} total={cartTotal}
+                    deliveryFee={isDelivery && deliverySource === 'restaurant' ? deliveryFee : 0}
                     currencySymbol={currencySymbol} paymentMethod={paymentMethod} onSetPaymentMethod={onSetPaymentMethod}
                     onShowSplitModal={onShowSplitModal} isTouchMode={isTouchMode} lang={lang} t={t}
                     tipAmount={tipAmount} onSetTipAmount={onSetTipAmount} onVoid={onVoid}

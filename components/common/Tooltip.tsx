@@ -48,8 +48,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', 
         <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
             {children}
             {visible && (
-                <div className={`absolute z-[200] ${POSITION_CLASSES[position]} pointer-events-none animate-in fade-in zoom-in-95 duration-150`}>
-                    <div className="theme-tooltip px-2.5 py-1.5 text-[9px] font-bold whitespace-nowrap max-w-[200px]">
+                <div role="tooltip" className={`absolute z-[200] ${POSITION_CLASSES[position]} pointer-events-none animate-scale-in`}>
+                    <div className="theme-tooltip px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap max-w-[240px]">
                         {content}
                     </div>
                     <div className={`absolute w-0 h-0 border-[4px] ${ARROW_CLASSES[position]}`} />

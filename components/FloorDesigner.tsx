@@ -42,6 +42,18 @@ import { syncService } from '../services/syncService';
 import { toBranchEntityCache } from '../src/utils/branchEntityCache';
 import { useToast } from './common/ToastProvider';
 import { useConfirm } from './common/ConfirmProvider';
+import TableVisual from './floor/TableVisual';
+
+export type DesignerTableShape = 'square' | 'round' | 'rectangle' | 'oval' | 'booth' | 'bar';
+
+const TABLE_CATALOG: { id: DesignerTableShape; nameEn: string; nameAr: string; width: number; height: number; seats: number }[] = [
+    { id: 'square', nameEn: 'Wooden Square · 4', nameAr: 'ترابيزة مربعة خشب · 4', width: 150, height: 150, seats: 4 },
+    { id: 'round', nameEn: 'Round Top · 4-6', nameAr: 'ترابيزة دائرية · 4-6', width: 160, height: 160, seats: 4 },
+    { id: 'rectangle', nameEn: 'Family Rect · 6', nameAr: 'ترابيزة مستطيلة عائلية · 6', width: 190, height: 150, seats: 6 },
+    { id: 'oval', nameEn: 'Oval · 6', nameAr: 'ترابيزة بيضاوية · 6', width: 200, height: 160, seats: 6 },
+    { id: 'booth', nameEn: 'Booth Sofa · 4', nameAr: 'بوكس كنب · 4', width: 200, height: 170, seats: 4 },
+    { id: 'bar', nameEn: 'Bar Counter · 3', nameAr: 'بار مرتفع · 3', width: 210, height: 130, seats: 3 },
+];
 
 const ZONE_ICONS: Record<string, any> = {
     Home,
@@ -196,9 +208,10 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
         return { x: padding, y: nextY };
     };
 
-    const handleAddTable = (shape: 'square' | 'round' | 'rectangle') => {
-        const width = shape === 'rectangle' ? 140 : 100;
-        const height = 100;
+    const handleAddTable = (shape: DesignerTableShape) => {
+        const spec = TABLE_CATALOG.find(s => s.id === shape) || TABLE_CATALOG[0];
+        const width = spec.width;
+        const height = spec.height;
         const { width: zoneWidth, height: zoneHeight } = getZoneBounds();
         const padding = 40;
         const gap = 24;
@@ -217,15 +230,15 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
         const newTable: Table = {
             id: `tbl-${Date.now()}`,
             name: String(localTables.length + 1),
-            seats: shape === 'rectangle' ? 6 : 4,
+            seats: spec.seats,
             status: TableStatus.AVAILABLE,
             position: { x, y },
             width,
             height,
-            shape,
+            shape: shape as Table['shape'],
             zoneId: activeZone,
             discount: 0,
-            isVIP: false
+            isVIP: shape === 'booth' ? false : false
         };
         setLocalTables([...localTables, newTable]);
         setSelectedId(newTable.id);
@@ -496,48 +509,23 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                     {/* Element Library */}
                     <div>
                         <p className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                            <Plus size={14} className="text-indigo-500" /> {tr('Structure Library', 'مكتبة العناصر')}
+                            <Plus size={14} className="text-indigo-500" /> {tr('Table Shapes', 'أشكال الترابيزات')}
                         </p>
-                        <div className="grid grid-cols-1 gap-4">
-                            <button
-                                onClick={() => handleAddTable('square')}
-                                className="w-full flex items-center justify-between p-5 bg-elevated rounded-[1.5rem] border border-border/50 hover:bg-card hover:shadow-xl hover:border-indigo-500/30 transition-all group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-card rounded-xl shadow-sm flex items-center justify-center text-muted group-hover:text-indigo-500 transition-colors border border-border/50">
-                                        <Square size={24} />
+                        <div className="grid grid-cols-2 gap-3">
+                            {TABLE_CATALOG.map(spec => (
+                                <button
+                                    key={spec.id}
+                                    onClick={() => handleAddTable(spec.id)}
+                                    className="flex flex-col items-center gap-2 p-3 bg-elevated rounded-[1.2rem] border border-border/50 hover:bg-card hover:shadow-xl hover:border-indigo-500/40 hover:-translate-y-0.5 transition-all group"
+                                >
+                                    <div className="w-full h-20 rounded-xl bg-card/80 border border-border/40 overflow-hidden pointer-events-none">
+                                        <TableVisual shape={spec.id} seats={spec.seats} name={spec.seats} compact showChairs />
                                     </div>
-                                    <span className="text-xs font-black uppercase tracking-widest text-main">{tr('Standard Table', 'طاولة قياسية')}</span>
-                                </div>
-                                <Plus size={18} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-
-                            <button
-                                onClick={() => handleAddTable('rectangle')}
-                                className="w-full flex items-center justify-between p-5 bg-elevated rounded-[1.5rem] border border-border/50 hover:bg-card hover:shadow-xl hover:border-indigo-500/30 transition-all group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-card rounded-xl shadow-sm flex items-center justify-center text-muted group-hover:text-indigo-500 transition-colors border border-border/50">
-                                        <RectangleHorizontal size={24} />
-                                    </div>
-                                    <span className="text-xs font-black uppercase tracking-widest text-main">{tr('Family Bench', 'جلسة عائلية')}</span>
-                                </div>
-                                <Plus size={18} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
-
-                            <button
-                                onClick={() => handleAddTable('round')}
-                                className="w-full flex items-center justify-between p-5 bg-elevated rounded-[1.5rem] border border-border/50 hover:bg-card hover:shadow-xl hover:border-indigo-500/30 transition-all group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-card rounded-xl shadow-sm flex items-center justify-center text-muted group-hover:text-indigo-500 transition-colors border border-border/50">
-                                        <Circle size={24} />
-                                    </div>
-                                    <span className="text-xs font-black uppercase tracking-widest text-main">{tr('Round Station', 'طاولة دائرية')}</span>
-                                </div>
-                                <Plus size={18} className="text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </button>
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-main text-center leading-tight">{lang === 'ar' ? spec.nameAr : spec.nameEn}</span>
+                                </button>
+                            ))}
                         </div>
+                        <p className="mt-3 text-[9px] font-bold text-muted leading-relaxed">{tr('Realistic top-view tables with chairs. Seats auto-adjust.', 'ترابيزات بشكل واقعي من الأعلى مع كراسي. عدد الكراسي بيتظبط تلقائي.')}</p>
                     </div>
 
                     {/* Inspector */}
@@ -558,6 +546,34 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                                         onChange={(e) => handleUpdateTable(selectedTable.id, { name: e.target.value })}
                                         className="w-full p-4 bg-elevated rounded-xl font-black text-sm text-main uppercase tracking-widest outline-none border border-border/50 focus:border-indigo-500 transition-all"
                                     />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black text-muted uppercase tracking-widest ml-1">{tr('Table Shape', 'شكل الترابيزة')}</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {TABLE_CATALOG.map(spec => {
+                                            const active = (selectedTable.shape || 'square') === spec.id;
+                                            return (
+                                                <button
+                                                    key={spec.id}
+                                                    onClick={() => {
+                                                        const updates: Partial<Table> = { shape: spec.id as Table['shape'] };
+                                                        // auto-resize to realistic footprint, keep position
+                                                        updates.width = spec.width;
+                                                        updates.height = spec.height;
+                                                        if ((selectedTable.seats || 0) <= 0) updates.seats = spec.seats;
+                                                        handleUpdateTable(selectedTable.id, updates);
+                                                    }}
+                                                    className={`rounded-xl border-2 overflow-hidden transition-all ${active ? 'border-indigo-500 ring-2 ring-indigo-500/30 scale-105' : 'border-border/50 hover:border-indigo-500/40'}`}
+                                                    title={lang === 'ar' ? spec.nameAr : spec.nameEn}
+                                                >
+                                                    <div className="h-14 bg-card pointer-events-none">
+                                                        <TableVisual shape={spec.id} seats={selectedTable.seats || spec.seats} name={selectedTable.name} compact showChairs selected={active} />
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -704,7 +720,9 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                                 backgroundSize: '40px 40px'
                             }}
                         />
-                        {tablesInZone.map(table => (
+                        {tablesInZone.map(table => {
+                            const isSelected = selectedId === table.id;
+                            return (
                             <div
                                 key={table.id}
                                 onClick={(e) => { e.stopPropagation(); setSelectedId(table.id); }}
@@ -747,47 +765,30 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                                     width: table.width,
                                     height: table.height,
                                     cursor: 'move',
-                                    borderRadius: table.shape === 'round' ? '100%' : '1.5rem',
-                                    zIndex: selectedId === table.id ? 100 : 10
+                                    zIndex: isSelected ? 100 : 10
                                 }}
-                                className={`flex flex-col items-center justify-center border-4 transition-all shadow-2xl shadow-black/10 dark:shadow-black/40 relative ${selectedId === table.id ? 'border-indigo-500 bg-elevated ring-8 ring-indigo-500/20 scale-105' : 'border-border/70 bg-card hover:scale-102 hover:border-indigo-500/40 hover:bg-elevated/80'}`}
+                                className={`transition-all relative ${isSelected ? 'scale-[1.04] drop-shadow-[0_0_18px_rgba(99,102,241,0.45)]' : 'hover:scale-[1.02]'}`}
                             >
-                                {table.isVIP && (
-                                    <div className="absolute -top-3 -right-3 w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center text-white shadow-lg border-2 border-card transform rotate-12">
-                                        <Crown size={14} />
-                                    </div>
-                                )}
+                                <div className={`absolute -inset-2 rounded-[1.6rem] border-2 border-dashed pointer-events-none transition-all ${isSelected ? 'border-indigo-500/70 bg-indigo-500/5' : 'border-transparent hover:border-indigo-500/20'}`} />
+                                <TableVisual shape={table.shape || 'square'} seats={table.seats} name={table.name} selected={isSelected} isVIP={table.isVIP} />
 
-                                <span className={`text-lg font-black transition-colors ${selectedId === table.id ? 'text-indigo-500' : 'text-main'}`}>
-                                    {table.name}
-                                </span>
-
-                                <div className="flex items-center gap-1.5 mt-1 opacity-60">
-                                    <Users size={12} className={selectedId === table.id ? 'text-indigo-400' : 'text-muted'} />
-                                    <span className={`text-[11px] font-black ${selectedId === table.id ? 'text-indigo-500' : 'text-muted'}`}>{table.seats}</span>
+                                {/* badges row under table */}
+                                <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 flex items-center gap-1 pointer-events-none">
                                     {table.defaultCouponCode ? (
-                                        <div className="flex items-center gap-1 ml-1 text-violet-500">
-                                            <Tag size={10} />
-                                            <span className="max-w-20 truncate text-[9px] font-black">{table.defaultCouponCode}</span>
-                                        </div>
+                                        <span className="px-1.5 py-0.5 rounded-md bg-violet-500 text-white text-[8px] font-black flex items-center gap-0.5"><Tag size={8} />{table.defaultCouponCode}</span>
                                     ) : table.discount ? (
-                                        <div className="flex items-center gap-1 ml-1 text-emerald-500">
-                                            <Tag size={10} />
-                                            <span className="text-[9px] font-black">{table.discount}%</span>
-                                        </div>
+                                        <span className="px-1.5 py-0.5 rounded-md bg-emerald-500 text-white text-[8px] font-black">{table.discount}%</span>
                                     ) : null}
                                     {Number(table.minSpend) > 0 && (
-                                        <span className="ml-1 text-[9px] font-black text-amber-500">
-                                            {tr('MIN', 'حد')} {Number(table.minSpend).toFixed(0)}
-                                        </span>
+                                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[8px] font-black">{Number(table.minSpend).toFixed(0)}</span>
                                     )}
                                     {table.notes && (
-                                        <StickyNote size={10} className="ml-1 text-sky-500" />
+                                        <span className="p-1 rounded-md bg-sky-500 text-white"><StickyNote size={8} /></span>
                                     )}
                                 </div>
 
-                                {selectedId === table.id && (
-                                    <div className="absolute -bottom-16 flex gap-2 animate-in slide-in-from-top-2 p-2 bg-card/95 border border-border/70 rounded-2xl shadow-xl shadow-black/10 dark:shadow-black/40">
+                                {isSelected && (
+                                    <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex gap-2 animate-in slide-in-from-top-2 p-2 bg-card/95 border border-border/70 rounded-2xl shadow-xl shadow-black/10 dark:shadow-black/40 z-50">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleDuplicateTable(table); }}
                                             className="w-10 h-10 rounded-xl bg-elevated border border-border/50 flex items-center justify-center text-muted hover:text-indigo-500 hover:bg-card hover:border-indigo-500/30 transition-all"
@@ -803,7 +804,8 @@ const FloorDesigner: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
                                     </div>
                                 )}
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* HUD / Info Overlay */}

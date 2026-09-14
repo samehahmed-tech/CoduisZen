@@ -16,6 +16,10 @@ const receiveGRN = requireRoleOrPermission(
     ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PROCUREMENT_MANAGER', 'WAREHOUSE_DIRECTOR', 'WAREHOUSE_STAFF'],
     ['OP_RECEIVE_GRN']
 );
+const sendPO = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PROCUREMENT_MANAGER'],
+    ['OP_CREATE_PO', 'OP_APPROVE_PO']
+);
 const approvePO = requireRoleOrPermission(
     ['SUPER_ADMIN', 'OWNER', 'PROCUREMENT_MANAGER', 'WAREHOUSE_DIRECTOR'],
     ['OP_APPROVE_PO']
@@ -38,8 +42,9 @@ router.get('/', readProcurement, enforceBranch, poController.getPOs);
 router.get('/:id', readProcurement, enforceBranch, poController.getPOById);
 router.post('/', createPO, enforceBranch, poController.createPO);
 router.put('/:id/receive', receiveGRN, enforceBranch, poController.receivePO);
-router.put('/:id/status', approvePO, enforceBranch, poController.updatePOStatus);
+router.put('/:id/status', sendPO, enforceBranch, poController.updatePOStatus);
 router.post('/grn', receiveGRN, enforceBranch, procController.createGRN);
+router.post('/returns', receiveGRN, enforceBranch, procController.createPurchaseReturn);
 router.post('/invoices', createSupplierInvoice, enforceBranch, procController.createSupplierInvoice);
 router.post('/invoices/:id/approve', approveSupplierInvoice, enforceBranch, procController.approveSupplierInvoice);
 

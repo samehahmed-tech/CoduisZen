@@ -41,33 +41,37 @@ const ItemGrid: React.FC<ItemGridProps> = React.memo(({
 
     const gridClass = (() => {
         switch (density) {
+            // Glass tiles carry media + chips + full-width action.
             case 'ultra':
-                return 'grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2 p-2.5';
+                return 'grid-cols-[repeat(auto-fill,minmax(205px,1fr))] gap-3 p-3';
+            // Split cards are bold image-first blocks.
             case 'buttons':
-                return 'grid-cols-[repeat(auto-fill,minmax(122px,1fr))] gap-2 p-2.5';
+                return 'grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3 p-3';
+            // Rail rows are horizontal: fewer, wider columns.
             case 'compact':
-                return 'grid-cols-[repeat(auto-fill,minmax(158px,1fr))] gap-2.5 p-3';
+                return 'grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2.5 p-3';
             default:
-                return 'grid-cols-[repeat(auto-fill,minmax(184px,1fr))] gap-3 p-3.5';
+                return 'grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 p-3.5';
         }
     })();
 
     return (
         <div className="h-full min-h-0 overflow-y-auto pos-scroll overscroll-contain">
-            <div className={`grid auto-rows-fr content-start ${lang === 'ar' ? 'justify-items-stretch' : ''} ${gridClass}`}>
-                {items.map((item) => (
-                    <MenuItemCard
-                        key={item.id}
-                        item={item}
-                        onAddItem={onAddItem}
-                        onRemoveItem={onRemoveItem}
-                        quantity={quantityByItemId[item.id] || 0}
-                        currencySymbol={currencySymbol}
-                        isTouchMode={isTouchMode}
-                        density={density}
-                        lang={lang}
-                        highlighted={highlightedItemId === item.id}
-                    />
+            <div className={`grid content-start fluid-stagger ${lang === 'ar' ? 'justify-items-stretch' : ''} ${gridClass}`}>
+                {items.map((item, i) => (
+                    <div key={item.id} style={{ '--zen-i': i % 12, contentVisibility: 'auto' } as React.CSSProperties}>
+                        <MenuItemCard
+                            item={item}
+                            onAddItem={onAddItem}
+                            onRemoveItem={onRemoveItem}
+                            quantity={quantityByItemId[item.id] || 0}
+                            currencySymbol={currencySymbol}
+                            isTouchMode={isTouchMode}
+                            density={density}
+                            lang={lang}
+                            highlighted={highlightedItemId === item.id}
+                        />
+                    </div>
                 ))}
             </div>
         </div>

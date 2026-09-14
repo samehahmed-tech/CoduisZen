@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, orderItems, inventoryItems, inventoryBatches, stockMovements, purchaseOrders, suppliers, recipes, recipeIngredients } from '../../../src/db/schema';
+import { orderItems, inventoryItems, inventoryBatches, stockMovements, purchaseOrders, suppliers, recipes, recipeIngredients } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
 
 export const getActualVsTheoretical = async (req: Request, res: Response) => {
@@ -10,25 +10,50 @@ export const getActualVsTheoretical = async (req: Request, res: Response) => {
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-        const orderConditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses)];
-        if (branchId && branchId !== 'undefined') orderConditions.push(eq(orders.branchId, branchId as string));
 
-        // Theoretical consumption: qty sold × recipe ingredient qty / recipe yield
-        const theoreticalRows = await db.select({
-            inventoryItemId: recipeIngredients.inventoryItemId,
-            itemName: inventoryItems.name,
-            unit: recipeIngredients.unit,
-            theoreticalQty: sql<number>`coalesce(sum(${orderItems.quantity} * ${recipeIngredients.quantity} / coalesce(${recipes.yield}, 1)), 0)`,
-        }).from(orderItems)
-            .innerJoin(orders, eq(orderItems.orderId, orders.id))
-            .innerJoin(recipes, eq(orderItems.menuItemId, recipes.menuItemId))
-            .innerJoin(recipeIngredients, eq(recipes.id, recipeIngredients.recipeId))
-            .innerJoin(inventoryItems, eq(recipeIngredients.inventoryItemId, inventoryItems.id))
-            .where(and(...orderConditions))
-            .groupBy(recipeIngredients.inventoryItemId, inventoryItems.name, recipeIngredients.unit);
+        // Theoretical consumption: qty sold × recipe ingredient qty / recipe yield.
+        // Exactly ONE recipe must match each sold line (size match → base → newest),
+        // otherwise items with sizes inflate consumption by their recipe count.
+        const sizeRank = sql`CASE
+            WHEN oi.size_id IS NOT NULL AND LTRIM(RTRIM(oi.size_id)) <> '' AND r.size_id = oi.size_id THEN 0
+            WHEN (oi.size_id IS NULL OR LTRIM(RTRIM(oi.size_id)) = '') AND (r.size_id IS NULL OR LTRIM(RTRIM(r.size_id)) = '') THEN 0
+            WHEN r.size_id IS NULL OR LTRIM(RTRIM(r.size_id)) = '' THEN 1
+            ELSE 2
+        END`;
+
+        const rawRows: any = await db.execute(sql`
+            WITH matched_recipes AS (
+                SELECT oi.id AS order_item_id,
+                       r.id AS recipe_id,
+                       r.yield AS recipe_yield,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY oi.id
+                           ORDER BY ${sizeRank} ASC, r.updated_at DESC
+                       ) AS rn
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                JOIN recipes r ON r.menu_item_id = oi.menu_item_id
+                WHERE o.created_at >= ${start} AND o.created_at <= ${end}
+                  AND o.status IN ('DELIVERED', 'COMPLETED')
+                  ${branchId && branchId !== 'undefined' ? sql`AND o.branch_id = ${branchId}` : sql``}
+            )
+            SELECT ri.inventory_item_id AS inventoryItemId,
+                   inv.name AS itemName,
+                   ri.unit AS unit,
+                   COALESCE(SUM(oi.quantity * ri.quantity / COALESCE(m.recipe_yield, 1)), 0) AS theoreticalQty
+            FROM matched_recipes m
+            JOIN order_items oi ON oi.id = m.order_item_id
+            JOIN recipe_ingredients ri ON ri.recipe_id = m.recipe_id
+            JOIN inventory_items inv ON inv.id = ri.inventory_item_id
+            WHERE m.rn = 1
+            GROUP BY ri.inventory_item_id, inv.name, ri.unit
+        `);
+        const theoreticalRows: any[] = Array.isArray(rawRows)
+            ? rawRows
+            : (rawRows?.recordset ?? rawRows?.rows ?? []);
 
         // Actual consumption: stock movements with type = CONSUMPTION/PRODUCTION/SALE
-        const movementConditions: any[] = [gte(stockMovements.createdAt, start), lte(stockMovements.createdAt, end), inArray(stockMovements.type, ['CONSUMPTION', 'PRODUCTION', 'SALE', 'MANUAL_OUT'])];
+        const movementConditions: any[] = [gte(stockMovements.createdAt, start), lte(stockMovements.createdAt, end), inArray(stockMovements.type, ['CONSUMPTION', 'PRODUCTION', 'SALE', 'SALE_CONSUMPTION', 'MANUAL_OUT'])];
 
         const actualRows = await db.select({
             inventoryItemId: stockMovements.itemId,

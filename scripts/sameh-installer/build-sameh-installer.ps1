@@ -64,6 +64,7 @@ try {
     }
     Get-ChildItem (Join-Path $stage "dist-server") -Filter "*.map" -Recurse | Remove-Item -Force
     Copy-Clean (Join-Path $PSScriptRoot "runtime") (Join-Path $stage "runtime")
+    Copy-Clean (Join-Path $PSScriptRoot "data-maintenance-fix") (Join-Path $stage "maintenance")
     Copy-Item (Join-Path $PSScriptRoot "hotfix\create-recovery-admin.cjs") (Join-Path $stage "runtime\create-recovery-admin.cjs") -Force
     Copy-Item (Join-Path $PSScriptRoot "table-pos-fix\reset-tables.cjs") (Join-Path $stage "runtime\reset-tables.cjs") -Force
     $tokenBytes = New-Object byte[] 48

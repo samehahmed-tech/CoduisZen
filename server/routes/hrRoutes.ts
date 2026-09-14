@@ -8,6 +8,7 @@ const hrAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGE
 
 router.get('/employees', hrAuth, enforceBranch, hrController.getEmployees);
 router.post('/employees', hrAuth, enforceBranch, hrController.upsertEmployee);
+router.delete('/employees/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGER'), enforceBranch, hrController.deleteEmployee);
 router.get('/attendance', hrAuth, enforceBranch, hrController.getAttendance);
 router.post('/attendance/clock-in', hrAuth, enforceBranch, hrController.clockIn);
 router.post('/attendance/clock-out', hrAuth, enforceBranch, hrController.clockOut);

@@ -54,16 +54,18 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
 
     const cancelEdit = () => setEditing(false);
 
+    // No `layout` + no spring on purpose: per-line layout animations force
+    // a full list reflow on every quantity change (the top POS jank source).
+    // Compositor-only fade/slide-in renders identically to the eye.
     return (
         <motion.div
-            layout
-            initial={{ opacity: 0, y: 15, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
             className="relative mb-1.5 overflow-hidden rounded-[14px]"
         >
-            <motion.div
+            <div
                 className={`group relative flex flex-col gap-2 rounded-[14px] border bg-card/95 px-2.5 py-2.5 shadow-sm backdrop-blur-sm transition-colors duration-200 ${
                     isLastAdded
                         ? 'border-primary/30 shadow-md shadow-primary/10'
@@ -197,7 +199,7 @@ const CartItem: React.FC<CartItemProps> = React.memo(({
                         </button>
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </motion.div>
     );
 });

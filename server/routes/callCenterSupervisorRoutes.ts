@@ -11,6 +11,7 @@ import {
     getBranchHealth,
     getFailedOrders,
     retryFailedOrder,
+    retryAllFailedOrders,
     getDailyOrderSummary,
 } from '../controllers/callCenterSupervisorController';
 
@@ -29,6 +30,7 @@ router.post('/discount-abuse/approve', approveDiscountViolation);
 router.get('/branch-health', getBranchHealth);
 router.get('/failed-orders', getFailedOrders);
 router.put('/failed-orders/:id/retry', retryFailedOrder);
+router.post('/failed-orders/retry-all', retryAllFailedOrders);
 router.get('/daily-summary', getDailyOrderSummary);
 
 export default router;

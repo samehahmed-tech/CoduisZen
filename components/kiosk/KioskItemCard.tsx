@@ -1,6 +1,7 @@
 import React from 'react';
-import { ImageOff, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { MenuItem } from '../../types';
+import { ItemImage } from '../../src/features/pos/components/ItemImage';
 
 interface KioskItemCardProps {
   item: MenuItem;
@@ -14,11 +15,7 @@ const KioskItemCard: React.FC<KioskItemCardProps> = ({ item, onAdd, lang, curren
   return (
     <button type="button" onClick={() => onAdd(item)} className="kiosk-item-card">
       <div className="kiosk-item-image">
-        {item.image ? (
-          <img src={item.image} alt="" loading="lazy" decoding="async" />
-        ) : (
-          <div className="kiosk-image-placeholder"><ImageOff size={38} /></div>
-        )}
+        <ItemImage src={item.image} name={isAr ? item.nameAr || item.name : item.name} />
       </div>
       <div className="kiosk-item-body">
         <h3>{isAr ? item.nameAr || item.name : item.name}</h3>

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, menuItemModifiers, modifierOptions, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons } from '../../src/db/schema';
+import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, menuItemModifiers, modifierOptions, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons, kdsTickets, dayCloseReports } from '../../src/db/schema';
 import { eq, and, desc, gte, lte, inArray, gt, sql } from 'drizzle-orm';
 import { inventoryService } from '../services/inventoryService';
 import { getStringParam } from '../utils/request';
@@ -9,7 +9,7 @@ import { emitBranchEvent } from '../utils/socketEmit';
 import { submitOrderToFiscal } from '../services/fiscalSubmitService';
 import { postCogsForOrderEntry, postPosOrderEntry } from '../services/financePostingService';
 import { buildRequestHash, getIdempotencyKeyFromRequest, sanitizeIdempotencyPayload } from '../services/idempotencyService';
-import { transitionOrderStatus } from '../services/orderLifecycleService';
+import { transitionOrderStatus, sweepStaleBranchOrders } from '../services/orderLifecycleService';
 import { webhookService } from '../services/webhookService';
 import { analyticsService } from '../services/analyticsService';
 import { loyaltyService } from '../services/loyaltyService';
@@ -20,14 +20,70 @@ import { randomUUID } from 'crypto';
 import { nanoid } from 'nanoid';
 import { parseSettingJson, toSettingValue } from '../utils/settingsStore.js';
 import { calculateCouponDiscount } from '../services/couponPricing';
+import { detectQuoteDrift, normalizeChannel, resolveBranchPrice as resolveBranchPriceForChannel, resolvePlatformOverride } from '../services/pricingService';
 import { allocateDailyOrderNumber } from '../services/orderNumberService';
 import { isBelowTableMinimumSpend } from '../../src/utils/tableMinimumSpend';
+import { writeDbError } from '../utils/dbErrors';
 
 const ORDER_CREATE_SCOPE = 'ORDER_CREATE';
 const ORDER_STATUS_UPDATE_SCOPE = 'ORDER_STATUS_UPDATE';
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
-const INVENTORY_DEDUCTION_WARNING_PATTERN = /^(INSUFFICIENT_STOCK|INSUFFICIENT_STOCK_BATCHES|INVALID_DEDUCTION_QUANTITY)\|/;
+const INVENTORY_DEDUCTION_WARNING_PATTERN = /^(INSUFFICIENT_STOCK|INSUFFICIENT_STOCK_BATCHES|INVALID_DEDUCTION_QUANTITY|MISSING_RECIPE)\|/;
+// Sales must remain available during service. The inventory service attempts
+// automatic batch production first; this flag only controls the final
+// fallback when production/deduction is genuinely impossible.
 const ALLOW_SALE_WITH_INSUFFICIENT_STOCK = String(process.env.ALLOW_SALE_WITH_INSUFFICIENT_STOCK || 'true').toLowerCase() !== 'false';
+
+// Older installs predate the order_items.size_id column; add it once so
+// sold lines can be tied back to their size-specific recipe.
+let orderItemsSizeIdReady: Promise<void> | null = null;
+export const ensureOrderItemsSizeIdColumn = () => {
+    if (!orderItemsSizeIdReady) {
+        orderItemsSizeIdReady = db.execute(sql`
+            IF COL_LENGTH('order_items', 'size_id') IS NULL
+                ALTER TABLE order_items ADD size_id nvarchar(150)
+        `).then(() => undefined).catch((err: any) => {
+            orderItemsSizeIdReady = null;
+            throw err;
+        });
+    }
+    return orderItemsSizeIdReady;
+};
+
+// Older installs predate the platform pricing audit columns; add them once
+// so every sold line keeps its pre-markup base price + silent markup amount.
+let orderItemsPricingReady: Promise<void> | null = null;
+export const ensureOrderItemsPricingColumns = () => {
+    if (!orderItemsPricingReady) {
+        orderItemsPricingReady = db.execute(sql`
+            IF COL_LENGTH('order_items', 'base_price') IS NULL
+                ALTER TABLE order_items ADD base_price real;
+            IF COL_LENGTH('order_items', 'platform_markup') IS NULL
+                ALTER TABLE order_items ADD platform_markup real DEFAULT 0;
+            IF COL_LENGTH('order_items', 'price_source') IS NULL
+                ALTER TABLE order_items ADD price_source nvarchar(60);
+        `).then(() => undefined).catch((err: any) => {
+            orderItemsPricingReady = null;
+            throw err;
+        });
+    }
+    return orderItemsPricingReady;
+};
+
+// Scheduled orders need a fire-time column on older installs.
+let orderScheduledReady: Promise<void> | null = null;
+export const ensureOrderScheduledColumn = () => {
+    if (!orderScheduledReady) {
+        orderScheduledReady = db.execute(sql`
+            IF COL_LENGTH('orders', 'scheduled_for') IS NULL
+                ALTER TABLE orders ADD scheduled_for datetime2(3)
+        `).then(() => undefined).catch((err: any) => {
+            orderScheduledReady = null;
+            throw err;
+        });
+    }
+    return orderScheduledReady;
+};
 
 const parseOrderTimestamp = (value: unknown) => {
     if (!value) return undefined;
@@ -424,10 +480,21 @@ export const validateCoupon = async (req: Request, res: Response) => {
 export const getAllOrders = async (req: Request, res: Response) => {
     try {
         const { status, type, date, limit, cursor } = req.query;
-        const requestedBranchId =
+        const explicitBranchId =
             cleanQueryString(req.query.branch_id) ||
-            cleanQueryString(req.query.branchId) ||
-            cleanQueryString(req.effectiveBranchId);
+            cleanQueryString(req.query.branchId);
+        // The call center is a cross-branch distributor/monitor with no stock
+        // of its own: it must see every branch unless it explicitly filters.
+        // Other roles stay scoped to their effective branch as before.
+        const isCallCenterMonitor = req.user != null &&
+            ['CALL_CENTER', 'CALL_CENTER_MANAGER'].includes(String((req.user as any).role || ''));
+        const requestedBranchId = explicitBranchId ||
+            (!isCallCenterMonitor ? cleanQueryString(req.effectiveBranchId) : undefined);
+
+        // Self-heal stale orders from already-closed business days (throttled
+        // internally) so the handover screen never shows trapped leftovers.
+        await sweepStaleBranchOrders(requestedBranchId);
+
         const source = cleanQueryString(req.query.source);
         const fromDate = cleanQueryString(req.query.from_date) || cleanQueryString(req.query.startDate);
         const toDate = cleanQueryString(req.query.to_date) || cleanQueryString(req.query.endDate);
@@ -535,6 +602,10 @@ export const getAllOrders = async (req: Request, res: Response) => {
                 categoryId: menuMeta?.categoryId || null,
                 printerIds: menuMeta?.printerIds || [],
                 price: item.price,
+                basePrice: item.basePrice ?? item.price,
+                priceSource: (item as any).priceSource || undefined,
+                sizeId: (item as any).sizeId || undefined,
+                size_id: (item as any).sizeId || undefined,
                 quantity: item.quantity,
                 notes: item.notes,
                 seatNumber: item.seatNumber,
@@ -567,7 +638,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
         res.json(enrichedOrders);
     } catch (error: any) {
         console.error('[getAllOrders] Error:', error?.stack || error?.message || error);
-        res.status(500).json({ error: error.message });
+        return writeDbError(res, error);
     }
 };
 
@@ -699,7 +770,31 @@ export const createOrder = async (req: Request, res: Response) => {
             syncStatus: bodyData.sync_status || bodyData.syncStatus,
             shiftId: cleanOptionalReference(bodyData.shift_id || bodyData.shiftId),
             createdAt: parseOrderTimestamp(bodyData.created_at || bodyData.createdAt),
+            scheduledFor: parseOrderTimestamp(bodyData.scheduled_for || bodyData.scheduledFor),
         };
+
+        // Scheduled orders (future fire-time): saved as SCHEDULED, never fired
+        // to the kitchen/stock/finance until the dispatcher wakes them.
+        // Only off-premise types can be scheduled.
+        const scheduledAt = orderData.scheduledFor instanceof Date ? orderData.scheduledFor.getTime() : NaN;
+        const isScheduledOrder = Number.isFinite(scheduledAt) && scheduledAt > Date.now() + 60_000;
+        if ((bodyData.scheduled_for || bodyData.scheduledFor) && !isScheduledOrder) {
+            if (idempotencyKey) await clearIdempotencyClaim();
+            return res.status(400).json({
+                error: 'INVALID_SCHEDULED_TIME', code: 'INVALID_SCHEDULED_TIME',
+                message: 'Scheduled time must be in the future.',
+            });
+        }
+        if (isScheduledOrder && !['DELIVERY', 'TAKEAWAY', 'PICKUP'].includes(String(orderData.type || '').toUpperCase())) {
+            if (idempotencyKey) await clearIdempotencyClaim();
+            return res.status(400).json({
+                error: 'SCHEDULED_TYPE_UNSUPPORTED', code: 'SCHEDULED_TYPE_UNSUPPORTED',
+                message: 'Only delivery, takeaway and pickup orders can be scheduled.',
+            });
+        }
+        if (isScheduledOrder) {
+            orderData.status = 'SCHEDULED';
+        }
 
         if (!orderData.branchId) {
             if (idempotencyKey) await clearIdempotencyClaim();
@@ -708,6 +803,26 @@ export const createOrder = async (req: Request, res: Response) => {
                 code: 'BRANCH_REQUIRED',
                 message: 'Order branch is required before placing an order.',
             });
+        }
+
+        // Aggregator double-entry guard: same platform order number twice.
+        const dupSource = String(orderData.deliverySource || '').trim().toLowerCase();
+        const dupExternal = String(orderData.platformOrderId || '').trim();
+        if (dupExternal && dupSource && dupSource !== 'restaurant') {
+            const [dup] = await db.select({ id: orders.id }).top(1).from(orders).where(and(
+                eq(orders.branchId, orderData.branchId),
+                eq(orders.deliverySource, orderData.deliverySource),
+                eq(orders.platformOrderId, orderData.platformOrderId),
+                sql`${orders.status} NOT IN ('CANCELLED', 'REFUNDED')`,
+            ));
+            if (dup) {
+                if (idempotencyKey) await clearIdempotencyClaim();
+                return res.status(409).json({
+                    error: 'DUPLICATE_PLATFORM_ORDER', code: 'DUPLICATE_PLATFORM_ORDER',
+                    message: 'This platform order number was already registered.',
+                    existingOrderId: dup.id,
+                });
+            }
         }
 
         const isPaymentAttempt = Array.isArray(bodyData.payments) && bodyData.payments.length > 0;
@@ -737,21 +852,12 @@ export const createOrder = async (req: Request, res: Response) => {
             }
         }
 
-        // Authorization: Call Center Agents can only assign orders to their allowed branches.
-        if (String(req.user?.role).toUpperCase() === 'CALL_CENTER_AGENT') {
-            const allowedBranches = Array.isArray(req.user?.allowedBranches)
-                ? req.user.allowedBranches.map((branchId) => String(branchId))
-                : [];
-            if (!allowedBranches.includes(orderData.branchId)) {
-                if (idempotencyKey) await clearIdempotencyClaim();
-                return res.status(403).json({
-                    error: 'FORBIDDEN_BRANCH_SCOPE',
-                    message: `You are not authorized to assign orders to branch: ${orderData.branchId}`
-                });
-            }
+        // Authorization: the call center distributes orders to ANY branch
+        // (cross-branch scope is granted in enforceBranch). Tag ownership.
+        if (['CALL_CENTER', 'CALL_CENTER_MANAGER', 'CALL_CENTER_AGENT'].includes(String(req.user?.role || '').toUpperCase())) {
             // Tag it as a call center order
             orderData.isCallCenterOrder = true;
-            orderData.callCenterAgentId = req.user?.id;
+            orderData.callCenterAgentId = orderData.callCenterAgentId || req.user?.id;
             orderData.source = orderData.source || 'call_center';
         }
 
@@ -911,6 +1017,8 @@ const [customerRecordForOrder] = await db
                 .select({
                     id: menuItems.id,
                     price: menuItems.price,
+                    branchPricing: menuItems.branchPricing,
+                    platformPricing: menuItems.platformPricing,
                     sizes: menuItems.sizes,
                     isTaxExempt: menuItems.isTaxExempt,
                     modifierGroups: menuItems.modifierGroups,
@@ -939,14 +1047,20 @@ const [customerRecordForOrder] = await db
                 .where(inArray(menuItemModifiers.menuItemId, menuItemIds))
             : [];
         const modifierPricesByItem = new Map<string, Map<string, number>>();
+        const modifierDefinitionsByItem = new Map<string, Map<string, any>>();
         for (const item of dbMenuItems) {
             const prices = new Map<string, number>();
+            const definitions = new Map<string, any>();
             for (const group of Array.isArray(item.modifierGroups) ? item.modifierGroups : []) {
                 for (const option of Array.isArray(group?.options) ? group.options : []) {
-                    if (option?.id) prices.set(String(option.id), Number(option.price || 0));
+                    if (option?.id) {
+                        prices.set(String(option.id), Number(option.price || 0));
+                        definitions.set(String(option.id), option);
+                    }
                 }
             }
             modifierPricesByItem.set(item.id, prices);
+            modifierDefinitionsByItem.set(item.id, definitions);
         }
         for (const row of linkedModifierRows) {
             const prices = modifierPricesByItem.get(row.menuItemId) || new Map<string, number>();
@@ -987,6 +1101,22 @@ const [sourcePlatform] = sourceKey
             const rawTaxPercent = Number(parseSettingJson(taxSetting?.value, branchRecord?.taxRate ?? 14));
             const taxPercent = Number.isFinite(rawTaxPercent) && rawTaxPercent >= 0 && rawTaxPercent <= 100 ? rawTaxPercent : 14;
             const configuredTaxRate = taxPercent / 100;
+
+            // Effective dine-in service charge: explicit branch value wins,
+            // otherwise the global 'serviceCharge' setting. 0 / missing = off.
+            const [serviceChargeSetting] = await tx.select({ value: settings.value }).top(1)
+                .from(settings).where(eq(settings.key, 'serviceCharge'));
+            const normalizeServiceRate = (raw: unknown): number => {
+                const num = Number(raw);
+                if (!Number.isFinite(num) || num <= 0) return 0;
+                return num > 1 ? num / 100 : num;
+            };
+            const branchServiceRaw = branchRecord?.serviceCharge === null || branchRecord?.serviceCharge === undefined
+                ? null
+                : Number(branchRecord.serviceCharge);
+            const effectiveServiceRate = branchServiceRaw !== null
+                ? normalizeServiceRate(branchServiceRaw)
+                : normalizeServiceRate(parseSettingJson(serviceChargeSetting?.value, 0));
             let calculatedSubtotal = 0;
             let calculatedTax = 0;
 
@@ -1000,8 +1130,39 @@ const [sourcePlatform] = sourceKey
                 if (sizeId && !configuredSize) {
                     throw appError(400, 'INVALID_ITEM_SIZE', 'Selected size is not available for this menu item.');
                 }
-                const basePrice = Number(configuredSize?.price ?? dbItem?.price ?? item.price ?? 0);
-                const price = platformPriceConfig
+                // Open-price / weighted items carry no menu base price: the
+                // cashier-entered client price IS the final selling price and
+                // must not be marked up (mirrors POS ItemOptionsModal).
+                const sizePrice = configuredSize ? Number(configuredSize.price) : NaN;
+                const dbPrice = Number(dbItem?.price || 0);
+                // Unified pricing (Branch × Channel × Platform — see
+                // services/pricingService, mirrored on the client):
+                // platform fixed override > branch+channel > branch flat > base.
+                // The FULFILLING branch owns revenue/tax, so its list wins.
+                const orderChannel = normalizeChannel(orderData.type);
+                const platformOverride = !configuredSize
+                    ? resolvePlatformOverride(dbItem?.platformPricing, sourceKey)
+                    : 0;
+                const branchResolved = resolveBranchPriceForChannel(dbItem?.branchPricing, orderData.branchId, orderChannel);
+                const branchPrice = branchResolved.price;
+                const isOpenPriced = !configuredSize && !(platformOverride > 0) && !(branchPrice > 0) && !(dbPrice > 0);
+                const basePrice = isOpenPriced
+                    ? Number(item.price || 0)
+                    : (platformOverride > 0
+                        ? platformOverride
+                        : (configuredSize
+                            ? sizePrice
+                            : (branchPrice > 0 ? branchPrice : (dbPrice > 0 ? dbPrice : Number(item.price || 0)))));
+                const priceSource = isOpenPriced
+                    ? 'OPEN_PRICE'
+                    : platformOverride > 0
+                        ? `PLATFORM:${sourceKey.toUpperCase()}`
+                        : configuredSize
+                            ? `SIZE:${sizeId}`
+                            : branchResolved.source !== 'BASE'
+                                ? branchResolved.source
+                                : 'BASE';
+                const price = (platformPriceConfig && !isOpenPriced)
                     ? Number((basePrice * (1 + Number(platformPriceConfig.priceMarkupPercentage || 0) / 100) + Number(platformPriceConfig.priceMarkupFixed || 0)).toFixed(2))
                     : basePrice;
                 const isExempt = dbItem?.isTaxExempt || false;
@@ -1015,7 +1176,15 @@ const [sourcePlatform] = sourceKey
                     }
                     const modifierPrice = Number(allowedModifierPrices.get(optionId) || 0);
                     modifierTotal += modifierPrice;
-                    return { ...modifier, id: optionId, price: modifierPrice };
+                    const definition = modifierDefinitionsByItem.get(menuItemId || '')?.get(optionId) || {};
+                    return {
+                        ...modifier,
+                        id: optionId,
+                        price: modifierPrice,
+                        recipeEffect: String(definition.recipeEffect || 'ADD').toUpperCase() === 'REMOVE' ? 'REMOVE' : 'ADD',
+                        recipe: Array.isArray(definition.recipe) ? definition.recipe : [],
+                        recipeBySize: definition.recipeBySize && typeof definition.recipeBySize === 'object' ? definition.recipeBySize : undefined,
+                    };
                 });
 
                 const lineSubtotal = (price + modifierTotal) * item.quantity;
@@ -1024,11 +1193,24 @@ const [sourcePlatform] = sourceKey
                 calculatedSubtotal += lineSubtotal;
                 calculatedTax += lineTax;
 
-                return { ...item, price, modifiers: canonicalModifiers, tax: lineTax };
+                // Silent platform pricing audit: price already includes markup,
+                // basePrice keeps the original menu price for margin/reporting.
+                const platformMarkup = platformPriceConfig
+                    ? Math.max(0, Number((price - basePrice).toFixed(2)))
+                    : 0;
+                return { ...item, price, basePrice, platformMarkup, priceSource, modifiers: canonicalModifiers, tax: lineTax };
             });
 
             const subtotal = calculatedSubtotal;
-            let discountAmount = Math.max(0, Math.min(Number(orderData.discount || 0), subtotal));
+            // Discount input semantics: clients send PERCENT (0-100) with
+            // discountType=PERCENT; legacy/absolute callers send an amount.
+            // Coupons stack on top of the manual discount (capped at subtotal).
+            const discountInput = Number(orderData.discount || 0);
+            const discountIsPercent = String(orderData.discountType || '').toUpperCase() === 'PERCENT';
+            const manualDiscount = discountIsPercent
+                ? Math.max(0, Math.min(subtotal * discountInput / 100, subtotal))
+                : Math.max(0, Math.min(discountInput, subtotal));
+            let discountAmount = manualDiscount;
             if (orderData.couponCode) {
                 const [coupon] = await tx.select().top(1).from(coupons).where(eq(coupons.code, orderData.couponCode));
                 const now = new Date();
@@ -1036,11 +1218,12 @@ const [sourcePlatform] = sourceKey
                 if (coupon.startDate && now < coupon.startDate) throw appError(400, 'COUPON_NOT_STARTED', 'Coupon has not started.');
                 if (coupon.endDate && now > coupon.endDate) throw appError(400, 'COUPON_EXPIRED', 'Coupon has expired.');
                 if (subtotal < Number(coupon.minOrderValue || 0)) throw appError(400, 'MIN_SUBTOTAL_NOT_MET', 'Minimum subtotal was not met.');
-                discountAmount = calculateCouponDiscount({
+                const couponDiscount = calculateCouponDiscount({
                     type: String(coupon.type).toUpperCase() === 'FIXED_AMOUNT' ? 'FIXED' : 'PERCENT',
                     value: Number(coupon.value),
                     maxDiscount: coupon.maxDiscount === null ? undefined : Number(coupon.maxDiscount),
                 }, subtotal);
+                discountAmount = Math.max(0, Math.min(discountAmount + couponDiscount, subtotal));
                 const [claimedCoupon] = await tx.update(coupons)
                     .set({ usedCount: sql`coalesce(${coupons.usedCount}, 0) + 1` })
                     .output()
@@ -1060,14 +1243,35 @@ const [sourcePlatform] = sourceKey
             const taxRatio = subtotal > 0 ? (netAmount / subtotal) : 0;
             const tax = parseFloat((calculatedTax * taxRatio).toFixed(2));
 
-            // Standard 12% Service Charge for Dine-In if not provided
+            // Dine-In service charge from branch config or the global setting
+            // (Settings → Financial). Accepts 12 (percent) or 0.12 (fraction);
+            // 0 / missing = disabled. No hidden defaults.
             let serviceCharge = 0;
             if (orderData.type === 'DINE_IN') {
-                const serviceRate = branchRecord?.serviceCharge || 0.12;
-                serviceCharge = orderData.serviceCharge !== undefined ? orderData.serviceCharge : parseFloat((netAmount * serviceRate).toFixed(2));
+                serviceCharge = orderData.serviceCharge !== undefined && orderData.serviceCharge !== null
+                    ? Number(orderData.serviceCharge)
+                    : parseFloat((netAmount * effectiveServiceRate).toFixed(2));
             }
 
             const total = netAmount + tax + serviceCharge + (orderData.deliveryFee || 0);
+
+            // Quote integrity (warn-only, never blocks): if the menu price
+            // moved between the client's quote and this authoritative
+            // recalculation, both sides see the drift instead of silently
+            // saving different numbers — no CC/branch disputes.
+            // Client total may include tip (kept in its own column); the
+            // server total never does, so tip is excluded from comparison.
+            const drift = detectQuoteDrift(
+                {
+                    subtotal: orderData.subtotal,
+                    total: Number(orderData.total || 0) - Number(orderData.tipAmount || 0),
+                },
+                { subtotal, total },
+            );
+            if (drift.drifted) {
+                inventoryWarnings.push({ code: 'PRICE_QUOTE_DRIFT', ...drift });
+                console.warn('[ORDER] price quote drift', { orderId: orderData.id, ...drift });
+            }
 
             const customerPhone = String(orderData.customerPhone || '').trim();
             if (orderData.customerId || customerPhone) {
@@ -1178,6 +1382,7 @@ const [createdOrExistingCustomer] = await tx
 
             const dailyOrderNumber = await allocateDailyOrderNumber(tx, orderData.branchId, activeBusinessDate);
 
+            await ensureOrderScheduledColumn();
             const [newOrder] = await tx.insert(orders).output().values({
                 ...orderData,
                 orderNumber: dailyOrderNumber,
@@ -1209,13 +1414,19 @@ const [createdOrExistingCustomer] = await tx
             let cogsCost = 0;
 
             // 3. Insert Order Items and Deduct Inventory
+            await ensureOrderItemsSizeIdColumn();
+            await ensureOrderItemsPricingColumns();
             for (const item of processedItems) {
                 await tx.insert(orderItems).values({
                     orderId: newOrder.id,
                     menuItemId: resolveOrderItemMenuItemId(item),
+                    sizeId: String(item.sizeId || item.size_id || '').trim() || null,
                     name: item.name,
                     nameAr: item.nameAr || item.name_ar || item.name,
                     price: item.price,
+                    basePrice: Number(item.basePrice ?? item.price ?? 0),
+                    platformMarkup: Number(item.platformMarkup || 0),
+                    priceSource: String(item.priceSource || 'BASE').slice(0, 60),
                     quantity: item.quantity,
                     tax: item.tax, // Store calculated tax per line
                     notes: item.notes,
@@ -1224,7 +1435,8 @@ const [createdOrExistingCustomer] = await tx
                     modifiers: item.modifiers,
                 });
 
-                if (branchWarehouses.length > 0) {
+                // Scheduled orders deduct nothing yet — stock is consumed on wake.
+                if (!isScheduledOrder && branchWarehouses.length > 0) {
                     let deductionApplied = false;
                     let lastDeductionError: any = null;
                     let attemptedWarehouseId = branchWarehouses[0].id;
@@ -1238,7 +1450,11 @@ const [createdOrExistingCustomer] = await tx
                                 item.quantity,
                                 candidateWarehouse.id,
                                 newOrder.id,
-                                newOrder.callCenterAgentId || 'system'
+                                newOrder.callCenterAgentId || 'system',
+                                {
+                                    sizeId: String(item.sizeId || item.size_id || '').trim() || undefined,
+                                    selectedModifiers: item.modifiers,
+                                }
                             );
                             cogsCost += Number(Array.isArray(deduction) ? 0 : deduction?.totalCost || 0);
                             deductionApplied = true;
@@ -1375,13 +1591,19 @@ const [createdOrExistingCustomer] = await tx
         // ================== KDS DISPATCHING LOGIC ==================
         // Dine-in must reach KDS before the create response so the POS follow-up
         // dispatch is an idempotent confirmation, not a race that can lose the ticket.
+        // Delivery/takeaway/pickup dispatch regardless of payment: the kitchen
+        // starts on order creation (cash is collected on handover), otherwise
+        // unpaid orders stay kitchen-blind with no legal dispatch path.
         const isPosOrder = String(orderData.source || '').toLowerCase() === 'pos';
+        const isScheduledSaved = String(savedOrder.status || '').toUpperCase() === 'SCHEDULED';
         if (['DINE_IN', 'KIOSK'].includes(String(savedOrder.type))) {
             await kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch((error) => {
                 console.error('[Orders] KDS auto-dispatch failed', savedOrder.id, error);
                 inventoryWarnings.push({ code: 'KDS_DISPATCH_FAILED', orderId: savedOrder.id });
             });
-        } else if (paidNow && !isPosOrder) {
+        } else if (!isScheduledSaved && ['DELIVERY', 'TAKEAWAY', 'PICKUP'].includes(String(savedOrder.type))) {
+            kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
+        } else if (paidNow && !isPosOrder && !isScheduledSaved) {
             kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
         }
         // POS prints the cashier receipt through the client orchestrator so its
@@ -1407,7 +1629,8 @@ const [createdOrExistingCustomer] = await tx
         whatsappAutomationService.onOrderCreated(savedOrder).catch(() => {});
 
         // Finance posting stays non-blocking, but sale must be visible before COGS for the same order.
-        void (async () => {
+        // Scheduled orders post nothing yet — the wake step posts on fire.
+        if (!isScheduledSaved) void (async () => {
             await postPosOrderEntry({
                 orderId: savedOrder.id,
                 amount: Number(savedOrder.total || 0),
@@ -1425,7 +1648,7 @@ const [createdOrExistingCustomer] = await tx
             // Finance exceptions capture posting failures without blocking customer flow
         });
 
-        if (paidNow) {
+        if (paidNow && !isScheduledSaved) {
             setTimeout(() => {
                 submitOrderToFiscal(savedOrder.id).catch(() => {
                     // background submission; errors are stored in fiscal logs
@@ -1762,6 +1985,385 @@ const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id,
             code: 'ORDER_CUSTOMER_UPDATE_FAILED',
             message: 'Order customer details could not be updated.',
         });
+    }
+};
+
+// =======================================================
+// Edit PENDING order items (call-center correction flow)
+// =======================================================
+// Only PENDING orders on the branch's open business day can be edited —
+// once the branch starts preparation the kitchen owns the ticket and the
+// agent must cancel (with reason/approval) instead. Same-order id is kept
+// so KDS / dispatch / driver screens update by consequence: open kitchen
+// tickets are rebuilt and branch print jobs re-enqueued server-side.
+// Stock: positive per-line quantity deltas are deducted (warn-only, same
+// philosophy as creation); removed lines stay deducted like any cancel.
+export const updateOrderItems = async (req: Request, res: Response) => {
+    try {
+        const orderId = getStringParam((req.params as any).id);
+        if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED', code: 'ORDER_ID_REQUIRED' });
+        const body = req.body || {};
+        const items = Array.isArray(body.items) ? body.items : [];
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'ORDER_ITEMS_REQUIRED', code: 'ORDER_ITEMS_REQUIRED', message: 'At least one item is required.' });
+        }
+        const changedBy = String(body.changed_by || body.changedBy || req.user?.id || 'call_center');
+        const editNotes = String(body.notes || '').trim();
+        const expectedUpdatedAtRaw = body?.expected_updated_at || body?.expectedUpdatedAt;
+
+        const [currentOrder] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
+        if (!currentOrder) return res.status(404).json({ error: 'ORDER_NOT_FOUND', code: 'ORDER_NOT_FOUND' });
+        const editableStatuses = ['PENDING', 'SCHEDULED'];
+        if (!editableStatuses.includes(String(currentOrder.status || '').toUpperCase())) {
+            return res.status(409).json({
+                error: 'ORDER_NOT_EDITABLE', code: 'ORDER_NOT_EDITABLE',
+                message: 'Only pending or scheduled orders can be edited. The branch already started this order — cancel it instead.',
+            });
+        }
+
+        // Mutable header fields (channel/payment/address stay editable while
+        // the kitchen hasn't started; branch is immutable on edit).
+        const nextDeliverySource = body.deliverySource !== undefined && body.deliverySource !== null && String(body.deliverySource).trim() !== ''
+            ? String(body.deliverySource).trim().toLowerCase()
+            : String((currentOrder as any).deliverySource || 'restaurant');
+        const nextPaymentMethod = body.paymentMethod !== undefined && body.paymentMethod !== null
+            ? String(body.paymentMethod)
+            : (currentOrder as any).paymentMethod;
+        const nextPlatformOrderId = body.platformOrderId !== undefined
+            ? (String(body.platformOrderId).trim() || undefined)
+            : (currentOrder as any).platformOrderId;
+        const nextAddress = body.deliveryAddress !== undefined ? String(body.deliveryAddress) : undefined;
+        const nextScheduledFor = body.scheduledFor !== undefined || body.scheduled_for !== undefined
+            ? parseOrderTimestamp(body.scheduledFor ?? body.scheduled_for)
+            : undefined;
+
+        // Role scoping (mirrors orderStatusPolicy): agents edit pending
+        // call-center orders inside their allowed branches only.
+        const role = String((req.user as any)?.role || '').toUpperCase();
+        const userBranch = (req.user as any)?.branchId ? String((req.user as any).branchId) : null;
+        const allowedBranches = Array.isArray((req.user as any)?.allowedBranches) ? (req.user as any).allowedBranches.map(String) : [];
+        const isCallCenter = role === 'CALL_CENTER_AGENT' || role === 'CALL_CENTER';
+        if (isCallCenter) {
+            if (!currentOrder.isCallCenterOrder) {
+                return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE', code: 'FORBIDDEN_BRANCH_SCOPE' });
+            }
+            if (!allowedBranches.includes(String(currentOrder.branchId))) {
+                return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE', code: 'FORBIDDEN_BRANCH_SCOPE' });
+            }
+        } else if (role !== 'SUPER_ADMIN' && userBranch && currentOrder.branchId && userBranch !== String(currentOrder.branchId)) {
+            return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE', code: 'FORBIDDEN_BRANCH_SCOPE' });
+        }
+
+        const [branch] = await db.select({ businessDate: branches.businessDate, taxRate: branches.taxRate })
+            .top(1).from(branches).where(eq(branches.id, currentOrder.branchId));
+        if (!branch) return res.status(400).json({ error: 'INVALID_BRANCH_REFERENCE', code: 'INVALID_BRANCH_REFERENCE' });
+        const orderDay = currentOrder.businessDate
+            ? String(currentOrder.businessDate).slice(0, 10)
+            : (currentOrder.createdAt ? new Date(currentOrder.createdAt).toISOString().slice(0, 10) : '');
+        const activeDay = branch.businessDate
+            ? String(branch.businessDate).slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
+        if (!orderDay || orderDay !== activeDay) {
+            return res.status(409).json({ error: 'ORDER_HISTORY_READ_ONLY', code: 'ORDER_HISTORY_READ_ONLY' });
+        }
+        const [closedDay] = await db.select({ id: dayCloseReports.id }).top(1).from(dayCloseReports)
+            .where(and(
+                eq(dayCloseReports.branchId, currentOrder.branchId),
+                sql`${dayCloseReports.businessDate} = CAST(${orderDay} AS DATE)`,
+            ));
+        if (closedDay) return res.status(409).json({ error: 'ORDER_BUSINESS_DAY_CLOSED', code: 'ORDER_BUSINESS_DAY_CLOSED' });
+
+        if (expectedUpdatedAtRaw && currentOrder.updatedAt) {
+            const expected = new Date(expectedUpdatedAtRaw).getTime();
+            const actual = new Date(currentOrder.updatedAt).getTime();
+            if (!Number.isNaN(expected) && expected !== actual) {
+                return res.status(409).json({ error: 'ORDER_VERSION_CONFLICT', code: 'ORDER_VERSION_CONFLICT', currentUpdatedAt: currentOrder.updatedAt });
+            }
+        }
+
+        // ---- Catalog + modifier validation (same gates as creation) ----
+        const resolvedIds = items.map(resolveOrderItemMenuItemId);
+        if (resolvedIds.some((id: unknown) => typeof id !== 'string' || id.length === 0)) {
+            return res.status(400).json({ error: 'INVALID_MENU_ITEM', code: 'INVALID_MENU_ITEM' });
+        }
+        const menuItemIds: string[] = Array.from(new Set(resolvedIds as string[]));
+        const dbMenuItems = await db.select({
+            id: menuItems.id, price: menuItems.price, branchPricing: menuItems.branchPricing,
+            platformPricing: menuItems.platformPricing, sizes: menuItems.sizes,
+            isTaxExempt: menuItems.isTaxExempt, modifierGroups: menuItems.modifierGroups,
+        }).from(menuItems).where(inArray(menuItems.id, menuItemIds));
+        const menuLookup = new Map(dbMenuItems.map((m) => [m.id, m]));
+        const missing = menuItemIds.filter((id: string) => !menuLookup.has(id));
+        if (missing.length > 0) {
+            return res.status(400).json({ error: 'INVALID_MENU_ITEM', code: 'INVALID_MENU_ITEM', missingItemIds: missing });
+        }
+        const linkedModifierRows = await db.select({
+            menuItemId: menuItemModifiers.menuItemId, optionId: modifierOptions.id, price: modifierOptions.price,
+        }).from(menuItemModifiers)
+            .innerJoin(modifierOptions, eq(modifierOptions.groupId, menuItemModifiers.modifierGroupId))
+            .where(inArray(menuItemModifiers.menuItemId, menuItemIds));
+        const modifierPricesByItem = new Map<string, Map<string, number>>();
+        for (const item of dbMenuItems) {
+            const prices = new Map<string, number>();
+            for (const group of Array.isArray(item.modifierGroups) ? item.modifierGroups : []) {
+                for (const option of Array.isArray(group?.options) ? group.options : []) {
+                    if (option?.id) prices.set(String(option.id), Number(option.price || 0));
+                }
+            }
+            modifierPricesByItem.set(item.id, prices);
+        }
+        for (const row of linkedModifierRows) {
+            const prices = modifierPricesByItem.get(row.menuItemId) || new Map<string, number>();
+            prices.set(String(row.optionId), Number(row.price || 0));
+            modifierPricesByItem.set(row.menuItemId, prices);
+        }
+
+        const sourceKey = String(nextDeliverySource || '').trim().toLowerCase();
+        const [sourcePlatform] = sourceKey
+            ? await db.select({
+                id: deliveryPlatforms.id, applyFeesToMenuPrice: deliveryPlatforms.applyFeesToMenuPrice,
+                priceMarkupPercentage: deliveryPlatforms.priceMarkupPercentage, priceMarkupFixed: deliveryPlatforms.priceMarkupFixed,
+            }).top(1).from(deliveryPlatforms).where(and(
+                eq(deliveryPlatforms.isActive, true),
+                sql`(lower(${deliveryPlatforms.id}) = ${sourceKey} OR lower(${deliveryPlatforms.name}) = ${sourceKey})`,
+            ))
+            : [];
+        const platformPriceConfig = sourcePlatform?.applyFeesToMenuPrice ? sourcePlatform : undefined;
+
+        const [taxSetting] = await db.select({ value: settings.value }).top(1).from(settings).where(eq(settings.key, 'taxRate'));
+        const rawTaxPercent = Number(parseSettingJson(taxSetting?.value, (branch as any)?.taxRate ?? 14));
+        const taxPercent = Number.isFinite(rawTaxPercent) && rawTaxPercent >= 0 && rawTaxPercent <= 100 ? rawTaxPercent : 14;
+        const configuredTaxRate = taxPercent / 100;
+
+        // ---- Authoritative re-pricing (same resolvers as creation) ----
+        const orderChannel = normalizeChannel(currentOrder.type);
+        let calculatedSubtotal = 0;
+        let calculatedTax = 0;
+        const processedItems = items.map((item: any) => {
+            const menuItemId = resolveOrderItemMenuItemId(item);
+            const dbItem = menuLookup.get(menuItemId || '');
+            const sizeId = String(item?.sizeId || item?.size_id || '').trim();
+            const configuredSize = sizeId && Array.isArray(dbItem?.sizes)
+                ? dbItem.sizes.find((size: any) => String(size?.id || '').trim() === sizeId)
+                : undefined;
+            if (sizeId && !configuredSize) throw appError(400, 'INVALID_ITEM_SIZE', 'Selected size is not available for this menu item.');
+            const sizePrice = configuredSize ? Number(configuredSize.price) : NaN;
+            const dbPrice = Number(dbItem?.price || 0);
+            const platformOverride = !configuredSize ? resolvePlatformOverride(dbItem?.platformPricing, sourceKey) : 0;
+            const branchResolved = resolveBranchPriceForChannel(dbItem?.branchPricing, currentOrder.branchId, orderChannel);
+            const branchPrice = branchResolved.price;
+            const isOpenPriced = !configuredSize && !(platformOverride > 0) && !(branchPrice > 0) && !(dbPrice > 0);
+            const basePrice = isOpenPriced
+                ? Number(item.price || 0)
+                : (platformOverride > 0 ? platformOverride
+                    : (configuredSize ? sizePrice : (branchPrice > 0 ? branchPrice : (dbPrice > 0 ? dbPrice : Number(item.price || 0)))));
+            const priceSource = isOpenPriced ? 'OPEN_PRICE'
+                : platformOverride > 0 ? `PLATFORM:${sourceKey.toUpperCase()}`
+                    : configuredSize ? `SIZE:${sizeId}`
+                        : branchResolved.source !== 'BASE' ? branchResolved.source : 'BASE';
+            const price = (platformPriceConfig && !isOpenPriced)
+                ? Number((basePrice * (1 + Number(platformPriceConfig.priceMarkupPercentage || 0) / 100) + Number(platformPriceConfig.priceMarkupFixed || 0)).toFixed(2))
+                : basePrice;
+            const isExempt = (dbItem as any)?.isTaxExempt || false;
+            const allowedPrices = modifierPricesByItem.get(menuItemId || '') || new Map<string, number>();
+            let modifierTotal = 0;
+            const canonicalModifiers = (Array.isArray(item.modifiers) ? item.modifiers : []).map((modifier: any) => {
+                const optionId = String(modifier?.id || modifier?.optionId || '').trim();
+                if (!optionId || !allowedPrices.has(optionId)) {
+                    throw appError(400, 'INVALID_MODIFIER_OPTION', 'Selected modifier is not available for this menu item.');
+                }
+                const modifierPrice = Number(allowedPrices.get(optionId) || 0);
+                modifierTotal += modifierPrice;
+                return { ...modifier, id: optionId, price: modifierPrice };
+            });
+            const quantity = Math.max(1, Number(item.quantity || 1));
+            const lineSubtotal = (price + modifierTotal) * quantity;
+            const lineTax = isExempt ? 0 : parseFloat((lineSubtotal * configuredTaxRate).toFixed(2));
+            calculatedSubtotal += lineSubtotal;
+            calculatedTax += lineTax;
+            const platformMarkup = platformPriceConfig ? Math.max(0, Number((price - basePrice).toFixed(2))) : 0;
+            return {
+                ...item, menuItemId, sizeId: sizeId || undefined, quantity,
+                price, basePrice, platformMarkup, priceSource, modifiers: canonicalModifiers, tax: lineTax,
+            };
+        });
+
+        const subtotal = calculatedSubtotal;
+        const requestedDiscount = body.discount !== undefined && body.discount !== null ? Number(body.discount) : Number(currentOrder.discount || 0);
+        const discountAmount = Math.max(0, Math.min(Number.isFinite(requestedDiscount) ? requestedDiscount : 0, subtotal));
+        const netAmount = subtotal - discountAmount;
+        const taxRatio = subtotal > 0 ? netAmount / subtotal : 0;
+        const tax = parseFloat((calculatedTax * taxRatio).toFixed(2));
+        const deliveryFee = body.delivery_fee !== undefined || body.deliveryFee !== undefined
+            ? Number(body.delivery_fee ?? body.deliveryFee ?? 0)
+            : Number(currentOrder.deliveryFee || 0);
+        const serviceCharge = String(currentOrder.type || '').toUpperCase() === 'DINE_IN' ? Number((currentOrder as any).serviceCharge || 0) : 0;
+        const total = netAmount + tax + serviceCharge + deliveryFee;
+
+        const oldLines = await db.select({
+            menuItemId: orderItems.menuItemId, sizeId: orderItems.sizeId, quantity: orderItems.quantity,
+            modifiers: orderItems.modifiers,
+        }).from(orderItems).where(eq(orderItems.orderId, orderId));
+        const oldQtyByKey = new Map<string, number>();
+        for (const line of oldLines) {
+            const key = `${String(line.menuItemId || '')}::${String(line.sizeId || '')}`;
+            oldQtyByKey.set(key, Number(oldQtyByKey.get(key) || 0) + Number(line.quantity || 0));
+        }
+
+        const inventoryWarnings: any[] = [];
+        const now = new Date();
+        const isScheduledEditOrder = String(currentOrder.status || '').toUpperCase() === 'SCHEDULED';
+        const result = await db.transaction(async (tx) => {
+            const branchWarehouses = await tx.select({ id: warehouses.id }).from(warehouses)
+                .where(eq(warehouses.branchId, currentOrder.branchId))
+                .orderBy(sql`CASE ${warehouses.type} WHEN 'KITCHEN' THEN 0 WHEN 'MAIN' THEN 1 WHEN 'POINT_OF_SALE' THEN 2 ELSE 3 END`);
+
+            await ensureOrderItemsSizeIdColumn();
+            await ensureOrderItemsPricingColumns();
+            await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+            for (const item of processedItems) {
+                await tx.insert(orderItems).values({
+                    orderId,
+                    menuItemId: resolveOrderItemMenuItemId(item),
+                    sizeId: String(item.sizeId || item.size_id || '').trim() || null,
+                    name: item.name,
+                    nameAr: item.nameAr || item.name_ar || item.name,
+                    price: item.price,
+                    basePrice: Number(item.basePrice ?? item.price ?? 0),
+                    platformMarkup: Number(item.platformMarkup || 0),
+                    priceSource: String(item.priceSource || 'BASE').slice(0, 60),
+                    quantity: item.quantity,
+                    tax: item.tax,
+                    notes: item.notes,
+                    seatNumber: item.seatNumber ?? item.seat_number ?? null,
+                    course: item.course ?? null,
+                    modifiers: item.modifiers,
+                });
+            }
+
+            // Stock delta per menuItem::size key (PENDING only — SCHEDULED
+            // orders deduct everything at wake, so skip here to avoid double).
+            const warehousesList = isScheduledEditOrder ? [] : (branchWarehouses || []);
+            const oldLinesByKey = new Map<string, any[]>();
+            for (const line of oldLines) {
+                const key = `${String(line.menuItemId || '')}::${String(line.sizeId || '')}`;
+                if (!oldLinesByKey.has(key)) oldLinesByKey.set(key, []);
+                oldLinesByKey.get(key)!.push(line);
+            }
+            for (const item of processedItems) {
+                const key = `${String(resolveOrderItemMenuItemId(item) || '')}::${String(item.sizeId || item.size_id || '')}`;
+                const delta = Number(item.quantity || 0) - Number(oldQtyByKey.get(key) || 0);
+                if (warehousesList.length === 0) continue;
+                if (delta > 0) {
+                    let applied = false;
+                    let lastError: any = null;
+                    for (const candidate of warehousesList) {
+                        try {
+                            await inventoryService.deductIngredients(
+                                tx, resolveOrderItemMenuItemId(item) || item.id, delta,
+                                candidate.id, orderId, changedBy,
+                                { sizeId: String(item.sizeId || item.size_id || '').trim() || undefined, selectedModifiers: item.modifiers },
+                            );
+                            applied = true;
+                            break;
+                        } catch (deductionError: any) {
+                            const message = String(deductionError?.message || '');
+                            if (!INVENTORY_DEDUCTION_WARNING_PATTERN.test(message)) throw deductionError;
+                            lastError = deductionError;
+                        }
+                    }
+                    if (!applied && lastError) {
+                        inventoryWarnings.push({ code: 'INSUFFICIENT_INVENTORY', menuItemId: resolveOrderItemMenuItemId(item), reason: String(lastError.message || '') });
+                    }
+                } else if (delta < 0) {
+                    try {
+                        await inventoryService.returnIngredients(
+                            tx, resolveOrderItemMenuItemId(item) || item.id, Math.abs(delta),
+                            orderId, changedBy,
+                            {
+                                sizeId: String(item.sizeId || item.size_id || '').trim() || undefined,
+                                selectedModifiers: item.modifiers,
+                                fallbackWarehouseId: warehousesList[0]?.id,
+                                reason: 'Order edit shrink',
+                            },
+                        );
+                    } catch (returnError: any) {
+                        inventoryWarnings.push({ code: 'STOCK_RETURN_SKIPPED', menuItemId: resolveOrderItemMenuItemId(item), reason: String(returnError?.message || '') });
+                    }
+                }
+            }
+            // Fully removed lines: return their whole quantity (PENDING only —
+            // scheduled lines were never deducted).
+            const newKeys = new Set(processedItems.map((item: any) => `${String(resolveOrderItemMenuItemId(item) || '')}::${String(item.sizeId || item.size_id || '')}`));
+            if (!isScheduledEditOrder) for (const [key, keyLines] of oldLinesByKey.entries()) {
+                if (newKeys.has(key)) continue;
+                for (const line of keyLines) {
+                    if (!(Number((line as any).quantity || 0) > 0)) continue;
+                    try {
+                        await inventoryService.returnIngredients(
+                            tx, String((line as any).menuItemId || ''), Number((line as any).quantity),
+                            orderId, changedBy,
+                            {
+                                sizeId: String((line as any).sizeId || '').trim() || undefined,
+                                selectedModifiers: Array.isArray((line as any).modifiers) ? (line as any).modifiers : [],
+                                fallbackWarehouseId: warehousesList[0]?.id,
+                                reason: 'Order edit line removed',
+                            },
+                        );
+                    } catch (returnError: any) {
+                        inventoryWarnings.push({ code: 'STOCK_RETURN_SKIPPED', menuItemId: String((line as any).menuItemId || ''), reason: String(returnError?.message || '') });
+                    }
+                }
+            }
+
+            // Rebuild kitchen tickets so the branch cooks the edited lines:
+            // drop open tickets, then dispatch fresh (re-enqueues branch
+            // print jobs server-side, so the branch printer fires again).
+            // SCHEDULED orders have no tickets yet — dispatch skipped.
+            const isScheduledEdit = isScheduledEditOrder;
+            if (!isScheduledEdit) {
+                await tx.delete(kdsTickets).where(and(
+                    eq(kdsTickets.orderId, orderId),
+                    sql`${kdsTickets.status} NOT IN ('DELIVERED', 'CANCELLED')`,
+                ));
+            }
+            const [updatedOrder] = await tx.update(orders).set({
+                subtotal, discount: discountAmount, tax, deliveryFee, total,
+                deliverySource: nextDeliverySource,
+                paymentMethod: nextPaymentMethod,
+                platformOrderId: nextPlatformOrderId ?? (currentOrder as any).platformOrderId,
+                ...(nextAddress !== undefined ? {
+                    deliveryAddress: nextAddress,
+                    deliveryLat: body.deliveryLat ?? body.delivery_lat ?? (currentOrder as any).deliveryLat,
+                    deliveryLng: body.deliveryLng ?? body.delivery_lng ?? (currentOrder as any).deliveryLng,
+                    deliveryAddressLabel: body.deliveryAddressLabel ?? body.delivery_address_label ?? (currentOrder as any).deliveryAddressLabel,
+                } : {}),
+                ...(nextScheduledFor !== undefined ? { scheduledFor: nextScheduledFor || null } : {}),
+                notes: editNotes ? `${currentOrder.notes || ''} | تعديل: ${editNotes}`.slice(0, 900) : currentOrder.notes,
+                updatedAt: now,
+            }).output().where(eq(orders.id, orderId));
+            await tx.insert(orderStatusHistory).values({
+                orderId, status: String(currentOrder.status || 'PENDING'), changedBy,
+                notes: `ITEMS_EDITED${editNotes ? `: ${editNotes}` : ''} | total ${Number(currentOrder.total || 0).toFixed(2)} → ${total.toFixed(2)}`,
+                createdAt: now,
+            });
+            return updatedOrder;
+        });
+
+        if (!isScheduledEditOrder) {
+            await kdsController.dispatchToKitchen(currentOrder.branchId, orderId).catch(() => undefined);
+        }
+        emitBranchEvent(currentOrder.branchId, 'order:status', { id: orderId, status: String(currentOrder.status || 'PENDING'), updatedAt: now });
+        emitBranchEvent(currentOrder.branchId, 'order:updated', { id: orderId, total, updatedAt: now });
+        const [fullOrder] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
+        const freshItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+        res.json({ ...(fullOrder || result), items: freshItems, warnings: inventoryWarnings });
+    } catch (error: any) {
+        const statusCode = Number(error?.status) || 500;
+        if (statusCode === 400 || statusCode === 403 || statusCode === 404 || statusCode === 409) {
+            return res.status(statusCode).json({ error: error.message, code: error.code || error.message });
+        }
+        res.status(500).json({ error: 'ORDER_ITEMS_UPDATE_FAILED', code: 'ORDER_ITEMS_UPDATE_FAILED' });
     }
 };
 

@@ -25,22 +25,65 @@ const parseJsonField = <T>(value: any, fallback: T): T => {
     if (Array.isArray(value)) return value as unknown as T;
     if (value && typeof value === 'object') return value as unknown as T;
     if (typeof value === 'string' && value.trim()) {
-        try { return JSON.parse(value) as T; } catch { /* ignore */ }
+        const trimmed = value.trim();
+        try { return JSON.parse(trimmed) as T; } catch { /* ignore */ }
+        // nvarchar columns come back as comma-joined strings (driver coerces arrays on write)
+        if (Array.isArray(fallback)) {
+            return trimmed.split(',').map((s) => s.trim()).filter(Boolean) as unknown as T;
+        }
     }
     return fallback;
 };
 
 const mapUserResponse = (u: any) => {
     if (!u) return u;
+    // Never leak one-way secrets: bcrypt hashes and MFA secret stay server-side.
+    // PIN is stored in plain `pinCode` so admins with CFG_MANAGE_USERS can view it;
+    // passwords are bcrypt-hashed (irreversible) — only expose whether one is set.
+    const { passwordHash, pinCodeHash, mfaSecret, ...rest } = u;
     return {
-        ...u,
+        ...rest,
         permissions: parseJsonField<string[]>(u.permissions, []),
         allowedBranches: parseJsonField<string[]>(u.allowedBranches, []),
         customPermissions: parseJsonField<Record<string, any>>(u.customPermissions, {}),
+        hasPassword: Boolean(passwordHash),
+        hasPin: Boolean(u.pinCode || pinCodeHash),
     };
 };
 
 const isEmailLike = (value: string | undefined) => !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const activeUsersExcept = async (userId?: string) => {
+    const allUsers = await db.select().from(users).where(eq(users.isActive, true));
+    return userId ? allUsers.filter((user) => user.id !== userId) : allUsers;
+};
+
+const assertUniqueSecret = async (input: { userId?: string; password?: string; pin?: string; managerPin?: string }) => {
+    const candidates = await activeUsersExcept(input.userId);
+    if (input.password) {
+        for (const user of candidates) {
+            if (user.passwordHash && await bcrypt.compare(input.password, user.passwordHash)) {
+                throw Object.assign(new Error('PASSWORD_ALREADY_USED_BY_ANOTHER_USER'), { statusCode: 409 });
+            }
+        }
+    }
+    if (input.pin) {
+        for (const user of candidates) {
+            const samePlainPin = user.pinCode && user.pinCode === input.pin;
+            const sameHashedPin = user.pinCodeHash && await bcrypt.compare(input.pin, user.pinCodeHash);
+            if (samePlainPin || sameHashedPin) {
+                throw Object.assign(new Error('PIN_ALREADY_USED_BY_ANOTHER_USER'), { statusCode: 409 });
+            }
+        }
+    }
+    if (input.managerPin) {
+        for (const user of candidates) {
+            if (user.managerPin && user.managerPin === input.managerPin) {
+                throw Object.assign(new Error('MANAGER_PIN_ALREADY_USED_BY_ANOTHER_USER'), { statusCode: 409 });
+            }
+        }
+    }
+};
 
 const userBody = (body: any) => ({
     id: cleanString(body.id),
@@ -76,6 +119,9 @@ const writeError = (res: Response, error: any) => {
     if (isForeignKeyDeleteError(error)) {
         return writeForeignKeyDeleteConflict(res, 'user', ['shifts', 'approvals', 'audit logs']);
     }
+    if (error?.statusCode) {
+        return res.status(error.statusCode).json({ error: error.message });
+    }
     return res.status(500).json({ error: error.message || 'USER_WRITE_FAILED' });
 };
 
@@ -84,7 +130,7 @@ export const getAllUsers = async (_req: Request, res: Response) => {
         const rawUsers = await db.select().from(users).orderBy(desc(users.createdAt));
         res.json(rawUsers.map(mapUserResponse));
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(error?.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -96,7 +142,7 @@ export const getUserById = async (req: Request, res: Response) => {
         if (!user) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         res.json(mapUserResponse(user));
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(error?.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -108,6 +154,7 @@ export const createUser = async (req: Request, res: Response) => {
         if (req.body.createEmployeeRecord && !body.assignedBranchId) {
             return res.status(400).json({ error: 'EMPLOYEE_BRANCH_REQUIRED' });
         }
+        await assertUniqueSecret({ password: body.password, pin: body.pin, managerPin: body.managerPin });
         let passwordHash: string | undefined;
         let pinCodeHash: string | undefined;
         if (body.password) passwordHash = await bcrypt.hash(body.password, 10);
@@ -174,6 +221,7 @@ export const updateUser = async (req: Request, res: Response) => {
         const [existing] = await db.select().from(users).where(eq(users.id, id));
         if (!existing) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         if (body.email !== undefined && !isEmailLike(body.email)) return res.status(400).json({ error: 'VALID_EMAIL_REQUIRED' });
+        await assertUniqueSecret({ userId: id, password: body.password, pin: body.pin, managerPin: body.managerPin });
         const protectedUser = PROTECTED_USER_IDS.includes(id);
         const passwordHash = body.password ? await bcrypt.hash(body.password, 10) : existing.passwordHash;
         const pinCodeHash = body.pin ? await bcrypt.hash(body.pin, 10) : existing.pinCodeHash;
@@ -252,7 +300,7 @@ export const bulkCreateUsers = async (req: Request, res: Response) => {
         await audit(req, 'USER_CREATED', { bulk: true, created: created.length, failed: errors.length }, 'Bulk user creation');
         res.status(201).json({ created: created.length, failed: errors.length, users: created.map(mapUserResponse), errors });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(error?.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -268,7 +316,7 @@ export const bulkUpdateStatus = async (req: Request, res: Response) => {
         }
         res.json({ updated: updated.length, skipped: userIds.length - toUpdate.length, users: updated.map(mapUserResponse) });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(error?.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -422,6 +470,7 @@ export const resetUserPin = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         const pin = cleanString(req.body?.newPin) || crypto.randomInt(100000, 1000000).toString();
         if (!/^\d{6}$/.test(pin)) return res.status(400).json({ error: 'PIN_MUST_BE_6_DIGITS' });
+        await assertUniqueSecret({ userId: id, pin });
         const [updated] = await db.update(users).set({ pinCode: pin, pinCodeHash: await bcrypt.hash(pin, 10), pinLoginEnabled: true, updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         res.json({ success: true, pin });
@@ -436,6 +485,7 @@ export const adminResetPassword = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         const newPassword = cleanString(req.body?.newPassword);
         if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'PASSWORD_MIN_6_CHARS' });
+        await assertUniqueSecret({ userId: id, password: newPassword });
         const [updated] = await db.update(users).set({ passwordHash: await bcrypt.hash(newPassword, 10), updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));

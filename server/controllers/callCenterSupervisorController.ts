@@ -528,14 +528,57 @@ export const retryFailedOrder = async (req: Request, res: Response) => {
         const orderId = String(req.params.id || '').trim();
         if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
 
-        await db.update(orders).set({
-            syncStatus: 'PENDING',
-            updatedAt: new Date(),
-        }).where(eq(orders.id, orderId));
+        const [order] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
+        if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        const status = String((order as any).status || '').toUpperCase();
+        if (['CANCELLED', 'DELIVERED', 'COMPLETED', 'REFUNDED'].includes(status)) {
+            return res.status(409).json({ error: 'ORDER_ALREADY_TERMINAL', orderId, status });
+        }
 
-        res.json({ success: true, orderId, syncStatus: 'PENDING' });
+        // Real re-push to the branch: fresh kitchen dispatch (re-enqueues
+        // branch print jobs), branch events, and sync flag flip.
+        const { kdsController } = await import('./kdsController');
+        const { emitBranchEvent } = await import('../utils/socketEmit');
+        await kdsController.dispatchToKitchen((order as any).branchId, orderId).catch(() => undefined);
+        emitBranchEvent((order as any).branchId, 'order:created', order);
+        emitBranchEvent((order as any).branchId, 'order:status', { id: orderId, status, updatedAt: new Date() });
+        await db.update(orders).set({ syncStatus: 'SYNCED', updatedAt: new Date() }).where(eq(orders.id, orderId));
+
+        res.json({ success: true, orderId, syncStatus: 'SYNCED', redispatched: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_RETRY_ORDER' });
+    }
+};
+
+export const retryAllFailedOrders = async (req: Request, res: Response) => {
+    try {
+        const branchId = String(req.query.branchId || req.body?.branchId || '').trim();
+        const conditions: any[] = [
+            or(eq(orders.isCallCenterOrder, true), eq(orders.source, 'call_center')),
+            or(eq(orders.syncStatus, 'FAILED'), eq(orders.syncStatus, 'PENDING')),
+            sql`${orders.status} NOT IN ('CANCELLED', 'DELIVERED', 'COMPLETED', 'REFUNDED')`,
+        ];
+        if (branchId) conditions.push(eq(orders.branchId, branchId));
+        const rows = await db.select({ id: orders.id }).from(orders).where(and(...conditions)).orderBy(desc(orders.createdAt)).offset(0).fetch(100);
+        let ok = 0;
+        const failed: string[] = [];
+        for (const row of rows) {
+            try {
+                const [order] = await db.select().top(1).from(orders).where(eq(orders.id, (row as any).id));
+                if (!order) continue;
+                const { kdsController } = await import('./kdsController');
+                const { emitBranchEvent } = await import('../utils/socketEmit');
+                await kdsController.dispatchToKitchen((order as any).branchId, (order as any).id).catch(() => undefined);
+                emitBranchEvent((order as any).branchId, 'order:created', order);
+                await db.update(orders).set({ syncStatus: 'SYNCED', updatedAt: new Date() }).where(eq(orders.id, (order as any).id));
+                ok += 1;
+            } catch {
+                failed.push(String((row as any).id));
+            }
+        }
+        res.json({ success: true, retried: ok, failed, total: rows.length });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message || 'FAILED_TO_RETRY_ORDERS' });
     }
 };
 
@@ -596,13 +639,16 @@ export const getDailyOrderSummary = async (req: Request, res: Response) => {
             branchId: branchId || 'ALL',
             totalOrders,
             totalRevenue: Number(totalRevenue.toFixed(2)),
-            byStatus: summary.map(s => ({
-                status: s.status,
-                count: Number(s.orderCount),
-                revenue: Number(Number(s.totalRevenue).toFixed(2)),
-                discount: Number(Number(s.totalDiscount).toFixed(2)),
-                avgOrderValue: Number(Number(s.avgTotal).toFixed(2)),
-            })),
+            byStatus: summary.map(s => {
+                const excluded = ['CANCELLED', 'REFUNDED', 'VOID'].includes(String(s.status));
+                return {
+                    status: s.status,
+                    count: Number(s.orderCount),
+                    revenue: excluded ? 0 : Number(Number(s.totalRevenue).toFixed(2)),
+                    discount: Number(Number(s.totalDiscount).toFixed(2)),
+                    avgOrderValue: excluded ? 0 : Number(Number(s.avgTotal).toFixed(2)),
+                };
+            }),
             hourly: hourly.map(h => ({
                 hour: Number(h.hour),
                 orders: Number(h.orderCount),

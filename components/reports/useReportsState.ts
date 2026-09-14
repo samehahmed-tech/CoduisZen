@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { reportsApi } from '../../services/api/reports';
 import { inventoryApi } from '../../services/api/inventory';
+import { productionApi, suppliersApi, purchaseOrdersApi } from '../../services/api/procurement';
 import { UserRole } from '../../types';
 
 // ?? Types ??
@@ -94,7 +95,10 @@ export function useReportsState() {
    const [tipsData, setTipsData] = useState<any>(null);
    const [serviceChargeData, setServiceChargeData] = useState<any>(null);
    const [shiftSummaryData, setShiftSummaryData] = useState<any[]>([]);
-   const [actualVsTheoreticalData, setActualVsTheoreticalData] = useState<any[]>([]);
+    const [actualVsTheoreticalData, setActualVsTheoreticalData] = useState<any[]>([]);
+    const [productionBatchesData, setProductionBatchesData] = useState<any[]>([]);
+    const [suppliersData, setSuppliersData] = useState<any[]>([]);
+    const [purchaseOrdersData, setPurchaseOrdersData] = useState<any[]>([]);
    const [purchaseHistoryData, setPurchaseHistoryData] = useState<any>(null);
    const [inventoryValuationData, setInventoryValuationData] = useState<any>(null);
    const [staffCostData, setStaffCostData] = useState<any>(null);
@@ -227,7 +231,10 @@ export function useReportsState() {
                case 'Reorder Alerts': { const r = await reportsApi.getReorderAlerts().catch(() => []); setReorderAlerts(r as any || []); break; }
                case 'Expiring Batches': { const r = await reportsApi.getExpiringBatches().catch(() => null); setExpiringBatches(r as any); break; }
                case 'Actual vs Theoretical': { const r = await reportsApi.getActualVsTheoretical(params).catch(() => []); setActualVsTheoreticalData(r as any || []); break; }
-               case 'Purchase History': { const r = await reportsApi.getPurchaseHistory(params).catch(() => null); setPurchaseHistoryData(r as any); break; }
+                case 'Purchase History': { const r = await reportsApi.getPurchaseHistory(params).catch(() => null); setPurchaseHistoryData(r as any); break; }
+                case 'Production Batches': { const r = await productionApi.getOrders({ branchId: params.branchId }).catch(() => []); setProductionBatchesData(r as any || []); break; }
+                case 'Suppliers': { const r = await suppliersApi.getAll().catch(() => []); setSuppliersData(r as any || []); break; }
+                case 'Purchase Orders': { const r = await purchaseOrdersApi.getAll().catch(() => []); setPurchaseOrdersData(r as any || []); break; }
                case 'Inventory Valuation': { const r = await reportsApi.getInventoryValuation().catch(() => null); setInventoryValuationData(r as any); break; }
                case 'Supplier Price Tracking': { const r = await reportsApi.getSupplierPriceTracking(params).catch(() => []); setSupplierPriceData(r as any || []); break; }
                case 'Recipe Cost Alerts': { const r = await reportsApi.getRecipeCostAlerts().catch(() => null); setRecipeCostData(r as any); break; }
@@ -278,7 +285,7 @@ export function useReportsState() {
                case 'Branch Comparison': { const r = await reportsApi.getBranchComparison(params).catch(() => null); setBranchCompData(r as any); break; }
                case 'Delivery Zone Analytics': { const r = await reportsApi.getDeliveryZone(params).catch(() => []); setDeliveryZoneData(r as any || []); break; }
                case 'Delivery Cost vs Revenue': { const r = await reportsApi.getDeliveryCostRevenue(params).catch(() => null); setDeliveryCostData(r as any); break; }
-               case '3rd Party vs In-House': { const r = await reportsApi.getThirdPartyVsInHouse(params).catch(() => null); setThirdPartyData(r as any); break; }
+                case '3rd Party vs In-House': { const r = await reportsApi.getThirdPartyVsInHouse(params).catch(() => null); setThirdPartyData(r as any); const cm = await reportsApi.getChannelMix(params).catch(() => []); setChannelMixData(cm as any || []); break; }
                case 'Daily Flash Report': { const r = await reportsApi.getDailyFlash({ branchId: params.branchId }).catch(() => null); setDailyFlashData(r as any); break; }
                case 'Demand Forecasting': { const r = await reportsApi.getDemandForecast({ branchId: params.branchId }).catch(() => null); setDemandForecastData(r as any); break; }
                case 'Price Elasticity Simulator': { const r = await reportsApi.getPriceElasticity({ branchId: params.branchId }).catch(() => []); setPriceElasticityData(r as any || []); break; }
@@ -362,7 +369,8 @@ export function useReportsState() {
       modifierSalesData, avgTicketTrend, salesComparisonData,
       slowMovingItems, revenueByWeekday, voidItemsData,
       tipsData, serviceChargeData, shiftSummaryData,
-      actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
+       actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
+       productionBatchesData, suppliersData, purchaseOrdersData,
       staffCostData, salesPerLaborData,
       customerRetentionData, newVsReturningData, customerFrequencyData,
       kitchenPerformanceData, menuEngineeringData, daypartData, basketData,

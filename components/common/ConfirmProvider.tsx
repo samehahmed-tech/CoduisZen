@@ -41,6 +41,14 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setState(null);
     };
 
+    React.useEffect(() => {
+        if (!state) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(false); };
+        document.addEventListener('keydown', onKey);
+        document.body.style.overflow = 'hidden';
+        return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    }, [state]);
+
     const variant = state?.options.variant || 'danger';
     const style = VARIANT_STYLES[variant];
     const Icon = style.icon;
@@ -49,22 +57,24 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
         <ConfirmContext.Provider value={{ confirm }}>
             {children}
             {state && (
-                <div className="fixed inset-0 bg-black/60  z-[9998] flex items-center justify-center p-4" onClick={() => handleClose(false)}>
-                    <div className="bg-card border border-border rounded-[2rem] w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div role="alertdialog" aria-modal="true" aria-label={state.options.title} className="fixed inset-0 bg-black/60 theme-overlay z-[9998] flex items-center justify-center p-4 modal-backdrop-enter" onClick={() => handleClose(false)}>
+                    <div className="theme-modal-panel bg-card border border-border rounded-[1.75rem] w-full max-w-sm shadow-2xl modal-glass-enter" onClick={e => e.stopPropagation()}>
                         <div className="p-6 text-center">
                             <div className={`w-14 h-14 rounded-2xl ${style.iconBg} flex items-center justify-center mx-auto mb-4`}>
-                                <Icon size={28} className={style.iconColor} />
+                                <Icon size={26} className={style.iconColor} />
                             </div>
-                            <h3 className="text-lg font-black text-main mb-2">{state.options.title}</h3>
-                            <p className="text-sm text-muted leading-relaxed">{state.options.message}</p>
+                            <h3 className="text-base font-extrabold text-main mb-2 leading-snug">{state.options.title}</h3>
+                            <p className="text-[13px] text-muted leading-relaxed">{state.options.message}</p>
                         </div>
                         <div className="p-4 border-t border-border flex gap-3">
                             <button onClick={() => handleClose(false)}
-                                className="flex-1 py-3 bg-app border border-border rounded-xl text-xs font-black text-muted uppercase tracking-widest hover:text-main transition-colors">
+                                data-interaction="press"
+                                className="ux-btn ux-btn-secondary flex-1 !min-h-[44px] text-xs">
                                 {state.options.cancelText || 'Cancel'}
                             </button>
                             <button onClick={() => handleClose(true)}
-                                className={`flex-1 py-3 ${style.btnColor} text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors`}>
+                                data-interaction="press" autoFocus
+                                className={`ux-btn flex-1 !min-h-[44px] text-white text-xs ${variant === 'danger' ? 'ux-btn-danger' : style.btnColor + ' rounded-xl font-bold'}`}>
                                 {state.options.confirmText || 'Confirm'}
                             </button>
                         </div>

@@ -53,7 +53,7 @@ type DiscountViolation = {
     approved?: boolean;
 };
 
-type Tab = 'overview' | 'agents' | 'drivers' | 'escalations' | 'quality' | 'branches' | 'failed' | 'daily';
+type Tab = 'overview' | 'delivery' | 'agents' | 'drivers' | 'escalations' | 'quality' | 'branches' | 'failed' | 'daily';
 
 const getOrderDate = (o: AnyOrder) => new Date(o.created_at || o.createdAt || Date.now());
 const getOrderStatus = (o: AnyOrder) => String(o.status || '').toUpperCase();
@@ -123,6 +123,10 @@ export const useCallCenterState = () => {
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const currency = settings.currencySymbol || (lang === 'ar' ? 'ج.م' : 'EGP');
     const branchId = settings.activeBranchId || '';
+    const userRole = String((settings as any)?.currentUser?.role || '');
+    // The call center monitors every branch (it holds no stock and only
+    // distributes orders), so it starts on the global view, not one branch.
+    const startsGlobal = ['CALL_CENTER', 'CALL_CENTER_MANAGER', 'SUPER_ADMIN', 'OWNER'].includes(userRole);
     const businessDate = branches.find(branch => branch.id === branchId)?.businessDate || formatLocalDate(new Date());
 
     /* ── State ──────────────────────────────────────────────────── */
@@ -131,8 +135,11 @@ export const useCallCenterState = () => {
         return formatLocalDate(d);
     });
     const [toDate, setToDate] = React.useState(businessDate);
-    const [selectedBranch, setSelectedBranch] = React.useState(branchId);
+    const [selectedBranch, setSelectedBranch] = React.useState(startsGlobal ? '' : branchId);
     const [orders, setOrders] = React.useState<AnyOrder[]>([]);
+    // ALL delivery orders across branches (any source: call center, POS,
+    // platform) — the live delivery pipeline the call center must follow.
+    const [deliveryOrders, setDeliveryOrders] = React.useState<AnyOrder[]>([]);
     const [drivers, setDrivers] = React.useState<AnyDriver[]>([]);
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
@@ -185,9 +192,17 @@ export const useCallCenterState = () => {
                 is_call_center_order: true,
             };
             if (selectedBranch) orderParams.branch_id = selectedBranch;
-            const [allOrders, allDrivers] = await Promise.all([
+            const deliveryParams: any = {
+                limit: 200,
+                type: 'DELIVERY',
+                from_date: fromDate,
+                to_date: toDate,
+            };
+            if (selectedBranch) deliveryParams.branch_id = selectedBranch;
+            const [allOrders, allDrivers, allDeliveries] = await Promise.all([
                 ordersApi.getAll(orderParams),
                 deliveryApi.getDrivers(selectedBranch ? { branchId: selectedBranch } : undefined),
+                ordersApi.getAll(deliveryParams).catch(() => []),
             ]);
             const [escalationData, coachingData, discountAbuseData] = await Promise.all([
                 callCenterSupervisorApi.getEscalations({ status: 'OPEN', ...(selectedBranch ? { branchId: selectedBranch } : {}) }),
@@ -221,6 +236,7 @@ export const useCallCenterState = () => {
             prevEscalationCountRef.current = newEscalations.length;
 
             setOrders(ccOrders);
+            setDeliveryOrders(Array.isArray(allDeliveries) ? allDeliveries : (Array.isArray((allDeliveries as any)?.data) ? (allDeliveries as any).data : []));
             setDrivers(Array.isArray(allDrivers) ? allDrivers : []);
             setEscalations(newEscalations);
             setCoachingNotes(Array.isArray(coachingData) ? coachingData : []);
@@ -228,7 +244,7 @@ export const useCallCenterState = () => {
             setLastRefresh(new Date());
         } catch (e: any) {
             setError(e?.message || 'Failed to load call center overview');
-            setOrders([]); setDrivers([]); setEscalations([]); setCoachingNotes([]); setDiscountViolations([]);
+            setOrders([]); setDeliveryOrders([]); setDrivers([]); setEscalations([]); setCoachingNotes([]); setDiscountViolations([]);
         } finally {
             setIsLoading(false);
         }
@@ -422,11 +438,35 @@ export const useCallCenterState = () => {
     );
     const escalatedOrderIds = React.useMemo(() => new Set(escalations.map(e => e.orderId)), [escalations]);
 
+    /* ── Live delivery pipeline (all branches, any source) ────────── */
+    const ACTIVE_DELIVERY_STATUSES = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
+    const activeDeliveries = React.useMemo(() => {
+        const terminal = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED', 'VOID', 'REFUNDED']);
+        return deliveryOrders
+            .filter(o => !terminal.has(getOrderStatus(o)))
+            .map(o => {
+                const mins = Math.floor((Date.now() - getOrderDate(o).getTime()) / 60000);
+                const driverId = getOrderDriver(o);
+                const driver = drivers.find((d: any) => String(d.id || '') === driverId);
+                return {
+                    order: o,
+                    mins,
+                    isLate: mins >= 45,
+                    isAtRisk: mins >= 30 && mins < 45,
+                    driverName: driver ? (driver.name || driver.fullName || driverId) : '',
+                    branchName: branches.find(b => b.id === getOrderBranch(o))?.name || getOrderBranch(o),
+                };
+            })
+            .sort((a, b) => b.mins - a.mins);
+    }, [deliveryOrders, drivers, branches]);
+
     /* ── The order being viewed in detail ───────────────────────── */
     const detailOrder = React.useMemo(() => {
         if (!orderDetailId) return null;
-        return orders.find(o => String(o.id) === orderDetailId) || null;
-    }, [orderDetailId, orders]);
+        return orders.find(o => String(o.id) === orderDetailId)
+            || deliveryOrders.find(o => String(o.id) === orderDetailId)
+            || null;
+    }, [orderDetailId, orders, deliveryOrders]);
 
     /* ── Customer lookup ────────────────────────────────────────── */
     const loadCustomer = async (phone: string) => {
@@ -599,6 +639,23 @@ export const useCallCenterState = () => {
         }
     };
 
+    const [isRetryingAll, setIsRetryingAll] = React.useState(false);
+    const retryAllFailed = async () => {
+        if (isRetryingAll) return;
+        setIsRetryingAll(true);
+        try {
+            const result = await callCenterSupervisorApi.retryAllFailedOrders(selectedBranch ? { branchId: selectedBranch } : undefined);
+            setError(null);
+            await loadFailedOrders();
+            return result;
+        } catch (e: any) {
+            setError(getActionableErrorMessage(e, lang));
+            return null;
+        } finally {
+            setIsRetryingAll(false);
+        }
+    };
+
     /* ── Load daily summary ─────────────────────────────────────── */
     const loadDailySummary = React.useCallback(async () => {
         setIsLoadingDailySummary(true);
@@ -624,6 +681,7 @@ export const useCallCenterState = () => {
 
     const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
         { id: 'overview', label: lang === 'ar' ? 'نظرة عامة' : 'Overview', icon: BarChart3 },
+        { id: 'delivery', label: lang === 'ar' ? 'الدليفري الحي' : 'Live Delivery', icon: Bike, badge: activeDeliveries.length },
         { id: 'agents', label: lang === 'ar' ? 'الموظفين' : 'Agents', icon: Users, badge: agentStats.length },
         { id: 'drivers', label: lang === 'ar' ? 'الطيارين' : 'Drivers', icon: Bike, badge: driverStats.filter(d => d.status === 'AVAILABLE' || d.status === 'ON_DELIVERY').length },
         { id: 'escalations', label: lang === 'ar' ? 'التصعيدات' : 'Escalations', icon: AlertTriangle, badge: escalations.length },
@@ -687,5 +745,5 @@ export const useCallCenterState = () => {
     ];
 
 
-    return { activeTab, setActiveTab, lang, currency, branches, users, orders, drivers, escalations, coachingNotes, discountViolations, metrics, hourlyData, agentStats, coachingNotesByAgent, activeOrdersByDriver, driverStats, branchComparison, cancelledOrders, pendingOrders, escalatedOrderIds, detailOrder, customerProfile, isLoadingCustomer, branchHealthData, isLoadingBranchHealth, failedOrdersData, isLoadingFailedOrders, retryingOrderId, dailySummary, isLoadingDailySummary, dailyReviewDate, expandedSections, setExpandedSections, createEscalation, resolveEscalation, scanEscalations, saveCoachingNote, approveDiscountViolation, loadCustomer, retryOrder, loadBranchHealth, loadFailedOrders, loadDailySummary, fmt, fmtMoney, fmtMins, timeAgo, coachingAgentId, setCoachingAgentId, coachingNoteInput, setCoachingNoteInput, isSavingCoaching, isScanningEscalations, resolvingEscalationId, escalatingOrderId, isApprovingDiscountOrderId, setDailyReviewDate, toggleSection, getOrderStatus, getOrderDate, getOrderTotal, getOrderDiscount, getOrderBranch, getOrderAgent, getOrderDriver, getCustomerName, getCustomerPhone, getDeliveryAddress, getOrderNumber, getCancelReason, StatusDot, PriorityBadge, MiniSparkline, setOrderDetailId, orderDetailId, isLoading, selectedBranch, setSelectedBranch, autoRefresh, setAutoRefresh, soundEnabled, setSoundEnabled, showFilters, setShowFilters, fromDate, setFromDate, toDate, setToDate, lastRefresh, load, exportCSV, tabs, kpis };
+    return { activeTab, setActiveTab, lang, currency, branches, users, orders, deliveryOrders, activeDeliveries, drivers, escalations, coachingNotes, discountViolations, metrics, hourlyData, agentStats, coachingNotesByAgent, activeOrdersByDriver, driverStats, branchComparison, cancelledOrders, pendingOrders, escalatedOrderIds, detailOrder, customerProfile, isLoadingCustomer, branchHealthData, isLoadingBranchHealth, failedOrdersData, isLoadingFailedOrders, retryingOrderId, isRetryingAll, retryAllFailed, dailySummary, isLoadingDailySummary, dailyReviewDate, expandedSections, setExpandedSections, createEscalation, resolveEscalation, scanEscalations, saveCoachingNote, approveDiscountViolation, loadCustomer, retryOrder, loadBranchHealth, loadFailedOrders, loadDailySummary, fmt, fmtMoney, fmtMins, timeAgo, coachingAgentId, setCoachingAgentId, coachingNoteInput, setCoachingNoteInput, isSavingCoaching, isScanningEscalations, resolvingEscalationId, escalatingOrderId, isApprovingDiscountOrderId, setDailyReviewDate, toggleSection, getOrderStatus, getOrderDate, getOrderTotal, getOrderDiscount, getOrderBranch, getOrderAgent, getOrderDriver, getCustomerName, getCustomerPhone, getDeliveryAddress, getOrderNumber, getCancelReason, StatusDot, PriorityBadge, MiniSparkline, setOrderDetailId, orderDetailId, isLoading, selectedBranch, setSelectedBranch, autoRefresh, setAutoRefresh, soundEnabled, setSoundEnabled, showFilters, setShowFilters, fromDate, setFromDate, toDate, setToDate, lastRefresh, load, exportCSV, tabs, kpis };
 };

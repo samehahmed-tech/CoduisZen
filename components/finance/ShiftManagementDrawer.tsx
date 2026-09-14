@@ -15,10 +15,12 @@ export const ShiftManagementDrawer: React.FC = () => {
     const setIsShiftDrawerOpen = useFinanceStore(s => s.setIsShiftDrawerOpen);
     const activeShift = useFinanceStore(s => s.activeShift);
     const setShift = useFinanceStore(s => s.setShift);
+    const refreshActiveShift = useFinanceStore(s => s.refreshActiveShift);
     const settings = useAuthStore(s => s.settings);
     const { showToast } = useToast();
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const isRtl = lang === 'ar';
+    const [isRecheckingShift, setIsRecheckingShift] = useState(false);
     
     // Feature Toggle for Blind Reconciliation
     const isBlindReconciliation = settings?.blindShiftReconciliation === true;
@@ -38,6 +40,21 @@ export const ShiftManagementDrawer: React.FC = () => {
         }
     }, [isShiftDrawerOpen, activeShift]);
 
+    // If the drawer opens with no shift in state (e.g. a transient fetch
+    // failure nulled it before the guard landed), re-check once so the
+    // header self-corrects instead of showing "no active shift".
+    useEffect(() => {
+        if (!isShiftDrawerOpen || activeShift || closedData) return;
+        const branchId = settings.activeBranchId;
+        if (!branchId) return;
+        let cancelled = false;
+        setIsRecheckingShift(true);
+        refreshActiveShift(branchId)
+            .catch(() => { })
+            .finally(() => { if (!cancelled) setIsRecheckingShift(false); });
+        return () => { cancelled = true; };
+    }, [isShiftDrawerOpen, activeShift, closedData, settings.activeBranchId, refreshActiveShift]);
+
     const loadXReport = async () => {
         if (!activeShift) return;
         setLoadingReport(true);
@@ -53,12 +70,17 @@ export const ShiftManagementDrawer: React.FC = () => {
 
     const handleCloseShift = async () => {
         if (!activeShift) return;
+        if (!report) {
+            showToast(isRtl ? 'يرجى الانتظار لحين تحميل تقرير الشيفت' : 'Please wait for the shift report to load', 'error');
+            return;
+        }
         const balance = Number(actualBalance);
         if (!Number.isFinite(balance) || balance < 0) {
             showToast(getActionableErrorMessage({ code: 'INVALID_CASH_BALANCE' }, lang), 'error');
             return;
         }
-        if (Math.abs(balance - expectedCash) > 1 && !closingNotes.trim()) {
+        const expectedCashVal = Number(report.expectedCashBalance || 0);
+        if (Math.abs(balance - expectedCashVal) > 1 && !closingNotes.trim()) {
             showToast(getActionableErrorMessage({ code: 'VARIANCE_REASON_REQUIRED' }, lang), 'error');
             return;
         }
@@ -71,6 +93,7 @@ export const ShiftManagementDrawer: React.FC = () => {
                 branchId: activeShift.branchId
             });
             setClosedData(res);
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
         } catch (closeError) {
             showToast(getActionableErrorMessage(closeError, lang), 'error');
         } finally {
@@ -80,10 +103,10 @@ export const ShiftManagementDrawer: React.FC = () => {
 
     if (!isShiftDrawerOpen) return null;
 
-    const expectedCash = report?.expectedCashBalance ?? activeShift?.openingBalance ?? 0;
+    const expectedCash = report ? Number(report.expectedCashBalance || 0) : null;
     const inputCash = Number(actualBalance);
-    const variance = inputCash - expectedCash;
-    const isActualBalanceValid = actualBalance !== '' && Number.isFinite(inputCash) && inputCash >= 0;
+    const variance = expectedCash !== null ? inputCash - expectedCash : 0;
+    const isActualBalanceValid = report !== null && actualBalance !== '' && Number.isFinite(inputCash) && inputCash >= 0;
     const requiresVarianceReason = isActualBalanceValid && Math.abs(variance) > 1;
     const paymentLabel = (method: string) => {
         const custom = settings.customPaymentMethods?.find(item => item.id === method);
@@ -147,10 +170,14 @@ export const ShiftManagementDrawer: React.FC = () => {
                     {!activeShift ? (
                         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                             <div className="w-20 h-20 bg-elevated/40 rounded-full flex items-center justify-center mb-6 border border-border/20">
-                                <AlertCircle size={32} className="text-muted/50" />
+                                {isRecheckingShift
+                                    ? <RefreshCw size={32} className="text-indigo-500 animate-spin" />
+                                    : <AlertCircle size={32} className="text-muted/50" />}
                             </div>
                             <h3 className="text-lg font-black text-main mb-2">
-                                {isRtl ? 'لم يتم فتح أي شيفت' : 'No Shift is Open'}
+                                {isRecheckingShift
+                                    ? (isRtl ? 'جاري التحقق من الوردية...' : 'Checking shift...')
+                                    : (isRtl ? 'لم يتم فتح أي شيفت' : 'No Shift is Open')}
                             </h3>
                             <p className="text-xs text-muted leading-relaxed max-w-xs">
                                 {isRtl 

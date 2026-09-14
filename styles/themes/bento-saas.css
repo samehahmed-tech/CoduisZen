@@ -1,0 +1,88 @@
+/* THEME 08 · BENTO SAAS — playful coral-rose light / midnight-rose dark */
+[data-theme='bento-saas'] {
+    --primary: 225, 29, 72;
+    --primary-hover: 190, 18, 60;
+    --secondary: 100, 116, 139;
+    --accent: 245, 158, 11;
+
+    --bg-app: 255, 245, 243;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 255, 240, 238;
+    --bg-elevated: 255, 250, 249;
+    --bg-global: 255, 245, 243;
+
+    --text-main: 46, 22, 30;
+    --text-muted: 150, 115, 125;
+
+    --border-color: 245, 215, 210;
+    --border-subtle: 245 215 210 / 0.6;
+    --glass-bg: 255 255 255 / 0.85;
+
+    --success: 16, 185, 129;
+    --warning: 245, 158, 11;
+    --danger: 220, 38, 38;
+    --info: 59, 130, 246;
+
+    --theme-page-bg: radial-gradient(700px 260px at 90% 0%, rgba(225,29,72,0.09), transparent 60%), radial-gradient(600px 240px at 8% 10%, rgba(245,158,11,0.08), transparent 60%), linear-gradient(180deg, #fff5f3 0%, #fbe9e5 100%);
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #fff7f5;
+    --theme-rail-bg: linear-gradient(180deg, #fff0ed 0%, #f9e2dc 100%);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.8);
+    --theme-table-head-bg: #fbe9e5;
+    --theme-row-hover-bg: rgba(225, 29, 72, 0.05);
+    --theme-input-bg: #fff4f2;
+    --theme-button-bg: linear-gradient(135deg, #e11d48 0%, #be1239 100%);
+    --theme-active-bg: rgba(225, 29, 72, 0.10);
+    --theme-focus-ring: rgba(225, 29, 72, 0.32);
+    --theme-popup-bg: #ffffff;
+
+    --chart-1: 225, 29, 72;
+    --chart-2: 245, 158, 11;
+    --chart-3: 16, 185, 129;
+    --chart-4: 59, 130, 246;
+    --chart-5: 139, 92, 246;
+    --chart-grid: 245 215 210 / 0.9;
+    --chart-tooltip-bg: #ffffff;
+}
+
+.dark [data-theme='bento-saas'],
+[data-theme='bento-saas'].dark {
+    --primary: 251, 113, 133;
+    --primary-hover: 253, 164, 175;
+    --secondary: 148, 163, 184;
+    --accent: 251, 191, 36;
+
+    --bg-app: 22, 10, 14;
+    --bg-card: 36, 18, 24;
+    --bg-sidebar: 26, 12, 17;
+    --bg-elevated: 48, 26, 32;
+    --bg-global: 22, 10, 14;
+
+    --text-main: 255, 238, 240;
+    --text-muted: 185, 150, 158;
+
+    --border-color: 72, 40, 47;
+    --border-subtle: 251 113 133 / 0.16;
+    --glass-bg: 36 18 24 / 0.85;
+
+    --theme-page-bg: radial-gradient(700px 260px at 90% 0%, rgba(225,29,72,0.14), transparent 60%), radial-gradient(600px 240px at 8% 10%, rgba(245,158,11,0.08), transparent 60%), linear-gradient(180deg, #1d0c11 0%, #120709 100%);
+    --theme-card-bg: #241218;
+    --theme-card-hover-bg: #332029;
+    --theme-rail-bg: linear-gradient(180deg, #1a0b0f 0%, #100608 100%);
+    --theme-topbar-bg: rgba(36, 18, 24, 0.8);
+    --theme-table-head-bg: #120709;
+    --theme-row-hover-bg: rgba(251, 113, 133, 0.10);
+    --theme-input-bg: #332029;
+    --theme-button-bg: linear-gradient(135deg, #e11d48 0%, #9f1239 100%);
+    --theme-active-bg: rgba(251, 113, 133, 0.16);
+    --theme-focus-ring: rgba(251, 113, 133, 0.42);
+    --theme-popup-bg: #332029;
+
+    --chart-1: 251, 113, 133;
+    --chart-2: 251, 191, 36;
+    --chart-3: 52, 211, 153;
+    --chart-4: 96, 165, 250;
+    --chart-5: 167, 139, 250;
+    --chart-grid: 72 40 47 / 0.9;
+    --chart-tooltip-bg: #332029;
+}

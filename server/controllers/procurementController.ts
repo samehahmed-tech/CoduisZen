@@ -21,9 +21,124 @@ import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import { createSignedAuditLog } from '../services/auditService';
 import { buildRequestHash } from '../services/idempotencyService';
+import { resolveSystemAccountCode, resolveTaxAccountCode } from '../services/financePostingService';
 
 const PO_RECEIPT_SCOPE = 'PURCHASE_ORDER_GRN';
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Supplier purchase return (spoiled / short / wrong delivery): decrements
+ * aggregate stock, records a PURCHASE_RETURN movement, and posts a supplier
+ * credit note (debit AP 2100 / credit inventory 1210). Batch rows are left
+ * untouched (aggregate-level return, reconciled by stock count).
+ */
+export const createPurchaseReturn = async (req: Request, res: Response) => {
+    try {
+        const body = req.body || {};
+        const warehouseId = String(body.warehouseId || '').trim();
+        const supplierId = String(body.supplierId || '').trim() || null;
+        const items = Array.isArray(body.items) ? body.items : [];
+        const reason = String(body.reason || '').trim();
+        const creditNoteRef = String(body.creditNoteRef || body.referenceNumber || '').trim();
+        const userId = String((req as any)?.user?.id || body.createdBy || 'system');
+        if (!warehouseId || items.length === 0 || reason.length < 3) {
+            return res.status(400).json({ error: 'WAREHOUSE_ITEMS_REASON_REQUIRED', code: 'WAREHOUSE_ITEMS_REASON_REQUIRED' });
+        }
+        const [warehouse] = await db.select({ id: warehouses.id, branchId: warehouses.branchId })
+            .top(1).from(warehouses).where(eq(warehouses.id, warehouseId));
+        if (!warehouse) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND', code: 'WAREHOUSE_NOT_FOUND' });
+
+        const returnId = `PRET-${Date.now().toString(36).toUpperCase()}`;
+        let totalValue = 0;
+        const returned: Array<{ itemId: string; quantity: number; unitPrice: number }> = [];
+        const skipped: Array<{ itemId: string; reason: string }> = [];
+
+        await db.transaction(async (tx) => {
+            for (const line of items) {
+                const itemId = String(line.itemId || line.inventoryItemId || '').trim();
+                const qty = Number(line.quantity || line.qty || 0);
+                const unitPrice = Number(line.unitPrice ?? line.price ?? 0);
+                if (!itemId || !(qty > 0)) {
+                    skipped.push({ itemId: itemId || '?', reason: 'INVALID_LINE' });
+                    continue;
+                }
+                const [stock] = await tx.select({ quantity: inventoryStock.quantity }).from(inventoryStock)
+                    .where(and(eq(inventoryStock.itemId, itemId), eq(inventoryStock.warehouseId, warehouseId)));
+                if (Number(stock?.quantity || 0) + 1e-6 < qty) {
+                    skipped.push({ itemId, reason: 'INSUFFICIENT_STOCK' });
+                    continue;
+                }
+                await tx.update(inventoryStock)
+                    .set({ quantity: sql`${inventoryStock.quantity} - ${qty}`, lastUpdated: new Date() })
+                    .where(and(
+                        eq(inventoryStock.itemId, itemId),
+                        eq(inventoryStock.warehouseId, warehouseId),
+                        sql`${inventoryStock.quantity} >= ${qty}`,
+                    ));
+                await tx.insert(stockMovements).values({
+                    itemId,
+                    fromWarehouseId: warehouseId,
+                    quantity: qty,
+                    unitCost: unitPrice,
+                    totalCost: qty * unitPrice,
+                    type: 'PURCHASE_RETURN',
+                    referenceId: returnId,
+                    reason: `Supplier return${supplierId ? ` / ${supplierId}` : ''}: ${reason}`,
+                    performedBy: userId,
+                    createdAt: new Date(),
+                });
+                totalValue += qty * unitPrice;
+                returned.push({ itemId, quantity: qty, unitPrice });
+            }
+            if (returned.length === 0) {
+                throw Object.assign(new Error('NOTHING_RETURNABLE'), { status: 409 });
+            }
+        });
+
+        // Supplier credit note (best-effort GL, audited on failure).
+        let glEntryId: string | null = null;
+        try {
+            const [apAccount, invAccount] = await Promise.all([
+                resolveSystemAccountCode('PURCHASE_RETURN', 'DEBIT', '2100'),
+                resolveSystemAccountCode('PURCHASE_RETURN', 'CREDIT', '1210'),
+            ]);
+            const result = await GLService.postJournalEntry({
+                reference: returnId,
+                referenceType: 'MANUAL',
+                description: `Supplier return ${returnId}${creditNoteRef ? ` / ${creditNoteRef}` : ''} — ${reason}`.slice(0, 200),
+                branchId: (warehouse as any).branchId,
+                createdBy: userId,
+                lines: [
+                    { accountCode: apAccount, debit: totalValue, credit: 0 },
+                    { accountCode: invAccount, debit: 0, credit: totalValue },
+                ],
+            });
+            glEntryId = typeof result === 'string' ? null : (result as any)?.entryId || null;
+        } catch (error: any) {
+            await createSignedAuditLog({
+                eventType: 'PURCHASE_RETURN_GL_FAILED',
+                userId,
+                branchId: (warehouse as any).branchId,
+                payload: { returnId, totalValue, error: String(error?.message || error) },
+            }).catch(() => undefined);
+        }
+
+        try {
+            getIO().to(`branch:${(warehouse as any).branchId}`).emit('stock:updated', { reason: 'PURCHASE_RETURN', referenceId: returnId });
+        } catch { /* socket optional */ }
+        await createSignedAuditLog({
+            eventType: 'PURCHASE_RETURN_CREATED',
+            userId,
+            branchId: (warehouse as any).branchId,
+            payload: { returnId, supplierId, totalValue, lines: returned.length, creditNoteRef, reason },
+        }).catch(() => undefined);
+
+        res.status(201).json({ id: returnId, totalValue, returned, skipped, glEntryId });
+    } catch (error: any) {
+        const status = Number((error as any)?.status) || 500;
+        res.status(status).json({ error: (error as any)?.message || 'PURCHASE_RETURN_FAILED', code: (error as any)?.message || 'PURCHASE_RETURN_FAILED' });
+    }
+};
 
 export const getGRNs = async (req: Request, res: Response) => {
     try {
@@ -468,19 +583,34 @@ export const createSupplierInvoice = async (req: Request, res: Response) => {
             // Post to GL if Auto-Approved
             if (matchStatus === 'APPROVED') {
                 const branchReq = grnId ? await tx.select().top(1).from(goodsReceiptNotes).where(eq(goodsReceiptNotes.id, grnId)) : [];
-                const branchId = branchReq[0]?.branchId || 'HQ';
+                const branchId = branchReq[0]?.branchId;
+                if (!branchId) throw new Error('SUPPLIER_INVOICE_BRANCH_REQUIRED');
+                // A GRN already posted the inventory value. The invoice only
+                // adds input VAT and the tax portion of the payable, avoiding
+                // a second inventory and AP posting.
+                const [inventoryAccount, payableAccount, inputTaxAccount] = await Promise.all([
+                    resolveSystemAccountCode('SUPPLIER_INVOICE', 'DEBIT', '1210'),
+                    resolveSystemAccountCode('SUPPLIER_INVOICE', 'CREDIT', '2100'),
+                    resolveTaxAccountCode('INPUT_VAT', '2220'),
+                ]);
+                const lines = grnId
+                    ? [
+                        { accountCode: inputTaxAccount, debit: Number(tax || 0), credit: 0 },
+                        { accountCode: payableAccount, debit: 0, credit: Number(tax || 0) },
+                    ]
+                    : [
+                        { accountCode: inventoryAccount, debit: Number(subtotal || 0), credit: 0 },
+                        { accountCode: inputTaxAccount, debit: Number(tax || 0), credit: 0 },
+                        { accountCode: payableAccount, debit: 0, credit: Number(total || 0) },
+                    ];
                 
                 await GLService.postJournalEntry({
                     reference: invoiceId,
-                    referenceType: 'MANUAL',
+                    referenceType: 'SUPPLIER_INVOICE',
                     description: `AP Bill for Invoice ${invoiceNumber || invoiceId}`,
                     branchId,
                     createdBy: userId || 'system',
-                    lines: [
-                        { accountCode: '2100', debit: 0, credit: total }, // Accounts Payable
-                        { accountCode: '2220', debit: tax, credit: 0 },   // Input VAT
-                        { accountCode: '1300', debit: subtotal, credit: 0 } // Inventory Asset
-                    ]
+                    lines,
                 });
             }
         });
@@ -507,25 +637,43 @@ export const approveSupplierInvoice = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Already processed' });
         }
 
+        const branchReq = invoice[0].grnId
+            ? await db.select().top(1).from(goodsReceiptNotes).where(eq(goodsReceiptNotes.id, invoice[0].grnId))
+            : [];
+        const branchId = branchReq[0]?.branchId;
+        if (!branchId) return res.status(409).json({ error: 'SUPPLIER_INVOICE_BRANCH_REQUIRED' });
+
         await db.update(supplierInvoices).set({ status: 'APPROVED' }).where(eq(supplierInvoices.id, id));
         
         // Post GL exactly like above...
+        const [inventoryAccount, payableAccount, inputTaxAccount] = await Promise.all([
+            resolveSystemAccountCode('SUPPLIER_INVOICE', 'DEBIT', '1210'),
+            resolveSystemAccountCode('SUPPLIER_INVOICE', 'CREDIT', '2100'),
+            resolveTaxAccountCode('INPUT_VAT', '2220'),
+        ]);
+        const invoiceLines = invoice[0].grnId
+            ? [
+                { accountCode: inputTaxAccount, debit: Number(invoice[0].tax || 0), credit: 0 },
+                { accountCode: payableAccount, debit: 0, credit: Number(invoice[0].tax || 0) },
+            ]
+            : [
+                { accountCode: inventoryAccount, debit: Number(invoice[0].subtotal || 0), credit: 0 },
+                { accountCode: inputTaxAccount, debit: Number(invoice[0].tax || 0), credit: 0 },
+                { accountCode: payableAccount, debit: 0, credit: Number(invoice[0].total || 0) },
+            ];
         await GLService.postJournalEntry({
             reference: id,
-            referenceType: 'MANUAL',
+            referenceType: 'SUPPLIER_INVOICE',
             description: `AP Bill (Manager Approved) ${invoice[0].invoiceNumber}`,
-            createdBy: userId,
-            lines: [
-                { accountCode: '2100', debit: 0, credit: invoice[0].total! }, 
-                { accountCode: '2220', debit: invoice[0].tax!, credit: 0 },   
-                { accountCode: '1300', debit: invoice[0].subtotal!, credit: 0 } // Inventory Asset
-            ]
+            branchId,
+            createdBy: userId || req.user?.id || 'system',
+            lines: invoiceLines,
         });
 
         await createSignedAuditLog({
             eventType: 'SUPPLIER_INVOICE_APPROVED',
             userId: userId || 'system',
-            branchId: null, // HQ level approval usually
+            branchId,
             payload: { invoiceId: id, total: invoice[0].total },
             reason: 'Manager approved supplier invoice variance (3-way match exception)',
             sourceDevice: req.headers['user-agent'] || 'unknown',

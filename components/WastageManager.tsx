@@ -14,6 +14,8 @@ type WastageEntry = {
     itemId: string;
     itemName?: string;
     warehouseId: string;
+    warehouseName?: string;
+    unit?: string;
     quantity: number;
     reason: string;
     notes?: string;
@@ -24,11 +26,10 @@ type WastageEntry = {
 
 type WastageTab = 'log' | 'record' | 'analytics';
 
-const REASONS = ['Expired', 'Damaged', 'Overproduction', 'Spoiled', 'Spillage', 'Return', 'Quality Fail', 'Other'];
+const REASONS = ['Expired', 'Damaged', 'Spoiled', 'Spillage', 'Return', 'Quality Fail', 'Other'];
 const reasonAr: Record<string, string> = {
     Expired: 'منتهي الصلاحية',
     Damaged: 'تالف',
-    Overproduction: 'زيادة إنتاج',
     Spoiled: 'فساد',
     Spillage: 'انسكاب',
     Return: 'مرتجع',
@@ -36,16 +37,37 @@ const reasonAr: Record<string, string> = {
     Other: 'أخرى',
 };
 
+// Older translations were stored as UTF-8 decoded through Windows-1256.
+// Repair that display-only corruption without changing database values.
+const repairArabic = (value: string) => {
+    if (!value || typeof TextDecoder === 'undefined') return value;
+    try {
+        const decoder = new TextDecoder('windows-1256');
+        const reverse = new Map<string, number>();
+        for (let byte = 0; byte < 256; byte += 1) reverse.set(decoder.decode(new Uint8Array([byte])), byte);
+        const bytes: number[] = [];
+        for (const char of value) {
+            const byte = reverse.get(char);
+            if (byte === undefined) return value;
+            bytes.push(byte);
+        }
+        const repaired = new TextDecoder().decode(new Uint8Array(bytes));
+        return repaired.includes('\uFFFD') || !/[\u0600-\u06FF]/.test(repaired) ? value : repaired;
+    } catch {
+        return value;
+    }
+};
+
 const WastageManager: React.FC = () => {
     const { settings } = useAuthStore();
-    const { inventory, warehouses } = useInventoryStore();
+    const { inventory, warehouses, fetchInventory, fetchWarehouses } = useInventoryStore();
     const currency = settings.currencySymbol || 'LE';
     const { success, error: showError } = useToast();
     const isAr = settings.language === 'ar';
-    const tr = (en: string, ar: string) => isAr ? ar : en;
+    const tr = (en: string, ar: string) => isAr ? repairArabic(ar) : en;
     const displayItemName = (item: any) => isAr ? (item.nameAr || item.name) : item.name;
     const displayWarehouseName = (wh: any) => isAr ? (wh.nameAr || wh.name) : wh.name;
-    const displayReason = (reason: string) => isAr ? (reasonAr[reason] || reason) : reason;
+    const displayReason = (reason: string) => isAr ? repairArabic(reasonAr[reason] || reason) : reason;
 
     const [activeTab, setActiveTab] = useState<WastageTab>('log');
     const [entries, setEntries] = useState<WastageEntry[]>([]);
@@ -53,11 +75,28 @@ const WastageManager: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [form, setForm] = useState({ itemId: '', warehouseId: '', quantity: '1', reason: 'Expired', notes: '' });
+    const [filters, setFilters] = useState({ startDate: '', endDate: '', warehouseId: '', itemId: '', reason: '' });
+
+    const activeInventory = useMemo(() => inventory.filter(item => item.isActive !== false), [inventory]);
+    const activeWarehouses = useMemo(() => warehouses.filter(warehouse => warehouse.isActive !== false), [warehouses]);
+    const getWarehouseRows = (item: any) => Array.isArray(item?.warehouseQuantities) ? item.warehouseQuantities : [];
+    const getItemWarehouseQty = (item: any, warehouseId: string) =>
+        Number(getWarehouseRows(item).find((row: any) => row.warehouseId === warehouseId)?.quantity || 0);
+    const itemsForSelectedWarehouse = useMemo(() => {
+        if (!form.warehouseId) return activeInventory;
+        const linkedItems = activeInventory.filter(item => getWarehouseRows(item).some((row: any) => row.warehouseId === form.warehouseId));
+        return linkedItems.length > 0 ? linkedItems : activeInventory;
+    }, [activeInventory, form.warehouseId]);
+    const selectedItem = activeInventory.find(item => item.id === form.itemId);
+    const currentStock = selectedItem && form.warehouseId
+        ? getItemWarehouseQty(selectedItem, form.warehouseId)
+        : 0;
+    const quantityStep = selectedItem && ['COUNT', 'PACK', 'BOX', 'BOTTLE'].includes(String(selectedItem.unit).toUpperCase()) ? '1' : '0.001';
 
     const load = async () => {
         setIsLoading(true);
         try {
-            const [entries, rep] = await Promise.all([wastageApi.getRecent(100), wastageApi.getReport()]);
+            const [entries, rep] = await Promise.all([wastageApi.getRecent(500), wastageApi.getReport(filters)]);
             setEntries(entries || []);
             setReport(rep);
         } catch (error: any) {
@@ -67,11 +106,18 @@ const WastageManager: React.FC = () => {
         }
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => {
+        void fetchInventory();
+        void fetchWarehouses();
+    }, [fetchInventory, fetchWarehouses]);
+
+    useEffect(() => {
+        void load();
+    }, [filters.startDate, filters.endDate, filters.warehouseId, filters.itemId, filters.reason]);
 
     const handleRecord = async () => {
         const quantity = Number(form.quantity);
-        if (!form.itemId || !form.warehouseId || !Number.isFinite(quantity) || quantity <= 0) {
+        if (!form.itemId || !form.warehouseId || !Number.isFinite(quantity) || quantity <= 0 || quantity > currentStock) {
             showError(tr('Select item, warehouse, and a valid quantity.', 'اختر الصنف والمخزن وكمية صحيحة.'));
             return;
         }
@@ -83,15 +129,16 @@ const WastageManager: React.FC = () => {
             });
             setShowModal(false);
             setForm({ itemId: '', warehouseId: '', quantity: '1', reason: 'Expired', notes: '' });
+            await useInventoryStore.getState().fetchInventory();
             await load();
-            success(tr('Wastage recorded', 'تم تسجيل الهالك'));
+            success(tr('Wastage approval requested', 'تم إرسال طلب اعتماد الهالك'));
         } catch (e: any) { showError(e.message); }
     };
 
     const totals = useMemo(() => ({
-        totalEvents: entries.length,
-        totalCost: entries.reduce((s, e) => s + (e.costImpact || 0), 0),
-        totalQty: entries.reduce((s, e) => s + e.quantity, 0),
+        totalEvents: Number(report?.summary?.totalIncidents ?? entries.length),
+        totalCost: Number(report?.summary?.totalCost ?? entries.reduce((s, e) => s + (e.costImpact || 0), 0)),
+        totalQty: Number(report?.summary?.totalQty ?? entries.reduce((s, e) => s + e.quantity, 0)),
         topReason: (() => {
             const counts: Record<string, number> = {};
             entries.forEach(e => { counts[e.reason] = (counts[e.reason] || 0) + 1; });
@@ -144,6 +191,13 @@ const WastageManager: React.FC = () => {
             </div>
 
             {/* Tabs */}
+            <div className="card-primary border border-border rounded-2xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <input type="date" value={filters.startDate} onChange={e => setFilters(f => ({ ...f, startDate: e.target.value }))} className="px-3 py-2.5 bg-app border border-border rounded-xl text-xs font-bold text-main" aria-label={tr('Start date', 'طھط§ط±ظٹط® ط§ط¨طھط¯ط§ط،')} />
+                <input type="date" value={filters.endDate} onChange={e => setFilters(f => ({ ...f, endDate: e.target.value }))} className="px-3 py-2.5 bg-app border border-border rounded-xl text-xs font-bold text-main" aria-label={tr('End date', 'طھط§ط±ظٹط® ط§ظ†طھظ‡ط§ط،')} />
+                <select value={filters.itemId} onChange={e => setFilters(f => ({ ...f, itemId: e.target.value }))} className="px-3 py-2.5 bg-app border border-border rounded-xl text-xs font-bold text-main"><option value="">{tr('All items', 'ظƒظ„ ط§ظ„ط£طµظ†ط§ظپ')}</option>{activeInventory.map(item => <option key={item.id} value={item.id}>{displayItemName(item)}</option>)}</select>
+                <select value={filters.warehouseId} onChange={e => setFilters(f => ({ ...f, warehouseId: e.target.value }))} className="px-3 py-2.5 bg-app border border-border rounded-xl text-xs font-bold text-main"><option value="">{tr('All warehouses', 'ظƒظ„ ط§ظ„ظ…ط®ط§ط²ظ†')}</option>{activeWarehouses.map(wh => <option key={wh.id} value={wh.id}>{displayWarehouseName(wh)}</option>)}</select>
+                <select value={filters.reason} onChange={e => setFilters(f => ({ ...f, reason: e.target.value }))} className="px-3 py-2.5 bg-app border border-border rounded-xl text-xs font-bold text-main"><option value="">{tr('All reasons', 'ظƒظ„ ط§ظ„ط£ط³ط¨ط§ط¨')}</option>{REASONS.map(reason => <option key={reason} value={reason}>{displayReason(reason)}</option>)}</select>
+            </div>
             <div className="flex gap-1 mb-8 bg-elevated/40 p-1.5 rounded-2xl border border-border w-fit">
                 {[
                     { id: 'log' as WastageTab, label: tr('Recent Log', 'آخر السجلات'), icon: Clock },
@@ -180,7 +234,7 @@ const WastageManager: React.FC = () => {
                                     return (
                                         <tr key={e.id || i} className="hover:bg-elevated/20 transition-all">
                                             <td className="px-6 py-4 text-xs font-black text-main">{e.itemName || (item ? displayItemName(item) : e.itemId)}</td>
-                                            <td className="px-4 py-4 font-mono text-xs font-black text-rose-500">{e.quantity}</td>
+                                            <td className="px-4 py-4 font-mono text-xs font-black text-rose-500">{e.quantity} {item?.unit || ''}</td>
                                             <td className="px-4 py-4"><span className="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600 text-[9px] font-black uppercase">{displayReason(e.reason)}</span></td>
                                             <td className="px-4 py-4 text-[10px] text-muted truncate max-w-[150px]">{e.notes || '—'}</td>
                                             <td className="px-4 py-4 text-[10px] font-bold text-main">{e.performedBy || '—'}</td>
@@ -198,6 +252,10 @@ const WastageManager: React.FC = () => {
             {/* ANALYTICS TAB */}
             {activeTab === 'analytics' && report && (
                 <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                    <div className="card-primary border border-border rounded-[2.5rem] p-6 shadow-sm">
+                        <h3 className="text-lg font-black text-main uppercase tracking-tight mb-5">{tr('Detailed wastage report', 'طھظ‚ط±ظٹط± ط§ظ„ظ‡ط§ظ„ظƒ ط§ظ„طھظپطµظٹظ„ظٹ')}</h3>
+                        <div className="responsive-table overflow-auto"><table className="w-full text-sm"><thead className="bg-app/50 text-[9px] font-black uppercase text-muted"><tr><th className="px-4 py-3 text-start">{tr('Item', 'ط§ظ„طµظ†ظپ')}</th><th className="px-4 py-3 text-start">{tr('Warehouse', 'ط§ظ„ظ…ط®ط²ظ†')}</th><th className="px-4 py-3 text-start">{tr('Reason', 'ط§ظ„ط³ط¨ط¨')}</th><th className="px-4 py-3 text-end">{tr('Qty', 'ط§ظ„ظƒظ…ظٹط©')}</th><th className="px-4 py-3 text-end">{tr('Cost', 'ط§ظ„طھظƒظ„ظپط©')}</th><th className="px-4 py-3 text-end">{tr('Events', 'ط§ظ„ط¹ظ…ظ„ظٹط§طھ')}</th></tr></thead><tbody className="divide-y divide-border/20">{(report.items || []).map((row: any) => <tr key={`${row.itemId}-${row.warehouseId}-${row.reason}`}><td className="px-4 py-3 font-black text-main">{row.itemName || row.itemId}</td><td className="px-4 py-3 text-muted">{row.warehouseName || row.warehouseId || '-'}</td><td className="px-4 py-3"><span className="text-[10px] font-black text-amber-600">{displayReason(row.reason)}</span></td><td className="px-4 py-3 text-end font-black text-rose-500">{Number(row.totalQty || 0).toLocaleString()}</td><td className="px-4 py-3 text-end font-black text-rose-500">{Number(row.costImpact || 0).toLocaleString()} {currency}</td><td className="px-4 py-3 text-end font-black">{row.count || 0}</td></tr>)}</tbody></table></div>
+                    </div>
                     <div className="card-primary border border-border rounded-[2.5rem] p-6 shadow-sm">
                         <h3 className="text-lg font-black text-main uppercase tracking-tight mb-6">{tr('Wastage by Reason', 'الهالك حسب السبب')}</h3>
                         <div className="space-y-4">
@@ -234,21 +292,30 @@ const WastageManager: React.FC = () => {
                                 <select value={form.itemId} onChange={e => setForm({ ...form, itemId: e.target.value })}
                                     className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-amber-500 text-main">
                                     <option value="">{tr('Select item...', 'اختر الصنف...')}</option>
-                                    {inventory.map(item => <option key={item.id} value={item.id}>{displayItemName(item)}</option>)}
+                                        {itemsForSelectedWarehouse.map(item => <option key={item.id} value={item.id}>{displayItemName(item)} — {form.warehouseId ? getItemWarehouseQty(item, form.warehouseId) : Number((item as any).quantity || 0)} {item.unit}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{tr('Warehouse', 'المخزن')}</label>
-                                <select value={form.warehouseId} onChange={e => setForm({ ...form, warehouseId: e.target.value })}
+                                <select value={form.warehouseId} onChange={e => setForm({ ...form, warehouseId: e.target.value, itemId: '' })}
                                     className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-amber-500 text-main">
                                     <option value="">{tr('Select warehouse...', 'اختر المخزن...')}</option>
-                                    {warehouses.map(wh => <option key={wh.id} value={wh.id}>{displayWarehouseName(wh)}</option>)}
+                                    {activeWarehouses.map(wh => <option key={wh.id} value={wh.id}>{displayWarehouseName(wh)}</option>)}
                                 </select>
                             </div>
+                            {form.itemId && form.warehouseId && (
+                                <div className={`rounded-xl border px-4 py-3 ${currentStock > 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-rose-500/30 bg-rose-500/10'}`}>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted">{tr('Current balance', 'ط§ظ„ط±طµظٹط¯ ط§ظ„ط­ط§ظ„ظٹ')}</span>
+                                        <strong className="text-sm font-black text-main">{currentStock} {selectedItem?.unit || ''}</strong>
+                                    </div>
+                                    <p className="mt-1 text-[10px] font-bold text-muted">{selectedItem?.name || ''} / {displayWarehouseName(activeWarehouses.find(wh => wh.id === form.warehouseId))}</p>
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{tr('Quantity', 'الكمية')}</label>
-                                    <input type="number" min={1} value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })}
+                                    <input type="number" min={quantityStep} max={currentStock || undefined} step={quantityStep} value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })}
                                         className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-black outline-none focus:border-amber-500 text-main" />
                                 </div>
                                 <div>

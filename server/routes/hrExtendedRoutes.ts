@@ -19,6 +19,17 @@ import { randomUUID } from 'crypto';
 const router = Router();
 const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 
+// HR data includes salaries, national IDs and bank accounts: role-gate the
+// whole surface (branch scoping below stays as the second layer).
+const hrRoles = ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGER', 'PAYROLL_OFFICER', 'MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR'] as const;
+router.use((req: Request, res: Response, next: NextFunction) => {
+    const role = String((req as any)?.user?.role || '').toUpperCase();
+    if (!(hrRoles as readonly string[]).includes(role)) {
+        return res.status(403).json({ error: 'FORBIDDEN_ROLE', code: 'FORBIDDEN_ROLE', message: 'HR access requires an HR role.' });
+    }
+    return next();
+});
+
 router.use((req: Request, res: Response, next: NextFunction) => {
     if (['SUPER_ADMIN', 'OWNER'].includes(String(req.user?.role || '').toUpperCase())) return next();
     return scopeBranchQuery(req, res, () => {

@@ -5,7 +5,7 @@
  */
 
 import { db } from '../db';
-import { chartOfAccounts, journalEntries, journalLines } from '../../src/db/schema';
+import { chartOfAccounts, journalEntries, journalLines, costCenters, postingRules } from '../../src/db/schema';
 import { eq, and, lte, gte, sql, inArray } from 'drizzle-orm';
 
 // =============================================================================
@@ -120,7 +120,7 @@ const ACCOUNT_CODES = {
     CURRENT_LIABILITY_MAX: '2399',
 };
 
-async function getAccountBalances(startDate?: string, endDate?: string) {
+async function getAccountBalances(startDate?: string, endDate?: string, branchId?: string) {
     let dateFilter = sql`${journalEntries.status} = 'POSTED'`;
     if (startDate) {
         dateFilter = and(dateFilter, gte(journalEntries.date, new Date(startDate)));
@@ -144,19 +144,26 @@ async function getAccountBalances(startDate?: string, endDate?: string) {
     .from(chartOfAccounts)
     .leftJoin(journalLines, eq(chartOfAccounts.id, journalLines.accountId))
     .leftJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
-    .where(dateFilter)
+    .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+    .where(and(dateFilter, branchId ? eq(costCenters.branchId, branchId) : undefined))
     .groupBy(chartOfAccounts.id, chartOfAccounts.code, chartOfAccounts.name, chartOfAccounts.type, chartOfAccounts.normalBalance, chartOfAccounts.parentId);
 
-    const accountsMap = await db.select().from(chartOfAccounts);
+    const balanceByAccount = new Map(balances.map(row => [row.accountId, row]));
 
-    return accountsMap.map(acc => {
-        const b = balances.find(x => x.accountId === acc.id);
+    return balances.map(acc => {
+        const b = balanceByAccount.get(acc.accountId);
         const debit = Number(b?.totalDebit || 0);
         const credit = Number(b?.totalCredit || 0);
         const balance = acc.normalBalance === 'DEBIT' ? debit - credit : credit - debit;
             
         return {
-            ...acc,
+            id: acc.accountId,
+            code: acc.code,
+            name: acc.name,
+            nameAr: null,
+            type: acc.type,
+            normalBalance: acc.normalBalance,
+            parentId: acc.parentId,
             debit,
             credit,
             balance
@@ -168,45 +175,91 @@ function getHierarchyBalances(balances: any[], prefix: string) {
     return balances.filter(a => a.code.startsWith(prefix));
 }
 
+const leafAccounts = (balances: any[]) => balances.filter(a => !balances.some(x => x.parentId === a.id));
+
+const getAncestors = (account: any, byId: Map<string, any>) => {
+    const ancestors: any[] = [];
+    let cursor = account?.parentId ? byId.get(account.parentId) : undefined;
+    const seen = new Set<string>();
+    while (cursor && !seen.has(cursor.id)) {
+        ancestors.push(cursor);
+        seen.add(cursor.id);
+        cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+    return ancestors;
+};
+
+const isNonCurrentAccount = (account: any, byId: Map<string, any>) => {
+    const chain = [account, ...getAncestors(account, byId)];
+    return chain.some(a => {
+        const code = String(a.code || '');
+        const name = `${a.name || ''} ${a.nameAr || ''}`.toLowerCase();
+        return code.startsWith('14') || code.startsWith('15') || /fixed|non[- ]current|long[- ]term|ثابت|غير متداول|طويل/.test(name);
+    });
+};
+
+const getCogsAccountIds = async (balances: any[]) => {
+    const [rule] = await db.select({ accountCode: postingRules.accountCode })
+        .from(postingRules)
+        .where(and(eq(postingRules.documentType, 'COGS'), eq(postingRules.amountSource, 'SYSTEM'), eq(postingRules.direction, 'DEBIT'), eq(postingRules.isActive, true)))
+        .top(1);
+    if (!rule?.accountCode) return new Set<string>();
+    const byId = new Map(balances.map(a => [a.id, a]));
+    const root = balances.find(a => a.code === rule.accountCode);
+    if (!root) return new Set<string>();
+    const ids = new Set<string>([root.id]);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const account of balances) {
+            if (account.parentId && ids.has(account.parentId) && !ids.has(account.id)) { ids.add(account.id); changed = true; }
+        }
+    }
+    // If the mapping points at a leaf, it remains a valid one-account COGS tree.
+    return ids;
+};
+
+const getConfiguredAccountCode = async (documentType: string, direction: 'DEBIT' | 'CREDIT', fallback: string) => {
+    const [rule] = await db.select({ accountCode: postingRules.accountCode })
+        .from(postingRules)
+        .where(and(eq(postingRules.documentType, documentType), eq(postingRules.amountSource, 'SYSTEM'), eq(postingRules.direction, direction), eq(postingRules.isActive, true)))
+        .top(1);
+    return rule?.accountCode || fallback;
+};
+
 // =============================================================================
 // Service Methods
 // =============================================================================
 
 export const financialStatements = {
 
-    async profitAndLoss(periodStart: string, periodEnd: string): Promise<ProfitAndLossReport> {
-        const balances = await getAccountBalances(periodStart, periodEnd);
+    async profitAndLoss(periodStart: string, periodEnd: string, branchId?: string): Promise<ProfitAndLossReport> {
+        const balances = await getAccountBalances(periodStart, periodEnd, branchId);
+        const leaves = leafAccounts(balances);
+        const cogsIds = await getCogsAccountIds(balances);
         
-        // Revenue (4xxx)
-        const revenueItems = getHierarchyBalances(balances, '4')
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        // Revenue is classified by account type, so a customer can use any
+        // valid code structure in their own chart.
+        const revenueItems = leaves
+            .filter(a => a.type === 'REVENUE' && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const totalRevenue = revenueItems.reduce((acc, val) => acc + val.amount, 0);
 
-        // COGS (51xx)
-        const cogsItems = getHierarchyBalances(balances, '51')
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        const cogsItems = leaves
+            .filter(a => a.type === 'EXPENSE' && cogsIds.has(a.id) && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const totalCOGS = cogsItems.reduce((acc, val) => acc + val.amount, 0);
         
         const grossProfit = totalRevenue - totalCOGS;
 
-        // OPEX (52xx-59xx)
-        const opexItems = balances
-            .filter(a => a.type === 'EXPENSE' && a.code >= '5200' && a.code < '6000')
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        const opexItems = leaves
+            .filter(a => a.type === 'EXPENSE' && !cogsIds.has(a.id) && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const totalOpex = opexItems.reduce((acc, val) => acc + val.amount, 0);
 
         const operatingIncome = grossProfit - totalOpex;
 
-        // Other Income/Expenses (6xxx)
-        const otherExpenseItems = getHierarchyBalances(balances, '6')
-            .filter(a => a.type === 'EXPENSE' && !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
-            .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
-        const totalOtherExpenses = otherExpenseItems.reduce((acc, val) => acc + val.amount, 0);
-
-        const netIncome = operatingIncome - totalOtherExpenses;
+        const netIncome = operatingIncome;
 
         return {
             periodStart,
@@ -219,37 +272,35 @@ export const financialStatements = {
             operatingExpenses: { items: opexItems, total: totalOpex },
             operatingIncome,
             otherIncome: { items: [], total: 0 },
-            otherExpenses: { items: otherExpenseItems, total: totalOtherExpenses },
+            otherExpenses: { items: [], total: 0 },
             netIncome,
             netMargin: totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0,
         };
     },
 
-    async balanceSheet(asOfDate?: string): Promise<BalanceSheetReport> {
+    async balanceSheet(asOfDate?: string, branchId?: string): Promise<BalanceSheetReport> {
         // Balance sheet requires cumulative balances, so no start date
-        const balances = await getAccountBalances(undefined, asOfDate || new Date().toISOString());
+        const balances = await getAccountBalances(undefined, asOfDate || new Date().toISOString(), branchId);
 
-        const currentAssets = balances
-            .filter(a => a.type === 'ASSET' && a.code <= ACCOUNT_CODES.CURRENT_ASSET_MAX)
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        const byId = new Map(balances.map(a => [a.id, a]));
+        const leaves = leafAccounts(balances);
+        const currentAssets = leaves
+            .filter(a => a.type === 'ASSET' && !isNonCurrentAccount(a, byId) && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const currentAssetsTotal = currentAssets.reduce((s, i) => s + i.amount, 0);
 
-        const nonCurrentAssets = balances
-            .filter(a => a.type === 'ASSET' && a.code >= ACCOUNT_CODES.NON_CURRENT_ASSET_MIN)
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        const nonCurrentAssets = leaves
+            .filter(a => a.type === 'ASSET' && isNonCurrentAccount(a, byId) && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const nonCurrentAssetsTotal = nonCurrentAssets.reduce((s, i) => s + i.amount, 0);
 
-        const currentLiabilities = balances
-            .filter(a => a.type === 'LIABILITY' && a.code <= ACCOUNT_CODES.CURRENT_LIABILITY_MAX)
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        const currentLiabilities = leaves
+            .filter(a => a.type === 'LIABILITY' && !isNonCurrentAccount(a, byId) && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const currentLiabilitiesTotal = currentLiabilities.reduce((s, i) => s + i.amount, 0);
 
-        const nonCurrentLiabilities = balances
-            .filter(a => a.type === 'LIABILITY' && a.code > ACCOUNT_CODES.CURRENT_LIABILITY_MAX)
-            .filter(a => !balances.some(x => x.parentId === a.id) && Math.abs(a.balance) > 0.001)
+        const nonCurrentLiabilities = leaves
+            .filter(a => a.type === 'LIABILITY' && isNonCurrentAccount(a, byId) && Math.abs(a.balance) > 0.001)
             .map(a => ({ code: a.code, name: a.name, amount: a.balance }));
         const nonCurrentLiabilitiesTotal = nonCurrentLiabilities.reduce((s, i) => s + i.amount, 0);
 
@@ -291,9 +342,9 @@ export const financialStatements = {
         };
     },
 
-    async cashFlowStatement(periodStart: string, periodEnd: string): Promise<CashFlowReport> {
-        const periodBalances = await getAccountBalances(periodStart, periodEnd);
-        const pnl = await this.profitAndLoss(periodStart, periodEnd);
+    async cashFlowStatement(periodStart: string, periodEnd: string, branchId?: string): Promise<CashFlowReport> {
+        const periodBalances = await getAccountBalances(periodStart, periodEnd, branchId);
+        const pnl = await this.profitAndLoss(periodStart, periodEnd, branchId);
 
         const operatingItems: CashFlowLineItem[] = [];
         operatingItems.push({ description: 'Net Income', amount: pnl.netIncome, source: 'P&L' });
@@ -350,7 +401,7 @@ export const financialStatements = {
         }
         const totalFinancing = financingItems.reduce((s, i) => s + i.amount, 0);
 
-        const priorBalances = await getAccountBalances(undefined, new Date(new Date(periodStart).getTime() - 1).toISOString());
+        const priorBalances = await getAccountBalances(undefined, new Date(new Date(periodStart).getTime() - 1).toISOString(), branchId);
         const openingCashBalance = getHierarchyBalances(priorBalances, ACCOUNT_CODES.CASH_PREFIX)
             .reduce((s, a) => s + a.balance, 0);
 
@@ -369,7 +420,8 @@ export const financialStatements = {
         };
     },
 
-    async accountsReceivable(): Promise<AccountsReceivableSummary> {
+    async accountsReceivable(branchId?: string): Promise<AccountsReceivableSummary> {
+        const receivableCode = await getConfiguredAccountCode('RECEIVABLE', 'DEBIT', ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
         // Query journal lines directly for AR aging
         const rows = await db.select({
             date: journalEntries.date,
@@ -379,7 +431,8 @@ export const financialStatements = {
         .from(journalLines)
         .leftJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
         .leftJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
-        .where(eq(chartOfAccounts.code, ACCOUNT_CODES.ACCOUNTS_RECEIVABLE));
+        .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+        .where(and(eq(chartOfAccounts.code, receivableCode), branchId ? eq(costCenters.branchId, branchId) : undefined));
 
         const byRef: Record<string, { amount: number, date: Date }> = {};
         for(const row of rows) {
@@ -417,7 +470,8 @@ export const financialStatements = {
         };
     },
 
-    async accountsPayable(): Promise<AccountsPayableSummary> {
+    async accountsPayable(branchId?: string): Promise<AccountsPayableSummary> {
+        const payableCode = await getConfiguredAccountCode('PAYABLE', 'CREDIT', ACCOUNT_CODES.ACCOUNTS_PAYABLE);
         // Query journal lines directly for AP aging
         const rows = await db.select({
             date: journalEntries.date,
@@ -427,7 +481,8 @@ export const financialStatements = {
         .from(journalLines)
         .leftJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
         .leftJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
-        .where(eq(chartOfAccounts.code, ACCOUNT_CODES.ACCOUNTS_PAYABLE));
+        .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+        .where(and(eq(chartOfAccounts.code, payableCode), branchId ? eq(costCenters.branchId, branchId) : undefined));
 
         const byRef: Record<string, { amount: number, date: Date }> = {};
         for(const row of rows) {

@@ -29,7 +29,9 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ── Performance Middlewares ──
-app.use(compression({ threshold: 1024 })); // gzip/brotli for responses > 1KB
+// threshold 512: small API JSON payloads (orders/menu/settings deltas) also
+// compress — the dominant cost on LAN is round-trips, not CPU.
+app.use(compression({ threshold: 512, level: 6, memLevel: 8 })); // gzip for responses > 512B
 
 // ── SSL/TLS Enforcement ──
 app.use(enforceHttps);
@@ -80,6 +82,7 @@ import setupRoutes from './routes/setupRoutes';
 import printGatewayGatewayRoutes from './routes/printGatewayGatewayRoutes';
 import attendanceBridgeRoutes from './routes/attendanceBridgeRoutes';
 import publicScreenRoutes from './routes/publicScreenRoutes';
+import deploymentRoutes from './routes/deploymentRoutes';
 
 // Public Routes & Modules
 app.use('/api/auth', authRoutes); // Expose auth globally before token check
@@ -87,6 +90,7 @@ app.use('/api/setup', setupRoutes); // Expose setup globally
 app.use('/api/whatsapp', whatsappWebhookRoutes); // Public WhatsApp webhook only
 app.use('/api/attendance-bridge', attendanceBridgeRoutes); // Expose branch attendance bridge ingest
 app.use('/api/public-screens', publicScreenRoutes); // Link-only KDS/Packing screens for legacy operator displays
+app.use('/api/deployment', deploymentRoutes);
 app.use('/iclock', admsRoutes); // ADMS Biometric Endpoint (Must be top-level)
 
 // Bridge routes — fail closed unless PRINT_GATEWAY_TOKEN is configured and supplied.
@@ -148,8 +152,10 @@ import hrExtendedRoutes from './routes/hrExtendedRoutes';
 import barcodeRoutes from './routes/barcodeRoutes';
 import whatsappRoutes from './routes/whatsappRoutes';
 import waitlistRoutes from './routes/waitlistRoutes';
+import reservationRoutes from './routes/reservationRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
 import ttsRoutes from './routes/ttsRoutes';
+import mailRoutes from './routes/mailRoutes';
 
 app.use('/api/settings', settingsRoutes);
 app.use('/api/branches', branchRoutes);
@@ -180,8 +186,10 @@ app.use('/api/hr-extended', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+app.use('/api/reservations', reservationRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/tts', ttsRoutes);
+app.use('/api/mail', mailRoutes);
 
 // Legacy/Specific Support (to be moved fully in next phase)
 import approvalRoutes from './routes/approvalRoutes';
@@ -194,11 +202,11 @@ import attendanceOpsRoutes from './routes/attendanceOpsRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import rolesRoutes from './routes/rolesRoutes';
 
-app.use('/api/approvals', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'), approvalRoutes);
+app.use('/api/approvals', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER', 'WAITER', 'CALL_CENTER', 'CALL_CENTER_MANAGER', 'CALL_CENTER_AGENT'), approvalRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/menu', menuRoutes);
-app.use('/api/call-center', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CALL_CENTER_MANAGER'), callCenterSupervisorRoutes);
+app.use('/api/call-center', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CALL_CENTER_MANAGER', 'CALL_CENTER', 'CALL_CENTER_AGENT'), callCenterSupervisorRoutes);
 app.use('/api/webhooks', requireRoles('SUPER_ADMIN', 'OWNER'), webhookRoutes);
 app.use('/api/migration', requireRoles('SUPER_ADMIN', 'OWNER'), migrationRoutes);
 app.use('/api/analytics', analyticsRoutes);

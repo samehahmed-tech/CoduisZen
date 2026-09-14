@@ -114,6 +114,26 @@ function waitForSqlService(server) {
   throw new Error(`SQL Server service ${service} did not become ready.`);
 }
 
+// SQL error numbers that mean "already there" and are safe to skip when
+// (re)applying empty-schema.sql onto a partial database left by an older
+// installer run. Anything else still throws so real problems surface.
+const IDEMPOTENT_SQL_ERRORS = new Set([2714, 1913, 2627, 2601]);
+
+async function runSchemaBatches(pool) {
+  const schema = fs.readFileSync(path.join(root, 'database', 'empty-schema.sql'), 'utf8');
+  let applied = 0, skipped = 0;
+  for (const batch of schema.split(/^\s*GO\s*$/gim).map(x => x.trim()).filter(Boolean)) {
+    try {
+      await pool.request().batch(batch);
+      applied += 1;
+    } catch (error) {
+      if (IDEMPOTENT_SQL_ERRORS.has(error?.number)) { skipped += 1; continue; }
+      throw error;
+    }
+  }
+  log(`empty-schema batches applied=${applied} skipped=${skipped}`);
+}
+
 async function ensureEmptyDatabase(connectionString) {
   const sql = require('mssql/msnodesqlv8');
   const master = connectionString.replace(/Database=[^;]*/i, 'Database=master');
@@ -126,11 +146,15 @@ async function ensureEmptyDatabase(connectionString) {
   pool = await new sql.ConnectionPool({ connectionString }).connect();
   await pool.request().query("IF USER_ID(N'NT AUTHORITY\\SYSTEM') IS NULL CREATE USER [NT AUTHORITY\\SYSTEM] FOR LOGIN [NT AUTHORITY\\SYSTEM]; IF IS_ROLEMEMBER(N'db_owner', N'NT AUTHORITY\\SYSTEM') = 0 ALTER ROLE [db_owner] ADD MEMBER [NT AUTHORITY\\SYSTEM]");
   const schemaExists = await pool.request().query("SELECT OBJECT_ID(N'users', N'U') AS id");
-  if (schemaExists.recordset?.[0]?.id) { await pool.close(); return false; }
-  const schema = fs.readFileSync(path.join(root, 'database', 'empty-schema.sql'), 'utf8');
-  for (const batch of schema.split(/^\s*GO\s*$/gim).map(x => x.trim()).filter(Boolean)) await pool.request().batch(batch);
+  const fresh = !schemaExists.recordset?.[0]?.id;
+  // NOTE: most empty-schema.sql batches have no IF OBJECT_ID guard, and a
+  // previous installer version could leave a half-created database behind.
+  // runSchemaBatches therefore re-applies everything while skipping
+  // "already exists" errors, so partial databases get completed instead of
+  // failing with "There is already an object named 'users'".
+  await runSchemaBatches(pool);
   await pool.close();
-  return true;
+  return fresh;
 }
 
 async function ensureDatabaseWithRetry(connectionString) {
@@ -243,7 +267,7 @@ function runSchemaDoctor() {
   if (doctor.status !== 0) return { warning: `Schema Doctor: ${publicError(doctor.stderr || doctor.stdout || 'فشل الفحص')}` };
   try {
     const report = JSON.parse(String(doctor.stdout || '').trim().split(/\r?\n/).pop());
-    return { repairs: report.added || [], missingTables: report.missingTables || [] };
+    return { repairs: report.added || [], createdTables: report.createdTables || [], missingTables: report.missingTables || [] };
   } catch (error) {
     return { warning: `Schema Doctor result: ${publicError(error)}` };
   }
@@ -348,7 +372,8 @@ async function install() {
     if (!databaseCreated) createVerifiedBackup();
     const schema = runSchemaDoctor();
     if (schema.warning) throw new Error(schema.warning);
-    if (schema.missingTables?.length) throw new Error(`جداول ناقصة: ${schema.missingTables.slice(0, 20).join(', ')}`);
+    if (schema.createdTables?.length) log(`schema-doctor auto-created tables: ${schema.createdTables.join(', ')}`);
+    if (schema.missingTables?.length) throw new Error(`Missing tables after auto-repair (check logs/installer.log): ${schema.missingTables.slice(0, 20).join(', ')}`);
     resetTablesAfterUpgrade();
     if (databaseCreated) createVerifiedBackup();
     const recoveryUsers = run(path.join(root, 'runtime', 'node.exe'), [path.join(root, 'runtime', 'create-recovery-admin.cjs')]);

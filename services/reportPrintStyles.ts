@@ -1,15 +1,38 @@
-export const getReportPrintCSS = (restaurantName: string, reportTitle: string, dateRange: string): string => {
+export interface ReportPrintOptions {
+   /** Custom restaurant logo (data URL or absolute URL). Falls back to /logo.png. */
+   logoUrl?: string;
+   /** A4 orientation — landscape fits accounting tables best. */
+   orientation?: 'portrait' | 'landscape';
+   /** Extra meta chips rendered under the title (e.g. cashier, filters). */
+   extraMeta?: string[];
+}
+
+export const getReportPrintCSS = (
+   restaurantName: string,
+   reportTitle: string,
+   dateRange: string,
+   opts: ReportPrintOptions = {},
+): string => {
   const isArabic = /[\u0600-\u06FF]/.test(`${restaurantName} ${reportTitle} ${dateRange}`);
   const printedAt = new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-GB');
-  const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png';
+  const logoUrl = opts.logoUrl
+     || (typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png');
+  const orientation = opts.orientation || 'landscape';
+  const extraChips = (opts.extraMeta || []).map((m) => `<span>${m}</span>`).join('\n');
   const dir = isArabic ? 'rtl' : 'ltr';
   const align = isArabic ? 'right' : 'left';
 
   return `
 <style>
   @page {
-    margin: 12mm;
-    size: A4 portrait;
+    margin: 11mm 10mm 14mm 10mm;
+    size: A4 ${orientation};
+    @bottom-right {
+      content: counter(page) ' / ' counter(pages);
+      font-size: 8pt;
+      color: #64748b;
+      font-weight: 700;
+    }
   }
 
   html, body {
@@ -44,9 +67,17 @@ export const getReportPrintCSS = (restaurantName: string, reportTitle: string, d
     overflow: visible !important;
   }
 
+  thead {
+    display: table-header-group !important;
+  }
+
   thead tr {
     background: #10243e !important;
     color: #ffffff !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
   }
 
   th, td {
@@ -141,11 +172,16 @@ export const getReportPrintCSS = (restaurantName: string, reportTitle: string, d
     display: flex !important;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 8px 0 0;
     border-top: 1px solid #dbe4ee;
     color: #64748b;
     font-size: 8.5pt;
     font-weight: 700;
+  }
+
+  .print-footer .page-counter::after {
+    content: counter(page) ' / ' counter(pages);
   }
 
   .report-export-shell {
@@ -199,7 +235,7 @@ export const getReportPrintCSS = (restaurantName: string, reportTitle: string, d
 <div class="print-shell" dir="${dir}">
   <div class="print-header">
     <div class="print-header__brand">
-      <img src="${logoUrl}" alt="Coduis Zen" />
+      <img src="${logoUrl}" alt="${restaurantName}" onerror="this.style.display='none'" />
       <div>
         <h1 class="print-header__title">${restaurantName}</h1>
         <div class="print-header__meta">${reportTitle}</div>
@@ -213,6 +249,7 @@ export const getReportPrintCSS = (restaurantName: string, reportTitle: string, d
 <div class="print-footer" dir="${dir}">
   <span>${restaurantName}</span>
   <span>${isArabic ? 'وقت الطباعة' : 'Printed at'}: ${printedAt}</span>
+  <span class="page-counter">${isArabic ? 'صفحة' : 'Page'}: </span>
 </div>
 `;
 };

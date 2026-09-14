@@ -65,10 +65,13 @@ class SocketService {
         this._wasConnected = false;
         this.socket = io(getSocketUrl(), {
             auth: { token },
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: Infinity,
-            reconnectionDelay: 1000,
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 30000,
+            randomizationFactor: 0.5,
+            timeout: 20000,
         });
 
         this.socket.on('connect', () => {
@@ -104,6 +107,15 @@ class SocketService {
 
     off(event: string, handler: SocketEventHandler) {
         this.socket?.off(event, handler);
+    }
+
+    /** Best-effort client → server emit (no-op when disconnected). */
+    emit(event: string, payload?: unknown) {
+        try {
+            this.socket?.emit(event, payload);
+        } catch {
+            /* non-critical — offline queue / next poll covers it */
+        }
     }
 
     /** Register a callback that fires only on RE-connections (after disconnect). */

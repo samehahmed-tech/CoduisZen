@@ -1,8 +1,10 @@
 const fs = require('fs');
-const mssql = require('mssql');
 
 const connectionString = process.env.SQLSERVER_URL
     || 'Driver={ODBC Driver 18 for SQL Server};Server=(localdb)\\CoduisZen;Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;';
+const mssql = connectionString.includes('Driver=')
+    ? require('mssql/msnodesqlv8')
+    : require('mssql');
 
 const schemaSource = fs.readFileSync('src/db/schema.ts', 'utf8');
 const sqlSource = fs.readFileSync('scripts/sql-server-schema.sql', 'utf8');

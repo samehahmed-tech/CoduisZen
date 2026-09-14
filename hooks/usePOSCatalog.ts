@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useMemo } from 'react';
 import type { MenuCategory, MenuItem, OrderItem, OrderType } from '../types';
+import { applyPlatformMarkup, type PlatformMarkup } from '../services/platformPricing';
 
 export type POSIndexedMenuItem = MenuItem & {
     displayCategory: string;
@@ -12,6 +13,12 @@ export type POSIndexedMenuItem = MenuItem & {
 export type POSPricedMenuItem = POSIndexedMenuItem & {
     displayDescription?: string;
     isActuallyAvailable: boolean;
+    /** Pre-markup menu price (audit). */
+    basePrice: number;
+    /** Per-unit silent markup baked into price (0 when no platform). */
+    platformMarkupAmount: number;
+    /** Markup source platform id (null when none). */
+    platformId: string | null;
 };
 
 type UsePOSCatalogParams = {
@@ -26,6 +33,8 @@ type UsePOSCatalogParams = {
     lang: 'en' | 'ar';
     searchQuery: string;
     safeActiveCart: OrderItem[];
+    /** Silent platform markup (Talabat-style). Applied AFTER price-list resolution. */
+    platformMarkup?: PlatformMarkup | null;
 };
 
 export function usePOSCatalog({
@@ -40,6 +49,7 @@ export function usePOSCatalog({
     lang,
     searchQuery,
     safeActiveCart,
+    platformMarkup,
 }: UsePOSCatalogParams) {
     const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -136,12 +146,21 @@ export function usePOSCatalog({
             return left.displayName.localeCompare(right.displayName);
         }), [activeCategory, indexedItems, itemFilter, itemSort, normalizedSearchQuery]);
 
-    const pricedItems = useMemo<POSPricedMenuItem[]>(() => filteredItems.map((item) => ({
-        ...item,
-        displayDescription: lang === 'ar' ? (item.descriptionAr || item.description) : item.description,
-        price: item.resolvedPrice,
-        isActuallyAvailable: item.isAvailable,
-    })), [filteredItems, lang]);
+    const pricedItems = useMemo<POSPricedMenuItem[]>(() => filteredItems.map((item) => {
+        const base = item.resolvedPrice;
+        const marked = platformMarkup
+            ? applyPlatformMarkup(base, platformMarkup.pct, platformMarkup.fixed)
+            : base;
+        return {
+            ...item,
+            displayDescription: lang === 'ar' ? (item.descriptionAr || item.description) : item.description,
+            price: marked,
+            basePrice: base,
+            platformMarkupAmount: Math.max(0, Math.round(((marked - base) + Number.EPSILON) * 100) / 100),
+            platformId: platformMarkup?.platformId ?? null,
+            isActuallyAvailable: item.isAvailable,
+        };
+    }), [filteredItems, lang, platformMarkup]);
 
     const categoryResultCounts = useMemo(() => {
         const counts: Record<string, number> = {};

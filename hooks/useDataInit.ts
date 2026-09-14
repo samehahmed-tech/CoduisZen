@@ -59,8 +59,35 @@ export const useDataInit = (): InitResult => {
                     return;
                 }
 
-                const health = await checkHealth();
-                const connected = health.status === 'ok';
+                // Health probe runs CONCURRENTLY with essentials (it used to
+                // block them) and is capped at 4s: a hanging /health must
+                // never stall the shell. Essentials resolve from IndexedDB
+                // cache on failure inside each fetcher.
+                const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
+                    Promise.race([
+                        promise,
+                        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), ms)),
+                    ]) as Promise<T | null>;
+
+                // Essentials first: shell cannot render without branches/settings.
+                // Menu catalog is heavy (API fetch + IndexedDB bulkPut) and is
+                // NOT needed for first paint — it loads right after, off the
+                // critical path. POS/Menu routes show their own loading state.
+                const essentials: Promise<void>[] = [
+                    fetchBranches(),
+                    fetchSettings(),
+                    fetchPrinters(),
+                ];
+
+                if (currentUser?.role === UserRole.SUPER_ADMIN) {
+                    essentials.push(fetchUsers());
+                }
+
+                const [health] = await Promise.all([
+                    withTimeout(checkHealth(), 4000),
+                    Promise.allSettled(essentials),
+                ]);
+                const connected = health?.status === 'ok';
 
                 if (!cancelled) {
                     setIsConnected(connected);
@@ -70,20 +97,14 @@ export const useDataInit = (): InitResult => {
                     syncService.syncPending();
                 }
 
-                // Sprint 2 Item 10: Lazy loading — only bootstrap essentials at startup.
-                // Orders load when POS/Dashboard is visited. Customers load when CRM is visited.
-                const dataPromises: Promise<void>[] = [
-                    fetchBranches(),
-                    fetchSettings(),
-                    fetchPrinters(),
-                    fetchMenu(),
-                ];
-
-                if (currentUser?.role === UserRole.SUPER_ADMIN) {
-                    dataPromises.push(fetchUsers());
+                const loadMenuSoon = () => {
+                    void fetchMenu().catch(() => undefined);
+                };
+                if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+                    (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(loadMenuSoon, { timeout: 2500 });
+                } else {
+                    window.setTimeout(loadMenuSoon, 800);
                 }
-
-                await Promise.allSettled(dataPromises);
             } catch (err: any) {
                 if (!cancelled) {
                     setError(err.message);

@@ -21,6 +21,38 @@ const jsonText = customType<{ data: any; driverData: string }>({
     },
 });
 
+/**
+ * order_items.modifiers: nvarchar(max) holding a JSON array of selected
+ * modifiers ({ groupName, optionName, price }). Older builds let the driver
+ * stringify raw arrays, corrupting rows into "[object Object]" — always write
+ * proper JSON and degrade unreadable legacy rows to an empty list.
+ */
+const modifierListJson = customType<{ data: any; driverData: string | null }>({
+    dataType() {
+        return 'nvarchar(max)';
+    },
+    toDriver(value) {
+        if (value === null || value === undefined) return null;
+        if (typeof value === 'string') {
+            try {
+                return JSON.stringify(JSON.parse(value));
+            } catch {
+                return JSON.stringify([]);
+            }
+        }
+        return JSON.stringify(value);
+    },
+    fromDriver(value) {
+        if (typeof value !== 'string' || !value.trim()) return [];
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    },
+});
+
 // ============================================================================
 // 👤 USERS & AUTHENTICATION
 // ============================================================================
@@ -161,6 +193,8 @@ export const customers = mssqlTable('customers', {
     loyaltyPoints: int('loyalty_points').default(0),
     // Metadata
     source: nvarchar('source').default('call_center'), // call_center, pos, online, app
+    marketingOptIn: bit('marketing_opt_in').default(true), // consent for campaigns; false = never contact
+    marketingOptOutAt: datetime2('marketing_opt_out_at'),
     deletedAt: datetime2('deleted_at'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
@@ -363,6 +397,7 @@ export const orders = mssqlTable('orders', {
     cancelReason: nvarchar('cancel_reason'),
     // Shift Tracking (Phase 3: Financial Ironclad)
     shiftId: nvarchar('shift_id'), // Will be linked logically to shifts.id
+    scheduledFor: datetime2('scheduled_for'), // Future fire-time; dispatcher wakes SCHEDULED orders
     deletedAt: datetime2('deleted_at'),
 }, (table) => [
     index('orders_branch_date_idx').on(table.branchId, table.createdAt),
@@ -391,17 +426,17 @@ export const orderItems = mssqlTable('order_items', {
     id: int('id').identity().primaryKey(),
     orderId: nvarchar('order_id').references(() => orders.id, { onDelete: 'cascade' }).notNull(),
     menuItemId: nvarchar('menu_item_id').references(() => menuItems.id),
+    sizeId: nvarchar('size_id'), // Selected size variant; ties sold lines to their BOM recipe
     name: nvarchar('name').notNull(),
     nameAr: nvarchar('name_ar'),
     price: real('price').notNull(),
+    basePrice: real('base_price'), // Pre-platform-markup unit price (audit trail)
+    platformMarkup: real('platform_markup').default(0), // Per-unit silent platform markup baked into price
+    priceSource: nvarchar('price_source'), // Where the unit price came from: BASE | BRANCH:ALL | BRANCH:DELIVERY | SIZE:x | PLATFORM:x | OPEN_PRICE
     cost: real('cost').default(0), // Snapshot of calculated cost at time of order
     quantity: int('quantity').notNull(),
     notes: nvarchar('notes'),
-    modifiers: nvarchar('modifiers').$type<{
-        groupName: string;
-        optionName: string;
-        price: number;
-    }[]>(),
+    modifiers: modifierListJson('modifiers'),
     // Kitchen
     status: nvarchar('status').default('PENDING'), // PENDING, PREPARING, READY, SERVED
     preparedAt: datetime2('prepared_at'),
@@ -497,6 +532,8 @@ export const inventoryItems = mssqlTable('inventory_items', {
     sku: nvarchar('sku'),
     barcode: nvarchar('barcode'),
     unit: nvarchar('unit').notNull(), // kg, g, liter, piece, etc.
+    purchaseUnit: nvarchar('purchase_unit'),
+    purchaseUnitFactor: real('purchase_unit_factor').default(1),
     category: nvarchar('category'),
     threshold: real('threshold').default(0), // Low stock alert threshold
     costPrice: real('cost_price').default(0),
@@ -554,6 +591,8 @@ export const stockMovements = mssqlTable('stock_movements', {
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
 }, (table) => [
     index('stock_mov_item_date_idx').on(table.itemId, table.createdAt),
+    index('stock_mov_type_date_idx').on(table.type, table.createdAt),
+    index('stock_mov_from_wh_date_idx').on(table.fromWarehouseId, table.createdAt),
 ]);
 
 export const inventoryBatches = mssqlTable('inventory_batches', {
@@ -636,7 +675,10 @@ export const recipeIngredients = mssqlTable('recipe_ingredients', {
     // Cost tracking
     lastKnownCost: real('last_known_cost'),
     lastCostUpdate: datetime2('last_cost_update'),
-});
+}, (table) => [
+    index('recipe_ingredients_recipe_idx').on(table.recipeId),
+    index('recipe_ingredients_item_idx').on(table.inventoryItemId),
+]);
 
 // ============================================================================
 // 🚚 SUPPLIERS
@@ -831,6 +873,7 @@ export const financeExceptions = mssqlTable('finance_exceptions', {
     id: nvarchar('id').primaryKey(),
     reference: nvarchar('reference'),
     referenceType: nvarchar('reference_type'),
+    branchId: nvarchar('branch_id'),
     payload: jsonText('payload'), // The original JournalEntryInput
     reason: nvarchar('reason').notNull(), // 'NO_OPEN_PERIOD', 'UNBALANCED', 'ACCOUNT_NOT_FOUND', etc.
     status: nvarchar('status').default('PENDING'), // PENDING, RESOLVED, DISMISSED
@@ -1108,11 +1151,113 @@ export const deliveryPlatforms = mssqlTable('delivery_platforms', {
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 });
 
+export const bankAccounts = mssqlTable('bank_accounts', {
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), name: nvarchar('name'),
+    accountType: nvarchar('account_type'), institution: nvarchar('institution'), accountNumber: nvarchar('account_number'),
+    accountId: nvarchar('account_id'), openingBalance: numeric('opening_balance', { precision: 14, scale: 2 }), isActive: bit('is_active'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const accountTransfers = mssqlTable('account_transfers', {
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), fromAccountId: nvarchar('from_account_id'),
+    toAccountId: nvarchar('to_account_id'), amount: numeric('amount', { precision: 14, scale: 2 }), reason: nvarchar('reason'), status: nvarchar('status'),
+    requestedBy: nvarchar('requested_by'), approvedBy: nvarchar('approved_by'), completedAt: datetime2('completed_at'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+// 🏦 TREASURY VOUCHERS — سندات القبض والصرف (محاسب الخزينة)
+// kind: RECEIPT (قبض) / PAYMENT (صرف). Every COMPLETED voucher moves the
+// linked treasury account balance (see bankingService.accountBalance).
+export const treasuryVouchers = mssqlTable('treasury_vouchers', {
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'),
+    voucherNo: int('voucher_no').identity(),
+    kind: nvarchar('kind'), // RECEIPT | PAYMENT
+    category: nvarchar('category'), // SUPPLIER_PAYMENT | SUPPLIER_ADVANCE | EXPENSE | CUSTODY_ISSUE | CUSTODY_SETTLEMENT | COLLECTION | SALARY | OTHER
+    accountId: nvarchar('account_id'), // bankAccounts.id — الخزينة المتأثرة
+    amount: numeric('amount', { precision: 14, scale: 2 }),
+    supplierId: nvarchar('supplier_id'),
+    invoiceId: nvarchar('invoice_id'),
+    holderUserId: nvarchar('holder_user_id'), // صاحب العهدة
+    holderName: nvarchar('holder_name'),
+    expenseAccountCode: nvarchar('expense_account_code'), // كود حساب المصروف في الدليل
+    description: nvarchar('description'),
+    paymentMethod: nvarchar('payment_method'), // CASH | BANK_TRANSFER | CHECK | WALLET
+    reference: nvarchar('reference'), // رقم الشيك / التحويل / المستند
+    status: nvarchar('status'), // PENDING | COMPLETED | REJECTED | CANCELLED
+    requestedBy: nvarchar('requested_by'), approvedBy: nvarchar('approved_by'),
+    completedAt: datetime2('completed_at'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+}, (table) => [
+    index('treasury_vouchers_branch_idx').on(table.branchId, table.status),
+    index('treasury_vouchers_account_idx').on(table.accountId),
+    index('treasury_vouchers_supplier_idx').on(table.supplierId),
+    index('treasury_vouchers_holder_idx').on(table.holderUserId),
+]);
+
+export const dailyPnlSnapshots = mssqlTable('daily_pnl_snapshots', {
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), businessDate: date('business_date'),
+    totalRevenue: numeric('total_revenue', { precision: 14, scale: 2 }), totalDiscount: numeric('total_discount', { precision: 14, scale: 2 }), totalTax: numeric('total_tax', { precision: 14, scale: 2 }), netSales: numeric('net_sales', { precision: 14, scale: 2 }),
+    totalOrders: int('total_orders'), cogs: numeric('cogs', { precision: 14, scale: 2 }), foodCostPercent: numeric('food_cost_percent', { precision: 8, scale: 2 }), laborCost: numeric('labor_cost', { precision: 14, scale: 2 }),
+    laborCostPercent: numeric('labor_cost_percent', { precision: 8, scale: 2 }), operatingExpenses: numeric('operating_expenses', { precision: 14, scale: 2 }), grossProfit: numeric('gross_profit', { precision: 14, scale: 2 }),
+    grossMarginPercent: numeric('gross_margin_percent', { precision: 8, scale: 2 }), operatingIncome: numeric('operating_income', { precision: 14, scale: 2 }), netMarginPercent: numeric('net_margin_percent', { precision: 8, scale: 2 }),
+    status: nvarchar('status'), finalizedBy: nvarchar('finalized_by'), finalizedAt: datetime2('finalized_at'),
+    computedAt: datetime2('computed_at'), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const cashDrawers = mssqlTable('cash_drawers', {
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), openedBy: nvarchar('opened_by'), closedBy: nvarchar('closed_by'),
+    openedAt: datetime2('opened_at').default(sql`GETDATE()`), closedAt: datetime2('closed_at'), openingCash: numeric('opening_cash', { precision: 14, scale: 2 }), closingCash: numeric('closing_cash', { precision: 14, scale: 2 }), expectedCash: numeric('expected_cash', { precision: 14, scale: 2 }), totalSalesCash: numeric('total_sales_cash', { precision: 14, scale: 2 }), totalRefundsCash: numeric('total_refunds_cash', { precision: 14, scale: 2 }),
+    totalPayoutsCash: numeric('total_payouts_cash', { precision: 14, scale: 2 }), totalCollectionsCash: numeric('total_collections_cash', { precision: 14, scale: 2 }), variance: numeric('variance', { precision: 14, scale: 2 }),
+    status: nvarchar('status'), notes: nvarchar('notes'), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const drawerCountLines = mssqlTable('drawer_count_lines', {
+    id: int('id').identity().primaryKey(), drawerId: nvarchar('drawer_id'), countType: nvarchar('count_type'), label: nvarchar('label'),
+    faceValue: numeric('face_value', { precision: 14, scale: 2 }), quantity: int('quantity'), lineTotal: numeric('line_total', { precision: 14, scale: 2 }), countedBy: nvarchar('counted_by'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+});
+
+export const drawerDiscrepancies = mssqlTable('drawer_discrepancies', {
+    id: nvarchar('id').primaryKey(), drawerId: nvarchar('drawer_id'), branchId: nvarchar('branch_id'), cashierId: nvarchar('cashier_id'),
+    shiftId: nvarchar('shift_id'), variance: numeric('variance', { precision: 14, scale: 2 }), direction: nvarchar('direction'), resolution: nvarchar('resolution'),
+    approvedBy: nvarchar('approved_by'), approvedAt: datetime2('approved_at'), amountPaid: numeric('amount_paid', { precision: 14, scale: 2 }), notes: nvarchar('notes'),
+    resolvedAt: datetime2('resolved_at'), createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const giftCards = mssqlTable('gift_cards', {
+    id: nvarchar('id').primaryKey(), code: nvarchar('code'), branchId: nvarchar('branch_id'), customerId: nvarchar('customer_id'),
+    purchasedOrderId: nvarchar('purchased_order_id'), initialAmount: numeric('initial_amount', { precision: 14, scale: 2 }), balance: numeric('balance', { precision: 14, scale: 2 }), status: nvarchar('status'),
+    expiresAt: datetime2('expires_at'), createdBy: nvarchar('created_by'), issuedBy: nvarchar('issued_by'), createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const giftCardTransactions = mssqlTable('gift_card_transactions', {
+    id: nvarchar('id').primaryKey(), giftCardId: nvarchar('gift_card_id'), type: nvarchar('type'), amount: numeric('amount', { precision: 14, scale: 2 }),
+    balanceAfter: numeric('balance_after', { precision: 14, scale: 2 }), orderId: nvarchar('order_id'), createdBy: nvarchar('created_by'), createdAt: datetime2('created_at').default(sql`GETDATE()`),
+});
+
+export const supplierInvoiceMatches = mssqlTable('supplier_invoice_matches', {
+    id: nvarchar('id').primaryKey(), supplierInvoiceId: nvarchar('supplier_invoice_id'), purchaseOrderId: nvarchar('purchase_order_id'), grnId: nvarchar('grn_id'),
+    expectedTotal: numeric('expected_total', { precision: 14, scale: 2 }), grnTotal: numeric('grn_total', { precision: 14, scale: 2 }), invoiceTotal: numeric('invoice_total', { precision: 14, scale: 2 }), quantityVariance: numeric('quantity_variance', { precision: 14, scale: 2 }),
+    priceVariance: numeric('price_variance', { precision: 14, scale: 2 }), matchStatus: nvarchar('match_status'), reviewStatus: nvarchar('review_status'), reviewedBy: nvarchar('reviewed_by'), reviewedAt: datetime2('reviewed_at'), notes: nvarchar('notes'),
+    reviewNotes: nvarchar('review_notes'), createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const tipPools = mssqlTable('tip_pools', {
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), shiftId: nvarchar('shift_id'), pooledAmount: numeric('pooled_amount', { precision: 14, scale: 2 }),
+    paymentMethod: nvarchar('payment_method'), distributionMethod: nvarchar('distribution_method'), status: nvarchar('status'), paidOutAt: datetime2('paid_out_at'), allocatedBy: nvarchar('allocated_by'), createdBy: nvarchar('created_by'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+export const tipAllocations = mssqlTable('tip_allocations', {
+    id: nvarchar('id').primaryKey(), tipPoolId: nvarchar('tip_pool_id'), employeeId: nvarchar('employee_id'), baseHours: real('base_hours'),
+    roleWeight: numeric('role_weight', { precision: 8, scale: 2 }), allocatedAmount: numeric('allocated_amount', { precision: 14, scale: 2 }), paidOut: bit('paid_out'), createdAt: datetime2('created_at').default(sql`GETDATE()`),
+});
+
 export const deliveryZones = mssqlTable('delivery_zones', {
     id: int('id').identity().primaryKey(),
     name: nvarchar('name').notNull(), // Maadi, New Cairo, etc.
     nameAr: nvarchar('name_ar'),
-    branchId: nvarchar('branch_id').references(() => branches.id).notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id), // NULL = global zone (all branches)
     deliveryFee: real('delivery_fee').default(0),
     minOrderAmount: real('min_order_amount').default(0),
     estimatedTime: int('estimated_time').default(45), // minutes
@@ -1121,6 +1266,7 @@ export const deliveryZones = mssqlTable('delivery_zones', {
 
 export const drivers = mssqlTable('drivers', {
     id: nvarchar('id').primaryKey(),
+    userId: nvarchar('user_id'), // Linked login user (users.id) — resolves "my assignments" reliably
     name: nvarchar('name').notNull(),
     phone: nvarchar('phone').notNull(),
     branchId: nvarchar('branch_id').references(() => branches.id),
@@ -1166,6 +1312,33 @@ export const driverTelemetryLatest = mssqlTable('driver_telemetry_latest', {
     batteryLevel: int('battery_level'),
     orderId: nvarchar('order_id', { length: 255 }),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+});
+
+// Pilot cash ledger: every COLLECT (at delivery) and SETTLE (branch handover).
+// Balance truth = SUM(COLLECT) − SUM(SETTLE); drivers.current_cash_balance mirrors it.
+export const driverCashLedger = mssqlTable('driver_cash_ledger', {
+    id: int('id').identity().primaryKey(),
+    driverId: nvarchar('driver_id', { length: 255 }).references(() => drivers.id).notNull(),
+    branchId: nvarchar('branch_id', { length: 255 }).references(() => branches.id),
+    orderId: nvarchar('order_id', { length: 255 }),
+    type: nvarchar('type', { length: 20 }).notNull(), // COLLECT, SETTLE
+    amount: real('amount').notNull(),
+    balanceAfter: real('balance_after').notNull().default(0),
+    createdBy: nvarchar('created_by', { length: 255 }),
+    notes: nvarchar('notes'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+});
+
+// Pilot return check-ins: REQUESTED → APPROVED (official) / REJECTED.
+export const driverBranchCheckins = mssqlTable('driver_branch_checkins', {
+    id: nvarchar('id').primaryKey(),
+    driverId: nvarchar('driver_id', { length: 255 }).references(() => drivers.id).notNull(),
+    branchId: nvarchar('branch_id', { length: 255 }).references(() => branches.id),
+    status: nvarchar('status', { length: 20 }).notNull().default('REQUESTED'),
+    requestedAt: datetime2('requested_at').default(sql`GETDATE()`),
+    decidedAt: datetime2('decided_at'),
+    decidedBy: nvarchar('decided_by', { length: 255 }),
+    notes: nvarchar('notes'),
 });
 
 // ============================================================================
@@ -1605,7 +1778,10 @@ export const productionOrders = mssqlTable('production_orders', {
     createdBy: nvarchar('created_by').references(() => users.id),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
-});
+}, (table) => [
+    index('production_orders_warehouse_status_idx').on(table.warehouseId, table.status, table.createdAt),
+    index('production_orders_target_idx').on(table.targetItemId, table.createdAt),
+]);
 
 export const productionOrderItems = mssqlTable('production_order_items', {
     id: int('id').identity().primaryKey(),
@@ -1614,7 +1790,10 @@ export const productionOrderItems = mssqlTable('production_order_items', {
     requiredQty: real('required_qty').notNull(),
     actualQty: real('actual_qty'), // How much was actually used
     unit: nvarchar('unit').notNull(),
-});
+}, (table) => [
+    index('production_order_items_order_idx').on(table.productionOrderId),
+    index('production_order_items_item_idx').on(table.inventoryItemId),
+]);
 
 // ============================================================================
 // 🪑 RESERVATIONS
@@ -1846,6 +2025,35 @@ export const internalMessages = mssqlTable('internal_messages', {
     isArchived: bit('is_archived').default(false), // User clears from inbox
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
 });
+
+// ============================================================================
+// Staff mail hub: multi-recipient + branch/all broadcast, server-persisted.
+// One row per message; recipients fan out into mail_message_recipients so
+// read/star/archive state is tracked per user.
+// ============================================================================
+
+export const mailMessages = mssqlTable('mail_messages', {
+    id: nvarchar('id').primaryKey(),
+    branchId: nvarchar('branch_id'), // sender branch; null when broadcast to ALL
+    senderId: nvarchar('sender_id').references(() => users.id).notNull(),
+    subject: nvarchar('subject').notNull(),
+    body: nvarchar('body').notNull(),
+    priority: nvarchar('priority').default('NORMAL'), // LOW, NORMAL, HIGH, URGENT
+    isBroadcast: bit('is_broadcast').default(false),
+    broadcastScope: nvarchar('broadcast_scope'), // BRANCH, ALL
+    replyToMessageId: nvarchar('reply_to_message_id'), // null = رسالة جديدة، قيمة = رد على رسالة
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+});
+
+export const mailMessageRecipients = mssqlTable('mail_message_recipients', {
+    id: int('id').identity().primaryKey(),
+    messageId: nvarchar('message_id').references(() => mailMessages.id).notNull(),
+    userId: nvarchar('user_id').references(() => users.id).notNull(),
+    isRead: bit('is_read').default(false),
+    readAt: datetime2('read_at'),
+    isStarred: bit('is_starred').default(false),
+    isArchived: bit('is_archived').default(false),
+});
 // ============================================================================
 // 🏆 WORKSTREAM 7: CRM, LOYALTY, AND MARKETING
 // ============================================================================
@@ -2016,6 +2224,8 @@ export const kdsTicketItems = mssqlTable('kds_ticket_items', {
     itemName: nvarchar('item_name').notNull(),
     quantity: int('quantity').notNull(),
     modifiersText: nvarchar('modifiers_text'), // Flattened string for screen view
+    sizeLabel: nvarchar('size_label'), // Selected size variant label (e.g. Large / كبير)
+    itemNotes: nvarchar('item_notes'), // Per-item kitchen note
     isBumped: bit('is_bumped').default(false), // Item-level tracking
 });
 

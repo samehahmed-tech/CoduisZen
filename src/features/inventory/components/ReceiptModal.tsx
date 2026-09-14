@@ -8,7 +8,7 @@ interface ReceiptModalProps {
     onSave: (data: {
         warehouseId: string;
         supplierId?: string;
-        items: { itemId: string; quantity: number; costPrice?: number }[];
+        items: { itemId: string; quantity: number; costPrice?: number; purchaseUnit?: string }[];
     }) => void | Promise<void>;
     lang: 'en' | 'ar';
     inventory: InventoryItem[];
@@ -19,7 +19,7 @@ interface ReceiptModalProps {
 const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, lang, inventory, warehouses, suppliers }) => {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
     const [selectedSupplierId, setSelectedSupplierId] = useState('');
-    const [receivedItems, setReceivedItems] = useState<{ itemId: string; quantity: number; costPrice: number }[]>([]);
+    const [receivedItems, setReceivedItems] = useState<{ itemId: string; quantity: number; costPrice: number; purchaseUnit: string }[]>([]);
     const [saving, setSaving] = useState(false);
     const hasValidItems = receivedItems.length > 0 && receivedItems.every(item => (
         item.itemId
@@ -33,7 +33,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
     if (!isOpen) return null;
 
     const handleAddItem = () => {
-        setReceivedItems([...receivedItems, { itemId: '', quantity: 1, costPrice: 0 }]);
+        setReceivedItems([...receivedItems, { itemId: '', quantity: 1, costPrice: 0, purchaseUnit: '' }]);
     };
 
     const handleRemoveItem = (index: number) => {
@@ -50,6 +50,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
             const masterItem = inventory.find(i => i.id === value);
             if (masterItem) {
                 item.costPrice = masterItem.purchasePrice || masterItem.costPrice || 0;
+                item.purchaseUnit = masterItem.purchaseUnit || masterItem.unit || '';
             }
         }
 
@@ -147,7 +148,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
 
                         <div className="space-y-3">
                             {receivedItems.map((item, idx) => (
-                                <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr,120px,140px,40px] gap-3 items-end p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-left-2 transition-all">
+                                <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr,120px,120px,140px,40px] gap-3 items-end p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 animate-in slide-in-from-left-2 transition-all">
                                     <div className="space-y-1.5">
                                         <label className="text-[9px] font-black text-slate-400 uppercase">{lang === 'ar' ? 'الصنف' : 'Item'}</label>
                                         <select
@@ -160,6 +161,26 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, onSave, la
                                                 <option key={i.id} value={i.id}>{lang === 'ar' ? i.nameAr || i.name : i.name}</option>
                                             ))}
                                         </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase">{lang === 'ar' ? 'وحدة الشراء' : 'Buy Unit'}</label>
+                                        <select
+                                            value={item.purchaseUnit}
+                                            onChange={e => handleUpdateItem(idx, 'purchaseUnit', e.target.value)}
+                                            className="w-full px-4 py-2 card-primary rounded-xl outline-none text-sm font-bold appearance-none"
+                                        >
+                                            {(() => {
+                                                const masterItem = inventory.find(i => i.id === item.itemId);
+                                                const units = Array.from(new Set([masterItem?.purchaseUnit, masterItem?.unit].filter(Boolean) as string[]));
+                                                return units.map(unit => <option key={unit} value={unit}>{unit}</option>);
+                                            })()}
+                                        </select>
+                                        {(() => {
+                                            const masterItem = inventory.find(i => i.id === item.itemId);
+                                            const factor = Number(masterItem?.purchaseUnitFactor || 1);
+                                            if (!masterItem || !item.purchaseUnit || item.purchaseUnit === masterItem.unit || factor <= 1) return null;
+                                            return <p className="text-[9px] font-bold text-emerald-600">1 {item.purchaseUnit} = {factor} {masterItem.unit}</p>;
+                                        })()}
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[9px] font-black text-slate-400 uppercase">{lang === 'ar' ? 'الكمية' : 'Qty'}</label>

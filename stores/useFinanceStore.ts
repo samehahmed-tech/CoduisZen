@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { FinancialAccount, JournalEntry } from '../types';
 import { financeApi } from '../services/api/finance';
+import { shiftsApi } from '../services/api/shifts';
 
 interface Shift {
     id: string;
@@ -40,7 +41,25 @@ interface FinanceState {
     reverseJournal: (id: string, reason?: string) => Promise<void>;
     setShift: (shift: Shift | null) => void;
     setIsShiftDrawerOpen: (isOpen: boolean) => void;
+    /** Re-fetch the OPEN shift for a branch. Only clears state on a
+     * definitive "no shift" (404 / empty); transient failures (network,
+     * timeout, 5xx, 401) keep the last known shift so the header never
+     * flashes "no shift" while a shift is actually open. */
+    refreshActiveShift: (branchId: string) => Promise<Shift | null>;
+    lastShiftCheckAt: number | null;
+    lastShiftCheckOk: boolean;
 }
+
+// In-flight dedup: one shared promise per branch so mount-time double
+// fetches (POS sync + ShiftOverlays hydrate) don't race each other.
+const shiftRefreshInflight = new Map<string, Promise<Shift | null>>();
+
+const isDefinitiveNoShift = (error: any) => {
+    const status = Number(error?.status);
+    if (status === 404) return true;
+    const code = String(error?.code || error?.message || '').toUpperCase();
+    return code === 'NO_ACTIVE_SHIFT_FOUND' || code === 'HTTP_404';
+};
 
 export const useFinanceStore = create<FinanceState>((set, get) => ({
     accounts: [],
@@ -57,6 +76,40 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
 
     setShift: (shift) => set({ activeShift: shift }),
     setIsShiftDrawerOpen: (isOpen) => set({ isShiftDrawerOpen: isOpen }),
+    lastShiftCheckAt: null,
+    lastShiftCheckOk: false,
+
+    refreshActiveShift: async (branchId) => {
+        const key = String(branchId || '').trim();
+        if (!key) return get().activeShift;
+        const pending = shiftRefreshInflight.get(key);
+        if (pending) return pending;
+        const run = (async () => {
+            try {
+                const res = await shiftsApi.getActive(key);
+                if (res && res.id && String(res.status || '').toUpperCase() === 'OPEN') {
+                    set({ activeShift: res as Shift, lastShiftCheckAt: Date.now(), lastShiftCheckOk: true });
+                    return get().activeShift;
+                }
+                // Server answered but there is no OPEN shift — definitive.
+                set({ activeShift: null, lastShiftCheckAt: Date.now(), lastShiftCheckOk: true });
+                return null;
+            } catch (error: any) {
+                if (error?.name === 'AbortError' || error?.silent) return get().activeShift;
+                if (isDefinitiveNoShift(error)) {
+                    set({ activeShift: null, lastShiftCheckAt: Date.now(), lastShiftCheckOk: true });
+                    return null;
+                }
+                // Transient failure — keep the last known shift untouched.
+                set({ lastShiftCheckAt: Date.now(), lastShiftCheckOk: false });
+                return get().activeShift;
+            } finally {
+                if (shiftRefreshInflight.get(key) === run) shiftRefreshInflight.delete(key);
+            }
+        })();
+        shiftRefreshInflight.set(key, run);
+        return run;
+    },
 
     fetchPostingRules: async () => {
         try {
@@ -90,7 +143,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     fetchFinanceData: async () => {
         set({ isLoading: true, error: null });
         try {
-            const [recsData, periodsData, accData, jrnData, tbData, excData] = await Promise.all([
+            const results = await Promise.allSettled([
                 financeApi.getReconciliations(),
                 financeApi.getPeriodCloses(),
                 financeApi.getAccounts(),
@@ -99,14 +152,37 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
                 financeApi.getExceptions(),
             ]);
 
-            const mappedAccounts: FinancialAccount[] = accData.map((a: any) => ({
-                id: a.id,
-                code: a.code,
-                name: a.name,
-                type: a.type,
-                balance: Number(a.balance || 0),
-                parentId: a.parentId,
-            }));
+            const valueOr = <T,>(index: number, fallback: T): T => {
+                const result = results[index];
+                return result?.status === 'fulfilled' ? result.value as T : fallback;
+            };
+            const recsData = valueOr(0, [] as any[]);
+            const periodsData = valueOr(1, [] as any[]);
+            const accData = valueOr(2, [] as any[]);
+            const jrnData = valueOr(3, [] as any[]);
+            const tbData = valueOr(4, { totals: { debit: 0, credit: 0 }, balanced: true });
+            const excData = valueOr(5, [] as any[]);
+
+            // The accounts endpoint returns a nested tree. Flatten it first,
+            // then rebuild the local tree so child accounts are not dropped
+            // by a root-only map operation.
+            const flattenAccounts = (rows: any[], parentId: string | null = null): FinancialAccount[] => rows.flatMap((a: any) => {
+                const account: FinancialAccount = {
+                    id: a.id,
+                    code: a.code,
+                    name: a.name,
+                    nameAr: a.nameAr,
+                    type: a.type,
+                    normalBalance: a.normalBalance,
+                    isControlAccount: a.isControlAccount,
+                    allowManualJournals: a.allowManualJournals !== false,
+                    isActive: a.isActive !== false,
+                    balance: Number(a.balance || 0),
+                    parentId: a.parentId ?? parentId,
+                };
+                return [account, ...flattenAccounts(Array.isArray(a.children) ? a.children : [], account.id)];
+            });
+            const mappedAccounts = flattenAccounts(Array.isArray(accData) ? accData : []);
 
             // Convert flat accounts to tree for current finance UI component
             const byId = new Map(mappedAccounts.map(a => [a.id, { ...a, children: [] as FinancialAccount[] }]));
@@ -133,12 +209,12 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
                 accounts: roots,
                 transactions: mappedJournal,
                 trialBalance: {
-                    debit: Number(tbData.totals?.debit || 0),
-                    credit: Number(tbData.totals?.credit || 0),
-                    balanced: Boolean(tbData.balanced),
+                    debit: Number(tbData?.totals?.debit ?? 0),
+                    credit: Number(tbData?.totals?.credit ?? 0),
+                    balanced: Boolean(tbData?.balanced),
                 },
-                reconciliations: recsData,
-                periodCloses: periodsData,
+                reconciliations: Array.isArray(recsData) ? recsData : [],
+                periodCloses: Array.isArray(periodsData) ? periodsData : [],
                 exceptions: excData,
                 isLoading: false,
             });

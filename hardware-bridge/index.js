@@ -23,6 +23,7 @@ const ALLOWED_BROWSER_ORIGINS = new Set([
     'http://127.0.0.1:5173',
 ]);
 const POLL_MS = Math.max(250, Number(process.env.POLL_MS || 500));
+const BRIDGE_REQUEST_TIMEOUT_MS = Math.max(3000, Number(process.env.BRIDGE_REQUEST_TIMEOUT_MS || 10000));
 const PORT = Number(process.env.BRIDGE_PORT || 3002);
 const CLAIM_UNASSIGNED = true;
 const GLOBAL_CLAIM = String(process.env.GLOBAL_CLAIM || 'true').toLowerCase() !== 'false';
@@ -66,14 +67,23 @@ const headers = { 'Content-Type': 'application/json', 'x-gateway-id': GATEWAY_ID
 if (GATEWAY_TOKEN) headers['x-gateway-token'] = GATEWAY_TOKEN;
 
 const fetchJson = async (url, options = {}) => {
-    const res = await fetch(url, { headers, ...options });
-    if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        const error = new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-        error.statusCode = res.status;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), BRIDGE_REQUEST_TIMEOUT_MS);
+    try {
+        const res = await fetch(url, { headers, ...options, signal: controller.signal });
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            const error = new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+            error.statusCode = res.status;
+            throw error;
+        }
+        return res.json();
+    } catch (error) {
+        if (error?.name === 'AbortError') throw new Error(`BRIDGE_REQUEST_TIMEOUT after ${BRIDGE_REQUEST_TIMEOUT_MS}ms`);
         throw error;
+    } finally {
+        clearTimeout(timer);
     }
-    return res.json();
 };
 
 const bridgeFetch = async (path, options = {}) => fetchJson(`${SERVER_URL}${path}`, options);
@@ -117,9 +127,7 @@ const listWindowsPrinters = () => new Promise((resolve) => {
 });
 
 // ── Print ──
-const printImage = (printerName, imageBase64) => new Promise((resolve, reject) => {
-    const tmpFile = path.join(os.tmpdir(), `rf_img_${Date.now()}.png`);
-    fs.writeFileSync(tmpFile, Buffer.from(imageBase64, 'base64'));
+const printPngFile = (printerName, pngPath) => new Promise((resolve, reject) => {
     const psCommand = `
         Add-Type -AssemblyName System.Drawing
         $doc = New-Object System.Drawing.Printing.PrintDocument
@@ -139,9 +147,8 @@ const printImage = (printerName, imageBase64) => new Promise((resolve, reject) =
     `;
     execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
         timeout: 30000,
-        env: { ...process.env, RF_PRINTER_NAME: printerName, RF_PRINT_FILE: tmpFile },
+        env: { ...process.env, RF_PRINTER_NAME: printerName, RF_PRINT_FILE: pngPath },
     }, (err, stdout, stderr) => {
-        removeTempFile(tmpFile);
         if (err) {
             reject(new Error(`PowerShell print failed: ${stderr || err.message}`));
         } else {
@@ -150,11 +157,74 @@ const printImage = (printerName, imageBase64) => new Promise((resolve, reject) =
     });
 });
 
-const printText = (printerName, text) => {
+const printImage = (printerName, imageBase64) => {
+    const tmpFile = path.join(os.tmpdir(), `rf_img_${Date.now()}.png`);
+    fs.writeFileSync(tmpFile, Buffer.from(imageBase64, 'base64'));
+    return printPngFile(printerName, tmpFile).then(
+        (result) => { removeTempFile(tmpFile); return result; },
+        (error) => { removeTempFile(tmpFile); throw error; },
+    );
+};
+
+// Renders UTF-8 text (Arabic-safe) to a PNG via System.Drawing Tahoma with
+// RTL line direction, mirroring the network raster text branch. Text is
+// wrapped on word boundaries — a hard mid-word cut breaks Arabic shaping and
+// prints disconnected/garbled glyphs.
+const renderTextPng = (text, widthPx = 576, maxChars = 28) => new Promise((resolve, reject) => {
+    const inputFile = path.join(os.tmpdir(), `rf_txt_${Date.now()}_${process.pid}.txt`);
+    const outputFile = `${inputFile}.png`;
+    fs.writeFileSync(inputFile, '﻿' + String(text), 'utf8');
+    const psCommand = `
+Add-Type -AssemblyName System.Drawing
+$raw = Get-Content $env:RF_PRINT_INPUT -Raw -Encoding UTF8
+$maxChars = [int]$env:RF_WRAP_MAX
+$lines = [Collections.Generic.List[string]]::new()
+foreach ($logicalLine in ($raw -split "\\r?\\n")) {
+    $remaining = [string]$logicalLine
+    if ($remaining.Length -eq 0) { $lines.Add(''); continue }
+    while ($remaining.Length -gt $maxChars) {
+        $cut = $remaining.LastIndexOf(' ', $maxChars)
+        if ($cut -le 0) { $cut = $maxChars }
+        $lines.Add($remaining.Substring(0, $cut))
+        $remaining = $remaining.Substring($cut).TrimStart()
+    }
+    $lines.Add($remaining)
+}
+$width = [int]$env:RF_PRINT_WIDTH
+$lineHeight = 44
+$height = [Math]::Max(48, $lines.Count * $lineHeight + 16)
+$bitmap = [Drawing.Bitmap]::new($width, $height, [Drawing.Imaging.PixelFormat]::Format24bppRgb)
+$graphics = [Drawing.Graphics]::FromImage($bitmap)
+$graphics.Clear([Drawing.Color]::White)
+$graphics.TextRenderingHint = [Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+$font = [Drawing.Font]::new('Tahoma', 17, [Drawing.FontStyle]::Bold)
+$left = [Drawing.StringFormat]::new(); $left.Alignment = [Drawing.StringAlignment]::Near
+$right = [Drawing.StringFormat]::new(); $right.Alignment = [Drawing.StringAlignment]::Near; $right.FormatFlags = [Drawing.StringFormatFlags]::DirectionRightToLeft
+for ($i = 0; $i -lt $lines.Count; $i++) {
+    $line = $lines[$i]
+    $format = if ($line -match '[\\u0600-\\u06FF]') { $right } else { $left }
+    $graphics.DrawString($line, $font, [Drawing.Brushes]::Black, [Drawing.RectangleF]::new(6, 8 + $i * $lineHeight, $width - 12, $lineHeight), $format)
+}
+$font.Dispose(); $left.Dispose(); $right.Dispose()
+$bitmap.Save($env:RF_PRINT_OUTPUT, [Drawing.Imaging.ImageFormat]::Png)
+$graphics.Dispose(); $bitmap.Dispose()
+`;
+    execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
+        timeout: 30000,
+        windowsHide: true,
+        env: { ...process.env, RF_PRINT_INPUT: inputFile, RF_PRINT_OUTPUT: outputFile, RF_PRINT_WIDTH: String(widthPx), RF_WRAP_MAX: String(maxChars) },
+    }, (error, stdout, stderr) => {
+        removeTempFile(inputFile);
+        if (error) { removeTempFile(outputFile); reject(new Error(`Text raster render failed: ${stderr || error.message}`)); return; }
+        resolve(outputFile);
+    });
+});
+
+const printTextLegacy = (printerName, text) => {
     return new Promise((resolve, reject) => {
         const tmpFile = path.join(os.tmpdir(), `rf_txt_${Date.now()}.txt`);
         // Write UTF-8 with BOM so PowerShell reads Arabic correctly
-        fs.writeFileSync(tmpFile, '\uFEFF' + text, 'utf8');
+        fs.writeFileSync(tmpFile, '﻿' + text, 'utf8');
         const psCommand = 'Get-Content $env:RF_PRINT_FILE -Raw -Encoding UTF8 | Out-Printer -Name $env:RF_PRINTER_NAME';
         execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
             timeout: 30000,
@@ -168,6 +238,24 @@ const printText = (printerName, text) => {
             }
         });
     });
+};
+
+// Windows text jobs (server auto-receipts, KDS text tickets) are rasterized to
+// an image first so Arabic never depends on the printer driver's text mode —
+// "Generic / Text Only" drivers render Arabic as ???? via Out-Printer.
+// Falls back to the legacy Out-Printer path if rasterization fails.
+const printText = async (printerName, text) => {
+    try {
+        const pngPath = await renderTextPng(text);
+        try {
+            await printPngFile(printerName, pngPath);
+        } finally {
+            removeTempFile(pngPath);
+        }
+    } catch (rasterError) {
+        log(`[print] text raster failed, Out-Printer fallback: ${rasterError.message}`);
+        await printTextLegacy(printerName, text);
+    }
 };
 
 const printRawWindows = (printerName, content) => new Promise((resolve, reject) => {
@@ -273,7 +361,12 @@ if ($env:RF_CONTENT_TYPE -eq 'image') {
     foreach ($logicalLine in ($raw -split "\\r?\\n")) {
         $remaining = [string]$logicalLine
         if ($remaining.Length -eq 0) { $lines.Add(''); continue }
-        while ($remaining.Length -gt 24) { $lines.Add($remaining.Substring(0, 24)); $remaining = $remaining.Substring(24) }
+        while ($remaining.Length -gt 24) {
+            $cut = $remaining.LastIndexOf(' ', 24)
+            if ($cut -le 0) { $cut = 24 }
+            $lines.Add($remaining.Substring(0, $cut))
+            $remaining = $remaining.Substring($cut).TrimStart()
+        }
         $lines.Add($remaining)
     }
     $lineHeight = 44
@@ -367,7 +460,6 @@ const executePrint = async (job) => {
         if ((printerType === 'NETWORK' || printerType === 'LAN') && !address.startsWith('windows:')) await printRawTcp(address, job.content, cType);
         else if (cType === 'image') {
             await printImage(printerName, job.content);
-            await cutWindowsPaper(printerName);
         }
         else if (job.content === CASH_DRAWER_PULSE) await printRawWindows(printerName, job.content);
         else await printText(printerName, job.content);
@@ -379,7 +471,6 @@ const executePrint = async (job) => {
         log(`[print] fallback printer=${fallbackName} reason=${error.message}`);
         if (cType === 'image') {
             await printImage(fallbackName, job.content);
-            await cutWindowsPaper(fallbackName);
         }
         else if (job.content === CASH_DRAWER_PULSE) await printRawWindows(fallbackName, job.content);
         else await printText(fallbackName, job.content);
@@ -465,8 +556,23 @@ const tick = async () => {
     runtime.lastPollAt = new Date().toISOString();
     try {
         if (!(await flushPendingReports())) return;
+        // Advertise local printer capabilities so the server routes USB/local
+        // jobs ONLY to the machine that actually owns the printer.
+        if (!runtime.lastPrinterScanAt || Date.now() - runtime.lastPrinterScanAt > 30000) {
+            runtime.lastPrinterScanAt = Date.now();
+            await listWindowsPrinters();
+        }
+        const printerNames = (runtime.printers || [])
+            .flatMap(p => [p.name, `windows:${p.name}`])
+            .filter(Boolean);
+        const printersParam = printerNames.length
+            ? `&printers=${encodeURIComponent(printerNames.slice(0, 100).join('|'))}`
+            : '';
+        // Never claim another job while Windows Spooler is still handling the
+        // previous one. Concurrent USB jobs can leave the queue stuck.
+        if (runtime.activeJob) return;
         const data = await bridgeFetch(
-            `/api/print-gateway/bridge/jobs?gatewayId=${encodeURIComponent(GATEWAY_ID)}&claimUnassigned=${CLAIM_UNASSIGNED}&global=${GLOBAL_CLAIM}`
+            `/api/print-gateway/bridge/jobs?gatewayId=${encodeURIComponent(GATEWAY_ID)}&claimUnassigned=${CLAIM_UNASSIGNED}&global=${GLOBAL_CLAIM}${printersParam}`
         );
         runtime.serverConnected = true;
         runtime.lastSuccessAt = new Date().toISOString();

@@ -2,6 +2,7 @@
 export enum OrderStatus {
   PEND = 'PENDING',
   PENDING = 'PENDING',
+  SCHEDULED = 'SCHEDULED',
   PREPARING = 'PREPARING',
   READY = 'READY',
   OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
@@ -108,6 +109,11 @@ export interface FinancialAccount {
   type: AccountType;
   balance: number;
   parentId?: string;
+  nameAr?: string | null;
+  normalBalance?: 'DEBIT' | 'CREDIT' | string;
+  isControlAccount?: boolean;
+  allowManualJournals?: boolean;
+  isActive?: boolean;
   children?: FinancialAccount[];
 }
 
@@ -135,7 +141,9 @@ export interface ModifierOption {
   nameAr?: string;
   price: number;
   isAvailable?: boolean;
+  recipeEffect?: 'ADD' | 'REMOVE';
   recipe?: RecipeIngredient[]; // Recipe for the specific modifier option
+  recipeBySize?: Record<string, RecipeIngredient[]>;
 }
 
 export interface ModifierGroup {
@@ -246,7 +254,7 @@ export interface MenuItem {
   archivedAt?: string;                // ISO date, set when soft-archived
   scheduledAvailability?: ScheduledWindow[];
   // Multi-Branch Enterprise Extensions
-  branchPricing?: { branchId: string; price: number; isLocked?: boolean }[];
+  branchPricing?: { branchId: string; price: number; isLocked?: boolean; channel?: 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY' }[];
   branchSalesData?: { branchId: string; today: number; last30: number; revenue30: number }[];
   dietaryBadges?: string[]; // Phase 1: Dietary Badges (e.g. 'Spicy', 'Vegan', etc.)
 }
@@ -285,7 +293,10 @@ export interface InventoryItem {
   id: string;
   name: string;
   nameAr?: string;
+  isActive?: boolean;
   unit: InventoryUnit | string;
+  purchaseUnit?: string;
+  purchaseUnitFactor?: number;
   category: string;
   threshold: number;
   costPrice: number; // Current valuation
@@ -320,6 +331,11 @@ export interface OrderItem extends MenuItem {
   sizeId?: string;
   quantity: number;
   notes?: string;
+  // Silent platform pricing audit (unit-level, modifiers excluded like server)
+  basePrice?: number; // Pre-markup unit price (original menu price)
+  platformId?: string | null; // Markup source platform id, if any
+  platformMarkup?: number; // Per-unit markup amount baked into price
+  isOpenPrice?: boolean; // Cashier-entered price — never marked up
   seatNumber?: number;
   seat_number?: number;
   course?: 'APPETIZER' | 'MAIN' | 'DESSERT' | 'DRINKS' | string;
@@ -354,6 +370,8 @@ export interface Order {
   deliveryLng?: number;
   deliveryAddressLabel?: string;
   isCallCenterOrder?: boolean;
+  callCenterAgentId?: string;
+  scheduledFor?: string;
   items: OrderItem[];
   status: OrderStatus;
   syncStatus?: SyncStatus; // Offline-first sync tracking
@@ -506,7 +524,7 @@ export interface Table {
   width: number;
   height: number;
   zoneId?: string;
-  shape?: 'square' | 'round' | 'rectangle';
+  shape?: 'square' | 'round' | 'rectangle' | 'oval' | 'booth' | 'bar' | 'circle';
   discount?: number;
   defaultCouponCode?: string;
   discountMode?: 'PERCENT' | 'COUPON';
@@ -671,6 +689,7 @@ export enum AppPermission {
   NAV_WEBHOOKS = 'NAV_WEBHOOKS',
   NAV_REFUNDS = 'NAV_REFUNDS',
   NAV_FISCAL = 'NAV_FISCAL',
+  NAV_MAIL = 'NAV_MAIL',
 }
 
 export enum UserRole {
@@ -738,6 +757,8 @@ export interface User {
   role: UserRole | string;
   password?: string;
   pin?: string;
+  hasPassword?: boolean;
+  hasPin?: boolean;
   assignedBranchId?: string;
   assignedBranchIds?: string[];
   allowedBranches?: string[];
@@ -815,8 +836,8 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_SETTINGS, AppPermission.NAV_SECURITY,
     AppPermission.NAV_APPROVAL, AppPermission.NAV_TREASURY,
     AppPermission.NAV_MARKETING, AppPermission.NAV_WHATSAPP,
-    AppPermission.NAV_PLATFORMS, AppPermission.NAV_REFUNDS,
-    AppPermission.NAV_FISCAL,
+    AppPermission.  NAV_PLATFORMS, AppPermission.NAV_REFUNDS,
+    AppPermission.NAV_FISCAL, AppPermission.NAV_MAIL,
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS, AppPermission.DATA_VIEW_AUDIT_LOGS,
     AppPermission.DATA_VIEW_SALARIES,
@@ -836,7 +857,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS, AppPermission.DATA_VIEW_AUDIT_LOGS,
     AppPermission.DATA_VIEW_SALARIES,
-    AppPermission.CFG_MANAGE_BRANCHES,
+    AppPermission.CFG_MANAGE_BRANCHES, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.OWNER_VIEWER]: [
@@ -845,7 +866,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_CRM, AppPermission.NAV_ORDERS,
     AppPermission.NAV_INVENTORY,
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
-    AppPermission.DATA_VIEW_PROFITS,
+    AppPermission.DATA_VIEW_PROFITS, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.CEO]: [
@@ -856,7 +877,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_APPROVAL, AppPermission.NAV_FORENSICS,
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS, AppPermission.DATA_VIEW_AUDIT_LOGS,
-    AppPermission.DATA_VIEW_SALARIES,
+    AppPermission.DATA_VIEW_SALARIES, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.COO]: [
@@ -872,7 +893,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_STOCK_LEVELS,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_TRANSFER_STOCK,
-    AppPermission.OP_ADJUST_STOCK, AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_ADJUST_STOCK, AppPermission.OP_CLOSE_DAY, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.GENERAL_MANAGER]: [
@@ -891,7 +912,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_APPLY_DISCOUNT,
     AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
     AppPermission.OP_CREATE_PO, AppPermission.OP_RECEIVE_GRN,
-    AppPermission.OP_VOID_ORDER, AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_VOID_ORDER, AppPermission.OP_CLOSE_DAY, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.BRANCH_MANAGER]: [
@@ -910,37 +931,37 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_APPLY_DISCOUNT,
     AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
     AppPermission.OP_VOID_ORDER, AppPermission.OP_CLOSE_DAY,
-    AppPermission.CFG_MANAGE_USERS, AppPermission.CFG_MANAGE_ROLES,
+    AppPermission.CFG_MANAGE_USERS, AppPermission.CFG_MANAGE_ROLES, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.CASHIER]: [
-    AppPermission.NAV_POS, AppPermission.NAV_DASHBOARD,
+    AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_DASHBOARD,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_MANAGE_CASH_DRAWER,
     AppPermission.OP_CLOSE_DAY,
   ],
 
   [UserRole.WAITER]: [
-    AppPermission.NAV_POS, AppPermission.NAV_KDS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_KDS,
     AppPermission.NAV_FLOOR_PLAN,
     AppPermission.OP_PLACE_ORDER,
   ],
 
   [UserRole.CAPTAIN]: [
-    AppPermission.NAV_POS, AppPermission.NAV_KDS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_KDS,
     AppPermission.NAV_FLOOR_PLAN,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_VOID_ORDER,
   ],
 
   [UserRole.DRIVER]: [
-    AppPermission.NAV_DRIVER,
+    AppPermission.NAV_MAIL, AppPermission.NAV_DRIVER,
   ],
 
   [UserRole.KITCHEN_STAFF]: [
-    AppPermission.NAV_KDS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_KDS,
   ],
 
   [UserRole.CALL_CENTER]: [
-    AppPermission.NAV_CALL_CENTER, AppPermission.NAV_CRM,
+    AppPermission.NAV_MAIL, AppPermission.NAV_CALL_CENTER, AppPermission.NAV_CRM,
     AppPermission.NAV_DISPATCH,
     AppPermission.OP_PLACE_ORDER,
     AppPermission.DATA_VIEW_CUSTOMER_SENSITIVE,
@@ -948,7 +969,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   ],
 
   [UserRole.CALL_CENTER_MANAGER]: [
-    AppPermission.NAV_CALL_CENTER, AppPermission.NAV_CRM,
+    AppPermission.NAV_MAIL, AppPermission.NAV_CALL_CENTER, AppPermission.NAV_CRM,
     AppPermission.NAV_DISPATCH, AppPermission.NAV_REPORTS,
     AppPermission.NAV_WHATSAPP, AppPermission.NAV_PLATFORMS,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_VOID_ORDER,
@@ -957,7 +978,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   ],
 
   [UserRole.CASHIER_MANAGER]: [
-    AppPermission.NAV_POS, AppPermission.NAV_DASHBOARD,
+    AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_DASHBOARD,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_MANAGE_CASH_DRAWER,
     AppPermission.OP_CLOSE_DAY, AppPermission.OP_PROCESS_REFUND,
     AppPermission.OP_VOID_ORDER, AppPermission.NAV_REPORTS,
@@ -966,14 +987,14 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   ],
 
   [UserRole.WAREHOUSE_STAFF]: [
-    AppPermission.NAV_INVENTORY,
+    AppPermission.NAV_MAIL, AppPermission.NAV_INVENTORY,
     AppPermission.DATA_VIEW_STOCK_LEVELS,
     AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
     AppPermission.OP_RECEIVE_GRN,
   ],
 
   [UserRole.WAREHOUSE_DIRECTOR]: [
-    AppPermission.NAV_INVENTORY, AppPermission.NAV_PRODUCTION,
+    AppPermission.NAV_MAIL, AppPermission.NAV_INVENTORY, AppPermission.NAV_PRODUCTION,
     AppPermission.NAV_WASTAGE, AppPermission.NAV_REPORTS,
     AppPermission.NAV_APPROVAL,
     AppPermission.DATA_VIEW_STOCK_LEVELS, AppPermission.DATA_VIEW_COSTS,
@@ -982,12 +1003,12 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   ],
 
   [UserRole.PRODUCTION_STAFF]: [
-    AppPermission.NAV_PRODUCTION, AppPermission.NAV_RECIPES,
+    AppPermission.NAV_MAIL, AppPermission.NAV_PRODUCTION, AppPermission.NAV_RECIPES,
     AppPermission.DATA_VIEW_STOCK_LEVELS,
   ],
 
   [UserRole.PROCUREMENT_MANAGER]: [
-    AppPermission.NAV_INVENTORY, AppPermission.NAV_REPORTS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_INVENTORY, AppPermission.NAV_REPORTS,
     AppPermission.NAV_APPROVAL,
     AppPermission.DATA_VIEW_COSTS, AppPermission.DATA_VIEW_STOCK_LEVELS,
     AppPermission.OP_CREATE_PO, AppPermission.OP_RECEIVE_GRN,
@@ -995,13 +1016,13 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   ],
 
   [UserRole.ACCOUNTANT]: [
-    AppPermission.NAV_FINANCE, AppPermission.NAV_REPORTS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_FINANCE, AppPermission.NAV_REPORTS,
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS,
   ],
 
   [UserRole.COST_ACCOUNTANT]: [
-    AppPermission.NAV_RECIPES, AppPermission.NAV_MENU_MANAGER,
+    AppPermission.NAV_MAIL, AppPermission.NAV_RECIPES, AppPermission.NAV_MENU_MANAGER,
     AppPermission.NAV_INVENTORY, AppPermission.NAV_REPORTS,
     AppPermission.NAV_WASTAGE,
     AppPermission.DATA_VIEW_COSTS, AppPermission.DATA_VIEW_STOCK_LEVELS,
@@ -1009,40 +1030,40 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
 
   [UserRole.FINANCE_DIRECTOR]: [
     AppPermission.NAV_FINANCE, AppPermission.NAV_REPORTS,
-    AppPermission.NAV_FORENSICS, AppPermission.NAV_APPROVAL,
-    AppPermission.NAV_TREASURY, AppPermission.NAV_DASHBOARD,
+    AppPermission.NAV_FORENSICS,     AppPermission.NAV_APPROVAL,
+    AppPermission.NAV_TREASURY, AppPermission.NAV_DASHBOARD, AppPermission.NAV_MAIL,
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS, AppPermission.DATA_VIEW_AUDIT_LOGS,
     AppPermission.OP_CLOSE_DAY,
   ],
 
   [UserRole.HR_MANAGER]: [
-    AppPermission.NAV_PEOPLE, AppPermission.NAV_REPORTS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_PEOPLE, AppPermission.NAV_REPORTS,
     AppPermission.NAV_ATTENDANCE, AppPermission.NAV_PAYROLL,
     AppPermission.DATA_VIEW_SALARIES,
   ],
 
   [UserRole.PAYROLL_OFFICER]: [
-    AppPermission.NAV_PAYROLL, AppPermission.NAV_PEOPLE,
+    AppPermission.NAV_MAIL, AppPermission.NAV_PAYROLL, AppPermission.NAV_PEOPLE,
     AppPermission.OP_PROCESS_PAYROLL,
     AppPermission.DATA_VIEW_SALARIES,
   ],
 
   [UserRole.TREASURY_OFFICER]: [
-    AppPermission.NAV_TREASURY, AppPermission.NAV_FINANCE,
+    AppPermission.NAV_MAIL, AppPermission.NAV_TREASURY, AppPermission.NAV_FINANCE,
     AppPermission.NAV_DASHBOARD,
     AppPermission.OP_MANAGE_CASH_DRAWER, AppPermission.OP_CLOSE_DAY,
     AppPermission.DATA_VIEW_REVENUE,
   ],
 
   [UserRole.TECH_SUPPORT]: [
-    AppPermission.NAV_SETTINGS, AppPermission.NAV_PRINTERS,
+    AppPermission.NAV_MAIL, AppPermission.NAV_SETTINGS, AppPermission.NAV_PRINTERS,
     AppPermission.NAV_FORENSICS,
     AppPermission.CFG_OFFLINE_MODE,
   ],
 
   [UserRole.QUALITY_OFFICER]: [
-    AppPermission.NAV_INVENTORY, AppPermission.NAV_PRODUCTION,
+    AppPermission.NAV_MAIL, AppPermission.NAV_INVENTORY, AppPermission.NAV_PRODUCTION,
     AppPermission.NAV_WASTAGE, AppPermission.NAV_QUALITY,
     AppPermission.DATA_VIEW_STOCK_LEVELS,
   ],
@@ -1051,16 +1072,16 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
 };
 
 export type AppTheme =
-  | 'mica-glass'
-  | 'fluent-clean'
-  | 'material-soft'
-  | 'neumorphism-soft'
-  | 'flat-minimal'
-  | 'fintech-sharp'
-  | 'cupertino-light'
-  | 'monochrome-pro'
-  | 'warm-beige'
-  | 'dark-elegant';
+  | 'aurora-glass'
+  | 'midnight-command'
+  | 'neo-brutal'
+  | 'soft-organic'
+  | 'editorial-luxury'
+  | 'terminal-ops'
+  | 'future-hud'
+  | 'bento-saas'
+  | 'industrial-ops'
+  | 'premium-hospitality';
 
 export interface AppSettings {
   restaurantName: string;
@@ -1073,6 +1094,7 @@ export interface AppSettings {
   timezone?: string;
   isDarkMode: boolean;
   isTouchMode: boolean;
+  layoutMode: 'classic' | 'tiles'; // Shell view: sidebar workspace vs 3D tiles launcher
   theme: AppTheme;
   accentColor?: string;
   branchAddress: string;
@@ -1110,6 +1132,9 @@ export interface AppSettings {
   wallpaper?: string;           // Wallpaper key, 'custom', or 'none'
   wallpaperOpacity?: number;    // 0.05–0.35 typical range
   customWallpaperUrl?: string;  // Data URL for user-uploaded wallpaper
+  mapsProvider?: 'osm' | 'google'; // Runtime map provider (default osm = free)
+  googleMapsKey?: string;          // Browser key, used only when provider is google
+  maptilerKey?: string;            // MapTiler key for Leaflet tiles (OSM data), empty = free OSM mirrors
   rolePermissionOverrides?: Record<string, AppPermission[]>;
   customRoles?: CustomRole[];
   customPaymentMethods?: CustomPaymentMethod[];
@@ -1167,6 +1192,7 @@ export interface Driver {
   currentOrderId?: string;
   branchId?: string;
   isActive?: boolean;
+  currentCashBalance?: number;
 }
 
 export type ViewState = 'DASHBOARD' | 'POS' | 'KDS' | 'INVENTORY' | 'FINANCE' | 'CRM' | 'REPORTS' | 'MENU_MANAGER' | 'AI_ASSISTANT' | 'AI_INSIGHTS' | 'SETTINGS' | 'CALL_CENTER' | 'FORENSICS' | 'SECURITY' | 'RECIPES' | 'PRINTERS' | 'PRODUCTION' | 'PEOPLE' | 'DISPATCH';

@@ -121,7 +121,7 @@ const orderItemSchema = z.object({
         name: z.string().optional(),
         nameAr: z.string().optional(),
         price: z.number().min(0).optional(),
-    }).refine(modifier => Boolean(modifier.id || modifier.optionId || modifier.optionName), {
+    }).passthrough().refine(modifier => Boolean(modifier.id || modifier.optionId || modifier.optionName), {
         message: 'Modifier option reference is required',
     })).optional().default([]),
     // Legacy compat — accept cartId/selectedModifiers too
@@ -180,12 +180,16 @@ export const createOrderSchema = z.object({
         amount: z.number().min(0),
     })).optional(),
     couponCode: z.string().max(50).optional().nullable(),
+    discountType: z.string().max(20).optional().nullable(),
+    discount_type: z.string().max(20).optional().nullable(),
+    scheduledFor: z.union([z.string(), z.date()]).optional().nullable(),
+    scheduled_for: z.union([z.string(), z.date()]).optional().nullable(),
 }).refine(data => data.branchId || data.branch_id, {
     message: 'Branch ID is required (branchId or branch_id)',
 });
 
 export const updateOrderStatusSchema = z.object({
-    status: z.enum(['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED']),
+    status: z.enum(['PENDING', 'SCHEDULED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED']),
     changed_by: z.string().optional(),
     notes: z.string().max(1000).optional(),
     expected_updated_at: z.string().optional(),
@@ -318,6 +322,7 @@ export const directStockReceiptSchema = z.object({
         item_id: z.string().min(1),
         quantity: z.number().finite().positive(),
         unit_cost: z.number().finite().positive(),
+        purchase_unit: z.string().min(1).max(50).optional(),
     })).min(1),
 });
 
@@ -340,6 +345,8 @@ export const createUserSchema = z.object({
     is_active: z.boolean().optional(),
     password: optionalTrimmedString,
     pin: optionalTrimmedString,
+    managerPin: optionalTrimmedString,
+    manager_pin: optionalTrimmedString,
     phone: optionalTrimmedString,
     nationalId: optionalTrimmedString,
     employeeCode: optionalTrimmedString,
@@ -355,7 +362,41 @@ export const createUserSchema = z.object({
     bankAccount: optionalTrimmedString,
 });
 
-export const updateUserSchema = createUserSchema.partial();
+export const updateUserSchema = z.object({
+    id: optionalTrimmedString,
+    name: z.string().trim().min(1).max(200).optional(),
+    email: optionalTrimmedString.refine((value) => !value || z.string().email().safeParse(value).success, {
+        message: 'Valid email is required',
+    }).optional(),
+    role: z.string().min(1).optional(),
+    permissions: z.array(z.string()).optional(),
+    assignedBranchId: optionalTrimmedString,
+    assigned_branch_id: optionalTrimmedString,
+    allowedBranches: optionalStringArray.optional(),
+    isActive: z.boolean().optional(),
+    is_active: z.boolean().optional(),
+    password: z.union([z.string().min(6).max(128), z.null(), z.undefined()]).optional().transform((value) => {
+        if (value === null || value === undefined) return undefined;
+        const trimmed = String(value).trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    }),
+    pin: optionalTrimmedString,
+    managerPin: optionalTrimmedString,
+    manager_pin: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    nationalId: optionalTrimmedString,
+    employeeCode: optionalTrimmedString,
+    attendanceCode: optionalTrimmedString,
+    employmentDate: optionalTrimmedString,
+    salary: optionalSalarySchema,
+    createEmployeeRecord: z.boolean().optional(),
+    basicSalary: z.number().min(0).optional(),
+    hourlyRate: z.number().min(0).optional(),
+    departmentId: optionalTrimmedString,
+    jobTitleId: optionalTrimmedString,
+    emergencyContact: optionalTrimmedString,
+    bankAccount: optionalTrimmedString,
+}).passthrough();
 
 // ============================================================================
 // Finance Schemas

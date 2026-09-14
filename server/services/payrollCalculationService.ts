@@ -59,6 +59,44 @@ const normalizeDateOnly = (value: Date | string | null | undefined) => {
     return String(value).slice(0, 10);
 };
 
+// Statutory payroll deductions (Egypt defaults — same math as the compliance
+// report, so ledger, payslip and bank file finally agree). Exported for reuse.
+export type StatutoryBreakdown = {
+    employeeInsurance: number;
+    monthlySalaryTax: number;
+    martyrsContribution: number;
+    total: number;
+};
+
+export const computeStatutoryDeductions = (grossPay: number): StatutoryBreakdown => {
+    const gross = Math.max(0, Number(grossPay || 0));
+    const pensionableWage = gross <= 0 ? 0 : Math.max(2700, Math.min(16700, gross));
+    const employeeInsurance = pensionableWage * 0.11;
+    const martyrsContribution = gross * 0;
+    const taxableMonthlyIncome = Math.max(0, gross - employeeInsurance);
+    const taxableAnnualIncome = Math.max(0, taxableMonthlyIncome * 12 - 60000);
+    const brackets: Array<{ upTo: number | null; rate: number }> = [
+        { upTo: 40000, rate: 0 },
+        { upTo: 55000, rate: 0.1 },
+        { upTo: 70000, rate: 0.15 },
+        { upTo: 270000, rate: 0.2 },
+        { upTo: 400000, rate: 0.225 },
+        { upTo: null, rate: 0.25 },
+    ];
+    let annualTax = 0;
+    let lower = 0;
+    for (const bracket of brackets) {
+        const ceiling = bracket.upTo ?? taxableAnnualIncome;
+        const slice = Math.max(0, Math.min(taxableAnnualIncome, ceiling) - lower);
+        if (slice > 0) annualTax += slice * bracket.rate;
+        lower = ceiling;
+        if (bracket.upTo === null || taxableAnnualIncome <= ceiling) break;
+    }
+    const monthlySalaryTax = annualTax / 12;
+    const total = employeeInsurance + monthlySalaryTax + martyrsContribution;
+    return { employeeInsurance, monthlySalaryTax, martyrsContribution, total };
+};
+
 const isDateRangeOverlapping = (
     rangeStart: string,
     rangeEnd: string,
@@ -261,6 +299,8 @@ const buildCycleCalculation = async (cycleId: string) => {
             loanDeductions: number;
             fixedAllowances: number;
             fixedDeductions: number;
+            statutoryDeductions: number;
+            statutoryBreakdown: StatutoryBreakdown;
             bonusPenaltyIds: string[];
             loanInstallmentIds: number[];
             compensationItemIds: string[];
@@ -355,10 +395,13 @@ const buildCycleCalculation = async (cycleId: string) => {
         const employeeLoanInstallments = pendingLoanInstallments.filter(row => activeLoanById.get(row.loanId)?.employeeId === employee.id);
         const loanDeductionAmount = employeeLoanInstallments.reduce((sum, row) => sum + Number(row.amount || 0), 0);
         const attendanceDeductions = deductions;
-        const totalDeductions = attendanceDeductions + penaltyAmount + loanDeductionAmount + fixedDeductionAmount;
         const overtimePay = (overtimeMinutes / 60) * hourlyRate * overtimeRate;
         const basePay = resolveBasePay(profile, baseSalary, hourlyRate, totalHours, attendanceDays, expectedDays);
         const grossPay = basePay + overtimePay + earnings + bonusAmount + fixedAllowanceAmount;
+        // Statutory deductions are part of the official net — ledger, payslip
+        // and bank file all read the same netPay from here.
+        const statutory = computeStatutoryDeductions(grossPay);
+        const totalDeductions = attendanceDeductions + penaltyAmount + loanDeductionAmount + fixedDeductionAmount + statutory.total;
         const netPay = grossPay - totalDeductions;
 
         totalAmount += netPay;
@@ -378,6 +421,8 @@ const buildCycleCalculation = async (cycleId: string) => {
                 loanDeductions: loanDeductionAmount,
                 fixedAllowances: fixedAllowanceAmount,
                 fixedDeductions: fixedDeductionAmount,
+                statutoryDeductions: statutory.total,
+                statutoryBreakdown: statutory,
                 bonusPenaltyIds: employeeBonusPenaltyRows.map(row => row.id),
                 loanInstallmentIds: employeeLoanInstallments.map(row => row.id),
                 compensationItemIds: employeeCompensationRows.map(row => row.id),
@@ -447,11 +492,12 @@ export const payrollCalculationService = {
                 }
 
                 if (line.adjustments.loanInstallmentIds.length) {
+                    // Link only — status flips to DEDUCTED at close approval.
+                    // (Previously marked PAID here, which stranded installments
+                    // and risked double deduction on recalculate.)
                     await tx.update(loanInstallments)
                         .set({
-                            status: 'PAID',
                             payrollCycleId: cycle.id,
-                            paidAt: new Date(),
                             updatedAt: new Date(),
                         })
                         .where(inArray(loanInstallments.id, line.adjustments.loanInstallmentIds));

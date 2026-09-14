@@ -3,7 +3,7 @@ import {
   Wallet, Plus, Search, ChevronRight, ChevronDown, History, BookText,
   ShieldCheck, CalendarCheck2, X, Save, TrendingUp, TrendingDown,
   BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Layers, Scale,
-  FileText, DollarSign, Building2, RefreshCw, AlertTriangle
+  FileText, DollarSign, Building2, RefreshCw, AlertTriangle, Trash2, Edit3, Link2
 } from 'lucide-react';
 import { FinancialAccount } from '../types';
 import { useFinanceStore } from '../stores/useFinanceStore';
@@ -11,6 +11,8 @@ import { useAuthStore } from '../stores/useAuthStore';
 import ExportButton from './common/ExportButton';
 import { useToast } from './Toast';
 import { reportsApi } from '../services/api/reports';
+import { financeApi } from '../services/api/finance';
+import { getActionableErrorMessage } from '../services/api/core';
 
 // Shared Components
 import PageSkeleton from './common/PageSkeleton';
@@ -21,10 +23,17 @@ import { useConfirm } from './common/ConfirmProvider';
 
 type FinanceTab = 'dashboard' | 'coa' | 'rules' | 'journal' | 'recurring' | 'exceptions' | 'reconciliation' | 'periods' | 'pnl';
 
+// Arabic keyboards emit Eastern Arabic-Indic (٠-٩) or Persian (۰-۹) digits;
+// convert them live so account codes always reach the server as 0-9.
+const normalizeDigitKeys = (value: string): string =>
+    value
+        .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+        .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
+
 const TABS: { id: FinanceTab; label: string; labelAr: string; icon: any }[] = [
   { id: 'dashboard', label: 'Dashboard', labelAr: 'لوحة المحاسبة', icon: BarChart3 },
   { id: 'pnl', label: 'P&L', labelAr: 'الأرباح والخسائر', icon: TrendingUp },
-  { id: 'coa', label: 'Chart of Accounts', labelAr: 'دليل الحسابات', icon: BookText },
+  { id: 'coa', label: 'Chart of Accounts', labelAr: 'شجرة الحسابات', icon: BookText },
   { id: 'rules', label: 'Posting Engine', labelAr: 'قواعد الترحيل', icon: Layers },
   { id: 'journal', label: 'Journal', labelAr: 'اليومية العامة', icon: History },
   { id: 'recurring', label: 'Recurring', labelAr: 'قيود دورية', icon: RefreshCw },
@@ -68,8 +77,13 @@ const Finance: React.FC = () => {
   const currency = settings.currencySymbol || (isAr ? 'ج.م' : 'EGP');
   const activeBranch = branches.find((branch: any) => branch.id === settings.activeBranchId);
   const tabTitle = (tab: FinanceTab) => {
+    const arabicTitles: Record<FinanceTab, string> = {
+      dashboard: 'لوحة المحاسبة', pnl: 'الأرباح والخسائر', coa: 'شجرة الحسابات',
+      rules: 'قواعد الترحيل', journal: 'اليومية العامة', recurring: 'قيود دورية',
+      exceptions: 'الاستثناءات المالية', reconciliation: 'مطابقة الحسابات', periods: 'الفترات المغلقة',
+    };
     const current = TABS.find(item => item.id === tab);
-    return isAr ? (current?.labelAr || current?.label || tab) : (current?.label || tab);
+    return isAr ? (arabicTitles[tab] || current?.label || tab) : (current?.label || tab);
   };
   const t = {
     title: isAr ? 'المحاسبة' : 'Financial Nexus',
@@ -116,7 +130,7 @@ const Finance: React.FC = () => {
     next: isAr ? 'التالي' : 'Next',
     active: isAr ? 'نشط' : 'ACTIVE',
     paused: isAr ? 'متوقف' : 'PAUSED',
-    chartOfAccounts: isAr ? 'دليل الحسابات' : 'Chart of Accounts',
+    chartOfAccounts: isAr ? 'شجرة الحسابات' : 'Chart of Accounts',
     postingEngine: isAr ? 'محرك الترحيل' : 'Dynamic Posting Engine',
     addRule: isAr ? '+ قاعدة جديدة' : '+ Add Rule',
     noRules: isAr ? 'لا توجد قواعد ترحيل' : 'No Posting Rules Found',
@@ -176,6 +190,18 @@ const Finance: React.FC = () => {
   const [pendingFinanceAction, setPendingFinanceAction] = useState<string | null>(null);
   const [reverseModalTxId, setReverseModalTxId] = useState<string | null>(null);
   const [reverseReason, setReverseReason] = useState('');
+  const [accountModal, setAccountModal] = useState(false);
+  const [accountForm, setAccountForm] = useState({ code: '', name: '', nameAr: '', type: 'EXPENSE', normalBalance: 'DEBIT', parentId: '', allowManualJournals: true });
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
+  const [resetChartModal, setResetChartModal] = useState(false);
+  const [resetChartConfirmText, setResetChartConfirmText] = useState('');
+  const [paymentMappings, setPaymentMappings] = useState<any[]>([]);
+  const [taxMappings, setTaxMappings] = useState<any[]>([]);
+  const [mappingsLoading, setMappingsLoading] = useState(false);
+  const [archivedAccounts, setArchivedAccounts] = useState<any[]>([]);
+  const [showArchivedAccounts, setShowArchivedAccounts] = useState(false);
+  const [postingRuleModal, setPostingRuleModal] = useState(false);
+  const [postingRuleForm, setPostingRuleForm] = useState({ documentType: 'POS_SALE', amountSource: 'TOTAL', direction: 'DEBIT', accountCode: '', conditionField: '', conditionValue: '' });
   
   const [recurringTemplates, setRecurringTemplates] = useState<any[]>([]);
 
@@ -218,13 +244,31 @@ const Finance: React.FC = () => {
     return out;
   }, [accounts]);
 
+  const loadMappings = async () => {
+    setMappingsLoading(true);
+    const [payments, taxes] = await Promise.allSettled([financeApi.getPaymentMappings(), financeApi.getTaxMappings()]);
+    if (payments.status === 'fulfilled') setPaymentMappings(payments.value || []);
+    if (taxes.status === 'fulfilled') setTaxMappings(taxes.value || []);
+    setMappingsLoading(false);
+  };
+
+  const loadArchivedAccounts = async () => {
+    try { setArchivedAccounts(await financeApi.getArchivedAccounts()); }
+    catch (err: any) { showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error'); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'rules') void loadMappings();
+    if (activeTab === 'coa' && showArchivedAccounts) void loadArchivedAccounts();
+  }, [activeTab, showArchivedAccounts]);
+
   // Compute financial summaries
   const financialSummary = useMemo(() => {
-    const assets = flatAccounts.filter(a => a.code?.startsWith('1')).reduce((s, a) => s + Number(a.balance || 0), 0);
-    const liabilities = flatAccounts.filter(a => a.code?.startsWith('2')).reduce((s, a) => s + Number(a.balance || 0), 0);
-    const equity = flatAccounts.filter(a => a.code?.startsWith('3')).reduce((s, a) => s + Number(a.balance || 0), 0);
-    const revenue = flatAccounts.filter(a => a.code?.startsWith('4')).reduce((s, a) => s + Number(a.balance || 0), 0);
-    const expenses = flatAccounts.filter(a => a.code?.startsWith('5')).reduce((s, a) => s + Number(a.balance || 0), 0);
+    const assets = flatAccounts.filter(a => (a as any).type === 'ASSET').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const liabilities = flatAccounts.filter(a => (a as any).type === 'LIABILITY').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const equity = flatAccounts.filter(a => (a as any).type === 'EQUITY').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const revenue = flatAccounts.filter(a => (a as any).type === 'REVENUE').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const expenses = flatAccounts.filter(a => (a as any).type === 'EXPENSE').reduce((s, a) => s + Number(a.balance || 0), 0);
     const netIncome = revenue - expenses;
     return { assets, liabilities, equity, revenue, expenses, netIncome };
   }, [flatAccounts]);
@@ -253,6 +297,150 @@ const Finance: React.FC = () => {
     setExpandedAccounts(next);
   };
 
+  const submitAccount = async () => {
+    if (pendingFinanceAction) return;
+    setPendingFinanceAction('account');
+    try {
+      const payload = editingAccount
+        ? { name: accountForm.name, nameAr: accountForm.nameAr, parentId: accountForm.parentId, allowManualJournals: accountForm.allowManualJournals }
+        : accountForm;
+      const created = editingAccount
+        ? await financeApi.updateAccount(editingAccount.id, payload)
+        : await financeApi.createAccount(payload);
+      await fetchFinanceData();
+      // Keep a newly-created child visible even when its parent was collapsed.
+      if (created?.parentId) {
+        setExpandedAccounts((current) => new Set(current).add(created.parentId));
+      }
+      setAccountModal(false);
+      setEditingAccount(null);
+      setAccountForm({ code: '', name: '', nameAr: '', type: 'EXPENSE', normalBalance: 'DEBIT', parentId: '', allowManualJournals: true });
+      showToast(isAr ? 'تمت إضافة الحساب إلى شجرة الحسابات' : 'Account added to the account tree', 'success');
+    } catch (err: any) {
+      showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error');
+    } finally {
+      setPendingFinanceAction(null);
+    }
+  };
+
+  const openNewAccountModal = () => {
+    setEditingAccount(null);
+    setAccountForm({ code: '', name: '', nameAr: '', type: 'EXPENSE', normalBalance: 'DEBIT', parentId: '', allowManualJournals: true });
+    setAccountModal(true);
+  };
+
+  const openAccountEditor = (account: FinancialAccount) => {
+    setEditingAccount(account);
+    setAccountForm({
+      code: account.code || '', name: account.name || '', nameAr: (account as any).nameAr || '',
+      type: (account as any).type || 'EXPENSE', normalBalance: (account as any).normalBalance || 'DEBIT',
+      parentId: (account as any).parentId || '', allowManualJournals: (account as any).allowManualJournals !== false,
+    });
+    setAccountModal(true);
+  };
+
+  const handleArchiveAccount = async (account: FinancialAccount) => {
+    const confirmed = await confirm({
+      title: isAr ? 'أرشفة الحساب؟' : 'Archive account?',
+      message: isAr ? 'سيختفي الحساب من الشجرة النشطة مع الاحتفاظ بكل القيود التاريخية. لا يمكن أرشفة حساب رئيسي قبل نقل حساباته الفرعية.' : 'The account will leave the active tree while historical journal entries remain preserved. Parent accounts must be emptied first.',
+      confirmText: isAr ? 'أرشفة الحساب' : 'Archive account',
+      cancelText: isAr ? 'إلغاء' : 'Cancel', variant: 'danger',
+    });
+    if (!confirmed) return;
+    setPendingFinanceAction(`archive:${account.id}`);
+    try {
+      await financeApi.deactivateAccount(account.id);
+      await fetchFinanceData();
+      showToast(isAr ? 'تمت أرشفة الحساب مع الحفاظ على تاريخه' : 'Account archived; history preserved', 'success');
+    } catch (err: any) {
+      const code = err?.code || err?.error;
+      showToast(code === 'ACCOUNT_HAS_CHILDREN_MOVE_OR_DEACTIVATE_CHILDREN_FIRST'
+        ? (isAr ? 'انقل الحسابات الفرعية أو أرشفها أولًا' : 'Move or archive the child accounts first')
+        : getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error');
+    } finally {
+      setPendingFinanceAction(null);
+    }
+  };
+
+  const handleResetChart = async () => {
+    if (resetChartConfirmText !== 'RESET' || pendingFinanceAction) return;
+    setPendingFinanceAction('reset-chart');
+    try {
+      const result = await financeApi.resetChartOfAccounts();
+      await Promise.all([fetchFinanceData(), fetchPostingRules(), loadMappings()]);
+      setResetChartModal(false);
+      setResetChartConfirmText('');
+      showToast(isAr
+        ? `تمت أرشفة ${result?.archivedCount || 0} حسابًا. التاريخ محفوظ وقواعد الترحيل متوقفة لإعادة الربط.`
+        : `${result?.archivedCount || 0} accounts archived. History preserved; posting rules need remapping.`, 'success');
+    } catch (err: any) {
+      showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error');
+    } finally {
+      setPendingFinanceAction(null);
+    }
+  };
+
+  const handleUpdatePostingRule = async (rule: any, patch: any) => {
+    setPendingFinanceAction(`rule:${rule.id}`);
+    try {
+      await financeApi.updatePostingRule(rule.id, { accountCode: rule.accountCode, ...patch });
+      await fetchPostingRules();
+      showToast(isAr ? 'تم تحديث ربط قاعدة الترحيل' : 'Posting rule mapping updated', 'success');
+    } catch (err: any) {
+      showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error');
+    } finally {
+      setPendingFinanceAction(null);
+    }
+  };
+
+  const submitPostingRule = async () => {
+    if (pendingFinanceAction) return;
+    if (!postingRuleForm.accountCode.trim()) {
+      showToast(isAr ? 'حساب الترحيل مطلوب' : 'Posting account is required', 'error');
+      return;
+    }
+    setPendingFinanceAction('create-rule');
+    try {
+      await financeApi.createPostingRule({
+        ...postingRuleForm,
+        accountCode: postingRuleForm.accountCode.trim(),
+        conditionField: postingRuleForm.conditionField.trim() || undefined,
+        conditionValue: postingRuleForm.conditionValue.trim() || undefined,
+      });
+      await fetchPostingRules();
+      setPostingRuleModal(false);
+      setPostingRuleForm({ documentType: 'POS_SALE', amountSource: 'TOTAL', direction: 'DEBIT', accountCode: '', conditionField: '', conditionValue: '' });
+      showToast(isAr ? 'تمت إضافة قاعدة الترحيل' : 'Posting rule created', 'success');
+    } catch (err: any) {
+      showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error');
+    } finally { setPendingFinanceAction(null); }
+  };
+
+  const handleRestoreAccount = async (account: any) => {
+    if (pendingFinanceAction) return;
+    setPendingFinanceAction(`restore:${account.id}`);
+    try {
+      await financeApi.restoreAccount(account.id);
+      await Promise.all([fetchFinanceData(), loadArchivedAccounts()]);
+      showToast(isAr ? 'تم استرجاع الحساب إلى الشجرة' : 'Account restored to the active tree', 'success');
+    } catch (err: any) { showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error'); }
+    finally { setPendingFinanceAction(null); }
+  };
+
+  const handlePaymentMapping = async (mapping: any, accountId: string) => {
+    setPendingFinanceAction(`payment:${mapping.id}`);
+    try { await financeApi.updatePaymentMapping(mapping.id, accountId); await loadMappings(); showToast(isAr ? 'تم تحديث ربط طريقة الدفع' : 'Payment mapping updated', 'success'); }
+    catch (err: any) { showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error'); }
+    finally { setPendingFinanceAction(null); }
+  };
+
+  const handleTaxMapping = async (mapping: any, accountId: string) => {
+    setPendingFinanceAction(`tax:${mapping.id}`);
+    try { await financeApi.updateTaxMapping(mapping.id, accountId, mapping.rate); await loadMappings(); showToast(isAr ? 'تم تحديث ربط الضريبة' : 'Tax mapping updated', 'success'); }
+    catch (err: any) { showToast(getActionableErrorMessage(err, isAr ? 'ar' : 'en'), 'error'); }
+    finally { setPendingFinanceAction(null); }
+  };
+
   const renderAccountRow = (account: FinancialAccount, level = 0): React.ReactNode => {
     const hasChildren = Boolean(account.children && account.children.length > 0);
     const isExpanded = expandedAccounts.has(account.id);
@@ -267,9 +455,17 @@ const Finance: React.FC = () => {
             <span className="font-mono text-[10px] font-black text-muted w-12">{account.code}</span>
             <span className="text-xs font-black text-main uppercase">{account.name}</span>
           </button>
-          <span className={`font-mono text-xs font-black ${Number(account.balance || 0) < 0 ? 'text-rose-500' : 'text-main'}`}>
-            {Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`font-mono text-xs font-black ${Number(account.balance || 0) < 0 ? 'text-rose-500' : 'text-main'}`}>
+              {Number(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <button onClick={(e) => { e.stopPropagation(); openAccountEditor(account); }} className="w-8 h-8 rounded-lg border border-border/40 text-muted hover:text-indigo-500 hover:border-indigo-500/40 flex items-center justify-center" title={isAr ? 'تعديل الحساب' : 'Edit account'}>
+              <Edit3 size={13} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); void handleArchiveAccount(account); }} disabled={Boolean(pendingFinanceAction)} className="w-8 h-8 rounded-lg border border-border/40 text-muted hover:text-rose-500 hover:border-rose-500/40 flex items-center justify-center disabled:opacity-40" title={isAr ? 'أرشفة الحساب' : 'Archive account'}>
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
         {hasChildren && isExpanded && account.children!.map(c => renderAccountRow(c, level + 1))}
       </React.Fragment>
@@ -673,13 +869,32 @@ const Finance: React.FC = () => {
             <div className="p-8 animate-in slide-in-from-bottom-5 duration-150">
                <div className="bg-app/40 rounded-[2.5rem] border border-border/30 overflow-hidden shadow-2xl">
                  <div className="p-8 border-b border-border/20 flex items-center justify-between bg-elevated/30">
+                   <div className="flex items-center gap-4">
                    <h3 className="text-xl font-black text-main uppercase tracking-tighter flex items-center gap-4">
                      <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-500/20"><BookText size={24} /></div>
                      {t.chartOfAccounts}
                    </h3>
+                   </div>
+                   <div className="flex items-center gap-2">
+                   <button onClick={openNewAccountModal} className="px-5 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg">
+                     {isAr ? '+ إضافة حساب' : '+ Add Account'}
+                   </button>
+                   <button onClick={() => { setResetChartConfirmText(''); setResetChartModal(true); }} className="px-5 py-3 bg-rose-500/10 text-rose-500 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-colors" title={isAr ? 'أرشفة الشجرة الحالية والبدء بشجرة جديدة' : 'Archive the current tree and start a new one'}>
+                     {isAr ? 'تهيئة شجرة جديدة' : 'Replace chart'}
+                   </button>
+                   <button onClick={() => { setShowArchivedAccounts(v => !v); if (!showArchivedAccounts) void loadArchivedAccounts(); }} className="px-5 py-3 bg-elevated text-muted border border-border/40 rounded-xl text-[10px] font-black uppercase tracking-widest hover:text-indigo-500 transition-colors">
+                     {showArchivedAccounts ? (isAr ? 'إخفاء المؤرشف' : 'Hide archived') : (isAr ? 'عرض المؤرشف' : 'Show archived')}
+                   </button>
+                   </div>
                  </div>
                  <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
                    {accounts.map(acc => renderAccountRow(acc))}
+                   {showArchivedAccounts && (
+                     <div className="m-6 p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 space-y-3">
+                       <div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-widest text-amber-600">{isAr ? 'الحسابات المؤرشفة' : 'Archived accounts'}</h4><span className="text-[10px] text-muted">{archivedAccounts.length}</span></div>
+                       {archivedAccounts.length === 0 ? <p className="text-xs text-muted">{isAr ? 'لا توجد حسابات مؤرشفة' : 'No archived accounts'}</p> : archivedAccounts.map(account => <div key={account.id} className="flex items-center justify-between gap-3 py-2 border-b border-border/20 last:border-0"><span className="text-xs font-black text-main">{account.code} · {account.name}</span><button onClick={() => void handleRestoreAccount(account)} disabled={Boolean(pendingFinanceAction)} className="px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 text-[10px] font-black uppercase disabled:opacity-40">{isAr ? 'استرجاع' : 'Restore'}</button></div>)}
+                     </div>
+                   )}
                  </div>
                </div>
              </div>
@@ -693,7 +908,7 @@ const Finance: React.FC = () => {
                      <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-500/20"><Layers size={24} /></div>
                      {t.postingEngine}
                    </h3>
-                   <button className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg">
+                   <button onClick={() => setPostingRuleModal(true)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg">
                      {t.addRule}
                    </button>
                  </div>
@@ -703,36 +918,48 @@ const Finance: React.FC = () => {
                          <Layers size={48} className="mx-auto mb-4 text-muted" />
                          <p className="font-black uppercase tracking-widest text-sm">{t.noRules}</p>
                       </div>
-                   ) : postingRules?.map((rule: any) => (
-                      <div key={rule.id} className="p-6 bg-card/40 border border-border/30 rounded-3xl shrink-0 group hover:border-indigo-500/30 transition-all shadow-lg flex justify-between items-center">
-                         <div>
+                   ) : postingRules?.map((rule: any) => {
+                     const currentIsActive = flatAccounts.some(account => account.code === rule.accountCode);
+                     return (
+                     <div key={rule.id} className="p-6 bg-card/40 border border-border/30 rounded-3xl shrink-0 group hover:border-indigo-500/30 transition-all shadow-lg">
+                        <div className="flex flex-wrap justify-between items-start gap-4">
+                          <div>
                             <div className="flex items-center gap-3 mb-2">
-                               <span className="px-3 py-1 rounded bg-indigo-500/10 text-indigo-500 font-black text-[10px] uppercase tracking-widest border border-indigo-500/20">{rule.documentType}</span>
-                               {rule.conditionField && (
-                                 <span className="text-xs font-bold text-muted uppercase">IF {rule.conditionField} = {rule.conditionValue}</span>
-                               )}
-                               {rule.isSystem && (
-                                  <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-stone-500/10 text-stone-500 border border-stone-500/20">{t.system}</span>
-                               )}
+                              <span className="px-3 py-1 rounded bg-indigo-500/10 text-indigo-500 font-black text-[10px] uppercase tracking-widest border border-indigo-500/20">{rule.documentType}</span>
+                              <span className="px-2 py-1 rounded bg-elevated text-muted font-black text-[10px] uppercase">{rule.amountSource} · {rule.direction}</span>
+                              {rule.conditionField && <span className="text-xs font-bold text-muted uppercase">IF {rule.conditionField} = {rule.conditionValue}</span>}
+                              {rule.isSystem && <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-stone-500/10 text-stone-500 border border-stone-500/20">{t.system}</span>}
                             </div>
-                            <div className="flex items-center gap-4 text-xs font-black uppercase tracking-widest">
-                               <div className="flex items-center gap-2">
-                                  <span className="text-muted">DR:</span>
-                                  <span className="text-emerald-500">{rule.debitAccountCode}</span>
-                               </div>
-                               <div className="flex items-center gap-2">
-                                  <span className="text-muted">CR:</span>
-                                  <span className="text-rose-500">{rule.creditAccountCode}</span>
-                               </div>
+                            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest">
+                              <Link2 size={14} className="text-indigo-500" />
+                              <span className="text-muted">{isAr ? 'الحساب المرحل إليه' : 'Posting account'}</span>
                             </div>
-                         </div>
-                         {!rule.isSystem && (
-                             <button onClick={() => handleDeletePostingRule(rule.id)} disabled={Boolean(pendingFinanceAction)} className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-50">
-                               <X size={16} />
-                             </button>
-                         )}
-                      </div>
-                   ))}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select value={rule.accountCode || ''} onChange={(e) => void handleUpdatePostingRule(rule, { accountCode: e.target.value })} disabled={Boolean(pendingFinanceAction)} className={`min-w-[230px] px-3 py-2 rounded-xl bg-app border text-xs font-black text-main ${!currentIsActive && !String(rule.accountCode || '').startsWith('{') ? 'border-rose-500 text-rose-500' : 'border-border/40'}`}>
+                              {!currentIsActive && !String(rule.accountCode || '').startsWith('{') && <option value={rule.accountCode}>{rule.accountCode} — {isAr ? 'حساب مؤرشف، أعد الربط' : 'Archived; remap required'}</option>}
+                              {['{PAYMENT_METHOD}', '{TAX_OUTPUT}', '{TAX_INPUT}'].map(code => <option key={code} value={code}>{code}</option>)}
+                              {flatAccounts.map(account => <option key={`rule-${account.id}`} value={account.code}>{account.code} · {account.name}</option>)}
+                            </select>
+                            <button onClick={() => void handleUpdatePostingRule(rule, { isActive: !rule.isActive })} disabled={Boolean(pendingFinanceAction)} className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase border ${rule.isActive ? 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10' : 'text-rose-500 border-rose-500/30 bg-rose-500/10'}`}>
+                              {rule.isActive ? (isAr ? 'نشطة' : 'Active') : (isAr ? 'متوقفة' : 'Paused')}
+                            </button>
+                            {!rule.isSystem && <button onClick={() => handleDeletePostingRule(rule.id)} disabled={Boolean(pendingFinanceAction)} className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-50"><X size={16} /></button>}
+                          </div>
+                        </div>
+                     </div>
+                     );
+                   })}
+                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3">
+                     <div className="p-5 bg-card/40 border border-border/30 rounded-3xl">
+                       <div className="flex items-center gap-2 mb-4"><Wallet size={16} className="text-emerald-500" /><h4 className="text-sm font-black text-main">{isAr ? 'ربط طرق الدفع' : 'Payment method mapping'}</h4></div>
+                       {mappingsLoading ? <p className="text-xs text-muted">{isAr ? 'جاري التحميل...' : 'Loading...'}</p> : paymentMappings.map(mapping => <div key={mapping.id} className="flex items-center justify-between gap-3 py-2 border-b border-border/20 last:border-0"><span className="text-xs font-black text-main">{mapping.paymentMethod}</span><select value={mapping.accountId || ''} onChange={e => void handlePaymentMapping(mapping, e.target.value)} disabled={Boolean(pendingFinanceAction)} className="max-w-[220px] px-3 py-2 rounded-xl bg-app border border-border/40 text-xs font-black text-main"><option value="">{isAr ? 'اختر حسابًا' : 'Select account'}</option>{flatAccounts.map(account => <option key={`pay-${account.id}`} value={account.id}>{account.code} · {account.name}</option>)}</select></div>)}
+                     </div>
+                     <div className="p-5 bg-card/40 border border-border/30 rounded-3xl">
+                       <div className="flex items-center gap-2 mb-4"><Scale size={16} className="text-amber-500" /><h4 className="text-sm font-black text-main">{isAr ? 'ربط حسابات الضرائب' : 'Tax account mapping'}</h4></div>
+                       {mappingsLoading ? <p className="text-xs text-muted">{isAr ? 'جاري التحميل...' : 'Loading...'}</p> : taxMappings.map(mapping => <div key={mapping.id} className="flex items-center justify-between gap-3 py-2 border-b border-border/20 last:border-0"><span className="text-xs font-black text-main">{mapping.taxType} {mapping.rate ? `(${mapping.rate}%)` : ''}</span><select value={mapping.accountId || ''} onChange={e => void handleTaxMapping(mapping, e.target.value)} disabled={Boolean(pendingFinanceAction)} className="max-w-[220px] px-3 py-2 rounded-xl bg-app border border-border/40 text-xs font-black text-main"><option value="">{isAr ? 'اختر حسابًا' : 'Select account'}</option>{flatAccounts.map(account => <option key={`tax-${account.id}`} value={account.id}>{account.code} · {account.name}</option>)}</select></div>)}
+                     </div>
+                   </div>
                  </div>
                </div>
             </div>
@@ -974,6 +1201,66 @@ const Finance: React.FC = () => {
                 <CalendarCheck2 size={18} /> {t.confirmClose}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {accountModal && (
+        <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4" onClick={() => !pendingFinanceAction && setAccountModal(false)}>
+          <div className="w-full max-w-2xl bg-card border border-border/40 rounded-[2rem] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7 border-b border-border/20 flex items-center justify-between">
+              <h3 className="text-xl font-black text-main">{isAr ? (editingAccount ? 'تعديل الحساب' : 'إضافة حساب إلى شجرة الحسابات') : (editingAccount ? 'Edit account' : 'Add Account to Tree')}</h3>
+              <button onClick={() => setAccountModal(false)} className="w-10 h-10 rounded-xl bg-elevated/50 text-muted flex items-center justify-center"><X size={18} /></button>
+            </div>
+            <div className="p-7 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input value={accountForm.code} disabled={Boolean(editingAccount)} onChange={(e) => setAccountForm({ ...accountForm, code: normalizeDigitKeys(e.target.value) })} inputMode="numeric" placeholder={isAr ? 'كود الحساب (أرقام)' : 'Account code'} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main disabled:opacity-50" />
+              <input value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} placeholder={isAr ? 'اسم الحساب' : 'Account name'} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main" />
+              <input value={accountForm.nameAr} onChange={(e) => setAccountForm({ ...accountForm, nameAr: e.target.value })} placeholder={isAr ? 'الاسم بالعربية' : 'Arabic name'} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main" />
+              <select value={accountForm.type} onChange={(e) => setAccountForm({ ...accountForm, type: e.target.value, normalBalance: ['LIABILITY', 'EQUITY', 'REVENUE'].includes(e.target.value) ? 'CREDIT' : 'DEBIT' })} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main">
+                {['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].map(type => <option key={type} value={type}>{type}</option>)}
+              </select>
+              <select value={accountForm.parentId} onChange={(e) => setAccountForm({ ...accountForm, parentId: e.target.value })} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main md:col-span-2">
+                <option value="">{isAr ? 'حساب رئيسي' : 'Root account'}</option>
+                {flatAccounts.filter(account => account.id !== editingAccount?.id).map(account => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
+              </select>
+            </div>
+            <div className="p-7 border-t border-border/20 flex gap-3">
+              <button onClick={() => setAccountModal(false)} className="flex-1 py-3 rounded-xl bg-elevated text-muted font-black text-xs">{isAr ? 'إلغاء' : 'Cancel'}</button>
+              <button onClick={submitAccount} disabled={Boolean(pendingFinanceAction) || !accountForm.name.trim() || (!editingAccount && !accountForm.code.trim())} className="flex-[2] py-3 rounded-xl bg-indigo-600 text-white font-black text-xs disabled:opacity-50">{isAr ? 'حفظ الحساب' : 'Save account'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {postingRuleModal && (
+        <div className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4" onClick={() => !pendingFinanceAction && setPostingRuleModal(false)}>
+          <div className="w-full max-w-2xl bg-card border border-border/40 rounded-[2rem] shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-7 border-b border-border/20 flex items-center justify-between"><h3 className="text-xl font-black text-main">{isAr ? 'إضافة قاعدة ترحيل' : 'Add posting rule'}</h3><button onClick={() => setPostingRuleModal(false)} className="w-10 h-10 rounded-xl bg-elevated/50 text-muted flex items-center justify-center"><X size={18} /></button></div>
+            <div className="p-7 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input value={postingRuleForm.documentType} onChange={e => setPostingRuleForm({ ...postingRuleForm, documentType: e.target.value.toUpperCase() })} placeholder="Document type" className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main" />
+              <input value={postingRuleForm.amountSource} onChange={e => setPostingRuleForm({ ...postingRuleForm, amountSource: e.target.value.toUpperCase() })} placeholder="Amount source" className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main" />
+              <select value={postingRuleForm.direction} onChange={e => setPostingRuleForm({ ...postingRuleForm, direction: e.target.value })} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main"><option value="DEBIT">DEBIT</option><option value="CREDIT">CREDIT</option></select>
+              <select value={postingRuleForm.accountCode} onChange={e => setPostingRuleForm({ ...postingRuleForm, accountCode: e.target.value })} className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main"><option value="">{isAr ? 'اختر حساب الترحيل' : 'Select posting account'}</option>{['{PAYMENT_METHOD}', '{TAX_OUTPUT}', '{TAX_INPUT}'].map(code => <option key={code} value={code}>{code}</option>)}{flatAccounts.map(account => <option key={`new-rule-${account.id}`} value={account.code}>{account.code} · {account.name}</option>)}</select>
+              <input value={postingRuleForm.conditionField} onChange={e => setPostingRuleForm({ ...postingRuleForm, conditionField: e.target.value })} placeholder="Condition field (optional)" className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main" />
+              <input value={postingRuleForm.conditionValue} onChange={e => setPostingRuleForm({ ...postingRuleForm, conditionValue: e.target.value })} placeholder="Condition value (optional)" className="px-4 py-3 rounded-xl bg-app border border-border/40 text-main" />
+            </div>
+            <div className="p-7 border-t border-border/20 flex gap-3"><button onClick={() => setPostingRuleModal(false)} className="flex-1 py-3 rounded-xl bg-elevated text-muted font-black text-xs">{isAr ? 'إلغاء' : 'Cancel'}</button><button onClick={() => void submitPostingRule()} disabled={Boolean(pendingFinanceAction)} className="flex-[2] py-3 rounded-xl bg-indigo-600 text-white font-black text-xs disabled:opacity-50">{isAr ? 'حفظ القاعدة' : 'Save rule'}</button></div>
+          </div>
+        </div>
+      )}
+
+      {resetChartModal && (
+        <div className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4" onClick={() => !pendingFinanceAction && setResetChartModal(false)}>
+          <div className="w-full max-w-xl bg-card border border-rose-500/30 rounded-[2rem] shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-7 border-b border-border/20 flex items-center justify-between bg-rose-500/5">
+              <div><h3 className="text-xl font-black text-main">{isAr ? 'تهيئة شجرة حسابات جديدة' : 'Replace chart of accounts'}</h3><p className="text-xs text-muted mt-2">{isAr ? 'إجراء محاسبي آمن لاستبدال الشجرة الحالية' : 'A controlled accounting operation for replacing the active chart'}</p></div>
+              <button onClick={() => setResetChartModal(false)} className="w-10 h-10 rounded-xl bg-elevated/50 text-muted flex items-center justify-center"><X size={18} /></button>
+            </div>
+            <div className="p-7 space-y-4">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-sm text-main leading-relaxed">{isAr ? 'سيتم أرشفة كل الحسابات النشطة وإيقاف قواعد الترحيل مؤقتًا. القيود والتقارير التاريخية لن تُحذف، لكن يجب إضافة الشجرة الجديدة ثم إعادة ربط قواعد الترحيل وطرق الدفع والضرائب.' : 'All active accounts will be archived and posting rules paused. Journal history and reports remain intact; add the new tree and remap posting rules, payments, and taxes afterward.'}</div>
+              <label className="space-y-2 block"><span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">{isAr ? 'اكتب RESET للتأكيد' : 'Type RESET to confirm'}</span><input value={resetChartConfirmText} onChange={e => setResetChartConfirmText(e.target.value)} placeholder="RESET" className="w-full px-5 py-4 bg-app border border-border/40 rounded-xl text-main font-black uppercase" /></label>
+            </div>
+            <div className="p-7 border-t border-border/20 flex gap-3"><button onClick={() => setResetChartModal(false)} className="flex-1 py-3 rounded-xl bg-elevated text-muted font-black text-xs">{isAr ? 'إلغاء' : 'Cancel'}</button><button onClick={handleResetChart} disabled={resetChartConfirmText !== 'RESET' || Boolean(pendingFinanceAction)} className="flex-[2] py-3 rounded-xl bg-rose-600 text-white font-black text-xs disabled:opacity-40">{isAr ? 'أرشفة الشجرة الحالية' : 'Archive current chart'}</button></div>
           </div>
         </div>
       )}

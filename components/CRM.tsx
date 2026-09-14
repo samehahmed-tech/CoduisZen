@@ -40,12 +40,12 @@ const CRMMetric: React.FC<{
 
 const CRM: React.FC = () => {
   const { customers, addCustomer, fetchCustomers } = useCRMStore();
-  const { settings } = useAuthStore();
+  const settings = useAuthStore((state) => state.settings);
   const lang = settings.language || 'en';
   const isAr = lang === 'ar';
   const tr = (en: string, ar: string) => isAr ? ar : en;
 
-  const { orders } = useOrderStore();
+  const orders = useOrderStore((state) => state.orders);
 
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 250);

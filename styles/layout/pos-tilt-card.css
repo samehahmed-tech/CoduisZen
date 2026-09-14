@@ -133,9 +133,9 @@
     inset: 0;
     background: linear-gradient(
         to bottom,
-        rgba(0, 0, 0, 0.1) 0%,
-        rgba(0, 0, 0, 0.35) 40%,
-        rgba(0, 0, 0, 0.85) 100%
+        rgba(0, 0, 0, 0.22) 0%,
+        rgba(0, 0, 0, 0.48) 40%,
+        rgba(0, 0, 0, 0.9) 100%
     );
     z-index: 1;
 }
@@ -152,6 +152,104 @@
     transform: scale(1.15);
     opacity: 1;
 }
+
+/* ─── Glass item fallback (.pos-img-fallback) ───
+   Pure frosted-glass tile for items with no photo — NO text, NO patterns,
+   so the overlaid item name is always the single readable text. Soft aurora
+   blobs glow through the frost; [data-motif="0-5"] (stable per item name)
+   shifts hues and glow geometry so cards stay distinguishable. A top glass
+   reflection + inner edge light sell the frosted depth. */
+.pos-img-fallback {
+    --motif-a: var(--primary);
+    --motif-b: var(--accent);
+    --blob-x: 50%;
+    --blob-y: 26%;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at var(--blob-x) var(--blob-y), rgba(var(--motif-a), 0.34), transparent 60%),
+        radial-gradient(circle at calc(100% - var(--blob-x)) calc(100% - var(--blob-y)), rgba(var(--motif-b), 0.24), transparent 58%),
+        linear-gradient(155deg, rgba(var(--motif-a), 0.20), rgba(var(--motif-b), 0.10) 55%, rgba(var(--text-main), 0.07)),
+        rgba(var(--text-main), 0.06);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -18px 34px -22px rgba(0, 0, 0, 0.35);
+}
+/* Frosted top reflection — the signature glass highlight. */
+.pos-img-fallback::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 32%, transparent 46%);
+    pointer-events: none;
+}
+/* Deep inner edge light for glass depth. */
+.pos-img-fallback::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10), inset 0 -30px 44px -30px rgba(var(--motif-b), 0.35);
+    pointer-events: none;
+}
+.pos-img-fallback[data-motif="1"] {
+    --motif-a: var(--accent);
+    --motif-b: var(--primary);
+    --blob-x: 26%;
+    --blob-y: 60%;
+}
+.pos-img-fallback[data-motif="2"] {
+    --motif-a: var(--primary);
+    --motif-b: var(--success);
+    --blob-x: 74%;
+    --blob-y: 30%;
+}
+.pos-img-fallback[data-motif="3"] {
+    --motif-a: var(--warning);
+    --motif-b: var(--primary);
+    --blob-x: 50%;
+    --blob-y: 72%;
+}
+.pos-img-fallback[data-motif="4"] {
+    --motif-a: var(--accent);
+    --motif-b: var(--success);
+    --blob-x: 30%;
+    --blob-y: 24%;
+}
+.pos-img-fallback[data-motif="5"] {
+    --motif-a: var(--success);
+    --motif-b: var(--accent);
+    --blob-x: 70%;
+    --blob-y: 64%;
+}
+/* Keep hover zoom parity with photos */
+.pos-tilt-bg .pos-img-fallback {
+    opacity: 0.9;
+    transition: transform 800ms ease, opacity 400ms ease;
+}
+/* Kiosk surfaces: fill the fixed image boxes (rules live here — not in
+   kiosk.css — so the tile works wherever kiosk cards render). */
+.kiosk-item-image .pos-img-fallback {
+    position: absolute;
+    inset: 0;
+}
+.kiosk-modifier-product .pos-img-fallback {
+    width: 72px;
+    height: 72px;
+    flex: 0 0 auto;
+    border-radius: 18px;
+}
+.pos-tilt-card:hover .pos-tilt-bg .pos-img-fallback {
+    transform: scale(1.15);
+    opacity: 1;
+}
+.pos-flip-media .pos-img-fallback {
+    transform: scale(1.02);
+    transition: transform 700ms var(--pos-flip-ease);
+}
+.pos-flip-card:hover .pos-flip-media .pos-img-fallback { transform: scale(1.12); }
 
 /* ─── Content layer ─── */
 .pos-tilt-content {
@@ -404,42 +502,6 @@
     100% { border-color: rgba(var(--primary), 0.4); box-shadow: 0 0 0 0 rgba(var(--primary), 0); }
 }
 
-/* ═══ List Variant ═══ */
-.pos-tilt-card--list {
-    flex-direction: row;
-    align-items: center;
-    padding: 12px;
-    border-radius: 20px;
-}
-.pos-tilt-card--list .pos-tilt-bg {
-    display: none;
-}
-.pos-tilt-media {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    overflow: hidden;
-    flex-shrink: 0;
-    margin-right: 16px;
-    transform: translateZ(30px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-}
-[dir="rtl"] .pos-tilt-card--list .pos-tilt-media {
-    margin-right: 0;
-    margin-left: 16px;
-}
-.pos-tilt-card--list .pos-tilt-content {
-    padding: 0;
-    flex-direction: row;
-    align-items: center;
-    width: 100%;
-    transform: translateZ(40px);
-    text-align: left;
-}
-[dir="rtl"] .pos-tilt-card--list .pos-tilt-content {
-    text-align: right;
-}
-
 /* ─── Empty Media State ─── */
 .pos-menu-item-empty-media {
     background: rgba(120, 120, 120, 0.1);
@@ -457,31 +519,630 @@
     color: rgba(255, 255, 255, 0.4);
 }
 
-.pos-tilt-card--button .pos-tilt-bg {
-    display: none;
-}
-.pos-tilt-card--button .pos-tilt-title {
-    font-size: 14px;
-    margin-bottom: 8px;
-    text-align: start;
-}
-
 /* ═══ Dark Theme Enhancements ═══ */
 .dark .pos-tilt-card {
     background: rgba(15, 23, 42, 0.65);
     border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 
+    box-shadow:
         0 10px 30px -10px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .dark .pos-tilt-card:hover {
     background: rgba(15, 23, 42, 0.85);
     border-color: rgba(var(--primary), 0.5);
-    box-shadow: 
+    box-shadow:
         0 35px 65px -12px rgba(0, 0, 0, 0.5),
         0 15px 30px -8px rgba(var(--primary), 0.2),
         inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 .dark .pos-tilt-card--image[data-selected='true'] {
     background: rgba(15, 23, 42, 0.65);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3D LAYERED CARD v2 (compact) — Gayane-style spotlight trading card.
+   No white flash: cover stays, shade deepens, shine sweeps, layers float
+   with staggered spring motion. Morphing add button (circle → pill).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pos-3d-card {
+    --card-radius: 22px;
+    --pos-spring: cubic-bezier(.34, 1.4, .5, 1);
+    --pos-expo: cubic-bezier(.22, 1, .36, 1);
+    min-height: 248px;
+    height: 100%;
+    justify-content: flex-end;
+    align-items: stretch;
+    text-align: center;
+    padding: 12px 14px 14px;
+    perspective: 900px;
+}
+.pos-3d-card::after { display: none; }
+.pos-3d-card:hover,
+.pos-3d-card:focus-within { background: rgba(var(--bg-card), 0.7); }
+.pos-3d-card:active { transform: scale(0.97); }
+.pos-3d-wrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    transition: transform 600ms var(--pos-expo), box-shadow 600ms ease;
+}
+.pos-3d-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.02);
+    transition: transform 800ms var(--pos-expo);
+}
+.pos-3d-card:hover .pos-3d-cover,
+.pos-3d-card:focus-within .pos-3d-cover { transform: scale(1.1); }
+.pos-3d-cover--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.5);
+    background:
+        radial-gradient(circle at 50% 28%, rgba(var(--primary), 0.55), transparent 62%),
+        linear-gradient(165deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+}
+.pos-3d-shade {
+    position: absolute;
+    inset: 0;
+    /* Legibility scrim: deep base for title/foot + mid stop so busy
+       photos (e.g. the house default) never wash the white text out. */
+    background: linear-gradient(to top, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.62) 34%, rgba(0,0,0,0.22) 58%, rgba(0,0,0,0.05) 78%);
+    transition: opacity 500ms ease;
+}
+.pos-3d-card:hover .pos-3d-shade,
+.pos-3d-card:focus-within .pos-3d-shade {
+    background: linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.68) 38%, rgba(0,0,0,0.26) 62%, rgba(0,0,0,0.08) 80%);
+}
+.pos-3d-shine {
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: -70%;
+    width: 45%;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.28), transparent);
+    transform: skewX(-18deg);
+    transition: left 650ms var(--pos-expo);
+}
+.pos-3d-card:hover .pos-3d-shine,
+.pos-3d-card:focus-within .pos-3d-shine { left: 135%; }
+.pos-3d-card:hover .pos-3d-wrapper,
+.pos-3d-card:focus-within .pos-3d-wrapper {
+    transform: perspective(900px) translateY(-4%) rotateX(10deg);
+    box-shadow: 0 28px 56px -12px rgba(0, 0, 0, 0.55);
+}
+.pos-3d-title {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    font-size: 17px;
+    font-weight: 900;
+    line-height: 1.2;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.85), 0 4px 16px rgba(0,0,0,0.6);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: transform 550ms var(--pos-expo);
+}
+.pos-3d-card:hover .pos-3d-title,
+.pos-3d-card:focus-within .pos-3d-title {
+    transform: translateY(-10px) translateZ(60px);
+}
+.pos-3d-character {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    height: 0;
+    margin-top: 0;
+    opacity: 0;
+    transform: translateY(16px) scale(0.7);
+    transition: opacity 350ms ease, transform 550ms var(--pos-spring) 60ms, height 350ms ease, margin 350ms ease;
+    pointer-events: none;
+    overflow: visible;
+}
+.pos-3d-card:hover .pos-3d-character,
+.pos-3d-card:focus-within .pos-3d-character {
+    height: 34px;
+    margin-top: 8px;
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+}
+.pos-3d-medallion {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    white-space: nowrap;
+    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    box-shadow: 0 10px 24px rgba(var(--primary), 0.55), inset 0 1px 0 rgba(255,255,255,0.4);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.pos-3d-medallion small {
+    font-size: 10px;
+    font-weight: 800;
+    opacity: 0.85;
+}
+.pos-3d-foot {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+    min-height: 40px;
+    align-items: center;
+}
+.pos-3d-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 40px;
+    max-width: 40px;
+    width: max-content;
+    padding: 8px 0;
+    overflow: hidden;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: max-width 400ms var(--pos-expo) 120ms, background 250ms ease, gap 300ms ease, transform 150ms ease;
+}
+.pos-3d-add-label {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 400ms var(--pos-expo) 120ms, opacity 250ms ease 120ms;
+}
+.pos-3d-card:hover .pos-3d-add,
+.pos-3d-card:focus-within .pos-3d-add {
+    max-width: 170px;
+    gap: 6px;
+    padding-inline: 18px;
+    background: rgb(var(--primary));
+}
+.pos-3d-card:hover .pos-3d-add-label,
+.pos-3d-card:focus-within .pos-3d-add-label { max-width: 120px; opacity: 1; }
+.pos-3d-add:active { transform: scale(0.94); }
+.pos-3d-unavailable {
+    font-size: 11px;
+    font-weight: 900;
+    color: #fda4af;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FLIP CARD v2 (ultra) — Aron-style flip with a rich glass back.
+   Back = blurred dish photo + deep scrim + glass CTA. Never a white panel.
+   Flip runs 650ms with a soft overshoot; card lifts while turning.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pos-flip-card {
+    --card-radius: 20px;
+    --pos-flip-ease: cubic-bezier(.3, .7, .3, 1.12);
+    min-height: 246px;
+    height: 100%;
+    perspective: 1200px;
+    padding: 0;
+}
+.pos-flip-card::after { display: none; }
+.pos-flip-card:hover,
+.pos-flip-card:focus-within { background: rgba(var(--bg-card), 0.7); }
+.pos-flip-card:active { transform: scale(0.97); }
+.pos-flip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 246px;
+    transform-style: preserve-3d;
+    transition: transform 650ms var(--pos-flip-ease);
+}
+/* Flip engages only when the item has a description to reveal. */
+.pos-flip-card[data-has-desc='true']:hover .pos-flip-inner,
+.pos-flip-card[data-has-desc='true']:focus-within .pos-flip-inner,
+.pos-flip-card[data-flipped='true'] .pos-flip-inner {
+    transform: rotateY(180deg) scale(1.02);
+}
+.pos-flip-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    border-radius: inherit;
+    overflow: hidden;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background: rgb(var(--bg-card));
+    box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.35);
+}
+.pos-flip-front { z-index: 2; }
+.pos-flip-media {
+    position: relative;
+    height: 128px;
+    flex-shrink: 0;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 50% 20%, rgba(var(--primary), 0.3), transparent 65%),
+        rgba(var(--text-main), 0.06);
+}
+.pos-flip-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.02);
+    transition: transform 700ms var(--pos-flip-ease);
+}
+.pos-flip-card:hover .pos-flip-media img { transform: scale(1.12); }
+.pos-flip-media::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 44px;
+    background: linear-gradient(to top, rgb(var(--bg-card)), transparent);
+}
+.pos-flip-price-ribbon {
+    position: absolute;
+    bottom: 8px;
+    inset-inline-start: 10px;
+    z-index: 2;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    box-shadow: 0 6px 16px rgba(var(--primary), 0.5), inset 0 1px 0 rgba(255,255,255,0.35);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.pos-flip-price-ribbon small { font-size: 9px; font-weight: 800; opacity: 0.85; }
+.pos-flip-info {
+    position: absolute;
+    top: 8px;
+    inset-inline-end: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background 200ms ease, transform 150ms ease;
+}
+.pos-flip-info:hover { background: rgb(var(--primary)); transform: scale(1.1) rotate(12deg); }
+.pos-flip-front-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 10px 12px 12px;
+}
+.pos-flip-title {
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1.25;
+    color: rgb(var(--text-main));
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.pos-flip-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 8px;
+}
+.pos-flip-hint {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(var(--text-main), 0.45);
+}
+/* Back: blurred photo + deep scrim + glass content — rich in both modes */
+.pos-flip-back {
+    transform: rotateY(180deg);
+    border: 1px solid rgba(var(--primary), 0.3);
+    background: linear-gradient(160deg, rgba(var(--primary), 0.75), rgba(8, 10, 18, 0.88));
+}
+.pos-flip-back-blur {
+    position: absolute;
+    inset: -20px;
+    width: calc(100% + 40px);
+    height: calc(100% + 40px);
+    object-fit: cover;
+    filter: blur(22px) saturate(1.3);
+    opacity: 0.55;
+}
+.pos-flip-back-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(165deg, rgba(var(--primary), 0.35) 0%, rgba(5, 7, 14, 0.72) 55%, rgba(5, 7, 14, 0.88) 100%);
+}
+.pos-flip-back-body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 14px 12px 12px;
+}
+.pos-flip-kicker {
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.65);
+}
+.pos-flip-desc {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+}
+.pos-flip-back-price {
+    font-size: 19px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.pos-flip-back-price small { font-size: 10px; font-weight: 800; opacity: 0.8; margin-inline-start: 2px; }
+.pos-flip-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    padding: 8px 20px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    box-shadow: 0 8px 20px rgba(var(--primary), 0.55), inset 0 1px 0 rgba(255,255,255,0.35);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: transform 150ms ease, box-shadow 250ms ease;
+}
+.pos-flip-cta:hover { transform: scale(1.06); box-shadow: 0 10px 26px rgba(var(--primary), 0.65); }
+.pos-flip-cta:active { transform: scale(0.94); }
+.pos-flip-stepper {
+    margin-top: 0 !important;
+    padding: 4px !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+.pos-flip-stepper .pos-tilt-qty-val { color: #fff !important; }
+.pos-flip-stepper .pos-tilt-qty-btn { color: #fff !important; background: rgba(255,255,255,0.12) !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TICKET CARD v2 (buttons) — boarding-pass stub design.
+   Gradient top strip, punched notch circles on the perforation, dotted
+   stub frame, orbit-ring add button, shine sweep. Gentle lift, no whitening.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pos-ticket-card {
+    --card-radius: 16px;
+    --pos-expo: cubic-bezier(.22, 1, .36, 1);
+    flex-direction: row;
+    align-items: stretch;
+    padding: 14px 10px 14px 14px;
+    min-height: 108px;
+    height: 100%;
+    gap: 0;
+    overflow: hidden;
+    transition: transform 350ms var(--pos-expo), box-shadow 350ms ease, border-color 350ms ease, background 350ms ease;
+}
+.pos-ticket-card::after { display: none; }
+.pos-ticket-card:hover,
+.pos-ticket-card:focus-within {
+    background: rgba(var(--bg-card), 0.7);
+    transform: translateY(-3px);
+    box-shadow: 0 18px 38px -14px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(var(--primary), 0.25);
+}
+.pos-ticket-card:active { transform: translateY(-1px) scale(0.98); }
+[dir="rtl"] .pos-ticket-card { padding: 14px 14px 14px 10px; }
+.pos-ticket-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    inset-inline: 0;
+    height: 3px;
+    z-index: 6;
+    background: linear-gradient(90deg, rgb(var(--primary)), rgba(var(--primary), 0.15) 60%, rgb(var(--accent)));
+    opacity: 0.85;
+}
+.pos-ticket-shine {
+    content: '';
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: -60%;
+    width: 40%;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transform: skewX(-18deg);
+    transition: left 600ms var(--pos-expo);
+}
+.pos-ticket-card:hover .pos-ticket-shine,
+.pos-ticket-card:focus-within .pos-ticket-shine { left: 135%; }
+.pos-ticket-main {
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.pos-ticket-popular {
+    align-self: flex-start;
+    margin-bottom: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--primary));
+    background: rgba(var(--primary), 0.12);
+    border: 1px solid rgba(var(--primary), 0.25);
+}
+.pos-ticket-title {
+    font-size: 14.5px;
+    font-weight: 900;
+    line-height: 1.25;
+    color: rgb(var(--text-main));
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: transform 300ms var(--pos-expo);
+}
+.pos-ticket-card:hover .pos-ticket-title,
+.pos-ticket-card:focus-within .pos-ticket-title { transform: translateX(2px); }
+[dir="rtl"] .pos-ticket-card:hover .pos-ticket-title,
+[dir="rtl"] .pos-ticket-card:focus-within .pos-ticket-title { transform: translateX(-2px); }
+.pos-ticket-desc {
+    margin-top: 2px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: rgba(var(--text-main), 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pos-ticket-desc--empty { font-style: italic; }
+.pos-ticket-unavailable {
+    margin-top: 4px;
+    font-size: 10px;
+    font-weight: 900;
+    color: rgb(var(--danger));
+}
+.pos-ticket-perf {
+    position: relative;
+    flex-shrink: 0;
+    width: 0;
+    margin: 0 10px;
+    border-inline-start: 2px dashed rgba(var(--text-main), 0.2);
+}
+.pos-ticket-notch {
+    position: absolute;
+    left: 50%;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: rgb(var(--bg-app));
+    border: 1px solid rgba(var(--border-color), 0.6);
+    transform: translateX(-50%);
+}
+.pos-ticket-notch--top { top: -14px; }
+.pos-ticket-notch--bottom { bottom: -14px; }
+.pos-ticket-stub {
+    flex-shrink: 0;
+    width: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 2px;
+    border: 1.5px dashed rgba(var(--primary), 0.35);
+    border-radius: 12px;
+    background: rgba(var(--primary), 0.05);
+    transition: transform 300ms var(--pos-expo), background 300ms ease, border-color 300ms ease;
+}
+.pos-ticket-card:hover .pos-ticket-stub,
+.pos-ticket-card:focus-within .pos-ticket-stub {
+    transform: translateY(-2px);
+    background: rgba(var(--primary), 0.1);
+    border-color: rgba(var(--primary), 0.55);
+}
+.pos-ticket-add {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    color: #fff;
+    background: linear-gradient(135deg, rgb(var(--primary)), rgb(var(--primary-hover)));
+    box-shadow: 0 8px 18px rgba(var(--primary), 0.45), inset 0 1px 0 rgba(255,255,255,0.35);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    transition: transform 160ms ease, box-shadow 250ms ease;
+}
+.pos-ticket-add::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 999px;
+    border: 1.5px dashed rgba(var(--primary), 0.55);
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 300ms ease, transform 300ms var(--pos-expo);
+}
+.pos-ticket-card:hover .pos-ticket-add::before,
+.pos-ticket-card:focus-within .pos-ticket-add::before {
+    opacity: 1;
+    transform: scale(1);
+    animation: pos-ticket-orbit 7s linear infinite;
+}
+@keyframes pos-ticket-orbit { to { transform: scale(1) rotate(360deg); } }
+.pos-ticket-add:hover { transform: scale(1.1); box-shadow: 0 10px 24px rgba(var(--primary), 0.6); }
+.pos-ticket-add:active { transform: scale(0.9); }
+
+/* ── Reduced motion: keep meaning, drop rotation ── */
+@media (prefers-reduced-motion: reduce) {
+    .pos-flip-inner { transition: opacity 120ms linear; transform: none !important; }
+    .pos-flip-back { opacity: 0; }
+    .pos-flip-card[data-has-desc='true']:hover .pos-flip-back,
+    .pos-flip-card[data-has-desc='true']:focus-within .pos-flip-back,
+    .pos-flip-card[data-flipped='true'] .pos-flip-back { opacity: 1; }
+    .pos-flip-card[data-has-desc='true']:hover .pos-flip-front,
+    .pos-flip-card[data-has-desc='true']:focus-within .pos-flip-front,
+    .pos-flip-card[data-flipped='true'] .pos-flip-front { opacity: 0; }
+    .pos-3d-wrapper,
+    .pos-3d-cover,
+    .pos-3d-title,
+    .pos-3d-character,
+    .pos-3d-add,
+    .pos-3d-add-label { transition: none; }
+    .pos-3d-character { opacity: 1; height: 34px; margin-top: 8px; transform: none; }
+    .pos-3d-card:hover .pos-3d-add,
+    .pos-3d-card:focus-within .pos-3d-add { max-width: 170px; gap: 6px; padding-inline: 18px; }
+    .pos-3d-card:hover .pos-3d-add-label,
+    .pos-3d-card:focus-within .pos-3d-add-label { max-width: 120px; opacity: 1; }
+    .pos-ticket-shine,
+    .pos-3d-shine { display: none; }
+    .pos-ticket-card:hover .pos-ticket-add::before,
+    .pos-ticket-card:focus-within .pos-ticket-add::before { animation: none; }
 }

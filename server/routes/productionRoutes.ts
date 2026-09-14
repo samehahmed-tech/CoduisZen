@@ -6,11 +6,15 @@ import { enforceBranch } from '../middleware/branchIsolation';
 const router = Router();
 
 const productionAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PRODUCTION_STAFF');
+const productionManage = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER');
 
 router.get('/orders', productionAuth, enforceBranch, productionController.getProductionOrders);
 router.post('/orders', productionAuth, enforceBranch, productionController.createProductionOrder);
+router.get('/orders/:id', productionAuth, enforceBranch, productionController.getProductionOrderById);
+router.put('/orders/:id', productionManage, enforceBranch, productionController.updateProductionOrder);
+router.delete('/orders/:id', productionManage, enforceBranch, productionController.deleteProductionOrder);
 router.put('/orders/:id/start', productionAuth, enforceBranch, productionController.startProductionOrder);
 router.put('/orders/:id/complete', productionAuth, enforceBranch, productionController.completeProductionOrder);
-router.put('/orders/:id/cancel', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'), enforceBranch, productionController.cancelProductionOrder);
+router.put('/orders/:id/cancel', productionManage, enforceBranch, productionController.cancelProductionOrder);
 
 export default router;

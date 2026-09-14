@@ -20,6 +20,7 @@ interface ShiftOverlaysProps {
 export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
     const activeShift = useFinanceStore(state => state.activeShift);
     const setShift = useFinanceStore(state => state.setShift);
+    const refreshActiveShift = useFinanceStore(state => state.refreshActiveShift);
     const settings = useAuthStore(state => state.settings);
     const branches = useAuthStore(state => state.branches);
     const setActiveBranch = useAuthStore(state => state.setActiveBranch);
@@ -57,24 +58,21 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
                 setIsCheckingShift(false);
                 return;
             }
-            if (activeShift?.branchId === activeBranchId) {
-                setIsCheckingShift(false);
-                return;
-            }
-            if (activeShift && !cancelled) setShift(null);
+            // Shared store action: clears state only on a definitive
+            // "no open shift" and keeps the last known shift on transient
+            // failures, so an open shift never flashes as missing.
             setIsCheckingShift(true);
             try {
-                const res = await shiftsApi.getActive(activeBranchId);
-                if (!cancelled && res && res.id) setShift(res);
+                await refreshActiveShift(activeBranchId);
             } catch {
-                if (!cancelled) setShift(null);
+                // refreshActiveShift never throws for transient failures
             } finally {
                 if (!cancelled) setIsCheckingShift(false);
             }
         };
         hydrateShift();
         return () => { cancelled = true; };
-    }, [activeShift, resolvedBranchId, setActiveBranch, setShift, settings.activeBranchId, user?.id]);
+    }, [resolvedBranchId, setActiveBranch, setShift, refreshActiveShift, settings.activeBranchId, user?.id]);
 
     if (isCheckingShift && !activeShift) {
         return (
@@ -205,7 +203,7 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
                             ))}
                         </div>
 
-<button
+                        <button
                             onClick={handleOpenShift}
                             disabled={loading || !isOpeningBalanceValid(openingBalance)}
                             className="w-full py-4 lg:py-6 mt-auto bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-3xl font-black text-base lg:text-xl flex items-center justify-center gap-3 lg:gap-4 transition-all active:scale-[0.98] shadow-[0_8px_30px_rgba(var(--primary-rgb),0.3)]"
@@ -222,6 +220,30 @@ export const ShiftOverlays: React.FC<ShiftOverlaysProps> = ({ onOpen }) => {
                     </div>
                 </motion.div>
             </motion.div>
+        );
+    }
+
+    if (activeShift && (activeShift as any).isStale) {
+        const setIsShiftDrawerOpen = useFinanceStore.getState().setIsShiftDrawerOpen;
+        return (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[400] max-w-xl w-full px-4">
+                <div className="bg-amber-500 text-slate-950 p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-3 border border-amber-300 font-bold">
+                    <div className="flex items-center gap-3">
+                        <ShieldAlert size={24} className="shrink-0" />
+                        <div>
+                            <p className="font-black text-sm">{isRTL ? 'شيفت مفتوح من يوم سابق' : 'Stale Shift Detected'}</p>
+                            <p className="text-xs opacity-90">{isRTL ? 'الشيفت الحالي تم فتحه في يوم تشغيل سابق. يرجى تسوية وإغلاق الشيفت لتحديث بيانات اليوم.' : 'This shift was opened on an older business date. Please close and reconcile it.'}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setIsShiftDrawerOpen(true)}
+                        className="shrink-0 px-3 py-2 rounded-xl bg-slate-950 text-white font-black text-xs uppercase"
+                    >
+                        {isRTL ? 'إغلاق الشيفت' : 'Close Shift'}
+                    </button>
+                </div>
+            </div>
         );
     }
 

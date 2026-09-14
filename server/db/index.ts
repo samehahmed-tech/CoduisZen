@@ -20,12 +20,29 @@ let databaseConnectPromise: Promise<void> | null = null;
 const connectDatabase = async () => {
     if (sqlPool.connected) return;
     if (!databaseConnectPromise) {
-        databaseConnectPromise = sqlPool.connect()
-            .then(() => dbLogger.info('SQL Server connection ready'))
-            .catch((err: any) => dbLogger.warn({ err: err.message }, 'SQL Server unavailable; API remains online'))
+        const attempt = async (triesLeft: number): Promise<void> => {
+            try {
+                await sqlPool.connect();
+                dbLogger.info('SQL Server connection ready');
+            } catch (err: any) {
+                if (triesLeft > 0) {
+                    const backoffMs = 1500 * (3 - triesLeft);
+                    dbLogger.warn({ err: err?.message, backoffMs }, 'SQL Server connect failed; retrying with backoff');
+                    await new Promise(resolve => setTimeout(resolve, backoffMs));
+                    return attempt(triesLeft - 1);
+                }
+                dbLogger.warn({ err: err?.message }, 'SQL Server unavailable; API remains online');
+            }
+        };
+        databaseConnectPromise = attempt(2)
             .finally(() => { databaseConnectPromise = null; });
     }
     await databaseConnectPromise;
+};
+
+const isConnectionError = (error: any) => {
+    const text = [error?.message, error?.code, error?.originalError?.message, String(error || '')].filter(Boolean).join(' ');
+    return /SQL_SERVER_UNAVAILABLE|Connection is closed|Connection lost|ECONNRESET|ECONNREFUSED|ETIMEDOUT|Login timeout|Failed to connect/i.test(text);
 };
 
 void connectDatabase();
@@ -150,18 +167,42 @@ export const db = dbInstance as typeof dbInstance & { query: any };
 
 export const pool = {
     query: async (text: string, params?: any[]) => {
-        await waitForDatabase();
-        const rawDb = (db as any).$client;
-        const conn = typeof rawDb.$instance === 'function' ? await rawDb.$instance() : rawDb;
-        const request = conn.request();
-        if (params) {
-            params.forEach((parameterValue, index) => request.input(`rf_param_${index}`, parameterValue ?? null));
-            const parameterizedText = text.replace(/\$(\d+)/g, (_match, index) => `@rf_param_${Number(index) - 1}`);
-            const result = await request.query(parameterizedText);
+        const runQuery = async () => {
+            await waitForDatabase();
+            const rawDb = (db as any).$client;
+            const conn = typeof rawDb.$instance === 'function' ? await rawDb.$instance() : rawDb;
+            const request = conn.request();
+            if (params) {
+                params.forEach((parameterValue, index) => {
+                    const name = `rf_param_${index}`;
+                    if (typeof parameterValue === 'string') {
+                        // Explicit Unicode type: without it the native driver can
+                        // bind long/odd payloads as VARCHAR, permanently storing
+                        // Arabic as ???? in nvarchar columns.
+                        const length = parameterValue.length > 4000 ? (mssql as any).MAX : Math.max(parameterValue.length, 1);
+                        request.input(name, (mssql as any).NVarChar(length), parameterValue);
+                    } else {
+                        request.input(name, parameterValue ?? null);
+                    }
+                });
+                const parameterizedText = text.replace(/\$(\d+)/g, (_match, index) => `@rf_param_${Number(index) - 1}`);
+                const result = await request.query(parameterizedText);
+                return { rows: result.recordset, rowCount: result.rowsAffected?.[0] ?? 0 };
+            }
+            const result = await request.query(text);
             return { rows: result.recordset, rowCount: result.rowsAffected?.[0] ?? 0 };
+        };
+        try {
+            return await runQuery();
+        } catch (error: any) {
+            // The pool can go stale mid-flight (SQL Server restart, idle
+            // timeout). Reconnect once and retry instead of 500ing the
+            // request — this closes most of the transient-error window.
+            if (!isConnectionError(error)) throw error;
+            dbLogger.warn({ err: error?.message }, 'Query hit a dead connection; reconnecting and retrying once');
+            await connectDatabase();
+            return await runQuery();
         }
-        const result = await request.query(text);
-        return { rows: result.recordset, rowCount: result.rowsAffected?.[0] ?? 0 };
     }
 };
 

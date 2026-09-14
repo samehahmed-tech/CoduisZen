@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { markBridgePoll, registerBridge } from '../services/printerBridgeService.js';
+import { markBridgePoll, registerBridge, getBridgeRegistry } from '../services/printerBridgeService.js';
 import {
     enqueuePrintJob,
     completePrintJob,
@@ -102,11 +102,28 @@ export const claimBridgeJob = async (req: Request, res: Response) => {
         const claimUnassigned = String(req.query?.claimUnassigned || '').toLowerCase() === 'true';
         const globalClaim = String(req.query?.global || '').toLowerCase() === 'true' || !branchId;
         if (!gatewayId) return res.status(400).json({ error: 'GATEWAY_ID_REQUIRED' });
-        markBridgePoll(gatewayId, branchId || undefined);
-        const job = await claimNextPrintJob({ branchId: branchId || undefined, gatewayId, claimUnassigned, globalClaim });
+        // Capability list: Windows printer names visible to this bridge —
+        // enables printer-aware job claiming (USB jobs go to the owning machine).
+        const printers = String(req.query?.printers || '')
+            .split('|')
+            .map(name => name.trim())
+            .filter(Boolean)
+            .slice(0, 100);
+        await markBridgePoll(gatewayId, branchId || undefined, printers);
+        const job = await claimNextPrintJob({ branchId: branchId || undefined, gatewayId, claimUnassigned, globalClaim, printers });
         return res.json({ ok: true, jobs: job ? [job] : [] });
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'PRINT_JOB_CLAIM_FAILED' });
+    }
+};
+
+/** Registry for the Printers UI: which gateways are online and what they can print. */
+export const getBridges = async (req: Request, res: Response) => {
+    try {
+        const registry = await getBridgeRegistry();
+        return res.json(registry);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message || 'BRIDGE_REGISTRY_FAILED' });
     }
 };
 

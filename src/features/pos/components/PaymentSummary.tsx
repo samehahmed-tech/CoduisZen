@@ -33,6 +33,7 @@ interface PaymentSummaryProps {
     splitPayments: { method: PaymentMethod | string; amount: number }[];
     customPaymentMethods?: CustomPaymentMethod[];
     activeOrderType?: string;
+    deliveryFee?: number;
 }
 
 const ar = {
@@ -56,7 +57,7 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
     subtotal = 0, discount = 0, discountAmount = 0, tax = 0, total = 0, currencySymbol, paymentMethod, onSetPaymentMethod, onShowSplitModal,
     lang, t, tipAmount = 0, onSetTipAmount, onSubmit, onSendKitchen,
     canSubmit, couponCode, activeCoupon, isApplyingCoupon, onCouponCodeChange, onApplyCoupon, onClearCoupon, splitPayments = [], activeOrderType,
-    customPaymentMethods = []
+    customPaymentMethods = [], deliveryFee = 0
 }) => {
     const isAr = lang === 'ar';
     const { showToast } = useToast();
@@ -125,6 +126,9 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({
                 <div className="flex items-center gap-3 text-muted/70 font-bold">
                     <span>{t.subtotal} <b className="text-main tabular-nums ml-1">{subtotal.toFixed(2)}</b></span>
                     <span>{t.tax} <b className="tabular-nums ml-1">{tax.toFixed(2)}</b></span>
+                    {Number(deliveryFee || 0) > 0 && (
+                        <span>{isAr ? 'التوصيل' : 'Delivery'} <b className="text-emerald-600 tabular-nums ml-1">{Number(deliveryFee).toFixed(2)}</b></span>
+                    )}
                 </div>
                 {discount > 0 && (
                     <span className="text-emerald-500 font-bold tabular-nums bg-emerald-500/10 px-1.5 rounded">-{discountAmount.toFixed(2)}</span>

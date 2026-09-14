@@ -114,7 +114,7 @@ export const reportsApi = {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<{ revenue: number; expenses: number; netProfit: number; details: Array<{ type: string; name: string; debit: number; credit: number; net: number }> }>(`/reports/profit-loss?${query}`);
     },
-    getTopExpenses: (params: { startDate: string; endDate: string }) => {
+    getTopExpenses: (params: { startDate: string; endDate: string; branchId?: string }) => {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<Array<{ name: string; total: number }>>(`/reports/top-expenses?${query}`);
     },
@@ -144,9 +144,14 @@ export const reportsApi = {
             }>;
         }>(`/reports/expenses?${query}`);
     },
-    getStockMovements: (params: { branchId?: string; startDate: string; endDate: string }) => {
-        const query = new URLSearchParams(params as any).toString();
-        return apiRequest<Array<{ id: number; itemName: string; quantity: number; unitCost: number; totalCost: number; type: string; reason: string; performedBy: string; createdAt: string }>>(`/reports/stock-movements?${query}`);
+    getStockMovements: (params: { branchId?: string; startDate: string; endDate: string; types?: string | string[]; itemId?: string }) => {
+        const search = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === '') return;
+            if (Array.isArray(value)) value.forEach((entry) => search.append('types', String(entry)));
+            else search.append(key, String(value));
+        });
+        return apiRequest<Array<{ id: number; itemName: string; itemNameAr?: string | null; unit?: string | null; quantity: number; unitCost: number; totalCost: number; type: string; reason: string; performedBy: string; createdAt: string; referenceId?: string | null; warehouseName?: string | null }>>(`/reports/stock-movements?${search.toString()}`);
     },
     getWasteLoss: (params: { startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();

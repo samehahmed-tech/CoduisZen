@@ -7,6 +7,7 @@ import {
    ChevronDown, Filter, Target, Megaphone, Zap, Scale, Info, Users, Clock, Box, ShieldCheck, Activity, LineChart as ChartIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 
 export const CrmReports = ({ state }: any) => {
    const {
@@ -132,16 +133,45 @@ export const CrmReports = ({ state }: any) => {
                         </div>
                         <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg">
                            <p className="text-[10px] font-black uppercase tracking-widest text-muted">Retention Rate</p>
-                           <p className={`text-2xl font-black mt-1 ${customerRetentionData.retentionRate >= 50 ? 'text-emerald-500' : 'text-rose-500'}`}>{customerRetentionData.retentionRate}%</p>
-                        </div>
-                     </div>
-                  </div>
+                            <p className={`text-2xl font-black mt-1 ${customerRetentionData.retentionRate >= 50 ? 'text-emerald-500' : 'text-rose-500'}`}>{customerRetentionData.retentionRate}%</p>
+                         </div>
+                      </div>
+                      <ReportDataTable
+                         title="Customer Retention — table"
+                         data={[
+                            { segment: 'Total Customers', count: customerRetentionData.totalCustomers },
+                            { segment: 'Returning', count: customerRetentionData.returningCustomers },
+                            { segment: 'New', count: customerRetentionData.newCustomers },
+                            { segment: 'Retention Rate %', count: customerRetentionData.retentionRate },
+                         ]}
+                         columns={[
+                            { key: 'segment', label: 'Segment', sortable: false },
+                            { key: 'count', label: 'Value', align: 'right', sortable: false, format: (v: any) => fmtNum(v) },
+                         ]}
+                         exportFilename="customer-retention"
+                         lang="en"
+                      />
+                   </div>
                 )}
                 {activeCategory === 'CRM' && activeSubReport === 'Customer Retention' && !customerRetentionData && <p className="text-center text-muted py-16">No data.</p>}
 
-               {activeCategory === 'CRM' && activeSubReport === 'New vs Returning' && newVsReturningData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="grid grid-cols-2 gap-6">
+                {activeCategory === 'CRM' && activeSubReport === 'New vs Returning' && newVsReturningData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title="New vs Returning — table"
+                         data={[
+                            { segment: 'New', orders: newVsReturningData.new?.orders, revenue: newVsReturningData.new?.revenue },
+                            { segment: 'Returning', orders: newVsReturningData.returning?.orders, revenue: newVsReturningData.returning?.revenue },
+                         ]}
+                         columns={[
+                            { key: 'segment', label: 'Segment', sortable: false },
+                            { key: 'orders', label: 'Orders', align: 'right', sum: true, sortable: false, format: (v: any) => fmtNum(v) },
+                            { key: 'revenue', label: 'Revenue', align: 'right', sum: true, sortable: false, format: (v: any) => fmtMoney(v, 'LE') },
+                         ]}
+                         exportFilename="new-vs-returning"
+                         lang="en"
+                      />
+                      <div className="grid grid-cols-2 gap-6">
                         <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">New Customers</p><p className="text-3xl font-black text-blue-500">{newVsReturningData.new.orders} <span className="text-xs text-muted">orders</span></p><p className="text-lg font-bold text-muted mt-1">{newVsReturningData.new.revenue.toLocaleString()} LE</p></div>
                         <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-2">Returning Customers</p><p className="text-3xl font-black text-emerald-500">{newVsReturningData.returning.orders} <span className="text-xs text-muted">orders</span></p><p className="text-lg font-bold text-muted mt-1">{newVsReturningData.returning.revenue.toLocaleString()} LE</p></div>
                      </div>
@@ -181,9 +211,20 @@ export const CrmReports = ({ state }: any) => {
                )}
                {activeCategory === 'CRM' && activeSubReport === 'Customer Churn' && !churnData && <p className="text-center text-muted py-16">No data.</p>}
 
-               {activeCategory === 'CRM' && activeSubReport === 'Customer Journey Funnel' && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8">
+                {activeCategory === 'CRM' && activeSubReport === 'Customer Journey Funnel' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title="Customer Journey Funnel — table"
+                         data={journeyFunnelData}
+                         columns={[
+                            { key: 'stage', label: 'Stage' },
+                            { key: 'count', label: 'Count', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                            { key: 'percent', label: '%', align: 'right', format: (v: any) => `${Number(v || 0).toFixed(1)}%` },
+                         ]}
+                         exportFilename="customer-journey"
+                         lang="en"
+                      />
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8">
                         <h3 className="text-xl font-black text-main mb-6">Customer Journey Funnel</h3>
                         <div className="space-y-3">
                            {journeyFunnelData.map((s: any, i: number) => {
@@ -216,8 +257,32 @@ export const CrmReports = ({ state }: any) => {
                      </div>
                   </div>
                )}
-               {activeCategory === 'CRM' && activeSubReport === 'Loyalty Points' && loyaltyData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'CRM' && activeSubReport === 'Loyalty Points' && loyaltyData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                         <ReportDataTable
+                            title="Points by Tier — table"
+                            data={loyaltyData.tiers || []}
+                            columns={[
+                               { key: 'tier', label: 'Tier' },
+                               { key: 'count', label: 'Customers', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                               { key: 'totalPoints', label: 'Points', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                               { key: 'totalSpent', label: 'Spent', align: 'right', sum: true, format: (v: any) => fmtMoney(v, 'LE') },
+                            ]}
+                            exportFilename="loyalty-tiers"
+                            lang="en"
+                         />
+                         <ReportDataTable
+                            title="Top Point Holders — table"
+                            data={(loyaltyData.topPointHolders || []).slice(0, 20)}
+                            columns={[
+                               { key: 'name', label: 'Customer' },
+                               { key: 'loyaltyPoints', label: 'Points', align: 'right', format: (v: any) => fmtNum(v) },
+                            ]}
+                            exportFilename="loyalty-top-holders"
+                            lang="en"
+                         />
+                      </div>
                      <div className="grid grid-cols-3 gap-4">{[{ l: 'Total Customers', v: loyaltyData.summary.totalCustomers }, { l: 'Points Outstanding', v: loyaltyData.summary.totalPoints.toLocaleString(), c: 'text-amber-500' }, { l: 'Total Spent', v: `${loyaltyData.summary.totalSpent.toLocaleString()} LE`, c: 'text-emerald-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                      <div className="grid grid-cols-2 gap-6"><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6"><h3 className="text-lg font-black text-main mb-4">By Tier</h3>{loyaltyData.tiers.map((t: any, i: number) => (<div key={i} className="flex justify-between py-2 text-xs border-b border-border/20"><span className="font-black">{t.tier}</span><span className="text-muted">{t.count} customers · {t.totalPoints} pts · {t.totalSpent.toLocaleString()} LE</span></div>))}</div><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6"><h3 className="text-lg font-black text-main mb-4">Top Point Holders</h3>{loyaltyData.topPointHolders.slice(0, 10).map((c: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs"><span className="text-main font-bold">{c.name}</span><span className="font-mono text-amber-500">{c.loyaltyPoints} pts</span></div>))}</div></div>
                   </div>

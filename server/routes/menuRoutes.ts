@@ -25,6 +25,7 @@ router.post('/items/:id/approve', managerAuth, menuController.approveItem);
 router.post('/items/:id/publish', managerAuth, menuController.publishItem);
 router.post('/items/:id/request-price-change', managerAuth, menuController.requestPriceChange);
 router.post('/items/:id/approve-price', managerAuth, menuController.approvePriceChange);
+router.post('/branch-pricing/copy', managerAuth, menuController.copyBranchPricing);
 
 router.get('/full', menuController.getFullMenu);
 

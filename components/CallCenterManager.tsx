@@ -7,6 +7,7 @@ import {
 import { useCallCenterState } from './callcenter/useCallCenterState';
 
 import { OverviewTab } from './callcenter/OverviewTab';
+import { DeliveryTab } from './callcenter/DeliveryTab';
 import { AgentsTab } from './callcenter/AgentsTab';
 import { DriversTab } from './callcenter/DriversTab';
 import { EscalationsTab } from './callcenter/EscalationsTab';
@@ -138,6 +139,7 @@ const CallCenterManager: React.FC = () => {
                     <AnimatePresence mode="wait">
                         <motion.div key={activeTab} {...tabAnimations} className="h-full max-w-7xl mx-auto space-y-6">
                             {activeTab === 'overview' && <OverviewTab state={state} />}
+                            {activeTab === 'delivery' && <DeliveryTab state={state} />}
                             {activeTab === 'agents' && <AgentsTab state={state} />}
                             {activeTab === 'drivers' && <DriversTab state={state} />}
                             {activeTab === 'escalations' && <EscalationsTab state={state} />}

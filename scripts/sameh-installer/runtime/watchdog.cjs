@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const http = require('http');
 const { spawn, spawnSync } = require('child_process');
 const { appendLog } = require('./log-file.cjs');
@@ -9,8 +10,11 @@ const root = path.resolve(__dirname, '..');
 const node = path.join(root, 'runtime', 'node.exe');
 const logFile = path.join(root, 'logs', 'watchdog.log');
 const watchdogStateFile = path.join(root, 'runtime', 'watchdog-state.json');
+const pendingUpdateFile = path.join(root, 'runtime', 'pending-update.json');
+const updateStateFile = path.join(root, 'runtime', 'update-state.json');
 fs.mkdirSync(path.dirname(logFile), { recursive: true });
 const log = message => appendLog(logFile, message);
+const readJson = (file, fallback = {}) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; } };
 
 function probe(port, requestPath = '/', host = '127.0.0.1') {
   return new Promise(resolve => {
@@ -43,6 +47,63 @@ function requestApiRestart(reason) {
   fs.writeFileSync(watchdogStateFile, JSON.stringify({ lastApiRestartAt: Date.now(), reason }, null, 2));
   log(`API restart requested: ${reason}`);
   return true;
+}
+
+function requestBridgeRestart(reason) {
+  let state = {};
+  try { state = JSON.parse(fs.readFileSync(watchdogStateFile, 'utf8')); } catch {}
+  if (Date.now() - Number(state.lastBridgeRestartAt || 0) < 120_000) return false;
+  const escapedRoot = root.replace(/'/g, "''");
+  const command = `$root='${escapedRoot}'; Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like ('*' + $root + '*hardware-bridge\\index.js*') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+  spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true });
+  spawnSync('schtasks.exe', ['/Run', '/TN', 'Sameh Print Bridge'], { windowsHide: true });
+  fs.writeFileSync(watchdogStateFile, JSON.stringify({ ...state, lastBridgeRestartAt: Date.now(), bridgeReason: reason }, null, 2));
+  log(`Print Bridge restart requested: ${reason}`);
+  return true;
+}
+
+function updateVersionParts(value) { return String(value || '').replace(/^v/i, '').split('.').map(part => Number.parseInt(part, 10) || 0); }
+function newerVersion(candidate, current) {
+  const a = updateVersionParts(candidate); const b = updateVersionParts(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  return false;
+}
+
+async function applyPendingUpdate() {
+  if (!fs.existsSync(pendingUpdateFile)) return false;
+  let release;
+  try { release = JSON.parse(fs.readFileSync(pendingUpdateFile, 'utf8')); } catch { return false; }
+  const state = readJson(updateStateFile, {});
+  if (state.status === 'installing' || (state.version === release.version && state.status === 'complete')) return false;
+  if (state.version === release.version && state.status === 'failed' && Date.now() - new Date(state.updatedAt || 0).getTime() < 5 * 60 * 1000) return false;
+  let installState = {};
+  try { installState = JSON.parse(fs.readFileSync(path.join(root, 'install-state.json'), 'utf8')); } catch {}
+  if (!newerVersion(release.version, installState.version)) { fs.rmSync(pendingUpdateFile, { force: true }); return false; }
+  const parsed = new URL(String(release.setupUrl || ''));
+  if (!['https:', 'http:'].includes(parsed.protocol) || (parsed.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(parsed.hostname))) {
+    fs.writeFileSync(updateStateFile, JSON.stringify({ status: 'failed', version: release.version, error: 'SETUP_URL_MUST_USE_HTTPS', updatedAt: new Date().toISOString() }, null, 2));
+    return false;
+  }
+  const updatesDir = path.join(root, 'updates'); fs.mkdirSync(updatesDir, { recursive: true });
+  const target = path.join(updatesDir, `RestoFlow-${release.version}.exe`);
+  fs.writeFileSync(updateStateFile, JSON.stringify({ status: 'downloading', version: release.version, updatedAt: new Date().toISOString() }, null, 2));
+  try {
+    const response = await fetch(release.setupUrl);
+    if (!response.ok) throw new Error(`DOWNLOAD_HTTP_${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    if (hash !== String(release.sha256).toLowerCase()) throw new Error('SETUP_SHA256_MISMATCH');
+    fs.writeFileSync(target, buffer);
+    fs.writeFileSync(updateStateFile, JSON.stringify({ status: 'installing', version: release.version, target, updatedAt: new Date().toISOString() }, null, 2));
+    log(`verified update ${release.version}; launching setup`);
+    const child = spawn(target, ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS'], { cwd: root, detached: true, windowsHide: true, stdio: 'ignore' });
+    child.unref();
+    return true;
+  } catch (error) {
+    fs.writeFileSync(updateStateFile, JSON.stringify({ status: 'failed', version: release.version, error: String(error.message || error), updatedAt: new Date().toISOString() }, null, 2));
+    log(`update ${release.version} failed: ${error.stack || error}`);
+    return false;
+  }
 }
 
 function sqlInstance() {
@@ -92,6 +153,7 @@ function ensureTask(name, script, schedule) {
   if (!processExists(path.join(root, 'runtime', 'supervisor.pid'))) launch('supervisor.cjs');
   if (!(await probe(3099, '/health')).reachable) launch('monitor.cjs');
   const state = JSON.parse(fs.readFileSync(path.join(root, 'install-state.json'), 'utf8'));
+  await applyPendingUpdate();
   const apiTarget = new URL(state.appUrl);
   const apiHealth = assessApiHealth(await probe(Number(apiTarget.port || 80), '/api/health', apiTarget.hostname));
   if (state.role === 'server' && !apiHealth.reachable && requestApiRestart('unreachable')) {
@@ -99,9 +161,19 @@ function ensureTask(name, script, schedule) {
   } else if (state.role === 'server' && !apiHealth.databaseConnected && requestApiRestart('database disconnected')) {
     repairs.push('تم تشغيل SQL وطلب إعادة تشغيل API لأن قاعدة البيانات غير متصلة.');
   }
-  if (fs.existsSync(path.join(root, 'hardware-bridge', '.env')) && !(await probe(3002, '/health')).reachable) {
-    spawnSync('schtasks.exe', ['/Run', '/TN', 'Sameh Print Bridge'], { windowsHide: true });
-    repairs.push('تم طلب إعادة تشغيل Interactive Print Bridge.');
+  if (fs.existsSync(path.join(root, 'hardware-bridge', '.env'))) {
+    const bridgeHealth = await probe(3002, '/health');
+    let stale = !bridgeHealth.reachable;
+    if (bridgeHealth.reachable) {
+      try {
+        const status = JSON.parse(bridgeHealth.body || '{}');
+        const lastSuccess = new Date(status.lastSuccessAt || 0).getTime();
+        stale = !status.serverConnected || !lastSuccess || Date.now() - lastSuccess > 90_000;
+      } catch { stale = true; }
+    }
+    if (stale && requestBridgeRestart(bridgeHealth.reachable ? 'health-stale' : 'health-unreachable')) {
+      repairs.push('تم طلب إعادة تشغيل Print Bridge لأنه متوقف أو لا يتصل بالسيرفر.');
+    }
   }
   if (repairs.length) {
     const statusFile = path.join(root, 'runtime-status.json');

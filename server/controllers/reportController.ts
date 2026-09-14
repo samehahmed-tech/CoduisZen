@@ -6,6 +6,7 @@ import PDFDocument from 'pdfkit';
 import { DELIVERED_STATUSES, DashboardScope, parseLocalDateRange, parseReportFilters, ReportGranularity, resolveScopedBranchId } from './report/reportUtils';
 import { generateHrTabularXlsx } from '../services/hrReportExportService';
 import { revenueEligibleOrder, revenueRecognizedOrder } from '../utils/orderRevenue';
+import { writeDbError } from '../utils/dbErrors';
 
 // Re-exports from domain-specific report modules
 export { getCashierSummary, getDailySales, getFiscalSummary, getFoodCostReport, getHourlySales, getOverview, getPaymentMethodSummary, getProfitDaily, getProfitSummary, getRefundsReport, getVatReport } from './report/salesReports';
@@ -368,7 +369,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
         console.error('[DashboardKPIs] Error:', error);
         if (message === 'AUTH_REQUIRED') return res.status(401).json({ error: message });
         if (message === 'FORBIDDEN_BRANCH_SCOPE' || message === 'BRANCH_SCOPE_REQUIRED') return res.status(403).json({ error: message });
-        return res.status(500).json({ error: message });
+        return writeDbError(res, error);
     }
 };
 

@@ -2,16 +2,16 @@ import React, { createContext, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { THEME_REGISTRY, type ThemeConfig } from './tokens';
 import type { AppTheme } from '../types';
-import micaGlassThemeUrl from '../styles/themes/mica-glass.css?url';
-import fluentCleanThemeUrl from '../styles/themes/fluent-clean.css?url';
-import materialSoftThemeUrl from '../styles/themes/material-soft.css?url';
-import neumorphismSoftThemeUrl from '../styles/themes/neumorphism-soft.css?url';
-import flatMinimalThemeUrl from '../styles/themes/flat-minimal.css?url';
-import fintechSharpThemeUrl from '../styles/themes/fintech-sharp.css?url';
-import cupertinoLightThemeUrl from '../styles/themes/cupertino-light.css?url';
-import monochromeProThemeUrl from '../styles/themes/monochrome-pro.css?url';
-import warmBeigeThemeUrl from '../styles/themes/warm-beige.css?url';
-import darkElegantThemeUrl from '../styles/themes/dark-elegant.css?url';
+import auroraGlassThemeUrl from '../styles/themes/aurora-glass.css?url';
+import midnightCommandThemeUrl from '../styles/themes/midnight-command.css?url';
+import neoBrutalThemeUrl from '../styles/themes/neo-brutal.css?url';
+import softOrganicThemeUrl from '../styles/themes/soft-organic.css?url';
+import editorialLuxuryThemeUrl from '../styles/themes/editorial-luxury.css?url';
+import terminalOpsThemeUrl from '../styles/themes/terminal-ops.css?url';
+import futureHudThemeUrl from '../styles/themes/future-hud.css?url';
+import bentoSaasThemeUrl from '../styles/themes/bento-saas.css?url';
+import industrialOpsThemeUrl from '../styles/themes/industrial-ops.css?url';
+import premiumHospitalityThemeUrl from '../styles/themes/premium-hospitality.css?url';
 
 export interface ThemeContextValue {
     theme: AppTheme;
@@ -26,128 +26,205 @@ export const ThemeContext = createContext<ThemeContextValue | null>(null);
 const THEME_STYLESHEET_ID = 'restoflow-theme-stylesheet';
 
 const THEME_STYLESHEET_URLS: Record<AppTheme, string> = {
-    'mica-glass': micaGlassThemeUrl,
-    'fluent-clean': fluentCleanThemeUrl,
-    'material-soft': materialSoftThemeUrl,
-    'neumorphism-soft': neumorphismSoftThemeUrl,
-    'flat-minimal': flatMinimalThemeUrl,
-    'fintech-sharp': fintechSharpThemeUrl,
-    'cupertino-light': cupertinoLightThemeUrl,
-    'monochrome-pro': monochromeProThemeUrl,
-    'warm-beige': warmBeigeThemeUrl,
-    'dark-elegant': darkElegantThemeUrl,
+    'aurora-glass': auroraGlassThemeUrl,
+    'midnight-command': midnightCommandThemeUrl,
+    'neo-brutal': neoBrutalThemeUrl,
+    'soft-organic': softOrganicThemeUrl,
+    'editorial-luxury': editorialLuxuryThemeUrl,
+    'terminal-ops': terminalOpsThemeUrl,
+    'future-hud': futureHudThemeUrl,
+    'bento-saas': bentoSaasThemeUrl,
+    'industrial-ops': industrialOpsThemeUrl,
+    'premium-hospitality': premiumHospitalityThemeUrl,
 };
 
+function applySemanticTokenLayers(config: ThemeConfig) {
+    const root = document.documentElement;
+    const primitive = config.primitives ?? {
+        fontFamily: 'var(--font-body, Cairo, system-ui, sans-serif)',
+        fontDisplay: 'var(--font-heading, Cairo, system-ui, sans-serif)',
+        fontMono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSizeBase: '16px',
+        lineHeight: '1.45',
+        focusRingWidth: '3px',
+        overlayOpacity: '0.56',
+    };
+    const interaction = config.interaction ?? {
+        intensity: 'standard' as const,
+        fast: '140ms',
+        normal: config.motion.duration,
+        slow: config.motion.durationSlow,
+        easeStandard: config.motion.easing,
+        easeEmphasized: config.motion.easing,
+        easeEnter: config.motion.easing,
+        easeExit: 'cubic-bezier(0.4, 0, 1, 1)',
+        hoverDistance: '2px',
+        pressScale: '0.98',
+        hoverScale: '1.01',
+    };
+    const semantic = config.semantic ?? {
+        background: 'rgb(var(--bg-app))',
+        backgroundSubtle: 'rgb(var(--bg-global))',
+        surface: 'rgb(var(--bg-card))',
+        surfaceRaised: 'rgb(var(--bg-elevated))',
+        surfaceSunken: 'rgb(var(--bg-app))',
+        surfaceOverlay: 'var(--theme-popup-bg, rgb(var(--bg-card)))',
+        surfaceHover: 'var(--theme-card-hover-bg, rgb(var(--bg-card)))',
+        surfaceActive: 'var(--theme-active-bg, rgba(var(--primary), 0.12))',
+        textPrimary: 'rgb(var(--text-main))',
+        textSecondary: 'rgb(var(--text-muted))',
+        textMuted: 'rgb(var(--text-muted))',
+        textDisabled: 'rgba(var(--text-muted), 0.55)',
+        textInverse: 'rgb(var(--bg-card))',
+        border: 'rgb(var(--border-color))',
+        borderSubtle: 'rgba(var(--border-color), 0.5)',
+        borderStrong: 'rgba(var(--border-color), 0.9)',
+        interactivePrimary: 'rgb(var(--primary))',
+        interactiveHover: 'rgb(var(--primary-hover))',
+        interactiveActive: 'rgb(var(--primary-hover))',
+        statusSuccess: 'rgb(var(--success))',
+        statusWarning: 'rgb(var(--warning))',
+        statusDanger: 'rgb(var(--danger))',
+        statusInfo: 'rgb(var(--info))',
+        focus: 'var(--theme-focus-ring, rgba(var(--primary), 0.24))',
+        selection: 'rgba(var(--primary), 0.18)',
+    };
+    const values: Record<string, string> = {
+        '--primitive-font-family': primitive.fontFamily,
+        '--primitive-font-display': primitive.fontDisplay,
+        '--primitive-font-mono': primitive.fontMono,
+        '--primitive-font-size-base': primitive.fontSizeBase,
+        '--primitive-line-height': primitive.lineHeight,
+        '--primitive-focus-ring-width': primitive.focusRingWidth,
+        '--primitive-overlay-opacity': primitive.overlayOpacity,
+        '--motion-fast': interaction.fast,
+        '--motion-normal': interaction.normal,
+        '--motion-slow': interaction.slow,
+        '--ease-standard': interaction.easeStandard,
+        '--ease-emphasized': interaction.easeEmphasized,
+        '--ease-enter': interaction.easeEnter,
+        '--ease-exit': interaction.easeExit,
+        '--interaction-intensity': interaction.intensity,
+        '--interaction-hover-distance': interaction.hoverDistance,
+        '--interaction-press-scale': interaction.pressScale,
+        '--interaction-hover-scale': interaction.hoverScale,
+    };
+    Object.entries(semantic).forEach(([key, value]) => {
+        values[`--semantic-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`] = value;
+    });
+    Object.entries(values).forEach(([key, value]) => root.style.setProperty(key, value));
+}
+
 const POS_CARD_THEME_TOKENS: Record<AppTheme, Record<string, string>> = {
-    'mica-glass': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 76% 20%, rgba(var(--primary), 0.2), transparent 25%), linear-gradient(135deg, rgba(var(--bg-card), 0.72), rgba(var(--primary), 0.16)), rgba(var(--bg-card), 0.54)',
-        '--pos-theme-card-hero-text': 'var(--text-main)',
-        '--pos-theme-card-hero-muted': 'var(--text-muted)',
-        '--pos-theme-card-action-bg': 'rgba(var(--primary), 0.95)',
-        '--pos-theme-card-action-text': '255 255 255',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-card), 0.42)',
-        '--pos-theme-card-badge-bg': 'rgba(var(--primary), 0.88)',
-        '--pos-theme-card-pattern-opacity': '0.18',
-        '--pos-theme-card-art-ring': 'rgba(var(--primary), 0.34)',
-    },
-    'fluent-clean': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.14), transparent 24%), linear-gradient(135deg, #182230, rgb(var(--primary))), rgb(var(--primary))',
+    'aurora-glass': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34, 211, 238, 0.35), transparent 26%), linear-gradient(135deg, #4f46e5, rgb(var(--primary))), rgb(var(--primary))',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '219 234 254',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(15, 23, 42, 0.28)',
-        '--pos-theme-card-badge-bg': 'rgba(15, 23, 42, 0.78)',
-        '--pos-theme-card-pattern-opacity': '0.28',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.36)',
-    },
-    'material-soft': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.18), transparent 24%), linear-gradient(145deg, rgb(var(--primary)), rgba(var(--accent), 0.76)), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '237 233 254',
+        '--pos-theme-card-hero-muted': '224 231 255',
         '--pos-theme-card-action-bg': 'rgba(255, 255, 255, 0.94)',
         '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(255, 255, 255, 0.16)',
-        '--pos-theme-card-badge-bg': 'rgba(var(--accent), 0.86)',
-        '--pos-theme-card-pattern-opacity': '0.2',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.38)',
+        '--pos-theme-card-control-bg': 'rgba(255, 255, 255, 0.20)',
+        '--pos-theme-card-badge-bg': 'rgba(34, 211, 238, 0.9)',
+        '--pos-theme-card-pattern-opacity': '0.26',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.5)',
     },
-    'neumorphism-soft': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(var(--primary), 0.12), transparent 24%), linear-gradient(135deg, rgba(var(--bg-card), 0.98), rgba(var(--primary), 0.1)), rgb(var(--bg-card))',
-        '--pos-theme-card-hero-text': 'var(--text-main)',
-        '--pos-theme-card-hero-muted': 'var(--text-muted)',
-        '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': '255 255 255',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-card), 0.82)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-pattern-opacity': '0',
-        '--pos-theme-card-art-ring': 'rgba(var(--primary), 0.26)',
-    },
-    'flat-minimal': {
-        '--pos-theme-card-hero-bg': 'rgb(var(--bg-card))',
-        '--pos-theme-card-hero-text': 'var(--text-main)',
-        '--pos-theme-card-hero-muted': 'var(--text-muted)',
-        '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': '255 255 255',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.72)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-pattern-opacity': '0',
-        '--pos-theme-card-art-ring': 'rgba(var(--border-color), 0.55)',
-    },
-    'fintech-sharp': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.1), transparent 24%), linear-gradient(135deg, #061326, rgb(var(--primary))), rgb(var(--primary))',
+    'midnight-command': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, rgb(var(--primary)), #1e293b), rgb(var(--primary))',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '219 234 254',
+        '--pos-theme-card-hero-muted': '220 224 235',
         '--pos-theme-card-action-bg': '#ffffff',
         '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(2, 6, 23, 0.32)',
-        '--pos-theme-card-badge-bg': 'rgba(2, 6, 23, 0.78)',
-        '--pos-theme-card-pattern-opacity': '0.3',
-        '--pos-theme-card-art-ring': 'rgba(var(--primary), 0.52)',
-    },
-    'cupertino-light': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 76% 18%, rgba(var(--primary), 0.14), transparent 24%), linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(var(--primary), 0.055)), rgb(var(--bg-card))',
-        '--pos-theme-card-hero-text': 'var(--text-main)',
-        '--pos-theme-card-hero-muted': 'var(--text-muted)',
-        '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': '255 255 255',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.76)',
-        '--pos-theme-card-badge-bg': 'linear-gradient(180deg, rgb(var(--primary)), rgb(var(--primary-hover)))',
+        '--pos-theme-card-control-bg': 'rgba(10, 14, 25, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
         '--pos-theme-card-pattern-opacity': '0.08',
-        '--pos-theme-card-art-ring': 'rgba(var(--primary), 0.36)',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
     },
-    'monochrome-pro': {
+    'neo-brutal': {
+        '--pos-theme-card-hero-bg': 'rgb(var(--primary))',
+        '--pos-theme-card-hero-text': 'var(--bg-card)',
+        '--pos-theme-card-hero-muted': 'var(--text-muted)',
+        '--pos-theme-card-action-bg': 'rgb(var(--accent))',
+        '--pos-theme-card-action-text': '15 15 15',
+        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.9)',
+        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
+        '--pos-theme-card-pattern-opacity': '0',
+        '--pos-theme-card-art-ring': 'rgba(var(--border-color), 0.9)',
+    },
+    'soft-organic': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, rgb(var(--primary)), #e8a87c), rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '255 240 225',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(90, 60, 40, 0.25)',
+        '--pos-theme-card-badge-bg': 'rgba(232, 168, 124, 0.95)',
+        '--pos-theme-card-pattern-opacity': '0.14',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.5)',
+    },
+    'editorial-luxury': {
         '--pos-theme-card-hero-bg': 'rgb(var(--bg-card))',
         '--pos-theme-card-hero-text': 'var(--text-main)',
         '--pos-theme-card-hero-muted': 'var(--text-muted)',
         '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': '255 255 255',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.72)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
+        '--pos-theme-card-action-text': 'var(--bg-card)',
+        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.9)',
+        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
         '--pos-theme-card-pattern-opacity': '0',
-        '--pos-theme-card-art-ring': 'rgba(var(--border-color), 0.55)',
+        '--pos-theme-card-art-ring': 'rgba(var(--border-color), 0.8)',
     },
-    'warm-beige': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(245, 203, 140, 0.2), transparent 24%), linear-gradient(135deg, #463424, rgb(var(--primary))), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '254 243 199',
-        '--pos-theme-card-action-bg': 'rgba(255, 247, 237, 0.96)',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(63, 45, 32, 0.26)',
-        '--pos-theme-card-badge-bg': 'rgba(245, 158, 11, 0.86)',
-        '--pos-theme-card-pattern-opacity': '0.18',
-        '--pos-theme-card-art-ring': 'rgba(245, 203, 140, 0.56)',
-    },
-    'dark-elegant': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(var(--primary), 0.2), transparent 24%), linear-gradient(135deg, #101827, #1e293b), #101827',
-        '--pos-theme-card-hero-text': '248 250 252',
-        '--pos-theme-card-hero-muted': '203 213 225',
+    'terminal-ops': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #0c2b1a, rgb(var(--primary))), rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '220 240 225',
+        '--pos-theme-card-hero-muted': '150 190 160',
         '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': '255 255 255',
-        '--pos-theme-card-control-bg': 'rgba(15, 23, 42, 0.55)',
-        '--pos-theme-card-badge-bg': 'rgba(var(--primary), 0.86)',
+        '--pos-theme-card-action-text': '4 12 8',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.35)',
+        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
+        '--pos-theme-card-pattern-opacity': '0.18',
+        '--pos-theme-card-art-ring': 'rgba(60, 220, 130, 0.5)',
+    },
+    'future-hud': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34, 211, 238, 0.4), transparent 26%), linear-gradient(135deg, #0c2340, rgb(var(--primary))), rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '210 230 250',
+        '--pos-theme-card-action-bg': 'rgba(255, 255, 255, 0.95)',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.3)',
+        '--pos-theme-card-badge-bg': 'rgba(34, 211, 238, 0.9)',
+        '--pos-theme-card-pattern-opacity': '0.24',
+        '--pos-theme-card-art-ring': 'rgba(34, 211, 238, 0.55)',
+    },
+    'bento-saas': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, rgb(var(--primary)), #ec4899), rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '240 230 250',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(40, 30, 90, 0.25)',
+        '--pos-theme-card-badge-bg': 'rgba(236, 72, 153, 0.9)',
+        '--pos-theme-card-pattern-opacity': '0.16',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+    },
+    'industrial-ops': {
+        '--pos-theme-card-hero-bg': 'repeating-linear-gradient(-45deg, transparent 0 12px, rgba(255,255,255,0.06) 12px 13px), linear-gradient(135deg, #3a3d40, rgb(var(--primary))), rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '235 230 220',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.35)',
+        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
         '--pos-theme-card-pattern-opacity': '0.2',
-        '--pos-theme-card-art-ring': 'rgba(var(--primary), 0.48)',
+        '--pos-theme-card-art-ring': 'rgba(250, 200, 60, 0.55)',
+    },
+    'premium-hospitality': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 15%, rgba(212, 175, 105, 0.4), transparent 28%), linear-gradient(135deg, #6e1822, rgb(var(--primary))), rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '255 250 240',
+        '--pos-theme-card-hero-muted': '235 215 190',
+        '--pos-theme-card-action-bg': 'rgba(255, 255, 255, 0.95)',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(40, 20, 15, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgba(212, 175, 105, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.2',
+        '--pos-theme-card-art-ring': 'rgba(212, 175, 105, 0.55)',
     },
 };
 
@@ -190,11 +267,12 @@ function applyThemeCSSVariables(config: ThemeConfig) {
     root.style.setProperty('--theme-input-variant', config.components.input.variant);
     root.style.setProperty('--theme-modal-variant', config.components.modal.variant);
     root.style.setProperty('--theme-layout-density', config.layout.density);
+    applySemanticTokenLayers(config);
 }
 
 function applyPOSCardThemeVariables(theme: AppTheme) {
     const root = document.documentElement;
-    const tokens = POS_CARD_THEME_TOKENS[theme] ?? POS_CARD_THEME_TOKENS['mica-glass'];
+    const tokens = POS_CARD_THEME_TOKENS[theme] ?? POS_CARD_THEME_TOKENS['aurora-glass'];
     Object.entries(tokens).forEach(([key, value]) => {
         root.style.setProperty(key, value);
     });
@@ -204,9 +282,27 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const settings = useAuthStore((s) => s.settings);
     const updateSettings = useAuthStore((s) => s.updateSettings);
 
-    const themeId = settings.theme || 'mica-glass';
+    // Migrate stored choices from retired (pre-10-personality) theme ids.
+    const LEGACY_THEME_MAP: Record<string, AppTheme> = {
+        'fluent-frost': 'aurora-glass',
+        'aero-glass': 'aurora-glass',
+        'aurora-mesh': 'aurora-glass',
+        'mica-noir': 'midnight-command',
+        'cupertino-noir': 'midnight-command',
+        'cupertino-mist': 'soft-organic',
+        'material-bloom': 'bento-saas',
+        'pixel-dusk': 'future-hud',
+        'linear-drift': 'terminal-ops',
+        'notion-bone': 'editorial-luxury',
+    };
+    const storedTheme = settings.theme as string | undefined;
+    const themeId = (
+        storedTheme && THEME_REGISTRY[storedTheme as AppTheme]
+            ? storedTheme
+            : (storedTheme && LEGACY_THEME_MAP[storedTheme]) || 'aurora-glass'
+    ) as AppTheme;
     const isDark = settings.isDarkMode;
-    const config = THEME_REGISTRY[themeId] ?? THEME_REGISTRY['mica-glass'];
+    const config = THEME_REGISTRY[themeId] ?? THEME_REGISTRY['aurora-glass'];
 
     useEffect(() => {
         const root = document.documentElement;
@@ -214,6 +310,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         root.setAttribute('data-theme', themeId);
         body.setAttribute('data-theme', themeId);
+        root.setAttribute('data-motion-style', config.motion.style);
+        root.setAttribute('data-interaction-intensity', config.interaction?.intensity ?? 'standard');
 
         if (isDark) {
             root.classList.add('dark');
@@ -255,7 +353,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [themeId, isDark, config, settings.language, settings.wallpaper, settings.wallpaperOpacity, settings.customWallpaperUrl]);
 
     useEffect(() => {
-        const href = THEME_STYLESHEET_URLS[themeId] || THEME_STYLESHEET_URLS['mica-glass'];
+        const href = THEME_STYLESHEET_URLS[themeId] || THEME_STYLESHEET_URLS['aurora-glass'];
         let link = document.getElementById(THEME_STYLESHEET_ID) as HTMLLinkElement | null;
 
         if (!link) {

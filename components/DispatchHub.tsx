@@ -1,19 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    AlertTriangle,
-    Bike,
-    CheckCircle2,
-    Clock,
-    MapPin,
-    Navigation,
-    PackageCheck,
-    Phone,
-    Plus,
-    RefreshCw,
-    Save,
-    Truck,
-    User,
-    X,
+    AlertTriangle, Bike, CheckCircle2, ChevronDown, Clock, MapPin,
+    Phone, RefreshCw, Search, Truck, User, Users,
 } from 'lucide-react';
 import { useOrderStore } from '../stores/useOrderStore';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -23,804 +11,519 @@ import { socketService } from '../services/socketService';
 import { formatDisplayId } from '../src/utils/idGenerator';
 import DeliveryTrackingMap from './common/DeliveryTrackingMap';
 import { defaultMapCenter } from './common/googleMaps';
-import { estimateEta } from './common/mapRouting';
 import { useConfirm } from './common/ConfirmProvider';
+import { rankDriversForOrder } from '../services/driverAssignment';
+import { printDriverTicket } from '../services/posPrintOrchestrator';
+import { getCashToCollect } from '../src/features/driver/cashCollection';
+import { Link } from 'react-router-dom';
 
 const SLA_MINUTES = 45;
 
-type DriverTelemetry = {
-    driverId: string;
-    branchId?: string | null;
-    lat: number;
-    lng: number;
-    speedKmh?: number;
-    accuracy?: number;
-    updatedAt: string;
-};
+type Tab = 'ready' | 'road' | 'alerts';
 
-const toUiDriverStatus = (status?: string): Driver['status'] => {
-    const value = String(status || 'OFFLINE').toUpperCase();
-    if (value === 'BUSY') return 'ON_DELIVERY';
-    if (['AVAILABLE', 'ON_DELIVERY', 'BREAK', 'OFFLINE', 'RETURNING'].includes(value)) return value as Driver['status'];
-    return 'OFFLINE';
-};
-
-const toApiDriverStatus = (status?: string) => {
-    const value = String(status || '').toUpperCase();
-    return value === 'ON_DELIVERY' ? 'BUSY' : value;
-};
-
-const getOrderAgeMins = (order: Order) => Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000));
+const ageMins = (order: Order) => Math.max(0, Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000));
 
 const DispatchHub: React.FC = () => {
-    const { settings } = useAuthStore();
-    const { orders, fetchOrders, updateOrderStatus } = useOrderStore();
+    const { settings, printers, branches } = useAuthStore();
+    const { orders, fetchOrders } = useOrderStore();
     const { confirm } = useConfirm();
     const lang = settings.language || 'en';
     const isAr = lang === 'ar';
-    const activeBranchId = settings.activeBranchId;
+    const branchId = settings.activeBranchId;
+    const currency = settings.currencySymbol || 'EGP';
 
     const [drivers, setDrivers] = useState<Driver[]>([]);
-    const [telemetryByDriver, setTelemetryByDriver] = useState<Record<string, DriverTelemetry>>({});
+    const [telemetry, setTelemetry] = useState<Record<string, { lat: number; lng: number; updatedAt: string; speedKmh?: number; accuracy?: number }>>({});
     const [slaAlerts, setSlaAlerts] = useState<any[]>([]);
-    const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [isAssigningOrderId, setIsAssigningOrderId] = useState<string | null>(null);
-    const [isCompletingOrderId, setIsCompletingOrderId] = useState<string | null>(null);
-    const [operationError, setOperationError] = useState<string | null>(null);
-    const [operationMessage, setOperationMessage] = useState<string | null>(null);
-    const [showDriverForm, setShowDriverForm] = useState(false);
-    const [isSavingDriver, setIsSavingDriver] = useState(false);
-    const [driverForm, setDriverForm] = useState({
-        name: '',
-        phone: '',
-        email: '',
-        password: '',
-        pin: '',
-        createLogin: true,
-    });
+    const [tab, setTab] = useState<Tab>('ready');
+    const [query, setQuery] = useState('');
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
+    const [podOrder, setPodOrder] = useState<Order | null>(null);
+    const [podCash, setPodCash] = useState('');
+    const [podBusy, setPodBusy] = useState(false);
+    // Branch close-out acts as a manager fallback (no OTP in hand): requires
+    // manager PIN + written reason, verified server-side.
+    const [podPin, setPodPin] = useState('');
+    const [podReason, setPodReason] = useState('');
+    const [showMap, setShowMap] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
 
-    const copy = {
-        title: isAr ? 'الديسباتش' : 'Dispatch',
-        subtitle: isAr ? 'متابعة أوردرات الدليفري والطيارين فقط' : 'Delivery orders and driver operations only',
-        ready: isAr ? 'جاهز للتعيين' : 'Ready to assign',
-        onRoad: isAr ? 'في الطريق' : 'On the road',
-        drivers: isAr ? 'الطيارين' : 'Drivers',
-        addDriver: isAr ? 'إضافة طيار' : 'Add driver',
-        close: isAr ? 'إغلاق' : 'Close',
-        noReady: isAr ? 'لا توجد أوردرات دليفري جاهزة للتعيين' : 'No delivery orders ready for assignment',
-        noRoad: isAr ? 'لا توجد أوردرات دليفري في الطريق' : 'No delivery orders on the road',
-        noDrivers: isAr ? 'لا يوجد طيارين بعد' : 'No drivers yet',
-        addressMissing: isAr ? 'لا يوجد عنوان مسجل' : 'No address recorded',
-        assign: isAr ? 'تعيين وخروج' : 'Assign and dispatch',
-        delivered: isAr ? 'تم التسليم' : 'Delivered',
-        arrived: isAr ? 'رجع الفرع' : 'Arrived branch',
-        saveDriver: isAr ? 'حفظ الطيار' : 'Save driver',
-        saving: isAr ? 'جاري الحفظ...' : 'Saving...',
-        refresh: isAr ? 'تحديث' : 'Refresh',
-        unavailable: isAr ? 'لا يوجد طيار متاح' : 'No available driver',
-        liveMap: isAr ? 'خريطة التتبع الحي' : 'Live tracking map',
-        expected: isAr ? 'المفروض' : 'Target',
-        remaining: isAr ? 'متبقي' : 'Remaining',
-        late: isAr ? 'متأخر' : 'Late',
-        onTime: isAr ? 'في الوقت' : 'On time',
-        watch: isAr ? 'مراقبة' : 'Watch',
-        driverLeft: isAr ? 'راح بالأوردر' : 'Left with order',
-        driverBack: isAr ? 'رجع الفرع' : 'Back to branch',
-        loginBranch: isAr ? 'دخول الفرع' : 'Branch login',
-        logoutBranch: isAr ? 'خروج' : 'Logout',
+    const refreshOrders = async (silent = true) => {
+        if (!silent) setLoading(true);
+        try {
+            await fetchOrders(branchId ? { branch_id: branchId, limit: 150 } : { limit: 150 });
+        } catch (e: any) {
+            if (!silent) setError(e?.message || (isAr ? 'تعذر التحميل' : 'Load failed'));
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const getErrorMessage = (error: unknown, fallbackEn: string, fallbackAr: string) =>
-        error instanceof Error && error.message ? error.message : isAr ? fallbackAr : fallbackEn;
-
-    if (isAr) {
-        Object.assign(copy, {
-            title: 'الديسباتش',
-            subtitle: 'متابعة أوردرات الدليفري والطيارين فقط',
-            ready: 'جاهز للتعيين',
-            onRoad: 'في الطريق',
-            drivers: 'الطيارين',
-            addDriver: 'إضافة طيار',
-            close: 'إغلاق',
-            noReady: 'لا توجد أوردرات دليفري جاهزة للتعيين',
-            noRoad: 'لا توجد أوردرات دليفري في الطريق',
-            noDrivers: 'لا يوجد طيارين بعد',
-            addressMissing: 'لا يوجد عنوان مسجل',
-            assign: 'تعيين وخروج',
-            delivered: 'تم التسليم',
-            arrived: 'رجع الفرع',
-            saveDriver: 'حفظ الطيار',
-            saving: 'جاري الحفظ...',
-            refresh: 'تحديث',
-            unavailable: 'لا يوجد طيار متاح',
-            liveMap: 'خريطة التتبع الحي',
-            expected: 'المفروض',
-            remaining: 'متبقي',
-            late: 'متأخر',
-            onTime: 'في الوقت',
-            watch: 'مراقبة',
-            driverLeft: 'خرج بالأوردر',
-            driverBack: 'رجع الفرع',
-            loginBranch: 'دخول الفرع',
-            logoutBranch: 'خروج',
-        });
-    }
-
     const loadDrivers = async () => {
-        setIsLoadingDrivers(true);
         try {
-            const data = await deliveryApi.getDrivers(activeBranchId ? { branchId: activeBranchId } : undefined);
-            setDrivers(data.map((d: any) => ({
-                id: String(d.id),
-                name: String(d.name || ''),
-                phone: String(d.phone || ''),
-                status: toUiDriverStatus(d.status),
-                vehicleType: (d.vehicleType || d.vehicle_type || 'BIKE') as Driver['vehicleType'],
-                branchId: d.branchId || d.branch_id,
-                isActive: d.isActive !== false && d.is_active !== false,
+            const list = await deliveryApi.getDrivers(branchId ? { branchId } : undefined);
+            setDrivers((list || []).map((d: any) => ({
+                id: String(d.id), name: String(d.name || ''), phone: String(d.phone || ''),
+                status: String(d.status || 'OFFLINE').toUpperCase() === 'BUSY' ? 'ON_DELIVERY' : String(d.status || 'OFFLINE').toUpperCase(),
+                vehicleType: d.vehicleType || d.vehicle_type || 'BIKE',
+                branchId: d.branchId || d.branch_id, isActive: d.isActive !== false && d.is_active !== false,
             })));
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to load drivers', 'تعذر تحميل الطيارين'));
-        } finally {
-            setIsLoadingDrivers(false);
-        }
+        } catch { /* drivers picker degrades gracefully */ }
     };
 
     const loadTelemetry = async () => {
         try {
-            const telemetry = await deliveryApi.getTelemetry(activeBranchId || undefined);
-            const map: Record<string, DriverTelemetry> = {};
-            for (const item of telemetry || []) {
-                map[item.driverId] = item;
-            }
-            setTelemetryByDriver(map);
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to load driver locations', 'تعذر تحميل مواقع الطيارين'));
-        }
+            const rows = await deliveryApi.getTelemetry(branchId || undefined).catch(() => []);
+            const map: Record<string, { lat: number; lng: number; updatedAt: string }> = {};
+            for (const t of rows || []) map[t.driverId] = t;
+            setTelemetry(map);
+        } catch { /* ignore */ }
     };
 
-    const loadSlaAlerts = async () => {
+    const loadSla = async () => {
         try {
-            const result = await deliveryApi.getSlaAlerts(activeBranchId ? { branchId: activeBranchId } : undefined);
-            setSlaAlerts(Array.isArray(result.alerts) ? result.alerts : []);
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to load SLA alerts', 'تعذر تحميل تنبيهات التأخير'));
-            setSlaAlerts([]);
-        }
+            const r = await deliveryApi.getSlaAlerts(branchId ? { branchId } : undefined);
+            setSlaAlerts(Array.isArray(r.alerts) ? r.alerts : []);
+        } catch { setSlaAlerts([]); }
     };
 
-    const refreshAll = async () => {
-        setIsRefreshing(true);
-        setOperationError(null);
-        try {
-            await Promise.all([
-                fetchOrders(activeBranchId ? { branch_id: activeBranchId, limit: 150 } : { limit: 150 }),
-                loadDrivers(),
-                loadTelemetry(),
-                loadSlaAlerts(),
-            ]);
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to refresh dispatch data', 'تعذر تحديث بيانات الديسباتش'));
-        } finally {
-            setIsRefreshing(false);
-        }
+    const refreshAll = async (silent = true) => {
+        if (!silent) setRefreshing(true);
+        setError(null);
+        await Promise.all([refreshOrders(true), loadDrivers(), loadTelemetry(), loadSla()]);
+        if (!silent) setRefreshing(false);
     };
 
+    useEffect(() => { setLoading(true); refreshAll(true).finally(() => setLoading(false)); }, [branchId]);
     useEffect(() => {
-        refreshAll();
-    }, [activeBranchId]);
-
-    useEffect(() => {
-        const timer = window.setInterval(() => {
-            loadTelemetry();
-            loadSlaAlerts();
-        }, 30000);
-        return () => window.clearInterval(timer);
-    }, [activeBranchId]);
-
-    useEffect(() => {
-        const reload = () => refreshAll();
-        const onDriverStatus = (payload: { id: string; status: string }) => {
-            setDrivers(prev => prev.map(driver => driver.id === payload.id ? { ...driver, status: toUiDriverStatus(payload.status) } : driver));
+        const ordersOnly = () => refreshOrders(true);
+        const onDriverStatus = (p: { id: string; status: string }) =>
+            setDrivers((prev) => prev.map((d) => (d.id === p.id ? { ...d, status: p.status } : d)));
+        // Live GPS: move the pilot marker the moment a fix lands (30s poll stays as fallback).
+        const onDriverLocation = (p: { driverId: string; lat: number; lng: number; updatedAt: string; speedKmh?: number; accuracy?: number }) => {
+            if (!p || !p.driverId || !Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lng))) return;
+            setTelemetry((prev) => ({ ...prev, [p.driverId]: { lat: Number(p.lat), lng: Number(p.lng), updatedAt: p.updatedAt || new Date().toISOString(), speedKmh: p.speedKmh, accuracy: p.accuracy } }));
         };
-        const onDriverLocation = (payload: DriverTelemetry) => {
-            if (!payload?.driverId) return;
-            setTelemetryByDriver(prev => ({ ...prev, [payload.driverId]: payload }));
-        };
-        socketService.on('order:created', reload);
-        socketService.on('order:updated', reload);
-        socketService.on('order:status', reload);
-        socketService.on('dispatch:assigned', reload);
-        socketService.on('delivery:sla-escalation', reload);
+        socketService.on('order:created', ordersOnly);
+        socketService.on('order:updated', ordersOnly);
+        socketService.on('order:status', ordersOnly);
+        socketService.on('dispatch:assigned', ordersOnly);
         socketService.on('driver:status', onDriverStatus as any);
         socketService.on('driver:location', onDriverLocation as any);
+        const timer = window.setInterval(() => { loadTelemetry(); loadSla(); }, 30000);
         return () => {
-            socketService.off('order:created', reload);
-            socketService.off('order:updated', reload);
-            socketService.off('order:status', reload);
-            socketService.off('dispatch:assigned', reload);
-            socketService.off('delivery:sla-escalation', reload);
+            socketService.off('order:created', ordersOnly);
+            socketService.off('order:updated', ordersOnly);
+            socketService.off('order:status', ordersOnly);
+            socketService.off('dispatch:assigned', ordersOnly);
             socketService.off('driver:status', onDriverStatus as any);
             socketService.off('driver:location', onDriverLocation as any);
+            window.clearInterval(timer);
         };
-    }, [activeBranchId]);
+    }, [branchId]);
 
-    const deliveryOrders = useMemo(() => {
-        return orders
-            .filter(order => order.type === OrderType.DELIVERY)
-            .filter(order => !activeBranchId || order.branchId === activeBranchId)
-            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    }, [orders, activeBranchId]);
+    const deliveryOrders = useMemo(() => orders
+        .filter((o) => o.type === OrderType.DELIVERY)
+        .filter((o) => !branchId || o.branchId === branchId), [orders, branchId]);
 
-    const readyOrders = useMemo(() => {
-        return deliveryOrders.filter(order =>
-            [OrderStatus.READY, OrderStatus.PREPARING, OrderStatus.PENDING].includes(order.status) &&
-            order.status !== OrderStatus.CANCELLED &&
-            order.status !== OrderStatus.DELIVERED
-        );
-    }, [deliveryOrders]);
+    const q = query.trim().toLowerCase();
+    const matchQuery = (o: Order) => !q
+        || String(o.orderNumber || o.id).toLowerCase().includes(q)
+        || String(o.customerName || '').toLowerCase().includes(q)
+        || String(o.customerPhone || '').includes(q)
+        || String(o.deliveryAddress || '').toLowerCase().includes(q);
 
-    const roadOrders = useMemo(() => {
-        return deliveryOrders.filter(order => order.status === OrderStatus.OUT_FOR_DELIVERY);
-    }, [deliveryOrders]);
+    const readyOrders = useMemo(() => deliveryOrders
+        .filter((o) => String(o.status) !== 'SCHEDULED' && ['READY', 'PREPARING', 'PENDING', 'ASSIGNED'].includes(String(o.status)) && matchQuery(o))
+        .sort((a, b) => ageMins(b) - ageMins(a)), [deliveryOrders, q]);
 
-    const activeDrivers = useMemo(() => drivers.filter(driver => driver.isActive !== false), [drivers]);
-    const availableDrivers = useMemo(
-        () => activeDrivers.filter(driver => driver.status === 'AVAILABLE'),
-        [activeDrivers],
-    );
+    const roadOrders = useMemo(() => deliveryOrders
+        .filter((o) => String(o.status) === OrderStatus.OUT_FOR_DELIVERY && matchQuery(o))
+        .sort((a, b) => ageMins(b) - ageMins(a)), [deliveryOrders, q]);
 
-    const driverById = useMemo(() => new Map(activeDrivers.map(driver => [driver.id, driver])), [activeDrivers]);
     const criticalAlerts = useMemo(
-        () => slaAlerts.filter(alert => ['HIGH', 'CRITICAL'].includes(String(alert?.severity || '').toUpperCase())),
-        [slaAlerts],
+        () => slaAlerts.filter((a) => ['HIGH', 'CRITICAL'].includes(String(a?.severity || '').toUpperCase())),
+        [slaAlerts]);
+
+    const loadByDriver = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const o of deliveryOrders) {
+            if (!o.driverId || !['READY', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(String(o.status))) continue;
+            map[o.driverId] = (map[o.driverId] || 0) + 1;
+        }
+        return map;
+    }, [deliveryOrders]);
+
+    const lastSeenMins = (driverId?: string | null) => {
+        const t = driverId ? telemetry[driverId] : undefined;
+        if (!t?.updatedAt) return null;
+        return Math.max(0, Math.floor((Date.now() - new Date(t.updatedAt).getTime()) / 60000));
+    };
+
+    const rankedFor = (order: Order) => rankDriversForOrder(
+        drivers.filter((d) => d.isActive !== false).map((d) => ({
+            id: d.id, name: d.name, status: d.status,
+            lat: telemetry[d.id]?.lat, lng: telemetry[d.id]?.lng,
+            activeOrders: loadByDriver[d.id] || 0,
+            lastSeenMinutes: lastSeenMins(d.id) ?? undefined,
+        })),
+        order.deliveryLat && order.deliveryLng ? { lat: order.deliveryLat, lng: order.deliveryLng } : null,
+        defaultMapCenter,
     );
-
-    const getLastSeenLabel = (driverId: string) => {
-        const telemetry = telemetryByDriver[driverId];
-        if (!telemetry?.updatedAt) return isAr ? 'لا يوجد موقع' : 'No location';
-        const mins = Math.max(0, Math.floor((Date.now() - new Date(telemetry.updatedAt).getTime()) / 60000));
-        if (mins === 0) return isAr ? 'الآن' : 'now';
-        return isAr ? `منذ ${mins} د` : `${mins}m ago`;
-    };
-
-    const getTiming = (order: Order) => {
-        const elapsed = getOrderAgeMins(order);
-        const driver = order.driverId ? driverById.get(order.driverId) : undefined;
-        const telemetry = order.driverId ? telemetryByDriver[order.driverId] : undefined;
-        const staleMins = telemetry?.updatedAt
-            ? Math.max(0, Math.floor((Date.now() - new Date(telemetry.updatedAt).getTime()) / 60000))
-            : 0;
-        const speed = Number(telemetry?.speedKmh || 0);
-        const baseEta = order.status === OrderStatus.OUT_FOR_DELIVERY ? 18 : 28;
-        const speedAdjustment = speed >= 35 ? -5 : speed > 0 && speed < 12 ? 8 : 0;
-        const staleAdjustment = staleMins >= 10 ? 6 : staleMins >= 5 ? 3 : 0;
-        const fallbackEta = Math.max(5, Math.round(baseEta + speedAdjustment + staleAdjustment));
-        const routeEta = order.deliveryLat && order.deliveryLng
-            ? estimateEta(defaultMapCenter, { lat: order.deliveryLat, lng: order.deliveryLng }, speed > 8 ? speed : 24)
-            : null;
-        const eta = routeEta?.etaMinutes ?? fallbackEta;
-        const projected = elapsed + eta;
-        const lateBy = Math.max(0, projected - SLA_MINUTES);
-        const remaining = Math.max(0, SLA_MINUTES - elapsed);
-        const score = projected <= SLA_MINUTES ? 100 : projected <= SLA_MINUTES + 10 ? 70 : projected <= SLA_MINUTES + 20 ? 45 : 20;
-        return {
-            elapsed,
-            eta,
-            projected,
-            remaining,
-            lateBy,
-            score,
-            driver,
-            telemetry,
-            distanceKm: routeEta?.distanceKm,
-            etaSource: routeEta?.source,
-            isLate: elapsed > SLA_MINUTES || projected > SLA_MINUTES,
-            label: projected <= SLA_MINUTES ? copy.onTime : `${copy.late} ${lateBy}m`,
-        };
-    };
-
-    const mapDrivers = useMemo(() => activeDrivers.map(driver => {
-        const telemetry = telemetryByDriver[driver.id];
-        return {
-            id: driver.id,
-            name: driver.name,
-            status: driver.status,
-            lat: telemetry?.lat,
-            lng: telemetry?.lng,
-            speedKmh: telemetry?.speedKmh,
-            lastSeenLabel: getLastSeenLabel(driver.id),
-        };
-    }), [activeDrivers, telemetryByDriver]);
-
-    const mapOrders = useMemo(() => deliveryOrders
-        .filter(order => ['READY', 'OUT_FOR_DELIVERY', 'PREPARING'].includes(String(order.status)))
-        .map(order => ({
-            id: order.id,
-            label: formatDisplayId(order),
-            address: order.deliveryAddress,
-            lat: order.deliveryLat,
-            lng: order.deliveryLng,
-            driverId: order.driverId,
-            status: order.status,
-        })), [deliveryOrders]);
-
-    const saveDriver = async () => {
-        const name = driverForm.name.trim();
-        const phone = driverForm.phone.trim();
-        const branchId = activeBranchId || settings.currentUser?.assignedBranchId || '';
-        if (!name || !phone || !branchId) {
-            setOperationError(isAr ? 'اسم الطيار والهاتف والفرع مطلوبين.' : 'Driver name, phone, and branch are required.');
-            return;
-        }
-
-        setIsSavingDriver(true);
-        setOperationError(null);
-        setOperationMessage(null);
-        try {
-            await deliveryApi.createDriver({
-                name,
-                phone,
-                branchId,
-                email: driverForm.email.trim() || undefined,
-                password: driverForm.password.trim() || undefined,
-                pin: driverForm.pin.trim() || undefined,
-                createLogin: driverForm.createLogin,
-                status: 'AVAILABLE',
-            });
-            setDriverForm({ name: '', phone: '', email: '', password: '', pin: '', createLogin: true });
-            setShowDriverForm(false);
-            await loadDrivers();
-            setOperationMessage(isAr ? 'تم حفظ الطيار' : 'Driver saved');
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to save driver', 'تعذر حفظ الطيار'));
-        } finally {
-            setIsSavingDriver(false);
-        }
-    };
 
     const assignDriver = async (orderId: string, driverId: string) => {
-        if (isAssigningOrderId) return;
-        setIsAssigningOrderId(orderId);
-        setOperationError(null);
-        setOperationMessage(null);
+        if (assigningOrderId) return;
+        setAssigningOrderId(orderId);
+        setError(null);
         try {
             await deliveryApi.assign({ orderId, driverId });
-            await refreshAll();
-            setOperationMessage(isAr ? 'تم تعيين الطيار وخروج الأوردر' : 'Driver assigned and order dispatched');
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to assign driver', 'تعذر تعيين الطيار'));
-        } finally {
-            setIsAssigningOrderId(null);
-        }
-    };
-
-    const changeDriverStatus = async (driverId: string, status: Driver['status']) => {
-        setOperationError(null);
-        try {
-            await deliveryApi.updateDriverStatus(driverId, toApiDriverStatus(status));
+            setExpandedOrderId(null);
+            setMessage(isAr ? 'تم التعيين — بانتظار استلام الطيار' : 'Assigned — awaiting pilot pickup');
+            await refreshOrders(true);
             await loadDrivers();
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to update driver status', 'تعذر تحديث حالة الطيار'));
-        }
-    };
-
-    const deactivateDriver = async (driverId: string) => {
-        const driver = drivers.find(d => d.id === driverId);
-        const confirmed = await confirm({
-            title: isAr ? 'تعطيل الطيار؟' : 'Disable driver?',
-            message: isAr
-                ? `سيتم إخفاء ${driver?.name || 'الطيار'} من قائمة الطيارين المتاحين.`
-                : `${driver?.name || 'This driver'} will be removed from the available drivers list.`,
-            confirmText: isAr ? 'تعطيل' : 'Disable',
-            cancelText: isAr ? 'إلغاء' : 'Cancel',
-            variant: 'danger',
-        });
-        if (!confirmed) return;
-        setOperationError(null);
-        try {
-            await deliveryApi.updateDriver(driverId, { status: 'OFFLINE', isActive: false });
-            await loadDrivers();
-            setOperationMessage(isAr ? 'تم تعطيل الطيار' : 'Driver disabled');
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to disable driver', 'تعذر تعطيل الطيار'));
-        }
-    };
-
-    const confirmDeliveredAndReturning = async (order: Order) => {
-        if (isCompletingOrderId) return;
-        setIsCompletingOrderId(order.id);
-        setOperationError(null);
-        setOperationMessage(null);
-        try {
-            await updateOrderStatus(order.id, OrderStatus.DELIVERED);
-            if (order.driverId) {
-                await deliveryApi.updateDriverStatus(order.driverId, 'RETURNING');
+            // Driver ticket (شيك الطيار) — non-blocking: the assignment has
+            // already succeeded, so a print failure only warns.
+            try {
+                const assignedOrder = deliveryOrders.find((o) => o.id === orderId);
+                const driver = drivers.find((d) => d.id === driverId);
+                if (assignedOrder) {
+                    await printDriverTicket({
+                        order: assignedOrder,
+                        driverName: driver?.name || driverName(driverId),
+                        driverPhone: (driver as any)?.phone || undefined,
+                        printers,
+                        branchId: assignedOrder.branchId || branchId || '',
+                        settings,
+                        currencySymbol: currency,
+                        lang,
+                        branch: branches.find((b: any) => b.id === (assignedOrder.branchId || branchId)),
+                    });
+                }
+            } catch {
+                setError(isAr ? 'تم التعيين لكن تعذرت طباعة شيك الطيار' : 'Assigned, but the driver ticket failed to print');
             }
-            await refreshAll();
-            setOperationMessage(isAr ? 'تم تسجيل التسليم والطيار راجع للفرع' : 'Delivery confirmed and driver marked returning');
-        } catch (error) {
-            setOperationError(getErrorMessage(error, 'Failed to confirm delivery', 'تعذر تأكيد التسليم'));
+        } catch (e: any) {
+            const code = String(e?.message || '');
+            setError(code.includes('ORDER_NOT_READY_FOR_DISPATCH')
+                ? (isAr ? 'الأوردر لسه في المطبخ — التعيين متاح بعد ما يبقى جاهز' : 'Order still in kitchen — assign once it is ready')
+                : code.includes('DRIVER_NOT_AVAILABLE')
+                    ? (isAr ? 'الطيار غير متاح حالياً' : 'Driver not available right now')
+                    : (e?.message || (isAr ? 'تعذر التعيين' : 'Assign failed')));
         } finally {
-            setIsCompletingOrderId(null);
+            setAssigningOrderId(null);
         }
     };
+
+    const openPod = (order: Order) => {
+        setPodOrder(order);
+        const due = getCashToCollect(order);
+        setPodCash(due > 0 ? String(Math.round(due)) : '');
+        setPodPin('');
+        setPodReason('');
+    };
+
+    const submitPod = async () => {
+        if (!podOrder || podBusy) return;
+        const due = getCashToCollect(podOrder);
+        const collected = Number(podCash || 0);
+        if (due > 0 && !(Number.isFinite(collected) && collected + 0.01 >= due)) {
+            setError(isAr ? `المبلغ يجب أن يغطي المستحق (${due.toFixed(0)})` : `Amount must cover due (${due.toFixed(0)})`);
+            return;
+        }
+        if (!podPin.trim() || podReason.trim().length < 3) {
+            setError(isAr ? 'أدخل PIN المدير وسبب الإغلاق من الفرع' : 'Enter manager PIN and branch close-out reason');
+            return;
+        }
+        setPodBusy(true);
+        try {
+            // Branch fallback path: records cash in the pilot's ledger + burns OTP.
+            await deliveryApi.deliverOrder(podOrder.id, {
+                cashCollected: due > 0 ? collected : 0,
+                managerPin: podPin.trim(),
+                notes: podReason.trim(),
+            });
+            setPodOrder(null);
+            setMessage(isAr ? 'تم التسليم' : 'Delivered');
+            await refreshAll(true);
+        } catch (e: any) {
+            setError(e?.message || (isAr ? 'تعذر التأكيد' : 'Confirm failed'));
+        } finally {
+            setPodBusy(false);
+        }
+    };
+
+    const driverName = (id?: string | null) => drivers.find((d) => d.id === id)?.name || (id ? `#${String(id).slice(-6)}` : '-');
+    const expandedOrder = expandedOrderId ? deliveryOrders.find((o) => o.id === expandedOrderId) : undefined;
+    const routeTarget = expandedOrder && String(expandedOrder.status) === OrderStatus.OUT_FOR_DELIVERY && expandedOrder.driverId && telemetry[expandedOrder.driverId]
+        ? { from: { lat: telemetry[expandedOrder.driverId].lat, lng: telemetry[expandedOrder.driverId].lng },
+            to: (expandedOrder.deliveryLat && expandedOrder.deliveryLng) ? { lat: expandedOrder.deliveryLat, lng: expandedOrder.deliveryLng } : defaultMapCenter }
+        : null;
 
     const renderOrderCard = (order: Order, mode: 'ready' | 'road') => {
-        const age = getOrderAgeMins(order);
-        const delayed = age >= SLA_MINUTES && order.status !== OrderStatus.DELIVERED;
-        const driver = order.driverId ? driverById.get(order.driverId) : undefined;
-        const timing = getTiming(order);
+        const age = ageMins(order);
+        const late = age >= SLA_MINUTES;
+        const cash = getCashToCollect(order);
+        const assignedName = order.driverId ? driverName(order.driverId) : null;
+        const expanded = expandedOrderId === order.id;
+        const ranked = mode === 'ready' && expanded ? rankedFor(order).slice(0, 6) : [];
         return (
-            <article key={order.id} className={`rounded-2xl border bg-card p-4 shadow-sm ${delayed ? 'border-rose-300 ring-1 ring-rose-200' : 'border-border'}`}>
-                <div className="flex items-start justify-between gap-3">
+            <article key={order.id} className={`rounded-2xl border bg-card p-4 shadow-sm ${late ? 'border-rose-300 ring-1 ring-rose-200' : 'border-border'}`}>
+                <button className="flex w-full items-start justify-between gap-3 text-start" onClick={() => setExpandedOrderId(expanded ? null : order.id)}>
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-black text-main">{formatDisplayId(order)}</span>
-                            <span className={`rounded-full px-2 py-1 text-[10px] font-black ${delayed ? 'bg-rose-100 text-rose-700' : 'bg-elevated text-muted'}`}>
-                                {age}m
-                            </span>
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-black ${late ? 'bg-rose-100 text-rose-700' : 'bg-elevated text-muted'}`}>{age}m</span>
                             {order.isUrgent && <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">{isAr ? 'عاجل' : 'URGENT'}</span>}
+                            {cash > 0
+                                ? <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black text-emerald-600">{isAr ? 'نقدي' : 'CASH'} {cash.toFixed(0)}</span>
+                                : <span className="rounded-full bg-sky-500/15 px-2 py-1 text-[10px] font-black text-sky-600">{isAr ? 'مدفوع' : 'PAID'}</span>}
                         </div>
-                        <h3 className="mt-2 truncate text-base font-black text-main">{order.customerName || (isAr ? 'عميل دليفري' : 'Delivery customer')}</h3>
-                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-bold text-muted">
-                            {order.customerPhone && <span className="inline-flex items-center gap-1"><Phone size={13} />{order.customerPhone}</span>}
+                        <h3 className="mt-1.5 truncate text-base font-black text-main">{order.customerName || (isAr ? 'عميل دليفري' : 'Delivery customer')}</h3>
+                        <p className="mt-1 truncate text-xs font-bold text-muted">{order.deliveryAddress || (isAr ? 'لا عنوان' : 'No address')}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm font-black tabular-nums text-primary">{Number(order.total || 0).toFixed(0)}</span>
+                        <ChevronDown size={16} className={`text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    </div>
+                </button>
+
+                {expanded && (
+                    <div className="mt-3 space-y-3 border-t border-border pt-3">
+                        <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-muted">
+                            {order.customerPhone && <a href={`tel:${order.customerPhone}`} className="inline-flex items-center gap-1 text-primary"><Phone size={13} />{order.customerPhone}</a>}
                             <span className="inline-flex items-center gap-1"><Clock size={13} />{order.status}</span>
-                            <span className="text-primary">{Number(order.total || 0).toFixed(2)} {settings.currencySymbol || 'EGP'}</span>
+                            {order.deliveryNotes && <span className="w-full text-[11px]">{order.deliveryNotes}</span>}
                         </div>
-                    </div>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        {mode === 'road' ? <Bike size={20} /> : <PackageCheck size={20} />}
-                    </div>
-                </div>
 
-                <div className="mt-4 rounded-xl border border-border bg-elevated/40 p-3">
-                    <div className="flex items-start gap-2 text-xs font-bold leading-5 text-main">
-                        <MapPin className="mt-0.5 shrink-0 text-rose-500" size={15} />
-                        <span>{order.deliveryAddress || copy.addressMissing}</span>
-                    </div>
-                    {order.deliveryNotes && <p className="mt-2 text-xs font-semibold text-muted">{order.deliveryNotes}</p>}
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                    <div className="rounded-xl border border-border bg-app px-3 py-2">
-                        <div className="text-[10px] font-black text-muted">{copy.expected}</div>
-                        <div className="mt-1 text-sm font-black text-main">{SLA_MINUTES}m</div>
-                    </div>
-                    <div className="rounded-xl border border-border bg-app px-3 py-2">
-                        <div className="text-[10px] font-black text-muted">ETA</div>
-                        <div className="mt-1 text-sm font-black text-main">{timing.eta}m</div>
-                        {timing.distanceKm && <div className="mt-0.5 text-[9px] font-black text-muted">{timing.distanceKm} km</div>}
-                    </div>
-                    <div className={`rounded-xl border px-3 py-2 ${timing.isLate ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                        <div className="text-[10px] font-black opacity-70">{copy.watch}</div>
-                        <div className="mt-1 text-sm font-black">{timing.label}</div>
-                    </div>
-                </div>
-
-                {mode === 'ready' ? (
-                    <div className="mt-4">
-                        <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-muted">
-                            {isAr ? 'اختار الطيار' : 'Choose driver'}
-                        </div>
-                        {availableDrivers.length === 0 ? (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">
-                                {copy.unavailable}
+                        {mode === 'ready' ? (
+                            <div>
+                                {assignedName && (
+                                    <p className="mb-2 text-[11px] font-black text-muted">
+                                        {isAr ? 'المعيّن حالياً:' : 'Assigned:'} <span className="text-main">{assignedName}</span>
+                                        <span className="text-muted"> — {isAr ? 'اختر بديلاً لإعادة التعيين' : 'pick another to reassign'}</span>
+                                    </p>
+                                )}
+                                {!['READY', 'ASSIGNED'].includes(String(order.status)) ? (
+                                    <p className="rounded-xl bg-amber-500/10 p-3 text-xs font-black text-amber-700">
+                                        {isAr ? 'الأوردر لسه في المطبخ — التعيين للطيار متاح بعد التجهيز' : 'Order still in the kitchen — assign once it is ready'}
+                                    </p>
+                                ) : ranked.length === 0 ? (
+                                    <p className="rounded-xl bg-amber-500/10 p-3 text-xs font-black text-amber-700">
+                                        {isAr ? 'لا يوجد طيار متاح — فعّل أحدهم من صفحة الطيارين' : 'No available pilots — activate one from Pilots'}
+                                    </p>
+                                ) : (
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {ranked.map((d, i) => (
+                                            <button key={d.id} disabled={assigningOrderId === order.id}
+                                                onClick={() => assignDriver(order.id, d.id)}
+                                                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-app px-3 py-2.5 text-start transition hover:border-primary disabled:opacity-50">
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-xs font-black text-main">
+                                                        {i === 0 && <span className="mr-1 rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] text-white">★</span>}{d.name}
+                                                    </span>
+                                                    <span className="block text-[10px] font-bold text-muted">
+                                                        {(loadByDriver[d.id] || 0)} {isAr ? 'طلبات' : 'orders'}
+                                                        {d.distanceKm != null && ` · ${d.distanceKm} ${isAr ? 'كم' : 'km'}`}
+                                                    </span>
+                                                </span>
+                                                <User size={16} className="shrink-0 text-muted" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <div className="flex flex-wrap gap-2">
-                                {availableDrivers.map(driver => (
-                                    <button
-                                        key={driver.id}
-                                        onClick={() => assignDriver(order.id, driver.id)}
-                                        disabled={isAssigningOrderId === order.id}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-border bg-app px-3 py-2 text-xs font-black text-main transition hover:border-primary hover:text-primary disabled:opacity-50"
-                                    >
-                                        <User size={14} />
-                                        {driver.name}
-                                    </button>
-                                ))}
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <div className="min-w-0 flex-1 rounded-xl bg-elevated/60 px-3 py-2.5 text-xs font-black text-main">
+                                    <Bike size={14} className="mb-1 text-muted" />
+                                    {assignedName}
+                                    {(order as any).delivery_otp && (
+                                        <span className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                                            <span className="text-muted">{isAr ? 'رمز التسليم:' : 'OTP:'}</span>
+                                            <span className="rounded-lg bg-elevated border border-border px-2.5 py-1 font-black tabular-nums tracking-[0.2em] text-muted" dir="ltr" title={isAr ? 'أُرسل للعميل واتساب — لا تشاركه' : 'Sent to customer WhatsApp — do not share'}>
+                                                ••••
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
+                                <button onClick={() => openPod(order)}
+                                    className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white">
+                                    <CheckCircle2 size={15} />{isAr ? 'تأكيد التسليم' : 'Confirm delivered'}
+                                </button>
                             </div>
                         )}
-                    </div>
-                ) : (
-                    <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-app p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-wider text-muted">{isAr ? 'الطيار الحالي' : 'Assigned driver'}</div>
-                            <div className="mt-1 truncate text-sm font-black text-main">{driver?.name || order.driverId || '-'}</div>
-                            <div className="mt-1 text-[11px] font-bold text-muted">{copy.driverLeft} - {getLastSeenLabel(order.driverId || '')}</div>
-                        </div>
-                        <button
-                            onClick={() => confirmDeliveredAndReturning(order)}
-                            disabled={isCompletingOrderId === order.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                            <CheckCircle2 size={15} />
-                            {copy.delivered}
-                        </button>
                     </div>
                 )}
             </article>
         );
     };
 
+    const tabs: { id: Tab; label: string; count: number }[] = [
+        { id: 'ready', label: isAr ? 'جاهز للتعيين' : 'Ready', count: readyOrders.length },
+        { id: 'road', label: isAr ? 'في الطريق' : 'On road', count: roadOrders.length },
+        { id: 'alerts', label: isAr ? 'تنبيهات' : 'Alerts', count: criticalAlerts.length },
+    ];
+
     return (
         <div className="min-h-screen bg-app p-4 md:p-6 lg:p-8" dir={isAr ? 'rtl' : 'ltr'}>
-            <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-sm">
-                        <Truck size={25} />
-                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white"><Truck size={25} /></div>
                     <div>
-                        <h1 className="text-2xl font-black text-main">{copy.title}</h1>
-                        <p className="mt-1 text-sm font-bold text-muted">{copy.subtitle}</p>
+                        <h1 className="text-2xl font-black text-main">{isAr ? 'تسليم الطيارين' : 'Pilot Handover'}</h1>
+                        <p className="mt-1 text-sm font-bold text-muted">{isAr ? 'طابور واحد ذكي: تعيين ثم استلام ثم تسليم' : 'One smart queue: assign, pickup, deliver'}</p>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        onClick={refreshAll}
-                        disabled={isRefreshing}
-                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60"
-                    >
-                        <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
-                        {copy.refresh}
+                    <div className="relative">
+                        <Search size={15} className={`absolute top-1/2 -translate-y-1/2 text-muted ${isAr ? 'right-3' : 'left-3'}`} />
+                        <input value={query} onChange={(e) => setQuery(e.target.value)}
+                            placeholder={isAr ? 'بحث برقم/اسم/هاتف/عنوان' : 'Search #/name/phone/address'}
+                            className={`h-11 w-60 rounded-xl border border-border bg-card text-sm font-bold outline-none focus:border-primary ${isAr ? 'pr-9 pl-3' : 'pl-9 pr-3'}`} />
+                    </div>
+                    <button onClick={() => setShowMap((v) => !v)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-black text-main">
+                        <MapPin size={15} />{isAr ? 'الخريطة' : 'Map'}
                     </button>
-                    <button
-                        onClick={() => setShowDriverForm(value => !value)}
-                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-white transition hover:opacity-90"
-                    >
-                        {showDriverForm ? <X size={15} /> : <Plus size={15} />}
-                        {showDriverForm ? copy.close : copy.addDriver}
+                    <Link to="/drivers" className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-black text-main">
+                        <Users size={15} />{isAr ? 'الطيارون' : 'Pilots'}
+                    </Link>
+                    <button onClick={() => refreshAll(false)} disabled={refreshing} className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-white disabled:opacity-60">
+                        <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />{isAr ? 'تحديث' : 'Refresh'}
                     </button>
                 </div>
             </header>
 
-            {(operationError || operationMessage) && (
-                <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-bold ${
-                    operationError
-                        ? 'border-rose-200 bg-rose-50 text-rose-700'
-                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                }`}>
-                    {operationError || operationMessage}
+            {(error || message) && (
+                <div className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-bold ${error ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                    {error || message}
                 </div>
             )}
 
-            <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {[
-                    { label: isAr ? 'دليفري اليوم' : 'Delivery orders', value: deliveryOrders.length },
-                    { label: copy.ready, value: readyOrders.length },
-                    { label: copy.onRoad, value: roadOrders.length },
-                    { label: isAr ? 'طيارين متاحين' : 'Available drivers', value: availableDrivers.length },
-                    { label: isAr ? 'تنبيهات SLA' : 'SLA alerts', value: criticalAlerts.length, danger: criticalAlerts.length > 0 },
-                ].map(item => (
-                    <div key={item.label} className={`rounded-2xl border bg-card p-4 ${item.danger ? 'border-rose-300' : 'border-border'}`}>
-                        <div className="text-[11px] font-black uppercase tracking-wider text-muted">{item.label}</div>
-                        <div className={`mt-2 text-2xl font-black ${item.danger ? 'text-rose-600' : 'text-main'}`}>{item.value}</div>
+                    { label: isAr ? 'جاهز' : 'Ready', value: readyOrders.length, tone: 'text-primary' },
+                    { label: isAr ? 'في الطريق' : 'On road', value: roadOrders.length, tone: 'text-indigo-600' },
+                    { label: isAr ? 'متأخر' : 'Late', value: [...readyOrders, ...roadOrders].filter((o) => ageMins(o) >= SLA_MINUTES).length, tone: 'text-rose-600' },
+                    { label: isAr ? 'تنبيهات' : 'Alerts', value: criticalAlerts.length, tone: criticalAlerts.length ? 'text-rose-600' : 'text-muted' },
+                ].map((s) => (
+                    <div key={s.label} className="rounded-2xl border border-border bg-card p-4">
+                        <div className="text-[11px] font-black uppercase tracking-wider text-muted">{s.label}</div>
+                        <div className={`mt-1 text-2xl font-black ${s.tone}`}>{s.value}</div>
                     </div>
                 ))}
             </section>
 
-            <section id="route" className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <DeliveryTrackingMap
-                    lang={lang}
-                    title={copy.liveMap}
-                    subtitle={isAr ? 'خريطة Google فعلية للطيارين وأماكن أوردرات الدليفري.' : 'Real Google map for drivers and delivery orders.'}
-                    drivers={mapDrivers}
-                    orders={mapOrders}
-                    center={defaultMapCenter}
-                    heightClass="min-h-[360px]"
-                    showSearch
-                />
-
-                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                    <h3 className="mb-3 text-sm font-black text-main">{isAr ? 'متابعة الطريق' : 'Route watch'}</h3>
-                    <div className="space-y-3">
-                        {roadOrders.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs font-black text-muted">{copy.noRoad}</div>
-                        ) : roadOrders.map(order => {
-                            const timing = getTiming(order);
-                            return (
-                                <div key={order.id} className="rounded-xl border border-border bg-app p-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="text-sm font-black text-main">{formatDisplayId(order)}</div>
-                                            <div className="mt-1 truncate text-xs font-bold text-muted">{timing.driver?.name || order.driverId || '-'}</div>
-                                        </div>
-                                        <span className={`rounded-full px-2 py-1 text-[10px] font-black ${timing.isLate ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                            {timing.score}%
-                                        </span>
-                                    </div>
-                                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                                        <div className="rounded-lg bg-card p-2">
-                                            <div className="text-[9px] font-black text-muted">{isAr ? 'مضى' : 'Elapsed'}</div>
-                                            <div className="text-xs font-black text-main">{timing.elapsed}m</div>
-                                        </div>
-                                        <div className="rounded-lg bg-card p-2">
-                                            <div className="text-[9px] font-black text-muted">ETA</div>
-                                            <div className="text-xs font-black text-main">{timing.eta}m</div>
-                                            {timing.distanceKm && <div className="text-[9px] font-black text-muted">{timing.distanceKm} km</div>}
-                                        </div>
-                                        <div className="rounded-lg bg-card p-2">
-                                            <div className="text-[9px] font-black text-muted">{copy.expected}</div>
-                                            <div className="text-xs font-black text-main">{SLA_MINUTES}m</div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-card">
-                                        <div className={`h-full rounded-full ${timing.isLate ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, Math.max(8, (timing.elapsed / SLA_MINUTES) * 100))}%` }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </section>
-
-            {showDriverForm && (
-                <section className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
-                    <div className="mb-4 flex items-center gap-2 text-sm font-black text-main">
-                        <User size={18} />
-                        {copy.addDriver}
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <input value={driverForm.name} onChange={e => setDriverForm(f => ({ ...f, name: e.target.value }))} placeholder={isAr ? 'اسم الطيار' : 'Driver name'} className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                        <input value={driverForm.phone} onChange={e => setDriverForm(f => ({ ...f, phone: e.target.value }))} placeholder={isAr ? 'رقم الهاتف' : 'Phone'} className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                        <input value={driverForm.email} onChange={e => setDriverForm(f => ({ ...f, email: e.target.value }))} placeholder={isAr ? 'إيميل الدخول' : 'Login email'} className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                        <input value={driverForm.password} onChange={e => setDriverForm(f => ({ ...f, password: e.target.value }))} placeholder={isAr ? 'كلمة المرور' : 'Password'} type="password" className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                        <input value={driverForm.pin} onChange={e => setDriverForm(f => ({ ...f, pin: e.target.value }))} placeholder="PIN" className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                        <label className="flex h-11 items-center gap-2 rounded-xl border border-border bg-app px-3 text-xs font-black text-muted">
-                            <input type="checkbox" checked={driverForm.createLogin} onChange={e => setDriverForm(f => ({ ...f, createLogin: e.target.checked }))} />
-                            {isAr ? 'إنشاء حساب دخول للطيار' : 'Create driver login'}
-                        </label>
-                    </div>
-                    {driverForm.createLogin && !driverForm.email.trim() && (
-                        <p className="mt-3 text-xs font-bold text-amber-600">{isAr ? 'الإيميل مطلوب عند إنشاء حساب دخول.' : 'Email is required when creating a login.'}</p>
-                    )}
-                    <button
-                        onClick={saveDriver}
-                        disabled={isSavingDriver || !driverForm.name.trim() || !driverForm.phone.trim() || (driverForm.createLogin && !driverForm.email.trim())}
-                        className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-xs font-black text-white disabled:opacity-50"
-                    >
-                        <Save size={15} />
-                        {isSavingDriver ? copy.saving : copy.saveDriver}
-                    </button>
+            {showMap && (
+                <section className="mb-5">
+                    <DeliveryTrackingMap
+                        lang={lang as any}
+                        drivers={drivers.filter((d) => d.isActive !== false).map((d) => ({
+                            id: d.id, name: d.name, status: d.status,
+                            lat: telemetry[d.id]?.lat, lng: telemetry[d.id]?.lng,
+                            speedKmh: telemetry[d.id]?.speedKmh, accuracyM: telemetry[d.id]?.accuracy,
+                            lastSeenLabel: lastSeenMins(d.id) === null ? '' : lastSeenMins(d.id) === 0 ? (isAr ? 'الآن' : 'now') : (isAr ? `منذ ${lastSeenMins(d.id)} د` : `${lastSeenMins(d.id)}m ago`),
+                        }))}
+                        orders={[...readyOrders, ...roadOrders].map((o) => ({
+                            id: o.id, label: formatDisplayId(o), address: o.deliveryAddress,
+                            lat: o.deliveryLat, lng: o.deliveryLng, driverId: o.driverId, status: o.status,
+                        }))}
+                        route={routeTarget}
+                        heightClass="min-h-[320px]"
+                        showSearch={false}
+                    />
                 </section>
             )}
 
-            <main className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-                <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <div className="min-w-0">
-                        <div className="mb-3 flex items-center justify-between">
-                            <h2 className="flex items-center gap-2 text-sm font-black text-main">
-                                <PackageCheck size={18} className="text-primary" />
-                                {copy.ready}
-                            </h2>
-                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">{readyOrders.length}</span>
-                        </div>
-                        <div className="space-y-3">
-                            {readyOrders.length === 0 ? (
-                                <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm font-black text-muted">{copy.noReady}</div>
-                            ) : readyOrders.map(order => renderOrderCard(order, 'ready'))}
-                        </div>
-                    </div>
+            <div className="mb-4 flex gap-2">
+                {tabs.map((t) => (
+                    <button key={t.id} onClick={() => setTab(t.id)}
+                        className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-black transition ${tab === t.id ? 'bg-primary text-white shadow' : 'border border-border bg-card text-muted'}`}>
+                        {t.label}
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] ${tab === t.id ? 'bg-white/20' : 'bg-elevated'}`}>{t.count}</span>
+                    </button>
+                ))}
+            </div>
 
-                    <div className="min-w-0">
-                        <div className="mb-3 flex items-center justify-between">
-                            <h2 className="flex items-center gap-2 text-sm font-black text-main">
-                                <Navigation size={18} className="text-primary" />
-                                {copy.onRoad}
-                            </h2>
-                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">{roadOrders.length}</span>
-                        </div>
-                        <div className="space-y-3">
-                            {roadOrders.length === 0 ? (
-                                <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm font-black text-muted">{copy.noRoad}</div>
-                            ) : roadOrders.map(order => renderOrderCard(order, 'road'))}
-                        </div>
-                    </div>
-                </section>
-
-                <aside className="space-y-4">
-                    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h2 className="flex items-center gap-2 text-sm font-black text-main">
-                                <User size={18} className="text-primary" />
-                                {copy.drivers}
-                            </h2>
-                            {isLoadingDrivers && <RefreshCw size={14} className="animate-spin text-muted" />}
-                        </div>
-
-                        <div className="space-y-3">
-                            {activeDrivers.length === 0 ? (
-                                <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs font-black text-muted">{copy.noDrivers}</div>
-                            ) : activeDrivers.map(driver => {
-                                const telemetry = telemetryByDriver[driver.id];
-                                const statusClass = driver.status === 'AVAILABLE'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : driver.status === 'ON_DELIVERY'
-                                        ? 'bg-indigo-100 text-indigo-700'
-                                        : driver.status === 'RETURNING'
-                                            ? 'bg-amber-100 text-amber-700'
-                                            : 'bg-elevated text-muted';
-                                return (
-                                    <div key={driver.id} className="rounded-2xl border border-border bg-app p-3">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="truncate text-sm font-black text-main">{driver.name}</div>
-                                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted">
-                                                    <span>{driver.phone}</span>
-                                                    <span>{driver.vehicleType}</span>
-                                                    <span>{getLastSeenLabel(driver.id)}</span>
-                                                </div>
-                                                {telemetry && (
-                                                    <div className="mt-2 text-[10px] font-bold text-muted">
-                                                        {telemetry.lat.toFixed(4)}, {telemetry.lng.toFixed(4)}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${statusClass}`}>
-                                                {driver.status}
-                                            </span>
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                                            <button
-                                                onClick={() => changeDriverStatus(driver.id, 'AVAILABLE')}
-                                                className="h-9 rounded-xl bg-emerald-600 px-3 text-[10px] font-black text-white"
-                                            >
-                                                {copy.loginBranch}
-                                            </button>
-                                            <button
-                                                onClick={() => changeDriverStatus(driver.id, 'ON_DELIVERY')}
-                                                className="h-9 rounded-xl bg-indigo-600 px-3 text-[10px] font-black text-white"
-                                            >
-                                                {copy.driverLeft}
-                                            </button>
-                                            <select
-                                                value={driver.status}
-                                                onChange={e => changeDriverStatus(driver.id, e.target.value as Driver['status'])}
-                                                className="h-9 flex-1 rounded-xl border border-border bg-card px-2 text-[11px] font-black text-main outline-none"
-                                            >
-                                                <option value="AVAILABLE">{isAr ? 'متاح' : 'Available'}</option>
-                                                <option value="BREAK">{isAr ? 'استراحة' : 'Break'}</option>
-                                                <option value="OFFLINE">{isAr ? 'غير متصل' : 'Offline'}</option>
-                                                <option value="RETURNING">{isAr ? 'راجع للمطعم' : 'Returning'}</option>
-                                                <option value="ON_DELIVERY">{isAr ? 'في التوصيل' : 'On delivery'}</option>
-                                            </select>
-                                            {driver.status === 'RETURNING' && (
-                                                <button onClick={() => changeDriverStatus(driver.id, 'AVAILABLE')} className="h-9 rounded-xl bg-emerald-600 px-3 text-[10px] font-black text-white">
-                                                    {copy.arrived}
-                                                </button>
-                                            )}
-                                            <button onClick={() => changeDriverStatus(driver.id, 'OFFLINE')} className="h-9 rounded-xl bg-slate-500/10 px-3 text-[10px] font-black text-slate-600">
-                                                {copy.logoutBranch}
-                                            </button>
-                                            <button onClick={() => deactivateDriver(driver.id)} className="h-9 rounded-xl bg-rose-500/10 px-3 text-[10px] font-black text-rose-600">
-                                                {isAr ? 'تعطيل' : 'Disable'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {criticalAlerts.length > 0 && (
-                        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
-                            <div className="mb-3 flex items-center gap-2 text-sm font-black">
-                                <AlertTriangle size={17} />
-                                {isAr ? 'تنبيهات تأخير' : 'Delay alerts'}
-                            </div>
-                            <div className="space-y-2">
-                                {criticalAlerts.slice(0, 6).map((alert: any) => (
-                                    <div key={alert.id || `${alert.orderId}-${alert.type}`} className="rounded-xl bg-white/80 p-3 text-xs font-bold">
-                                        #{String(alert.orderId || '').slice(-6)} - {alert.details || alert.type || 'SLA'}
-                                    </div>
-                                ))}
-                            </div>
+            {loading ? (
+                <div className="rounded-2xl border border-border bg-card p-10 text-center text-sm font-bold text-muted">{isAr ? 'جاري التحميل...' : 'Loading...'}</div>
+            ) : tab === 'alerts' ? (
+                <div className="space-y-2">
+                    {criticalAlerts.length === 0 && (
+                        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm font-black text-muted">
+                            {isAr ? 'لا توجد تنبيهات حرجة' : 'No critical alerts'}
                         </div>
                     )}
-                </aside>
-            </main>
+                    {criticalAlerts.slice(0, 20).map((a: any) => (
+                        <div key={a.id || `${a.orderId}-${a.type}`} className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">
+                            <AlertTriangle size={17} className="shrink-0" />
+                            <span className="min-w-0 flex-1">#{String(a.orderId || '').slice(-6)} — {a.details || a.type}</span>
+                            <span className="shrink-0 text-[10px] font-black">{a.ageMinutes}m</span>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {(tab === 'ready' ? readyOrders : roadOrders).length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm font-black text-muted lg:col-span-2">
+                            {tab === 'ready'
+                                ? (isAr ? 'لا طلبات بانتظار التعيين' : 'Nothing awaiting assignment')
+                                : (isAr ? 'لا طلبات في الطريق' : 'Nobody on the road')}
+                        </div>
+                    ) : (
+                        (tab === 'ready' ? readyOrders : roadOrders).map((o) => renderOrderCard(o, tab === 'ready' ? 'ready' : 'road'))
+                    )}
+                </div>
+            )}
+
+            {podOrder && (() => {
+                const due = getCashToCollect(podOrder);
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center" onClick={() => !podBusy && setPodOrder(null)}>
+                        <div className="w-full max-w-md rounded-3xl bg-card p-6 shadow-2xl" dir={isAr ? 'rtl' : 'ltr'} onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-lg font-black text-main">{isAr ? 'تأكيد التسليم' : 'Confirm delivery'} #{podOrder.orderNumber || podOrder.id}</h3>
+                            <p className="mt-1 text-xs font-bold text-muted">{podOrder.customerName} · {podOrder.deliveryAddress}</p>
+                            {due > 0 ? (
+                                <div className="mt-4">
+                                    <div className="mb-2 flex items-center justify-between rounded-2xl bg-amber-500/10 p-3">
+                                        <span className="text-xs font-black text-amber-600">{isAr ? 'المستحق نقداً' : 'Cash due'}</span>
+                                        <span className="text-xl font-black text-amber-600">{due.toFixed(0)}</span>
+                                    </div>
+                                    <label className="text-xs font-black text-muted">{isAr ? 'المبلغ المحصّل' : 'Collected'}</label>
+                                    <input type="number" inputMode="decimal" value={podCash} onChange={(e) => setPodCash(e.target.value)}
+                                        className="mt-2 h-14 w-full rounded-2xl border border-border bg-app px-4 text-center text-2xl font-black tabular-nums outline-none focus:border-emerald-500" placeholder="0" />
+                                </div>
+                            ) : (
+                                <p className="mt-4 rounded-2xl bg-emerald-500/10 p-3 text-xs font-black text-emerald-600">
+                                    {isAr ? 'مدفوع مقدماً — أكّد التسليم فقط' : 'Prepaid — just confirm handover'}
+                                </p>
+                            )}
+                            <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-500/10 p-3">
+                                <p className="text-[11px] font-black text-amber-700">
+                                    {isAr ? 'إغلاق من الفرع (بدون OTP): يتطلب PIN مدير وسبباً — يُسجل في التدقيق' : 'Branch close-out (no OTP): requires manager PIN + reason — audited'}
+                                </p>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <input type="password" inputMode="numeric" value={podPin} onChange={(e) => setPodPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                        placeholder={isAr ? 'PIN المدير *' : 'Manager PIN *'}
+                                        className="h-11 rounded-xl border border-border bg-app px-3 text-center font-black tabular-nums outline-none focus:border-amber-500" />
+                                    <input value={podReason} onChange={(e) => setPodReason(e.target.value)}
+                                        placeholder={isAr ? 'السبب *' : 'Reason *'}
+                                        className="h-11 rounded-xl border border-border bg-app px-3 text-xs font-bold outline-none focus:border-amber-500" />
+                                </div>
+                            </div>
+                            <div className="mt-5 grid grid-cols-2 gap-2">
+                                <button onClick={() => !podBusy && setPodOrder(null)} disabled={podBusy} className="h-12 rounded-2xl bg-elevated/60 text-sm font-black text-main disabled:opacity-50">{isAr ? 'رجوع' : 'Back'}</button>
+                                <button onClick={submitPod} disabled={podBusy} className="h-12 rounded-2xl bg-emerald-600 text-sm font-black text-white disabled:opacity-50">
+                                    {podBusy ? (isAr ? 'جاري...' : 'Saving...') : (isAr ? 'تأكيد' : 'Confirm')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 };

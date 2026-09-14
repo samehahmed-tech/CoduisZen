@@ -44,13 +44,13 @@ export const generateReceiptHTML = ({
    const orderTypeText = isAr ? typeInfo.ar : typeInfo.en;
 
    const restaurantName = settings.restaurantName || 'Restaurant';
-   const branchName = branch?.name || (isAr ? branch?.nameAr : branch?.name) || '';
+   const branchName = (isAr ? branch?.nameAr || branch?.name : branch?.name || branch?.nameAr) || '';
    const branchAddr = settings.branchAddress || branch?.address || '';
    const phone = settings.phone || branch?.phone || '';
    const taxId = (settings as any).taxRegistrationNumber || '';
    const logoUrl = settings.receiptLogoUrl || '';
    const qrValue = settings.receiptQrUrl || '';
-   const qrImageUrl = qrValue ? createQrDataUrl(qrValue, 88) : '';
+   const qrImageUrl = qrValue ? createQrDataUrl(qrValue, 260) : '';
 
    // Calculate totals
    const totals = calculateOrderTotalsFromOrder(order, settings);
@@ -126,8 +126,8 @@ export const generateReceiptHTML = ({
       </tr>
    `).join('');
 
-   // Payment
-   const pmStr = String(order.paymentMethod || '').toUpperCase();
+    // Payment
+    const pmStr = String(order.paymentMethod || '').trim().toUpperCase();
    const paymentLabels: Record<string, { ar: string; en: string }> = {
       CASH: { ar: 'كاش', en: 'Cash' },
       CARD: { ar: 'بطاقة', en: 'Card' },
@@ -170,8 +170,8 @@ export const generateReceiptHTML = ({
 
    body {
       font-family: 'Cairo', Tahoma, Arial, sans-serif;
-      font-size: 15px;
-      color: #1a1a1a;
+      font-size: 16px;
+      color: #000;
       width: 76mm;
       max-width: 100%;
       margin: 0 auto;
@@ -189,24 +189,24 @@ export const generateReceiptHTML = ({
       border-bottom: 2px solid #111;
    }
    .restaurant-name {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 900;
       letter-spacing: -0.5px;
       line-height: 1.2;
    }
-   .branch-name { font-size: 14px; font-weight: 700; color: #444; margin-top: 1px; }
-   .branch-info { font-size: 12px; color: #777; margin-top: 1px; }
+   .branch-name { font-size: 14px; font-weight: 800; color: #000; margin-top: 1px; }
+   .branch-info { font-size: 12px; color: #333; font-weight: 700; margin-top: 1px; }
 
    /* Title */
    .receipt-title {
       text-align: center;
-      font-size: 16px;
-      font-weight: 800;
+      font-size: 18px;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 2px;
       padding: 6px 0;
       margin: 6px 0;
-      border: 1px dashed #999;
+      border: 1px dashed #555;
       border-radius: 4px;
       background: #f5f5f5;
    }
@@ -218,7 +218,7 @@ export const generateReceiptHTML = ({
       align-items: flex-start;
       gap: 4px;
       padding: 6px 0;
-      border-bottom: 1px dashed #ccc;
+      border-bottom: 1px dashed #555;
    }
     .meta-block {
        display: flex;
@@ -228,16 +228,16 @@ export const generateReceiptHTML = ({
        text-align: ${align};
    }
    .meta-label {
-      font-size: 10px;
-      font-weight: 800;
+      font-size: 11px;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      color: #999;
+      color: #333;
    }
     .meta-value {
        display: block;
-       font-weight: 700;
-       font-size: 15px;
+       font-weight: 900;
+       font-size: 16px;
        white-space: nowrap;
        unicode-bidi: isolate;
    }
@@ -255,8 +255,8 @@ export const generateReceiptHTML = ({
    }
    .receipt-logo {
       display: block;
-      max-width: 42mm;
-      max-height: 18mm;
+      max-width: 54mm;
+      max-height: 28mm;
       object-fit: contain;
       margin: 0 auto 5px;
    }
@@ -267,13 +267,13 @@ export const generateReceiptHTML = ({
    }
    .info-chip {
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 800;
       padding: 2px 0;
-      color: #333;
+      color: #000;
    }
    .order-note {
       font-style: italic;
-      color: #666;
+      color: #333; font-weight: 700;
    }
 
    /* Items Table */
@@ -288,7 +288,7 @@ export const generateReceiptHTML = ({
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      color: #888;
+      color: #333;
       padding: 4px 0;
       border-bottom: 2px solid #222;
    }
@@ -304,21 +304,21 @@ export const generateReceiptHTML = ({
     }
    .items-table td {
       padding: 5px 2px;
-      border-bottom: 1px dashed #e5e5e5;
+      border-bottom: 1px dashed #999;
       vertical-align: top;
       font-size: 15px;
       overflow-wrap: anywhere;
       word-break: normal;
    }
-   .alt-row td { background: #fafafa; }
-   .item-name { font-weight: 800; font-size: 16px; display: block; line-height: 1.42; }
+   .alt-row td { background: #f0f0f0; }
+   .item-name { font-weight: 900; font-size: 17px; display: block; line-height: 1.42; }
    .item-mod {
       font-size: 13px;
       color: #666;
       padding-${align}: 8px;
       line-height: 1.3;
    }
-   .mod-price { color: #999; }
+   .mod-price { color: #555; }
    .item-note {
       font-size: 13px;
       color: #888;
@@ -336,7 +336,7 @@ export const generateReceiptHTML = ({
    /* Separator */
    .dashed-sep {
       border: none;
-      border-top: 1px dashed #bbb;
+      border-top: 1px dashed #666;
       margin: 6px 0;
    }
    .thick-sep {
@@ -378,7 +378,7 @@ export const generateReceiptHTML = ({
       font-weight: 800;
    }
     .grand-total-value {
-       font-size: 20px;
+       font-size: 22px;
        font-weight: 900;
        letter-spacing: -0.5px;
        direction: ltr;
@@ -392,23 +392,25 @@ export const generateReceiptHTML = ({
       text-align: center;
       padding: 6px 0;
    }
-   .payment-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 5px 16px;
-      min-width: 96px;
-      max-width: 100%;
-      border: 1.5px solid #333;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1.25;
-      white-space: nowrap;
-      text-align: center;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-   }
+    .payment-pill {
+       display: inline-flex;
+       align-items: center;
+       justify-content: center;
+       padding: 5px 16px;
+       min-width: 96px;
+       max-width: 100%;
+       border: 1.5px solid #333;
+       border-radius: 20px;
+       font-size: 14px;
+       font-weight: 800;
+       line-height: 1.25;
+       /* Wrap instead of clipping: clipped half-glyphs rasterize as garbage. */
+       white-space: normal;
+       overflow-wrap: anywhere;
+       text-align: center;
+       text-transform: uppercase;
+       letter-spacing: 0.5px;
+    }
 
    /* Footer */
    .receipt-footer {
@@ -424,16 +426,16 @@ export const generateReceiptHTML = ({
    }
    .qr-image {
       display: block;
-      width: 23mm;
-      height: 23mm;
+      width: 30mm;
+      height: 30mm;
       margin: 0 auto;
       image-rendering: pixelated;
    }
    .qr-caption {
       margin-top: 2px;
-      font-size: 10px;
-      font-weight: 700;
-      color: #555;
+      font-size: 11px;
+      font-weight: 800;
+      color: #000;
    }
    .footer-thanks {
       font-size: 15px;
@@ -442,16 +444,16 @@ export const generateReceiptHTML = ({
    }
    .footer-sub {
       font-size: 12px;
-      color: #888;
+      color: #333; font-weight: 700;
    }
    .tax-id-line {
       font-size: 11px;
-      color: #aaa;
+      color: #555; font-weight: 700;
       margin-top: 4px;
    }
    .powered-by {
-      font-size: 9px;
-      color: #ccc;
+      font-size: 10px;
+      color: #777; font-weight: 700;
       margin-top: 8px;
       letter-spacing: 0.5px;
    }
@@ -489,7 +491,7 @@ export const generateReceiptHTML = ({
       <div class="meta-block" style="text-align:${alignEnd}">
          <span class="meta-label">${isAr ? 'التاريخ' : 'DATE'}</span>
          <span class="meta-value">${dateStr}</span>
-         <span style="font-size:12px;color:#666;">${timeStr}</span>
+         <span style="font-size:13px;font-weight:800;color:#000;">${timeStr}</span>
       </div>
    </div>
 

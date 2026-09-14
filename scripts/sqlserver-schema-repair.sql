@@ -2,6 +2,18 @@ SET XACT_ABORT ON;
 SET QUOTED_IDENTIFIER ON;
 BEGIN TRANSACTION;
 
+IF OBJECT_ID(N'dbo.inventory_items', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.inventory_items', 'purchase_unit') IS NULL
+        ALTER TABLE dbo.inventory_items ADD purchase_unit nvarchar(max) NULL;
+    IF COL_LENGTH('dbo.inventory_items', 'purchase_unit_factor') IS NULL
+        ALTER TABLE dbo.inventory_items ADD purchase_unit_factor real NULL;
+    IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = 'df_inventory_items_purchase_unit_factor')
+        ALTER TABLE dbo.inventory_items ADD CONSTRAINT df_inventory_items_purchase_unit_factor DEFAULT 1 FOR purchase_unit_factor;
+    UPDATE dbo.inventory_items SET purchase_unit_factor = 1
+    WHERE purchase_unit_factor IS NULL OR purchase_unit_factor <= 0;
+END;
+
 IF OBJECT_ID(N'dbo.kds_tickets', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH('dbo.kds_tickets', 'routing_station') IS NULL
@@ -347,6 +359,20 @@ IF OBJECT_ID(N'dbo.payroll_runs', N'U') IS NOT NULL
     CREATE UNIQUE INDEX payroll_runs_closed_cycle_unique_idx
         ON dbo.payroll_runs(cycle_id)
         WHERE status = N'CLOSED';
+
+-- High-volume report and FEFO indexes. Safe for existing installations.
+IF OBJECT_ID(N'dbo.stock_movements', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'stock_mov_type_date_idx' AND object_id = OBJECT_ID(N'dbo.stock_movements'))
+    CREATE INDEX stock_mov_type_date_idx ON dbo.stock_movements(type, created_at);
+IF OBJECT_ID(N'dbo.stock_movements', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'stock_mov_from_wh_date_idx' AND object_id = OBJECT_ID(N'dbo.stock_movements'))
+    CREATE INDEX stock_mov_from_wh_date_idx ON dbo.stock_movements(from_warehouse_id, created_at);
+IF OBJECT_ID(N'dbo.recipe_ingredients', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'recipe_ingredients_recipe_idx' AND object_id = OBJECT_ID(N'dbo.recipe_ingredients'))
+    CREATE INDEX recipe_ingredients_recipe_idx ON dbo.recipe_ingredients(recipe_id);
+IF OBJECT_ID(N'dbo.recipe_ingredients', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'recipe_ingredients_item_idx' AND object_id = OBJECT_ID(N'dbo.recipe_ingredients'))
+    CREATE INDEX recipe_ingredients_item_idx ON dbo.recipe_ingredients(inventory_item_id);
+IF OBJECT_ID(N'dbo.production_orders', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'production_orders_warehouse_status_idx' AND object_id = OBJECT_ID(N'dbo.production_orders'))
+    CREATE INDEX production_orders_warehouse_status_idx ON dbo.production_orders(warehouse_id, status, created_at);
+IF OBJECT_ID(N'dbo.production_order_items', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'production_order_items_order_idx' AND object_id = OBJECT_ID(N'dbo.production_order_items'))
+    CREATE INDEX production_order_items_order_idx ON dbo.production_order_items(production_order_id);
 
 COMMIT TRANSACTION;
 GO

@@ -53,6 +53,31 @@ const standardCOA = [
 ];
 
 const defaultPostingRules = [
+    // --- SYSTEM INVENTORY / PROCUREMENT RULES ---
+    // These mappings are deliberately editable by the finance administrator.
+    // Operational code never needs to know the customer's account numbers.
+    { documentType: 'PURCHASE_RECEIPT', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1210' },
+    { documentType: 'PURCHASE_RECEIPT', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '2100' },
+    { documentType: 'SUPPLIER_INVOICE', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1210' },
+    { documentType: 'SUPPLIER_INVOICE', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '2100' },
+    { documentType: 'COGS', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '5110' },
+    { documentType: 'COGS', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '1210' },
+    { documentType: 'INVENTORY_ADJUSTMENT_DECREASE', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '5110' },
+    { documentType: 'INVENTORY_ADJUSTMENT_DECREASE', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '1210' },
+    { documentType: 'INVENTORY_ADJUSTMENT_INCREASE', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1210' },
+    { documentType: 'INVENTORY_ADJUSTMENT_INCREASE', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '4200' },
+    { documentType: 'WASTAGE', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '5140' },
+    { documentType: 'WASTAGE', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '1210' },
+    { documentType: 'PRODUCTION_COMPLETION', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1220' },
+    { documentType: 'PRODUCTION_COMPLETION', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '1210' },
+    { documentType: 'STOCK_COUNT_SHORTAGE', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '5140' },
+    { documentType: 'STOCK_COUNT_SHORTAGE', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '1210' },
+    { documentType: 'STOCK_COUNT_SURPLUS', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1210' },
+    { documentType: 'STOCK_COUNT_SURPLUS', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '4200' },
+    { documentType: 'RECEIVABLE', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1300' },
+    { documentType: 'PAYABLE', amountSource: 'SYSTEM', direction: 'CREDIT', accountCode: '2100' },
+    { documentType: 'CASH', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1110' },
+    { documentType: 'INVENTORY', amountSource: 'SYSTEM', direction: 'DEBIT', accountCode: '1210' },
     // --- POS SALE RULES ---
     // Debit cash or bank for the total amount
     { documentType: 'POS_SALE', amountSource: 'TOTAL', direction: 'DEBIT', accountCode: '{PAYMENT_METHOD}' },
@@ -83,6 +108,25 @@ const defaultPostingRules = [
     { documentType: 'PAYROLL', amountSource: 'OTHER_DEDUCTIONS', direction: 'CREDIT', accountCode: '2100' },
 ];
 
+// Keep Arabic labels readable even when an older installer stored the
+// original seed file with the wrong Windows code page.
+const arabicAccountNames: Record<string, string> = {
+    '1000': 'إجمالي الأصول', '1100': 'الأصول المتداولة', '1110': 'الخزينة الرئيسية',
+    '1120': 'العهدة النقدية', '1130': 'الحساب البنكي', '1140': 'تسويات بوابات الدفع',
+    '1200': 'أصول المخزون', '1210': 'مخزون المواد الخام', '1220': 'مخزون المنتج التام',
+    '1300': 'العملاء', '1500': 'الأصول الثابتة', '2000': 'إجمالي الالتزامات',
+    '2100': 'الموردون', '2200': 'الالتزامات الضريبية', '2210': 'ضريبة المخرجات',
+    '2220': 'ضريبة المدخلات', '3000': 'حقوق الملكية', '3100': 'رأس المال',
+    '3200': 'الأرباح المحتجزة', '4000': 'إجمالي الإيرادات', '4100': 'مبيعات صالة الطعام',
+    '4110': 'مبيعات تيك أواي', '4120': 'مبيعات التوصيل', '4200': 'إيرادات الخدمة',
+    '4300': 'إيرادات أخرى', '5000': 'تكلفة البضاعة المباعة', '5100': 'استهلاك المواد الخام',
+    '5110': 'تكلفة استهلاك المخزون', '5140': 'تكلفة الهالك', '6000': 'المصروفات التشغيلية',
+    '6100': 'الرواتب والأجور', '6200': 'المرافق', '6300': 'الإيجار',
+};
+for (const account of standardCOA) {
+    if (arabicAccountNames[account.code]) account.nameAr = arabicAccountNames[account.code];
+}
+
 export const COASeedService = {
     async seed() {
         console.log('[COA Seed] Starting Chart of Accounts seeding...');
@@ -95,15 +139,8 @@ export const COASeedService = {
                 .where(eq(chartOfAccounts.code, acc.code));
 
             if (existingAccount) {
-                await db.update(chartOfAccounts)
-                    .set({
-                        name: acc.name,
-                        nameAr: acc.nameAr,
-                        type: acc.type,
-                        normalBalance: acc.normalBalance,
-                        isControlAccount: acc.isControlAccount || false,
-                    })
-                    .where(eq(chartOfAccounts.id, existingAccount.id));
+                // Never overwrite a customer's customized account names or
+                // classification during a routine startup/seed.
                 continue;
             }
 

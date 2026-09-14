@@ -79,6 +79,14 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const Icon = ICONS[type];
     const colors = COLORS[type];
 
+    React.useEffect(() => {
+        if (!modal) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleCancel(); };
+        document.addEventListener('keydown', onKey);
+        document.body.style.overflow = 'hidden';
+        return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    }, [modal]);
+
     return (
         <ModalContext.Provider value={{ showModal, confirm }}>
             {children}
@@ -86,11 +94,12 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             {/* Modal Overlay */}
             {modal && (
                 <div
-                    className="fixed inset-0 z-[9998] bg-black/60  flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    role="dialog" aria-modal="true" aria-label={modal.title}
+                    className="fixed inset-0 z-[9998] bg-black/60 theme-overlay flex items-center justify-center p-4 modal-backdrop-enter"
                     onClick={handleCancel}
                 >
                     <div
-                        className="card-primary rounded-3xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 slide-in-from-bottom-4 duration-150"
+                        className="theme-modal-panel card-primary rounded-3xl shadow-2xl max-w-md w-full p-6 modal-glass-enter"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Icon Header */}
@@ -118,13 +127,15 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         <div className="flex gap-3">
                             <button
                                 onClick={handleCancel}
-                                className="flex-1 py-3 px-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                className="ux-btn ux-btn-secondary flex-1 !min-h-[44px] text-sm"
                             >
                                 {modal.cancelText || 'Cancel'}
                             </button>
                             <button
                                 onClick={handleConfirm}
-                                className={`flex-1 py-3 px-4 rounded-xl ${colors.bg} text-white font-bold text-sm hover:opacity-90 transition-opacity shadow-lg`}
+                                autoFocus
+                                className={`ux-btn flex-1 !min-h-[44px] text-white text-sm ${type === 'danger' ? 'ux-btn-danger' : ''}`}
+                                style={type !== 'danger' ? { background: colors.bg } : undefined}
                             >
                                 {modal.confirmText || 'Confirm'}
                             </button>

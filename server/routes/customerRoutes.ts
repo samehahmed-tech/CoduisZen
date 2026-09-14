@@ -16,4 +16,7 @@ router.delete('/:id', posAuth, enforceBranch, customerController.deleteCustomer)
 // Loyalty endpoints
 router.post('/:id/redeem-points', posAuth, enforceBranch, customerController.redeemLoyaltyPoints);
 
+// Saved delivery addresses (call-center profile)
+router.post('/:id/addresses', posAuth, enforceBranch, customerController.addCustomerAddress);
+
 export default router;

@@ -54,14 +54,15 @@ describe('2026-07 client thermal receipt regression', () => {
         }
     });
 
-    it('keeps a white tail below the receipt so the final total clears the cutter', () => {
-        expect(rendererSource).toContain('48px !important');
+    it('keeps only a minimal print tail so it cannot create a blank paper section', () => {
+        expect(rendererSource).toContain('8px !important');
+        expect(rendererSource).not.toContain('48px !important');
     });
 
     it('feeds and uses the broadly supported ESC/POS GS V B cut command', () => {
         expect(bridgeSource).toContain("const PAPER_FEED_AND_CUT = '\\x1B\\x64\\x05\\x1D\\x56\\x42\\x00'");
         expect(bridgeSource).toContain('0x1B,0x32,0x1B,0x64,0x05,0x1D,0x56,0x42,0x00');
-        expect(bridgeSource).toContain('await cutWindowsPaper(printerName)');
+        expect(bridgeSource).not.toContain('await cutWindowsPaper(printerName)');
     });
 
     it('converts network receipt PNGs directly without a temporary print file', () => {
@@ -86,7 +87,7 @@ describe('2026-07 client thermal receipt regression', () => {
             ],
             fontSize: 'normal', paperWidth: '80mm', showLogo: true,
             linkedPrinterIds: [], linkedDepartments: [], isDefault: true,
-            createdAt: new Date(0).toISOString(), styleVariant: 'bold',
+            createdAt: new Date(0).toISOString(), styleVariant: 'royal',
         } as any;
         const html = generateHtmlFromTemplate({
             template,

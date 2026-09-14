@@ -3,7 +3,7 @@ import {
     Receipt, GripVertical, Plus, Trash2, Eye, Save, Copy, Edit3,
     Printer as PrinterIcon, QrCode, Image, Type, AlignCenter,
     ChevronDown, ChevronUp, ToggleLeft, ToggleRight, X, Check,
-    ArrowLeft, FileText, LayoutTemplate, Link2
+    ArrowLeft, FileText, LayoutTemplate, Link2, RotateCcw
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToast } from './Toast';
@@ -48,7 +48,7 @@ interface ReceiptTemplate {
     linkedDepartments: string[];
     isDefault: boolean;
     createdAt: string;
-    styleVariant?: 'classic' | 'compact' | 'bold';
+    styleVariant?: 'royal' | 'neo' | 'ledger' | 'express';
 }
 
 // ?? Default block definitions ??
@@ -61,8 +61,8 @@ const BLOCK_CATALOG: Record<BlockType, { icon: any; label: string; labelAr: stri
     items: { icon: FileText, label: 'Items Table', labelAr: 'جدول الأصناف', defaultConfig: { showModifiers: true, showNotes: true, showPrice: true, showQty: true } },
     totals: { icon: FileText, label: 'Totals Section', labelAr: 'قسم الإجمالي', defaultConfig: { showSubtotal: true, showDiscount: true, showTax: true, showTotal: true, showTip: true } },
     payment: { icon: FileText, label: 'Payment Method', labelAr: 'طريقة الدفع', defaultConfig: { style: 'badge' } },
-    qrCode: { icon: QrCode, label: 'QR Code', labelAr: 'كود QR', defaultConfig: { url: '', imageUrl: '', size: 80 } },
-    logo: { icon: Image, label: 'Logo Image', labelAr: 'صورة اللوجو', defaultConfig: { url: '', maxHeight: 60 } },
+    qrCode: { icon: QrCode, label: 'QR Code', labelAr: 'كود QR', defaultConfig: { url: '', imageUrl: '', size: 200 } },
+    logo: { icon: Image, label: 'Logo Image', labelAr: 'صورة اللوجو', defaultConfig: { url: '', maxHeight: 120 } },
     footer: { icon: Type, label: 'Footer Message', labelAr: 'رسالة الختام', defaultConfig: { text: 'Thank you for your visit!', textAr: 'شكراً لزيارتكم!', showTaxId: true, showPoweredBy: true } },
     separator: { icon: FileText, label: 'Separator Line', labelAr: 'خط فاصل', defaultConfig: { style: 'dashed' } },
     customText: { icon: Type, label: 'Custom Text', labelAr: 'نص مخصص', defaultConfig: { text: '', textAr: '', alignment: 'center', bold: false, fontSize: 12 } },
@@ -100,23 +100,57 @@ const createDefaultTemplate = (type: 'receipt' | 'kitchen'): ReceiptTemplate => 
             ? { config: { ...BLOCK_CATALOG.title.defaultConfig, text: 'KITCHEN TICKET', textAr: 'تذكرة المطبخ' } }
             : undefined)
     ),
-    fontSize: type === 'kitchen' ? 'large' : 'normal',
+    fontSize: type === 'kitchen' ? 'large' : 'large',
     paperWidth: '80mm',
     showLogo: type === 'receipt',
     linkedPrinterIds: [],
     linkedDepartments: [],
     isDefault: true,
     createdAt: new Date().toISOString(),
-    styleVariant: 'classic',
+    styleVariant: 'royal',
 });
+
+export type ReceiptStyleVariant = 'royal' | 'neo' | 'ledger' | 'express';
+
+// Retired factory designs → their modern successor. Stored templates keep
+// their blocks and printer links; only the look is upgraded.
+export const LEGACY_VARIANT_MAP: Record<string, ReceiptStyleVariant> = {
+    classic: 'ledger',
+    compact: 'express',
+    bold: 'royal',
+};
+
+const LEGACY_PRESET_LOOK: Record<string, { styleVariant: ReceiptStyleVariant; name: string; nameAr: string }> = {
+    preset_receipt_classic_80: { styleVariant: 'ledger', name: 'Ledger Pro 80mm', nameAr: 'دفتر احترافي 80mm' },
+    preset_receipt_compact_80: { styleVariant: 'express', name: 'Express Counter 80mm', nameAr: 'إكسبريس كاونتر 80mm' },
+    preset_receipt_bold_80: { styleVariant: 'royal', name: 'Royal Band 80mm', nameAr: 'رويال مميز 80mm' },
+};
+
+const migrateLegacyPresetLook = (template: ReceiptTemplate): ReceiptTemplate => {
+    const legacy = LEGACY_PRESET_LOOK[template.id];
+    if (!legacy) return template;
+    const currentVariant = String((template as any).styleVariant || '');
+    if (!['classic', 'compact', 'bold'].includes(currentVariant)) return template;
+    const oldNames = Object.values(LEGACY_PRESET_LOOK);
+    return {
+        ...template,
+        styleVariant: legacy.styleVariant,
+        // Keep the user's own rename; only refresh untouched factory names.
+        name: oldNames.some(entry => entry.name === template.name) || template.name.startsWith('Classic') || template.name.startsWith('Counter') || template.name.startsWith('Bold')
+            ? legacy.name : template.name,
+        nameAr: oldNames.some(entry => entry.nameAr === template.nameAr) || template.nameAr.includes('كلاسيك') || template.nameAr.includes('مختصر') || template.nameAr.includes('بارزة')
+            ? legacy.nameAr : template.nameAr,
+    };
+};
 
 const createReceiptPresets = (): ReceiptTemplate[] => {
     const createPreset = (config: {
         id: string;
         name: string;
         nameAr: string;
-        styleVariant: 'classic' | 'compact' | 'bold';
+        styleVariant: ReceiptStyleVariant;
         fontSize: 'small' | 'normal' | 'large';
+        paperWidth: '58mm' | '80mm';
         blockTypes: BlockType[];
     }): ReceiptTemplate => ({
         ...createDefaultTemplate('receipt'),
@@ -125,20 +159,22 @@ const createReceiptPresets = (): ReceiptTemplate[] => {
         nameAr: config.nameAr,
         styleVariant: config.styleVariant,
         fontSize: config.fontSize,
-        isDefault: config.styleVariant === 'classic',
+        paperWidth: config.paperWidth,
+        isDefault: config.styleVariant === 'royal',
         blocks: config.blockTypes.map(type => createBlock(type, type === 'separator'
-            ? { config: { ...BLOCK_CATALOG.separator.defaultConfig, style: config.styleVariant === 'compact' ? 'dashed' : 'solid' } }
+            ? { config: { ...BLOCK_CATALOG.separator.defaultConfig, style: config.styleVariant === 'express' ? 'dashed' : 'solid' } }
             : undefined)),
     });
 
     return [
-        createPreset({ id: 'preset_receipt_classic_80', name: 'Classic Ledger 80mm', nameAr: 'دفتر كلاسيك 80mm', styleVariant: 'classic', fontSize: 'normal', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
-        createPreset({ id: 'preset_receipt_compact_80', name: 'Counter Compact 80mm', nameAr: 'كاونتر مختصر 80mm', styleVariant: 'compact', fontSize: 'small', blockTypes: [
-            'logo', 'header', 'orderInfo', 'items', 'totals', 'qrCode', 'footer',
-        ] }),
-        createPreset({ id: 'preset_receipt_bold_80', name: 'Bold Order Ticket 80mm', nameAr: 'تذكرة طلب بارزة 80mm', styleVariant: 'bold', fontSize: 'large', blockTypes: [
-            'logo', 'header', 'separator', 'title', 'orderInfo', 'customerInfo', 'separator',
+        createPreset({ id: 'preset_receipt_royal_80', name: 'Royal Band 80mm', nameAr: 'رويال مميز 80mm', styleVariant: 'royal', fontSize: 'large', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_neo_80', name: 'Neo Air 80mm', nameAr: 'نيو مريح 80mm', styleVariant: 'neo', fontSize: 'normal', paperWidth: '80mm', blockTypes: [
+            'logo', 'header', 'title', 'orderInfo', 'customerInfo', 'separator',
             'items', 'separator', 'totals', 'payment', 'qrCode', 'footer',
+        ] }),
+        createPreset({ id: 'preset_receipt_ledger_80', name: 'Ledger Pro 80mm', nameAr: 'دفتر احترافي 80mm', styleVariant: 'ledger', fontSize: 'large', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_express_58', name: 'Express 58mm', nameAr: 'إكسبريس 58مم', styleVariant: 'express', fontSize: 'normal', paperWidth: '58mm', blockTypes: [
+            'logo', 'header', 'orderInfo', 'items', 'totals', 'payment', 'qrCode', 'footer',
         ] }),
     ];
 };
@@ -147,22 +183,149 @@ const createReceiptPresets = (): ReceiptTemplate[] => {
 
 const STORAGE_KEY = 'coduiszen_receipt_templates';
 const PRESET_VERSION_KEY = 'coduiszen_receipt_presets_version';
-const PRESET_VERSION = '3';
+const PRESET_VERSION = '6';
+
+const MOJIBAKE_RE = /(?:[ØÙ][^\s]|Ã|Â|ط[§±¨µ¦©®¯¹ھ]|ظ[„…‚])/u;
+
+const legacyPairReplace = (text: string): string => text.replace(/ظ‚|ط§|ظ„|ظ…|ظˆ|ظٹ|ط¹|ط±|ط¨|طµ|ط®|ط¯|طھ|ط³|ط´|ط²/g, (pair) => ({
+    'ظ‚': 'ق', 'ط§': 'ا', 'ظ„': 'ل', 'ظ…': 'م', 'ظˆ': 'و', 'ظٹ': 'ي',
+    'ط¹': 'ع', 'ط±': 'ر', 'ط¨': 'ب', 'طµ': 'ص', 'ط®': 'خ', 'ط¯': 'د',
+    'طھ': 'ت', 'ط³': 'س', 'ط´': 'ش', 'ط²': 'ز',
+} as Record<string, string>)[pair] || pair);
+
+const latin1BytesToUtf8 = (text: string): string => {
+    const bytes = Uint8Array.from(text, (character) => character.charCodeAt(0) & 0xff);
+    return new TextDecoder('utf-8').decode(bytes);
+};
+
+const arabicRepairScore = (text: string): number => {
+    const arabic = (text.match(/[\u0600-\u06FF]/g) || []).length;
+    const broken = (text.match(/\uFFFD/g) || []).length;
+    const traces = MOJIBAKE_RE.test(text) ? 1000 : 0;
+    return arabic - broken * 100 - traces;
+};
+
+// Repairs doubly-misdecoded Arabic (UTF-8 bytes once read as Latin-1/Win-1252).
+// Tries single + double latin1→utf8 decodes plus the legacy pair map and keeps
+// whichever candidate actually restores Arabic — never corrupts valid text:
+// valid Arabic fails the mojibake sniff and is returned untouched, and a
+// candidate is only picked when it scores strictly better with no U+FFFD.
+const repairMojibake = (value: unknown): string => {
+    const raw = String(value ?? '');
+    if (!raw || !MOJIBAKE_RE.test(raw)) return raw;
+    let best = legacyPairReplace(raw);
+    let bestScore = arabicRepairScore(best);
+    const rawScore = arabicRepairScore(raw);
+    if (rawScore > bestScore) {
+        best = raw;
+        bestScore = rawScore;
+    }
+    for (const candidate of [latin1BytesToUtf8(raw), latin1BytesToUtf8(latin1BytesToUtf8(raw))]) {
+        if (candidate.includes('�')) continue;
+        const score = arabicRepairScore(candidate);
+        if (score > bestScore) {
+            best = candidate;
+            bestScore = score;
+        }
+    }
+    return best;
+};
+
+const repairTemplateArabic = (template: ReceiptTemplate): ReceiptTemplate => ({
+    ...template,
+    nameAr: repairMojibake(template.nameAr),
+    blocks: template.blocks.map(block => ({
+        ...block,
+        labelAr: repairMojibake(block.labelAr),
+        config: Object.fromEntries(Object.entries(block.config || {}).map(([key, value]) => [
+            key,
+            typeof value === 'string' ? repairMojibake(value) : value,
+        ])),
+    })),
+});
+
+// Literal '?' runs mean the original Arabic bytes are already lost (usually a
+// legacy non-Unicode write) — mojibake repair cannot recover them. Detect such
+// fields and restore them from the factory preset / block catalog instead, so
+// one load cycle heals templates that show "??????" in the designer.
+const isQuestionCorrupted = (value: unknown): boolean => {
+    const text = String(value ?? '');
+    if (/\?{4,}/.test(text)) return true;
+    if (text.length > 3) {
+        const marks = (text.match(/\?/g) || []).length;
+        if (marks > text.length / 2) return true;
+    }
+    return false;
+};
+
+const healTemplateArabic = (template: ReceiptTemplate, factoryById: Map<string, ReceiptTemplate>): { template: ReceiptTemplate; healed: boolean } => {
+    const factory = factoryById.get(template.id);
+    let healed = false;
+    const fixField = (value: string, fallback: string): string => {
+        if (!value || !isQuestionCorrupted(value)) return value;
+        healed = true;
+        return fallback;
+    };
+    const blocks = template.blocks.map(block => {
+        const catalog = BLOCK_CATALOG[block.type as BlockType];
+        const factoryBlock = factory?.blocks.find(b => b.type === block.type);
+        const fallbackLabelAr = factoryBlock?.labelAr || catalog?.labelAr || block.labelAr;
+        const labelAr = fixField(block.labelAr, fallbackLabelAr);
+        const config = { ...block.config };
+        if (typeof config.textAr === 'string' && isQuestionCorrupted(config.textAr)) {
+            config.textAr = factoryBlock?.config?.textAr ?? catalog?.defaultConfig?.textAr ?? '';
+            healed = true;
+        }
+        if (labelAr !== block.labelAr || config.textAr !== block.config.textAr) healed = true;
+        return { ...block, labelAr, config };
+    });
+    const nameAr = fixField(template.nameAr, factory?.nameAr || template.nameAr);
+    if (nameAr !== template.nameAr) healed = true;
+    return { template: healed ? { ...template, nameAr, blocks } : template, healed };
+};
+
+const buildFactoryIndex = (): { presets: ReceiptTemplate[]; byId: Map<string, ReceiptTemplate> } => {
+    const presets = [...createReceiptPresets(), createDefaultTemplate('kitchen')];
+    return { presets, byId: new Map(presets.map(template => [template.id, template])) };
+};
 
 const loadTemplates = (remoteTemplates?: ReceiptTemplate[]): ReceiptTemplate[] => {
     try {
+        const { presets, byId } = buildFactoryIndex();
+        const healAll = (list: ReceiptTemplate[]) => {
+            let anyHealed = false;
+            const healed = list
+                .map(repairTemplateArabic)
+                .map(migrateLegacyPresetLook)
+                .map(template => {
+                    if (template.styleVariant !== (list.find(t => t.id === template.id) as any)?.styleVariant) anyHealed = true;
+                    const result = healTemplateArabic(template, byId);
+                    if (result.healed) anyHealed = true;
+                    return result.template;
+                });
+            return { healed, anyHealed };
+        };
         const raw = localStorage.getItem(STORAGE_KEY);
-        const savedTemplates: ReceiptTemplate[] = remoteTemplates?.length ? remoteTemplates : (raw ? JSON.parse(raw) : []);
-        if (localStorage.getItem(PRESET_VERSION_KEY) === PRESET_VERSION) return savedTemplates;
+        const saved = (remoteTemplates?.length ? remoteTemplates : (raw ? JSON.parse(raw) : [])) as ReceiptTemplate[];
+        const { healed: savedHealed, anyHealed } = healAll(saved);
+        if (localStorage.getItem(PRESET_VERSION_KEY) === PRESET_VERSION) {
+            if (anyHealed) {
+                // Self-heal: persist repaired labels immediately so "??????"
+                // never shows again on this device.
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(savedHealed));
+            }
+            return savedHealed;
+        }
 
         const presetTemplates = createReceiptPresets();
-        const existingIds = new Set(savedTemplates.map(template => template.id));
-        const templates = savedTemplates.length
-            ? [...savedTemplates, ...presetTemplates.filter(template => !existingIds.has(template.id)).map(template => ({ ...template, isDefault: false }))]
+        const existingIds = new Set(savedHealed.map(template => template.id));
+        const templates = savedHealed.length
+            ? [...savedHealed, ...presetTemplates.filter(template => !existingIds.has(template.id)).map(template => ({ ...template, isDefault: false }))]
             : [...presetTemplates, createDefaultTemplate('kitchen')];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+        const { healed: finalTemplates } = healAll(templates);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(finalTemplates));
         localStorage.setItem(PRESET_VERSION_KEY, PRESET_VERSION);
-        return templates;
+        return finalTemplates;
     } catch { /* ignore */ }
     return [...createReceiptPresets(), createDefaultTemplate('kitchen')];
 };
@@ -232,9 +395,21 @@ const ReceiptDesigner: React.FC = () => {
     useEffect(() => {
         const remote = settings.receiptTemplates as ReceiptTemplate[] | undefined;
         if (!Array.isArray(remote) || remote.length === 0 || JSON.stringify(remote) === JSON.stringify(templates)) return;
-        saveTemplates(remote);
-        setTemplates(remote);
-        if (!remote.some(template => template.id === activeTemplateId)) setActiveTemplateId(remote[0].id);
+        // Never let ????-corrupted server data overwrite healthy local labels:
+        // heal first, then push the healed copy back so the server heals too.
+        const { byId } = buildFactoryIndex();
+        let pushedHealing = false;
+        const healedRemote = remote.map(repairTemplateArabic).map(migrateLegacyPresetLook).map(template => {
+            const result = healTemplateArabic(template, byId);
+            if (result.healed) pushedHealing = true;
+            return result.template;
+        });
+        saveTemplates(healedRemote);
+        setTemplates(healedRemote);
+        if (pushedHealing) {
+            updateSettings({ receiptTemplates: healedRemote });
+        }
+        if (!healedRemote.some(template => template.id === activeTemplateId)) setActiveTemplateId(healedRemote[0].id);
     }, [settings.receiptTemplates]);
 
     const updateTemplate = useCallback((updater: (t: ReceiptTemplate) => ReceiptTemplate) => {
@@ -346,6 +521,33 @@ const ReceiptDesigner: React.FC = () => {
         });
         setActiveTemplateId(dup.id);
         showToast(isAr ? 'تم نسخ القالب' : 'Template duplicated', 'success');
+    };
+
+    // Rebuilds every factory preset from source (correct Arabic) while keeping
+    // custom templates. Heals stored "??????" labels in one click.
+    const resetFactoryTemplates = async () => {
+        const ok = await confirm({
+            title: isAr ? 'استعادة قوالب المصنع؟' : 'Restore factory templates?',
+            message: isAr
+                ? 'سيتم إعادة إنشاء القوالب الافتراضية بالعربي السليم وإصلاح الأسماء التالفة. قوالبك المخصصة تبقى كما هي.'
+                : 'Factory presets will be rebuilt with correct Arabic and corrupted labels healed. Your custom templates stay untouched.',
+            confirmText: isAr ? 'استعادة' : 'Restore',
+            cancelText: isAr ? 'إلغاء' : 'Cancel',
+        });
+        if (!ok) return;
+        const { presets, byId } = buildFactoryIndex();
+        const factoryIds = new Set(presets.map(template => template.id));
+        const customs = templates
+            .filter(template => !factoryIds.has(template.id) && !LEGACY_PRESET_LOOK[template.id])
+            .map(repairTemplateArabic)
+            .map(template => healTemplateArabic(template, byId).template);
+        const next = [...presets, ...customs];
+        setTemplates(next);
+        saveTemplates(next);
+        localStorage.setItem(PRESET_VERSION_KEY, PRESET_VERSION);
+        updateSettings({ receiptTemplates: next });
+        if (!next.some(template => template.id === activeTemplateId)) setActiveTemplateId(next[0]?.id || '');
+        showToast(isAr ? 'تمت استعادة قوالب المصنع بالعربي' : 'Factory templates restored', 'success');
     };
 
     const deleteTemplate = async (id: string) => {
@@ -473,7 +675,7 @@ const ReceiptDesigner: React.FC = () => {
                 return (
                     <div style={{ textAlign: 'center', padding: '6px 0' }}>
                         {block.config.url
-                            ? <img src={block.config.url} alt="logo" style={{ maxHeight: block.config.maxHeight || 60, margin: '0 auto' }} />
+                            ? <img src={block.config.url} alt="logo" style={{ maxHeight: block.config.maxHeight || 120, margin: '0 auto' }} />
                             : <div style={{ width: 60, height: 40, background: '#eee', borderRadius: 8, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#999' }}>LOGO</div>
                         }
                     </div>
@@ -490,7 +692,7 @@ const ReceiptDesigner: React.FC = () => {
             case 'title':
                 return (
                     <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, padding: '5px 0', border: '1px dashed #999', borderRadius: 3, background: '#f5f5f5', margin: '4px 0' }}>
-                        {isAr ? (block.config.textAr || block.config.text) : block.config.text}
+                        {isAr ? (block.config.textAr || block.config.text || 'إيصال بيع') : (block.config.text || block.config.textAr || 'Sales Receipt')}
                     </div>
                 );
             case 'orderInfo':
@@ -666,8 +868,10 @@ const ReceiptDesigner: React.FC = () => {
                 );
             case 'separator':
                 return <div style={{ overflow: 'hidden' }}>{cfg.style === 'solid' ? '====================================' : '------------------------------------'}</div>;
-            case 'customText':
-                return <div style={{ textAlign: cfg.alignment === 'right' ? 'right' : cfg.alignment === 'left' ? 'left' : 'center', fontWeight: cfg.bold ? 'bold' : 'normal' }}>{cfg.text}</div>;
+            case 'customText': {
+                const rawCustomText = repairMojibake(isAr ? (cfg.textAr || cfg.text) : (cfg.text || cfg.textAr)) || '—';
+                return <div dir={isAr ? 'rtl' : 'ltr'} style={{ textAlign: cfg.alignment === 'right' ? 'right' : cfg.alignment === 'left' ? 'left' : 'center', fontWeight: cfg.bold ? 'bold' : 'normal' }}>{rawCustomText}</div>;
+            }
             default:
                 return null;
         }
@@ -766,6 +970,9 @@ const ReceiptDesigner: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex gap-3">
+                    <button onClick={resetFactoryTemplates} className="px-5 py-3 bg-card border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted hover:text-emerald-600 hover:border-emerald-500/50 transition-all flex items-center gap-2">
+                        <RotateCcw size={14} /> {isAr ? 'استعادة المصنع' : 'Factory reset'}
+                    </button>
                     <button onClick={duplicateTemplate} className="px-5 py-3 bg-card border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted hover:text-primary hover:border-primary/50 transition-all flex items-center gap-2">
                         <Copy size={14} /> {isAr ? 'نسخ القالب' : 'Duplicate'}
                     </button>
@@ -1022,9 +1229,9 @@ const ReceiptDesigner: React.FC = () => {
                             {/* Paper Header Effect */}
                             <div className="h-3 bg-gradient-to-b from-slate-100 to-white" />
                             <div
-                                dir={previewMode === 'rich' && isAr ? 'rtl' : 'ltr'}
+                                dir={isAr ? 'rtl' : 'ltr'}
                                 style={{
-                                    fontFamily: previewMode === 'raw' ? "'Courier New', Courier, monospace" : "'Cairo', system-ui, sans-serif",
+                                    fontFamily: previewMode === 'raw' ? "'Courier New', Tahoma, Arial, monospace" : "'Cairo', system-ui, sans-serif",
                                     padding: '8px 12px',
                                     fontSize: previewMode === 'raw' ? (activeTemplate.paperWidth === '58mm' ? 9.5 : 10.5) : (activeTemplate.fontSize === 'small' ? 10 : activeTemplate.fontSize === 'large' ? 14 : 12),
                                     color: '#1a1a1a',

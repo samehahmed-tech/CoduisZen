@@ -7,6 +7,7 @@ import {
    ChevronDown, Filter, Target, Megaphone, Zap, Scale, Info, Users, Clock, Box, ShieldCheck, Activity, LineChart as ChartIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 
 export const OpsReports = ({ state }: any) => {
    const {
@@ -276,17 +277,89 @@ export const OpsReports = ({ state }: any) => {
                )}
                {activeCategory === 'OPS' && activeSubReport === 'Delivery Cost vs Revenue' && !deliveryCostData && <p className="text-center text-muted py-16">No data.</p>}
 
-               {activeCategory === 'OPS' && activeSubReport === '3rd Party vs In-House' && thirdPartyData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'OPS' && activeSubReport === '3rd Party vs In-House' && thirdPartyData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title={isAr ? 'طرف ثالث مقابل داخلي — جدول' : '3rd Party vs In-House — table'}
+                         data={[
+                            { channel: isAr ? 'توصيل داخلي' : 'In-House', orders: thirdPartyData.inHouse?.orderCount, revenue: thirdPartyData.inHouse?.revenue, avgMin: thirdPartyData.inHouse?.avgDeliveryMinutes },
+                            { channel: isAr ? 'طرف ثالث' : '3rd Party', orders: thirdPartyData.thirdParty?.orderCount, revenue: thirdPartyData.thirdParty?.revenue, avgMin: (thirdPartyData.thirdParty as any)?.avgDeliveryMinutes },
+                         ]}
+                         columns={[
+                            { key: 'channel', label: isAr ? 'القناة' : 'Channel', sortable: false },
+                            { key: 'orders', label: isAr ? 'الطلبات' : 'Orders', align: 'right', sum: true, sortable: false, format: (v: any) => fmtNum(v) },
+                            { key: 'revenue', label: isAr ? 'الإيراد' : 'Revenue', align: 'right', sum: true, sortable: false, format: (v: any) => fmtMoney(v, currency) },
+                            { key: 'avgMin', label: isAr ? 'متوسط الدقائق' : 'Avg min', align: 'right', sortable: false, format: (v: any) => (v == null ? '-' : `${v}`) },
+                         ]}
+                         exportFilename="third-party-vs-inhouse"
+                         lang={isAr ? 'ar' : 'en'}
+                      />
                      <div className="grid grid-cols-2 gap-6"><div className="card-primary rounded-[2rem] border border-blue-200 dark:border-blue-800 shadow-xl p-6 bg-blue-50/30 dark:bg-blue-950/20"><h3 className="text-lg font-black text-blue-500 mb-4">?? In-House Delivery</h3><div className="space-y-2 text-xs"><div className="flex justify-between"><span className="text-muted">Orders</span><span className="font-black text-main">{thirdPartyData.inHouse.orderCount}</span></div><div className="flex justify-between"><span className="text-muted">Revenue</span><span className="font-black text-main">{thirdPartyData.inHouse.revenue.toLocaleString()} LE</span></div><div className="flex justify-between"><span className="text-muted">Avg Delivery</span><span className="font-black text-blue-500">{thirdPartyData.inHouse.avgDeliveryMinutes} min</span></div></div></div><div className="card-primary rounded-[2rem] border border-purple-200 dark:border-purple-800 shadow-xl p-6 bg-purple-50/30 dark:bg-purple-950/20"><h3 className="text-lg font-black text-purple-500 mb-4">?? 3rd Party</h3><div className="space-y-2 text-xs"><div className="flex justify-between"><span className="text-muted">Orders</span><span className="font-black text-main">{thirdPartyData.thirdParty.orderCount}</span></div><div className="flex justify-between"><span className="text-muted">Revenue</span><span className="font-black text-main">{thirdPartyData.thirdParty.revenue.toLocaleString()} LE</span></div></div></div></div>
+                     {/* Call-center + platform split (from Channel Mix Trend, same period). */}
+                     {Array.isArray(channelMixData) && channelMixData.length > 0 && (() => {
+                        // Channel key (server): 'call_center' for in-house calls,
+                        // platform id ('talabat'…​) for aggregator orders, 'pos'/'restaurant' otherwise.
+                        const isCC = (s: string) => {
+                           const k = String(s || '').toLowerCase();
+                           return k === 'call_center' || (k !== 'pos' && k !== 'restaurant' && k !== 'unknown');
+                        };
+                        const rows = channelMixData.filter((r: any) => isCC(r.source));
+                        const ccOrders = rows.reduce((s: number, r: any) => s + Number(r.count || 0), 0);
+                        const ccRevenue = rows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
+                        const byPlatform: Record<string, { orders: number; revenue: number }> = {};
+                        rows.forEach((r: any) => {
+                           const k = String(r.source || 'call_center');
+                           byPlatform[k] = byPlatform[k] || { orders: 0, revenue: 0 };
+                           byPlatform[k].orders += Number(r.count || 0);
+                           byPlatform[k].revenue += Number(r.revenue || 0);
+                        });
+                        return (
+                           <div className="card-primary rounded-[2rem] border border-indigo-200 dark:border-indigo-800 shadow-xl p-6">
+                              <h3 className="text-lg font-black text-main mb-1">{isAr ? 'الكول سنتر والمنصات (نفس الفترة)' : 'Call Center & Platforms (same period)'}</h3>
+                              <p className="text-xs text-muted font-bold mb-4">{isAr ? `طلبات: ${ccOrders} — إيراد: ${ccRevenue.toLocaleString()}` : `${ccOrders} orders — ${ccRevenue.toLocaleString()} revenue`}</p>
+                              <div className="space-y-1.5">
+                                 {Object.entries(byPlatform).map(([k, v]) => (
+                                    <div key={k} className="flex items-center justify-between text-xs font-bold border-b border-border/20 pb-1.5">
+                                       <span className="uppercase tracking-widest">{k}</span>
+                                       <span className="font-mono">{v.orders} / {v.revenue.toLocaleString()}</span>
+                                    </div>
+                                 ))}
+                                 {rows.length === 0 && <p className="text-xs text-muted font-bold">{isAr ? 'لا توجد طلبات كول سنتر في الفترة' : 'No call-center orders in range'}</p>}
+                              </div>
+                           </div>
+                        );
+                     })()}
                   </div>
                )}
                {activeCategory === 'OPS' && activeSubReport === '3rd Party vs In-House' && !thirdPartyData && <p className="text-center text-muted py-16">No data.</p>}
 
                {/* ============ PHASE 4: AI & PREDICTIVE ============ */}
 
-               {activeCategory === 'AI' && activeSubReport === 'Daily Flash Report' && dailyFlashData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'AI' && activeSubReport === 'Daily Flash Report' && dailyFlashData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <ReportDataTable
+                            title={isAr ? 'الفلاش حسب النوع — جدول' : 'Flash by Type — table'}
+                            data={dailyFlashData.byType || []}
+                            columns={[
+                               { key: 'type', label: isAr ? 'النوع' : 'Type' },
+                               { key: 'count', label: isAr ? 'الطلبات' : 'Orders', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                               { key: 'revenue', label: isAr ? 'الإيراد' : 'Revenue', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currency) },
+                            ]}
+                            exportFilename="daily-flash-by-type"
+                            lang={isAr ? 'ar' : 'en'}
+                         />
+                         <ReportDataTable
+                            title={isAr ? 'مدفوعات الفلاش — جدول' : 'Flash Payments — table'}
+                            data={dailyFlashData.paymentMix || []}
+                            columns={[
+                               { key: 'method', label: isAr ? 'الطريقة' : 'Method' },
+                               { key: 'total', label: isAr ? 'الإجمالي' : 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currency) },
+                            ]}
+                            exportFilename="daily-flash-payments"
+                            lang={isAr ? 'ar' : 'en'}
+                         />
+                      </div>
                      <div className="card-primary rounded-2xl border border-blue-200 dark:border-blue-800 p-5 shadow-lg bg-blue-50/30 dark:bg-blue-950/20"><p className="text-[10px] font-black uppercase tracking-widest text-blue-400">?? Daily Flash — {dailyFlashData.date}</p></div>
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Revenue', v: `${dailyFlashData.revenue.toLocaleString()} LE` }, { l: 'Orders', v: dailyFlashData.orderCount }, { l: 'Avg Ticket', v: `${dailyFlashData.avgTicket} LE` }, { l: 'Cancelled', v: dailyFlashData.cancelledOrders, c: 'text-rose-500' }, { l: 'Discounts', v: `${dailyFlashData.totalDiscount.toLocaleString()} LE`, c: 'text-amber-500' }, { l: 'Tips', v: `${dailyFlashData.totalTips.toLocaleString()} LE`, c: 'text-emerald-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                      <div className="grid grid-cols-2 gap-6"><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6"><h3 className="text-lg font-black text-main mb-3">By Type</h3>{dailyFlashData.byType.map((t: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-border/20"><span className="font-black">{t.type}</span><span className="text-muted">{t.count} orders · {t.revenue.toLocaleString()} LE</span></div>))}</div><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6"><h3 className="text-lg font-black text-main mb-3">Payments</h3>{dailyFlashData.paymentMix.map((p: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-border/20"><span className="font-black">{p.method}</span><span className="font-mono font-bold">{p.total.toLocaleString()} LE</span></div>))}</div></div>

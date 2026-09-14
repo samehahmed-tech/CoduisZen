@@ -4,6 +4,7 @@ import { requireEnv } from '../config/env';
 import { db } from '../db';
 import { userSessions } from '../../src/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
+import { isDatabaseUnavailableError, writeDatabaseUnavailable } from '../utils/dbErrors';
 
 export interface AuthUser {
     id: string;
@@ -77,7 +78,11 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
             tokenId,
         };
         return next();
-    } catch {
+    } catch (error) {
+        // A DB outage here must NOT look like a bad token: valid sessions
+        // would 401 everywhere and the frontend would log the user out.
+        // Surface 503 so clients retry with backoff and stay logged in.
+        if (isDatabaseUnavailableError(error)) return writeDatabaseUnavailable(res, error);
         return res.status(401).json({ error: 'INVALID_TOKEN' });
     }
 };

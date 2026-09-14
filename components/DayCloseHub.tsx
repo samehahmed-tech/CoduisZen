@@ -220,15 +220,23 @@ const DayCloseHub: React.FC = () => {
     }, [blockedReasons, readinessChecks]);
 
     const canClose = report?.readiness?.canClose && readinessChecks.every((check: any) => !check.isBlocked);
+  // Open shifts must NOT disable the close button: the server auto-closes them
+  // (autoCloseOpenShifts). Only other blockers (stock count, fiscal…) gate it.
+  const blockingChecks = readinessChecks.filter((check: any) => check.isBlocked);
+  const nonShiftBlockers = blockingChecks.filter((check: any) => check.code !== 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE');
+  const canCloseIgnoringShifts = report?.readiness?.canClose && nonShiftBlockers.length === 0;
+  const hasOpenShiftBlocker = blockingChecks.some((check: any) => check.code === 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE');
     const isClosedDay = report?.status === 'CLOSED';
     const closedSnapshot = report?.closedSnapshot || null;
     const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
     useEffect(() => {
-        if (!branchId && availableBranches[0]?.id) {
+        if (settings.activeBranchId && branchId !== settings.activeBranchId && availableBranches.some((b) => b.id === settings.activeBranchId)) {
+            setBranchId(settings.activeBranchId);
+        } else if (!branchId && availableBranches[0]?.id) {
             setBranchId(availableBranches[0].id);
         }
-    }, [availableBranches, branchId]);
+    }, [availableBranches, branchId, settings.activeBranchId]);
 
     useEffect(() => {
         if (!branchId) return;
@@ -283,13 +291,24 @@ const DayCloseHub: React.FC = () => {
             setError(lang === 'ar' ? 'هذا اليوم مقفول بالفعل ولا يمكن إقفاله مرة أخرى.' : 'This day is already closed and cannot be closed again.');
             return;
         }
-        if (!canClose) {
+        if (!canCloseIgnoringShifts) {
             setError(lang === 'ar' ? 'راجع متطلبات الجاهزية قبل إغلاق اليوم.' : 'Resolve readiness requirements before closing the day.');
+            return;
+        }
+        // Cash variance must be explained: a non-zero shift variance requires
+        // a written note before close is allowed.
+        const cashVariance = Number(report?.shiftCashSummary?.variance || 0);
+        if (Math.abs(cashVariance) > 0.005 && !notes.trim()) {
+            setError(lang === 'ar' ? `يوجد فرق نقدية (${cashVariance.toLocaleString()}) — اكتب سبب الفرق في ملاحظات الإغلاق أولاً.` : `Cash variance of ${cashVariance.toLocaleString()} needs a written reason in close notes first.`);
             return;
         }
         const confirmed = await confirm({
             title: lang === 'ar' ? `تأكيد إغلاق يوم ${date}` : `Confirm day close for ${date}`,
-            message: buildDayCloseConfirmationMessage(report, lang),
+            message: hasOpenShiftBlocker
+                ? (lang === 'ar'
+                    ? `${buildDayCloseConfirmationMessage(report, lang)}\n\nسيتم إغلاق الشيفتات المفتوحة تلقائياً كجزء من إغلاق اليوم.`
+                    : `${buildDayCloseConfirmationMessage(report, lang)}\n\nOpen shifts will be closed automatically as part of the day close.`)
+                : buildDayCloseConfirmationMessage(report, lang),
             confirmText: lang === 'ar' ? 'إغلاق اليوم' : 'Close day',
             cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
             variant: 'danger',
@@ -303,6 +322,7 @@ const DayCloseHub: React.FC = () => {
             const result = await dayCloseApi.close(branchId, date, {
                 notes: notes.trim() || undefined,
                 enforceShiftsClosed: true,
+                autoCloseOpenShifts: true,
                 emailConfig: settings.endOfDayEmailEnabled && settings.endOfDayEmailRecipients?.filter(isEmail).length ? {
                     to: settings.endOfDayEmailRecipients.filter(isEmail),
                     subject: `Day Close Report - ${date}`,
@@ -313,6 +333,7 @@ const DayCloseHub: React.FC = () => {
             setMessage(queued
                 ? (lang === 'ar' ? `تم إغلاق اليوم وإضافة التقرير لطابور واتساب (${queued}).` : `Day closed and WhatsApp report queued for ${queued} recipient(s).`)
                 : (result.message || (lang === 'ar' ? 'تم إغلاق اليوم بنجاح' : 'Day closed successfully')));
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
             setBlockedReasons([]);
             await loadHistory();
             await fetchBranches();
@@ -337,9 +358,16 @@ const DayCloseHub: React.FC = () => {
             setError(lang === 'ar' ? 'لا يمكن ضبط تاريخ التشغيل على تاريخ مستقبلي.' : 'Business date cannot be in the future.');
             return;
         }
-        if (!window.confirm(lang === 'ar'
-            ? `تغيير تاريخ تشغيل الفرع من ${businessDate} إلى ${manualBusinessDate}؟`
-            : `Change branch business date from ${businessDate} to ${manualBusinessDate}?`)) return;
+        const confirmed = await confirm({
+            title: lang === 'ar' ? 'تعديل تاريخ التشغيل' : 'Change business date',
+            message: lang === 'ar'
+                ? `تغيير تاريخ تشغيل الفرع من ${businessDate} إلى ${manualBusinessDate}؟`
+                : `Change branch business date from ${businessDate} to ${manualBusinessDate}?`,
+            confirmText: lang === 'ar' ? 'تعديل' : 'Update',
+            cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
+            variant: 'warning',
+        });
+        if (!confirmed) return;
 
         setIsUpdatingBusinessDate(true);
         setError(null);
@@ -542,9 +570,9 @@ const DayCloseHub: React.FC = () => {
                     </button>
                     <button
                         onClick={handleCloseDay}
-                        disabled={isClosing || isClosedDay || !canClose || !isViewingBusinessDate}
+                        disabled={isClosing || isClosedDay || !canCloseIgnoringShifts || !isViewingBusinessDate}
                         className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest disabled:opacity-50"
-                        title={!canClose && !isClosedDay ? (lang === 'ar' ? 'راجع قائمة الجاهزية قبل الإغلاق' : 'Review readiness checklist before closing') : undefined}
+                        title={!canCloseIgnoringShifts && !isClosedDay ? (lang === 'ar' ? 'راجع قائمة الجاهزية قبل الإغلاق' : 'Review readiness checklist before closing') : undefined}
                     >
                         {isClosing ? (lang === 'ar' ? 'جارٍ الإغلاق...' : 'Closing...') : (lang === 'ar' ? 'إغلاق اليوم' : 'Close Day')}
                     </button>
@@ -622,7 +650,7 @@ const DayCloseHub: React.FC = () => {
                     <input
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder={lang === 'ar' ? 'ملاحظات الإغلاق (اختياري)' : 'Close notes (optional)'}
+                        placeholder={lang === 'ar' ? 'ملاحظات الإغلاق (إجبارية عند وجود فرق نقدية)' : 'Close notes (required with cash variance)'}
                         className="px-3 py-2.5 rounded-xl bg-elevated border border-border/50 font-bold"
                     />
                 </div>
@@ -672,14 +700,50 @@ const DayCloseHub: React.FC = () => {
                                         </span>
                                     </div>
                                     {check.isBlocked && (
-                                        <button
-                                            type="button"
-                                            onClick={() => { void openReadinessAction(check); }}
-                                            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-black uppercase tracking-widest text-white"
-                                        >
-                                            {lang === 'ar' ? check.copy.actionLabelAr : check.copy.actionLabelEn}
-                                            <ExternalLink size={14} />
-                                        </button>
+                                        <div className="mt-3 space-y-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => { void openReadinessAction(check); }}
+                                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-black uppercase tracking-widest text-white"
+                                            >
+                                                {lang === 'ar' ? check.copy.actionLabelAr : check.copy.actionLabelEn}
+                                                <ExternalLink size={14} />
+                                            </button>
+                                            {check.code === 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE' && (check.openShifts || report?.readiness?.openShifts || report?.openShifts || []).length > 0 && (
+                                                <div className="mt-3 space-y-2 border-t border-amber-300/60 pt-2">
+                                                    <p className="text-[11px] font-black text-amber-950 uppercase">
+                                                        {lang === 'ar' ? 'الشيفتات المفتوحة حالياً:' : 'Currently Open Shifts:'}
+                                                    </p>
+                                                    {(check.openShifts || report?.readiness?.openShifts || report?.openShifts || []).map((s: any) => (
+                                                        <div key={s.id} className="flex items-center justify-between bg-white/95 p-2.5 rounded-xl border border-amber-300/60 text-xs shadow-sm">
+                                                            <div>
+                                                                <p className="font-black text-main">{s.userName || s.userId}</p>
+                                                                <p className="text-[10px] text-muted font-bold mt-0.5">
+                                                                    {lang === 'ar' ? 'وقت الفتح' : 'Opened'}: {new Date(s.openingTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} | {lang === 'ar' ? 'الافتتاحي' : 'Float'}: {Number(s.openingBalance || 0).toFixed(2)}
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setShift({
+                                                                        id: s.id,
+                                                                        branchId,
+                                                                        userId: s.userId,
+                                                                        status: 'OPEN',
+                                                                        openingBalance: Number(s.openingBalance || 0),
+                                                                        openingTime: s.openingTime,
+                                                                    });
+                                                                    setIsShiftDrawerOpen(true);
+                                                                }}
+                                                                className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase shadow-sm"
+                                                            >
+                                                                {lang === 'ar' ? 'تسوية وإغلاق' : 'Close'}
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -764,6 +828,20 @@ const DayCloseHub: React.FC = () => {
                         <p>{lang === 'ar' ? 'الصافي:' : 'Net Sales:'} {(report?.salesSummary?.netSales ?? 0).toLocaleString()}</p>
                         <p>{lang === 'ar' ? 'الضريبة:' : 'Tax:'} {(report?.salesSummary?.totalTax ?? 0).toLocaleString()}</p>
                         <p>{lang === 'ar' ? 'الخصومات:' : 'Discounts:'} {(report?.salesSummary?.totalDiscount ?? 0).toLocaleString()}</p>
+                        {(report?.cancelledPaidSummary?.orders ?? 0) > 0 && (
+                            <p className="text-amber-600">{lang === 'ar' ? 'ملغي-مدفوع (بالخزنة خارج الإيراد):' : 'Cancelled-paid (in drawer, out of revenue):'} {report.cancelledPaidSummary.orders} / {(report.cancelledPaidSummary.total ?? 0).toLocaleString()}</p>
+                        )}
+                        {(report?.driverCashOutstanding || []).length > 0 && (
+                            <div className="pt-1">
+                                <p className="text-violet-600">{lang === 'ar' ? 'عهدة طيارين (خارج الدرج):' : 'Driver pocket cash (out of drawer):'}</p>
+                                {(report.driverCashOutstanding || []).map((d: any) => (
+                                    <p key={d.driverId} className="text-xs font-bold text-main flex justify-between">
+                                        <span>{d.driverName}</span>
+                                        <span className="tabular-nums">{Number(d.outstanding || 0).toLocaleString()}</span>
+                                    </p>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -784,6 +862,26 @@ const DayCloseHub: React.FC = () => {
                         <p>{lang === 'ar' ? 'إلغاء:' : 'Voids:'} {report?.auditSummary?.voidCount ?? 0}</p>
                         <p>{lang === 'ar' ? 'خصومات:' : 'Discounts:'} {report?.auditSummary?.discountCount ?? 0}</p>
                         <p>{lang === 'ar' ? 'مرتجعات:' : 'Refunds:'} {report?.auditSummary?.refundCount ?? 0}</p>
+                    </div>
+                </div>
+
+                <div className="card-primary rounded-3xl p-5 border-indigo-500/20">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-muted mb-3">{lang === 'ar' ? 'الكول سنتر والقنوات (شامل في قفل الفرع)' : 'Call Center & Channels (included in branch close)'}</h3>
+                    <div className="space-y-2 text-sm font-bold">
+                        <p>{lang === 'ar' ? 'طلبات الكول سنتر:' : 'Call-center orders:'} {report?.callCenterSummary?.orders ?? 0} / {(report?.callCenterSummary?.revenue ?? 0).toLocaleString()}</p>
+                        <p>{lang === 'ar' ? 'منها منصات:' : 'Of which platforms:'} {report?.callCenterSummary?.platformOrders ?? 0} / {(report?.callCenterSummary?.platformRevenue ?? 0).toLocaleString()}</p>
+                        <div className="pt-2 space-y-1.5 max-h-40 overflow-y-auto">
+                            {(report?.channelBreakdown || []).map((row: any) => (
+                                <div key={row.source} className="flex items-center justify-between text-xs font-bold border-b border-border/30 pb-1.5">
+                                    <span className="uppercase tracking-widest">{row.source}</span>
+                                    <span>{row.count} / {(row.total || 0).toLocaleString()}</span>
+                                </div>
+                            ))}
+                            {(!report?.channelBreakdown || report.channelBreakdown.length === 0) && (
+                                <p className="text-xs text-muted font-bold">{lang === 'ar' ? 'لا توجد تفصيلة قنوات لهذا اليوم' : 'No channel split for this day'}</p>
+                            )}
+                        </div>
+                        <p className="text-[11px] text-muted font-bold pt-1">{lang === 'ar' ? 'لا يوجد قفل منفصل للكول سنتر — قفل الفرع يشمله تلقائياً.' : 'No separate call-center close — the branch close includes it.'}</p>
                     </div>
                 </div>
             </div>

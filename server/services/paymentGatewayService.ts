@@ -32,6 +32,13 @@ export interface PaymentResponse {
     message?: string;
 }
 
+export interface GatewayAdapter {
+    name: string;
+    createCheckout(input: { providerConfig: Record<string, any>; [key: string]: any }): Promise<any>;
+    handleWebhook(input: { providerConfig?: Record<string, any>; [key: string]: any }): Promise<{ status: 'PENDING' | 'SUCCESS' | 'FAILED'; failureReason?: string }>;
+    refund(input: { providerConfig: Record<string, any>; [key: string]: any }): Promise<any>;
+}
+
 export const paymentGatewayService = {
 
     /**
@@ -89,6 +96,30 @@ export const paymentGatewayService = {
     /** Fawry remains unavailable until a verified provider adapter is installed. */
     async initiateFawry(req: PaymentRequest): Promise<PaymentResponse> {
         throw new Error(`PAYMENT_PROVIDER_NOT_CONFIGURED: ${req.provider}`);
+    },
+
+    async configureProvider(_input: Record<string, any>) {
+        throw new Error('PAYMENT_PROVIDER_CONFIGURATION_NOT_IMPLEMENTED');
+    },
+
+    async listProviders(_branchId: string) {
+        return [];
+    },
+
+    async createCheckout(_input: Record<string, any>): Promise<{ checkoutUrl?: string; [key: string]: any }> {
+        throw new Error('PAYMENT_CHECKOUT_NOT_IMPLEMENTED');
+    },
+
+    async handleWebhook(provider: string, payload: any) {
+        return this.handleGatewayWebhook(provider as PaymentProvider, payload);
+    },
+
+    async refund(_sessionId: string) {
+        throw new Error('PAYMENT_REFUND_NOT_IMPLEMENTED');
+    },
+
+    async listSessions(_branchId: string) {
+        return [];
     },
 
     /**

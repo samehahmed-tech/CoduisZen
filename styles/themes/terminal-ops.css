@@ -1,0 +1,88 @@
+/* THEME 06 · TERMINAL OPS — light console / deep control-room dark */
+[data-theme='terminal-ops'] {
+    --primary: 0, 130, 70;
+    --primary-hover: 0, 110, 58;
+    --secondary: 90, 105, 95;
+    --accent: 0, 160, 90;
+
+    --bg-app: 232, 236, 232;
+    --bg-card: 246, 249, 246;
+    --bg-sidebar: 226, 231, 226;
+    --bg-elevated: 250, 252, 250;
+    --bg-global: 232, 236, 232;
+
+    --text-main: 18, 30, 22;
+    --text-muted: 90, 110, 95;
+
+    --border-color: 195, 205, 196;
+    --border-subtle: 195 205 196 / 0.6;
+    --glass-bg: 246 249 246 / 0.95;
+
+    --success: 0, 150, 80;
+    --warning: 190, 120, 0;
+    --danger: 200, 40, 40;
+    --info: 0, 120, 180;
+
+    --theme-page-bg: repeating-linear-gradient(0deg, transparent 0 27px, rgba(0,130,70,0.045) 27px 28px), repeating-linear-gradient(90deg, transparent 0 27px, rgba(0,130,70,0.045) 27px 28px), linear-gradient(180deg, #e9ede9 0%, #dde3dd 100%);
+    --theme-card-bg: #f6f9f6;
+    --theme-card-hover-bg: #eef4ee;
+    --theme-rail-bg: #dfe4df;
+    --theme-topbar-bg: rgba(246, 249, 246, 0.94);
+    --theme-table-head-bg: #12241a;
+    --theme-row-hover-bg: rgba(0, 130, 70, 0.08);
+    --theme-input-bg: #eef3ee;
+    --theme-button-bg: #0c2b1a;
+    --theme-active-bg: rgba(0, 130, 70, 0.12);
+    --theme-focus-ring: rgba(0, 130, 70, 0.4);
+    --theme-popup-bg: #f6f9f6;
+
+    --chart-1: 0, 150, 80;
+    --chart-2: 0, 170, 200;
+    --chart-3: 230, 150, 0;
+    --chart-4: 150, 90, 220;
+    --chart-5: 110, 120, 115;
+    --chart-grid: 195 205 196 / 0.9;
+    --chart-tooltip-bg: #12241a;
+}
+
+.dark [data-theme='terminal-ops'],
+[data-theme='terminal-ops'].dark {
+    --primary: 60, 220, 130;
+    --primary-hover: 90, 235, 150;
+    --secondary: 120, 150, 130;
+    --accent: 60, 220, 130;
+
+    --bg-app: 4, 12, 8;
+    --bg-card: 8, 20, 13;
+    --bg-sidebar: 5, 14, 9;
+    --bg-elevated: 12, 28, 18;
+    --bg-global: 4, 12, 8;
+
+    --text-main: 200, 230, 210;
+    --text-muted: 110, 150, 125;
+
+    --border-color: 28, 55, 38;
+    --border-subtle: 60 220 130 / 0.14;
+    --glass-bg: 8 20 13 / 0.95;
+
+    --theme-page-bg: repeating-linear-gradient(0deg, transparent 0 27px, rgba(60,220,130,0.05) 27px 28px), repeating-linear-gradient(90deg, transparent 0 27px, rgba(60,220,130,0.05) 27px 28px), radial-gradient(700px 260px at 50% 0%, rgba(60,220,130,0.07), transparent 60%), linear-gradient(180deg, #060f0a 0%, #030805 100%);
+    --theme-card-bg: #08140d;
+    --theme-card-hover-bg: #0c1e13;
+    --theme-rail-bg: #040b06;
+    --theme-topbar-bg: rgba(8, 20, 13, 0.94);
+    --theme-table-head-bg: #030805;
+    --theme-row-hover-bg: rgba(60, 220, 130, 0.08);
+    --theme-input-bg: #0a1a10;
+    --theme-button-bg: #047857;
+    --theme-active-bg: rgba(60, 220, 130, 0.14);
+    --theme-focus-ring: rgba(60, 220, 130, 0.45);
+    --theme-popup-bg: #0a1a10;
+
+    --chart-1: 60, 220, 130;
+    --chart-2: 56, 200, 235;
+    --chart-3: 250, 180, 60;
+    --chart-4: 170, 130, 250;
+    --chart-5: 130, 160, 140;
+    --chart-grid: 28 55 38 / 0.9;
+    --chart-tooltip-bg: #0a1a10;
+}

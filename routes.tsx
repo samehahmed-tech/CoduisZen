@@ -2,10 +2,13 @@
 import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
 import MainLayout from './components/MainLayout';
 import React, { Suspense } from 'react';
-import Login from './components/Login';
 import { useAuthStore } from './stores/useAuthStore';
 import { AppPermission } from './types';
 import ErrorBoundary from './components/common/ErrorBoundary';
+
+// Login is lazy too: authenticated users (the hot path) never download it,
+// and logged-out users get the shell + login chunk only.
+const Login = React.lazy(() => import('./components/Login'));
 
 // Lazy load components for better performance
 // Export loaders for preloading
@@ -17,15 +20,16 @@ export const loaders = {
     CallCenterManager: () => import('./components/CallCenterManager'),
     KDS: () => import('./components/KDS'),
     PickupScreen: () => import('./components/PickupScreen').then((mod) => ({ default: mod.PickupScreen })),
-    PackingScreen: () => import('./components/PackingScreen'),
     MenuManager: () => import('./components/menu/MenuProfitCenter'),
     PrinterManager: () => import('./components/PrinterManager'),
     ReceiptDesigner: () => import('./components/ReceiptDesigner'),
     RecipeManager: () => import('./components/RecipeManager'),
     Inventory: () => import('./src/features/inventory/Inventory'),
+    StockRequests: () => import('./src/features/inventory/StockRequests'),
     CRM: () => import('./components/CRM'),
     ZonesManager: () => import('./components/ZonesManager'),
     Finance: () => import('./components/Finance'),
+    TreasuryHub: () => import('./components/TreasuryHub'),
     Expenses: () => import('./components/Expenses'),
     Reports: () => import('./components/Reports'),
     AIInsights: () => import('./components/AIInsights'),
@@ -37,6 +41,7 @@ export const loaders = {
     FloorDesigner: () => import('./components/FloorDesigner'),
     Production: () => import('./components/Production'),
     DispatchHub: () => import('./components/DispatchHub'),
+    DriversHub: () => import('./components/DriversHub'),
     CampaignHub: () => import('./components/CampaignHub'),
 
     FiscalHub: () => import('./components/FiscalHub'),
@@ -48,10 +53,15 @@ export const loaders = {
     InventoryIntelligence: () => import('./components/InventoryIntelligence'),
     ApprovalCenter: () => import('./components/ApprovalCenter'),
     WhatsAppHub: () => import('./components/WhatsAppHub'),
+    MailHub: () => import('./components/MailHub'),
     PlatformAggregator: () => import('./components/PlatformAggregator'),
     UserManagement: () => import('./src/features/hr/UserManagement'),
     OrdersCenter: () => import('./components/OrdersCenter'),
     SelfOrderingKiosk: () => import('./components/kiosk/SelfOrderingKiosk'),
+    TrackOrder: () => import('./components/TrackOrder'),
+    ReservationsHub: () => import('./components/ReservationsHub'),
+    ComplaintsInbox: () => import('./components/ComplaintsInbox'),
+    InteractionShowcase: () => import('./components/InteractionShowcase'),
     
     // HR & Payroll UI
     HRHub: () => import('./src/features/hr/components/HRHub'),
@@ -64,6 +74,7 @@ export const loaders = {
     HRSettingsManager: () => import('./src/features/hr/components/HRSettingsManager'),
     HRUserGuide: () => import('./src/features/hr/components/HRUserGuide'),
     DriverDashboard: () => import('./src/features/driver/DriverDashboard'),
+    ThemeLab: () => import('./components/ThemeLab'),
 };
 
 // Lazy load components using exported loaders
@@ -74,15 +85,16 @@ const CallCenter = React.lazy(loaders.CallCenter);
 const CallCenterManager = React.lazy(loaders.CallCenterManager);
 const KDS = React.lazy(loaders.KDS);
 const PickupScreen = React.lazy(loaders.PickupScreen);
-const PackingScreen = React.lazy(loaders.PackingScreen);
 const MenuManager = React.lazy(loaders.MenuManager);
 const PrinterManager = React.lazy(loaders.PrinterManager);
 const ReceiptDesigner = React.lazy(loaders.ReceiptDesigner);
 const RecipeManager = React.lazy(loaders.RecipeManager);
 const Inventory = React.lazy(loaders.Inventory);
+const StockRequests = React.lazy(loaders.StockRequests);
 const CRM = React.lazy(loaders.CRM);
 const ZonesManager = React.lazy(loaders.ZonesManager);
 const Finance = React.lazy(loaders.Finance);
+const TreasuryHub = React.lazy(loaders.TreasuryHub);
 const Expenses = React.lazy(loaders.Expenses);
 const Reports = React.lazy(loaders.Reports);
 const AIInsights = React.lazy(loaders.AIInsights);
@@ -94,6 +106,7 @@ const RolesPermissions = React.lazy(loaders.RolesPermissions);
 const FloorDesigner = React.lazy(loaders.FloorDesigner);
 const Production = React.lazy(loaders.Production);
 const DispatchHub = React.lazy(loaders.DispatchHub);
+const DriversHub = React.lazy(loaders.DriversHub);
 const CampaignHub = React.lazy(loaders.CampaignHub);
 
 const FiscalHub = React.lazy(loaders.FiscalHub);
@@ -105,6 +118,7 @@ const WastageManager = React.lazy(loaders.WastageManager);
 const InventoryIntelligence = React.lazy(loaders.InventoryIntelligence);
 const ApprovalCenter = React.lazy(loaders.ApprovalCenter);
 const WhatsAppHub = React.lazy(loaders.WhatsAppHub);
+const MailHub = React.lazy(loaders.MailHub);
 const PlatformAggregator = React.lazy(loaders.PlatformAggregator);
 const UserManagement = React.lazy(loaders.UserManagement);
 const OrdersCenter = React.lazy(loaders.OrdersCenter);
@@ -119,11 +133,27 @@ const TaskChecklistManager = React.lazy(loaders.TaskChecklistManager);
 const HRSettingsManager = React.lazy(loaders.HRSettingsManager);
 const HRUserGuide = React.lazy(loaders.HRUserGuide);
 const SelfOrderingKiosk = React.lazy(loaders.SelfOrderingKiosk);
+const TrackOrder = React.lazy(loaders.TrackOrder);
+const ReservationsHub = React.lazy(loaders.ReservationsHub);
+const ComplaintsInbox = React.lazy(loaders.ComplaintsInbox);
+const InteractionShowcase = React.lazy(loaders.InteractionShowcase);
 const DriverDashboard = React.lazy(loaders.DriverDashboard);
+const ThemeLab = React.lazy(loaders.ThemeLab);
 
 import PageSkeleton from './components/common/PageSkeleton';
 
-const Loading = () => <PageSkeleton type="table" rows={5} />;
+// Delayed fallback: cached chunks resolve in ms — flashing a full skeleton
+// for them feels like flicker, not loading. Only show the skeleton if the
+// chunk actually takes longer than 200ms.
+const Loading = () => {
+    const [show, setShow] = React.useState(false);
+    React.useEffect(() => {
+        const timer = window.setTimeout(() => setShow(true), 200);
+        return () => window.clearTimeout(timer);
+    }, []);
+    if (!show) return null;
+    return <PageSkeleton type="table" rows={5} />;
+};
 
 const RequirePermission: React.FC<{ permission: AppPermission; children: React.ReactNode }> = ({ permission, children }) => {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -175,15 +205,17 @@ export const router = createBrowserRouter([
             { path: 'kds', element: withPermission(AppPermission.NAV_KDS, withSafe(KDS)) },
             { path: 'kitchen', element: <Navigate to="/kds" replace /> },
             { path: 'pickup', element: withPermission(AppPermission.NAV_PICKUP, withSafe(PickupScreen)) },
-            { path: 'packing', element: withPermission(AppPermission.NAV_PICKUP, withSafe(PackingScreen)) },
+            { path: 'packing', element: <Navigate to="/pickup" replace /> },
             { path: 'menu', element: withPermission(AppPermission.NAV_MENU_MANAGER, withSafe(MenuManager)) },
             { path: 'printers', element: withPermission(AppPermission.NAV_PRINTERS, withSafe(PrinterManager)) },
             { path: 'recipes', element: withPermission(AppPermission.NAV_RECIPES, withSafe(RecipeManager)) },
             { path: 'receipt-designer', element: withPermission(AppPermission.NAV_PRINTERS, withSafe(ReceiptDesigner)) },
             { path: 'inventory', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(Inventory)) },
+            { path: 'stock-requests', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(StockRequests)) },
             { path: 'crm', element: withPermission(AppPermission.NAV_CRM, withSafe(CRM)) },
             { path: 'zones', element: withPermission(AppPermission.NAV_CALL_CENTER, withSafe(ZonesManager)) },
             { path: 'finance', element: withPermission(AppPermission.NAV_FINANCE, withSafe(Finance)) },
+            { path: 'treasury', element: withPermission(AppPermission.NAV_FINANCE, withSafe(TreasuryHub)) },
             { path: 'expenses', element: withPermission(AppPermission.NAV_FINANCE, withSafe(Expenses)) },
             { path: 'reports', element: withPermission(AppPermission.NAV_REPORTS, withSafe(Reports)) },
             { path: 'ai-insights', element: withPermission(AppPermission.NAV_AI_ASSISTANT, withSafe(AIInsights)) },
@@ -193,6 +225,7 @@ export const router = createBrowserRouter([
             { path: 'settings', element: withPermission(AppPermission.NAV_SETTINGS, withSafe(SettingsHub)) },
             { path: 'production', element: withPermission(AppPermission.NAV_PRODUCTION, withSafe(Production)) },
             { path: 'dispatch', element: withPermission(AppPermission.NAV_DISPATCH, withSafe(DispatchHub)) },
+            { path: 'drivers', element: withPermission(AppPermission.NAV_DISPATCH, withSafe(DriversHub)) },
             { path: 'marketing', element: withPermission(AppPermission.NAV_MARKETING, withSafe(CampaignHub)) },
             { path: 'people', element: <Navigate to="/user-management" replace /> },
             { path: 'fiscal', element: withPermission(AppPermission.NAV_FISCAL, withSafe(FiscalHub)) },
@@ -203,9 +236,10 @@ export const router = createBrowserRouter([
             { path: 'inventory-intelligence', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(InventoryIntelligence)) },
             { path: 'approvals', element: withPermission(AppPermission.NAV_APPROVAL, withSafe(ApprovalCenter)) },
             { path: 'whatsapp', element: withPermission(AppPermission.NAV_WHATSAPP, withSafe(WhatsAppHub)) },
+            { path: 'mail', element: withPermission(AppPermission.NAV_MAIL, withSafe(MailHub)) },
             { path: 'platforms', element: withPermission(AppPermission.NAV_PLATFORMS, withSafe(PlatformAggregator)) },
             { path: 'user-management', element: withPermission(AppPermission.NAV_USER_MANAGEMENT, withSafe(UserManagement)) },
-            { path: 'roles', element: withPermission(AppPermission.NAV_USER_MANAGEMENT, withSafe(RolesPermissions)) },
+            { path: 'roles', element: <Navigate to="/user-management" replace /> },
             { path: 'orders', element: withPermission(AppPermission.NAV_ORDERS, withSafe(OrdersCenter)) },
             { path: 'hr', element: withPermission(AppPermission.NAV_PEOPLE, withSafe(HRHub)) },
             { path: 'attendance', element: withPermission(AppPermission.NAV_ATTENDANCE, withSafe(AttendanceManager)) },
@@ -217,6 +251,10 @@ export const router = createBrowserRouter([
             { path: 'migration', element: withPermission(AppPermission.NAV_APPROVAL, withSafe(DataMigrationWizard)) },
             { path: 'biometric-devices', element: withPermission(AppPermission.NAV_ATTENDANCE, withSafe(BiometricDeviceManager)) },
             { path: 'kiosk', element: withPermission(AppPermission.NAV_POS, withSafe(SelfOrderingKiosk)) },
+            { path: 'reservations', element: withPermission(AppPermission.NAV_FLOOR_PLAN, withSafe(ReservationsHub)) },
+            { path: 'complaints', element: withPermission(AppPermission.NAV_CRM, withSafe(ComplaintsInbox)) },
+            { path: 'theme-lab', element: withPermission(AppPermission.NAV_SETTINGS, withSafe(ThemeLab)) },
+            { path: 'ui-showcase', element: withPermission(AppPermission.NAV_SETTINGS, withSafe(InteractionShowcase)) },
         ],
     },
     {
@@ -229,7 +267,13 @@ export const router = createBrowserRouter([
     },
     {
         path: '/login',
-        element: <Login />,
+        element: (
+            <ErrorBoundary>
+                <Suspense fallback={<Loading />}>
+                    <Login />
+                </Suspense>
+            </ErrorBoundary>
+        ),
     },
     {
         path: '/driver',
@@ -237,6 +281,17 @@ export const router = createBrowserRouter([
             <RequirePermission permission={AppPermission.NAV_DRIVER}>
                 {withSafe(DriverDashboard)}
             </RequirePermission>
+        ),
+    },
+    {
+        // Public customer order tracking (no login — link-only token = order id)
+        path: '/t/:id',
+        element: (
+            <ErrorBoundary>
+                <Suspense fallback={<Loading />}>
+                    <TrackOrder />
+                </Suspense>
+            </ErrorBoundary>
         ),
     },
     {

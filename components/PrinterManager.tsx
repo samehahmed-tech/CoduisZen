@@ -173,6 +173,37 @@ const PrinterManager: React.FC = () => {
         fetchPrinters();
     }, [fetchPrinters]);
 
+    // Gateway capability registry: which bridge machines are online and which
+    // Windows printers they see — powers the routing status badge per printer.
+    const [bridgeRegistry, setBridgeRegistry] = useState<Array<{ gatewayId: string; online: boolean; lastSeenAt: string | null; branchId: string | null; printers: string[] }>>([]);
+    useEffect(() => {
+        let cancelled = false;
+        const load = () => {
+            printGatewayApi.getBridges()
+                .then((rows) => { if (!cancelled) setBridgeRegistry(rows || []); })
+                .catch(() => { if (!cancelled) setBridgeRegistry([]); });
+        };
+        load();
+        const timer = window.setInterval(load, 20000);
+        return () => { cancelled = true; window.clearInterval(timer); };
+    }, []);
+
+    const gatewayStatusFor = (printer: Printer): { label: string; cls: string; gateway: string | null } => {
+        const isLocal = String(printer.type || '').toUpperCase() !== 'NETWORK';
+        if (!isLocal) return { label: tr('Network printer', 'طابعة شبكة'), cls: 'bg-sky-50 dark:bg-sky-900/10 text-sky-600 border-sky-100', gateway: printer.gatewayId || null };
+        const boundId = printer.gatewayId || printer.stationId || null;
+        if (boundId) {
+            const entry = bridgeRegistry.find(b => b.gatewayId === boundId);
+            if (entry?.online) return { label: `${tr('Online on', 'متصل على')} ${boundId}`, cls: 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 border-emerald-100', gateway: boundId };
+            if (entry) return { label: `${tr('Bound to', 'مرتبطة بـ')} ${boundId} (${tr('offline', 'أوفلاين')})`, cls: 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 border-amber-100', gateway: boundId };
+            return { label: `${tr('Bound to', 'مرتبطة بـ')} ${boundId} (${tr('never seen', 'لم يُرصد')})`, cls: 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 border-amber-100', gateway: boundId };
+        }
+        const addr = String(printer.address || '');
+        const capable = bridgeRegistry.find(b => b.printers.some(name => name === addr || name === addr.replace(/^windows:/, '')));
+        if (capable?.online) return { label: `${tr('Auto-routed to', 'توجيه تلقائي إلى')} ${capable.gatewayId}`, cls: 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 border-emerald-100', gateway: capable.gatewayId };
+        return { label: tr('Unbound — may not print', 'غير مربوطة — قد لا تطبع'), cls: 'bg-rose-50 dark:bg-rose-900/10 text-rose-600 border-rose-100', gateway: null };
+    };
+
     const bridgeUrls = () => {
         const host = window.location.hostname;
         const urls = ['http://localhost:3002'];
@@ -845,6 +876,16 @@ const PrinterManager: React.FC = () => {
                                     </div>
                                     <div className={`w-3 h-3 rounded-full shadow-[0_0_12px] ${printer.isActive ? 'bg-emerald-500 shadow-emerald-500/50 animate-pulse' : 'bg-slate-300 shadow-transparent'}`} />
                                 </div>
+
+                                {(() => {
+                                    const gw = gatewayStatusFor(printer);
+                                    return (
+                                        <div className={`mt-3 px-4 py-2.5 rounded-2xl border text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${gw.cls}`} title={gw.gateway || undefined}>
+                                            <Monitor size={13} className="shrink-0" />
+                                            <span className="truncate">{gw.label}</span>
+                                        </div>
+                                    );
+                                })()}
 
                             </div>
 

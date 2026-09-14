@@ -7,6 +7,8 @@ export const inventoryApi = {
     delete: (id: string) => apiRequest<any>(`/inventory/${id}`, { method: 'DELETE' }),
     getWarehouses: () => apiRequest<any[]>('/warehouses'),
     createWarehouse: (warehouse: any) => apiRequest<any>('/warehouses', { method: 'POST', body: JSON.stringify(warehouse) }),
+    updateWarehouse: (id: string, warehouse: any) => apiRequest<any>(`/warehouses/${id}`, { method: 'PUT', body: JSON.stringify(warehouse) }),
+    deleteWarehouse: (id: string) => apiRequest<any>(`/warehouses/${id}`, { method: 'DELETE' }),
     updateStock: (data: { item_id: string; warehouse_id: string; quantity: number; type: string; reason?: string; actor_id?: string; reference_id?: string }) =>
         apiRequest<any>('/inventory/stock/update', { method: 'POST', body: JSON.stringify(data) }),
     receiveStock: (data: {
@@ -14,10 +16,38 @@ export const inventoryApi = {
         supplier_id?: string;
         reference_id: string;
         actor_id?: string;
-        items: Array<{ item_id: string; quantity: number; unit_cost: number }>;
+        items: Array<{ item_id: string; quantity: number; unit_cost: number; purchase_unit?: string }>;
     }) => apiRequest<any>('/inventory/stock/receive', { method: 'POST', body: JSON.stringify(data) }),
     transferStock: (data: { item_id: string; from_warehouse_id: string; to_warehouse_id: string; quantity: number; reason?: string; actor_id?: string; reference_id?: string }) =>
         apiRequest<any>('/inventory/stock/transfer', { method: 'POST', body: JSON.stringify(data) }),
+    getTransferRequests: (params?: { status?: string; branchId?: string }) => {
+        const query = new URLSearchParams();
+        if (params?.status) query.set('status', params.status);
+        if (params?.branchId) query.set('branchId', params.branchId);
+        const qs = query.toString();
+        return apiRequest<any[]>(`/inventory/stock/transfer-requests${qs ? `?${qs}` : ''}`);
+    },
+    getIncomingTransferRequests: (branchId?: string) => {
+        const query = new URLSearchParams({ scope: 'incoming' });
+        if (branchId) query.set('branchId', branchId);
+        return apiRequest<any[]>(`/inventory/stock/transfer-requests?${query.toString()}`);
+    },
+    createTransferRequest: (data: {
+        branchId: string;
+        sourceWarehouseId?: string;
+        destinationWarehouseId: string;
+        priority?: string;
+        notes?: string;
+        items: Array<{ itemId: string; quantity: number; unit?: string }>;
+    }) => apiRequest<any>('/inventory/stock/transfer-requests', { method: 'POST', body: JSON.stringify(data) }),
+    approveTransferRequest: (id: string, sourceWarehouseId: string, items?: Array<{ itemId: string; approvedQty: number }>) =>
+        apiRequest<any>(`/inventory/stock/transfer-requests/${id}/approve`, { method: 'POST', body: JSON.stringify({ sourceWarehouseId, items }) }),
+    dispatchTransferRequest: (id: string) =>
+        apiRequest<any>(`/inventory/stock/transfer-requests/${id}/dispatch`, { method: 'POST' }),
+    receiveTransferRequest: (id: string) =>
+        apiRequest<any>(`/inventory/stock/transfer-requests/${id}/receive`, { method: 'POST' }),
+    cancelTransferRequest: (id: string) =>
+        apiRequest<any>(`/inventory/stock/transfer-requests/${id}/cancel`, { method: 'POST' }),
     zeroStock: (data: { branchId: string; warehouseId?: string }) =>
         apiRequest<{ success: true; affectedRows: number }>('/inventory/stock/zero', {
             method: 'POST',
@@ -57,5 +87,12 @@ export const inventoryApi = {
         method: 'POST',
         body: JSON.stringify({ counts, finalize: options?.finalize }),
     }),
-    postStockCount: (id: string) => apiRequest<any>(`/inventory/counts/${id}/post`, { method: 'POST' })
+    postStockCount: (id: string) => apiRequest<any>(`/inventory/counts/${id}/post`, { method: 'POST' }),
+    getMenuAvailability: (branchId: string, menuItemIds: string[], opts?: { signal?: AbortSignal }) => {
+        const query = new URLSearchParams({ branchId, menuItemIds: menuItemIds.join(',') });
+        return apiRequest<{ branchId: string; items: Array<{ menuItemId: string; hasRecipe: boolean; maxServings: number | null; short: boolean; shortIngredients: any[] }> }>(
+            `/inventory/menu-availability?${query.toString()}`,
+            opts?.signal ? { signal: opts.signal } : {},
+        );
+    },
 };

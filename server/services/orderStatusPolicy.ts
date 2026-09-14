@@ -2,6 +2,9 @@ type StatusCheckInput = {
     currentStatus: string;
     nextStatus: string;
     orderType?: string | null;
+    orderDriverId?: string | null;
+    deliverySource?: string | null;
+    orderSource?: string | null;
     notes?: string;
     userRole?: string;
     userPermissions?: string[] | null;
@@ -12,6 +15,7 @@ type StatusCheckInput = {
 };
 
 const BASE_TRANSITION_MAP: Record<string, string[]> = {
+    SCHEDULED: ['PENDING', 'CANCELLED'],
     PENDING: ['PREPARING', 'READY', 'CANCELLED'],
     PREPARING: ['READY', 'CANCELLED'],
     READY: ['DELIVERED', 'COMPLETED', 'CANCELLED'],
@@ -37,7 +41,10 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
     if (current === next) return { ok: true };
 
     // Branch scoping
-    if (role === 'CALL_CENTER_AGENT') {
+    // CALL_CENTER and CALL_CENTER_AGENT are the same agent surface: both are
+    // locked to allowedBranches and locked out of branch-started orders.
+    const isCallCenter = role === 'CALL_CENTER_AGENT' || role === 'CALL_CENTER';
+    if (isCallCenter) {
         if (!allowedBranches.includes(String(orderBranch))) {
             return { ok: false, code: 'FORBIDDEN_BRANCH_SCOPE' };
         }
@@ -47,7 +54,7 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
 
     // Call Center Locking: Agents cannot modify orders that are already being processed by the branch
     const LOCKED_STATUSES = new Set(['PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED']);
-    if (role === 'CALL_CENTER_AGENT' && LOCKED_STATUSES.has(current)) {
+    if (isCallCenter && LOCKED_STATUSES.has(current)) {
         return { ok: false, code: 'ORDER_LOCKED_IN_BRANCH' };
     }
 
@@ -55,13 +62,30 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
         const canVoidOrder = HIGH_RISK_ROLES.has(role)
             || permissions.includes('*')
             || permissions.includes('OP_VOID_ORDER');
-        if (!canVoidOrder && role !== 'CALL_CENTER_AGENT' && !input.managerApproved) {
+        if (!canVoidOrder && !isCallCenter && !input.managerApproved) {
             return { ok: false, code: 'STATUS_TRANSITION_FORBIDDEN' };
         }
         if (!String(input.notes || '').trim()) {
             return { ok: false, code: 'CANCELLATION_REASON_REQUIRED' };
         }
         return { ok: true };
+    }
+
+    // Custody guard (monitoring + cash safety): an in-house delivery order
+    // (restaurant delivers it, not an aggregator) must have a driver before
+    // it leaves the branch (OUT_FOR_DELIVERY) or closes (DELIVERED).
+    // Without this, orders close with no one accountable for the cash/food,
+    // delivery KPIs break, and driverless orders pollute 3rd-party reports.
+    // Aggregator orders (talabat/…) are delivered by the platform — exempt.
+    if (orderType === 'DELIVERY' && (next === 'OUT_FOR_DELIVERY' || next === 'DELIVERED')) {
+        const source = String(input.deliverySource || '').trim().toLowerCase();
+        const origin = String(input.orderSource || '').trim().toLowerCase();
+        // Legacy platform orders may carry source=platform:<name> without a
+        // deliverySource — treat any platform marker as aggregator-delivered.
+        const aggregator = (source && source !== 'restaurant') || origin.startsWith('platform:');
+        if (!aggregator && !String(input.orderDriverId || '').trim()) {
+            return { ok: false, code: 'DRIVER_REQUIRED_FOR_DELIVERY' };
+        }
     }
 
     let allowed = [...(BASE_TRANSITION_MAP[current] || [])];

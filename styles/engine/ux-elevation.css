@@ -1,0 +1,175 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   UX ELEVATION LAYER (Global Experience System)
+   "Same identity — dramatically better experience."
+   Loaded LAST so it unifies motion/typography/hierarchy without changing
+   brand colors, logos, IA, or workflows. All values derive from existing
+   --primary / --bg-* / --text-* / --theme-* tokens.
+   Rules: transform+opacity only, calm SaaS, ops-fast kill-switch,
+   prefers-reduced-motion respected.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Canonical motion language (§23) */
+  --ux-fast: 120ms;        /* micro-interactions: hover/press/reveal */
+  --ux-standard: 180ms;    /* standard: dropdown/modal/tooltip/row */
+  --ux-complex: 280ms;     /* structural: drawer/page/skeleton→content */
+  --ux-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ux-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ux-press-scale: 0.97;
+  --ux-lift: -2px;
+  /* Hierarchy */
+  --ux-radius-sm: var(--radius-sm, 8px);
+  --ux-radius: var(--radius, 12px);
+  --ux-radius-lg: var(--radius-lg, 16px);
+}
+
+/* ── Page transition: GPU-only, no blur (perf fix for micro-interactions.css) ── */
+.page-enter { animation: uxPageEnter var(--ux-complex) var(--ux-ease-out) both !important; filter: none !important; }
+.page-exit { animation: uxPageExit var(--ux-fast) ease-out both !important; filter: none !important; }
+@keyframes uxPageEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes uxPageExit { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px); } }
+
+/* stagger: cap depth so long grids don't cascade forever */
+.stagger-appear { animation-duration: var(--ux-complex) !important; animation-delay: calc(min(var(--i, 0), 8) * 40ms) !important; filter: none !important; }
+.theme-animate-stagger { animation-duration: var(--ux-complex) !important; animation-delay: calc(min(var(--stagger-index, 0), 8) * 40ms) !important; }
+
+/* ── Buttons: unified hierarchy (all variants derive from --primary) ── */
+.ux-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: var(--density-btn-h, 2.5rem); padding: 0.625rem 1.25rem;
+  border-radius: var(--theme-radius, 12px); font-weight: 700; font-size: 0.8125rem;
+  line-height: 1.2; cursor: pointer; user-select: none; touch-action: manipulation;
+  transition: transform var(--ux-fast) var(--ux-ease-out), background-color var(--ux-fast) var(--ux-ease-out),
+    border-color var(--ux-fast) var(--ux-ease-out), box-shadow var(--ux-standard) var(--ux-ease-out),
+    color var(--ux-fast) var(--ux-ease-out), opacity var(--ux-fast) ease;
+}
+.ux-btn:hover { transform: translateY(-1px); }
+.ux-btn:active { transform: scale(var(--ux-press-scale)); }
+.ux-btn:disabled, .ux-btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+.ux-btn-primary { background: rgb(var(--primary)); color: #fff; border: 1px solid transparent; box-shadow: 0 2px 8px rgba(var(--primary), 0.25); }
+.ux-btn-primary:hover { background: rgb(var(--primary-hover, var(--primary))); box-shadow: 0 6px 16px rgba(var(--primary), 0.32); }
+.ux-btn-secondary { background: rgba(var(--bg-elevated), 0.9); color: rgb(var(--text-main)); border: 1px solid rgba(var(--border-color), 0.6); }
+.ux-btn-secondary:hover { border-color: rgba(var(--primary), 0.4); color: rgb(var(--primary)); background: rgba(var(--primary), 0.07); }
+.ux-btn-tertiary, .ux-btn-ghost { background: transparent; color: rgb(var(--text-muted)); border: 1px solid transparent; padding-inline: 0.75rem; }
+.ux-btn-tertiary:hover, .ux-btn-ghost:hover { background: rgba(var(--text-main), 0.06); color: rgb(var(--text-main)); transform: none; }
+.ux-btn-danger { background: rgb(var(--danger)); color: #fff; border: 1px solid transparent; box-shadow: 0 2px 8px rgba(var(--danger), 0.28); }
+.ux-btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.ux-btn-success { background: rgb(var(--success)); color: #fff; border: 1px solid transparent; }
+.ux-btn-icon { min-width: 40px; min-height: 40px; padding: 0.5rem; border-radius: 12px; }
+.ux-btn-sm { min-height: 36px; font-size: 0.75rem; padding: 0.5rem 0.875rem; }
+.ux-btn-lg { min-height: 48px; font-size: 0.875rem; padding: 0.75rem 1.5rem; }
+.ux-btn-loading { pointer-events: none; opacity: 0.8; }
+.ux-btn-loading .ux-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-top-color: transparent; animation: uxSpin 0.7s linear infinite; }
+@keyframes uxSpin { to { transform: rotate(360deg); } }
+
+/* ── Inputs: calm focus, animated validation ── */
+.ux-field-error { animation: uxFieldIn var(--ux-standard) var(--ux-ease-out) both; }
+@keyframes uxFieldIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  transition: border-color var(--ux-fast) var(--ux-ease-out), box-shadow var(--ux-standard) var(--ux-ease-out), background-color var(--ux-fast) ease;
+}
+input:focus, select:focus, textarea:focus { border-color: rgb(var(--primary)) !important; box-shadow: 0 0 0 3px rgba(var(--primary), 0.14) !important; outline: none !important; }
+[aria-invalid="true"] { border-color: rgba(var(--danger), 0.6) !important; }
+[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px rgba(var(--danger), 0.15) !important; }
+
+/* ── Tables: modern ERP rows (hover/selected/sticky/numeric) ── */
+.theme-table-row, tbody tr { transition: background-color var(--ux-fast) ease; }
+.theme-table-row:hover, tbody tr:hover { background-color: rgba(var(--primary), 0.045) !important; }
+tr[aria-selected="true"], tr.theme-active-row { background: rgba(var(--primary), 0.08) !important; box-shadow: inset 2px 0 0 rgb(var(--primary)); }
+.theme-table th, table thead th { position: sticky; top: 0; z-index: 5; white-space: nowrap; }
+td.tabular-nums, th.tabular-nums, td[data-numeric="true"] { text-align: end; font-variant-numeric: tabular-nums; }
+tbody tr [data-row-actions] { opacity: 0; transform: translateY(2px); transition: opacity var(--ux-fast) ease, transform var(--ux-fast) var(--ux-ease-out); }
+tbody tr:hover [data-row-actions], tbody tr:focus-within [data-row-actions] { opacity: 1; transform: none; }
+@media (hover: none) { tbody tr [data-row-actions] { opacity: 1; transform: none; } }
+
+/* ── Skeleton: GPU gradient sweep (replaces opacity-pulse repaints) ── */
+.theme-skeleton, .ux-skeleton {
+  background: linear-gradient(100deg, rgba(var(--text-muted), 0.12) 30%, rgba(var(--primary), 0.14) 50%, rgba(var(--text-muted), 0.12) 70%) !important;
+  background-size: 220% 100% !important; animation: uxSkeletonShift 1.4s ease-in-out infinite !important;
+}
+@keyframes uxSkeletonShift { to { background-position: -220% 0; } }
+.skeleton-reveal { animation: uxContentReveal var(--ux-complex) var(--ux-ease-out) both !important; filter: none !important; }
+@keyframes uxContentReveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── Toasts: calm 180ms enter (replaces 500ms bounce) ── */
+.toast-enter { animation: uxToastIn var(--ux-standard) var(--ux-ease-spring) both !important; }
+.toast-exit { animation: uxToastOut var(--ux-fast) ease-in both !important; }
+@keyframes uxToastIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes uxToastOut { to { opacity: 0; transform: translateY(-6px) scale(0.98); } }
+
+/* ── Modal/Drawer/Dropdown/Tooltip: consistent structural motion ── */
+.modal-glass-enter { animation: uxModalIn var(--ux-complex) var(--ux-ease-spring) both !important; filter: none !important; }
+@keyframes uxModalIn { from { opacity: 0; transform: scale(0.96) translateY(10px); } to { opacity: 1; transform: none; } }
+.modal-backdrop-enter, .theme-modal-overlay, .theme-overlay { animation: uxFade var(--ux-standard) ease-out both; }
+@keyframes uxFade { from { opacity: 0; } to { opacity: 1; } }
+.animate-scale-in { animation: uxDropdownIn var(--ux-standard) var(--ux-ease-out) both !important; }
+@keyframes uxDropdownIn { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+.theme-drawer-panel { animation: uxDrawerIn var(--ux-complex) var(--ux-ease-out) both; }
+@keyframes uxDrawerIn { from { opacity: 0.4; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+[dir="rtl"] .theme-drawer-panel { animation-name: uxDrawerInRtl; }
+@keyframes uxDrawerInRtl { from { opacity: 0.4; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+
+/* ── Cards: purposeful hover only (no random animation) ── */
+.theme-card, .card-primary, .glass-card { transition: transform var(--ux-fast) var(--ux-ease-out), box-shadow var(--ux-standard) var(--ux-ease-out), border-color var(--ux-fast) ease, background-color var(--ux-fast) ease !important; }
+[data-interaction~="lift"]:hover, .hover-lift:hover { transform: translateY(var(--ux-lift)) !important; }
+.theme-card:active, .card-primary:active { transform: scale(0.995); }
+
+/* ── Hierarchy: page + section headers scan in seconds ── */
+.ux-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.ux-page-title { font-size: 1.375rem; font-weight: 800; color: rgb(var(--text-main)); line-height: 1.25; letter-spacing: -0.01em; }
+.ux-page-sub { font-size: 0.8125rem; color: rgb(var(--text-muted)); margin-top: 0.25rem; line-height: 1.5; }
+.ux-section-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: rgb(var(--text-muted)); }
+.ux-section-sub { font-size: 0.75rem; color: rgb(var(--text-muted)); opacity: 0.75; margin-top: 2px; }
+
+/* ── Filter chips + search affordances ── */
+.ux-chip { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 32px; padding: 0.25rem 0.625rem 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: rgba(var(--primary), 0.09); color: rgb(var(--primary)); border: 1px solid rgba(var(--primary), 0.22); transition: background var(--ux-fast) ease, transform var(--ux-fast) var(--ux-ease-out); }
+.ux-chip:hover { background: rgba(var(--primary), 0.14); }
+.ux-chip:active { transform: scale(0.96); }
+.ux-chip button { display: inline-flex; border-radius: 999px; padding: 2px; }
+.ux-chip button:hover { background: rgba(var(--primary), 0.18); }
+[dir="rtl"] .ux-chip { padding: 0.25rem 0.75rem 0.25rem 0.625rem; }
+
+/* ── Status dots: state you can read at a glance ── */
+.ux-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+.ux-dot-pulse { position: relative; }
+.ux-dot-pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 999px; border: 2px solid currentColor; opacity: 0.35; animation: uxDotPing 1.8s ease-out infinite; }
+@keyframes uxDotPing { 0% { transform: scale(0.5); opacity: 0.5; } 80%, 100% { transform: scale(1); opacity: 0; } }
+
+/* ── Success feedback: subtle, once ── */
+.animate-success-pop { animation: uxSuccessPop var(--ux-complex) var(--ux-ease-spring) both !important; }
+@keyframes uxSuccessPop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ── Operational screens: SPEED > BEAUTY (§18) ──
+   Apply `ops-fast` on POS/KDS/Pickup/CallCenter/Dispatch roots. */
+.ops-fast *, .ops-fast *::before, .ops-fast *::after {
+  animation-duration: var(--ux-fast) !important; transition-duration: var(--ux-fast) !important;
+}
+.ops-fast .ambient-orb, .ops-fast .ambient-noise::after, .ops-fast .glass-shine::after,
+.ops-fast .glass-tilt::after, .ops-fast .animate-breathe, .ops-fast .animate-mode-glow,
+.ops-fast .glow-breathe, .ops-fast .animate-border-glow { animation: none !important; display: none !important; }
+.ops-fast .theme-card:hover, .ops-fast .card-primary:hover, .ops-fast .hover-lift:hover { transform: none !important; }
+.ops-fast .stagger-appear, .ops-fast .theme-animate-stagger, .ops-fast .scroll-reveal { opacity: 1 !important; transform: none !important; animation: none !important; }
+
+/* ── Touch + responsive (§19): 44px targets, no layout shrink-only ── */
+@media (hover: none) and (pointer: coarse) {
+  .ux-btn { min-height: 44px; }
+  .theme-icon-button { min-width: 44px; min-height: 44px; }
+  tbody tr [data-row-actions] button { min-width: 44px; min-height: 44px; }
+}
+@media (max-width: 639px) {
+  .ux-page-title { font-size: 1.125rem; }
+  .ux-btn:not(.ux-btn-icon) { padding: 0.625rem 1rem; }
+}
+
+/* ── Reduced motion (§20): calm, instant, still clear ── */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .page-exit, .stagger-appear, .theme-animate-stagger, .modal-glass-enter,
+  .toast-enter, .toast-exit, .animate-scale-in, .theme-drawer-panel, .skeleton-reveal,
+  .ux-field-error, .ux-chip, .ux-btn { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  .ux-btn:hover, .hover-lift:hover, [data-interaction~="lift"]:hover { transform: none !important; }
+  .ux-dot-pulse::after, .ux-btn-loading .ux-spinner { animation: none !important; }
+  .ux-btn-loading .ux-spinner { border-top-color: currentColor; opacity: 0.6; }
+}
+
+/* ── Lite perf tier: compose with existing lite rules ── */
+html[data-perf-tier="lite"] .ux-chip, html[data-perf-tier="lite"] .ux-dot-pulse::after { animation: none !important; }

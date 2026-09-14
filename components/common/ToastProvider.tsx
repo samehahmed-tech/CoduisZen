@@ -52,21 +52,21 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = (
     useEffect(() => {
         timerRef.current = setTimeout(() => {
             setExiting(true);
-            setTimeout(() => onDismiss(toast.id), 300);
+            setTimeout(() => onDismiss(toast.id), 180);
         }, toast.duration || 4000);
         return () => { if (timerRef.current) clearTimeout(timerRef.current); };
     }, [toast.id, toast.duration, onDismiss]);
 
     return (
-        <div className={`theme-toast flex items-center gap-3 px-4 py-3 border ${style.border} max-w-sm w-full transition-all duration-150 ${exiting ? 'opacity-0 translate-x-8 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}
-            style={{ animation: exiting ? undefined : 'slideInRight 0.3s ease-out' }}>
-            <div className={`p-1.5 rounded-xl ${style.bg}`}>
-                <Icon size={16} className={style.icon} />
+        <div role="status" aria-live="polite" className={`theme-toast flex items-center gap-3 px-4 py-3 border ${style.border} max-w-sm w-full shadow-2xl ${exiting ? 'toast-exit' : 'toast-enter'}`}>
+            <div className={`p-1.5 rounded-xl ${style.bg} shrink-0`}>
+                <Icon size={17} className={style.icon} />
             </div>
-            <p className="text-xs font-bold text-main flex-1 leading-relaxed">{toast.message}</p>
-            <button onClick={() => { setExiting(true); setTimeout(() => onDismiss(toast.id), 300); }}
-                className="theme-icon-button p-1 shrink-0">
-                <X size={12} />
+            <p className="text-[13px] font-semibold text-main flex-1 leading-relaxed">{toast.message}</p>
+            <button onClick={() => { setExiting(true); setTimeout(() => onDismiss(toast.id), 180); }}
+                aria-label="Dismiss notification"
+                className="theme-icon-button !min-w-[32px] !min-height-[32px] p-1 shrink-0">
+                <X size={13} />
             </button>
         </div>
     );
@@ -100,9 +100,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return (
         <ToastContext.Provider value={value}>
             {children}
-            <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: '360px' }}>
+            {/* top-center: avoids overlapping the floating sidebar on both RTL (right) and LTR (left).
+                z-[10000] keeps toasts above rail (z-50/60/80), modals and popovers. */}
+            <div
+                className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] flex flex-col gap-2 items-center pointer-events-none px-4 w-full"
+                style={{ maxWidth: 'min(400px, calc(100vw - 2rem))' }}
+            >
                 {toasts.map(t => (
-                    <div key={t.id} className="pointer-events-auto">
+                    <div key={t.id} className="pointer-events-auto w-full">
                         <ToastItem toast={t} onDismiss={dismiss} />
                     </div>
                 ))}

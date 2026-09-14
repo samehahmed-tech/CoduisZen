@@ -3,9 +3,10 @@ import React from 'react';
 import {
     Eye, EyeOff, Edit3, Copy, Archive, ArchiveRestore, Trash2,
     Flame, AlertTriangle, TrendingDown,
-    CheckSquare, Square, ImageIcon, Package, Layers
+    CheckSquare, Square, Package, Layers
 } from 'lucide-react';
 import { MenuItem } from '../../types';
+import { ItemImage } from '../../src/features/pos/components/ItemImage';
 import { ViewMode, DensityMode } from './MenuProfitCenter';
 
 interface Props {
@@ -87,13 +88,7 @@ const ItemCard: React.FC<Props> = ({
                     </div>
                 )}
 
-                {item.image ? (
-                    <img src={item.image} alt="" className="w-9 h-9 rounded-md object-cover border border-gray-200 dark:border-border/30 shrink-0" loading="lazy" />
-                ) : (
-                    <div className="w-9 h-9 rounded-md bg-gray-100 dark:bg-elevated/50 flex items-center justify-center shrink-0 text-gray-300 dark:text-muted/20">
-                        <ImageIcon size={14} />
-                    </div>
-                )}
+                <ItemImage src={item.image} name={itemName} small className="w-9 h-9 rounded-md border border-gray-200 dark:border-border/30 shrink-0" />
 
                 {/* Name & Category */}
                 <div className="flex-1 min-w-0">
@@ -164,14 +159,7 @@ const ItemCard: React.FC<Props> = ({
 
             {/* TOP: Image + Status */}
             <div className={`relative ${isCompact ? 'h-20' : 'h-28'} bg-gray-100 dark:bg-elevated/20 border-b border-gray-100 dark:border-white/[0.04] shrink-0 overflow-hidden`}>
-                {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
-                ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 dark:text-muted/40">
-                        <ImageIcon size={24} className="mb-2 opacity-30" />
-                        <span className="text-[10px] uppercase font-medium tracking-wider">No Image</span>
-                    </div>
-                )}
+                <ItemImage src={item.image} name={itemName} />
 
                 {/* Dietary Badges overlay */}
                 {item.dietaryBadges && item.dietaryBadges.length > 0 && (

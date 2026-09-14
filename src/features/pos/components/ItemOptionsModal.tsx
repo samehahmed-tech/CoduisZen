@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Minus, AlertCircle, DollarSign } from 'lucide-react';
 import { MenuItem, ItemSize } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { resolveItemOptionPrice } from '../itemOptionPricing';
+import { applyPlatformMarkup, type PlatformMarkup } from '@/services/platformPricing';
 
 interface ItemOptionsModalProps {
     isOpen: boolean;
@@ -11,10 +13,12 @@ interface ItemOptionsModalProps {
     onConfirm: (item: MenuItem, selectedModifiers: { groupName: string; optionName: string; price: number }[], newQuantity: number) => void;
     currencySymbol: string;
     lang: string;
+    /** Silent platform markup (Talabat-style). Open/weighted prices are never marked up. */
+    platformMarkup?: PlatformMarkup | null;
 }
 
 const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
-    isOpen, item, onClose, onConfirm, currencySymbol, lang
+    isOpen, item, onClose, onConfirm, currencySymbol, lang, platformMarkup
 }) => {
     const isRTL = lang === 'ar';
     const [quantity, setQuantity] = useState(1);
@@ -40,12 +44,25 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
     }, [isOpen, item]);
 
     const parsedCustomPrice = parseFloat(customPrice) || 0;
-    const basePrice = resolveItemOptionPrice({
-        itemPrice: item?.price || 0,
+    // item.price may already be platform-inclusive (catalog); always derive
+    // from the original base so the markup is applied exactly once.
+    const catalogBase = Number((item as any)?.basePrice ?? item?.price ?? 0);
+    const rawBasePrice = resolveItemOptionPrice({
+        itemPrice: catalogBase,
         isOpenPrice,
         customPrice: parsedCustomPrice,
         selectedSizePrice: selectedSize?.price,
     });
+    // Silent platform pricing: sizes/menu prices include the markup, while
+    // cashier-entered open/weighted prices are final and stay untouched.
+    // Modifiers are never marked up (server parity).
+    const basePrice = isOpenPrice ? rawBasePrice : Number((item as any)?.basePrice ?? rawBasePrice);
+    const unitPrice = (!isOpenPrice && platformMarkup)
+        ? applyPlatformMarkup(basePrice, platformMarkup.pct, platformMarkup.fixed)
+        : rawBasePrice;
+    const unitMarkup = (!isOpenPrice && platformMarkup)
+        ? Math.max(0, Math.round(((unitPrice - basePrice) + Number.EPSILON) * 100) / 100)
+        : 0;
 
     const modsPrice = useMemo(() => {
         let total = 0;
@@ -61,7 +78,7 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
         return total;
     }, [selectedMods, item]);
 
-    const totalPrice = (basePrice + modsPrice) * quantity;
+    const totalPrice = (unitPrice + modsPrice) * quantity;
 
     const isValid = useMemo(() => {
         if (!item?.modifierGroups) return true;
@@ -106,7 +123,11 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
                 finalItem.nameAr = `${item.nameAr || item.name} (${selectedSize.nameAr || selectedSize.name})`;
             }
         }
-        finalItem.price = basePrice;
+        finalItem.price = unitPrice;
+        (finalItem as any).basePrice = basePrice;
+        (finalItem as any).platformId = (!isOpenPrice && platformMarkup) ? platformMarkup.platformId : null;
+        (finalItem as any).platformMarkup = unitMarkup;
+        (finalItem as any).isOpenPrice = isOpenPrice || undefined;
 
         const finalMods: { groupName: string; optionName: string; price: number; optionId?: string; id?: string }[] = [];
         if (item.modifierGroups) {
@@ -125,25 +146,23 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
 
     if (!isOpen || !item) return null;
 
-    return (
+    // Portal to <body>: escapes any transformed/filtered ancestor or z-index
+    // trap inside the POS layout that could leave only the dim backdrop
+    // visible. Entrance uses fade + small rise (never a full-height offset),
+    // so the sheet is readable even if an animation frame is ever skipped.
+    return createPortal(
         <AnimatePresence>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center theme-modal-overlay p-2 sm:p-3">
-                <div className="absolute inset-0" onClick={onClose} />
-                <motion.div initial={{ y: "100%", scale: 1 }} animate={{ y: 0, scale: 1 }} exit={{ y: "100%", scale: 1 }} transition={{ type: "spring", duration: 0.15 }} className={`relative w-full sm:max-w-xl theme-modal-content flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-1.5rem)] overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} role="dialog" aria-modal="true" className="fixed inset-0 z-[120] flex items-center justify-center theme-modal-overlay p-2 sm:p-3">
+                <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+                <motion.div initial={{ opacity: 0, y: 28, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 28, scale: 0.99 }} transition={{ type: "tween", duration: 0.22, ease: "easeOut" }} className={`relative w-full sm:max-w-xl theme-modal-content flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-1.5rem)] overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
 
-                    {/* Header Image & Info */}
+                    {/* Compact item header: useful information without an empty image stage */}
                     <div className="flex flex-col relative shrink-0">
-                        {item.image && (
-                            <div className="w-full h-32 sm:h-40 overflow-hidden relative">
-                                <img src={item.image} alt="" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
-                            </div>
-                        )}
-                        <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 bg-black/60 rounded-full text-white flex items-center justify-center hover:bg-black/80 transition-colors z-10 border border-white/20 shadow-sm">
+                        <button onClick={onClose} className="absolute top-3 right-3 w-10 h-10 bg-black/60 rounded-full text-white flex items-center justify-center hover:bg-black/80 transition-colors z-10 border border-white/20 shadow-sm">
                             <X size={18} />
                         </button>
 
-                        <div className={`px-4 sm:px-6 pb-3 sm:pb-4 pt-3 sm:pt-4 border-b border-border/10 bg-card ${item.image ? '-mt-10 relative z-10' : ''}`}>
+                        <div className="px-4 sm:px-6 pb-4 pt-5 border-b border-border/10 bg-card relative z-10">
                             <div className="flex justify-between items-start gap-4">
                                 <div>
                                     <h2 className="text-xl sm:text-2xl font-black text-main leading-tight drop-shadow-sm">
@@ -159,7 +178,7 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
                                     <p className="text-[10px] font-black uppercase tracking-widest text-muted">{isRTL ? 'السعر' : 'Base'}</p>
                                     <p className="text-lg font-black text-indigo-500 tabular-nums leading-none mt-0.5">
                                         <span className="text-xs uppercase mr-0.5">{currencySymbol}</span>
-                                        {basePrice.toFixed(2)}
+                                        {unitPrice.toFixed(2)}
                                     </p>
                                 </div>
                             </div>
@@ -233,7 +252,7 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
                                                     {lang === 'ar' ? (size.nameAr || size.name) : size.name}
                                                 </span>
                                                 <span className={`text-[10px] font-black uppercase tracking-widest mt-1 ${isSelected ? 'text-indigo-200' : 'text-muted'}`}>
-                                                    +{size.price.toFixed(2)} {currencySymbol}
+                                                    +{(platformMarkup && !isOpenPrice ? applyPlatformMarkup(size.price, platformMarkup.pct, platformMarkup.fixed) : size.price).toFixed(2)} {currencySymbol}
                                                 </span>
                                             </button>
                                         );
@@ -333,7 +352,8 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
                     </div>
                 </motion.div>
             </motion.div>
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body,
     );
 };
 

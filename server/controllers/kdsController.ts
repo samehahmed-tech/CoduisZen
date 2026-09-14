@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import { db, pool } from '../db';
-import { kdsTickets, kdsTicketItems, menuCategories, menuItems, orders, orderItems, printers, tables } from '../../src/db/schema';
+import { kdsTickets, kdsTicketItems, menuCategories, menuItems, orderStatusHistory, orders, orderItems, printers, tables } from '../../src/db/schema';
 import { eq, inArray, and, notInArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import logger from '../utils/logger';
 import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
-import { transitionOrderStatus } from '../services/orderLifecycleService';
+import { transitionOrderStatus, sweepStaleBranchOrders } from '../services/orderLifecycleService';
 import { enqueuePrintJob } from '../services/printQueueService';
 import { isKitchenRoutingPrinter, resolvePrinterRoutingStation } from '../services/kdsRouting';
 
@@ -68,10 +68,20 @@ const ensureKdsSchema = async () => {
             item_name nvarchar(max) NOT NULL,
             quantity int NOT NULL,
             modifiers_text nvarchar(max) NULL,
+            size_label nvarchar(255) NULL,
+            item_notes nvarchar(max) NULL,
             is_bumped bit DEFAULT 0,
             CONSTRAINT pk_kds_ticket_items PRIMARY KEY (id),
             CONSTRAINT fk_kds_ticket_items_ticket FOREIGN KEY (kds_ticket_id) REFERENCES kds_tickets(id) ON DELETE CASCADE
         );
+
+        IF OBJECT_ID('kds_ticket_items', 'U') IS NOT NULL
+           AND COL_LENGTH('kds_ticket_items', 'size_label') IS NULL
+        ALTER TABLE kds_ticket_items ADD size_label nvarchar(255) NULL;
+
+        IF OBJECT_ID('kds_ticket_items', 'U') IS NOT NULL
+           AND COL_LENGTH('kds_ticket_items', 'item_notes') IS NULL
+        ALTER TABLE kds_ticket_items ADD item_notes nvarchar(max) NULL;
 
         IF OBJECT_ID('kds_ticket_items', 'U') IS NOT NULL
            AND COL_LENGTH('kds_ticket_items', 'is_bumped') IS NULL
@@ -108,6 +118,72 @@ const normalizePrinterIds = (value: unknown): string[] => {
     return trimmed.split(',').map((id) => id.trim()).filter(Boolean);
 };
 
+const JUNK_MODIFIER_TEXT = /\[object\s*object\]|\uFFFD/i;
+
+/**
+ * Resolves a readable size/variant label from any order-item shape.
+ * Order items only carry sizeId — the name lives on menuItems.sizes.
+ */
+const resolveOrderItemSizeLabel = (item: any, sizesByMenuItemId?: Map<string, any[]>): string => {
+    const direct = item?.sizeLabel || item?.size_label || item?.sizeName || item?.size_name
+        || item?.selectedSizeName || item?.selectedSize?.name || item?.selectedSize?.nameAr
+        || item?.size?.name || item?.size?.nameAr || item?.variantName || item?.variant;
+    if (direct && String(direct).trim()) return String(direct).trim();
+    const sizeId = String(item?.sizeId || item?.size_id || '').trim();
+    if (!sizeId) return '';
+    // sizeId may itself be a label when POS sends names instead of ids
+    if (sizesByMenuItemId) {
+        const sizes = sizesByMenuItemId.get(String(item?.menuItemId || item?.menu_item_id || '')) || [];
+        const match = sizes.find((s: any) => String(s?.id || '') === sizeId);
+        if (match) return String(match?.nameAr || match?.name || sizeId).trim();
+    }
+    return sizeId;
+};
+
+/**
+ * Builds a readable "group: option ×qty, ..." summary from any modifier payload shape
+ * (order-item arrays, kds modifiersText JSON, legacy "[object Object]" rows).
+ */
+const describeModifierEntry = (mod: any): string => {
+    if (!mod || typeof mod === 'boolean') return '';
+    if (typeof mod === 'string') {
+        const text = mod.trim();
+        return text && !JUNK_MODIFIER_TEXT.test(text) ? text : '';
+    }
+    if (typeof mod === 'number') return String(mod);
+    if (typeof mod === 'object') {
+        const option = String(
+            mod?.optionName || mod?.option_name || mod?.nameAr || mod?.name_ar
+            || mod?.name || mod?.itemName || mod?.title || mod?.label || mod?.value || '',
+        ).trim();
+        if (!option || JUNK_MODIFIER_TEXT.test(option)) return '';
+        const group = String(mod?.groupName || mod?.group_name || mod?.group || '').trim();
+        const quantity = Number(mod?.quantity || 1);
+        const base = group && group !== option ? `${group}: ${option}` : option;
+        return quantity > 1 ? `${base} ×${quantity}` : base;
+    }
+    return '';
+};
+
+const describeItemModifiers = (item: any): string => {
+    let payload: unknown = item?.modifiers;
+    if (!Array.isArray(payload) && typeof item?.modifiersText === 'string') {
+        try {
+            payload = JSON.parse(item.modifiersText);
+        } catch {
+            payload = null;
+        }
+    }
+    if (Array.isArray(payload)) {
+        const labels = (payload as any[]).map(describeModifierEntry)
+            .filter((label: string) => Boolean(label));
+        if (labels.length > 0) return Array.from(new Set(labels)).join('، ');
+        return '';
+    }
+    const text = String(item?.modifiersText || '').trim();
+    return text && !JUNK_MODIFIER_TEXT.test(text) ? text : '';
+};
+
 const formatKitchenTicket = (params: {
     ticketId: string;
     order: { id: string; orderNumber?: string | number | null; type?: string | null; tableId?: string | null; tableName?: string | null; kitchenNotes?: string | null; createdAt?: Date | string | null };
@@ -125,9 +201,15 @@ const formatKitchenTicket = (params: {
     lines.push(`الوقت: ${createdAt}`);
     lines.push('------------------------------');
     for (const item of params.items) {
-        lines.push(`${Number(item.quantity || 0)} x ${item.name || item.itemName || ''}`);
-        const notes = item.notes || item.modifiersText || (item.modifiers ? JSON.stringify(item.modifiers) : '');
-        if (notes) lines.push(`  ${notes}`);
+        const sizeLabel = resolveOrderItemSizeLabel(item);
+        const title = sizeLabel
+            ? `${Number(item.quantity || 0)} x ${item.name || item.itemName || ''} [${sizeLabel}]`
+            : `${Number(item.quantity || 0)} x ${item.name || item.itemName || ''}`;
+        lines.push(title);
+        const modifierLine = describeItemModifiers(item);
+        if (modifierLine) lines.push(`  + ${modifierLine}`);
+        const itemNote = String(item.notes || item.itemNotes || item.item_notes || '').trim();
+        if (itemNote) lines.push(`  ! ${itemNote}`);
     }
     if (params.order.kitchenNotes) {
         lines.push('------------------------------');
@@ -165,6 +247,61 @@ const [order] = await db.select({ id: orders.id, status: orders.status }).top(1)
         },
     });
     return true;
+};
+
+const terminalHandoverStatus = (type?: string | null) => String(type || '').toUpperCase() === 'DINE_IN' ? 'COMPLETED' : 'DELIVERED';
+
+/**
+ * Marks every non-terminal kitchen ticket of an order as DELIVERED so the
+ * kitchen/pickup screens no longer display it.
+ */
+const forceDeliverKdsTicketsByOrderId = async (orderId: string, now: Date) => {
+    await db.update(kdsTickets)
+        .set({ status: 'DELIVERED', updatedAt: now })
+        .where(and(eq(kdsTickets.orderId, orderId), notInArray(kdsTickets.status, ['DELIVERED', 'CANCELLED'])));
+};
+
+/**
+ * Last-resort handover path for orders blocked by stale-day / kitchen-ticket
+ * guards. Writes the transition directly (with an audit history row) instead
+ * of returning 409, so screens can always be cleared.
+ */
+const forceFinalizeOrderForHandover = async (orderId: string, userId?: string) => {
+    const [order] = await db.select({ id: orders.id, branchId: orders.branchId, status: orders.status, type: orders.type, tableId: orders.tableId })
+        .top(1)
+        .from(orders)
+        .where(eq(orders.id, orderId));
+    if (!order) return;
+
+    const now = new Date();
+    const nextStatus = terminalHandoverStatus(order.type);
+    if (!['COMPLETED', 'DELIVERED', 'CANCELLED'].includes(String(order.status))) {
+        await db.update(orders)
+            .set({
+                status: nextStatus,
+                ...(nextStatus === 'DELIVERED' ? { actualDeliveryTime: now } : {}),
+                ...(nextStatus === 'COMPLETED' ? { completedAt: now } : {}),
+                updatedAt: now,
+            })
+            .where(eq(orders.id, orderId));
+        await db.insert(orderStatusHistory).values({
+            orderId,
+            status: nextStatus,
+            changedBy: userId || null,
+            notes: 'Packing handover (forced: stale day or missing kitchen tickets)',
+            createdAt: now,
+        });
+        if (nextStatus === 'COMPLETED' && order.tableId) {
+            await db.update(tables)
+                .set({ status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null, updatedAt: now })
+                .where(eq(tables.id, order.tableId));
+        }
+        const room = order.branchId ? `branch:${order.branchId}` : null;
+        if (room) {
+            try { getIO().to(room).emit('order:status', { id: orderId, status: nextStatus }); } catch (e) {}
+        }
+    }
+    await forceDeliverKdsTicketsByOrderId(orderId, now);
 };
 
 export const kdsController = {
@@ -211,6 +348,10 @@ export const kdsController = {
             await ensureKdsSchema();
             const { station } = req.query;
             const branchId = req.effectiveBranchId;
+
+            // Self-heal any stale orders left from already-closed business days.
+            await sweepStaleBranchOrders(branchId);
+
             const includeServed = String(req.query.includeServed || '').toLowerCase() === 'true';
             const activeStatuses = includeServed ? ['DELIVERED', 'CANCELLED'] : ['SERVED', 'DELIVERED', 'CANCELLED'];
             const filters = [
@@ -241,20 +382,62 @@ export const kdsController = {
             const itemMenuIds = Array.from(new Set(items.map(item => item.menuItemId).filter(Boolean)));
             const menuNameRows = itemMenuIds.length > 0
                 ? await db
-                    .select({ id: menuItems.id, name: menuItems.name, nameAr: menuItems.nameAr })
+                    .select({ id: menuItems.id, name: menuItems.name, nameAr: menuItems.nameAr, sizes: menuItems.sizes })
                     .from(menuItems)
                     .where(inArray(menuItems.id, itemMenuIds))
                 : [];
             const menuNamesById = new Map(menuNameRows.map(item => [item.id, item]));
+            const sizesByMenuItemId = new Map<string, any[]>(
+                menuNameRows.map(row => [row.id, Array.isArray(row.sizes) ? row.sizes : []]),
+            );
+            // Backfill size/notes for tickets dispatched before size_label/item_notes existed
+            const kdsOrderItemIds = Array.from(new Set(items.map(item => Number(item.orderItemId)).filter(n => Number.isFinite(n) && n > 0)));
+            const orderItemRows = kdsOrderItemIds.length > 0
+                ? await db
+                    .select({ id: orderItems.id, sizeId: orderItems.sizeId, notes: orderItems.notes, modifiers: orderItems.modifiers })
+                    .from(orderItems)
+                    .where(inArray(orderItems.id, kdsOrderItemIds))
+                : [];
+            const orderItemsById = new Map(orderItemRows.map(row => [row.id, row]));
             const itemsByTicket: Record<string, any[]> = {};
+            const seenTicketItemKeys = new Map<string, Set<string>>();
             items.forEach(i => {
                 if (!itemsByTicket[i.kdsTicketId]) itemsByTicket[i.kdsTicketId] = [];
+                // Defensive: a retried dispatch (or legacy rows) can leave two
+                // kds_ticket_items rows pointing at the same order item. The
+                // kitchen must show that line once per ticket.
+                const itemKey = (i as any).orderItemId !== undefined && (i as any).orderItemId !== null
+                    ? `orderItem:${String((i as any).orderItemId)}`
+                    : `row:${String((i as any).id)}`;
+                let seen = seenTicketItemKeys.get(i.kdsTicketId);
+                if (!seen) {
+                    seen = new Set<string>();
+                    seenTicketItemKeys.set(i.kdsTicketId, seen);
+                }
+                if (seen.has(itemKey)) return;
+                seen.add(itemKey);
                 const menuName = menuNamesById.get(i.menuItemId);
+                const linkedOrderItem = orderItemsById.get(Number((i as any).orderItemId));
+                const mergedForSize = {
+                    ...linkedOrderItem,
+                    ...i,
+                    menuItemId: (i as any).menuItemId,
+                    sizeId: (i as any).sizeLabel ? undefined : linkedOrderItem?.sizeId,
+                    sizeLabel: (i as any).sizeLabel,
+                };
+                const sizeLabel = (i as any).sizeLabel
+                    || resolveOrderItemSizeLabel(mergedForSize, sizesByMenuItemId)
+                    || resolveOrderItemSizeLabel(linkedOrderItem, sizesByMenuItemId);
                 // Map DB field `itemName` to `name` which the frontend KDS component expects
                 itemsByTicket[i.kdsTicketId].push({
                     ...i,
                     name: menuName?.nameAr || i.itemName || menuName?.name || 'Item',
                     nameAr: menuName?.nameAr || i.itemName,
+                    sizeLabel: sizeLabel || null,
+                    size: sizeLabel || null,
+                    notes: (i as any).itemNotes || linkedOrderItem?.notes || (i as any).notes || null,
+                    itemNotes: (i as any).itemNotes || linkedOrderItem?.notes || null,
+                    modifiers: linkedOrderItem?.modifiers || (i as any).modifiers || null,
                 });
             });
 
@@ -336,6 +519,7 @@ export const kdsController = {
                         id: menuItems.id,
                         itemPrinterIds: menuItems.printerIds,
                         categoryPrinterIds: menuCategories.printerIds,
+                        sizes: menuItems.sizes,
                     })
                     .from(menuItems)
                     .leftJoin(menuCategories, eq(menuItems.categoryId, menuCategories.id))
@@ -364,6 +548,9 @@ export const kdsController = {
                 : [];
             const printerById = new Map(printerRows.map(printer => [printer.id, printer]));
             const stationByMenuItemId = new Map<string, string[]>();
+            const sizesByMenuItemId = new Map<string, any[]>(
+                menuRoutingRows.map(row => [row.id, Array.isArray((row as any).sizes) ? (row as any).sizes : []]),
+            );
             const printerIdsByStation = new Map<string, string[]>();
 
             for (const row of menuRoutingRows) {
@@ -382,18 +569,28 @@ export const kdsController = {
 
             const ticketsBuffer: any = {};
 
-            // Group items by station
+            // Group items by station (stations are already de-duplicated per
+            // menu item, so each order line lands at most once per ticket).
             orderItemsList.forEach(item => {
                 const stations = item.menuItemId ? stationByMenuItemId.get(item.menuItemId) : null;
-                for (const station of stations?.length ? stations : ['KITCHEN']) {
+                const uniqueStations = Array.from(new Set(stations?.length ? stations : ['KITCHEN']));
+                for (const station of uniqueStations) {
                     if (!ticketsBuffer[station]) ticketsBuffer[station] = [];
-                    ticketsBuffer[station].push(item);
+                    const bucket = ticketsBuffer[station] as any[];
+                    if (!bucket.some(existing => existing?.id !== undefined && existing.id === item.id)) {
+                        bucket.push(item);
+                    }
                 }
             });
 
             const printJobsToCreate: Array<{ ticketId: string; station: string; printerId?: string; printer?: any; items: any[] }> = [];
 
             await db.transaction(async (tx) => {
+                // Re-check inside the transaction: two concurrent dispatches
+                // (POS retry + server auto-dispatch) must not create duplicate
+                // ticket sets for the same order.
+                const already = await tx.select({ id: kdsTickets.id }).from(kdsTickets).where(eq(kdsTickets.orderId, orderId));
+                if (already.length > 0) return;
                 for (const station of Object.keys(ticketsBuffer)) {
                     const ticketId = `KDS-${nanoid(8)}`;
                     await tx.insert(kdsTickets).values({
@@ -413,6 +610,8 @@ export const kdsController = {
                         itemName: item.nameAr || item.name_ar || item.name,
                         quantity: item.quantity,
                         modifiersText: item.modifiers ? JSON.stringify(item.modifiers) : null,
+                        sizeLabel: resolveOrderItemSizeLabel(item, sizesByMenuItemId) || null,
+                        itemNotes: String(item.notes || '').trim() || null,
                     }));
 
                     await tx.insert(kdsTicketItems).values(itemsToInsert);
@@ -543,6 +742,15 @@ export const kdsController = {
                     await db.update(orders)
                         .set({ status: 'PREPARING', updatedAt: new Date() })
                         .where(eq(orders.id, ticket.orderId));
+                    // Audit the direct demotion (bypasses the status policy
+                    // by design — kitchen recall), so history stays complete.
+                    await db.insert(orderStatusHistory).values({
+                        orderId: ticket.orderId,
+                        status: 'PREPARING',
+                        changedBy: (req as any)?.user?.id || null,
+                        notes: `KDS_RECALL ticket ${ticketId}`,
+                        createdAt: new Date(),
+                    });
 
                     const branchRoom = ticket.branchId ? `branch:${ticket.branchId}` : null;
                     if (branchRoom) {
@@ -577,23 +785,41 @@ export const kdsController = {
             if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
             if (!canAccessBranch(req, order.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
             if (String(order.status) === 'CANCELLED') return res.status(409).json({ error: 'ORDER_CANCELLED' });
-            if (['COMPLETED', 'DELIVERED'].includes(String(order.status))) return res.json({ success: true });
+            if (['COMPLETED', 'DELIVERED'].includes(String(order.status))) {
+                // Already terminal: make sure no stale kitchen ticket keeps the screens dirty.
+                await forceDeliverKdsTicketsByOrderId(orderId, new Date());
+                return res.json({ success: true });
+            }
             if (!['TAKEAWAY', 'PICKUP', 'KIOSK'].includes(String(order.type))) {
                 return res.status(409).json({ error: 'PACKING_HANDOVER_TYPE_INVALID' });
             }
 
-            await transitionOrderStatus({
-                orderId,
-                nextStatus: 'DELIVERED',
-                notes: 'Packing handover',
-                changedBy: req.user?.id,
-                user: {
-                    role: req.user?.role,
-                    branchId: req.user?.branchId,
-                    allowedBranches: req.user?.allowedBranches,
-                },
-                requireKitchenReady: true,
-            });
+            try {
+                await transitionOrderStatus({
+                    orderId,
+                    nextStatus: 'DELIVERED',
+                    notes: 'Packing handover',
+                    changedBy: req.user?.id,
+                    user: {
+                        role: req.user?.role,
+                        branchId: req.user?.branchId,
+                        allowedBranches: req.user?.allowedBranches,
+                    },
+                    requireKitchenReady: true,
+                });
+            } catch (transitionError: any) {
+                const code = String(transitionError?.code || transitionError?.message || '');
+                const forceFinalizeCodes = new Set([
+                    'ORDER_BUSINESS_DAY_CLOSED',
+                    'ORDER_HISTORY_READ_ONLY',
+                    'KITCHEN_TICKETS_MISSING',
+                    'KITCHEN_TICKETS_NOT_READY',
+                ]);
+                if (!forceFinalizeCodes.has(code)) throw transitionError;
+                // Stale ticket/day guards must not trap orders on the pickup screen:
+                // finalize them directly so the handover always clears the display.
+                await forceFinalizeOrderForHandover(orderId, req.user?.id);
+            }
 
             const room = order.branchId ? `branch:${order.branchId}` : null;
             if (room) {

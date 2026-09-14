@@ -45,7 +45,7 @@ export const getAllSettings = async (req: Request, res: Response) => {
                 taxRate: 14,
                 serviceCharge: 0,
                 language: 'ar',
-                theme: 'mica-glass'
+                theme: 'fluent-frost'
             });
         }
 

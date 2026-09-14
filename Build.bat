@@ -1,1 +1,0 @@
-Running powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sameh-installer\build-sameh-installer.ps1 -Version 1.1.18 -OutputPath .\artifacts\final-setup-1.1.18

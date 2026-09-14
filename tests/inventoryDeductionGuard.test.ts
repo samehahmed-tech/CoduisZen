@@ -103,12 +103,13 @@ describe('inventory deduction guard', () => {
             const dbModule = await import('../server/db');
             db = dbModule.db;
         }
-        await db.execute(sql`DELETE FROM batch_transactions WHERE batch_id = 'test-inventory-guard-batch'`);
-        await db.execute(sql`DELETE FROM stock_movements WHERE item_id = ${FIXTURES.itemId}`);
+        await db.execute(sql`DELETE FROM batch_transactions WHERE stock_movement_id IN (SELECT id FROM stock_movements WHERE item_id IN (${FIXTURES.itemId}, 'test-inventory-guard-batch-item', 'test-inventory-guard-batch-source'))`);
+        await db.execute(sql`DELETE FROM batch_transactions WHERE batch_id IN ('test-inventory-guard-batch', 'test-inventory-guard-source-batch')`);
+        await db.execute(sql`DELETE FROM stock_movements WHERE item_id IN (${FIXTURES.itemId}, 'test-inventory-guard-batch-item', 'test-inventory-guard-batch-source')`);
         await db.execute(sql`DELETE FROM recipe_ingredients WHERE recipe_id = ${FIXTURES.recipeId}`);
         await db.execute(sql`DELETE FROM recipes WHERE id = ${FIXTURES.recipeId}`);
         await db.execute(sql`DELETE FROM inventory_stock WHERE item_id = ${FIXTURES.itemId} AND warehouse_id = ${FIXTURES.warehouseId}`);
-        await db.execute(sql`DELETE FROM inventory_batches WHERE id = 'test-inventory-guard-batch'`);
+        await db.execute(sql`DELETE FROM inventory_batches WHERE id IN ('test-inventory-guard-batch', 'test-inventory-guard-source-batch')`);
     });
 
     it('rejects recipe deduction before aggregate stock can go negative', async () => {
@@ -131,24 +132,25 @@ describe('inventory deduction guard', () => {
         expect(movements).toHaveLength(0);
     });
 
-    it('rolls back aggregate stock when FEFO batches cannot cover the deduction', async () => {
+    it('materializes legacy aggregate stock when no batch exists', async () => {
         await seedRecipeStock({ stockQty: 5 });
 
-        await expect(db.transaction((tx) => inventoryService.deductIngredients(
+        const result = await db.transaction((tx) => inventoryService.deductIngredients(
             tx,
             FIXTURES.menuItemId,
             1,
             FIXTURES.warehouseId,
             'test-inventory-guard-order-batches',
             'test-inventory-guard-user',
-        ))).rejects.toThrow(/INSUFFICIENT_STOCK_BATCHES/);
+        ));
 
-        expect(await getStockQuantity()).toBe(5);
+        expect(result.affectedStocks[0]?.quantity).toBe(4);
+        expect(await getStockQuantity()).toBe(4);
 
         const movements = await db.select()
             .from(stockMovements)
             .where(eq(stockMovements.referenceId, 'test-inventory-guard-order-batches'));
-        expect(movements).toHaveLength(0);
+        expect(movements).toHaveLength(1);
     });
 
     it('allows only one concurrent deduction when stock can cover one order', async () => {
@@ -190,5 +192,37 @@ describe('inventory deduction guard', () => {
             || movement.referenceId === 'test-inventory-guard-order-concurrent-b'
         ));
         expect(concurrentMovements).toHaveLength(1);
+    });
+
+    it('auto-produces a batch item before sale consumption when its batch stock is missing', async () => {
+        const batchItemId = 'test-inventory-guard-batch-item';
+        const batchRecipeId = 'test-inventory-guard-batch-recipe';
+        const batchSourceId = 'test-inventory-guard-batch-source';
+        await db.insert(inventoryItems).values([
+            { id: batchItemId, name: 'Auto Batch Item', unit: 'kg', isActive: true },
+            { id: batchSourceId, name: 'Auto Batch Source', unit: 'kg', isActive: true },
+        ]).onConflictDoNothing();
+        await db.insert(recipes).values({ id: batchRecipeId, inventoryItemId: batchItemId, yield: 1 });
+        await db.insert(recipeIngredients).values({ recipeId: batchRecipeId, inventoryItemId: batchSourceId, quantity: 1, unit: 'kg' });
+        await db.insert(inventoryStock).values({ itemId: batchSourceId, warehouseId: FIXTURES.warehouseId, quantity: 2 });
+        await db.insert(inventoryBatches).values({
+            id: 'test-inventory-guard-source-batch', itemId: batchSourceId, warehouseId: FIXTURES.warehouseId,
+            batchNumber: 'SOURCE-1', expiryDate: new Date(Date.now() + 86400000), initialQty: 2, currentQty: 2,
+            unitCost: 4, status: 'ACTIVE',
+        });
+
+        const result = await db.transaction((tx) => inventoryService.ensureSaleStock(
+            tx, batchItemId, FIXTURES.warehouseId, 1, 'test-inventory-guard-auto-order', 'test-user',
+        ));
+        expect(Number(result.totalCost)).toBe(4);
+        const movements = await db.select().from(stockMovements).where(eq(stockMovements.referenceId, 'test-inventory-guard-auto-order'));
+        expect(movements.map((m) => m.type).sort()).toEqual(['PRODUCTION', 'PRODUCTION_CONSUMPTION', 'SALE_CONSUMPTION'].sort());
+        await db.execute(sql`DELETE FROM batch_transactions WHERE stock_movement_id IN (SELECT id FROM stock_movements WHERE reference_id = 'test-inventory-guard-auto-order')`);
+        await db.execute(sql`DELETE FROM stock_movements WHERE reference_id = 'test-inventory-guard-auto-order'`);
+        await db.execute(sql`DELETE FROM inventory_batches WHERE item_id IN (${batchItemId}, ${batchSourceId})`);
+        await db.execute(sql`DELETE FROM inventory_stock WHERE item_id IN (${batchItemId}, ${batchSourceId})`);
+        await db.execute(sql`DELETE FROM recipe_ingredients WHERE recipe_id = ${batchRecipeId}`);
+        await db.execute(sql`DELETE FROM recipes WHERE id = ${batchRecipeId}`);
+        await db.execute(sql`DELETE FROM inventory_items WHERE id IN (${batchItemId}, ${batchSourceId})`);
     });
 });

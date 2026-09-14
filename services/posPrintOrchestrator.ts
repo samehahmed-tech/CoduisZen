@@ -1,6 +1,7 @@
 import { Branch, MenuCategory, Order, OrderItem, Printer } from '../types';
 import { generateReceiptHTML } from './receiptTemplate';
 import { generateKitchenTicketHTML } from './kitchenTicketTemplate';
+import { generateDriverTicketHTML } from './driverTicketTemplate';
 import { PrintJob, printService } from '../src/services/printService';
 import { findDefaultTemplate, findTemplateForPrinter, generateHtmlFromTemplate, selectReceiptTemplate } from './templateReceiptGenerator';
 import { createImagePrintPayload } from './receiptImageRenderer';
@@ -25,6 +26,19 @@ interface ReceiptPrintParams {
     currencySymbol: string;
     lang: 'en' | 'ar';
     t: any;
+    branch?: Branch;
+    title?: string;
+}
+
+interface DriverTicketPrintParams {
+    order: Order;
+    driverName: string;
+    driverPhone?: string;
+    printers?: Printer[];
+    branchId: string;
+    settings: any;
+    currencySymbol: string;
+    lang: 'en' | 'ar';
     branch?: Branch;
     title?: string;
 }
@@ -363,5 +377,52 @@ export const printOrderReceipt = async ({
         contentType: 'image',
     })));
     if (!queued.every(Boolean)) throw new Error('RECEIPT_PRINT_QUEUE_FAILED');
+};
+
+/**
+ * Driver/dispatch ticket (شيك الطيار) — printed right after an order is
+ * assigned to a driver so the pilot moves with a paper slip.
+ * Target: the branch PACKAGING printer, falling back to the cashier printer.
+ * Throws NO_DRIVER_PRINTER_CONFIGURED when neither exists (caller shows a
+ * non-blocking warning — the assignment itself already succeeded).
+ */
+export const printDriverTicket = async ({
+    order,
+    driverName,
+    driverPhone,
+    printers,
+    branchId,
+    settings,
+    currencySymbol,
+    lang,
+    branch,
+    title,
+}: DriverTicketPrintParams): Promise<void> => {
+    const onlineBranchPrinters = resolveOnlineBranchPrinters(printers || [], branchId);
+    const packagingPrinter = onlineBranchPrinters.find((p) => getPrinterRoles(p).includes('PACKAGING'));
+    const targetPrinter = packagingPrinter
+        || resolvePrimaryCashierPrinter(printers || [], branchId, settings);
+    if (!targetPrinter) throw new Error('NO_DRIVER_PRINTER_CONFIGURED');
+
+    const htmlTicket = generateDriverTicketHTML({
+        order,
+        driverName,
+        driverPhone,
+        settings,
+        currencySymbol,
+        lang,
+        branch,
+        title: title || (lang === 'ar' ? 'تذكرة طيار' : 'DRIVER TICKET'),
+        printerName: targetPrinter.name,
+    });
+    const imagePayload = await createImagePrintPayload(htmlTicket, resolvePrinterPaperWidth(targetPrinter, null));
+    const queued = await printService.print({
+        type: 'RECEIPT',
+        ...resolvePrinterDetails(targetPrinter),
+        branchId,
+        content: imagePayload.content,
+        contentType: imagePayload.contentType,
+    });
+    if (!queued) throw new Error('DRIVER_TICKET_QUEUE_FAILED');
 };
 

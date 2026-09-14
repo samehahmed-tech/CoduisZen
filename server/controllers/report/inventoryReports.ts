@@ -4,6 +4,8 @@ import { db } from '../../db';
 import { inventoryItems, inventoryStock, inventoryBatches, stockMovements, warehouses } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
 
+export const MOVEMENT_TYPES = ['PURCHASE', 'SALE', 'SALE_CONSUMPTION', 'TRANSFER', 'WASTE', 'ADJUSTMENT', 'PRODUCTION_CONSUMPTION', 'PRODUCTION'] as const;
+
 export const getStockMovementLog = async (req: Request, res: Response) => {
     try {
         const { startDate, endDate, branchId } = req.query;
@@ -14,25 +16,56 @@ export const getStockMovementLog = async (req: Request, res: Response) => {
             gte(stockMovements.createdAt, start),
             lte(stockMovements.createdAt, end),
         ];
-        if (branchId) conditions.push(eq(warehouses.branchId, String(branchId)));
+        // Inbound movements (PURCHASE/ADJUSTMENT+) carry only toWarehouseId, while
+        // outbound ones carry fromWarehouseId. A branch matches when either side
+        // belongs to it, otherwise PO receipts never appear under their branch.
+        const movementWarehouseExpr = sql`COALESCE(${stockMovements.fromWarehouseId}, ${stockMovements.toWarehouseId})`;
+        if (branchId) {
+            conditions.push(sql`EXISTS (
+                SELECT 1 FROM warehouses bw
+                WHERE bw.id IN (${stockMovements.fromWarehouseId}, ${stockMovements.toWarehouseId})
+                  AND bw.branch_id = ${String(branchId)}
+            )`);
+        }
+
+        // Optional movement-type filter ("PURCHASE,WASTE" or repeated ?types=)
+        const rawTypes = req.query.types;
+        const requestedTypes = Array.isArray(rawTypes)
+            ? rawTypes.flatMap((value) => String(value).split(','))
+            : String(rawTypes || '').split(',');
+        const typeFilter = requestedTypes
+            .map((value) => value.trim().toUpperCase())
+            .filter((value) => (MOVEMENT_TYPES as readonly string[]).includes(value));
+        if (typeFilter.length > 0) conditions.push(inArray(stockMovements.type, typeFilter));
+
+        // Optional single-item drill-down
+        const itemId = typeof req.query.itemId === 'string' ? req.query.itemId.trim() : '';
+        if (itemId) conditions.push(eq(stockMovements.itemId, itemId));
 
         const rows = await db.select({
             id: stockMovements.id,
             itemName: inventoryItems.name,
-            quantity: stockMovements.quantity,
+            itemNameAr: inventoryItems.nameAr,
+            unit: inventoryItems.unit,
+            // Outbound-only movements (from warehouse, no destination) are stored
+            // positive — sign them negative so summaries count them as OUT.
+            quantity: sql<number>`CASE WHEN ${stockMovements.fromWarehouseId} IS NOT NULL AND ${stockMovements.toWarehouseId} IS NULL THEN -${stockMovements.quantity} ELSE ${stockMovements.quantity} END`,
             unitCost: stockMovements.unitCost,
             totalCost: stockMovements.totalCost,
             type: stockMovements.type,
             reason: stockMovements.reason,
             performedBy: stockMovements.performedBy,
             createdAt: stockMovements.createdAt,
+            referenceId: stockMovements.referenceId,
+            warehouseId: movementWarehouseExpr,
+            warehouseName: warehouses.name,
         })
             .from(stockMovements)
             .innerJoin(inventoryItems, eq(stockMovements.itemId, inventoryItems.id))
-            .leftJoin(warehouses, eq(warehouses.id, stockMovements.fromWarehouseId))
+            .leftJoin(warehouses, sql`${warehouses.id} = ${movementWarehouseExpr}`)
             .where(and(...conditions))
             .orderBy(desc(stockMovements.createdAt))
-            .limit(500);
+            .limit(1000);
 
         res.json(rows);
     } catch (error: any) {

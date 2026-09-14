@@ -12,6 +12,7 @@ export const dayCloseApi = {
     close: (branchId: string, date: string, payload?: {
         notes?: string;
         enforceShiftsClosed?: boolean;
+        autoCloseOpenShifts?: boolean;
         overrideReason?: string;
         emailConfig?: any;
     }) =>

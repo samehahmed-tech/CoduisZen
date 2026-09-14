@@ -19,7 +19,7 @@
     radial-gradient(circle at 10% 0%, rgba(var(--primary), 0.16), transparent 30rem),
     radial-gradient(circle at 92% 92%, rgba(var(--accent), 0.11), transparent 34rem),
     var(--kiosk-app);
-  font-family: var(--font-body, 'Tajawal', system-ui, sans-serif);
+  font-family: var(--font-body, 'Cairo', system-ui, sans-serif);
   user-select: none;
 }
 

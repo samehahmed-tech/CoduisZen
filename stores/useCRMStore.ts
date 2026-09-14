@@ -16,7 +16,7 @@ interface CRMState {
     updateCustomer: (customer: Customer) => Promise<void>;
     deleteCustomer: (id: string) => Promise<void>;
     getCustomerByPhone: (phone: string) => Promise<Customer | null>;
-    searchCustomers: (query: string) => Promise<Customer[]>;
+    searchCustomers: (query: string, opts?: { signal?: AbortSignal }) => Promise<Customer[]>;
 
     // Local state helpers
     setCustomers: (customers: Customer[]) => void;
@@ -90,6 +90,7 @@ export const useCRMStore = create<CRMState>()(
                             lng: result.lng ?? result.longitude ?? customerData.lng,
                             addressLabel: result.address_label ?? result.addressLabel ?? customerData.addressLabel,
                             area: result.area,
+                            zoneId: result.zone_id ?? result.zoneId ?? customerData.zoneId,
                             building: result.building,
                             floor: result.floor,
                             apartment: result.apartment,
@@ -112,6 +113,7 @@ export const useCRMStore = create<CRMState>()(
                             lng: customerData.lng,
                             addressLabel: customerData.addressLabel,
                             area: customerData.area,
+                            zoneId: customerData.zoneId,
                             building: customerData.building,
                             floor: customerData.floor,
                             apartment: customerData.apartment,
@@ -229,14 +231,14 @@ export const useCRMStore = create<CRMState>()(
                 }
             },
 
-            searchCustomers: async (query) => {
+            searchCustomers: async (query, opts) => {
                 try {
                     if (navigator.onLine) {
-                        const data = await customersApi.getAll({ search: query });
-                        return data.map((c: any) => ({
-                            id: c.id,
-                            name: c.name,
-                            phone: c.phone,
+                        const data = await customersApi.getAll({ search: query }, opts?.signal ? { signal: opts.signal } : undefined);
+                        return (Array.isArray(data) ? data : (data as any)?.data || []).filter(Boolean).map((c: any) => ({
+                            id: c.id || c.phone || `cus-${Math.random().toString(36).slice(2)}`,
+                            name: c.name || c.phone || '—',
+                            phone: c.phone || '',
                             address: c.address,
                             lat: c.lat ?? c.latitude,
                             lng: c.lng ?? c.longitude,

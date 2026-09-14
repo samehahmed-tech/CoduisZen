@@ -46,7 +46,7 @@ const normalizeCouponCode = (value: unknown) => String(value ?? '').trim().toUpp
 
 const normalizeTableShape = (value: unknown) => {
     const shape = parseLayoutText(value, 'square').toLowerCase();
-    if (['square', 'round', 'rectangle', 'circle'].includes(shape)) return shape;
+    if (['square', 'round', 'rectangle', 'circle', 'oval', 'booth', 'bar'].includes(shape)) return shape === 'circle' ? 'round' : shape;
     return 'square';
 };
 
@@ -435,9 +435,23 @@ const recalcOrderTotals = async (tx: any, orderId: string) => {
     if (order.type === 'DINE_IN' && subtotal > 0) {
         const [branchRecord] = await tx.select({ serviceCharge: branches.serviceCharge })
             .top(1).from(branches).where(eq(branches.id, order.branchId));
-        
-        const configuredRate = Math.max(0, Number(branchRecord?.serviceCharge ?? 0));
-        const serviceRate = configuredRate > 1 ? configuredRate / 100 : configuredRate;
+        const [serviceSetting] = await tx.select({ value: settings.value }).top(1)
+            .from(settings).where(eq(settings.key, 'serviceCharge'));
+
+        // Effective rate: explicit branch value wins, otherwise the global
+        // setting (Settings → Financial). Accepts 12 (percent) or 0.12
+        // (fraction); 0 / missing = disabled. No hidden defaults.
+        const normalizeServiceRate = (raw: unknown): number => {
+            const num = Number(raw);
+            if (!Number.isFinite(num) || num <= 0) return 0;
+            return num > 1 ? num / 100 : num;
+        };
+        const branchRaw = branchRecord?.serviceCharge === null || branchRecord?.serviceCharge === undefined
+            ? null
+            : Number(branchRecord.serviceCharge);
+        const serviceRate = branchRaw !== null
+            ? normalizeServiceRate(branchRaw)
+            : normalizeServiceRate(parseSettingJson(serviceSetting?.value, 0));
         serviceCharge = money(netAmount * serviceRate);
     }
 

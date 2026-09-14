@@ -9,6 +9,7 @@ const toQuery = (params?: Record<string, unknown>) => {
 };
 
 export const printGatewayApi = {
+    getBridges: () => apiRequest<Array<{ gatewayId: string; online: boolean; lastSeenAt: string | null; branchId: string | null; printers: string[] }>>('/print-gateway/bridges'),
     getJobs: (params?: { branchId?: string; status?: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; limit?: number }) => {
         const query = toQuery(params);
         return apiRequest<{ ok: boolean; stats: { queued: number; processing: number; completed: number; failed: number; total: number }; jobs: any[] }>(`/print-gateway/jobs${query ? `?${query}` : ''}`);

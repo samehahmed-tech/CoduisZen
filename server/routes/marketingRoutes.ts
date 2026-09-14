@@ -14,5 +14,6 @@ router.post('/coupons', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', '
 // Complaints
 router.get('/complaints', marketingController.getComplaints);
 router.post('/complaints', marketingController.createComplaint);
+router.put('/complaints/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'CALL_CENTER_MANAGER'), marketingController.updateComplaint);
 
 export default router;

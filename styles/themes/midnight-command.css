@@ -1,0 +1,88 @@
+/* THEME 02 · MIDNIGHT COMMAND — clean technical light / deep charcoal dark */
+[data-theme='midnight-command'] {
+    --primary: 37, 99, 235;
+    --primary-hover: 29, 78, 216;
+    --secondary: 100, 116, 139;
+    --accent: 37, 99, 235;
+
+    --bg-app: 246, 248, 250;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 250, 251, 253;
+    --bg-elevated: 255, 255, 255;
+    --bg-global: 246, 248, 250;
+
+    --text-main: 17, 24, 39;
+    --text-muted: 107, 114, 128;
+
+    --border-color: 229, 231, 235;
+    --border-subtle: 229 231 235 / 0.6;
+    --glass-bg: 255 255 255 / 0.9;
+
+    --success: 5, 150, 105;
+    --warning: 180, 83, 9;
+    --danger: 220, 38, 38;
+    --info: 37, 99, 235;
+
+    --theme-page-bg: linear-gradient(180deg, #f7f9fb 0%, #eef1f5 100%);
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #f8fafc;
+    --theme-rail-bg: linear-gradient(180deg, #fafbfc 0%, #eef1f5 100%);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.9);
+    --theme-table-head-bg: #f1f4f8;
+    --theme-row-hover-bg: rgba(37, 99, 235, 0.05);
+    --theme-input-bg: #ffffff;
+    --theme-button-bg: #2563eb;
+    --theme-active-bg: rgba(37, 99, 235, 0.10);
+    --theme-focus-ring: rgba(37, 99, 235, 0.28);
+    --theme-popup-bg: #ffffff;
+
+    --chart-1: 37, 99, 235;
+    --chart-2: 5, 150, 105;
+    --chart-3: 217, 119, 6;
+    --chart-4: 124, 58, 237;
+    --chart-5: 100, 116, 139;
+    --chart-grid: 229 231 235 / 0.9;
+    --chart-tooltip-bg: #ffffff;
+}
+
+.dark [data-theme='midnight-command'],
+[data-theme='midnight-command'].dark {
+    --primary: 96, 165, 250;
+    --primary-hover: 147, 197, 253;
+    --secondary: 148, 163, 184;
+    --accent: 96, 165, 250;
+
+    --bg-app: 9, 10, 14;
+    --bg-card: 17, 19, 26;
+    --bg-sidebar: 12, 13, 18;
+    --bg-elevated: 24, 27, 36;
+    --bg-global: 9, 10, 14;
+
+    --text-main: 240, 242, 247;
+    --text-muted: 140, 148, 168;
+
+    --border-color: 42, 46, 58;
+    --border-subtle: 148 163 184 / 0.14;
+    --glass-bg: 17 19 26 / 0.9;
+
+    --theme-page-bg: linear-gradient(180deg, #0b0c11 0%, #08090c 100%);
+    --theme-card-bg: #11131a;
+    --theme-card-hover-bg: #181b24;
+    --theme-rail-bg: linear-gradient(180deg, #0c0d13 0%, #08090c 100%);
+    --theme-topbar-bg: rgba(17, 19, 26, 0.9);
+    --theme-table-head-bg: #090a0e;
+    --theme-row-hover-bg: rgba(96, 165, 250, 0.08);
+    --theme-input-bg: #181b24;
+    --theme-button-bg: #2563eb;
+    --theme-active-bg: rgba(96, 165, 250, 0.14);
+    --theme-focus-ring: rgba(96, 165, 250, 0.4);
+    --theme-popup-bg: #181b24;
+
+    --chart-1: 96, 165, 250;
+    --chart-2: 52, 211, 153;
+    --chart-3: 251, 191, 36;
+    --chart-4: 167, 139, 250;
+    --chart-5: 148, 163, 184;
+    --chart-grid: 42 46 58 / 0.9;
+    --chart-tooltip-bg: #181b24;
+}

@@ -10,9 +10,10 @@ const branchJournalScope = (branchId?: string) => (
 
 export const getTrialBalance = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, branchId: rawBranchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+        const branchId = resolveScopedBranchId(req, rawBranchId as string | undefined);
 
         const rows = await db.select({
             accountId: journalLines.accountId,
@@ -25,10 +26,12 @@ export const getTrialBalance = async (req: Request, res: Response) => {
             .from(journalLines)
             .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
             .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+            .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
             .where(and(
                 gte(journalEntries.date, start),
                 lte(journalEntries.date, end),
-                eq(journalEntries.status, 'POSTED')
+                eq(journalEntries.status, 'POSTED'),
+                branchJournalScope(branchId)
             ))
             .groupBy(journalLines.accountId, chartOfAccounts.code, chartOfAccounts.name, chartOfAccounts.type)
             .orderBy(chartOfAccounts.code);
@@ -61,6 +64,7 @@ export const getProfitAndLoss = async (req: Request, res: Response) => {
         ];
 
         const rows = await db.select({
+            accountCode: chartOfAccounts.code,
             accountType: chartOfAccounts.type,
             accountName: chartOfAccounts.name,
             totalDebit: sql<number>`coalesce(sum(${journalLines.debit}), 0)`,
@@ -71,8 +75,8 @@ export const getProfitAndLoss = async (req: Request, res: Response) => {
             .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
             .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
             .where(and(...conditions))
-            .groupBy(chartOfAccounts.type, chartOfAccounts.name)
-            .orderBy(chartOfAccounts.type);
+            .groupBy(chartOfAccounts.code, chartOfAccounts.type, chartOfAccounts.name)
+            .orderBy(chartOfAccounts.type, chartOfAccounts.code);
 
         const revenue = rows.filter(r => r.accountType === 'REVENUE').reduce((s, r) => s + Number(r.totalCredit) - Number(r.totalDebit), 0);
         const expenses = rows.filter(r => r.accountType === 'EXPENSE').reduce((s, r) => s + Number(r.totalDebit) - Number(r.totalCredit), 0);
@@ -82,6 +86,7 @@ export const getProfitAndLoss = async (req: Request, res: Response) => {
             expenses,
             netProfit: revenue - expenses,
             details: rows.map(r => ({
+                code: r.accountCode,
                 type: r.accountType,
                 name: r.accountName,
                 debit: Number(r.totalDebit),

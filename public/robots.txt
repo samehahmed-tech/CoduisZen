@@ -12,4 +12,8 @@ Disallow: /inventory
 Disallow: /orders
 Allow: /
 
-Sitemap: /sitemap.xml
+# NOTE: No public sitemap is published for this authenticated ERP
+# (all app routes are Disallowed above). Do NOT add a relative
+# "Sitemap: /sitemap.xml" — Lighthouse flags it as an invalid sitemap
+# URL. When a public marketing site ships, add its absolute URL here:
+# Sitemap: https://<production-domain>/sitemap.xml

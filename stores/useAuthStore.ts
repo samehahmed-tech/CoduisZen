@@ -110,7 +110,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     language: 'ar',
     isDarkMode: true,
     isTouchMode: false,
-    theme: 'mica-glass',
+    layoutMode: 'classic',
+    theme: 'aurora-glass',
     accentColor: '#6366f1',
     branchAddress: '',
     phone: '',
@@ -201,6 +202,7 @@ export const useAuthStore = create<AuthState>()(
                         isAuthenticated: true,
                         isLoading: false
                     }));
+                    syncService.init();
                     syncService.syncPending();
                     return mappedUser;
                 } catch (error: any) {
@@ -213,9 +215,20 @@ export const useAuthStore = create<AuthState>()(
                 const token = localStorage.getItem('auth_token');
                 const refreshToken = localStorage.getItem('auth_refresh_token');
                 if (!token && !refreshToken) return;
+                // Cache-first: persisted settings/currentUser already hydrate
+                // first paint — trust them and validate the token in the
+                // background so boot never waits on a network roundtrip.
+                // Only a proved-invalid session (401 / expired) logs out.
+                const cached = get();
+                if (cached.isAuthenticated && cached.settings.currentUser) {
+                    void validateSession(token).catch(() => undefined);
+                    return;
+                }
+                await validateSession(token);
+                async function validateSession(activeToken: string | null) {
                 try {
                     const { user } = await authApi.me();
-                    const currentToken = localStorage.getItem('auth_token') || token;
+                    const currentToken = localStorage.getItem('auth_token') || activeToken;
                     const mappedUser: User = {
                         id: user.id,
                         name: user.name,
@@ -244,7 +257,7 @@ export const useAuthStore = create<AuthState>()(
                     // An aborted reload or a temporary backend/network failure must not log out a valid cached session.
                     if (!sessionIsInvalid && cachedUser) {
                         set((state) => ({
-                            token: localStorage.getItem('auth_token') || token,
+                            token: localStorage.getItem('auth_token') || activeToken,
                             settings: { ...state.settings, currentUser: cachedUser, activeBranchId: cachedUser.assignedBranchId || state.branches[0]?.id },
                             isAuthenticated: true
                         }));
@@ -260,6 +273,7 @@ export const useAuthStore = create<AuthState>()(
                             },
                         }));
                     }
+                }
                 }
             },
 
@@ -281,6 +295,12 @@ export const useAuthStore = create<AuthState>()(
                                 mfaEnabled: u.mfa_enabled === true || u.mfaEnabled === true,
                                 employeeCode: u.employeeCode || u.employee_code,
                                 attendanceCode: u.attendanceCode || u.attendance_code,
+                                // Admin credential visibility (route is CFG_MANAGE_USERS-gated).
+                                // PIN is stored plain server-side so it can be shown; password
+                                // is a one-way bcrypt hash — only its presence is exposed.
+                                pin: u.pinCode || u.pin || undefined,
+                                hasPassword: u.hasPassword ?? undefined,
+                                hasPin: u.hasPin ?? Boolean(u.pinCode || u.pinCodeHash),
                             }));
                             set({ users, isLoading: false });
                             await localDb.users.bulkPut(users);
@@ -546,10 +566,14 @@ export const useAuthStore = create<AuthState>()(
                     const employeeCode = user.employeeCode?.trim();
                     const attendanceCode = user.attendanceCode?.trim();
                     const employmentDate = user.employmentDate?.trim();
+                    const password = (user as any).password?.trim();
+                    const pin = (user as any).pin?.trim();
                     if (email) payload.email = email;
                     if (assignedBranchId) payload.assigned_branch_id = assignedBranchId;
                     if (phone) payload.phone = phone;
                     if (nationalId) payload.nationalId = nationalId;
+                    if (password) payload.password = password;
+                    if (pin) payload.pin = pin;
                     if (employeeCode) payload.employeeCode = employeeCode;
                     if (attendanceCode || employeeCode) payload.attendanceCode = attendanceCode || employeeCode;
                     if (employmentDate) payload.employmentDate = employmentDate;
@@ -780,6 +804,10 @@ export const useAuthStore = create<AuthState>()(
                 if (user.customOverrides?.added?.includes(permission)) return true;
                 if (user.customOverrides?.removed?.includes(permission)) return false;
 
+                // Staff mail is universal: every active user gets it even if their
+                // stored permission snapshot predates NAV_MAIL (explicit removal above still wins).
+                if (permission === AppPermission.NAV_MAIL) return true;
+
                 let curPerms: AppPermission[] = [];
                 if (Array.isArray(user.permissions) && user.permissions.length > 0) {
                     curPerms = user.permissions;
@@ -870,23 +898,55 @@ export const useAuthStore = create<AuthState>()(
             saveRolePermissions: async (roleId, permissions) => {
                 const state = get();
                 const customRole = (state.settings.customRoles || []).find(r => r.id === roleId);
+                const normId = String(roleId).startsWith('role_') ? String(roleId) : `role_${String(roleId).toLowerCase()}`;
+                const normName = String(roleId).toUpperCase();
 
                 if (navigator.onLine) {
+                    let lastErr: any = null;
+                    const tryUpdate = async (id: string) => {
+                        await rolesApi.update(id, { permissions: permissions as string[] });
+                    };
+                    const tryCreate = async () => {
+                        await rolesApi.create({ id: normId, name: normName, nameAr: customRole?.nameAr || normName, permissions: permissions as string[], isSystem: !customRole });
+                    };
                     try {
                         if (customRole) {
-                            await rolesApi.update(roleId, { permissions: permissions as string[], name: customRole.name, nameAr: customRole.nameAr || '' });
+                            await tryUpdate(roleId);
                         } else {
-                            const existing = state.roles.find(r => r.id === roleId || r.name === roleId);
+                            const existing = state.roles.find(r => r.id === roleId || r.name === roleId || r.id === normId || r.name === normName);
                             if (existing) {
-                                await rolesApi.update(existing.id, { permissions: permissions as string[] });
+                                await tryUpdate(existing.id);
                             } else {
-                                throw new Error('ROLE_NOT_FOUND');
+                                // role not in local cache — try direct update by both id and name, then create
+                                try { await tryUpdate(roleId); } catch (e: any) {
+                                    const code = String(e?.code || e?.message || e?.error || '');
+                                    const isNotFound = code.includes('ROLE_NOT_FOUND') || e?.status === 404;
+                                    const isDup = code.includes('uq_roles_name') || code.includes('Violation of UNIQUE KEY') || code.includes('ROLE_ALREADY_EXISTS');
+                                    if (isNotFound) {
+                                        try { await tryCreate(); } catch (ce: any) {
+                                            const cCode = String(ce?.code || ce?.message || ce?.error || '');
+                                            const cDup = cCode.includes('ROLE_ALREADY_EXISTS') || cCode.includes('uq_roles_name') || cCode.includes('Violation of UNIQUE KEY') || ce?.status === 409;
+                                            if (cDup) {
+                                                // already exists (race) — just update it
+                                                try { await tryUpdate(normId); } catch { await tryUpdate(normName); }
+                                            } else throw ce;
+                                        }
+                                    } else if (isDup) {
+                                        // update hit duplicate name (concurrent create) — update by normalized id
+                                        try { await tryUpdate(normId); } catch { await tryUpdate(normName); }
+                                    } else throw e;
+                                }
                             }
                         }
                         await get().loadRoles();
                     } catch (err: any) {
-                        const message = err?.code || err?.message || 'SAVE_ROLE_PERMISSIONS_FAILED';
+                        // surface server's actual error, not generic
+                        const serverMsg = err?.data?.error || err?.error || err?.code || err?.message || 'SAVE_ROLE_PERMISSIONS_FAILED';
+                        const message = String(serverMsg);
                         set({ error: message });
+                        // attach for UI
+                        (err as any).message = message;
+                        lastErr = err;
                         throw err;
                     }
                 }

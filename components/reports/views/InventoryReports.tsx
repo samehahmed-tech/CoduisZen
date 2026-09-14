@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { inventoryApi } from '../../../services/api/inventory';
 import { printStockCountSession } from '../../../services/stockCountPrint';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 
 export const InventoryReports = ({ state }: any) => {
    const {
@@ -25,7 +26,8 @@ export const InventoryReports = ({ state }: any) => {
       modifierSalesData, avgTicketTrend, salesComparisonData,
       slowMovingItems, revenueByWeekday, voidItemsData,
       tipsData, serviceChargeData, shiftSummaryData,
-      actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
+       actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
+       productionBatchesData, suppliersData, purchaseOrdersData,
       staffCostData, salesPerLaborData,
       customerRetentionData, newVsReturningData, customerFrequencyData,
       kitchenPerformanceData, menuEngineeringData, daypartData, basketData,
@@ -391,7 +393,104 @@ export const InventoryReports = ({ state }: any) => {
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Item</th><th className="px-4 py-5 text-right">Price</th><th className="px-4 py-5 text-right">Cost</th><th className="px-4 py-5 text-right">Margin</th><th className="px-4 py-5 text-right">Suggested</th><th className="px-4 py-5 text-right">Change</th><th className="px-6 py-5 text-center">Action</th></tr></thead><tbody className="divide-y divide-border/30">{optimalPricingData.items.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.name}</td><td className="px-4 py-4 font-mono text-right">{r.currentPrice}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.cost}</td><td className="px-4 py-4 font-mono text-right">{r.currentMargin}%</td><td className="px-4 py-4 font-mono font-bold text-right">{r.suggestedPrice}</td><td className="px-4 py-4 font-mono text-right"><span className={r.priceChange > 0 ? 'text-emerald-500' : 'text-rose-500'}>{r.priceChange > 0 ? '+' : ''}{r.priceChange}</span></td><td className="px-6 py-4 text-center"><span className={`px-2 py-1 rounded-lg text-[9px] font-black ${r.action === 'INCREASE' ? 'bg-rose-500/10 text-rose-500' : r.action === 'DECREASE' ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>{r.action}</span></td></tr>)}</tbody></table></div></div>
                   </div>
                )}
-               {activeCategory === 'INVENTORY' && activeSubReport === 'Optimal Pricing' && !optimalPricingData && <p className="text-center text-muted py-16">No data.</p>}
+                {activeCategory === 'INVENTORY' && activeSubReport === 'Optimal Pricing' && !optimalPricingData && <p className="text-center text-muted py-16">No data.</p>}
+
+                {activeCategory === 'INVENTORY' && activeSubReport === 'Production Batches' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title={isAr ? 'تشغيلات الإنتاج — جدول' : 'Production Batches — table'}
+                         subtitle={isAr ? 'الكميات المطلوبة مقابل المنتجة والفرق' : 'Requested vs produced quantities and variance'}
+                         data={productionBatchesData || []}
+                         columns={[
+                            { key: 'batchNumber', label: isAr ? 'التشغيلة' : 'Batch', format: (v: any, r: any) => String(v || r.batch || r.id || '-').slice(0, 18) },
+                            { key: 'targetItemName', label: isAr ? 'الصنف' : 'Item', format: (v: any, r: any) => String(v || r.itemName || r.targetItemId || '-') },
+                            { key: 'quantityRequested', label: isAr ? 'المطلوب' : 'Requested', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                            { key: 'quantityProduced', label: isAr ? 'المنتج' : 'Produced', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                            { key: 'status', label: isAr ? 'الحالة' : 'Status' },
+                            { key: 'createdAt', label: isAr ? 'التاريخ' : 'Date', format: (v: any) => (v ? new Date(v).toLocaleDateString(isAr ? 'ar-EG' : 'en-GB') : '-') },
+                         ]}
+                         exportFilename="production-batches"
+                         lang={isAr ? 'ar' : 'en'}
+                      />
+                      {(productionBatchesData || []).length > 0 && (
+                         <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 shadow-xl">
+                            <h3 className="text-lg font-black text-main mb-4">{isAr ? 'حسب الحالة' : 'By status'}</h3>
+                            <ResponsiveContainer width="100%" height={200}>
+                               <BarChart
+                                  data={(() => {
+                                     const by: Record<string, number> = {};
+                                     (productionBatchesData || []).forEach((o: any) => { const k = String(o.status || 'UNKNOWN'); by[k] = (by[k] || 0) + 1; });
+                                     return Object.entries(by).map(([status, count]) => ({ status, count }));
+                                  })()}
+                                  margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+                               >
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                  <XAxis dataKey="status" tick={{ fontSize: 10, fontWeight: 700 }} />
+                                  <YAxis tick={{ fontSize: 10, fontWeight: 700 }} allowDecimals={false} />
+                                  <Tooltip />
+                                  <Bar dataKey="count" name={isAr ? 'العدد' : 'Count'} fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                               </BarChart>
+                            </ResponsiveContainer>
+                         </div>
+                      )}
+                   </div>
+                )}
+                {activeCategory === 'INVENTORY' && activeSubReport === 'Suppliers' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title={isAr ? 'الموردون — جدول' : 'Suppliers — table'}
+                         data={suppliersData || []}
+                         columns={[
+                            { key: 'name', label: isAr ? 'المورد' : 'Supplier' },
+                            { key: 'contactPerson', label: isAr ? 'جهة الاتصال' : 'Contact', format: (v: any) => String(v || '-') },
+                            { key: 'phone', label: isAr ? 'الهاتف' : 'Phone', format: (v: any) => String(v || '-') },
+                            { key: 'email', label: isAr ? 'البريد' : 'Email', format: (v: any) => String(v || '-') },
+                            { key: 'category', label: isAr ? 'التصنيف' : 'Category', format: (v: any) => String(v || '-') },
+                         ]}
+                         exportFilename="suppliers"
+                         lang={isAr ? 'ar' : 'en'}
+                      />
+                   </div>
+                )}
+                {activeCategory === 'INVENTORY' && activeSubReport === 'Purchase Orders' && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                      <ReportDataTable
+                         title={isAr ? 'أوامر الشراء — جدول' : 'Purchase Orders — table'}
+                         subtitle={isAr ? 'الحالة والقيم والاستلام' : 'Status, values and receiving'}
+                         data={purchaseOrdersData || []}
+                         columns={[
+                            { key: 'id', label: 'PO#', format: (v: any) => String(v || '-').slice(0, 12) },
+                            { key: 'supplierName', label: isAr ? 'المورد' : 'Supplier', format: (v: any, r: any) => String(v || r.supplierId || '-') },
+                            { key: 'date', label: isAr ? 'التاريخ' : 'Date', format: (v: any, r: any) => { const d = v || r.createdAt; return d ? new Date(d).toLocaleDateString(isAr ? 'ar-EG' : 'en-GB') : '-'; } },
+                            { key: 'status', label: isAr ? 'الحالة' : 'Status' },
+                            { key: 'totalCost', label: isAr ? 'الإجمالي' : 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, settings?.currencySymbol || 'LE') },
+                         ]}
+                         exportFilename="purchase-orders"
+                         lang={isAr ? 'ar' : 'en'}
+                      />
+                      {(purchaseOrdersData || []).length > 0 && (
+                         <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 shadow-xl">
+                            <h3 className="text-lg font-black text-main mb-4">{isAr ? 'القيمة حسب الحالة' : 'Value by status'}</h3>
+                            <ResponsiveContainer width="100%" height={200}>
+                               <BarChart
+                                  data={(() => {
+                                     const by: Record<string, number> = {};
+                                     (purchaseOrdersData || []).forEach((o: any) => { const k = String(o.status || 'UNKNOWN'); by[k] = (by[k] || 0) + Number(o.totalCost || 0); });
+                                     return Object.entries(by).map(([status, total]) => ({ status, total }));
+                                  })()}
+                                  margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                               >
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                  <XAxis dataKey="status" tick={{ fontSize: 10, fontWeight: 700 }} />
+                                  <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)} />
+                                  <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${settings?.currencySymbol || 'LE'}`, isAr ? 'الإجمالي' : 'Total']} />
+                                  <Bar dataKey="total" name="Total" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
+                               </BarChart>
+                            </ResponsiveContainer>
+                         </div>
+                      )}
+                   </div>
+                )}
 
                {/* ============ PHASE 4: CRM ============ */}
 

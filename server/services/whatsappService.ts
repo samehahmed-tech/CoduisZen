@@ -27,19 +27,33 @@ type OpenWaSessionConfig = {
     isDefault?: boolean;
 };
 
-type WhatsAppProvider = 'openwa' | 'whatsapp-web.js';
+type WhatsAppProvider = 'openwa' | 'whatsapp-web.js' | 'disabled';
 type WhatsAppStatus =
     | 'INITIALIZING'
     | 'AWAITING_SCAN'
+    | 'AUTHENTICATED'
     | 'READY'
     | 'DISCONNECTED'
+    | 'DISABLED'
     | 'AUTH_ERROR';
 
+const resolveProvider = (): WhatsAppProvider => {
+    const raw = String(process.env.WHATSAPP_PROVIDER || 'whatsapp-web.js').toLowerCase().trim();
+    if (raw === 'disabled' || raw === 'off' || raw === 'false' || raw === '') return 'disabled';
+    if (raw === 'openwa') return 'openwa';
+    return 'whatsapp-web.js';
+};
+
 class WhatsAppService {
-    private provider: WhatsAppProvider = String(process.env.WHATSAPP_PROVIDER || 'whatsapp-web.js').toLowerCase() === 'openwa' ? 'openwa' : 'whatsapp-web.js';
+    private provider: WhatsAppProvider = resolveProvider();
     private client: any;
     private isReady = false;
     private qrCode: string | null = null;
+    private qrIssuedAt: string | null = null;
+    // Set the moment the phone scan is accepted, cleared on ready/timeout.
+    // Without it the UI cannot tell "scan worked, session warming up" from
+    // "still waiting for scan" — the exact stuck screen users report.
+    private authenticatedAt: string | null = null;
     private lastError: string | null = null;
     private startedAt: Date | null = null;
 
@@ -58,6 +72,12 @@ class WhatsAppService {
     private lastOpenWaError: string | null = null;
 
     constructor() {
+        // أعد قراءة المتغير في كل إقلاع (الـ import cache قد يسبق ضبط dotenv في الاختبارات).
+        this.provider = resolveProvider();
+        if (this.provider === 'disabled') {
+            console.log('WhatsApp provider: disabled (set WHATSAPP_PROVIDER=whatsapp-web.js to enable QR pairing)');
+            return;
+        }
         if (this.provider === 'openwa') {
             console.log('WhatsApp provider: OpenWA gateway');
             return;
@@ -108,23 +128,41 @@ class WhatsAppService {
 
         this.client.on('qr', (qr: string) => {
             this.qrCode = qr;
+            this.qrIssuedAt = new Date().toISOString();
+            this.authenticatedAt = null;
             this.isReady = false;
             this.lastError = null;
             try { getIO().emit('whatsapp:qr', qr); } catch { /* noop */ }
-            try { getIO().emit('whatsapp:status', { status: 'AWAITING_SCAN', provider: this.provider }); } catch { /* noop */ }
+            try { getIO().emit('whatsapp:status', { status: 'AWAITING_SCAN', provider: this.provider, qr, qrAt: this.qrIssuedAt }); } catch { /* noop */ }
+        });
+
+        // Fired the instant the phone accepts the scan — minutes before
+        // 'ready' finishes warming the session. The UI switches to a
+        // "linking…" state immediately instead of hanging on the QR screen.
+        this.client.on('authenticated', () => {
+            console.log('WhatsApp Web Client authenticated (scan accepted, warming up)');
+            this.authenticatedAt = new Date().toISOString();
+            this.qrCode = null;
+            this.qrIssuedAt = null;
+            this.isReady = false;
+            this.lastError = null;
+            try { getIO().emit('whatsapp:status', { status: 'AUTHENTICATED', provider: this.provider, authenticatedAt: this.authenticatedAt }); } catch { /* noop */ }
         });
 
         this.client.on('ready', () => {
             console.log('WhatsApp Web Client is READY');
             this.isReady = true;
             this.qrCode = null;
+            this.qrIssuedAt = null;
+            this.authenticatedAt = null;
             this.lastError = null;
-            try { getIO().emit('whatsapp:status', { status: 'READY' }); } catch { /* noop */ }
+            try { getIO().emit('whatsapp:status', { status: 'READY', provider: this.provider }); } catch { /* noop */ }
             this.processQueue();
         });
 
         this.client.on('disconnected', (reason: string) => {
             this.isReady = false;
+            this.authenticatedAt = null;
             this.lastError = reason || null;
             console.log('WhatsApp disconnected:', reason);
             try { getIO().emit('whatsapp:status', { status: 'DISCONNECTED', reason }); } catch { /* noop */ }
@@ -134,6 +172,7 @@ class WhatsAppService {
         this.client.on('auth_failure', (msg: string) => {
             console.error('WhatsApp Auth failure', msg);
             this.isReady = false;
+            this.authenticatedAt = null;
             this.lastError = msg || 'AUTH_ERROR';
             try { getIO().emit('whatsapp:status', { status: 'AUTH_ERROR', reason: msg }); } catch { /* noop */ }
         });
@@ -148,6 +187,12 @@ class WhatsAppService {
     }
 
     public initialize() {
+        this.provider = resolveProvider();
+        if (this.provider === 'disabled') {
+            this.lastError = 'WhatsApp engine is disabled (WHATSAPP_PROVIDER=disabled). Enable it to show QR.';
+            try { getIO().emit('whatsapp:status', { status: 'DISABLED', provider: this.provider, reason: this.lastError }); } catch { /* noop */ }
+            return;
+        }
         if (this.provider === 'openwa') {
             this.startOpenWaSessions().catch((err) => console.error('OpenWA start failed:', err));
             return;
@@ -155,6 +200,7 @@ class WhatsAppService {
         this.startedAt = new Date();
         this.lastError = null;
         console.log('Initializing WhatsApp Engine...');
+        try { getIO().emit('whatsapp:status', { status: 'INITIALIZING', provider: this.provider }); } catch { /* noop */ }
         this.client?.initialize().catch((err: any) => {
             const message = err?.message || 'Could not start whatsapp engine';
             this.isReady = false;
@@ -165,13 +211,22 @@ class WhatsAppService {
     }
 
     public async restart(options: { resetSession?: boolean } = {}) {
+        this.provider = resolveProvider();
+        if (this.provider === 'disabled') {
+            this.lastError = 'WhatsApp engine is disabled (WHATSAPP_PROVIDER=disabled).';
+            try { getIO().emit('whatsapp:status', { status: 'DISABLED', provider: this.provider, reason: this.lastError }); } catch { /* noop */ }
+            return;
+        }
         if (this.provider === 'openwa') {
             this.initialize();
             return;
         }
         this.isReady = false;
         this.qrCode = null;
+        this.qrIssuedAt = null;
+        this.authenticatedAt = null;
         this.lastError = null;
+        try { getIO().emit('whatsapp:status', { status: 'INITIALIZING', provider: this.provider }); } catch { /* noop */ }
         try {
             await this.client?.destroy?.();
         } catch (error: any) {
@@ -192,6 +247,16 @@ class WhatsAppService {
     }
 
     public async getStatus() {
+        this.provider = resolveProvider();
+        if (this.provider === 'disabled') {
+            return this.decorateStatus({
+                status: 'DISABLED' as WhatsAppStatus,
+                provider: this.provider,
+                configured: false,
+                sessionName: this.getLocalClientId(),
+                reason: 'WhatsApp engine is disabled (WHATSAPP_PROVIDER=disabled). Set WHATSAPP_PROVIDER=whatsapp-web.js and restart.',
+            });
+        }
         if (this.provider === 'openwa') {
             return this.getOpenWaStatus();
         }
@@ -203,7 +268,10 @@ class WhatsAppService {
             reason: this.lastError || undefined,
         };
         if (this.isReady) return this.decorateStatus({ ...base, status: 'READY' });
-        if (this.qrCode) return this.decorateStatus({ ...base, status: 'AWAITING_SCAN', qr: this.qrCode });
+        // Scan accepted but session not warm yet — report it instead of a
+        // stale AWAITING_SCAN so the UI stops showing the consumed QR.
+        if (this.authenticatedAt) return this.decorateStatus({ ...base, status: 'AUTHENTICATED', authenticatedAt: this.authenticatedAt });
+        if (this.qrCode) return this.decorateStatus({ ...base, status: 'AWAITING_SCAN', qr: this.qrCode, qrAt: this.qrIssuedAt });
         return this.decorateStatus({ ...base, status: this.lastError ? 'DISCONNECTED' : 'INITIALIZING' });
     }
 
@@ -410,6 +478,10 @@ class WhatsAppService {
     }
 
     private async processQueue() {
+        if (this.provider === 'disabled') {
+            this.isProcessing = false;
+            return;
+        }
         if (this.queue.length === 0 || (this.provider !== 'openwa' && !this.isReady)) {
             this.isProcessing = false;
             return;

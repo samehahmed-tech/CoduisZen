@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '../db';
-import { shiftPlanEntries, shiftPlans, shiftTemplates } from '../../src/db/schema';
+import { leaveRequests, shiftPlanEntries, shiftPlans, shiftTemplates } from '../../src/db/schema';
 
 const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 const toSqlDate = (date: string | Date) => {
@@ -109,6 +109,20 @@ export const schedulingService = {
         const conflict = sameDay.find((entry) => hasOverlap(startTime, endTime, entry.startTime, entry.endTime));
         if (conflict) {
             throw new Error(`SHIFT_CONFLICT_WITH_ENTRY_${conflict.id}`);
+        }
+
+        // Approved leave wins over rostering: refuse entries on leave days.
+        const dayStart = toSqlDate(input.date);
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+        const onLeave = await db.select({ id: leaveRequests.id }).from(leaveRequests)
+            .where(and(
+                eq(leaveRequests.employeeId, input.employeeId),
+                eq(leaveRequests.status, 'APPROVED'),
+                lte(leaveRequests.startDate, dayEnd),
+                gte(leaveRequests.endDate, dayStart),
+            )).top(1);
+        if (onLeave.length > 0) {
+            throw new Error('SHIFT_CONFLICT_APPROVED_LEAVE');
         }
 
         const [created] = await db.insert(shiftPlanEntries).output().values({

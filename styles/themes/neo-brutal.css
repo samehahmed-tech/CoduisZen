@@ -1,0 +1,88 @@
+/* THEME 03 · NEO BRUTAL — editorial paper light / high-contrast dark brutal */
+[data-theme='neo-brutal'] {
+    --primary: 15, 15, 15;
+    --primary-hover: 0, 0, 0;
+    --secondary: 90, 90, 90;
+    --accent: 250, 204, 21;
+
+    --bg-app: 255, 252, 242;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 255, 250, 235;
+    --bg-elevated: 255, 255, 255;
+    --bg-global: 255, 252, 242;
+
+    --text-main: 15, 15, 15;
+    --text-muted: 95, 90, 80;
+
+    --border-color: 15, 15, 15;
+    --border-subtle: 15 15 15 / 0.25;
+    --glass-bg: 255 255 255 / 1;
+
+    --success: 22, 163, 74;
+    --warning: 234, 88, 12;
+    --danger: 220, 38, 38;
+    --info: 37, 99, 235;
+
+    --theme-page-bg: radial-gradient(rgba(15,15,15,0.06) 1px, transparent 1px), linear-gradient(180deg, #fffdf5 0%, #faf3e3 100%);
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #fffbe8;
+    --theme-rail-bg: #fffaeb;
+    --theme-topbar-bg: #fffdf5;
+    --theme-table-head-bg: #0f0f0f;
+    --theme-row-hover-bg: rgba(250, 204, 21, 0.25);
+    --theme-input-bg: #ffffff;
+    --theme-button-bg: #0f0f0f;
+    --theme-active-bg: rgba(250, 204, 21, 0.35);
+    --theme-focus-ring: rgba(250, 204, 21, 0.6);
+    --theme-popup-bg: #ffffff;
+
+    --chart-1: 15, 15, 15;
+    --chart-2: 202, 138, 4;
+    --chart-3: 220, 38, 38;
+    --chart-4: 22, 163, 74;
+    --chart-5: 37, 99, 235;
+    --chart-grid: 15 15 15 / 0.15;
+    --chart-tooltip-bg: #0f0f0f;
+}
+
+.dark [data-theme='neo-brutal'],
+[data-theme='neo-brutal'].dark {
+    --primary: 250, 204, 21;
+    --primary-hover: 253, 224, 71;
+    --secondary: 180, 180, 180;
+    --accent: 250, 204, 21;
+
+    --bg-app: 12, 12, 12;
+    --bg-card: 24, 24, 24;
+    --bg-sidebar: 16, 16, 16;
+    --bg-elevated: 32, 32, 32;
+    --bg-global: 12, 12, 12;
+
+    --text-main: 245, 245, 245;
+    --text-muted: 170, 170, 170;
+
+    --border-color: 245, 245, 245;
+    --border-subtle: 245 245 245 / 0.25;
+    --glass-bg: 24 24 24 / 1;
+
+    --theme-page-bg: radial-gradient(rgba(245,245,245,0.05) 1px, transparent 1px), linear-gradient(180deg, #141414 0%, #0a0a0a 100%);
+    --theme-card-bg: #181818;
+    --theme-card-hover-bg: #222222;
+    --theme-rail-bg: #101010;
+    --theme-topbar-bg: #141414;
+    --theme-table-head-bg: #facc15;
+    --theme-row-hover-bg: rgba(250, 204, 21, 0.12);
+    --theme-input-bg: #222222;
+    --theme-button-bg: #facc15;
+    --theme-active-bg: rgba(250, 204, 21, 0.22);
+    --theme-focus-ring: rgba(250, 204, 21, 0.55);
+    --theme-popup-bg: #1c1c1c;
+
+    --chart-1: 250, 204, 21;
+    --chart-2: 245, 245, 245;
+    --chart-3: 248, 113, 113;
+    --chart-4: 74, 222, 128;
+    --chart-5: 96, 165, 250;
+    --chart-grid: 245 245 245 / 0.14;
+    --chart-tooltip-bg: #facc15;
+}

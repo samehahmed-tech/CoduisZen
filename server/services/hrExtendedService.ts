@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { attendancePolicies, bonusPenaltyRecords, departments, employeeCompensationItems, employeeDocuments, employeeLoans, employeePayrollAssignments, employeeShiftAssignments, employees, jobTitles, leaveBalances, leaveRequests, leaveTypes, loanInstallments, overtimeEntries, payrollComponents, payrollProfiles, payrollRules, shiftTemplates } from '../../src/db/schema';
+import { attendancePolicies, bonusPenaltyRecords, departments, employeeCompensationItems, employeeDocuments, employeeLoans, employeePayrollAssignments, employeeShiftAssignments, employees, jobTitles, leaveBalances, leaveRequests, leaveTypes, loanInstallments, overtimeEntries, payrollComponents, payrollProfiles, payrollRules, settings, shiftTemplates } from '../../src/db/schema';
 import { eq, and, desc, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -1163,14 +1163,31 @@ export const hrExtendedService = {
         const type = await db._query.leaveTypes.findFirst({ where: eq(leaveTypes.id, data.leaveTypeId) });
         if (!type) throw new Error('Invalid leave type');
 
+        // Weekend days come from settings (HR_WEEKEND_DAYS, default Friday for
+        // Egypt) instead of a hardcoded Friday.
+        let weekendDays = [5];
+        try {
+            const [row] = await db.select({ value: settings.value }).top(1)
+                .from(settings).where(eq(settings.key, 'HR_WEEKEND_DAYS'));
+            const raw = (row as any)?.value;
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (Array.isArray(parsed) && parsed.length) {
+                const days = parsed.map(Number).filter((d: number) => Number.isInteger(d) && d >= 0 && d <= 6);
+                if (days.length) weekendDays = days;
+            }
+        } catch { /* default Friday */ }
+
         // Calculate working days
         const start = new Date(data.startDate);
         const end = new Date(data.endDate);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+            throw new Error('INVALID_LEAVE_RANGE');
+        }
         let totalDays = 0;
         const current = new Date(start);
         while (current <= end) {
             const day = current.getDay();
-            if (day !== 5) { // Friday is weekend in Egypt
+            if (!weekendDays.includes(day)) {
                 totalDays++;
             }
             current.setDate(current.getDate() + 1);
@@ -1178,6 +1195,18 @@ export const hrExtendedService = {
         const balance = await this.getLeaveBalance(data.employeeId, data.leaveTypeId);
         if (type.isPaid !== false && Number(type.daysPerYear || 0) < 365 && totalDays > Number(balance.remaining || 0)) {
             throw new Error('LEAVE_BALANCE_EXCEEDED');
+        }
+
+        // Overlap guard: no second PENDING/APPROVED request over the same days.
+        const overlapping = await db._query.leaveRequests.findMany({
+            where: and(
+                eq(leaveRequests.employeeId, data.employeeId),
+                sql`${leaveRequests.status} IN ('PENDING', 'APPROVED')`,
+                sql`${leaveRequests.startDate} <= ${end} AND ${leaveRequests.endDate} >= ${start}`,
+            ),
+        });
+        if (overlapping.length > 0) {
+            throw new Error('LEAVE_OVERLAPS_EXISTING');
         }
 
         const id = `LR-${randomUUID().slice(0,8)}`;

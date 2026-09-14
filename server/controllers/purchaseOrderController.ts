@@ -1,9 +1,10 @@
-import { Request, Response } from 'express';
+﻿import { Request, Response } from 'express';
 import { db } from '../db';
-import { purchaseOrders, purchaseOrderItems, inventoryStock, stockMovements, inventoryItems, auditLogs, inventoryBatches } from '../../src/db/schema';
-import { eq, desc, sql, and } from 'drizzle-orm';
+import { purchaseOrders, purchaseOrderItems, inventoryStock, stockMovements, inventoryItems, auditLogs, inventoryBatches, suppliers, branches, warehouses } from '../../src/db/schema';
+import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { postPurchaseReceiptEntry } from '../services/financePostingService';
+import { generatePurchaseOrderPDF } from '../services/pdfService';
 
 /**
  * Create new Purchase Order
@@ -12,11 +13,20 @@ export const createPO = async (req: Request, res: Response) => {
     try {
         const { id, supplierId, branchId, targetWarehouseId, expectedDate, notes, items, createdBy } = req.body;
 
-        if (!supplierId || !branchId || !items || items.length === 0) {
+        if (!supplierId || !branchId || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ error: 'supplierId, branchId, and items are required' });
         }
 
-        const subtotal = items.reduce((sum: number, item: any) => sum + (item.orderedQty * item.unitPrice), 0);
+        const normalizedItems = items.map((item: any) => ({
+            itemId: String(item.itemId || '').trim(),
+            orderedQty: Number(item.orderedQty ?? item.quantity),
+            unitPrice: Number(item.unitPrice),
+        }));
+        if (normalizedItems.some((item: any) => !item.itemId || !Number.isFinite(item.orderedQty) || item.orderedQty <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice <= 0)) {
+            return res.status(400).json({ error: 'Each purchase-order item must include a positive quantity and unit price' });
+        }
+
+        const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + (item.orderedQty * item.unitPrice), 0);
 
         const savedPO = await db.transaction(async (tx) => {
             // 1. Create PO header
@@ -35,7 +45,7 @@ export const createPO = async (req: Request, res: Response) => {
             });
 
             // 2. Create PO line items
-            for (const item of items) {
+            for (const item of normalizedItems) {
                 await tx.insert(purchaseOrderItems).values({
                     poId: po.id,
                     itemId: item.itemId,
@@ -218,14 +228,14 @@ export const receivePO = async (req: Request, res: Response) => {
                 .where(eq(purchaseOrders.id, id));
         });
 
-        // Finance posting: inventory receipt vs accounts payable (non-blocking)
-        postPurchaseReceiptEntry({
+        // Finance posting is part of the receive workflow. Failures are queued
+        // as finance exceptions, so the warehouse action remains auditable and
+        // the accounting team can retry it from Finance > Exceptions.
+        const financeResult = await postPurchaseReceiptEntry({
             poId: id,
             amount: totalReceivedCost,
             branchId: poBranchId,
             userId: receivedBy || 'system',
-        }).catch(() => {
-            // Keep PO receive flow resilient even if finance posting fails
         });
 
         await db.insert(auditLogs).values({
@@ -241,7 +251,7 @@ export const receivePO = async (req: Request, res: Response) => {
             createdAt: new Date(),
         });
 
-        res.json({ success: true, message: 'Goods received successfully' });
+        res.json({ success: true, message: 'Goods received successfully', finance: financeResult });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -264,7 +274,28 @@ export const getPOs = async (req: Request, res: Response) => {
             : db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
 
         const pos = await query.offset(0).fetch(100);
-        res.json(pos);
+        const poIds = pos.map((po) => po.id);
+        if (poIds.length === 0) return res.json([]);
+        const items = await db.select({
+            id: purchaseOrderItems.id,
+            poId: purchaseOrderItems.poId,
+            itemId: purchaseOrderItems.itemId,
+            itemName: inventoryItems.name,
+            unit: inventoryItems.unit,
+            orderedQty: purchaseOrderItems.orderedQty,
+            receivedQty: purchaseOrderItems.receivedQty,
+            unitPrice: purchaseOrderItems.unitPrice,
+        }).from(purchaseOrderItems)
+            .innerJoin(inventoryItems, eq(purchaseOrderItems.itemId, inventoryItems.id))
+            .where(inArray(purchaseOrderItems.poId, poIds));
+        const itemsByPO = new Map<string, any[]>();
+        for (const item of items) {
+            if (!poIds.includes(item.poId)) continue;
+            const list = itemsByPO.get(item.poId) || [];
+            list.push(item);
+            itemsByPO.set(item.poId, list);
+        }
+        res.json(pos.map((po) => ({ ...po, items: itemsByPO.get(po.id) || [] })));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -303,6 +334,67 @@ export const getPOById = async (req: Request, res: Response) => {
 };
 
 /**
+ * Purchase order PDF (A4 or 80mm thermal roll)
+ * GET /api/purchase-orders/:id/pdf?lang=ar&paper=80mm
+ */
+export const getPOPdf = async (req: Request, res: Response) => {
+    try {
+        const id = getStringParam((req.params as any).id);
+        if (!id) return res.status(400).json({ error: 'PO_ID_REQUIRED' });
+
+        const [po] = await db.select({
+            id: purchaseOrders.id,
+            status: purchaseOrders.status,
+            subtotal: purchaseOrders.subtotal,
+            createdAt: purchaseOrders.createdAt,
+            expectedDate: purchaseOrders.expectedDate,
+            createdBy: purchaseOrders.createdBy,
+            branchId: purchaseOrders.branchId,
+            supplierName: suppliers.name,
+            branchName: branches.name,
+            targetWarehouseId: purchaseOrders.targetWarehouseId,
+        })
+            .from(purchaseOrders)
+            .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+            .leftJoin(branches, eq(purchaseOrders.branchId, branches.id))
+            .where(eq(purchaseOrders.id, id));
+        if (!po) return res.status(404).json({ error: 'Purchase Order not found' });
+
+        const [items, targetWarehouse] = await Promise.all([
+            db.select({
+                itemId: purchaseOrderItems.itemId,
+                itemName: inventoryItems.name,
+                itemNameAr: inventoryItems.nameAr,
+                unit: inventoryItems.unit,
+                orderedQty: purchaseOrderItems.orderedQty,
+                receivedQty: purchaseOrderItems.receivedQty,
+                unitPrice: purchaseOrderItems.unitPrice,
+            })
+                .from(purchaseOrderItems)
+                .innerJoin(inventoryItems, eq(purchaseOrderItems.itemId, inventoryItems.id))
+                .where(eq(purchaseOrderItems.poId, id)),
+            po.targetWarehouseId
+                ? db.select({ name: warehouses.name }).from(warehouses).where(eq(warehouses.id, po.targetWarehouseId))
+                : Promise.resolve([] as any[]),
+        ]);
+
+        const lang = String(req.query.lang || 'ar') === 'en' ? 'en' : 'ar';
+        const paper = String(req.query.paper || 'a4') === '80mm' ? '80mm' : 'a4';
+        const buffer = await generatePurchaseOrderPDF({
+            ...po,
+            targetWarehouseName: (targetWarehouse as any[])[0]?.name || null,
+            items,
+        }, lang, paper);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="PO-${encodeURIComponent(id)}-${paper}.pdf"`);
+        res.send(buffer);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/**
  * Update PO status (e.g., DRAFT -> SENT)
  */
 export const updatePOStatus = async (req: Request, res: Response) => {
@@ -317,10 +409,11 @@ export const updatePOStatus = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Purchase Order not found' });
         }
 
-        const currentStatus = String(current.status || 'DRAFT').toUpperCase();
+        const rawStatus = String(current.status || 'DRAFT').trim().toUpperCase();
+        const currentStatus = ({ OPEN: 'DRAFT', NEW: 'DRAFT', PENDING: 'DRAFT', SUBMITTED: 'SENT', APPROVED: 'ORDERED' } as Record<string, string>)[rawStatus] || rawStatus;
         const requestedStatus = String(status).toUpperCase();
         const allowedTransitions: Record<string, string[]> = {
-            DRAFT: ['PENDING_APPROVAL', 'CANCELLED'],
+            DRAFT: ['SENT', 'PENDING_APPROVAL', 'ORDERED', 'CANCELLED'],
             PENDING_APPROVAL: ['ORDERED', 'CANCELLED'],
             ORDERED: ['SENT', 'CANCELLED'],
             SENT: ['PARTIAL', 'RECEIVED', 'CANCELLED'],
@@ -351,3 +444,4 @@ export const updatePOStatus = async (req: Request, res: Response) => {
         res.status(500).json({ error: error.message });
     }
 };
+

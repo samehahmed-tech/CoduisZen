@@ -28,6 +28,8 @@ export const purchaseOrdersApi = {
     updateStatus: (id: string, status: string) =>
         apiRequest<any>(`/purchase-orders/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
     createGRN: (data: any) => apiRequest<any>('/purchase-orders/grn', { method: 'POST', body: JSON.stringify(data) }),
+    createPurchaseReturn: (data: { warehouseId: string; supplierId?: string; reason: string; creditNoteRef?: string; items: { itemId: string; quantity: number; unitPrice?: number }[] }) =>
+        apiRequest<any>('/purchase-orders/returns', { method: 'POST', body: JSON.stringify(data) }),
     createSupplierInvoice: (data: any) => apiRequest<any>('/purchase-orders/invoices', { method: 'POST', body: JSON.stringify(data) }),
     approveSupplierInvoice: (id: string, managerId?: string) => 
         apiRequest<any>(`/purchase-orders/invoices/${id}/approve`, { method: 'POST', body: JSON.stringify({ managerId }) }),
@@ -38,7 +40,7 @@ export const productionApi = {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<any[]>(`/production/orders${query ? `?${query}` : ''}`);
     },
-    createOrder: (data: { targetItemId: string; quantityRequested: number; warehouseId: string; actorId?: string }) =>
+    createOrder: (data: { targetItemId: string; quantityRequested: number; warehouseId?: string; actorId?: string }) =>
         apiRequest<any>('/production/orders', { method: 'POST', body: JSON.stringify(data) }),
     startOrder: (id: string, data?: { actorId?: string }) =>
         apiRequest<any>(`/production/orders/${id}/start`, { method: 'PUT', body: JSON.stringify(data || {}) }),
@@ -46,4 +48,10 @@ export const productionApi = {
         apiRequest<any>(`/production/orders/${id}/complete`, { method: 'PUT', body: JSON.stringify(data) }),
     cancelOrder: (id: string, data?: { actorId?: string }) =>
         apiRequest<any>(`/production/orders/${id}/cancel`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+    getOrderById: (id: string) =>
+        apiRequest<any>(`/production/orders/${id}`),
+    updateOrder: (id: string, data: { quantityRequested?: number; warehouseId?: string; batchNumber?: string; notes?: string | null }) =>
+        apiRequest<any>(`/production/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteOrder: (id: string) =>
+        apiRequest<{ success: boolean; id: string }>(`/production/orders/${id}`, { method: 'DELETE' }),
 };

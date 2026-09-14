@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
    BarChart3,
    Calendar,
@@ -21,14 +21,15 @@ import { useNavigate } from 'react-router-dom';
 
 import { reportsApi } from '../services/api/reports';
 import { getReportPrintCSS } from '../services/reportPrintStyles';
+import { downloadElementPdf } from '../services/reportPdf';
 import { useReportsState } from './reports/useReportsState';
-import { SalesReports } from './reports/views/SalesReports';
-import { FinanceReports } from './reports/views/FinanceReports';
-import { InventoryReports } from './reports/views/InventoryReports';
-import { HrReports } from './reports/views/HrReports';
-import { CrmReports } from './reports/views/CrmReports';
-import { OpsReports } from './reports/views/OpsReports';
-import { AiReports } from './reports/views/AiReports';
+const SalesReports = React.lazy(() => import('./reports/views/SalesReports').then((module) => ({ default: module.SalesReports })));
+const FinanceReports = React.lazy(() => import('./reports/views/FinanceReports').then((module) => ({ default: module.FinanceReports })));
+const InventoryReports = React.lazy(() => import('./reports/views/InventoryReports').then((module) => ({ default: module.InventoryReports })));
+const HrReports = React.lazy(() => import('./reports/views/HrReports').then((module) => ({ default: module.HrReports })));
+const CrmReports = React.lazy(() => import('./reports/views/CrmReports').then((module) => ({ default: module.CrmReports })));
+const OpsReports = React.lazy(() => import('./reports/views/OpsReports').then((module) => ({ default: module.OpsReports })));
+const AiReports = React.lazy(() => import('./reports/views/AiReports').then((module) => ({ default: module.AiReports })));
 import { REPORT_CATEGORIES, downloadBlob, getExportReportType, getReportDisplayLabel, isTabularExportSupported } from './reports/reportConstants';
 
 type QuickRange = {
@@ -125,6 +126,33 @@ const coerceExcelValue = (value: string) => {
    return normalized;
 };
 
+/** Resolve a logo URL (data: or absolute http) to base64 for ExcelJS. Null = skip silently. */
+const loadLogoBase64 = async (url?: string): Promise<{ base64: string; extension: 'png' | 'jpeg' } | null> => {
+   if (!url) return null;
+   try {
+      if (url.startsWith('data:image/')) {
+         const m = url.match(/^data:image\/(png|jpe?g);base64,([\s\S]+)$/);
+         if (!m) return null;
+         return { base64: m[2], extension: m[1] === 'png' ? 'png' : 'jpeg' };
+      }
+      const absolute = url.startsWith('/') && typeof window !== 'undefined' ? `${window.location.origin}${url}` : url;
+      if (!/^https?:\/\//i.test(absolute)) return null;
+      const res = await fetch(absolute);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      if (!/^image\/(png|jpe?g)/.test(blob.type)) return null;
+      const dataUrl: string = await new Promise((resolve, reject) => {
+         const reader = new FileReader();
+         reader.onload = () => resolve(String(reader.result));
+         reader.onerror = () => reject(new Error('logo-read-failed'));
+         reader.readAsDataURL(blob);
+      });
+      return loadLogoBase64(dataUrl);
+   } catch {
+      return null;
+   }
+};
+
 export const extractRenderedReportRows = (node: HTMLElement | null, emptyLabel: string) => {
    if (!node) return { metadataRows: [] as string[][], tableRows: [[emptyLabel]] };
 
@@ -173,8 +201,11 @@ const Reports: React.FC = () => {
    const isArabic = settings.language !== 'en';
    const direction = isArabic ? 'rtl' : 'ltr';
    const reportViewportRef = useRef<HTMLDivElement | null>(null);
-   const [searchQuery, setSearchQuery] = useState('');
-   const [isExporting, setIsExporting] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    // Heavy report re-renders (fetch + big tables/charts) run as a transition
+    // so typing, clicking Apply, or switching reports never drops keystrokes.
+    const [, startFilterTransition] = useTransition();
+    const [isExporting, setIsExporting] = useState(false);
    const [pendingOutput, setPendingOutput] = useState<PendingOutput>(null);
 
    const visibleReportCategories = useMemo(
@@ -231,7 +262,10 @@ const Reports: React.FC = () => {
          .join('\n');
       const restaurantName = settings.restaurantName || 'Coduis Zen';
       const dateRangeText = isArabic ? `${appliedRange.start} إلى ${appliedRange.end}` : `${appliedRange.start} to ${appliedRange.end}`;
-      const printCSS = getReportPrintCSS(restaurantName, displaySubReportLabel, dateRangeText);
+      const printCSS = getReportPrintCSS(restaurantName, displaySubReportLabel, dateRangeText, {
+         logoUrl: settings.receiptLogoUrl || undefined,
+         orientation: 'landscape',
+      });
 
       printWindow.document.write(`
         <html dir="${direction}" lang="${isArabic ? 'ar' : 'en'}">
@@ -285,8 +319,10 @@ const Reports: React.FC = () => {
 
    const selectReport = (categoryId: string, reportName: string, mode: 'view' | 'print' | 'pdf' | 'xlsx' = 'view') => {
       setReportError(null);
-      setActiveCategory(categoryId);
-      setActiveSubReport(reportName);
+      startFilterTransition(() => {
+         setActiveCategory(categoryId);
+         setActiveSubReport(reportName);
+      });
       setPendingOutput({ categoryId, reportName, mode });
    };
 
@@ -298,8 +334,10 @@ const Reports: React.FC = () => {
          start: start.toISOString().split('T')[0],
          end: today.toISOString().split('T')[0],
       };
-      setDateRange(nextRange);
-      setAppliedRange(nextRange);
+      startFilterTransition(() => {
+         setDateRange(nextRange);
+         setAppliedRange(nextRange);
+      });
    };
 
    const exportCsv = async (reportName = activeSubReport) => {
@@ -331,7 +369,42 @@ const Reports: React.FC = () => {
          if (category) selectReport(category.id, reportName, 'pdf');
          return;
       }
-      openPrintableReport('pdf');
+      void downloadActivePdf();
+   };
+
+   /** Direct designer-PDF download (no print dialog). Falls back to print window on failure. */
+   const downloadActivePdf = async () => {
+      const node = printableRootRef.current;
+      if (!node) {
+         openPrintableReport('pdf');
+         return;
+      }
+      setIsExporting(true);
+      try {
+         await downloadElementPdf(node, {
+            filename: getSafeFileName(activeSubReport, appliedRange.start, appliedRange.end, 'pdf'),
+            title: displaySubReportLabel,
+            restaurant: settings.restaurantName || 'Coduis Zen',
+            logoUrl: settings.receiptLogoUrl || '/logo.png',
+            metaChips: [
+               displayCategoryLabel,
+               isArabic ? `${appliedRange.start} إلى ${appliedRange.end}` : `${appliedRange.start} to ${appliedRange.end}`,
+               activeBranchName || (isArabic ? 'كل الفروع' : 'All branches'),
+            ],
+            subtitle: isArabic ? REPORT_DESCRIPTIONS_AR[activeCategory] : REPORT_DESCRIPTIONS_EN[activeCategory],
+            orientation: 'landscape',
+            isArabic,
+         });
+      } catch (error: any) {
+         // Pixel pipeline failed (huge report, blocked canvas, etc.) — classic print flow still works.
+         try {
+            openPrintableReport('pdf');
+         } catch {
+            setReportError(error?.message || (isArabic ? 'تعذر إنشاء ملف PDF.' : 'Failed to build PDF.'));
+         }
+      } finally {
+         setIsExporting(false);
+      }
    };
 
    const exportXlsx = async (reportName = activeSubReport) => {
@@ -369,23 +442,43 @@ const Reports: React.FC = () => {
          workbook.views = [{ rightToLeft: isArabic } as any];
 
          const sheet = workbook.addWorksheet(isArabic ? 'التقرير' : 'Report', {
-            views: [{ rightToLeft: isArabic, state: 'frozen', ySplit: 8 }],
+            views: [{ rightToLeft: isArabic, state: 'frozen', ySplit: 10 }],
             properties: { defaultRowHeight: 24 },
          });
+         const restaurantName = settings.restaurantName || 'Coduis Zen';
          const reportLabel = isArabic ? getReportDisplayLabel(reportName) : reportName;
          const columnCount = Math.max(headers.length, 6);
-         sheet.mergeCells(1, 1, 3, columnCount);
-         sheet.getCell(1, 1).value = reportLabel;
-         sheet.getCell(1, 1).font = { bold: true, size: 24, color: { argb: 'FFFFFFFF' } };
-         sheet.getCell(1, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10243E' } };
+         // Row 1: restaurant brand + logo (skipped silently if unavailable)
+         sheet.mergeCells(1, 1, 1, columnCount);
+         sheet.getCell(1, 1).value = restaurantName;
+         sheet.getCell(1, 1).font = { bold: true, size: 18, color: { argb: 'FF0F766E' } };
          sheet.getCell(1, 1).alignment = { vertical: 'middle', horizontal: isArabic ? 'right' : 'left' };
+         sheet.getRow(1).height = 30;
+         const logo = await loadLogoBase64(settings.receiptLogoUrl || '/logo.png');
+         if (logo) {
+            try {
+               const imageId = workbook.addImage({ base64: logo.base64, extension: logo.extension });
+               sheet.addImage(imageId, {
+                  tl: { col: isArabic ? columnCount - 1.6 : 0, row: 0 },
+                  br: { col: isArabic ? columnCount + 0.4 : 2, row: 1 },
+                  editAs: 'oneCell',
+               } as any);
+            } catch {
+               // logo placement is decorative — never fail the export
+            }
+         }
+         sheet.mergeCells(2, 1, 4, columnCount);
+         sheet.getCell(2, 1).value = reportLabel;
+         sheet.getCell(2, 1).font = { bold: true, size: 24, color: { argb: 'FFFFFFFF' } };
+         sheet.getCell(2, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10243E' } };
+         sheet.getCell(2, 1).alignment = { vertical: 'middle', horizontal: isArabic ? 'right' : 'left' };
 
-         sheet.mergeCells(4, 1, 4, columnCount);
-         sheet.getCell(4, 1).value = isArabic
+         sheet.mergeCells(5, 1, 5, columnCount);
+         sheet.getCell(5, 1).value = isArabic
             ? `الفترة: ${appliedRange.start} إلى ${appliedRange.end} | الفرع: ${activeBranchName || 'كل الفروع'}`
             : `Range: ${appliedRange.start} to ${appliedRange.end} | Branch: ${activeBranchName || 'All branches'}`;
-         sheet.getCell(4, 1).font = { bold: true, size: 11, color: { argb: 'FF64748B' } };
-         sheet.getCell(4, 1).alignment = { horizontal: isArabic ? 'right' : 'left' };
+         sheet.getCell(5, 1).font = { bold: true, size: 11, color: { argb: 'FF64748B' } };
+         sheet.getCell(5, 1).alignment = { horizontal: isArabic ? 'right' : 'left' };
 
          const metaEntries = [
             [isArabic ? 'نوع التقرير' : 'Report type', getExportReportType(reportName)],
@@ -394,20 +487,20 @@ const Reports: React.FC = () => {
          ].slice(0, columnCount);
          metaEntries.forEach(([label, value], index) => {
             const col = index + 1;
-            sheet.getCell(6, col).value = label;
-            sheet.getCell(6, col).font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
-            sheet.getCell(6, col).alignment = { horizontal: 'center' };
-            sheet.getCell(7, col).value = value;
-            sheet.getCell(7, col).font = { bold: true, size: 12, color: { argb: 'FF10243E' } };
-            sheet.getCell(7, col).alignment = { horizontal: 'center', wrapText: true };
-            sheet.getCell(7, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
-            sheet.getCell(7, col).border = {
+            sheet.getCell(7, col).value = label;
+            sheet.getCell(7, col).font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+            sheet.getCell(7, col).alignment = { horizontal: 'center' };
+            sheet.getCell(8, col).value = value;
+            sheet.getCell(8, col).font = { bold: true, size: 12, color: { argb: 'FF10243E' } };
+            sheet.getCell(8, col).alignment = { horizontal: 'center', wrapText: true };
+            sheet.getCell(8, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
+            sheet.getCell(8, col).border = {
                top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
                bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
             };
          });
 
-         const headerRow = sheet.getRow(9);
+         const headerRow = sheet.getRow(10);
          headerRow.values = headers.length ? headers : [isArabic ? 'البيان' : 'Item'];
          headerRow.height = 30;
          headerRow.eachCell((cell) => {
@@ -420,12 +513,16 @@ const Reports: React.FC = () => {
             };
          });
 
+         const columnSums: number[] = new Array(Math.max(headers.length, 1)).fill(0);
+         const columnIsNumeric: boolean[] = new Array(Math.max(headers.length, 1)).fill(true);
          bodyRows.forEach((row, rowIndex) => {
             const sheetRow = sheet.addRow(row.map(coerceExcelValue));
             sheetRow.height = 24;
             sheetRow.eachCell((cell, colNumber) => {
                const value = cell.value;
                const isNumber = typeof value === 'number';
+               if (!isNumber) columnIsNumeric[colNumber - 1] = false;
+               else columnSums[colNumber - 1] += value;
                const isNegative = isNumber && value < 0;
                cell.font = {
                   size: 10,
@@ -444,15 +541,42 @@ const Reports: React.FC = () => {
             });
          });
 
+         if (bodyRows.length > 0 && columnIsNumeric.some(Boolean)) {
+            const totalsRow = sheet.addRow(
+               headers.map((_, colIndex) => {
+                  if (colIndex === 0) return isArabic ? 'الإجمالي' : 'TOTAL';
+                  return columnIsNumeric[colIndex] ? Math.round(columnSums[colIndex] * 100) / 100 : '';
+               })
+            );
+            totalsRow.height = 26;
+            totalsRow.eachCell((cell) => {
+               cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+               cell.alignment = { horizontal: 'center', vertical: 'middle' };
+               cell.border = { top: { style: 'medium', color: { argb: 'FF0F766E' } } };
+            });
+         }
+
          const widthSource = [headers, ...bodyRows.slice(0, 200)];
          for (let colIndex = 0; colIndex < columnCount; colIndex += 1) {
             const maxLength = Math.max(12, ...widthSource.map((row) => String(row[colIndex] ?? '').length));
             sheet.getColumn(colIndex + 1).width = Math.min(Math.max(maxLength + 4, 14), 38);
          }
          if (headers.length) {
-            sheet.autoFilter = { from: { row: 9, column: 1 }, to: { row: 9, column: headers.length } };
+            sheet.autoFilter = { from: { row: 10, column: 1 }, to: { row: 10, column: headers.length } };
          }
-         sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+         sheet.pageSetup = {
+            orientation: 'landscape',
+            fitToPage: true,
+            fitToWidth: 1,
+            fitToHeight: 0,
+            paperSize: 9,
+            horizontalCentered: true,
+         } as any;
+         sheet.headerFooter = {
+            oddHeader: `&L&\"Segoe UI,Bold\"&10 ${restaurantName} — ${reportLabel}&R&\"Segoe UI\"&9 ${appliedRange.start} : ${appliedRange.end}`,
+            oddFooter: `&L&\"Segoe UI\"&8 &D &T&C&\"Segoe UI\"&8 ${isArabic ? 'صفحة' : 'Page'} &P / &N&R&\"Segoe UI\"&8 Coduis Zen`,
+         };
 
          const buffer = await workbook.xlsx.writeBuffer();
          downloadBlob(
@@ -467,7 +591,7 @@ const Reports: React.FC = () => {
    };
 
    const renderActiveReport = () => (
-      <>
+      <React.Suspense fallback={null}>
          {activeCategory === 'SALES' && <SalesReports state={{ ...state, activeSubReport, activeCategory, navigate }} />}
          {activeCategory === 'FINANCE' && <FinanceReports state={{ ...state, activeSubReport, activeCategory, navigate }} />}
          {activeCategory === 'INVENTORY' && <InventoryReports state={{ ...state, activeSubReport, activeCategory, navigate }} />}
@@ -475,7 +599,7 @@ const Reports: React.FC = () => {
          {activeCategory === 'CRM' && <CrmReports state={{ ...state, activeSubReport, activeCategory, navigate }} />}
          {activeCategory === 'OPS' && <OpsReports state={{ ...state, activeSubReport, activeCategory, navigate }} />}
          {activeCategory === 'AI' && <AiReports state={{ ...state, activeSubReport, activeCategory, navigate }} />}
-      </>
+      </React.Suspense>
    );
 
    return (
@@ -534,9 +658,12 @@ const Reports: React.FC = () => {
                      <div className="grid gap-2">
                         <div className="relative">
                            <Search size={16} className={`absolute top-1/2 -translate-y-1/2 text-muted ${isArabic ? 'right-3' : 'left-3'}`} />
-                           <input
-                              value={searchQuery}
-                              onChange={(event) => setSearchQuery(event.target.value)}
+                            <input
+                               value={searchQuery}
+                               onChange={(event) => {
+                                  const value = event.target.value;
+                                  startFilterTransition(() => setSearchQuery(value));
+                               }}
                               placeholder={isArabic ? 'ابحث باسم التقرير أو القسم' : 'Search report or group'}
                               className={`w-full rounded-lg border border-border bg-card px-4 py-3 text-sm font-bold text-main outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15 ${isArabic ? 'pr-10' : 'pl-10'}`}
                            />
@@ -548,7 +675,7 @@ const Reports: React.FC = () => {
                            </div>
                            <ChevronLeft size={14} className="hidden text-muted sm:block rtl:rotate-180" />
                            <input type="date" value={dateRange.end} onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
-                           <button onClick={() => setAppliedRange(dateRange)} className="rounded-md bg-primary px-4 py-2 text-xs font-black text-white transition hover:bg-primary-hover">
+                            <button onClick={() => startFilterTransition(() => setAppliedRange(dateRange))} className="rounded-md bg-primary px-4 py-2 text-xs font-black text-white transition hover:bg-primary-hover">
                               {isArabic ? 'تطبيق' : 'Apply'}
                            </button>
                         </div>

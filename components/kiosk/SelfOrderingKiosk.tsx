@@ -35,6 +35,14 @@ const SelfOrderingKiosk: React.FC = () => {
   const [orderError, setOrderError] = useState('');
   const [kitchenWarning, setKitchenWarning] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  // Idle warning: 30s countdown before the 120s auto-reset wipes the cart.
+  const [idleCountdown, setIdleCountdown] = useState<number | null>(null);
+  const [idleToken, setIdleToken] = useState(0);
+  const idleCountdownRef = React.useRef<number | null>(null);
+  const setIdleCountdownSafe = (value: number | null) => {
+    idleCountdownRef.current = value;
+    setIdleCountdown(value);
+  };
 
   const { categories, fetchMenu, isLoading: menuLoading } = useMenuStore();
   const {
@@ -65,30 +73,51 @@ const SelfOrderingKiosk: React.FC = () => {
   }, [fetchMenu, setOrderMode]);
 
   useEffect(() => {
-    if (step === 'WELCOME' || step === 'SUCCESS') return;
-    let timeoutId = window.setTimeout(() => {
+    if (step === 'WELCOME' || step === 'SUCCESS') {
+      setIdleCountdownSafe(null);
+      return;
+    }
+    const IDLE_LIMIT_MS = 120_000;
+    const WARN_BEFORE_MS = 30_000;
+    let timeoutId = 0;
+    let warnId = 0;
+    let countId = 0;
+    const doReset = () => {
       clearCart();
       setSelectedItem(null);
       setSearchQuery('');
+      setIdleCountdownSafe(null);
       setStep('WELCOME');
-    }, 120_000);
-    const reset = () => {
-      window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        clearCart();
-        setSelectedItem(null);
-        setSearchQuery('');
-        setStep('WELCOME');
-      }, 120_000);
     };
+    const arm = () => {
+      window.clearTimeout(timeoutId);
+      window.clearTimeout(warnId);
+      window.clearInterval(countId);
+      setIdleCountdownSafe(null);
+      warnId = window.setTimeout(() => {
+        setIdleCountdownSafe(Math.ceil(WARN_BEFORE_MS / 1000));
+        countId = window.setInterval(() => {
+          setIdleCountdownSafe(idleCountdownRef.current !== null && idleCountdownRef.current > 1 ? idleCountdownRef.current - 1 : idleCountdownRef.current);
+        }, 1000);
+      }, IDLE_LIMIT_MS - WARN_BEFORE_MS);
+      timeoutId = window.setTimeout(doReset, IDLE_LIMIT_MS);
+    };
+    const reset = () => {
+      if (idleCountdownRef.current !== null) return; // modal owns the timer now
+      arm();
+    };
+    arm();
     window.addEventListener('pointerdown', reset);
     window.addEventListener('keydown', reset);
     return () => {
       window.clearTimeout(timeoutId);
+      window.clearTimeout(warnId);
+      window.clearInterval(countId);
       window.removeEventListener('pointerdown', reset);
       window.removeEventListener('keydown', reset);
     };
-  }, [clearCart, step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clearCart, step, idleToken]);
 
   useEffect(() => {
     if (step !== 'SUCCESS') return;
@@ -277,13 +306,16 @@ const SelfOrderingKiosk: React.FC = () => {
             <div className="kiosk-review-body"><CartItems /></div>
           ) : (
             <div className="kiosk-payment-grid">
+              <p style={{ gridColumn: '1 / -1', textAlign: 'center', fontWeight: 800, opacity: 0.75 }}>
+                {tr('Order now — pay at the counter. Your pickup number shows right after.', 'اطلب دلوقتي — وادفع عند الكاشير. رقم الاستلام هيظهر فوراً.')}
+              </p>
               {paymentMethods.map(method => {
                 const Icon = method.icon;
                 return (
                   <button key={method.id} type="button" disabled={isPlacingOrder} onClick={() => submitOrder(method.id)}>
                     <Icon size={40} />
                     <strong>{method.label}</strong>
-                    <span>{tr('Complete payment with the cashier', 'إتمام الدفع مع الكاشير')}</span>
+                    <span>{tr('Order now, pay at counter', 'اطلب الآن وادفع عند الكاشير')}</span>
                   </button>
                 );
               })}
@@ -360,6 +392,34 @@ const SelfOrderingKiosk: React.FC = () => {
       </button>
 
       {selectedItem && <KioskModifierModal item={selectedItem} lang={lang} currency={currency} onClose={() => setSelectedItem(null)} onConfirm={addConfiguredItem} />}
+
+      {/* Idle warning: extend or the cart resets when the countdown ends. */}
+      {idleCountdown !== null && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-6" dir={isAr ? 'rtl' : 'ltr'}>
+          <div className="w-full max-w-sm rounded-3xl bg-card p-8 text-center shadow-2xl">
+            <p className="text-6xl font-black tabular-nums text-main">{idleCountdown}</p>
+            <h3 className="mt-2 text-lg font-black text-main">{tr('Still there?', 'لسه موجود؟')}</h3>
+            <p className="mt-1 text-sm font-bold text-muted">{tr('Your order will reset for the next guest.', 'طلبك هيتمسح للضيف اللي بعدك.')}</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => { clearCart(); setSelectedItem(null); setSearchQuery(''); setIdleCountdownSafe(null); setStep('WELCOME'); }}
+                className="h-14 rounded-2xl bg-elevated text-sm font-black text-main"
+              >
+                {tr('Reset now', 'امسح الآن')}
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => { setIdleCountdownSafe(null); setIdleToken((t) => t + 1); }}
+                className="h-14 rounded-2xl bg-primary text-sm font-black text-white"
+              >
+                {tr("I'm still here", 'أنا لسه هنا')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

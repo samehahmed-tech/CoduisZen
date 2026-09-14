@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Search, X, SlidersHorizontal, LayoutGrid, Grid2x2, List, Grid3x3,
+    Search, X, SlidersHorizontal, LayoutGrid, Rows3, Sparkles, Ticket,
     ShoppingBag, Star, CheckCircle, RotateCcw, ArrowUpDown,
 } from 'lucide-react';
 import CategoryTabs from './CategoryTabs';
@@ -77,10 +77,10 @@ const ToolsDropdown: React.FC<{
     if (!isOpen) return null;
 
     const densities = [
-        { id: 'comfortable', icon: LayoutGrid, label: isAr ? 'بطاقات' : 'Cards' },
-        { id: 'compact', icon: Grid2x2, label: isAr ? 'مضغوط' : 'Compact' },
-        { id: 'ultra', icon: List, label: isAr ? 'قائمة' : 'List' },
-        { id: 'buttons', icon: Grid3x3, label: isAr ? 'سريع' : 'Fast' },
+        { id: 'comfortable', icon: LayoutGrid, label: isAr ? 'ملصق' : 'Poster' },
+        { id: 'compact', icon: Rows3, label: isAr ? 'شريط' : 'Rail' },
+        { id: 'ultra', icon: Sparkles, label: isAr ? 'زجاجي' : 'Glass' },
+        { id: 'buttons', icon: Ticket, label: isAr ? 'سبليت' : 'Split' },
     ];
 
     const sorts = [
@@ -161,7 +161,7 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
     const quickCategories = quickCategoryNav;
 
     return (
-        <div className="flex flex-1 h-full min-h-0 min-w-0 flex-col overflow-hidden bg-app">
+        <div className="pos-items-panel flex flex-1 h-full min-h-0 min-w-0 flex-col overflow-hidden bg-app">
             {/* Toolbar */}
             <div className="pos-items-toolbar relative z-20 shrink-0 border-b border-border/5 bg-card/60 backdrop-blur-md px-4 py-3 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
                 <div className="flex items-center gap-3">

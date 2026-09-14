@@ -1,0 +1,3 @@
+Built: 2026-09-05
+App: "version": "1.1.40", | Bridge: v2.1.0
+NEW: delivery UX overhaul — new Pilots roster page (/drivers) with one-tap status, load tracking and smart search; Dispatch rewritten as a single smart handover queue (ready/road/alerts tabs, ranked pilot suggestions, PoD cash check, reassign, OSRM road route on map); free OSM maps now switchable at runtime from Settings with Google-key option; and all previous fixes

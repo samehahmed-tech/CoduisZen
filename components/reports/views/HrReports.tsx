@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts';
 import { BadgeDollarSign, CalendarDays, Clock3, TrendingUp, Users, Wallet, ShieldAlert, TimerReset, BriefcaseBusiness } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 
 const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
 
@@ -313,10 +314,32 @@ export const HrReports = ({ state }: any) => {
                )}
             </TableShell>
          </div>
-      </div>
-   );
+          <ReportDataTable
+             title={lang === 'ar' ? 'الإنتاجية — جدول' : 'Productivity — table'}
+             data={productivityChart}
+             columns={[
+                { key: 'name', label: lang === 'ar' ? 'الموظف' : 'Employee' },
+                { key: 'revenue', label: lang === 'ar' ? 'الإيراد' : 'Revenue', align: 'right', sum: true, format: (v: any) => fmtMoney(v, settings?.currencySymbol || 'LE') },
+             ]}
+             exportFilename="hr-productivity"
+             lang={lang}
+          />
+          <ReportDataTable
+             title={lang === 'ar' ? 'الحضور — جدول' : 'Attendance — table'}
+             data={attendanceChart}
+             columns={[
+                { key: 'name', label: lang === 'ar' ? 'الموظف' : 'Employee' },
+                { key: 'present', label: lang === 'ar' ? 'حاضر' : 'Present', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                { key: 'late', label: lang === 'ar' ? 'متأخر' : 'Late', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                { key: 'absent', label: lang === 'ar' ? 'غائب' : 'Absent', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+             ]}
+             exportFilename="hr-attendance-summary"
+             lang={lang}
+          />
+       </div>
+    );
 
-   const renderPayroll = (ledger = false) => (
+    const renderPayroll = (ledger = false) => (
       <div className="space-y-6">
          <div className="grid gap-4 md:grid-cols-4">
             <StatCard icon={BadgeDollarSign} title={t.totalPayroll} value={`${formatNumber(payrollData?.totalPayroll, locale, 0)} ${currency}`} hint={t.payrollHealth} />

@@ -1,0 +1,53 @@
+/* Shared interaction grammar. Components opt in with data-interaction. */
+:root {
+  --semantic-background: rgb(var(--bg-app));
+  --semantic-surface: rgb(var(--bg-card));
+  --semantic-text-primary: rgb(var(--text-main));
+  --semantic-text-secondary: rgb(var(--text-muted));
+  --semantic-border: rgb(var(--border-color));
+  --semantic-interactive-primary: rgb(var(--primary));
+  --motion-reduced: 1ms;
+}
+
+::selection { background: var(--semantic-selection, rgba(var(--primary), .18)); }
+
+:where(button, a, input, select, textarea, [role="button"]):focus-visible {
+  outline: var(--primitive-focus-ring-width, 3px) solid var(--semantic-focus, rgba(var(--primary), .28));
+  outline-offset: 2px;
+}
+
+[data-interaction="subtle"] { --interaction-hover-distance: 1px; --interaction-hover-scale: 1; }
+[data-interaction="expressive"] { --interaction-hover-distance: 4px; --interaction-hover-scale: 1.015; }
+
+[data-interaction~="lift"] {
+  transition: transform var(--motion-normal) var(--ease-standard), box-shadow var(--motion-normal) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+}
+[data-interaction~="lift"]:hover { transform: translateY(calc(var(--interaction-hover-distance) * -1)) scale(var(--interaction-hover-scale)); }
+[data-interaction~="lift"]:active { transform: translateY(0) scale(var(--interaction-press-scale)); }
+
+[data-interaction~="press"] { transition: transform var(--motion-fast) var(--ease-emphasized); }
+[data-interaction~="press"]:active { transform: scale(var(--interaction-press-scale)); }
+
+[data-interaction~="reveal"] { overflow: hidden; }
+[data-interaction~="reveal"] [data-reveal-target] { opacity: 0; transform: translateY(4px); transition: opacity var(--motion-fast) var(--ease-enter), transform var(--motion-fast) var(--ease-enter); }
+[data-interaction~="reveal"]:hover [data-reveal-target],
+[data-interaction~="reveal"]:focus-within [data-reveal-target] { opacity: 1; transform: translateY(0); }
+
+[data-status="pending"] [data-status-indicator] { animation: status-breathe 2.4s var(--ease-standard) infinite; }
+[data-status="preparing"] [data-status-indicator] { animation: status-pulse 1.4s var(--ease-standard) infinite; }
+[data-status="ready"] [data-status-indicator] { animation: status-complete 420ms var(--ease-emphasized) both; }
+
+@keyframes status-breathe { 50% { opacity: .5; transform: scale(.86); } }
+@keyframes status-pulse { 50% { opacity: .7; box-shadow: 0 0 0 5px color-mix(in srgb, var(--semantic-status-warning) 16%, transparent); } }
+@keyframes status-complete { 0% { transform: scale(.7); opacity: .4; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+
+[data-feedback="success"] { animation: feedback-success 420ms var(--ease-emphasized); }
+@keyframes feedback-success { 45% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--semantic-status-success) 16%, transparent); } }
+
+.theme-skeleton { background: linear-gradient(100deg, color-mix(in srgb, var(--semantic-surface-raised) 80%, transparent), color-mix(in srgb, var(--semantic-interactive-primary) 10%, transparent), color-mix(in srgb, var(--semantic-surface-raised) 80%, transparent)); background-size: 220% 100%; animation: skeleton-shift 1.4s var(--ease-standard) infinite; }
+@keyframes skeleton-shift { to { background-position: -220% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: var(--motion-reduced) !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: var(--motion-reduced) !important; }
+  [data-interaction~="lift"]:hover { transform: none; }
+}

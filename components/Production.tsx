@@ -13,17 +13,23 @@ import {
     X,
     TrendingUp,
     Scale,
-    AlertTriangle
+    AlertTriangle,
+    Eye,
+    Pencil,
+    Trash2,
+    Save,
+    Bot
 } from 'lucide-react';
 import { useInventoryStore } from '../stores/useInventoryStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { translations } from '../services/translations';
 import { ProductionStatus, ProductionOrder } from '../types';
+import { productionApi } from '../services/api/procurement';
 import { useToast } from './Toast';
 
 const Production: React.FC = () => {
     const { settings } = useAuthStore();
-    const { inventory, warehouses, productionOrders, fetchInventory, fetchWarehouses, fetchProductionOrders, addProductionOrder, startProductionOrder, completeProductionOrder, cancelProductionOrder } = useInventoryStore();
+    const { inventory, warehouses, productionOrders, fetchInventory, fetchWarehouses, fetchProductionOrders, addProductionOrder, startProductionOrder, completeProductionOrder, cancelProductionOrder, updateProductionOrder, deleteProductionOrder } = useInventoryStore();
     const lang = settings.language || 'en';
     const t = translations[lang];
     const isAr = lang === 'ar';
@@ -43,6 +49,96 @@ const Production: React.FC = () => {
     const [orderToComplete, setOrderToComplete] = useState<ProductionOrder | null>(null);
     const [actualYield, setActualYield] = useState(0);
 
+    // Order Detail / Edit / Confirm State
+    const [detailOrder, setDetailOrder] = useState<any | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [editForm, setEditForm] = useState<{ quantityRequested: number; warehouseId: string; batchNumber: string; notes: string } | null>(null);
+    const [editSaving, setEditSaving] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<{ kind: 'cancel' | 'delete'; id: string; batch: string } | null>(null);
+    const [confirmBusy, setConfirmBusy] = useState(false);
+
+    const openOrderDetail = async (id: string) => {
+        setDetailLoading(true);
+        setDetailOrder({ id, _loading: true } as any);
+        try {
+            const detail = await productionApi.getOrderById(id);
+            setDetailOrder(detail);
+        } catch (error: any) {
+            showToast(error?.message || tr('Could not load order details.', 'تعذر تحميل تفاصيل الأمر.'), 'error');
+            setDetailOrder(null);
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    const openEditForm = (detail: any) => {
+        setEditForm({
+            quantityRequested: Number(detail.quantityRequested || 1),
+            warehouseId: detail.warehouseId || '',
+            batchNumber: detail.batchNumber || '',
+            notes: detail.notes || '',
+        });
+    };
+
+    const submitEditForm = async () => {
+        if (!detailOrder?.id || !editForm) return;
+        if (!Number.isFinite(editForm.quantityRequested) || editForm.quantityRequested <= 0) {
+            showToast(tr('Enter a valid quantity.', 'ادخل كمية صحيحة.'), 'error');
+            return;
+        }
+        setEditSaving(true);
+        try {
+            await updateProductionOrder(detailOrder.id, {
+                quantityRequested: editForm.quantityRequested,
+                warehouseId: editForm.warehouseId || undefined,
+                batchNumber: editForm.batchNumber.trim() || undefined,
+                notes: editForm.notes.trim() ? editForm.notes.trim() : null,
+            });
+            const detail = await productionApi.getOrderById(detailOrder.id);
+            setDetailOrder(detail);
+            setEditForm(null);
+            showToast(tr('Order updated.', 'تم تعديل أمر الإنتاج.'), 'success');
+        } catch (error: any) {
+            const raw = String(error?.message || '');
+            showToast(
+                raw.includes('ONLY_PLANNED_ORDERS_EDITABLE')
+                    ? tr('Only planned orders can be edited.', 'لا يمكن تعديل أمر بدأ تنفيذه بالفعل.')
+                    : (raw || tr('Could not update order.', 'تعذر تعديل الأمر.')),
+                'error'
+            );
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const submitConfirmAction = async () => {
+        if (!confirmAction) return;
+        setConfirmBusy(true);
+        try {
+            if (confirmAction.kind === 'cancel') await cancelProductionOrder(confirmAction.id);
+            else await deleteProductionOrder(confirmAction.id);
+            setConfirmAction(null);
+            setDetailOrder(null);
+            setEditForm(null);
+            showToast(
+                confirmAction.kind === 'cancel'
+                    ? tr('Order cancelled.', 'تم إلغاء أمر الإنتاج.')
+                    : tr('Order deleted.', 'تم حذف أمر الإنتاج.'),
+                'success'
+            );
+        } catch (error: any) {
+            const raw = String(error?.message || '');
+            showToast(
+                raw.includes('ONLY_PLANNED_ORDERS_DELETABLE')
+                    ? tr('Only planned orders can be deleted — cancel started ones instead.', 'لا يمكن حذف أمر بدأ تنفيذه — ألغه بدلاً من ذلك.')
+                    : (raw || tr('Action failed.', 'فشل تنفيذ الإجراء.')),
+                'error'
+            );
+        } finally {
+            setConfirmBusy(false);
+        }
+    };
+
     useEffect(() => {
         fetchProductionOrders();
         fetchInventory();
@@ -53,12 +149,22 @@ const Production: React.FC = () => {
 
     // Create Wizard Calculations
     const selectedCompositeItem = useMemo(() => compositeItems.find(i => i.id === targetItemId), [compositeItems, targetItemId]);
+    const automaticWarehouseId = useMemo(() => {
+        const activeWarehouses = warehouses.filter(w => w.isActive !== false);
+        return activeWarehouses.find(w => String(w.type || '').toUpperCase() === 'PRODUCTION')?.id
+            || activeWarehouses.find(w => String(w.type || '').toUpperCase() === 'KITCHEN')?.id
+            || activeWarehouses.find(w => String(w.type || '').toUpperCase() === 'MAIN')?.id
+            || activeWarehouses[0]?.id
+            || '';
+    }, [warehouses]);
+    const effectiveWarehouseId = warehouseId || automaticWarehouseId;
 
     const ingredientDeficits = useMemo(() => {
-        if (!selectedCompositeItem || !selectedCompositeItem.bom || !warehouseId) return [];
+        if (!selectedCompositeItem || !selectedCompositeItem.bom || !effectiveWarehouseId) return [];
         return selectedCompositeItem.bom.map(ing => {
-            const inventoryItem = inventory.find(i => i.id === ing.itemId);
-            const wq = inventoryItem?.warehouseQuantities?.find(w => w.warehouseId === warehouseId)?.quantity || 0;
+            const ingredientItemId = ing.itemId || (ing as any).inventoryItemId;
+            const inventoryItem = inventory.find(i => i.id === ingredientItemId);
+            const wq = inventoryItem?.warehouseQuantities?.find(w => w.warehouseId === effectiveWarehouseId)?.quantity || 0;
             const requiredQty = ing.quantity * quantityRequested;
             const deficit = requiredQty > wq ? requiredQty - wq : 0;
             return {
@@ -69,7 +175,7 @@ const Production: React.FC = () => {
                 unit: inventoryItem?.unit || '',
             };
         });
-    }, [selectedCompositeItem, quantityRequested, warehouseId, inventory, lang]);
+    }, [selectedCompositeItem, quantityRequested, effectiveWarehouseId, inventory, lang]);
 
     const hasDeficits = ingredientDeficits.some(d => d.deficit > 0);
     const activeOrders = useMemo(
@@ -112,8 +218,14 @@ const Production: React.FC = () => {
         try {
             await startProductionOrder(orderId);
             showToast(tr('Production batch started.', 'تم بدء أمر الإنتاج.'), 'success');
-        } catch (error) {
-            showToast(tr('Could not start production batch.', 'تعذر بدء أمر الإنتاج.'), 'error');
+        } catch (error: any) {
+            const raw = String(error?.message || '');
+            const msg = raw.includes('INSUFFICIENT_STOCK')
+                ? tr('Not enough stock — even after auto-producing sub-recipes. Receive or produce components first.', 'الرصيد غير كافٍ حتى بعد الإنتاج التلقائي للمكونات — استلم أو أنتج المكونات أولاً.')
+                : raw.includes('INGREDIENT_ITEM_INACTIVE')
+                    ? tr('One of the ingredients is inactive.', 'أحد المكونات غير نشط.')
+                    : raw || tr('Could not start production batch.', 'تعذر بدء أمر الإنتاج.');
+            showToast(msg, 'error');
         }
     };
 
@@ -127,7 +239,7 @@ const Production: React.FC = () => {
     };
 
     const handleCreateOrder = async () => {
-        if (!targetItemId || !warehouseId || quantityRequested <= 0) {
+        if (!targetItemId || quantityRequested <= 0) {
             showToast(tr('Select item, warehouse, and a valid quantity.', 'اختر المنتج والمخزن وكمية صحيحة.'), 'error');
             return;
         }
@@ -137,7 +249,7 @@ const Production: React.FC = () => {
                 targetItemId,
                 quantityRequested,
                 quantityProduced: 0,
-                warehouseId,
+                warehouseId: effectiveWarehouseId,
                 status: ProductionStatus.PENDING,
                 batchNumber: `B-${Date.now()}`,
                 createdAt: new Date(),
@@ -149,8 +261,18 @@ const Production: React.FC = () => {
             setTargetItemId('');
             setWarehouseId('');
             setQuantityRequested(1);
-        } catch (error) {
-            showToast(tr('Could not create production batch.', 'تعذر إنشاء أمر الإنتاج.'), 'error');
+        } catch (error: any) {
+            const raw = String(error?.message || '');
+            const msg = raw.includes('no recipe or BOM')
+                ? tr('This item has no recipe or BOM — add its recipe first.', 'الصنف المختار ليس له وصفة أو مكونات — أضف الوصفة أولاً ثم أعد المحاولة.')
+                : raw.includes('PRODUCTION_WAREHOUSE_NOT_FOUND')
+                    ? tr('No warehouse found — create a production warehouse for the branch first.', 'لا يوجد مخزن — أنشئ مخزن إنتاج للفرع أولاً ثم أعد المحاولة.')
+                    : raw.includes('WAREHOUSE_INACTIVE')
+                        ? tr('The selected warehouse is inactive.', 'المخزن المختار غير نشط.')
+                        : raw.includes('TARGET_ITEM_INACTIVE')
+                            ? tr('The selected item is inactive.', 'الصنف المختار غير نشط.')
+                            : raw || tr('Could not create production batch.', 'تعذر إنشاء أمر الإنتاج.');
+            showToast(msg, 'error');
         }
     };
 
@@ -287,19 +409,28 @@ const Production: React.FC = () => {
                                                     </button>
                                                 )}
                                                 {order.status === ProductionStatus.IN_PROGRESS && (
-                                                    <button
-                                                        onClick={() => { setOrderToComplete(order); setActualYield(order.quantityRequested); setIsCompleteModalOpen(true); }}
-                                                        className="flex-1 py-3.5 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-600 shadow-lg shadow-emerald-500/10 transition-colors"
-                                                    >
-                                                        {tr('Record Yield', 'تسجيل الإنتاج')} <CheckCircle2 size={14} />
-                                                    </button>
-                                                )}
+                                                <>
+                                                <button
+                                                    onClick={() => { setOrderToComplete(order); setActualYield(order.quantityRequested); setIsCompleteModalOpen(true); }}
+                                                    className="flex-1 py-3.5 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-600 shadow-lg shadow-emerald-500/10 transition-colors"
+                                                >
+                                                    {tr('Record Yield', 'تسجيل الإنتاج')} <CheckCircle2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => openOrderDetail(order.id)}
+                                                    title={tr('View details', 'عرض التفاصيل')}
+                                                    className="px-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-indigo-500 rounded-xl font-black text-[10px] uppercase hover:border-indigo-300 transition-colors"
+                                                >
+                                                    <Eye size={14} />
+                                                </button>
                                                 <button
                                                     onClick={() => handleCancelOrder(order.id)}
                                                     className="px-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-black text-[10px] uppercase hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-900/50 transition-colors"
                                                 >
                                                     {tr('Cancel', 'إلغاء')}
                                                 </button>
+                                                </>
+                                                )}
                                             </div>
                                         </div>
                                     );
@@ -398,9 +529,16 @@ const Production: React.FC = () => {
                                     {historyOrders.map((order) => {
                                         const item = inventory.find(i => i.id === order.targetItemId);
                                         return (
-                                            <tr key={order.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <tr key={order.id} onClick={() => openOrderDetail(order.id)} title={tr('View details', 'عرض التفاصيل')} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer">
                                                 <td className="p-4 font-black text-xs text-slate-700 dark:text-slate-300">
-                                                    {order.batchNumber}
+                                                    <div className="flex flex-col gap-1">
+                                                        <span>{order.batchNumber}</span>
+                                                        {String(order.batchNumber || '').startsWith('AUTO-') && (
+                                                            <span className="w-fit px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 text-[9px] font-black uppercase tracking-widest border border-cyan-500/25">
+                                                                {tr('Automatic', 'تلقائي')}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="p-4 font-bold text-sm text-slate-800 dark:text-slate-200">
                                                     {lang === 'ar' ? item?.nameAr || item?.name : item?.name}
@@ -486,7 +624,7 @@ const Production: React.FC = () => {
                             </div>
 
                             {/* BOM Analysis */}
-                            {selectedCompositeItem && warehouseId && quantityRequested > 0 && (
+                            {selectedCompositeItem && effectiveWarehouseId && quantityRequested > 0 && (
                                 <div className="mt-8">
                                     <h4 className="text-sm font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
                                         <TrendingUp size={16} className="text-indigo-500" />
@@ -542,7 +680,7 @@ const Production: React.FC = () => {
                         <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex gap-4">
                             <button
                                 onClick={handleCreateOrder}
-                                disabled={!targetItemId || !warehouseId || quantityRequested <= 0}
+                                disabled={!targetItemId || quantityRequested <= 0}
                                 className="flex-1 h-14 rounded-xl bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
                             >
                                 <Plus size={18} /> {tr('Create Batch', 'إنشاء أمر الإنتاج')}
@@ -594,6 +732,217 @@ const Production: React.FC = () => {
                             </button>
                             <button onClick={() => { setIsCompleteModalOpen(false); setOrderToComplete(null); }} className="px-6 h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-colors">
                                 {tr('Cancel', 'إلغاء')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Order Detail Modal */}
+            {detailOrder && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200" onClick={() => { if (!detailLoading) { setDetailOrder(null); setEditForm(null); } }}>
+                    <div className="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {detailOrder._loading || detailLoading && !detailOrder.batchNumber ? (
+                            <div className="p-16 text-center text-slate-500 font-black uppercase tracking-widest text-sm">{tr('Loading details...', 'جاري تحميل التفاصيل...')}</div>
+                        ) : (
+                            <>
+                                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex items-start justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="text-xl font-black uppercase text-slate-900 dark:text-white">
+                                                {isAr ? detailOrder.targetItemNameAr || detailOrder.targetItemName : detailOrder.targetItemName}
+                                            </h3>
+                                            {detailOrder.isAutomatic && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-cyan-500/10 text-cyan-600 text-[10px] font-black uppercase tracking-widest border border-cyan-500/25">
+                                                    <Bot size={12} /> {tr('Automatic', 'تلقائي')}
+                                                </span>
+                                            )}
+                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusStyles(detailOrder.status)}`}>
+                                                {getStatusLabel(detailOrder.status)}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                                            {tr('Batch', 'تشغيلة')}: <span className="text-slate-700 dark:text-slate-300">{detailOrder.batchNumber}</span>
+                                            {' • '}{detailOrder.id}
+                                        </p>
+                                        {detailOrder.notes && (
+                                            <p className="mt-2 text-xs font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">{detailOrder.notes}</p>
+                                        )}
+                                    </div>
+                                    <button onClick={() => { setDetailOrder(null); setEditForm(null); }} className="p-2 bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-700 rounded-full border border-slate-200 dark:border-slate-700 shrink-0">
+                                        <X size={18} />
+                                    </button>
+                                </div>
+
+                                <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 flex-1">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        {[
+                                            { label: tr('Target', 'المستهدف'), value: `${detailOrder.quantityRequested} ${detailOrder.targetUnit || ''}` },
+                                            { label: tr('Actual', 'الفعلي'), value: `${detailOrder.quantityProduced} ${detailOrder.targetUnit || ''}` },
+                                            { label: tr('Warehouse', 'المخزن'), value: detailOrder.warehouseName || '-' },
+                                            { label: tr('Created', 'أُنشئ'), value: detailOrder.createdAt ? new Date(detailOrder.createdAt).toLocaleString() : '-' },
+                                            { label: tr('Started', 'بدأ'), value: detailOrder.startedAt ? new Date(detailOrder.startedAt).toLocaleString() : '-' },
+                                            { label: tr('Completed', 'اكتمل'), value: detailOrder.completedAt ? new Date(detailOrder.completedAt).toLocaleString() : '-' },
+                                            { label: tr('By', 'بواسطة'), value: detailOrder.actorId || 'system' },
+                                            { label: tr('Order ID', 'رقم الأمر'), value: String(detailOrder.id || '').slice(0, 18) },
+                                        ].map((m, i) => (
+                                            <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{m.label}</p>
+                                                <p className="text-xs font-black text-slate-800 dark:text-slate-100 break-words">{m.value}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">
+                                            {tr('Ingredients', 'المكونات')} ({(detailOrder.ingredients || []).length})
+                                        </h4>
+                                        {(detailOrder.ingredients || []).length === 0 ? (
+                                            <p className="text-xs font-bold text-slate-400">{tr('No ingredients recorded.', 'لا توجد مكونات مسجلة.')}</p>
+                                        ) : (
+                                            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                                <table className="w-full text-left">
+                                                    <thead className="bg-slate-50 dark:bg-slate-800">
+                                                        <tr>
+                                                            <th className="p-3 text-[10px] font-black uppercase tracking-widest text-slate-500">{tr('Ingredient', 'المكون')}</th>
+                                                            <th className="p-3 text-[10px] font-black uppercase tracking-widest text-slate-500">{tr('Required', 'المطلوب')}</th>
+                                                            <th className="p-3 text-[10px] font-black uppercase tracking-widest text-slate-500">{tr('Actual', 'الفعلي')}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(detailOrder.ingredients || []).map((ing: any, idx: number) => (
+                                                            <tr key={idx} className="border-t border-slate-100 dark:border-slate-800">
+                                                                <td className="p-3 font-bold text-sm text-slate-800 dark:text-slate-200">{isAr ? ing.nameAr || ing.name : ing.name}</td>
+                                                                <td className="p-3 font-bold text-sm text-slate-600 dark:text-slate-400">{ing.requiredQty} <span className="text-xs uppercase opacity-70">{ing.unit}</span></td>
+                                                                <td className="p-3 font-bold text-sm text-slate-600 dark:text-slate-400">{ing.actualQty ?? '—'} <span className="text-xs uppercase opacity-70">{ing.unit}</span></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">
+                                            {tr('Stock Movements', 'حركات المخزون')} ({(detailOrder.movements || []).length})
+                                        </h4>
+                                        {(detailOrder.movements || []).length === 0 ? (
+                                            <p className="text-xs font-bold text-slate-400">{tr('No movements yet — stock moves when the batch starts and completes.', 'لا توجد حركات بعد — يتحرك المخزون عند بدء التشغيل وإغلاقها.')}</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {(detailOrder.movements || []).map((mv: any) => (
+                                                    <div key={mv.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">{mv.reason || mv.type}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400">{mv.createdAt ? new Date(mv.createdAt).toLocaleString() : ''} • {mv.performedBy}</p>
+                                                        </div>
+                                                        <span className="text-xs font-black text-slate-700 dark:text-slate-200 shrink-0">{mv.quantity} <span className="text-[10px] text-slate-400">{mv.type}</span></span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex flex-wrap gap-2">
+                                    {(detailOrder.status === ProductionStatus.PENDING || (detailOrder.status as string) === 'PLANNED') && (
+                                        <>
+                                            <button onClick={() => openEditForm(detailOrder)} className="flex-1 min-w-[140px] py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700">
+                                                <Pencil size={14} /> {tr('Edit Order', 'تعديل الأمر')}
+                                            </button>
+                                            <button onClick={() => setConfirmAction({ kind: 'delete', id: detailOrder.id, batch: detailOrder.batchNumber })} className="flex-1 min-w-[140px] py-3 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/50 text-rose-600 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-rose-50">
+                                                <Trash2 size={14} /> {tr('Delete', 'حذف')}
+                                            </button>
+                                        </>
+                                    )}
+                                    {(detailOrder.status === ProductionStatus.PENDING || (detailOrder.status as string) === 'PLANNED' || detailOrder.status === ProductionStatus.IN_PROGRESS) && (
+                                        <button onClick={() => setConfirmAction({ kind: 'cancel', id: detailOrder.id, batch: detailOrder.batchNumber })} className="flex-1 min-w-[140px] py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50">
+                                            {tr('Cancel Order', 'إلغاء الأمر')}
+                                        </button>
+                                    )}
+                                    <button onClick={() => { setDetailOrder(null); setEditForm(null); }} className="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                                        {tr('Close', 'إغلاق')}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Order Modal */}
+            {detailOrder && editForm && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200" onClick={() => !editSaving && setEditForm(null)}>
+                    <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                            <h3 className="text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+                                <Pencil size={18} className="text-indigo-600" /> {tr('Edit Production Order', 'تعديل أمر الإنتاج')}
+                            </h3>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1">{tr('Only planned orders can be edited — quantities rescale ingredients automatically.', 'التعديل متاح للأوامر المخططة فقط — تتعدل المكونات تلقائياً مع الكمية.')}</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{tr('Target Quantity', 'الكمية المستهدفة')}</label>
+                                <input type="number" min="0.001" step="0.001" value={editForm.quantityRequested}
+                                    onChange={(e) => setEditForm({ ...editForm, quantityRequested: Number(e.target.value) })}
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-black text-lg outline-none focus:border-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{tr('Warehouse', 'المخزن')}</label>
+                                <select value={editForm.warehouseId} onChange={(e) => setEditForm({ ...editForm, warehouseId: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-sm outline-none focus:border-indigo-500">
+                                    {warehouses.filter(w => w.isActive !== false).map((w) => (
+                                        <option key={w.id} value={w.id}>{w.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{tr('Batch No.', 'رقم التشغيلة')}</label>
+                                <input type="text" value={editForm.batchNumber} onChange={(e) => setEditForm({ ...editForm, batchNumber: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-sm outline-none focus:border-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{tr('Notes', 'ملاحظات')}</label>
+                                <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={2}
+                                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-sm outline-none focus:border-indigo-500 resize-none" />
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex gap-3">
+                            <button onClick={submitEditForm} disabled={editSaving} className="flex-1 py-3.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50">
+                                <Save size={14} /> {tr('Save Changes', 'حفظ التعديلات')}
+                            </button>
+                            <button onClick={() => setEditForm(null)} disabled={editSaving} className="px-6 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50">
+                                {tr('Back', 'رجوع')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cancel / Delete Confirm Modal */}
+            {confirmAction && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200" onClick={() => !confirmBusy && setConfirmAction(null)}>
+                    <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 text-center">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${confirmAction.kind === 'delete' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                <AlertTriangle size={26} />
+                            </div>
+                            <h3 className="text-lg font-black uppercase text-slate-900 dark:text-white">
+                                {confirmAction.kind === 'delete' ? tr('Delete Order?', 'حذف الأمر؟') : tr('Cancel Order?', 'إلغاء الأمر؟')}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-500 mt-2 leading-relaxed">
+                                {confirmAction.kind === 'delete'
+                                    ? tr(`Delete batch ${confirmAction.batch} permanently? Only planned orders can be deleted.`, `حذف التشغيلة ${confirmAction.batch} نهائياً؟ الحذف متاح للأوامر المخططة فقط.`)
+                                    : tr(`Cancel batch ${confirmAction.batch}? Reserved stock will be released back.`, `إلغاء التشغيلة ${confirmAction.batch}؟ سيُرد المخزون المحجوز.`)} 
+                            </p>
+                        </div>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex gap-3">
+                            <button onClick={submitConfirmAction} disabled={confirmBusy} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white disabled:opacity-50 ${confirmAction.kind === 'delete' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
+                                {tr('Confirm', 'تأكيد')}
+                            </button>
+                            <button onClick={() => setConfirmAction(null)} disabled={confirmBusy} className="flex-1 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50">
+                                {tr('Back', 'رجوع')}
                             </button>
                         </div>
                     </div>

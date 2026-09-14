@@ -103,6 +103,33 @@ export const initSocket = async (httpServer: HttpServer) => {
                 socket.leave(`branch:${branchId}`);
             }
         });
+
+        // Internal team inbox — relay a branch member's message to the whole
+        // branch room (including other devices). Validated + size-capped.
+        socket.on('team:message', (msg: any) => {
+            try {
+                if (!msg || typeof msg !== 'object') return;
+                const branchId = String(msg.branchId || '').slice(0, 128);
+                const text = String(msg.text || '').slice(0, 2000);
+                if (!branchId || !text.trim()) return;
+                // Only relay to rooms the sender actually joined (branch guard).
+                if (!socket.rooms.has(`branch:${branchId}`)) return;
+                const safe = {
+                    id: String(msg.id || '').slice(0, 128),
+                    branchId,
+                    fromId: String(msg.fromId || user?.id || '').slice(0, 128),
+                    fromName: String(msg.fromName || '').slice(0, 128),
+                    toId: msg.toId ? String(msg.toId).slice(0, 128) : undefined,
+                    toName: msg.toName ? String(msg.toName).slice(0, 128) : undefined,
+                    text: text.trim(),
+                    createdAt: typeof msg.createdAt === 'string' ? msg.createdAt : new Date().toISOString(),
+                };
+                if (!safe.id || !safe.fromId) return;
+                socket.to(`branch:${branchId}`).emit('team:message', safe);
+            } catch {
+                /* non-critical — local persistence already covers the sender */
+            }
+        });
     });
 
     return io;

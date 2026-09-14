@@ -5,6 +5,17 @@
 import { Order, OrderType, OrderItem, Branch, AppSettings } from '../types';
 import { getTableDisplayName } from '../src/utils/tableDisplay';
 
+/* Thermal-safe escaping + symbols. Thermal raster (html2canvas → 384px +
+   contrast crush) cannot render emoji/decorative glyphs reliably — they come
+   out as tofu boxes (؟؟؟-like marks). Only basic Latin/Arabic/punctuation. */
+const escapeHtml = (value: unknown): string =>
+    String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
 interface KitchenTicketParams {
     order: Order;
     items?: OrderItem[];
@@ -51,18 +62,18 @@ export const generateKitchenTicketHTML = ({
         const qty = item.quantity || 1;
 
         const modLines = (item.selectedModifiers || []).map(m =>
-            `<div class="k-mod">▸ ${m.optionName || m.groupName}</div>`
+            `<div class="k-mod">+ ${escapeHtml(m.optionName || m.groupName || '')}</div>`
         ).join('');
 
         const noteLine = item.notes
-            ? `<div class="k-note">⚠ ${item.notes}</div>`
+            ? `<div class="k-note">! ${escapeHtml(item.notes)}</div>`
             : '';
 
         return `
          <div class="k-item ${idx % 2 === 0 ? '' : 'k-item-alt'}">
             <div class="k-item-header">
-               <span class="k-qty">${qty}×</span>
-               <span class="k-name">${name}</span>
+               <span class="k-qty">${escapeHtml(qty)}x</span>
+               <span class="k-name">${escapeHtml(name)}</span>
             </div>
             ${modLines}${noteLine}
          </div>
@@ -247,22 +258,22 @@ export const generateKitchenTicketHTML = ({
 
    <!-- ═══ Header ═══ -->
    <div class="k-header">
-      <div class="k-title">${ticketTitle}</div>
-      ${printerName ? `<div class="k-printer-name">${printerName}</div>` : ''}
+      <div class="k-title">${escapeHtml(ticketTitle)}</div>
+      ${printerName ? `<div class="k-printer-name">${escapeHtml(printerName)}</div>` : ''}
    </div>
 
    <!-- ═══ Order Info Strip ═══ -->
    <div class="k-info-strip">
-      <span class="k-order-num">#${order.orderNumber || order.id?.slice(0, 6) || '—'}</span>
-      <span class="k-type-badge">${orderTypeText}</span>
-      <span class="k-time">${timeStr}</span>
+      <span class="k-order-num">#${escapeHtml(order.orderNumber || order.id?.slice(0, 6) || '-')}</span>
+      <span class="k-type-badge">${escapeHtml(orderTypeText)}</span>
+      <span class="k-time">${escapeHtml(timeStr)}</span>
    </div>
 
    <!-- ═══ Context (Table / Customer) ═══ -->
    ${getTableDisplayName(order as any) || order.customerName ? `
    <div class="k-context">
-      ${getTableDisplayName(order as any) ? `<div class="k-context-item">🪑 ${isAr ? 'طاولة' : 'Table'}: ${getTableDisplayName(order as any)}</div>` : ''}
-      ${order.customerName ? `<div class="k-context-item">👤 ${order.customerName}</div>` : ''}
+      ${getTableDisplayName(order as any) ? `<div class="k-context-item">${isAr ? 'طاولة' : 'Table'}: ${escapeHtml(getTableDisplayName(order as any))}</div>` : ''}
+      ${order.customerName ? `<div class="k-context-item">${isAr ? 'العميل' : 'Customer'}: ${escapeHtml(order.customerName)}</div>` : ''}
    </div>
    ` : ''}
 
@@ -274,14 +285,14 @@ export const generateKitchenTicketHTML = ({
    <!-- ═══ Kitchen Notes ═══ -->
    ${kitchenNotes ? `
    <div class="k-notes-section">
-      <div class="k-notes-title">${isAr ? '⚠ ملاحظات' : '⚠ NOTES'}</div>
-      <div class="k-notes-text">${kitchenNotes}</div>
+      <div class="k-notes-title">${isAr ? '! ملاحظات' : '! NOTES'}</div>
+      <div class="k-notes-text">${escapeHtml(kitchenNotes)}</div>
    </div>
    ` : ''}
 
    <!-- ═══ Footer ═══ -->
    <div class="k-footer">
-      <div class="k-footer-time">${dateStr} · ${timeStr} · ${settings.restaurantName || ''}</div>
+      <div class="k-footer-time">${escapeHtml(dateStr)} - ${escapeHtml(timeStr)} - ${escapeHtml(settings.restaurantName || '')}</div>
    </div>
 
 </body>

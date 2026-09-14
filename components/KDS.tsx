@@ -1,5 +1,6 @@
-import React from 'react';
-import { Clock, CheckCircle, Volume2, VolumeX, MonitorPlay, AlertTriangle, Play, Truck, Settings, Flame, ChefHat, Sparkles, X, UtensilsCrossed, Search, Zap, Layers } from 'lucide-react';
+import React, { useOptimistic, useTransition } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { Clock, CheckCircle, Volume2, VolumeX, MonitorPlay, AlertTriangle, Play, Truck, Settings, Flame, ChefHat, Sparkles, X, UtensilsCrossed, Search, Zap, Layers, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrderStatus } from '../types';
 import { advanceKdsTicketIdsOnce, compareKdsTicketPriority, hasNewKdsTicket, mergeKdsPriority, useKdsStore, KdsTicket } from '../stores/useKdsStore';
@@ -8,10 +9,14 @@ import { formatDisplayId } from '../src/utils/idGenerator';
 import { socketService } from '../services/socketService';
 import { getTableDisplayName } from '../src/utils/tableDisplay';
 import { kdsApi } from '../services/api/kds';
+import { useConfirm } from './common/ConfirmProvider';
 import { KDS_FALLBACK_POLL_MS, reconcileKdsPolling } from '../src/utils/kdsPolling';
 
 type Station = 'ALL' | string;
 type KdsDisplayMode = 'orders' | 'stations';
+
+/** Order types that flow through the packing/pickup handover screen. */
+const HANDOVER_ELIGIBLE_TYPES = new Set(['TAKEAWAY', 'PICKUP', 'KIOSK']);
 
 interface StationConfig {
   name: string;
@@ -114,17 +119,46 @@ const COLUMN_THEMES = {
    ??????????????????????????????????????????????????? */
 const SLA = { warning: 7, risk: 12, critical: 20 };
 
+const getKdsItemDedupeKey = (item: any): string | null => {
+  const orderItemId = item?.orderItemId ?? item?.order_item_id ?? item?.order_itemId;
+  if (orderItemId !== undefined && orderItemId !== null && String(orderItemId).trim() !== '') {
+    return `orderItem:${String(orderItemId)}`;
+  }
+  // Legacy rows without orderItemId: fall back to a content signature so the
+  // same logical line (menu item + size + modifiers + notes + quantity) merges
+  // instead of rendering twice when an order spans several station tickets.
+  const menuId = String(item?.menuItemId ?? item?.menu_item_id ?? item?.itemName ?? item?.name ?? '').trim();
+  const size = String(getKdsItemSize(item) || '').trim();
+  const mods = (getKdsItemModifiers(item) || []).map(String).sort().join('|');
+  const notes = String(getKdsItemNotes(item) || '').trim();
+  const qty = String(item?.quantity ?? 1);
+  const signature = `${menuId}__${size}__${mods}__${notes}__${qty}`;
+  return signature.trim() === '______1' ? null : `sig:${signature}`;
+};
+
+const dedupeKdsItems = (items: any[]) => {
+  const seen = new Set<string>();
+  const result: any[] = [];
+  for (const item of items || []) {
+    const key = getKdsItemDedupeKey(item);
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    result.push(item);
+  }
+  return result;
+};
+
 const mergeTicketsByOrder = (tickets: KdsTicket[]) => {
   const groups = new Map<string, any>();
 
   for (const ticket of tickets) {
     const groupKey = ticket.orderId || ticket.id;
     const existing = groups.get(groupKey);
-    const ticketItems = (ticket.items || []).map((item: any) => ({
+    const ticketItems = dedupeKdsItems((ticket.items || []).map((item: any) => ({
       ...item,
       kdsTicketId: item.kdsTicketId || ticket.id,
       routingStation: ticket.routingStation,
-    }));
+    })));
 
     if (!existing) {
       groups.set(groupKey, {
@@ -144,7 +178,18 @@ const mergeTicketsByOrder = (tickets: KdsTicket[]) => {
     if (!existing.routingStations.includes(ticket.routingStation)) {
       existing.routingStations.push(ticket.routingStation);
     }
-    existing.items.push(...ticketItems);
+    // The same order item can live in several station tickets (multi-printer
+    // routing or a retried dispatch). In the merged "orders" view it must
+    // appear once — otherwise items with options look duplicated.
+    const seenKeys = new Set(
+      (existing.items || []).map((item: any) => getKdsItemDedupeKey(item)).filter(Boolean),
+    );
+    for (const item of ticketItems) {
+      const key = getKdsItemDedupeKey(item);
+      if (key && seenKeys.has(key)) continue;
+      if (key) seenKeys.add(key);
+      existing.items.push(item);
+    }
     existing.priority = mergeKdsPriority([existing.priority, ticket.priority]);
     if (new Date(ticket.createdAt).getTime() < new Date(existing.createdAt).getTime()) {
       existing.createdAt = ticket.createdAt;
@@ -209,6 +254,171 @@ const markPendingItemsDone = async (order: any, toggleItemState: (ticketId: stri
 
 const kdsText = (isArabic: boolean, en: string, ar: string) => isArabic ? ar : en;
 
+/**
+ * Modifier payloads can come from different KDS/API generations:
+ * JSON arrays, a single JSON object, or legacy plain text. Normalize all
+ * supported shapes before rendering so a malformed payload cannot crash KDS.
+ */
+const JUNK_MODIFIER_TEXT = /\[object\s*object\]|\uFFFD/i;
+
+/** Resolves a human label from any modifier payload shape (objects, localized maps, nested options). */
+const resolveModifierLabel = (value: any, depth = 0): string => {
+  if (value === null || value === undefined || depth > 4) return '';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return '';
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return !text || JUNK_MODIFIER_TEXT.test(text) ? '' : text;
+  }
+  if (Array.isArray(value)) {
+    const labels = value.map((entry) => resolveModifierLabel(entry, depth + 1)).filter(Boolean);
+    return labels.join('، ');
+  }
+  if (typeof value === 'object') {
+    const candidates = [
+      value.optionName, value.option_name, value.nameAr, value.name_ar,
+      value.arabicName, value.itemNameAr, value.name, value.itemName,
+      value.title, value.label, value.value, value.ar, value.en,
+    ];
+    for (const candidate of candidates) {
+      const label = resolveModifierLabel(candidate, depth + 1);
+      if (label) return label;
+    }
+    for (const nested of [value.option, value.choice, value.modifier, value.group]) {
+      if (nested) {
+        const label = resolveModifierLabel(nested, depth + 1);
+        if (label) return label;
+      }
+    }
+    return '';
+  }
+  return '';
+};
+
+/** Size/variant label is a first-class field — never hide it inside modifiers. */
+const getKdsItemSize = (item: any): string => {
+  const direct = item?.sizeLabel ?? item?.size ?? item?.sizeName ?? item?.size_name
+    ?? item?.selectedSizeName ?? item?.selectedSize?.name ?? item?.selectedSize?.nameAr
+    ?? item?.variantName ?? item?.variant;
+  if (direct && String(direct).trim()) return String(direct).trim();
+  // Legacy fallback: size may be encoded as a modifier with group "Size"/"الحجم"
+  return '';
+};
+
+const SIZE_GROUP_NAMES = new Set(['size', 'sizes', 'variant', 'variants', 'الحجم', 'المقاس', 'مقاس']);
+
+const describeModifierOption = (mod: any): { group: string; option: string } => {
+  if (mod === null || mod === undefined) return { group: '', option: '' };
+  if (typeof mod === 'string' || typeof mod === 'number') {
+    const option = resolveModifierLabel(mod);
+    return { group: '', option };
+  }
+  if (typeof mod === 'object') {
+    const quantity = Number((mod as any).quantity || 1);
+    const optionBase = resolveModifierLabel(mod);
+    const option = optionBase && quantity > 1 ? `${optionBase} ×${quantity}` : optionBase;
+    const group = String((mod as any).groupName || (mod as any).group_name || (mod as any).group || '').trim();
+    return { group, option };
+  }
+  return { group: '', option: '' };
+};
+
+const parseModifierPayload = (raw: any, depth = 0): string[] => {
+  if (!raw || depth > 3) return [];
+  let payload = raw;
+  if (typeof payload === 'string') {
+    const text = payload.trim();
+    if (!text) return [];
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      return JUNK_MODIFIER_TEXT.test(text) ? [] : [text];
+    }
+  }
+  if (Array.isArray(payload)) return payload.flatMap((entry: any) => parseModifierPayload(entry, depth + 1));
+  if (typeof payload === 'object') {
+    // A size object mistakenly stored as modifier — surface it as size elsewhere
+    const groupName = String((payload as any).groupName || (payload as any).group || '').toLowerCase();
+    if (SIZE_GROUP_NAMES.has(groupName)) {
+      const label = resolveModifierLabel((payload as any).optionName ?? payload);
+      return label ? [`__SIZE__:${label}`] : [];
+    }
+    const label = resolveModifierLabel(payload);
+    if (!label) return [];
+    const group = String((payload as any).groupName || (payload as any).group_name || '').trim();
+    const display = group && group.toLowerCase() !== label.toLowerCase() ? `${group}: ${label}` : label;
+    const quantity = Number((payload as any).quantity || 1);
+    return [quantity > 1 ? `${display} ×${quantity}` : display];
+  }
+  return [];
+};
+
+/**
+ * Modifier payloads come from several client generations: POS cart objects
+ * ({groupName, optionName}), platform JSON, plain text notes, and legacy rows
+ * corrupted into "[object Object]" by the old nvarchar column. Normalize every
+ * shape into clean display labels and drop anything unusable.
+ */
+const getKdsItemModifiers = (item: any): string[] => {
+  const labels = [
+    ...parseModifierPayload(item?.modifiersText),
+    ...parseModifierPayload(item?.selectedModifiers),
+    ...parseModifierPayload(item?.modifiers),
+  ].filter(Boolean);
+  return Array.from(new Set(labels));
+};
+
+/** Grouped view for the kitchen: extras grouped under their group name. */
+const getKdsItemModifierGroups = (item: any): { group: string; options: string[] }[] => {
+  const rawLists = [item?.modifiersText, item?.selectedModifiers, item?.modifiers];
+  const entries: { group: string; option: string }[] = [];
+  for (const raw of rawLists) {
+    let payload: any = raw;
+    if (typeof payload === 'string') {
+      const text = payload.trim();
+      if (!text) continue;
+      try { payload = JSON.parse(text); } catch {
+        if (!JUNK_MODIFIER_TEXT.test(text)) entries.push({ group: '', option: text });
+        continue;
+      }
+    }
+    const list = Array.isArray(payload) ? payload : [payload];
+    for (const mod of list) {
+      if (!mod) continue;
+      const { group, option } = describeModifierOption(mod);
+      if (!option) continue;
+      if (group && SIZE_GROUP_NAMES.has(group.toLowerCase())) continue; // rendered as size badge
+      entries.push({ group, option });
+    }
+  }
+  const grouped = new Map<string, string[]>();
+  const seenOption = new Set<string>();
+  const normalizeOptionKey = (value: string) =>
+    String(value || '')
+      .replace(/\s×\d+\s*$/, '')
+      .trim()
+      .toLocaleLowerCase();
+  // Prefer the named group when the same option arrives from several payload
+  // generations (plain text + objects): sort named groups first.
+  const sortedEntries = [...entries].sort((a, b) => Number(!b.group) - Number(!a.group));
+  for (const { group, option } of sortedEntries) {
+    const optionKey = normalizeOptionKey(option);
+    if (optionKey && seenOption.has(optionKey)) continue;
+    if (optionKey) seenOption.add(optionKey);
+    const key = group || '';
+    if (!grouped.has(key)) grouped.set(key, []);
+    const bucket = grouped.get(key)!;
+    if (!bucket.includes(option)) bucket.push(option);
+  }
+  return Array.from(grouped.entries()).map(([group, options]) => ({ group, options }));
+};
+
+/** Per-item kitchen note (never merge into modifiers). */
+const getKdsItemNotes = (item: any): string => {
+  const note = item?.notes ?? item?.itemNotes ?? item?.item_notes ?? '';
+  return String(note || '').trim();
+};
+
 const orderTypeLabel = (type: string | undefined, isArabic: boolean) => {
   const normalized = String(type || 'ORDER').toUpperCase();
   const labels: Record<string, string> = {
@@ -248,8 +458,26 @@ const columnCopy = (key: keyof typeof COLUMN_THEMES, isArabic: boolean) => {
    ?? KDS — Main Component (Performance Optimized)
    ??????????????????????????????????????????????????? */
 const KDS: React.FC = () => {
-  const { tickets: orders, bumpTicket: updateOrderStatus, fetchTickets: fetchOrders, toggleItemState, recallTicket } = useKdsStore();
-  const { settings } = useAuthStore();
+  const { tickets: storeOrders, bumpTicket: updateOrderStatus, fetchTickets: fetchOrders, toggleItemState, recallTicket } = useKdsStore(useShallow((state) => ({
+    tickets: state.tickets,
+    bumpTicket: state.bumpTicket,
+    fetchTickets: state.fetchTickets,
+    toggleItemState: state.toggleItemState,
+    recallTicket: state.recallTicket,
+  })));
+  // Optimistic tickets: status taps apply to the UI in the same frame (the
+  // reducer sets an explicit target status, so re-applying on top of the
+  // server-confirmed base is idempotent — no double-advance possible).
+  // Rollback is automatic: when the transition settles without a base change,
+  // React discards the optimistic layer.
+  const [orders, bumpOptimistic] = useOptimistic(
+    storeOrders,
+    (state: KdsTicket[], action: { id: string; status: KdsTicket['status'] }) =>
+      state.map(t => (t.id === action.id ? { ...t, status: action.status, bumpedAt: new Date().toISOString() } : t))
+  );
+  const [, startTicketTransition] = useTransition();
+  const settings = useAuthStore((state) => state.settings);
+  const { confirm } = useConfirm();
   const isArabic = settings.language === 'ar';
   const activeBranchId = settings.activeBranchId;
 
@@ -282,13 +510,17 @@ const KDS: React.FC = () => {
   const lastUrgentAlertAtRef = React.useRef(0);
 
   const [stations, setStations] = React.useState<StationConfig[]>(DEFAULT_STATIONS);
+  // Connection visibility: kitchen must KNOW when it runs on polling fallback.
+  const [socketOnline, setSocketOnline] = React.useState(() => socketService.isConnected());
+  const [lastSyncAt, setLastSyncAt] = React.useState<number>(Date.now());
 
   React.useEffect(() => {
     let cancelled = false;
     kdsApi.getMeta(activeBranchId || undefined)
       .then(meta => {
         if (cancelled) return;
-        const serverStations = (meta.stations || [])
+        const stationRows = Array.isArray(meta?.stations) ? meta.stations : [];
+        const serverStations = stationRows
           .map(station => String(station.name || '').trim().toUpperCase())
           .filter(Boolean)
           .map(name => ({ name, keywords: [] }));
@@ -317,6 +549,7 @@ const KDS: React.FC = () => {
       try {
         await fetchOrders(params);
         if (cancelled) return;
+        setLastSyncAt(Date.now());
         const nextTickets = useKdsStore.getState().tickets.filter((ticket) =>
           (!activeBranchId || ticket.branchId === activeBranchId) &&
           (!station || ticket.routingStation === station)
@@ -330,6 +563,7 @@ const KDS: React.FC = () => {
     };
     const handleKdsUpdate = () => { void refreshTickets(true); };
     const handleConnectionChange = (connected: boolean) => {
+      setSocketOnline(connected);
       pollingTimer = reconcileKdsPolling(
         connected,
         pollingTimer,
@@ -360,6 +594,34 @@ const KDS: React.FC = () => {
     const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  // Screen Wake Lock — kitchen displays must never sleep mid-rush. Re-acquire
+  // on visibility change (the OS releases the lock when hidden). Silent
+  // no-op where unsupported; always released on unmount.
+  React.useEffect(() => {
+    let lock: { release: () => Promise<void> } | null = null;
+    let cancelled = false;
+    const request = async () => {
+      try {
+        const wl = (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock;
+        if (!wl || document.visibilityState !== 'visible') return;
+        lock = await wl.request('screen');
+      } catch {
+        lock = null;
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) void request();
+    };
+    void request();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      if (lock) void lock.release().catch(() => undefined);
+      lock = null;
+    };
   }, []);
 
   const toggleFullscreen = React.useCallback(async () => {
@@ -459,9 +721,14 @@ const KDS: React.FC = () => {
         return ticket?.status !== OrderStatus.READY;
       });
 
-    for (const ticketId of idsToAdvance) {
-      await updateOrderStatus(ticketId);
-    }
+    // Instant paint first, server confirm in the background.
+    startTicketTransition(async () => {
+      idsToAdvance.forEach((ticketId: string) => bumpOptimistic({ id: ticketId, status: 'READY' }));
+      for (const ticketId of idsToAdvance) {
+        await updateOrderStatus(ticketId);
+      }
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+    });
 
     if (order.status !== OrderStatus.READY) {
         // Add to recent bumps for undo while the ticket is in PASS/READY.
@@ -470,7 +737,7 @@ const KDS: React.FC = () => {
         }, 8000);
         setRecentBumps(prev => [...prev, { id: order.id, ticketIds: idsToAdvance, timeoutId: tid }]);
     }
-  }, [orders, updateOrderStatus]);
+  }, [orders, updateOrderStatus, startTicketTransition, bumpOptimistic]);
 
   const completeKitchenOrder = React.useCallback(async (order: any) => {
     if (!order?.id || completingOrderIdsRef.current.has(order.id)) return;
@@ -482,26 +749,62 @@ const KDS: React.FC = () => {
       : [order.primaryTicketId || order.id];
 
     try {
-      await advanceKdsTicketIdsOnce(ticketIds, updateOrderStatus);
+      startTicketTransition(async () => {
+        ticketIds.forEach((ticketId: string) => bumpOptimistic({ id: ticketId, status: 'READY' }));
+        await advanceKdsTicketIdsOnce(ticketIds, updateOrderStatus);
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+      });
     } finally {
       completingOrderIdsRef.current.delete(order.id);
     }
-  }, [orders, updateOrderStatus]);
+  }, [updateOrderStatus, startTicketTransition, bumpOptimistic]);
 
   const handleUndoBump = React.useCallback(async (id: string) => {
       const bump = recentBumps.find(b => b.id === id);
       if (bump) clearTimeout(bump.timeoutId);
       setRecentBumps(prev => prev.filter(b => b.id !== id));
       const ticketIds = bump?.ticketIds?.length ? bump.ticketIds : [id];
-      for (const ticketId of ticketIds) {
-        await recallTicket(ticketId);
-      }
-  }, [recentBumps, recallTicket]);
+      startTicketTransition(async () => {
+        ticketIds.forEach((ticketId: string) => bumpOptimistic({ id: ticketId, status: 'PREPARING' }));
+        for (const ticketId of ticketIds) {
+          await recallTicket(ticketId);
+        }
+      });
+  }, [recentBumps, recallTicket, startTicketTransition, bumpOptimistic]);
 
   const completeReadyBatch = React.useCallback(async () => {
     const readyOrders = activeOrders.filter(o => o.status === OrderStatus.READY);
     for (const order of readyOrders) await completeKitchenOrder(order);
   }, [activeOrders, completeKitchenOrder]);
+
+  const completeAllKitchenOrders = React.useCallback(async () => {
+    if (activeOrders.length === 0 || typeof window === 'undefined') return;
+    const confirmed = await confirm({
+      title: isArabic ? 'إنهاء وتسليم الطلبات' : 'Finish & hand over',
+      message: kdsText(
+        isArabic,
+        `Finish and hand over ${activeOrders.length} kitchen orders?`,
+        `إنهاء وتسليم كل طلبات المطبخ (${activeOrders.length})؟`,
+      ),
+      confirmText: isArabic ? 'تنفيذ' : 'Confirm',
+      cancelText: isArabic ? 'إلغاء' : 'Cancel',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+    for (const order of activeOrders) {
+      await completeKitchenOrder(order);
+      // After finishing, also hand the order over (pickup flow) so it clears
+      // the packing screen instead of waiting there in READY state.
+      const rawId = String(order.id || '');
+      const orderId = order.orderId || (!rawId.startsWith('order:') ? order.id : null);
+      const type = String(order.type || '').toUpperCase();
+      if (orderId && HANDOVER_ELIGIBLE_TYPES.has(type)) {
+        try {
+          await kdsApi.handoverOrder(String(orderId));
+        } catch { /* keep finishing the remaining orders */ }
+      }
+    }
+  }, [activeOrders, completeKitchenOrder, confirm, isArabic]);
 
   // Live match preview — find order as user types
   const matchedOrder = React.useMemo(() => {
@@ -627,7 +930,7 @@ const KDS: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col h-screen w-full font-sans"
+      className="ops-fast flex flex-col h-screen w-full font-sans"
       style={{ background: 'rgb(var(--bg-app))', color: 'rgb(var(--text-main))' }}
     >
       <AnimatePresence>
@@ -660,6 +963,20 @@ const KDS: React.FC = () => {
           opacity: 0.7,
         }}
       />
+      {/* Connection banner — kitchen must never silently run on stale polling. */}
+      {!socketOnline && (
+        <div
+          className="shrink-0 flex items-center justify-center gap-2 px-3 py-1.5 text-center"
+          style={{ background: 'rgba(var(--danger), 0.14)', borderBottom: '1px solid rgba(var(--danger), 0.4)', color: 'rgb(var(--danger))', fontSize: 12, fontWeight: 900 }}
+        >
+          <WifiOff size={14} />
+          <span className="uppercase tracking-widest">
+            {kdsText(isArabic,
+              `Offline — polling fallback · last sync ${new Date(lastSyncAt).toLocaleTimeString()}`,
+              `غير متصل — وضع التحديث الاحتياطي · آخر مزامنة ${new Date(lastSyncAt).toLocaleTimeString()}`)}
+          </span>
+        </div>
+      )}
 
       {/* ??? HEADER BAR ??? */}
       <div
@@ -753,6 +1070,25 @@ const KDS: React.FC = () => {
               );
             })}
           </div>
+
+          <button
+            type="button"
+            onClick={completeAllKitchenOrders}
+            disabled={activeOrders.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200 disabled:cursor-default disabled:opacity-40"
+            style={{
+              borderRadius: 'var(--theme-radius-sm, 8px)',
+              fontSize: 10,
+              fontWeight: 900,
+              background: 'rgba(var(--success), 0.12)',
+              color: 'rgb(var(--success))',
+              border: '1px solid rgba(var(--success), 0.25)',
+            }}
+            title={kdsText(isArabic, 'Finish and hand over all kitchen orders', 'إنهاء وتسليم كل طلبات المطبخ')}
+          >
+            <CheckCircle size={14} />
+            <span className="hidden sm:inline">{isArabic ? 'إنهاء الكل' : 'FINISH ALL'}</span>
+          </button>
 
           {/* Mode toggle */}
           <button
@@ -1169,6 +1505,91 @@ const TableOrTypeLabel = ({ order, isArabic }: { order: KdsTicket; isArabic: boo
   );
 };
 
+/**
+ * Kitchen item details: size badge + grouped extras + per-item note.
+ * Sizes and extras were previously rendered as one faint "+ ..." line and
+ * sizes were dropped entirely on the server — now each is visually distinct.
+ */
+const KdsItemDetails = React.memo(({ item, isArabic, station }: { item: any; isArabic: boolean; station?: string }) => {
+  const rawSize = getKdsItemSize(item);
+  const sizeFromMods = (getKdsItemModifiers(item) || []).find((label) => label.startsWith('__SIZE__:'));
+  const size = rawSize || (sizeFromMods ? sizeFromMods.replace('__SIZE__:', '') : '');
+  const groups = getKdsItemModifierGroups(item);
+  const note = getKdsItemNotes(item);
+  return (
+    <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex items-start justify-between gap-1.5">
+        <span className="uppercase line-clamp-2 leading-snug" style={{ fontSize: 14, fontWeight: 900, color: 'rgb(var(--text-main))' }}>
+          {getKdsItemDisplayName(item)}
+        </span>
+        {station && (
+          <span
+            className="shrink-0 mt-0.5 uppercase tracking-widest"
+            style={{
+              padding: '1px 4px',
+              borderRadius: 'var(--theme-radius-sm, 4px)',
+              fontSize: 7, fontWeight: 900,
+              background: 'rgba(var(--bg-app), 0.8)',
+              color: 'rgb(var(--text-muted))',
+              border: '1px solid rgba(var(--border-color), 0.15)',
+            }}
+          >
+            {station}
+          </span>
+        )}
+      </div>
+
+      {size ? (
+        <span
+          className="mt-1 inline-flex w-fit items-center uppercase tracking-widest"
+          style={{
+            padding: '2px 8px',
+            borderRadius: 'var(--theme-radius-sm, 6px)',
+            fontSize: 11, fontWeight: 900,
+            background: 'rgba(var(--primary), 0.16)',
+            color: 'rgb(var(--primary))',
+            border: '1px solid rgba(var(--primary), 0.35)',
+          }}
+        >
+          {kdsText(isArabic, 'Size', 'الحجم')}: {size}
+        </span>
+      ) : null}
+
+      {groups.length > 0 && (
+        <div className="mt-1.5 flex flex-col gap-1 rounded-lg p-1.5" style={{ background: 'rgba(var(--warning), 0.08)', border: '1px solid rgba(var(--warning), 0.22)' }}>
+          {groups.map((group, gIdx) => (
+            <div key={gIdx} className="flex flex-col">
+              {group.group ? (
+                <span className="uppercase tracking-widest" style={{ fontSize: 9, fontWeight: 900, color: 'rgb(var(--warning))' }}>
+                  {group.group}
+                </span>
+              ) : null}
+              {group.options.map((option, oIdx) => (
+                <span key={oIdx} className="uppercase leading-snug" style={{ fontSize: 12, fontWeight: 800, color: 'rgb(var(--text-main))' }}>
+                  + {option}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+      {note ? (
+        <span
+          className="mt-1 block uppercase leading-snug rounded-md px-1.5 py-1"
+          style={{
+            background: 'rgba(var(--danger), 0.08)',
+            borderLeft: '2px solid rgba(var(--danger), 0.6)',
+            color: 'rgb(var(--danger))',
+            fontSize: 11, fontWeight: 800,
+          }}
+        >
+          ! {note}
+        </span>
+      ) : null}
+    </div>
+  );
+});
+
 /* ???????????????????????????????????????????????????
    ?? Ticket Card — Themed, with progress bar
    ??????????????????????????????????????????????????? */
@@ -1184,24 +1605,32 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
   const isRush = order.priority === 'RUSH';
   const isRemake = order.priority === 'REMAKE';
 
+  // 3-step urgency scale readable at distance: warning (amber) → risk
+  // (orange, thicker border) → critical (red pulse). Risk previously shared
+  // danger red with critical, making 12m and 20m indistinguishable.
   const urgencyToken = (isRush || isRemake) ? '--danger'
     : urgency === 'critical' ? '--danger'
-    : urgency === 'risk' ? '--danger'
+    : urgency === 'risk' ? '--warning'
       : urgency === 'warning' ? '--warning'
         : urgency === 'ready' ? '--success'
           : '--success';
+  const urgencyPulse = urgency === 'critical' || isRush || isRemake;
 
   const cardBg = isReady
     ? 'rgba(var(--success), 0.06)'
     : urgency === 'critical'
-      ? 'rgba(var(--danger), 0.06)'
-      : 'rgba(var(--bg-elevated), 0.5)';
+      ? 'rgba(var(--danger), 0.10)'
+      : urgency === 'risk'
+        ? 'rgba(var(--warning), 0.10)'
+        : 'rgba(var(--bg-elevated), 0.5)';
 
   const cardBorder = isReady
     ? 'rgba(var(--success), 0.2)'
-    : (urgency === 'critical' || isRush || isRemake)
+    : urgencyPulse
       ? 'rgba(var(--danger), 0.5)'
-      : 'rgba(var(--border-color), 0.15)';
+      : urgency === 'risk'
+        ? '2px solid rgba(var(--warning), 0.55)'
+        : 'rgba(var(--border-color), 0.15)';
 
   const markAllDone = React.useCallback(async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -1216,14 +1645,16 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, x: 50, scale: 0.96, transition: { duration: 0.2 } }}
       transition={{ type: 'spring', duration: 0.15 }}
-      className="w-full text-left block overflow-hidden transition-all group backdrop-blur-xl"
+      className="kds-ticket w-full text-left block overflow-hidden transition-all group backdrop-blur-xl"
+      data-urgency={isReady ? 'ready' : (urgency || 'normal')}
       style={{
+        contentVisibility: 'auto',
         borderRadius: 'var(--theme-radius, 12px)',
         background: cardBg,
         border: `1px solid ${cardBorder}`,
         outline: isPendingBump ? `2px solid rgb(var(--primary))` : isHighlighted ? `2px solid rgb(var(--accent))` : 'none',
         outlineOffset: isPendingBump || isHighlighted ? 2 : 0,
-        boxShadow: (urgency === 'critical' || isRush || isRemake) ? '0 0 30px rgba(var(--danger), 0.3)' : isReady ? '0 0 20px rgba(var(--success), 0.15)' : '0 4px 20px rgba(0,0,0,0.1)',
+        boxShadow: urgencyPulse ? '0 0 30px rgba(var(--danger), 0.3)' : urgency === 'risk' ? '0 0 18px rgba(var(--warning), 0.22)' : isReady ? '0 0 20px rgba(var(--success), 0.15)' : '0 4px 20px rgba(0,0,0,0.1)',
       }}
     >
       {/* ?? Progress bar at top ?? */}
@@ -1248,9 +1679,10 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
           background: `rgba(var(${urgencyToken}), ${urgency === 'critical' ? 0.15 : 0.08})`,
         }}
       >
-        <div className="flex items-center gap-1 tabular-nums uppercase" style={{ fontSize: 12, fontWeight: 900, color: `rgb(var(${urgencyToken}))` }}>
-          <Clock size={12} /> {elapsed}m
-          {(urgency === 'critical' || isRush || isRemake) && <span className="animate-pulse">!</span>}
+        <div className="flex items-center gap-1 tabular-nums uppercase" style={{ fontSize: urgency === 'risk' || urgency === 'critical' ? 15 : 12, fontWeight: 900, color: `rgb(var(${urgencyToken}))` }}>
+          <Clock size={urgency === 'risk' || urgency === 'critical' ? 14 : 12} /> {elapsed}m
+          {urgencyPulse && <span className="animate-pulse">!</span>}
+          {urgency === 'risk' && !urgencyPulse && <span>•</span>}
         </div>
         <div className="uppercase tracking-widest flex items-center gap-2" style={{ fontSize: 9, fontWeight: 900, color: `rgb(var(${urgencyToken}))`, opacity: 0.8 }}>
           {isRemake && <span className="bg-red-500 text-white px-1.5 py-0.5 rounded opacity-100">{kdsText(isArabic, 'Remake', 'إعادة')}</span>}
@@ -1303,8 +1735,6 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
       <div style={{ padding: 10 }}>
         <ul className="space-y-1.5">
           {order.items.map((item: any, idx: number) => {
-            let mods: any[] = [];
-            try { mods = item.modifiersText ? JSON.parse(item.modifiersText) : []; } catch(e){}
             const isDone = item._done || item.isBumped;
 
             return (
@@ -1329,47 +1759,8 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
                 >
                   {isDone ? 'OK' : item.quantity}
                 </button>
-                <div className={`flex-1 min-w-0 flex flex-col ${isDone ? 'line-through' : ''}`}>
-                  <div className="flex items-start justify-between gap-1.5">
-                    <span className="uppercase line-clamp-2 leading-snug" style={{ fontSize: 13, fontWeight: 900, color: 'rgb(var(--text-main))' }}>
-                      {getKdsItemDisplayName(item)}
-                    </span>
-                    <span
-                      className="shrink-0 mt-0.5 uppercase tracking-widest"
-                      style={{
-                        padding: '1px 4px',
-                        borderRadius: 'var(--theme-radius-sm, 4px)',
-                        fontSize: 7, fontWeight: 900,
-                        background: 'rgba(var(--bg-app), 0.8)',
-                        color: 'rgb(var(--text-muted))',
-                        border: '1px solid rgba(var(--border-color), 0.15)',
-                      }}
-                    >
-                      {getStationForItem(item)}
-                    </span>
-                  </div>
-
-                  {mods.length > 0 && (
-                    <div className="mt-0.5 pl-1.5 flex flex-col" style={{ borderLeft: '1px solid rgba(var(--border-color), 0.25)' }}>
-                      {mods.map((m: any, mIdx: number) => (
-                        <span key={mIdx} className="uppercase leading-snug" style={{ fontSize: 10, fontWeight: 700, color: 'rgb(var(--text-muted))' }}>
-                          + {m.name || m.optionName || m.groupName} x{m.quantity || 1}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {item.notes && (
-                    <span
-                      className="mt-0.5 pl-1.5 block italic uppercase"
-                      style={{
-                        borderLeft: '1px solid rgba(var(--danger), 0.5)',
-                        color: 'rgb(var(--danger))',
-                        fontSize: 10, fontWeight: 700,
-                      }}
-                    >
-                      {item.notes}
-                    </span>
-                  )}
+                <div className={isDone ? 'flex-1 min-w-0 line-through' : 'flex-1 min-w-0'}>
+                  <KdsItemDetails item={item} isArabic={isArabic} station={getStationForItem(item, order)} />
                 </div>
               </li>
             );
@@ -1406,13 +1797,14 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
       <button
         type="button"
         onClick={() => advanceOrder(order)}
-        className="w-full min-h-11 py-1.5 text-center uppercase transition-all active:scale-[0.99]"
+        className="w-full py-3.5 text-center uppercase transition-all active:scale-[0.99]"
         style={{
-          fontSize: 8, fontWeight: 900, letterSpacing: '0.2em',
+          minHeight: 56,
+          fontSize: 13, fontWeight: 900, letterSpacing: '0.15em',
           background: isPendingBump
             ? 'rgb(var(--primary))'
             : isReady
-              ? 'rgba(var(--success), 0.08)'
+              ? 'rgba(var(--success), 0.12)'
               : 'rgba(var(--bg-elevated), 0.3)',
           color: isPendingBump
             ? 'white'
@@ -1473,6 +1865,7 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                   exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
                   className="overflow-hidden transition-all hover:scale-[1.01]"
                   style={{
+                    contentVisibility: 'auto',
                     borderRadius: 'var(--theme-radius-lg, 16px)',
                     background: isReady ? 'rgba(var(--success), 0.08)' : urgency === 'critical' ? 'rgba(var(--danger), 0.06)' : 'rgba(var(--bg-card), 0.65)',
                     border: `2px solid ${isReady ? 'rgba(var(--success), 0.3)' : urgency === 'critical' ? 'rgba(var(--danger), 0.3)' : 'rgba(var(--border-color), 0.15)'}`,
@@ -1553,15 +1946,7 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                   {/* ?? Items list ?? */}
                   <div className="px-4 pb-2" style={{ borderTop: '1px solid rgba(var(--border-color), 0.08)', paddingTop: 8 }}>
                     {order.items.map((item: any, idx: number) => {
-                      const mods = (() => {
-                        try {
-                          if (item.modifiersText) return JSON.parse(item.modifiersText);
-                        } catch {}
-                        if (Array.isArray(item.selectedModifiers) && item.selectedModifiers.length > 0) return item.selectedModifiers;
-                        if (Array.isArray(item.modifiers)) return item.modifiers;
-                        return [];
-                      })();
-                      const isDone = item.isBumped;
+                      const isDone = item._done || item.isBumped;
                       return (
                         <div key={idx} className={`flex items-start gap-2 py-1 transition-colors ${isDone ? 'opacity-30' : ''}`} onClick={(e) => {
                           e.stopPropagation();
@@ -1577,16 +1962,8 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                           }}>
                             {isDone ? 'OK' : item.quantity}
                           </span>
-                          <div className={`flex-1 min-w-0 ${isDone ? 'line-through' : ''}`}>
-                            <span className="block uppercase font-black leading-snug" style={{ fontSize: 13, color: 'rgb(var(--text-main))' }}>{getKdsItemDisplayName(item)}</span>
-                            {mods.map((m: any, mIdx: number) => (
-                              <span key={mIdx} className="block uppercase" style={{ fontSize: 10, fontWeight: 700, color: 'rgb(var(--text-muted))' }}>
-                                + {m.optionName || m.name || m.groupName}
-                              </span>
-                            ))}
-                            {item.notes && (
-                              <span className="block italic uppercase mt-0.5" style={{ fontSize: 10, fontWeight: 700, color: 'rgb(var(--danger))' }}>! {item.notes}</span>
-                            )}
+                          <div className={isDone ? 'flex-1 min-w-0 line-through' : 'flex-1 min-w-0'}>
+                            <KdsItemDetails item={item} isArabic={isArabic} />
                           </div>
                         </div>
                       );
@@ -1626,10 +2003,11 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                   <button
                     type="button"
                     onClick={() => completeOrder(order)}
-                    className="w-full min-h-11 py-2 text-center uppercase active:scale-[0.99]"
+                    className="w-full py-3.5 text-center uppercase active:scale-[0.99]"
                     style={{
-                    fontSize: 9, fontWeight: 900, letterSpacing: '0.15em',
-                    background: isReady ? 'rgba(var(--success), 0.1)' : 'rgba(var(--bg-elevated), 0.3)',
+                    minHeight: 56,
+                    fontSize: 13, fontWeight: 900, letterSpacing: '0.15em',
+                    background: isReady ? 'rgba(var(--success), 0.12)' : 'rgba(var(--bg-elevated), 0.3)',
                     color: isReady ? 'rgb(var(--success))' : 'rgb(var(--text-muted))',
                   }}>
                     {isReady
@@ -1648,22 +2026,21 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
 
 const SummaryGrid = React.memo(({ orders, isArabic }: any) => {
   const itemSummaries = React.useMemo(() => {
-    const hash: Record<string, { name: string; quantity: number; mods: any[] }> = {};
+    const hash: Record<string, { name: string; size: string; quantity: number; mods: any[] }> = {};
     for (const order of orders) {
       for (const item of order.items || []) {
         if (item.isBumped) continue;
-        let mods: any[] = [];
-        try {
-          mods = item.modifiersText ? JSON.parse(item.modifiersText) : item.selectedModifiers || item.modifiers || [];
-        } catch (e) {}
+        const mods = getKdsItemModifiers(item).filter((label) => !label.startsWith('__SIZE__:'));
+        const size = getKdsItemSize(item)
+          || (getKdsItemModifiers(item).find((label) => label.startsWith('__SIZE__:')) || '').replace('__SIZE__:', '');
 
-        // Simplified key based on name and basic mod properties
-        const modsKey = mods.map((m: any) => m.name || m.optionName).sort().join('|');
+        // Group by name + size + mods so different sizes never merge
+        const modsKey = mods.map(String).sort().join('|');
         const displayName = getKdsItemDisplayName(item);
-        const key = `${displayName}__${modsKey}`;
+        const key = `${displayName}__${size}__${modsKey}`;
 
         if (!hash[key]) {
-          hash[key] = { name: displayName, quantity: 0, mods };
+          hash[key] = { name: displayName, size, quantity: 0, mods };
         }
         hash[key].quantity += Number(item.quantity || 1);
       }
@@ -1713,22 +2090,37 @@ const SummaryGrid = React.memo(({ orders, isArabic }: any) => {
               <span className="block uppercase font-black text-lg leading-tight truncate" style={{ color: 'rgb(var(--text-main))' }}>
                 {summary.name}
               </span>
+              {summary.size ? (
+                <span
+                  className="mt-1 inline-block uppercase tracking-widest"
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    fontSize: 11, fontWeight: 900,
+                    background: 'rgba(var(--primary), 0.16)',
+                    color: 'rgb(var(--primary))',
+                    border: '1px solid rgba(var(--primary), 0.35)',
+                  }}
+                >
+                  {kdsText(isArabic, 'Size', 'الحجم')}: {summary.size}
+                </span>
+              ) : null}
               {summary.mods.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {summary.mods.map((m: any, i: number) => (
+                  {summary.mods.map((label: string, i: number) => (
                     <span
                       key={i}
                       className="uppercase tracking-wider"
                       style={{
-                        padding: '2px 6px',
-                        background: 'rgba(var(--bg-elevated), 0.5)',
-                        border: '1px solid rgba(var(--border-color), 0.2)',
+                        padding: '3px 8px',
+                        background: 'rgba(var(--warning), 0.1)',
+                        border: '1px solid rgba(var(--warning), 0.25)',
                         borderRadius: 4,
-                        fontSize: 10, fontWeight: 700,
-                        color: 'rgb(var(--text-muted))',
+                        fontSize: 11, fontWeight: 800,
+                        color: 'rgb(var(--text-main))',
                       }}
                     >
-                      + {m.optionName || m.name || m.groupName}
+                      + {label}
                     </span>
                   ))}
                 </div>

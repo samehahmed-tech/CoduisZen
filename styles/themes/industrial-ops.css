@@ -1,0 +1,88 @@
+/* THEME 09 · INDUSTRIAL OPS — steel light / gunmetal dark */
+[data-theme='industrial-ops'] {
+    --primary: 194, 65, 12;
+    --primary-hover: 170, 54, 8;
+    --secondary: 90, 98, 105;
+    --accent: 202, 138, 4;
+
+    --bg-app: 238, 240, 242;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 232, 234, 237;
+    --bg-elevated: 248, 249, 250;
+    --bg-global: 238, 240, 242;
+
+    --text-main: 24, 26, 28;
+    --text-muted: 105, 112, 118;
+
+    --border-color: 205, 210, 215;
+    --border-subtle: 205 210 215 / 0.6;
+    --glass-bg: 255 255 255 / 0.95;
+
+    --success: 22, 130, 70;
+    --warning: 190, 110, 0;
+    --danger: 190, 30, 30;
+    --info: 20, 110, 170;
+
+    --theme-page-bg: repeating-linear-gradient(-45deg, transparent 0 14px, rgba(24,26,28,0.018) 14px 15px), linear-gradient(180deg, #eef0f2 0%, #e0e3e6 100%);
+    --theme-card-bg: #ffffff;
+    --theme-card-hover-bg: #fafafa;
+    --theme-rail-bg: repeating-linear-gradient(180deg, #e8eaed 0 26px, #dee1e5 26px 28px);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.94);
+    --theme-table-head-bg: #1c1e20;
+    --theme-row-hover-bg: rgba(194, 65, 12, 0.06);
+    --theme-input-bg: #ffffff;
+    --theme-button-bg: linear-gradient(180deg, #d14e14 0%, #b23c0a 100%);
+    --theme-active-bg: rgba(194, 65, 12, 0.12);
+    --theme-focus-ring: rgba(194, 65, 12, 0.35);
+    --theme-popup-bg: #ffffff;
+
+    --chart-1: 194, 65, 12;
+    --chart-2: 202, 138, 4;
+    --chart-3: 22, 130, 70;
+    --chart-4: 30, 100, 160;
+    --chart-5: 100, 105, 110;
+    --chart-grid: 205 210 215 / 0.9;
+    --chart-tooltip-bg: #1c1e20;
+}
+
+.dark [data-theme='industrial-ops'],
+[data-theme='industrial-ops'].dark {
+    --primary: 251, 146, 60;
+    --primary-hover: 253, 170, 100;
+    --secondary: 150, 158, 165;
+    --accent: 250, 200, 60;
+
+    --bg-app: 15, 16, 18;
+    --bg-card: 25, 27, 31;
+    --bg-sidebar: 18, 19, 22;
+    --bg-elevated: 35, 38, 43;
+    --bg-global: 15, 16, 18;
+
+    --text-main: 235, 237, 240;
+    --text-muted: 150, 158, 165;
+
+    --border-color: 58, 62, 68;
+    --border-subtle: 251 146 60 / 0.14;
+    --glass-bg: 25 27 31 / 0.95;
+
+    --theme-page-bg: repeating-linear-gradient(-45deg, transparent 0 14px, rgba(255,255,255,0.015) 14px 15px), linear-gradient(180deg, #131416 0%, #0c0d0f 100%);
+    --theme-card-bg: #191b1e;
+    --theme-card-hover-bg: #222529;
+    --theme-rail-bg: repeating-linear-gradient(180deg, #121316 0 26px, #0b0c0e 26px 28px);
+    --theme-topbar-bg: rgba(25, 27, 31, 0.94);
+    --theme-table-head-bg: #0b0c0e;
+    --theme-row-hover-bg: rgba(251, 146, 60, 0.10);
+    --theme-input-bg: #222529;
+    --theme-button-bg: linear-gradient(180deg, #e05a1a 0%, #c2410c 100%);
+    --theme-active-bg: rgba(251, 146, 60, 0.16);
+    --theme-focus-ring: rgba(251, 146, 60, 0.45);
+    --theme-popup-bg: #222529;
+
+    --chart-1: 251, 146, 60;
+    --chart-2: 250, 200, 60;
+    --chart-3: 74, 200, 130;
+    --chart-4: 90, 170, 230;
+    --chart-5: 160, 168, 175;
+    --chart-grid: 58 62 68 / 0.9;
+    --chart-tooltip-bg: #222529;
+}

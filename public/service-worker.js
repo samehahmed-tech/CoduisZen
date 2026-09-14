@@ -1,5 +1,5 @@
-const CACHE_NAME = 'restoflow-erp-v1';
-const DYNAMIC_CACHE = 'restoflow-dynamic-v1';
+const CACHE_NAME = 'restoflow-erp-v2';
+const DYNAMIC_CACHE = 'restoflow-dynamic-v2';
 
 // Install event
 self.addEventListener('install', (event) => {

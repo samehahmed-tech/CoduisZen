@@ -2,9 +2,9 @@
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlertTriangle, Plus, Search, X, Truck, FileText, Package,
-  Tag, Briefcase,
+  Tag, Briefcase, Trash2,
   ArrowRightLeft, ListChecks, Download, Upload, Calculator, Home, Layers, LayoutGrid,
-  ClipboardCheck, Activity, Play, CheckCircle2, Save, Calendar, Utensils, Printer
+  ClipboardCheck, Activity, Play, CheckCircle2, Save, Calendar, Utensils, Printer, RefreshCw, Undo2
 } from 'lucide-react';
 import { Supplier, PurchaseOrder, Warehouse, Branch, WarehouseType, InventoryItem } from '@/types';
 
@@ -28,6 +28,7 @@ import WarehouseModal from './components/WarehouseModal';
 import StockAdjustmentModal from './components/StockAdjustmentModal';
 import StockTransferModal from './components/StockTransferModal';
 import ReceiptModal from './components/ReceiptModal';
+import SupplierReturnModal from './components/SupplierReturnModal';
 
 // Shared Components
 import VirtualList from '@/components/common/VirtualList';
@@ -73,13 +74,24 @@ const StockMetric: React.FC<{
 
 const dateOnly = (date = new Date()) => date.toISOString().split('T')[0];
 
+const MOVEMENT_TYPE_META: Record<string, { ar: string; en: string; badge: string; dot: string }> = {
+  PURCHASE: { ar: 'شراء', en: 'Purchase', badge: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/25', dot: 'bg-emerald-500' },
+  SALE_CONSUMPTION: { ar: 'سحب مبيعات', en: 'Sales Use', badge: 'text-rose-500 bg-rose-500/10 border-rose-500/25', dot: 'bg-rose-500' },
+  SALE: { ar: 'بيع مباشر', en: 'Sale', badge: 'text-orange-500 bg-orange-500/10 border-orange-500/25', dot: 'bg-orange-500' },
+  TRANSFER: { ar: 'تحويل مخزني', en: 'Transfer', badge: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/25', dot: 'bg-indigo-500' },
+  WASTE: { ar: 'هالك / تلف', en: 'Waste', badge: 'text-red-500 bg-red-500/10 border-red-500/25', dot: 'bg-red-500' },
+  ADJUSTMENT: { ar: 'تسوية جرد', en: 'Adjustment', badge: 'text-amber-500 bg-amber-500/10 border-amber-500/25', dot: 'bg-amber-500' },
+  PRODUCTION_CONSUMPTION: { ar: 'سحب إنتاج', en: 'Production Use', badge: 'text-violet-500 bg-violet-500/10 border-violet-500/25', dot: 'bg-violet-500' },
+  PRODUCTION: { ar: 'إنتاج تلقائي', en: 'Auto Production', badge: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/25', dot: 'bg-cyan-500' },
+};
+
 const Inventory: React.FC = () => {
   // Global State
   const {
     inventory, suppliers, purchaseOrders, warehouses, transferMovements,
     isLoading: inventoryLoading, error: inventoryError,
     fetchInventory, fetchWarehouses, fetchSuppliers, fetchPurchaseOrders, fetchTransferMovements,
-    addInventoryItem, updateInventoryItem,
+    addInventoryItem, updateInventoryItem, deleteInventoryItem,
     addWarehouse, updateStock,
     patchStockFromSocket,
     createSupplierInDB, updateSupplierInDB, deactivateSupplierInDB,
@@ -101,6 +113,7 @@ const Inventory: React.FC = () => {
       fetchTransferMovements: state.fetchTransferMovements,
       addInventoryItem: state.addInventoryItem,
       updateInventoryItem: state.updateInventoryItem,
+      deleteInventoryItem: state.deleteInventoryItem,
       addWarehouse: state.addWarehouse,
       updateStock: state.updateStock,
       patchStockFromSocket: state.patchStockFromSocket,
@@ -152,6 +165,7 @@ const Inventory: React.FC = () => {
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [supplierForm, setSupplierForm] = useState<Supplier>({
     id: '',
@@ -232,6 +246,25 @@ const Inventory: React.FC = () => {
     [warehouses]
   );
 
+  const activeInventory = useMemo(
+    () => inventory.filter((item) => item.isActive !== false),
+    [inventory]
+  );
+
+  const activeWarehouses = useMemo(
+    () => warehouses.filter((warehouse) => warehouse.isActive !== false),
+    [warehouses]
+  );
+
+  const orphanedWarehouseAssignments = useMemo(() => activeInventory.flatMap((item) =>
+    item.warehouseQuantities
+      .filter((row) => {
+        const warehouse = warehouseById.get(row.warehouseId);
+        return !warehouse || warehouse.isActive === false;
+      })
+      .map((row) => ({ item, row, warehouse: warehouseById.get(row.warehouseId) }))
+  ), [activeInventory, warehouseById]);
+
   const supplierById = useMemo(
     () => new Map(suppliers.map((supplier) => [supplier.id, supplier])),
     [suppliers]
@@ -263,18 +296,33 @@ const Inventory: React.FC = () => {
     return counts;
   }, [inventory]);
 
+  const selectedWarehouseRows = useMemo(() => {
+    if (!selectedWarehouse) return [];
+    return activeInventory.map(item => {
+      const row = item.warehouseQuantities.find(quantity => quantity.warehouseId === selectedWarehouse.id);
+      return row ? { item, quantity: Number(row.quantity) || 0 } : null;
+    }).filter(Boolean) as { item: InventoryItem; quantity: number }[];
+  }, [activeInventory, selectedWarehouse]);
+
+  const selectedWarehouseStats = useMemo(() => ({
+    items: selectedWarehouseRows.length,
+    quantity: selectedWarehouseRows.reduce((sum, row) => sum + row.quantity, 0),
+    low: selectedWarehouseRows.filter(row => row.quantity <= row.item.threshold).length,
+    value: selectedWarehouseRows.reduce((sum, row) => sum + row.quantity * (row.item.costPrice || 0), 0),
+  }), [selectedWarehouseRows]);
+
   const inventoryValuation = useMemo(
-    () => inventory.reduce((sum, item) => sum + (item.costPrice * (inventoryTotalsById.get(item.id) || 0)), 0),
-    [inventory, inventoryTotalsById]
+    () => activeInventory.reduce((sum, item) => sum + (item.costPrice * (inventoryTotalsById.get(item.id) || 0)), 0),
+    [activeInventory, inventoryTotalsById]
   );
 
   const outOfStockCount = useMemo(
-    () => inventory.filter((item) => (inventoryTotalsById.get(item.id) || 0) === 0).length,
-    [inventory, inventoryTotalsById]
+    () => activeInventory.filter((item) => (inventoryTotalsById.get(item.id) || 0) === 0).length,
+    [activeInventory, inventoryTotalsById]
   );
 
   const filteredInventory = useMemo(() => {
-    const filtered = inventory.filter((item) => {
+    const filtered = activeInventory.filter((item) => {
       if (!normalizedSearchQuery) return true;
       return (
         (item.name || '').toLowerCase().includes(normalizedSearchQuery) ||
@@ -299,7 +347,7 @@ const Inventory: React.FC = () => {
     });
 
     return filtered;
-  }, [inventory, normalizedSearchQuery, stockSort, inventoryTotalsById]);
+  }, [activeInventory, normalizedSearchQuery, stockSort, inventoryTotalsById]);
 
   const filteredSuppliers = useMemo(
     () => suppliers.filter((supplier) =>
@@ -327,11 +375,11 @@ const Inventory: React.FC = () => {
 
   const destinationWarehouses = useMemo(() => {
     const currentSourceBranchId = selectedSourceWarehouse?.branchId;
-    return warehouses.filter((warehouse) => (
+    return activeWarehouses.filter((warehouse) => (
       warehouse.id !== branchTransferFromWh &&
       (!currentSourceBranchId || warehouse.branchId !== currentSourceBranchId)
     ));
-  }, [warehouses, branchTransferFromWh, selectedSourceWarehouse]);
+  }, [activeWarehouses, branchTransferFromWh, selectedSourceWarehouse]);
 
 
   const handleSaveItem = async (item: InventoryItem) => {
@@ -367,6 +415,46 @@ const Inventory: React.FC = () => {
     }
     setItemModalOpen(false);
     setEditingItem(null);
+  };
+
+  const handleDeleteItem = async (item: InventoryItem) => {
+    const itemName = displayItemName(item);
+    const totalQty = inventoryTotalsById.get(item.id) || 0;
+    const brokenAssignments = item.warehouseQuantities.filter((row) => {
+      const warehouse = warehouseById.get(row.warehouseId);
+      return !warehouse || warehouse.isActive === false;
+    });
+    const ok = await confirm({
+      title: lang === 'ar' ? 'أرشفة الصنف؟' : 'Archive item?',
+      message: lang === 'ar'
+        ? `${itemName} سيتم إخفاؤه من الأصناف النشطة مع الاحتفاظ بالحركات والوصفات القديمة.${brokenAssignments.length ? ' تم اكتشاف ربط بمخزن غير نشط وسيظل ظاهرًا كتحذير.' : ''}`
+        : `${itemName} will be hidden from active inventory while historical movements and recipes remain safe.${brokenAssignments.length ? ' An inactive warehouse assignment was detected and will remain flagged.' : ''}`,
+      confirmText: lang === 'ar' ? 'أرشفة الصنف' : 'Archive item',
+      cancelText: lang === 'ar' ? 'إلغاء' : 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    if (totalQty > 0) {
+      showToast(
+        lang === 'ar'
+          ? 'لا يمكن أرشفة صنف له رصيد حالي. صفّر الرصيد أو انقله أولاً حتى لا يصبح الرصيد معلقًا.'
+          : 'This item has current stock. Zero or transfer the stock before archiving it so no balance is left orphaned.',
+        'error',
+      );
+      return;
+    }
+    try {
+      await deleteInventoryItem(item.id);
+      showToast(lang === 'ar' ? 'تمت أرشفة الصنف وإخفاؤه من القائمة.' : 'Item archived and removed from the active list.', 'success');
+    } catch (error: any) {
+      const code = error?.code || error?.message;
+      const message = code === 'INVENTORY_ITEM_USED_IN_RECIPE'
+        ? (lang === 'ar' ? 'لا يمكن أرشفة الصنف لأنه مستخدم في وصفة نشطة. عدّل الوصفة أولاً.' : 'This item is used in an active recipe. Update the recipe before archiving it.')
+        : code === 'INVENTORY_ITEM_HAS_STOCK'
+          ? (lang === 'ar' ? 'لا يمكن أرشفة الصنف قبل تصفير أو نقل رصيده الحالي.' : 'Zero or transfer the current stock before archiving this item.')
+          : (error?.message || (lang === 'ar' ? 'تعذر أرشفة الصنف.' : 'Failed to archive item.'));
+      showToast(message, 'error');
+    }
   };
 
   const exportInventoryTemplate = async () => {
@@ -479,7 +567,7 @@ const Inventory: React.FC = () => {
   const handleDirectReceipt = async (data: {
     warehouseId: string;
     supplierId?: string;
-    items: { itemId: string; quantity: number; costPrice?: number }[];
+    items: { itemId: string; quantity: number; costPrice?: number; purchaseUnit?: string }[];
   }) => {
     await inventoryApi.receiveStock({
       warehouse_id: data.warehouseId,
@@ -490,9 +578,39 @@ const Inventory: React.FC = () => {
         item_id: item.itemId,
         quantity: Number(item.quantity),
         unit_cost: Number(item.costPrice),
+        purchase_unit: item.purchaseUnit,
       })),
     });
     await Promise.all([fetchInventory(), fetchTransferMovements(100)]);
+  };
+
+  const handleSupplierReturn = async (data: {
+    warehouseId: string;
+    supplierId?: string;
+    reason: string;
+    creditNoteRef?: string;
+    items: { itemId: string; quantity: number; unitPrice?: number }[];
+  }) => {
+    const { purchaseOrdersApi } = await import('@/services/api/procurement');
+    const result = await purchaseOrdersApi.createPurchaseReturn({
+      warehouseId: data.warehouseId,
+      supplierId: data.supplierId,
+      reason: data.reason,
+      creditNoteRef: data.creditNoteRef,
+      items: data.items.map(item => ({
+        itemId: item.itemId,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice || 0),
+      })),
+    });
+    await Promise.all([fetchInventory(), fetchTransferMovements(100)]);
+    const skipped = Array.isArray((result as any)?.skipped) ? (result as any).skipped.length : 0;
+    showToast(
+      lang === 'ar'
+        ? `تم حفظ مرتجع المورد (${(result as any)?.returned?.length || 0} صنف)${skipped ? ` وتخطي ${skipped}` : ''}.`
+        : `Supplier return saved (${(result as any)?.returned?.length || 0} items)${skipped ? `, ${skipped} skipped` : ''}.`,
+      skipped ? 'warning' : 'success',
+    );
   };
 
   const handleZeroInventory = async () => {
@@ -569,7 +687,7 @@ const Inventory: React.FC = () => {
               className="w-full px-6 py-4 bg-card/60  border border-border/30 rounded-2xl text-main font-black text-xs uppercase tracking-widest outline-none focus:border-violet-500/50 appearance-none shadow-sm"
             >
               <option value="">{lang === 'ar' ? 'اختر المخزن...' : 'Select Warehouse...'}</option>
-              {warehouses.map(wh => <option key={wh.id} value={wh.id}>{displayWarehouseName(wh)}</option>)}
+              {activeWarehouses.map(wh => <option key={wh.id} value={wh.id}>{displayWarehouseName(wh)}</option>)}
             </select>
             <button
               onClick={handleStartCount}
@@ -622,6 +740,18 @@ const Inventory: React.FC = () => {
                         >
                           <Printer size={16} />
                         </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void exportStockCount(count.id);
+                          }}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/30 bg-card text-emerald-600 hover:bg-emerald-500 hover:text-white"
+                          title={lang === 'ar' ? 'تصدير الجرد إلى Excel' : 'Export stock count to Excel'}
+                          aria-label={lang === 'ar' ? 'تصدير الجرد إلى Excel' : 'Export stock count to Excel'}
+                        >
+                          <Download size={16} />
+                        </button>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] font-black">
@@ -660,6 +790,40 @@ const Inventory: React.FC = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <label className="flex items-center gap-2 px-5 py-3.5 bg-card border border-border/30 rounded-xl text-main font-black text-[10px] uppercase tracking-widest cursor-pointer select-none" title={lang === 'ar' ? 'إخفاء كمية النظام أثناء العد' : 'Hide system qty while counting'}>
+                <input type="checkbox" checked={blindCount} onChange={(e) => setBlindCount(e.target.checked)} className="w-4 h-4 accent-violet-600" />
+                {lang === 'ar' ? 'جرد أعمى' : 'BLIND'}
+              </label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
+                <input
+                  value={countScan}
+                  onChange={(e) => setCountScan(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    const q = countScan.trim().toLowerCase();
+                    if (!q) { setCountScanFilter(''); return; }
+                    const match = (countSession?.items || []).find((ci: any) =>
+                      String(ci.barcode || '').toLowerCase() === q
+                      || String(ci.sku || '').toLowerCase() === q
+                      || String(ci.itemName || '').toLowerCase().includes(q));
+                    if (match) {
+                      setCountScanFilter(String(match.itemId));
+                      showToast(lang === 'ar' ? `تم العثور: ${match.itemName}` : `Found: ${match.itemName}`, 'success');
+                    } else {
+                      setCountScanFilter('');
+                      showToast(lang === 'ar' ? 'لا يوجد صنف بهذا الباركود' : 'No item with this barcode', 'warning');
+                    }
+                  }}
+                  placeholder={lang === 'ar' ? 'امسح باركود…' : 'Scan barcode…'}
+                  className="h-full min-h-[52px] pl-11 pr-4 bg-card border border-border/30 rounded-xl text-sm font-bold outline-none focus:border-violet-500/50 placeholder-muted"
+                />
+                {countScanFilter && (
+                  <button onClick={() => { setCountScan(''); setCountScanFilter(''); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-rose-500">
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => void handleZeroCountInputs()}
                 disabled={countLoading}
@@ -674,6 +838,14 @@ const Inventory: React.FC = () => {
               >
                 <Printer size={15} />
                 {lang === 'ar' ? 'طباعة الجرد' : 'PRINT COUNT'}
+              </button>
+              <button
+                onClick={() => void exportStockCount()}
+                disabled={countLoading}
+                className="flex items-center gap-2 px-5 py-3.5 bg-card border border-border/30 rounded-xl text-emerald-600 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all active:scale-95"
+              >
+                <Download size={15} />
+                {lang === 'ar' ? 'تصدير Excel' : 'EXPORT EXCEL'}
               </button>
               <button
                 onClick={() => handleCompleteCount(false)}
@@ -705,13 +877,13 @@ const Inventory: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {(countSession.items || []).map((ci: any) => {
+                {(countSession.items || []).filter((ci: any) => !countScanFilter || String(ci.itemId) === countScanFilter).map((ci: any) => {
                   const variance = ci.countedQty !== null ? ci.countedQty - ci.systemQty : 0;
                   return (
                     <tr key={ci.itemId} className="hover:bg-violet-500/5 transition-colors group">
                       <td className="px-8 py-4 font-bold text-main uppercase tracking-tight">{ci.itemName}</td>
                       <td className="px-4 py-4 text-center text-[10px] font-black text-muted uppercase tracking-widest">{ci.unit}</td>
-                      <td className="px-4 py-4 text-center font-black text-muted/60 tabular-nums">{ci.systemQty}</td>
+                      <td className="px-4 py-4 text-center font-black text-muted/60 tabular-nums">{blindCount ? '•••' : ci.systemQty}</td>
                       <td className="px-4 py-4 text-center">
                         <input
                           type="number"
@@ -721,8 +893,8 @@ const Inventory: React.FC = () => {
                           placeholder="-"
                         />
                       </td>
-                      <td className={`px-4 py-4 text-center font-black tabular-nums transition-all ${ci.countedQty === null ? 'text-muted/30' : variance > 0 ? 'text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]' : variance < 0 ? 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.3)]' : 'text-main'}`}>
-                        {ci.countedQty !== null ? (variance > 0 ? `+${variance}` : variance) : '-'}
+                      <td className={`px-4 py-4 text-center font-black tabular-nums transition-all ${blindCount || ci.countedQty === null ? 'text-muted/30' : variance > 0 ? 'text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]' : variance < 0 ? 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.3)]' : 'text-main'}`}>
+                        {blindCount ? '•••' : ci.countedQty !== null ? (variance > 0 ? `+${variance}` : variance) : '-'}
                       </td>
                       <td className="px-8 py-4">
                         <input
@@ -745,97 +917,198 @@ const Inventory: React.FC = () => {
   );
 
   const renderMovements = () => (
-    <div className="p-6 md:p-8 space-y-8 relative z-10 animate-in fade-in duration-150">
+    <div className="p-6 md:p-8 space-y-6 relative z-10 animate-in fade-in duration-150">
+      {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 bg-elevated/20 p-5 rounded-3xl border border-border/10">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-500">
-                <Calendar size={14} />
-             </div>
-             <input
-               type="date"
-               value={movementDateFrom}
-               onChange={(e) => setMovementDateFrom(e.target.value)}
-               className="bg-card/60  border border-border/30 rounded-xl px-4 py-2 text-[11px] font-black uppercase text-main outline-none focus:border-sky-500/50"
-             />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center">
+            <Calendar size={16} />
           </div>
-          <span className="text-muted text-[10px] font-black uppercase tracking-widest">{lang === 'ar' ? 'إلى' : 'TO'}</span>
           <input
             type="date"
-            value={movementDateTo}
-            onChange={(e) => setMovementDateTo(e.target.value)}
-            className="bg-card/60  border border-border/30 rounded-xl px-4 py-2 text-[11px] font-black uppercase text-main outline-none focus:border-sky-500/50"
+            value={movementDateFrom}
+            onChange={(e) => setMovementDateFrom(e.target.value)}
+            aria-label={lang === 'ar' ? 'من تاريخ' : 'From date'}
+            className="bg-card/60 border border-border/30 rounded-xl px-4 py-2 text-[11px] font-black uppercase text-main outline-none focus:border-sky-500/50"
           />
         </div>
+        <span className="text-muted text-[10px] font-black uppercase tracking-widest">{lang === 'ar' ? 'إلى' : 'TO'}</span>
+        <input
+          type="date"
+          value={movementDateTo}
+          onChange={(e) => setMovementDateTo(e.target.value)}
+          aria-label={lang === 'ar' ? 'إلى تاريخ' : 'To date'}
+          className="bg-card/60 border border-border/30 rounded-xl px-4 py-2 text-[11px] font-black uppercase text-main outline-none focus:border-sky-500/50"
+        />
+
+        <div className="relative min-w-[200px] flex-1 max-w-xs">
+          <Search size={14} className={`absolute top-1/2 -translate-y-1/2 text-muted ${lang === 'ar' ? 'right-3' : 'left-3'}`} />
+          <input
+            value={movementSearch}
+            onChange={(e) => setMovementSearch(e.target.value)}
+            placeholder={lang === 'ar' ? 'بحث: صنف / سبب / مرجع…' : 'Search item / reason / ref…'}
+            aria-label={lang === 'ar' ? 'بحث في الحركات' : 'Search movements'}
+            className={`w-full bg-card/60 border border-border/30 rounded-xl ${lang === 'ar' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 text-[11px] font-bold text-main outline-none focus:border-sky-500/50`}
+          />
+        </div>
+
         <button
           onClick={loadMovements}
           disabled={movementLoading}
-          className="flex items-center gap-3 px-8 py-3 bg-card/60  text-sky-500 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-sky-500 hover:text-white transition-all active:scale-95 shadow-sm"
+          className="flex items-center gap-3 px-7 py-3 bg-card/60 text-sky-500 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-sky-500 hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50"
         >
-          <Activity size={14} className={movementLoading ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={movementLoading ? 'animate-spin' : ''} />
           {lang === 'ar' ? 'تحديث السجلات' : 'REFRESH LOGS'}
         </button>
-        <div className="ml-auto px-4 py-2 bg-elevated/40 rounded-xl text-[10px] font-black text-muted uppercase tracking-widest border border-border/10">
-           {movementLog.length} Records Detected
+        <button
+          onClick={printMovements}
+          disabled={filteredMovementRows.length === 0}
+          className="flex items-center gap-3 px-5 py-3 bg-card/60 text-muted rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-main hover:text-app disabled:opacity-40 transition-all active:scale-95"
+        >
+          <Printer size={14} />
+          {lang === 'ar' ? 'طباعة / PDF' : 'PRINT / PDF'}
+        </button>
+        <button
+          onClick={exportMovementsCsv}
+          disabled={filteredMovementRows.length === 0}
+          className="flex items-center gap-3 px-5 py-3 bg-card/60 text-muted rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-emerald-500 hover:text-white disabled:opacity-40 transition-all active:scale-95"
+        >
+          <Download size={14} />
+          Excel
+        </button>
+      </div>
+
+      {/* Type filter chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'النوع:' : 'TYPE:'}</span>
+        <button
+          onClick={() => setMovementTypeFilter(new Set())}
+          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 ${movementTypeFilter.size === 0 ? 'bg-sky-500 text-white border-sky-400 shadow-sm' : 'bg-card/40 text-muted border-border/20 hover:border-sky-500/30 hover:text-sky-400'}`}
+        >
+          {lang === 'ar' ? 'الكل' : 'ALL'}
+        </button>
+        {Object.entries(MOVEMENT_TYPE_META).map(([type, meta]) => {
+          const active = movementTypeFilter.has(type);
+          return (
+            <button
+              key={type}
+              onClick={() => toggleMovementType(type)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 ${active ? meta.badge : 'bg-card/40 text-muted border-border/20 hover:text-main'}`}
+            >
+              <span className={`h-2 w-2 rounded-full ${active ? meta.dot : 'bg-muted/40'}`} />
+              {lang === 'ar' ? meta.ar : meta.en}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-border/20 bg-card/50 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'عدد الحركات' : 'Total Movements'}</p>
+          <p className="mt-2 text-2xl font-black text-main tabular-nums">{movementSummary.count.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">{lang === 'ar' ? 'كمية واردة +' : 'Inbound Qty'}</p>
+          <p className="mt-2 text-2xl font-black text-emerald-500 tabular-nums">{movementSummary.inQty.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">{lang === 'ar' ? 'كمية منصرفة −' : 'Outbound Qty'}</p>
+          <p className="mt-2 text-2xl font-black text-rose-500 tabular-nums">{movementSummary.outQty.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-border/20 bg-card/50 p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted">{lang === 'ar' ? 'قيمة الحركات' : 'Movement Value'}</p>
+          <p className="mt-2 text-2xl font-black text-main tabular-nums">{settings.currencySymbol || 'EGP'} {movementSummary.cost.toFixed(2)}</p>
         </div>
       </div>
 
+      {/* Table */}
       <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm">
-        {movementLog.length === 0 ? (
+        {filteredMovementRows.length === 0 ? (
           <div className="text-center py-24 bg-card/20">
             <Activity size={64} className="mx-auto text-muted/10 mb-6 animate-pulse" />
             <p className="text-muted font-black uppercase tracking-[0.3em] text-xs">
-              {movementLoading ? (lang === 'ar' ? 'جاري استرجاع البيانات...' : 'QUERYING BLOCKCHAIN...') : (lang === 'ar' ? 'لا توجد حركات في هذه الفترة' : 'No movements found')}
+              {movementLoading ? (lang === 'ar' ? 'جاري استرجاع البيانات...' : 'LOADING...') : (lang === 'ar' ? 'لا توجد حركات مطابقة للفلاتر' : 'No movements match your filters')}
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1100px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-[150px]" />
+              <col className="w-[220px]" />
+              <col className="w-[120px]" />
+              <col className="w-[90px]" />
+              <col className="w-[70px]" />
+              <col className="w-[100px]" />
+              <col className="w-[110px]" />
+              <col className="w-[130px]" />
+              <col className="w-[140px]" />
+              <col className="w-[120px]" />
+            </colgroup>
             <thead className="bg-elevated/40 text-muted uppercase font-black text-[10px] tracking-widest">
               <tr>
-                <th className="text-left px-8 py-5">{lang === 'ar' ? 'الوقت' : 'Timestamp'}</th>
-                <th className="text-left px-4 py-5">{lang === 'ar' ? 'الأصل' : 'Asset'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'النوع' : 'Type'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                <th className="text-center px-4 py-5">{lang === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost'}</th>
-                <th className="text-left px-4 py-5">{lang === 'ar' ? 'السبب' : 'Reason'}</th>
-                <th className="text-left px-8 py-5">{lang === 'ar' ? 'المستخدم' : 'Operator'}</th>
+                <th className="px-4 py-5 text-start">{lang === 'ar' ? 'الوقت' : 'Timestamp'}</th>
+                <th className="px-4 py-5 text-start">{lang === 'ar' ? 'الصنف' : 'Item'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'النوع' : 'Type'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الكمية' : 'Qty'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الوحدة' : 'Unit'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost'}</th>
+                <th className="px-3 py-5 text-center">{lang === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                <th className="px-4 py-5 text-start">{lang === 'ar' ? 'المخزن' : 'Warehouse'}</th>
+                <th className="px-4 py-5 text-start">{lang === 'ar' ? 'المرجع / السبب' : 'Reference / Reason'}</th>
+                <th className="px-4 py-5 text-start">{lang === 'ar' ? 'بواسطة' : 'By'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {movementLog.map((mv, idx) => {
-                const typeColors: Record<string, string> = {
-                  ADJUSTMENT: 'text-amber-500 bg-amber-500/10 border-amber-500/20', 
-                  TRANSFER: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
-                  PURCHASE: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', 
-                  SALE: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
-                  WASTE: 'text-red-500 bg-red-500/10 border-red-500/20', 
-                  SALE_CONSUMPTION: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
-                };
+              {filteredMovementRows.map((mv, idx) => {
+                const meta = MOVEMENT_TYPE_META[String(mv.type || '').toUpperCase()];
+                const qty = Number(mv.quantity || 0);
                 return (
                   <tr key={mv.id || idx} className="hover:bg-sky-500/5 transition-colors group">
-                    <td className="px-8 py-4 text-[10px] font-black text-muted/60 uppercase tracking-tighter tabular-nums whitespace-nowrap">
-                      {new Date(mv.createdAt).toLocaleString()}
+                    <td className="px-4 py-3.5 text-[10px] font-black text-muted/70 tabular-nums whitespace-nowrap">
+                      {new Date(mv.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td className="px-4 py-4">
-                       <span className="font-black text-main text-xs uppercase tracking-tight group-hover:text-sky-500 transition-colors">{mv.itemName}</span>
+                    <td className="px-4 py-3.5">
+                      <p className="truncate text-xs font-black text-main group-hover:text-sky-500 transition-colors" title={lang === 'ar' ? mv.itemNameAr || mv.itemName : mv.itemName}>
+                        {lang === 'ar' ? mv.itemNameAr || mv.itemName : mv.itemName}
+                      </p>
                     </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${typeColors[mv.type] || 'bg-card text-muted border-border/20'}`}>
-                        {mv.type}
+                    <td className="px-3 py-3.5 text-center">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${meta?.badge || 'bg-card text-muted border-border/20'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${meta?.dot || 'bg-muted'}`} />
+                        {lang === 'ar' ? meta?.ar || mv.type : meta?.en || mv.type}
                       </span>
                     </td>
-                    <td className={`px-4 py-4 text-center font-black tabular-nums transition-all ${mv.quantity > 0 ? 'text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]' : 'text-rose-500'}`}>
-                      {mv.quantity > 0 ? `+${mv.quantity}` : mv.quantity}
+                    <td className={`px-3 py-3.5 text-center font-black tabular-nums whitespace-nowrap ${qty > 0 ? 'text-emerald-500' : qty < 0 ? 'text-rose-500' : 'text-muted'}`}>
+                      {qty > 0 ? `+${qty.toLocaleString()}` : qty.toLocaleString()}
                     </td>
-                    <td className="px-4 py-4 text-center font-black text-muted/80 tabular-nums text-[11px]">
-                      {mv.totalCost ? `${mv.totalCost.toFixed(2)}` : '-'}
+                    <td className="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-widest text-muted whitespace-nowrap">{mv.unit || '-'}</td>
+                    <td className="px-3 py-3.5 text-center font-bold text-muted tabular-nums text-[11px] whitespace-nowrap">
+                      {Number(mv.unitCost || 0) ? Number(mv.unitCost).toFixed(2) : '-'}
                     </td>
-                    <td className="px-4 py-4 text-[11px] text-muted font-bold truncate max-w-[150px]">{mv.reason || '-'}</td>
-                    <td className="px-8 py-4 text-[10px] font-black text-muted uppercase tracking-widest">{mv.performedBy || 'System'}</td>
+                    <td className="px-3 py-3.5 text-center font-black tabular-nums text-[11px] text-main whitespace-nowrap">
+                      {Number(mv.totalCost || 0) ? Math.abs(Number(mv.totalCost)).toFixed(2) : '-'}
+                    </td>
+                    <td className="px-4 py-3.5 text-[11px] font-bold text-muted truncate">{mv.warehouseName || '-'}</td>
+                    <td className="px-4 py-3.5">
+                      {mv.referenceId && <p className="truncate text-[10px] font-black text-main font-mono" title={mv.referenceId}>{mv.referenceId}</p>}
+                      {mv.reason && <p className="truncate text-[10px] font-bold text-muted" title={mv.reason}>{mv.reason}</p>}
+                      {!mv.referenceId && !mv.reason && <span>-</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-[10px] font-black text-muted uppercase tracking-widest truncate">{mv.performedBy || 'System'}</td>
                   </tr>
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="bg-elevated/60 font-black text-[11px] text-main">
+                <td className="px-4 py-4 uppercase tracking-widest" colSpan={3}>{lang === 'ar' ? 'الإجمالي' : 'TOTALS'}</td>
+                <td className="px-3 py-4 text-center tabular-nums text-emerald-500">+{movementSummary.inQty.toLocaleString()}</td>
+                <td colSpan={2} />
+                <td className="px-3 py-4 text-center tabular-nums">{settings.currencySymbol || 'EGP'} {movementSummary.cost.toFixed(2)}</td>
+                <td colSpan={4} />
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>
@@ -856,6 +1129,9 @@ const Inventory: React.FC = () => {
 
   // --- STOCK COUNT STATE ---
   const [countSession, setCountSession] = useState<any>(null);
+  const [blindCount, setBlindCount] = useState(false);
+  const [countScan, setCountScan] = useState('');
+  const [countScanFilter, setCountScanFilter] = useState('');
   const [countLoading, setCountLoading] = useState(false);
   const [selectedCountWarehouse, setSelectedCountWarehouse] = useState('');
   const [selectedCountDate, setSelectedCountDate] = useState(dateOnly());
@@ -953,6 +1229,50 @@ const Inventory: React.FC = () => {
     }
   };
 
+  const exportStockCount = async (id?: string) => {
+    setCountLoading(true);
+    try {
+      const count = id && countSession?.id !== id
+        ? await inventoryApi.getStockCount(id)
+        : countSession;
+      if (!count) return;
+      const XLSX = await import('xlsx');
+      const details = (count.items || []).map((item: any) => {
+        const systemQty = Number(item.systemQty ?? item.expectedQty ?? 0);
+        const countedQty = item.countedQty === null || item.countedQty === undefined ? '' : Number(item.countedQty);
+        const variance = countedQty === '' ? '' : Number(countedQty) - systemQty;
+        const unitCost = Number(item.cost || 0);
+        return {
+          [lang === 'ar' ? 'الصنف' : 'Item']: item.itemName || item.itemId,
+          [lang === 'ar' ? 'الوحدة' : 'Unit']: item.unit || '',
+          [lang === 'ar' ? 'كمية النظام' : 'System Qty']: systemQty,
+          [lang === 'ar' ? 'الجرد الفعلي' : 'Counted Qty']: countedQty,
+          [lang === 'ar' ? 'الفرق' : 'Variance']: variance,
+          [lang === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost']: unitCost,
+          [lang === 'ar' ? 'قيمة الفرق' : 'Variance Value']: variance === '' ? '' : Number(variance) * unitCost,
+          [lang === 'ar' ? 'ملاحظات' : 'Notes']: item.notes || '',
+        };
+      });
+      const summary = [{
+        [lang === 'ar' ? 'رقم الجلسة' : 'Session']: count.id,
+        [lang === 'ar' ? 'التاريخ' : 'Date']: String(count.countDate || '').split('T')[0],
+        [lang === 'ar' ? 'المخزن' : 'Warehouse']: count.warehouseName || count.warehouseId || '',
+        [lang === 'ar' ? 'الحالة' : 'Status']: count.status || '',
+        [lang === 'ar' ? 'عدد البنود' : 'Lines']: details.length,
+        [lang === 'ar' ? 'إجمالي قيمة الفرق' : 'Total Variance Value']: details.reduce((sum: number, row: any) => sum + Number(row[lang === 'ar' ? 'قيمة الفرق' : 'Variance Value'] || 0), 0),
+      }];
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(summary), lang === 'ar' ? 'ملخص الجرد' : 'Summary');
+      XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(details), lang === 'ar' ? 'تفاصيل الجرد' : 'Count Details');
+      XLSX.writeFile(book, `stock-count-${count.id}.xlsx`);
+      showToast(lang === 'ar' ? 'تم تصدير تفاصيل الجرد إلى Excel.' : 'Stock count details exported to Excel.', 'success');
+    } catch (error: any) {
+      setCountError(error?.message || (lang === 'ar' ? 'تعذر تصدير الجرد.' : 'Stock count export failed.'));
+    } finally {
+      setCountLoading(false);
+    }
+  };
+
   const handleUpdateCountItem = (itemId: string, field: string, value: any) => {
     if (!countSession) return;
     setCountSession((prev: any) => ({
@@ -1013,16 +1333,130 @@ const Inventory: React.FC = () => {
     return formatLocalDate(d);
   });
   const [movementDateTo, setMovementDateTo] = useState(() => formatLocalDate(new Date()));
+  const [movementTypeFilter, setMovementTypeFilter] = useState<Set<string>>(new Set());
+  const [movementSearch, setMovementSearch] = useState('');
 
   const loadMovements = async () => {
     setMovementLoading(true);
     try {
-      const data = await reportsApi.getStockMovements({ startDate: movementDateFrom, endDate: movementDateTo });
+      const data = await reportsApi.getStockMovements({
+        startDate: movementDateFrom,
+        endDate: movementDateTo,
+        branchId: settings.activeBranchId || undefined,
+        types: movementTypeFilter.size > 0 ? Array.from(movementTypeFilter) : undefined,
+      });
       setMovementLog(data || []);
     } catch {
       setMovementLog([]);
     }
     setMovementLoading(false);
+  };
+
+  const toggleMovementType = (type: string) => {
+    setMovementTypeFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  const filteredMovementRows = useMemo(() => {
+    const search = movementSearch.trim().toLowerCase();
+    if (!search) return movementLog;
+    return movementLog.filter((mv) => (
+      `${mv.itemName || ''} ${mv.itemNameAr || ''} ${mv.reason || ''} ${mv.referenceId || ''} ${mv.warehouseName || ''}`
+        .toLowerCase()
+        .includes(search)
+    ));
+  }, [movementLog, movementSearch]);
+
+  const movementSummary = useMemo(() => {
+    let inQty = 0;
+    let outQty = 0;
+    let cost = 0;
+    for (const mv of filteredMovementRows) {
+      const qty = Number(mv.quantity || 0);
+      if (qty >= 0) inQty += qty;
+      else outQty += Math.abs(qty);
+      cost += Math.abs(Number(mv.totalCost || 0));
+    }
+    return { count: filteredMovementRows.length, inQty, outQty, cost };
+  }, [filteredMovementRows]);
+
+  const getMovementExportRows = () => filteredMovementRows.map((mv) => ({
+    time: new Date(mv.createdAt).toLocaleString(),
+    item: lang === 'ar' ? mv.itemNameAr || mv.itemName : mv.itemName,
+    type: MOVEMENT_TYPE_META[String(mv.type || '').toUpperCase()]?.[lang === 'ar' ? 'ar' : 'en'] || String(mv.type || '-'),
+    quantity: Number(mv.quantity || 0),
+    unit: mv.unit || '',
+    unitCost: Number(mv.unitCost || 0),
+    totalCost: Math.abs(Number(mv.totalCost || 0)),
+    warehouse: mv.warehouseName || '-',
+    reference: mv.referenceId || '',
+    reason: mv.reason || '',
+    operator: mv.performedBy || 'System',
+  }));
+
+  const exportMovementsCsv = () => {
+    const headers = lang === 'ar'
+      ? ['الوقت', 'الصنف', 'النوع', 'الكمية', 'الوحدة', 'تكلفة الوحدة', 'إجمالي التكلفة', 'المخزن', 'المرجع', 'السبب', 'بواسطة']
+      : ['Time', 'Item', 'Type', 'Quantity', 'Unit', 'Unit Cost', 'Total Cost', 'Warehouse', 'Reference', 'Reason', 'Operator'];
+    const rows = getMovementExportRows().map(row => [
+      row.time, row.item, row.type, row.quantity, row.unit,
+      row.unitCost.toFixed(2), row.totalCost.toFixed(2),
+      row.warehouse, row.reference, row.reason, row.operator,
+    ]);
+    const csv = [headers, ...rows]
+      .map(line => line.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `stock-movements-${movementDateFrom}-${movementDateTo}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printMovements = () => {
+    const escapeHtml = (value: any) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+    const headers = lang === 'ar'
+      ? ['الوقت', 'الصنف', 'النوع', 'الكمية', 'الوحدة', 'تكلفة الوحدة', 'الإجمالي', 'المخزن', 'المرجع', 'بواسطة']
+      : ['Time', 'Item', 'Type', 'Qty', 'Unit', 'Unit Cost', 'Total', 'Warehouse', 'Ref', 'By'];
+    const rows = getMovementExportRows().map(row => [
+      row.time, row.item, row.type,
+      `${row.quantity >= 0 ? '+' : ''}${row.quantity}`,
+      row.unit, row.unitCost.toFixed(2), row.totalCost.toFixed(2),
+      row.warehouse, row.reference, row.operator,
+    ]);
+    const win = window.open('', '_blank', 'width=1200,height=850');
+    if (!win) return;
+    win.document.write(`
+      <html dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
+        <head>
+          <title>${lang === 'ar' ? 'حركات المخزون' : 'Stock Movements'}</title>
+          <style>
+            body{font-family:Arial,sans-serif;padding:22px;color:#111}
+            h1{font-size:20px;margin:0 0 4px}
+            p{margin:0 0 14px;color:#555;font-size:12px}
+            table{width:100%;border-collapse:collapse;font-size:11px}
+            th,td{border:1px solid #ddd;padding:6px;text-align:center}
+            th{background:#f4f4f5}
+            tbody tr:nth-child(even){background:#fafafa}
+          </style>
+        </head>
+        <body>
+          <h1>${lang === 'ar' ? 'سجل حركات المخزون' : 'Stock Movements Log'}</h1>
+          <p>${movementDateFrom} → ${movementDateTo} · ${lang === 'ar' ? 'عدد الحركات' : 'Records'}: ${rows.length}</p>
+          <table>
+            <thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+          <script>window.onload=()=>window.print()</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
   };
 
   const [consumptionRows, setConsumptionRows] = useState<any[]>([]);
@@ -1041,12 +1475,15 @@ const Inventory: React.FC = () => {
       : row.warehouseId
         ? Number(item?.warehouseQuantities?.find((qty) => qty.warehouseId === row.warehouseId)?.quantity || 0)
         : Number(inventoryTotalsById.get(row.itemId) || 0);
-    const consumedQty = Number(row.totalQuantity || 0);
     return {
       ...row,
       currentStock,
-      shortageQty: Math.max(consumedQty - currentStock, 0),
-      overQty: Math.max(currentStock - consumedQty, 0),
+      // Over/short comes ONLY from the latest posted physical count variance
+      // (counted - expected). Remaining balance is the live current quantity,
+      // never treated as "over". Without any posted count both stay zero and
+      // the balance simply extends the opening quantity through movements.
+      shortageQty: Math.max(Number(row.shortageQty || 0), 0),
+      overQty: Math.max(Number(row.overQty || 0), 0),
     };
   }), [consumptionRows, inventoryById, inventoryTotalsById]);
 
@@ -1070,13 +1507,14 @@ const Inventory: React.FC = () => {
     movements: Number(row.movementCount || 0),
     lastOrder: row.lastReferenceId || '',
     lastConsumedAt: row.lastConsumedAt ? new Date(row.lastConsumedAt).toLocaleString() : '',
+    lastCount: row.lastCountDate ? `${lang === 'ar' ? 'جرد' : 'Count'} ${Number(row.lastCountedQty ?? 0)} @ ${new Date(row.lastCountDate).toLocaleDateString()}` : '',
   }));
 
   const exportRecipeConsumptionCsv = () => {
     const headers = lang === 'ar'
-      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة', 'الحركات', 'آخر أوردر', 'آخر سحب']
-      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost', 'Movements', 'Last Order', 'Last Consumed At'];
-    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost, row.movements, row.lastOrder, row.lastConsumedAt]);
+      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة', 'الحركات', 'آخر أوردر', 'آخر سحب', 'آخر جرد']
+      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost', 'Movements', 'Last Order', 'Last Consumed At', 'Last Count'];
+    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost, row.movements, row.lastOrder, row.lastConsumedAt, row.lastCount]);
     const csv = [headers, ...rows]
       .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -1090,10 +1528,10 @@ const Inventory: React.FC = () => {
 
   const printRecipeConsumption = () => {
     const headers = lang === 'ar'
-      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة']
-      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost'];
+      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة', 'آخر جرد']
+      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost', 'Last Count'];
     const escapeHtml = (value: any) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
-    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost.toFixed(2)]);
+    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost.toFixed(2), row.lastCount]);
     const win = window.open('', '_blank', 'width=1100,height=800');
     if (!win) return;
     win.document.write(`
@@ -1142,7 +1580,7 @@ const Inventory: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'MOVEMENTS') loadMovements();
     if (activeTab === 'CONSUMPTION') loadRecipeConsumption();
-  }, [activeTab]);
+  }, [activeTab, movementDateFrom, movementDateTo, movementTypeFilter]);
 
   // --- TAB CONTENT RENDERERS ---
 
@@ -1280,7 +1718,14 @@ const Inventory: React.FC = () => {
                   </td>
                   <td className="px-4 py-4 text-xs font-bold text-muted truncate">{row.warehouseName || row.warehouseId || '-'}</td>
                   <td className="px-3 py-4 text-center font-black tabular-nums text-rose-500 whitespace-nowrap">{Number(row.totalQuantity || 0).toLocaleString()}</td>
-                  <td className="px-3 py-4 text-center font-black tabular-nums text-main whitespace-nowrap">{Number(row.currentStock || 0).toLocaleString()}</td>
+                  <td className="px-3 py-4 text-center font-black tabular-nums text-main whitespace-nowrap">
+                    {Number(row.currentStock || 0).toLocaleString()}
+                    {row.lastCountDate && (
+                      <p className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-muted">
+                        {lang === 'ar' ? 'آخر جرد' : 'Last count'}: {new Date(row.lastCountDate).toLocaleDateString()}
+                      </p>
+                    )}
+                  </td>
                   <td className="px-3 py-4 text-center font-black tabular-nums text-rose-500 whitespace-nowrap">{Number(row.shortageQty || 0).toLocaleString()}</td>
                   <td className="px-3 py-4 text-center font-black tabular-nums text-emerald-500 whitespace-nowrap">{Number(row.overQty || 0).toLocaleString()}</td>
                   <td className="px-3 py-4 text-center text-[10px] font-black uppercase tracking-widest text-muted whitespace-nowrap">{row.unit || '-'}</td>
@@ -1394,6 +1839,10 @@ const Inventory: React.FC = () => {
               const item = filteredInventory[index];
               const totalQty = inventoryTotalsById.get(item.id) || 0;
               const isLow = totalQty <= item.threshold;
+              const hasBrokenWarehouseLink = item.warehouseQuantities.some((row) => {
+                const warehouse = warehouseById.get(row.warehouseId);
+                return !warehouse || warehouse.isActive === false;
+              });
               return (
                 <div 
                   className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_0.8fr] gap-4 px-8 items-center h-full hover:bg-emerald-500/5 transition-colors border-b border-white/5 group"
@@ -1426,6 +1875,7 @@ const Inventory: React.FC = () => {
                     })}
                     {item.warehouseQuantities.length > 3 && <span className="text-[9px] font-black text-muted">+{item.warehouseQuantities.length - 3} {lang === 'ar' ? 'أكثر' : 'More'}</span>}
                     {item.warehouseQuantities.length === 0 && <span className="text-[10px] italic text-muted opacity-60">{lang === 'ar' ? 'لا يوجد رصيد' : 'Empty Stock'}</span>}
+                    {hasBrokenWarehouseLink && <span className="px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[9px] font-black text-amber-500">{lang === 'ar' ? 'مخزن غير نشط' : 'Invalid warehouse link'}</span>}
                   </div>
 
                   {/* Qty */}
@@ -1491,6 +1941,14 @@ const Inventory: React.FC = () => {
                     >
                       <Calculator size={15} />
                     </button>
+                    <button
+                      onClick={() => void handleDeleteItem(item)}
+                      aria-label={lang === 'ar' ? `أرشفة ${displayItemName(item)}` : `Archive ${displayItemName(item)}`}
+                      title={lang === 'ar' ? 'أرشفة الصنف' : 'Archive item'}
+                      className="p-2.5 bg-card/50 hover:bg-rose-500/10 border border-border/20 hover:border-rose-500/30 rounded-xl text-muted hover:text-rose-500 transition-all shadow-sm active:scale-95"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
               );
@@ -1510,6 +1968,10 @@ const Inventory: React.FC = () => {
           ) : filteredInventory.map((item) => {
             const totalQty = inventoryTotalsById.get(item.id) || 0;
             const isLow = totalQty <= item.threshold;
+            const hasBrokenWarehouseLink = item.warehouseQuantities.some((row) => {
+              const warehouse = warehouseById.get(row.warehouseId);
+              return !warehouse || warehouse.isActive === false;
+            });
             return (
               <article key={item.id} className="rounded-2xl border border-border/25 bg-card/70 p-4 shadow-sm">
                 <div className="flex items-start gap-3">
@@ -1544,12 +2006,13 @@ const Inventory: React.FC = () => {
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {item.warehouseQuantities.slice(0, 2).map((wq) => (
-                    <span key={wq.warehouseId} className="rounded-lg border border-border/20 bg-elevated/30 px-2 py-1 text-[9px] font-bold text-muted">
-                      {displayWarehouseName(warehouseById.get(wq.warehouseId))}: {wq.quantity}
-                    </span>
-                  ))}
-                </div>
+                    {item.warehouseQuantities.slice(0, 2).map((wq) => (
+                      <span key={wq.warehouseId} className="rounded-lg border border-border/20 bg-elevated/30 px-2 py-1 text-[9px] font-bold text-muted">
+                      {displayWarehouseName(warehouseById.get(wq.warehouseId)) || (lang === 'ar' ? 'مخزن غير موجود' : 'Missing warehouse')}: {wq.quantity}
+                      </span>
+                    ))}
+                    {hasBrokenWarehouseLink && <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-black text-amber-500">{lang === 'ar' ? 'مراجعة ربط المخزن' : 'Review warehouse link'}</span>}
+                  </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => { setEditingItem(item); setItemModalOpen(true); }} className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-[10px] font-black text-emerald-500">
@@ -1557,6 +2020,9 @@ const Inventory: React.FC = () => {
                   </button>
                   <button type="button" onClick={() => { setEditingItem(item); setAdjustmentModalOpen(true); }} className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-[10px] font-black text-amber-500">
                     {lang === 'ar' ? 'تسوية الرصيد' : 'Adjust stock'}
+                  </button>
+                  <button type="button" onClick={() => void handleDeleteItem(item)} className="col-span-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-[10px] font-black text-rose-500">
+                    {lang === 'ar' ? 'أرشفة الصنف' : 'Archive item'}
                   </button>
                 </div>
               </article>
@@ -1623,6 +2089,34 @@ const Inventory: React.FC = () => {
           </div>
         );
       })}
+
+      {selectedWarehouse && (
+        <div className="col-span-full bg-card/80 border border-emerald-500/20 rounded-[2.5rem] p-6 md:p-8 shadow-xl relative">
+          <button onClick={() => setSelectedWarehouse(null)} className="absolute top-5 right-5 p-2 rounded-xl text-muted hover:text-main hover:bg-elevated" aria-label={lang === 'ar' ? 'إغلاق' : 'Close'}><X size={18} /></button>
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-6 pr-10">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">{lang === 'ar' ? 'نظرة عامة على المخزن' : 'Warehouse overview'}</p>
+              <h3 className="mt-1 text-2xl font-black text-main">{displayWarehouseName(warehouseById.get(selectedWarehouse.id) || selectedWarehouse)}</h3>
+              <p className="mt-1 text-xs font-bold text-muted">{branchById.get(selectedWarehouse.branchId)?.name || 'Central'} / {selectedWarehouse.type}</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+              {[
+                [lang === 'ar' ? 'الأصناف' : 'Items', selectedWarehouseStats.items],
+                [lang === 'ar' ? 'الكمية' : 'Quantity', selectedWarehouseStats.quantity],
+                [lang === 'ar' ? 'منخفض' : 'Low', selectedWarehouseStats.low],
+                [lang === 'ar' ? 'القيمة' : 'Value', `${settings.currencySymbol || 'ج.م'} ${selectedWarehouseStats.value.toLocaleString()}`],
+              ].map(([label, value]) => <div key={String(label)} className="min-w-[82px] rounded-xl bg-elevated/40 border border-border/20 px-3 py-2"><p className="text-[9px] font-black text-muted">{label}</p><p className="mt-1 text-sm font-black text-main">{value}</p></div>)}
+            </div>
+          </div>
+          <div className="responsive-table rounded-2xl border border-border/20 overflow-auto max-h-[360px]">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-elevated text-[10px] font-black uppercase tracking-widest text-muted"><tr><th className="px-4 py-3 text-start">{lang === 'ar' ? 'الصنف' : 'Item'}</th><th className="px-4 py-3 text-start">{lang === 'ar' ? 'الكود' : 'SKU'}</th><th className="px-4 py-3 text-end">{lang === 'ar' ? 'الكمية' : 'Quantity'}</th><th className="px-4 py-3 text-end">{lang === 'ar' ? 'القيمة' : 'Value'}</th><th className="px-4 py-3 text-end">{lang === 'ar' ? 'الحالة' : 'Status'}</th></tr></thead>
+              <tbody className="divide-y divide-border/20">{selectedWarehouseRows.map(({ item, quantity }) => <tr key={item.id}><td className="px-4 py-3 font-black text-main">{displayItemName(item)}</td><td className="px-4 py-3 font-mono text-xs text-muted">{item.sku || '-'}</td><td className="px-4 py-3 text-end font-black">{quantity} {item.unit}</td><td className="px-4 py-3 text-end font-black text-emerald-500">{(quantity * (item.costPrice || 0)).toLocaleString()}</td><td className={`px-4 py-3 text-end text-[10px] font-black ${quantity <= item.threshold ? 'text-rose-500' : 'text-emerald-500'}`}>{quantity <= item.threshold ? (lang === 'ar' ? 'منخفض' : 'LOW') : (lang === 'ar' ? 'جيد' : 'OK')}</td></tr>)}</tbody>
+            </table>
+            {selectedWarehouseRows.length === 0 && <p className="p-8 text-center text-sm font-bold text-muted">{lang === 'ar' ? 'لا توجد أصناف مرتبطة بهذا المخزن.' : 'No items are assigned to this warehouse.'}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1749,7 +2243,7 @@ const Inventory: React.FC = () => {
   };
 
   const handleReceivePO = async (po: PurchaseOrder) => {
-    const wh = po.targetWarehouseId || poWarehouseId || warehouses[0]?.id;
+    const wh = po.targetWarehouseId || poWarehouseId || activeWarehouses[0]?.id;
     if (!wh) return;
     await receivePurchaseOrderInDB(po.id, wh, []);
     await fetchPurchaseOrders();
@@ -1779,11 +2273,11 @@ const Inventory: React.FC = () => {
           <div className="space-y-3 relative z-10">
             <select className="w-full px-4 py-3.5 rounded-2xl bg-elevated/40  border border-border/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all text-main font-bold text-sm shadow-inner appearance-none cursor-pointer" value={branchTransferItemId} onChange={(e) => setBranchTransferItemId(e.target.value)}>
               <option value="" className="bg-card">{lang === 'ar' ? 'اختر صنف' : 'Select Item'}</option>
-              {inventory.map(i => <option key={i.id} value={i.id} className="bg-card">{displayItemName(i)}</option>)}
+              {activeInventory.map(i => <option key={i.id} value={i.id} className="bg-card">{displayItemName(i)}</option>)}
             </select>
             <select className="w-full px-4 py-3.5 rounded-2xl bg-elevated/40  border border-border/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all text-main font-bold text-sm shadow-inner appearance-none cursor-pointer" value={branchTransferFromWh} onChange={(e) => setBranchTransferFromWh(e.target.value)}>
               <option value="" className="bg-card">{lang === 'ar' ? 'من مخزن' : 'From Warehouse'}</option>
-              {warehouses.map(w => <option key={w.id} value={w.id} className="bg-card">{displayWarehouseName(w)}</option>)}
+              {activeWarehouses.map(w => <option key={w.id} value={w.id} className="bg-card">{displayWarehouseName(w)}</option>)}
             </select>
             <select className="w-full px-4 py-3.5 rounded-2xl bg-elevated/40  border border-border/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all text-main font-bold text-sm shadow-inner appearance-none cursor-pointer" value={branchTransferToWh} onChange={(e) => setBranchTransferToWh(e.target.value)}>
               <option value="" className="bg-card">{lang === 'ar' ? 'إلى مخزن في فرع آخر' : 'To Warehouse (different branch)'}</option>
@@ -1898,6 +2392,12 @@ const Inventory: React.FC = () => {
               <Truck size={18} /> {lang === 'ar' ? 'استلام مباشر' : 'DIRECT RECEIPT'}
             </button>
             <button
+              onClick={() => setReturnModalOpen(true)}
+              className="h-14 flex items-center justify-center gap-3 bg-card/60 text-amber-600 px-8 rounded-2xl border border-border/30 font-black text-[11px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all active:scale-95 shadow-lg"
+            >
+              <Undo2 size={18} /> {lang === 'ar' ? 'مرتجع مورد' : 'SUPPLIER RETURN'}
+            </button>
+            <button
               onClick={() => setTransferModalOpen(true)}
               className="h-14 flex items-center justify-center gap-3 bg-card/60  text-sky-500 px-8 rounded-2xl border border-border/30 font-black text-[11px] uppercase tracking-widest hover:bg-sky-500 hover:text-white transition-all active:scale-95 shadow-lg"
             >
@@ -1930,9 +2430,25 @@ const Inventory: React.FC = () => {
           </div>
         )}
 
+        {orphanedWarehouseAssignments.length > 0 && (
+          <div className="flex items-start gap-4 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-amber-600 shadow-lg dark:text-amber-400">
+            <AlertTriangle size={20} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest">
+                {lang === 'ar' ? `تنبيه بيانات: ${orphanedWarehouseAssignments.length} ربط بمخزن غير نشط` : `${orphanedWarehouseAssignments.length} item-to-warehouse links need attention`}
+              </p>
+              <p className="mt-1 text-xs font-bold leading-relaxed">
+                {lang === 'ar'
+                  ? 'تم اكتشاف أصناف مربوطة بمخزن مؤرشف أو غير موجود. افتح تعديل الصنف لإزالة الربط بعد تصفير الرصيد أو نقله.'
+                  : 'Some items point to an archived or missing warehouse. Edit the item to remove the link after zeroing or transferring its balance.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StockMetric label={lang === 'ar' ? 'قيمة المخزون' : 'Inventory Valuation'} value={inventoryValuation.toLocaleString()} subValue={settings.currencySymbol || 'ج.م'} icon={Calculator} color="#10b981" lang={lang} />
-          <StockMetric label={lang === 'ar' ? 'الأصناف النشطة' : 'Active SKUs'} value={inventory.length} subValue={lang === 'ar' ? 'صنف' : 'Items'} icon={Layers} color="#3b82f6" lang={lang} />
+          <StockMetric label={lang === 'ar' ? 'الأصناف النشطة' : 'Active SKUs'} value={activeInventory.length} subValue={lang === 'ar' ? 'صنف' : 'Items'} icon={Layers} color="#3b82f6" lang={lang} />
           <StockMetric label={lang === 'ar' ? 'رصيد صفر' : 'Out of Stock'} value={outOfStockCount} subValue={lang === 'ar' ? 'تنبيه' : 'Alerts'} icon={AlertTriangle} color="#f43f5e" lang={lang} />
           <StockMetric label={lang === 'ar' ? 'معدل الدوران' : 'Turnover Ratio'} value="4.2x" icon={Activity} color="#8b5cf6" lang={lang} />
         </section>
@@ -1990,7 +2506,7 @@ const Inventory: React.FC = () => {
           onSave={handleSaveItem}
           lang={lang}
           warehouses={warehouses}
-          existingItems={inventory}
+          existingItems={activeInventory}
           initialItem={editingItem}
         />
 
@@ -2008,8 +2524,8 @@ const Inventory: React.FC = () => {
           onClose={() => { setAdjustmentModalOpen(false); setEditingItem(null); }}
           onSave={handleAdjustment}
           lang={lang}
-          items={inventory}
-          warehouses={warehouses}
+          items={activeInventory}
+          warehouses={activeWarehouses}
           initialItem={editingItem}
         />
 
@@ -2018,8 +2534,8 @@ const Inventory: React.FC = () => {
           onClose={() => setTransferModalOpen(false)}
           onSave={handleTransfer}
           lang={lang}
-          items={inventory}
-          warehouses={warehouses}
+          items={activeInventory}
+          warehouses={activeWarehouses}
         />
 
         <ReceiptModal
@@ -2027,8 +2543,18 @@ const Inventory: React.FC = () => {
           onClose={() => setReceiptModalOpen(false)}
           onSave={handleDirectReceipt}
           lang={lang}
-          inventory={inventory}
-          warehouses={warehouses}
+          inventory={activeInventory}
+          warehouses={activeWarehouses}
+          suppliers={suppliers}
+        />
+
+        <SupplierReturnModal
+          isOpen={returnModalOpen}
+          onClose={() => setReturnModalOpen(false)}
+          onSave={handleSupplierReturn}
+          lang={lang}
+          inventory={activeInventory}
+          warehouses={activeWarehouses}
           suppliers={suppliers}
         />
       </div>

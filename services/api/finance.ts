@@ -2,8 +2,14 @@ import { apiRequest } from './core';
 
 export const financeApi = {
     getAccounts: () => apiRequest<any[]>('/finance/accounts'),
+    getArchivedAccounts: () => apiRequest<any[]>('/finance/accounts/archived'),
     createExpenseAccount: (data: { name: string; nameAr?: string; code?: string }) =>
         apiRequest<any>('/finance/accounts/expense', { method: 'POST', body: JSON.stringify(data) }),
+    createAccount: (data: any) => apiRequest<any>('/finance/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    resetChartOfAccounts: () => apiRequest<any>('/finance/accounts/reset', { method: 'POST', body: JSON.stringify({ confirmation: 'RESET_CHART_OF_ACCOUNTS' }) }),
+    updateAccount: (id: string, data: any) => apiRequest<any>(`/finance/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deactivateAccount: (id: string) => apiRequest<any>(`/finance/accounts/${id}`, { method: 'DELETE' }),
+    restoreAccount: (id: string) => apiRequest<any>(`/finance/accounts/${id}/restore`, { method: 'POST' }),
     getJournal: (limit?: number) => apiRequest<any[]>(`/finance/journal${limit ? `?limit=${limit}` : ''}`),
     createJournal: (data: { description: string; amount?: number; lines?: any[]; debitAccountCode?: string; creditAccountCode?: string; referenceId?: string; source?: string; metadata?: any; date?: string }) =>
         apiRequest<any>('/finance/journal', { method: 'POST', body: JSON.stringify(data) }),
@@ -36,4 +42,9 @@ export const financeApi = {
     getPostingRules: () => apiRequest<any[]>('/finance/mappings/rules'),
     createPostingRule: (data: any) => apiRequest<any>('/finance/mappings/rules', { method: 'POST', body: JSON.stringify(data) }),
     deletePostingRule: (id: string) => apiRequest<any>(`/finance/mappings/rules/${id}`, { method: 'DELETE' }),
+    updatePostingRule: (id: string, data: any) => apiRequest<any>(`/finance/mappings/rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    getPaymentMappings: () => apiRequest<any[]>('/finance/mappings/payment'),
+    updatePaymentMapping: (id: string | number, accountId: string) => apiRequest<any>(`/finance/mappings/payment/${id}`, { method: 'PUT', body: JSON.stringify({ accountId }) }),
+    getTaxMappings: () => apiRequest<any[]>('/finance/mappings/tax'),
+    updateTaxMapping: (id: string | number, accountId: string, rate?: number) => apiRequest<any>(`/finance/mappings/tax/${id}`, { method: 'PUT', body: JSON.stringify({ accountId, rate }) }),
 };

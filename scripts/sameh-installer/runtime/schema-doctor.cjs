@@ -7,7 +7,7 @@ const env = Object.fromEntries(fs.readFileSync(path.join(root, '.env'), 'utf8').
   .filter(line => line && !line.startsWith('#') && line.includes('='))
   .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
 const source = fs.readFileSync(path.join(root, 'database', 'schema.ts'), 'utf8');
-const sqlTypes = { nvarchar: 'nvarchar(max)', jsonText: 'nvarchar(max)', int: 'int', real: 'real', bit: 'bit', date: 'date', datetime2: 'datetime2' };
+const sqlTypes = { nvarchar: 'nvarchar(max)', jsonText: 'nvarchar(max)', int: 'int', real: 'real', numeric: 'decimal(14,2)', bit: 'bit', date: 'date', datetime2: 'datetime2' };
 const snake = name => name.replace(/[A-Z]/g, char => `_${char.toLowerCase()}`);
 const quote = name => `[${name.replace(/]/g, ']]')}]`;
 const repairKdsPriority = `
@@ -43,7 +43,7 @@ function expectedSchema() {
   for (const match of source.matchAll(/mssqlTable\((?:'|")([^'"]+)(?:'|")\s*,\s*\{([\s\S]*?)\n\s*\}(?:\s*,|\s*\))/g)) {
     const columns = new Map();
     for (const line of match[2].split(/\r?\n/)) {
-      const property = line.match(/^\s*([A-Za-z_$][\w$]*):\s*(nvarchar|int|real|bit|date|datetime2|jsonText)\s*\((.*)$/);
+      const property = line.match(/^\s*([A-Za-z_$][\w$]*):\s*(nvarchar|int|real|numeric|bit|date|datetime2|jsonText)\s*\((.*)$/);
       if (!property) continue;
       const explicit = property[3].match(/^\s*(?:'|")([^'"]+)(?:'|")/);
       columns.set(explicit?.[1] || snake(property[1]), sqlTypes[property[2]]);
@@ -67,9 +67,30 @@ async function repair() {
       actual.get(row.TABLE_NAME).add(row.COLUMN_NAME);
     }
     const added = [];
-    const missingTables = [];
+    const createdTables = [];
+    const stillMissing = [];
     for (const [table, columns] of expectedSchema()) {
-      if (!actual.has(table)) { missingTables.push(table); continue; }
+      if (!actual.has(table)) {
+        // Self-heal: create the whole table instead of only reporting it.
+        // Fresh installs on a new client PC previously aborted here with
+        // "جداول ناقصة: bank_accounts, ..." when empty-schema.sql was
+        // outdated or a first-run batch stopped halfway.
+        const defs = [];
+        for (const [column, type] of columns) {
+          if (column === 'id' && type === 'int') defs.push(`${quote(column)} int IDENTITY(1,1) NOT NULL`);
+          else if (column === 'id') defs.push(`${quote(column)} nvarchar(255) NOT NULL`);
+          else defs.push(`${quote(column)} ${type} NULL`);
+        }
+        if (!defs.length) { stillMissing.push(table); continue; }
+        const pk = columns.has('id') ? `, CONSTRAINT ${quote(`pk_${table}`)} PRIMARY KEY ([id])` : '';
+        try {
+          await new mssql.Request(transaction).batch(`IF OBJECT_ID(${`'dbo.${table.replace(/'/g, "''")}'`}, 'U') IS NULL CREATE TABLE ${quote(table)} (${defs.join(', ')}${pk})`);
+          createdTables.push(table);
+        } catch {
+          stillMissing.push(table);
+        }
+        continue;
+      }
       for (const [column, type] of columns) {
         if (actual.get(table).has(column)) continue;
         await new mssql.Request(transaction).batch(`ALTER TABLE ${quote(table)} ADD ${quote(column)} ${type} NULL`);
@@ -81,7 +102,7 @@ async function repair() {
       await new mssql.Request(transaction).batch(dailyOrderNumberMigration);
     }
     await transaction.commit();
-    console.log(JSON.stringify({ ok: true, added, missingTables }));
+    console.log(JSON.stringify({ ok: true, added, createdTables, missingTables: stillMissing }));
   } catch (error) {
     await transaction.rollback();
     throw error;

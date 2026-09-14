@@ -5,7 +5,7 @@ interface PageSkeletonProps {
     rows?: number;
 }
 
-const shimmer = 'bg-elevated animate-pulse rounded-xl';
+const shimmer = 'theme-skeleton ux-skeleton rounded-xl';
 
 const PageSkeleton: React.FC<PageSkeletonProps> = ({ type = 'table', rows = 6 }) => {
     if (type === 'cards') {

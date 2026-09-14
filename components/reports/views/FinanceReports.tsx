@@ -7,6 +7,8 @@ import {
    ChevronDown, Filter, Target, Megaphone, Zap, Scale, Info, Users, Clock, Box, ShieldCheck, Activity, LineChart as ChartIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ExportButton from '../../common/ExportButton';
+import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 
 export const FinanceReports = ({ state }: any) => {
    const {
@@ -43,6 +45,11 @@ export const FinanceReports = ({ state }: any) => {
       settings
    } = state;
    const isAr = settings?.language !== 'en';
+   const cur = settings?.currencySymbol || 'LE';
+   const pnlDetails = Array.isArray(profitAndLoss?.details) ? profitAndLoss.details : [];
+   const pnlDebitTotal = pnlDetails.reduce((sum: number, row: any) => sum + Number(row.debit || 0), 0);
+   const pnlCreditTotal = pnlDetails.reduce((sum: number, row: any) => sum + Number(row.credit || 0), 0);
+   const pnlIsBalanced = Math.abs(pnlDebitTotal - pnlCreditTotal) < 0.01;
    const [expenseStatusFilter, setExpenseStatusFilter] = useState<string>('ALL');
    const expenseLabels = {
       approved: isAr ? 'المصروفات المعتمدة' : 'Approved Expenses',
@@ -115,6 +122,32 @@ export const FinanceReports = ({ state }: any) => {
                         </button>
                      </div>
 
+                     <ReportDataTable
+                        title={isAr ? 'تقرير Z — جدول المراجعة' : 'Z-Report — audit table'}
+                        subtitle={isAr ? 'مطابقة الإيراد والضريبة والطرق' : 'Revenue, tax and tender tie-out'}
+                        data={(() => {
+                           const s = vatReport?.summary || {};
+                           const rows: any[] = [
+                              { metric: isAr ? 'إجمالي المبيعات' : 'Gross Sales', value: Number(s.grandTotal || 0) },
+                              { metric: isAr ? 'الخصومات' : 'Total Discounts', value: -Number(overview?.discountTotal || 0) },
+                              { metric: isAr ? 'الصافي الخاضع' : 'Net Taxable', value: Number(s.netTotal || 0) },
+                              { metric: isAr ? 'الضريبة' : 'VAT', value: Number(s.taxTotal || 0) },
+                              { metric: isAr ? 'رسوم الخدمة' : 'Service Charge', value: Number(s.serviceChargeTotal || 0) },
+                              { metric: isAr ? 'الإجمالي العام' : 'Grand Total', value: Number(s.netTotal || 0) + Number(s.taxTotal || 0) + Number(s.serviceChargeTotal || 0) },
+                           ];
+                           (paymentSummary || []).forEach((p: any) => rows.push({
+                              metric: `${isAr ? 'طريقة' : 'Tender'}: ${p.method || p.paymentMethod || 'UNKNOWN'}`,
+                              value: Number(p.total || p.amount || 0),
+                           }));
+                           return rows;
+                        })()}
+                        columns={[
+                           { key: 'metric', label: isAr ? 'البند' : 'Line', sortable: false },
+                           { key: 'value', label: isAr ? 'القيمة' : 'Value', align: 'right', sum: true, sortable: false, format: (v: any) => fmtMoney(v, cur) },
+                        ]}
+                        exportFilename="z-report"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
                      <div className="card-primary rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
                         <div className="p-10 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                            <div>
@@ -167,12 +200,57 @@ export const FinanceReports = ({ state }: any) => {
                {activeCategory === 'FINANCE' && activeSubReport === 'Trial Balance' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="bg-card/80  rounded-[2.5rem] border border-border/50 shadow-2xl overflow-hidden">
-                        <div className="p-8 border-b border-border/50 bg-elevated/30">
+                        <div className="flex items-center justify-between border-b border-border/50 bg-elevated/30 p-8">
                            <h3 className="text-2xl font-black text-main uppercase tracking-tighter flex items-center gap-4">
                               <div className="w-12 h-12 bg-violet-500/10 rounded-2xl flex items-center justify-center border border-violet-500/20 text-violet-500"><Scale size={24} /></div>
                               Trial Balance
                            </h3>
+                           <ExportButton
+                              data={trialBalance.map((row: any) => ({ code: row.accountCode, account: row.accountName, type: row.accountType, debit: Number(row.totalDebit || 0), credit: Number(row.totalCredit || 0), balance: Number(row.balance || 0) }))}
+                              columns={[
+                                 { key: 'code', label: isAr ? 'كود الحساب' : 'Account Code' },
+                                 { key: 'account', label: isAr ? 'الحساب' : 'Account' },
+                                 { key: 'type', label: isAr ? 'النوع' : 'Type' },
+                                 { key: 'debit', label: isAr ? 'مدين' : 'Debit' },
+                                 { key: 'credit', label: isAr ? 'دائن' : 'Credit' },
+                                 { key: 'balance', label: isAr ? 'الرصيد' : 'Balance' },
+                              ]}
+                              filename="trial-balance"
+                              title={isAr ? 'ميزان المراجعة' : 'Trial Balance'}
+                           />
                         </div>
+                        {trialBalance.length > 0 && <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-border/30 bg-card/40 px-8 py-4 text-xs font-black">
+                           <span>{isAr ? 'إجمالي المدين' : 'Total Debit'}: <b className="font-mono">{trialBalance.reduce((s: number, r: any) => s + Number(r.totalDebit || 0), 0).toLocaleString()}</b></span>
+                           <span>{isAr ? 'إجمالي الدائن' : 'Total Credit'}: <b className="font-mono">{trialBalance.reduce((s: number, r: any) => s + Number(r.totalCredit || 0), 0).toLocaleString()}</b></span>
+                           <span className="text-emerald-600">{isAr ? 'الميزان قابل للمراجعة' : 'Audit-ready account totals'}</span>
+                        </div>}
+                        {trialBalance.length > 0 && (
+                           <div className="p-6 border-b border-border/20">
+                              <ResponsiveContainer width="100%" height={200}>
+                                 <BarChart
+                                    data={(() => {
+                                       const byType: Record<string, { type: string; debit: number; credit: number }> = {};
+                                       trialBalance.forEach((r: any) => {
+                                          const k = r.accountType || 'OTHER';
+                                          byType[k] = byType[k] || { type: k, debit: 0, credit: 0 };
+                                          byType[k].debit += Number(r.totalDebit || 0);
+                                          byType[k].credit += Number(r.totalCredit || 0);
+                                       });
+                                       return Object.values(byType);
+                                    })()}
+                                    margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                                 >
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                    <XAxis dataKey="type" tick={{ fontSize: 9, fontWeight: 700 }} interval={0} />
+                                    <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)} />
+                                    <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${cur}`, '']} />
+                                    <Legend />
+                                    <Bar dataKey="debit" name={isAr ? 'مدين' : 'Debit'} fill="#6366f1" radius={[6, 6, 0, 0]} />
+                                    <Bar dataKey="credit" name={isAr ? 'دائن' : 'Credit'} fill="#10b981" radius={[6, 6, 0, 0]} />
+                                 </BarChart>
+                              </ResponsiveContainer>
+                           </div>
+                        )}
                         {trialBalance.length === 0 ? (
                            <div className="p-16 text-center text-muted text-xs font-black uppercase tracking-widest">No journal {expenseLabels.rows} found for this period</div>
                         ) : (
@@ -208,6 +286,36 @@ export const FinanceReports = ({ state }: any) => {
                               Top Expenses
                            </h3>
                         </div>
+                        {topExpenses.length > 0 && (
+                           <div className="p-6 border-b border-border/20">
+                              <ResponsiveContainer width="100%" height={Math.min(420, 60 + topExpenses.slice(0, 12).length * 34)}>
+                                 <BarChart data={[...topExpenses].sort((a: any, b: any) => Number(b.total || 0) - Number(a.total || 0)).slice(0, 12)} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(148,163,184,0.25)" />
+                                    <XAxis type="number" tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)} />
+                                    <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 10, fontWeight: 700 }} />
+                                    <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${cur}`, isAr ? 'الإجمالي' : 'Total']} />
+                                    <Bar dataKey="total" name="Total" fill="#f43f5e" radius={[0, 6, 6, 0]} />
+                                 </BarChart>
+                              </ResponsiveContainer>
+                           </div>
+                        )}
+                        <ReportDataTable
+                           title={isAr ? 'أعلى المصروفات — جدول' : 'Top Expenses — table'}
+                           data={(() => {
+                              const total = (topExpenses || []).reduce((s: number, e: any) => s + Number(e.total || 0), 0);
+                              return [...(topExpenses || [])]
+                                 .sort((a: any, b: any) => Number(b.total || 0) - Number(a.total || 0))
+                                 .map((e: any, i: number) => ({ rank: i + 1, name: e.name, total: Number(e.total || 0), pct: total > 0 ? (Number(e.total || 0) / total) * 100 : 0 }));
+                           })()}
+                           columns={[
+                              { key: 'rank', label: '#', align: 'right', format: (v: any) => fmtNum(v) },
+                              { key: 'name', label: isAr ? 'البند' : 'Account' },
+                              { key: 'total', label: isAr ? 'الإجمالي' : 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, cur) },
+                              { key: 'pct', label: '%', align: 'right', format: (v: any) => `${Number(v || 0).toFixed(1)}%` },
+                           ]}
+                           exportFilename="top-expenses"
+                           lang={isAr ? 'ar' : 'en'}
+                        />
                         {topExpenses.length === 0 ? (
                            <div className="p-16 text-center text-muted text-xs font-black uppercase tracking-widest">No expense data found</div>
                         ) : (
@@ -352,6 +460,24 @@ export const FinanceReports = ({ state }: any) => {
                             </div>
 
                             {/* Daily Breakdown */}
+                            {(expenseReport?.byDay || []).length > 1 && (
+                               <div className="bg-card/80 rounded-[2.5rem] border border-border/50 shadow-2xl overflow-hidden">
+                                  <div className="p-6 border-b border-border/50 bg-elevated/30">
+                                     <h3 className="text-xl font-black text-main uppercase tracking-tighter">{isAr ? 'الاتجاه اليومي' : 'Daily Trend'}</h3>
+                                  </div>
+                                  <div className="p-6">
+                                     <ResponsiveContainer width="100%" height={200}>
+                                        <AreaChart data={expenseReport.byDay} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                           <XAxis dataKey="day" tick={{ fontSize: 9, fontWeight: 700 }} />
+                                           <YAxis tick={{ fontSize: 10, fontWeight: 700 }} tickFormatter={(v: any) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)} />
+                                           <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${cur}`, isAr ? 'الإجمالي' : 'Total']} />
+                                           <Area type="monotone" dataKey="total" name="Total" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.15} strokeWidth={3} />
+                                        </AreaChart>
+                                     </ResponsiveContainer>
+                                  </div>
+                               </div>
+                            )}
                             {(expenseReport?.byDay || []).length > 0 && (
                                <div className="bg-card/80 rounded-[2.5rem] border border-border/50 shadow-2xl overflow-hidden">
                                   <div className="p-6 border-b border-border/50 bg-elevated/30">
@@ -390,16 +516,44 @@ export const FinanceReports = ({ state }: any) => {
                            <h3 className={`text-4xl font-black ${profitAndLoss.netProfit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{profitAndLoss.netProfit.toLocaleString()} <span className="text-sm">LE</span></h3>
                         </div>
                      </div>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-2xl border border-border/50 bg-elevated/20 p-4 text-xs font-black">
+                        <div><span className="text-muted">{isAr ? 'إجمالي المدين' : 'Total Debits'}: </span><span className="font-mono text-main">{pnlDebitTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div><span className="text-muted">{isAr ? 'إجمالي الدائن' : 'Total Credits'}: </span><span className="font-mono text-main">{pnlCreditTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div className={pnlIsBalanced ? 'text-emerald-600' : 'text-rose-600'}>{pnlIsBalanced ? (isAr ? 'القيد متوازن' : 'Ledger balanced') : (isAr ? 'تحذير: فرق في التوازن' : 'Warning: ledger imbalance')}</div>
+                     </div>
                      <div className="bg-card/80  rounded-[2.5rem] border border-border/50 shadow-2xl overflow-hidden">
+                        <div className="flex items-center justify-between border-b border-border/50 bg-elevated/30 p-6">
+                           <div>
+                              <h3 className="text-lg font-black text-main">{isAr ? 'تفصيل حسابات قائمة الدخل' : 'Income Statement Account Detail'}</h3>
+                              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted">{isAr ? 'الأرقام من القيود المرحّلة فقط' : 'Posted journal entries only'}</p>
+                           </div>
+                           <ExportButton
+                              data={(profitAndLoss.details || []).map((d: any) => ({
+                                 code: d.code || '', account: d.name, type: d.type,
+                                 debit: Number(d.debit || 0), credit: Number(d.credit || 0), net: Number(d.net || 0),
+                              }))}
+                              columns={[
+                                 { key: 'code', label: isAr ? 'كود الحساب' : 'Account Code' },
+                                 { key: 'account', label: isAr ? 'الحساب' : 'Account' },
+                                 { key: 'type', label: isAr ? 'النوع' : 'Type' },
+                                 { key: 'debit', label: isAr ? 'مدين' : 'Debit' },
+                                 { key: 'credit', label: isAr ? 'دائن' : 'Credit' },
+                                 { key: 'net', label: isAr ? 'الصافي' : 'Net' },
+                              ]}
+                              filename="income-statement-detail"
+                              title={isAr ? 'تفصيل قائمة الدخل' : 'Income Statement Detail'}
+                           />
+                        </div>
                         <div className="responsive-table">
                            <table className="w-full text-left border-collapse">
                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
-                                 <th className="px-8 py-5">Account</th><th className="px-6 py-5">Type</th><th className="px-6 py-5 text-right">Debit</th><th className="px-6 py-5 text-right">Credit</th><th className="px-8 py-5 text-right">Net</th>
+                                 <th className="px-6 py-5">Code</th><th className="px-6 py-5">Account</th><th className="px-6 py-5">Type</th><th className="px-6 py-5 text-right">Debit</th><th className="px-6 py-5 text-right">Credit</th><th className="px-8 py-5 text-right">Net</th>
                               </tr></thead>
                               <tbody className="divide-y divide-border/30">
                                  {profitAndLoss.details.map((d, idx) => (
                                     <tr key={idx} className="hover:bg-elevated/40 transition-colors">
-                                       <td className="px-8 py-4 text-xs font-black text-main uppercase">{d.name}</td>
+                                       <td className="px-6 py-4 font-mono text-xs font-bold text-indigo-500">{d.code || '-'}</td>
+                                       <td className="px-6 py-4 text-xs font-black text-main uppercase">{d.name}</td>
                                        <td className="px-6 py-4"><span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${d.type === 'REVENUE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>{d.type}</span></td>
                                        <td className="px-6 py-4 font-mono text-sm text-right">{d.debit.toLocaleString()}</td>
                                        <td className="px-6 py-4 font-mono text-sm text-right">{d.credit.toLocaleString()}</td>
@@ -414,6 +568,17 @@ export const FinanceReports = ({ state }: any) => {
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Tips Report' && tipsData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={isAr ? 'البقشيش حسب النوع — جدول' : 'Tips by Order Type — table'}
+                        data={tipsData.byType || []}
+                        columns={[
+                           { key: 'orderType', label: isAr ? 'النوع' : 'Type' },
+                           { key: 'count', label: isAr ? 'الطلبات' : 'Orders', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'totalTips', label: isAr ? 'الإجمالي' : 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, cur) },
+                        ]}
+                        exportFilename="tips-report"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
                            { l: 'Total Tips', v: `${tipsData.summary.totalTips.toLocaleString()} LE` },
@@ -456,6 +621,23 @@ export const FinanceReports = ({ state }: any) => {
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
                         <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Shift Summary / Cash Drawer</h3></div>
+                        {shiftSummaryData.length > 1 && (
+                           <div className="p-6 border-b border-border/20">
+                              <ResponsiveContainer width="100%" height={200}>
+                                 <BarChart data={shiftSummaryData.map((r: any, i: number) => ({ name: `S${i + 1}`, variance: Number(r.variance || 0) }))} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700 }} />
+                                    <YAxis tick={{ fontSize: 10, fontWeight: 700 }} />
+                                    <Tooltip formatter={(v: any) => [`${Number(v || 0).toLocaleString()} ${cur}`, isAr ? 'الفرق' : 'Variance']} />
+                                    <Bar dataKey="variance" name="Variance">
+                                       {shiftSummaryData.map((r: any, i: number) => (
+                                          <Cell key={i} fill={Number(r.variance || 0) >= 0 ? '#10b981' : '#f43f5e'} />
+                                       ))}
+                                    </Bar>
+                                 </BarChart>
+                              </ResponsiveContainer>
+                           </div>
+                        )}
                          <div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Open</th><th className="px-4 py-5 text-left">Close</th><th className="px-4 py-5 text-left">Status</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">Opening</th><th className="px-4 py-5 text-right">Expected</th><th className="px-4 py-5 text-right">Actual</th><th className="px-6 py-5 text-right">Variance</th></tr></thead><tbody className="divide-y divide-border/30">{shiftSummaryData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 font-mono text-[10px]">{r.openingTime ? new Date(r.openingTime).toLocaleString() : '-'}</td><td className="px-4 py-4 font-mono text-[10px]">{r.closingTime ? new Date(r.closingTime).toLocaleString() : '-'}</td><td className="px-4 py-4"><span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${r.status === 'CLOSED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{r.status}</span></td><td className="px-4 py-4 font-mono text-right">{r.orderCount}</td><td className="px-4 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.openingBalance}</td><td className="px-4 py-4 font-mono text-right">{r.expectedBalance}</td><td className="px-4 py-4 font-mono text-right">{r.actualBalance}</td><td className={`px-6 py-4 font-mono font-bold text-right ${r.variance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{r.variance >= 0 ? '+' : ''}{r.variance} LE</td></tr>)}</tbody></table></div>
                         {shiftSummaryData.length === 0 && <p className="text-center text-muted py-16">No shifts found.</p>}
                      </div>
@@ -469,14 +651,61 @@ export const FinanceReports = ({ state }: any) => {
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Cash Flow Forecast' && cashFlowData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <ReportDataTable
+                           title={isAr ? 'السجل (12 أسبوع) — جدول' : 'History (12 wks) — table'}
+                           data={cashFlowData.history || []}
+                           columns={[
+                              { key: 'week', label: isAr ? 'الأسبوع' : 'Week', align: 'right', format: (v: any) => fmtNum(v) },
+                              { key: 'revenue', label: isAr ? 'الإيراد' : 'Revenue', align: 'right', sum: true, format: (v: any) => fmtMoney(v, cur) },
+                           ]}
+                           exportFilename="cash-flow-history"
+                           lang={isAr ? 'ar' : 'en'}
+                        />
+                        <ReportDataTable
+                           title={isAr ? 'التوقع — جدول' : 'Forecast — table'}
+                           data={cashFlowData.forecast || []}
+                           columns={[
+                              { key: 'week', label: isAr ? 'الأسبوع' : 'Week', align: 'right', format: (v: any) => fmtNum(v) },
+                              { key: 'projectedRevenue', label: isAr ? 'المتوقع' : 'Projected', align: 'right', sum: true, format: (v: any) => fmtMoney(v, cur) },
+                           ]}
+                           exportFilename="cash-flow-forecast"
+                           lang={isAr ? 'ar' : 'en'}
+                        />
+                     </div>
                      <div className="grid grid-cols-2 gap-4"><div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">Avg Weekly Revenue</p><p className="text-2xl font-black text-main mt-1">{cashFlowData.avgWeeklyRevenue.toLocaleString()} LE</p></div><div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">Weekly Trend</p><p className={`text-2xl font-black mt-1 ${cashFlowData.weeklyTrend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{cashFlowData.weeklyTrend >= 0 ? '+' : ''}{cashFlowData.weeklyTrend.toLocaleString()} LE</p></div></div>
                      <div className="grid grid-cols-2 gap-6"><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden p-6"><h3 className="text-lg font-black text-main mb-4">History (12 wks)</h3>{cashFlowData.history.map((h: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs"><span className="text-muted font-mono">W{h.week}</span><span className="font-black text-main">{h.revenue.toLocaleString()} LE</span></div>))}</div><div className="card-primary rounded-[2rem] border border-blue-200 dark:border-blue-800 shadow-xl overflow-hidden p-6 bg-blue-50/30 dark:bg-blue-950/20"><h3 className="text-lg font-black text-blue-500 mb-4">Forecast</h3>{cashFlowData.forecast.map((f: any, i: number) => (<div key={i} className="flex justify-between py-2 text-xs"><span className="text-blue-400 font-mono">Week {f.week}</span><span className="font-black text-blue-500">{f.projectedRevenue.toLocaleString()} LE</span></div>))}</div></div>
                   </div>
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Cash Flow Forecast' && !cashFlowData && <p className="text-center text-muted py-16">No data.</p>}
 
-               {activeCategory === 'FINANCE' && activeSubReport === 'Tax Compliance' && taxComplianceData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'FINANCE' && activeSubReport === 'Tax Compliance' && taxComplianceData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={isAr ? 'ملخص الفواتير — جدول' : 'Invoice Summary — table'}
+                        data={[
+                           { status: isAr ? 'الإجمالي' : 'Total', count: taxComplianceData.fiscal?.total },
+                           { status: isAr ? 'مُرسل' : 'Submitted', count: taxComplianceData.fiscal?.submitted },
+                           { status: isAr ? 'فاشل' : 'Failed', count: taxComplianceData.fiscal?.failed },
+                           { status: isAr ? 'معلق' : 'Pending', count: taxComplianceData.fiscal?.pending },
+                        ]}
+                        columns={[
+                           { key: 'status', label: isAr ? 'الحالة' : 'Status', sortable: false },
+                           { key: 'count', label: isAr ? 'العدد' : 'Count', align: 'right', sum: true, sortable: false, format: (v: any) => fmtNum(v) },
+                        ]}
+                        exportFilename="tax-compliance"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
+                     <ReportDataTable
+                        title={isAr ? 'الرسائل الميتة — جدول' : 'Dead Letters — table'}
+                        data={taxComplianceData.deadLetters || []}
+                        columns={[
+                           { key: 'status', label: isAr ? 'الحالة' : 'Status' },
+                           { key: 'count', label: isAr ? 'العدد' : 'Count', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                        ]}
+                        exportFilename="tax-dead-letters"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[{ l: 'Total Invoices', v: taxComplianceData.fiscal.total }, { l: 'Submitted', v: taxComplianceData.fiscal.submitted, c: 'text-emerald-500' }, { l: 'Failed', v: taxComplianceData.fiscal.failed, c: 'text-rose-500' }, { l: 'Pending', v: taxComplianceData.fiscal.pending, c: 'text-amber-500' }, { l: 'Success Rate', v: `${taxComplianceData.fiscal.successRate}%`, c: taxComplianceData.fiscal.successRate > 90 ? 'text-emerald-500' : 'text-rose-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                      {taxComplianceData.deadLetters.length > 0 && <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden p-6"><h3 className="text-lg font-black text-main mb-4">Dead Letters by Status</h3>{taxComplianceData.deadLetters.map((d: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs"><span className="text-muted">{d.status}</span><span className="font-black text-main">{d.count}</span></div>))}</div>}
                   </div>
@@ -507,8 +736,20 @@ export const FinanceReports = ({ state }: any) => {
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Break-Even Analysis' && !breakEvenData && <p className="text-center text-muted py-16">No data.</p>}
 
-               {activeCategory === 'FINANCE' && activeSubReport === 'Payment Reconciliation' && reconciliationData && (
-                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                {activeCategory === 'FINANCE' && activeSubReport === 'Payment Reconciliation' && reconciliationData && (
+                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={isAr ? 'المطابقة حسب الطريقة — جدول التدقيق' : 'Reconciliation by Method — audit table'}
+                        subtitle={isAr ? 'يجب أن يكون الفرق صفراً' : 'Discrepancy must be zero'}
+                        data={reconciliationData.byMethod || []}
+                        columns={[
+                           { key: 'method', label: isAr ? 'الطريقة' : 'Method' },
+                           { key: 'count', label: isAr ? 'المعاملات' : 'Txns', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'total', label: isAr ? 'الإجمالي' : 'Total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, cur) },
+                        ]}
+                        exportFilename="payment-reconciliation"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Order Total', v: `${reconciliationData.orderTotal.toLocaleString()} LE` }, { l: 'Payment Total', v: `${reconciliationData.paymentTotal.toLocaleString()} LE` }, { l: 'Discrepancy', v: `${reconciliationData.discrepancy.toLocaleString()} LE`, c: reconciliationData.discrepancy > 0 ? 'text-rose-500' : 'text-emerald-500' }, { l: 'Discrepancy %', v: `${reconciliationData.discrepancyPercent}%`, c: Math.abs(reconciliationData.discrepancyPercent) > 2 ? 'text-rose-500' : 'text-emerald-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                       <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden p-6"><h3 className="text-lg font-black text-main mb-4">By Payment Method</h3>{reconciliationData.byMethod.map((m: any, i: number) => (<div key={i} className="flex justify-between py-2 text-xs border-b border-border/20"><span className="font-black">{m.method}</span><span className="text-muted">{m.count} txns - <span className="font-black text-main">{m.total.toLocaleString()} LE</span></span></div>))}</div>
                   </div>

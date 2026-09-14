@@ -25,7 +25,8 @@ const PADDING: Record<string, string> = {
 const Card: React.FC<CardProps> = ({ children, className = '', padding = 'md', hover = false, onClick }) => (
     <div
         onClick={onClick}
-        className={`glass-card rounded-[1.8rem] shadow-sm ${PADDING[padding]} ${hover ? 'hover:shadow-md hover:border-primary/20 hover:-translate-y-1 transition-all duration-150' : 'transition-colors duration-150'} ${onClick ? 'cursor-pointer' : ''} ${className}`}
+        data-interaction={hover || onClick ? 'lift' : undefined}
+        className={`theme-card rounded-[1.8rem] shadow-sm ${PADDING[padding]} ${hover ? 'hover:shadow-md hover:border-primary/20' : ''} ${onClick ? 'cursor-pointer pressable' : ''} ${className}`}
     >
         {children}
     </div>

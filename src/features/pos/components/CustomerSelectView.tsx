@@ -3,6 +3,7 @@ import { Users, Truck, Search, Plus, MapPin, Phone, ArrowRight, Loader2, Save, S
 import { Customer, DeliveryPlatform } from '@/types';
 import { useCRMStore } from '@/stores/useCRMStore';
 import AddressMapPicker from '@/components/common/AddressMapPicker';
+import DeliveryZonePicker from '@/components/common/DeliveryZonePicker';
 import { useToast } from '@/components/common/ToastProvider';
 import { useConfirm } from '@/components/common/ConfirmProvider';
 import { isPlatformDeliveryValid } from '../platformDeliveryValidation';
@@ -27,6 +28,12 @@ interface CustomerSelectViewProps {
     onUsePlatformDelivery: () => void;
     lang: 'en' | 'ar';
     t: any;
+    branchId?: string;
+    branches?: { id: string; name: string; nameAr?: string }[];
+    deliveryZones?: any[];
+    selectedZoneId?: string;
+    onZoneChange?: (zoneId: string, zone?: any) => void;
+    onZonesChange?: (zones: any[]) => void;
 }
 
 const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
@@ -43,6 +50,12 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
     onUsePlatformDelivery,
     lang,
     t,
+    branchId,
+    branches = [],
+    deliveryZones = [],
+    selectedZoneId = '',
+    onZoneChange,
+    onZonesChange,
 }) => {
     const isRTL = lang === 'ar';
     const { error: showError } = useToast();
@@ -88,6 +101,7 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
     const [newCustName, setNewCustName] = useState('');
     const [newCustPhone, setNewCustPhone] = useState('');
     const [newCustArea, setNewCustArea] = useState('');
+    const [newCustZoneId, setNewCustZoneId] = useState('');
     const [newCustAddress, setNewCustAddress] = useState('');
     const [newCustBuilding, setNewCustBuilding] = useState('');
     const [newCustFloor, setNewCustFloor] = useState('');
@@ -107,14 +121,14 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
 
                 setIsSearching(true);
                 try {
-                    const results = await searchCustomers(searchQuery);
+                    const results = await searchCustomers(searchQuery, { signal: controller.signal });
                     // Only update if this request wasn't aborted
                     if (!controller.signal.aborted) {
-                        setApiResults(results);
+                        setApiResults(Array.isArray(results) ? results.filter(Boolean) : []);
                         setIsSearching(false);
                     }
-                } catch (err) {
-                    if (!controller.signal.aborted) {
+                } catch (err: any) {
+                    if (!controller.signal.aborted && err?.name !== 'AbortError') {
                         setIsSearching(false);
                         setApiResults([]);
                     }
@@ -130,9 +144,9 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
         };
     }, [searchQuery, searchCustomers]);
 
-    const activeCustomers = searchQuery.trim().length > 2 ? apiResults : customers.filter(c => 
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        c.phone.includes(searchQuery)
+    const activeCustomers = searchQuery.trim().length > 2 ? apiResults.filter(Boolean) : customers.filter(c =>
+        (c?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c?.phone || '').includes(searchQuery)
     );
 
     const handleOpenInlineRegistration = () => {
@@ -140,6 +154,7 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
         setNewCustPhone(isNumeric ? searchQuery : '');
         setNewCustName(!isNumeric ? searchQuery : '');
         setNewCustArea('');
+        setNewCustZoneId(selectedZoneId || '');
         setNewCustAddress('');
         setNewCustBuilding('');
         setNewCustFloor('');
@@ -159,6 +174,7 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
                 name: newCustName,
                 phone: newCustPhone,
                 area: newCustArea,
+                zoneId: newCustZoneId ? Number(newCustZoneId) : undefined,
                 address: newCustAddress, // Typically Street
                 lat: newCustLat,
                 lng: newCustLng,
@@ -407,15 +423,27 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 xl:gap-4">
                                     <div>
-                                        <label className="block text-[10px] font-black tracking-widest text-muted uppercase mb-2">
-                                            {isRTL ? 'المنطقة' : 'Area/Region'}
-                                        </label>
+                                        <DeliveryZonePicker
+                                            zones={deliveryZones}
+                                            value={newCustZoneId}
+                                            branchId={branchId}
+                                            branches={branches}
+                                            lang={lang}
+                                            onZonesChange={onZonesChange}
+                                            onChange={(zoneId, zone) => {
+                                                setNewCustZoneId(zoneId);
+                                                if (zone) setNewCustArea(zone.nameAr || zone.name || '');
+                                                onZoneChange?.(zoneId, zone);
+                                            }}
+                                            label={isRTL ? 'المنطقة (من السيستم + إضافة جديدة)' : 'Zone (system list + quick-add)'}
+                                            placeholder={isRTL ? 'اختر المنطقة...' : 'Select zone...'}
+                                        />
                                         <input
                                             type="text"
                                             value={newCustArea}
                                             onChange={(e) => setNewCustArea(e.target.value)}
-                                            className="w-full h-14 bg-card border border-border/20 rounded-xl px-5 text-sm font-bold outline-none focus:border-indigo-500"
-                                            placeholder={isRTL ? 'المنطقة أو الحي...' : 'City/Area'}
+                                            className="mt-2 w-full h-11 bg-card border border-border/20 rounded-xl px-5 text-xs font-bold outline-none focus:border-indigo-500"
+                                            placeholder={isRTL ? 'تفاصيل المنطقة (اختياري)...' : 'Area details (optional)...'}
                                         />
                                     </div>
                                     <div>
@@ -519,26 +547,26 @@ const CustomerSelectView: React.FC<CustomerSelectViewProps> = ({
                             {activeCustomers.length > 0 ? (
                                 activeCustomers.map((c, idx) => (
                                     <button 
-                                        key={c.id} 
+                                        key={c?.id || `${c?.phone || 'noid'}-${idx}`} 
                                         onClick={() => onSelectCustomer(c)} 
                                         className={`w-full p-4 xl:p-6 rounded-3xl border ${searchQuery && idx === 0 ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-card/30 border-border/5 hover:border-indigo-500/30'} flex items-center justify-between group transition-all duration-150 animate-in slide-in-from-bottom-2 fade-in fill-mode-both`}
                                         style={{ animationDelay: `${idx * 30}ms` }}
                                     >
                                         <div className="flex min-w-0 items-center gap-3 xl:gap-5">
                                             <div className="w-11 h-11 xl:w-14 xl:h-14 rounded-2xl bg-indigo-500/10 flex shrink-0 items-center justify-center text-indigo-500 font-black text-xl group-hover:bg-indigo-500 group-hover:text-white transition-all shadow-inner">
-                                                {c.name.charAt(0).toUpperCase()}
+                                                {(c?.name?.charAt(0) || '?').toUpperCase()}
                                             </div>
                                             <div className="min-w-0 text-left">
-                                                <h3 className="font-black text-main text-base uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{c.name}</h3>
+                                                <h3 className="font-black text-main text-base uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{c?.name || '—'}</h3>
                                                 <div className="flex items-center gap-3 mt-1.5">
                                                     <span className="flex items-center gap-1.5 text-xs font-bold text-muted">
                                                         <Phone size={12} className="opacity-40" />
-                                                        {c.phone}
+                                                        {c?.phone || '—'}
                                                     </span>
-                                                    {c.address && (
+                                                    {(c?.address || c?.area) && (
                                                         <span className="flex items-center gap-1.5 text-xs font-bold text-muted truncate max-w-[200px]">
                                                             <MapPin size={12} className="opacity-40" />
-                                                            {c.area || c.address}
+                                                            {c?.area || c?.address}
                                                         </span>
                                                     )}
                                                 </div>

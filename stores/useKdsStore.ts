@@ -7,6 +7,12 @@ interface KdsItem {
     itemName: string;
     quantity: number;
     modifiersText: string | null;
+    modifiers?: any;
+    selectedModifiers?: any;
+    sizeLabel?: string | null;
+    size?: string | null;
+    notes?: string | null;
+    itemNotes?: string | null;
     isBumped?: boolean;
 }
 
@@ -75,7 +81,18 @@ export const useKdsStore = create<KdsStore>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const res: any = await kdsApi.getTickets(params);
-            set({ tickets: Array.isArray(res) ? res : (res.data || []), isLoading: false });
+            const payload: any[] = Array.isArray(res)
+                ? res
+                : Array.isArray(res?.data)
+                    ? res.data
+                    : Array.isArray(res?.tickets)
+                        ? res.tickets
+                        : [];
+            const tickets = payload.map((ticket: any) => ({
+                ...ticket,
+                items: Array.isArray(ticket?.items) ? ticket.items : [],
+            }));
+            set({ tickets, isLoading: false });
         } catch (e: any) {
             set({ error: e.message || 'Failed to fetch KDS tickets', isLoading: false });
         }

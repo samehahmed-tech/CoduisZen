@@ -291,6 +291,50 @@ export const deleteCustomer = async (req: Request, res: Response) => {
 };
 
 /**
+ * Add a delivery address to a customer (used by the call-center profile to
+ * replace the old hardcoded Home/Work mock with real saved addresses).
+ */
+export const addCustomerAddress = async (req: Request, res: Response) => {
+    try {
+        const customerId = getStringParam((req.params as any).id);
+        if (!customerId) return res.status(400).json({ error: 'CUSTOMER_ID_REQUIRED', code: 'CUSTOMER_ID_REQUIRED' });
+        const body = req.body || {};
+        const address = String(body.address || '').trim();
+        if (!address) {
+            return res.status(400).json({ error: 'ADDRESS_REQUIRED', code: 'ADDRESS_REQUIRED', message: 'Address text is required.' });
+        }
+        const [customer] = await db.select({ id: customers.id }).top(1).from(customers).where(eq(customers.id, customerId));
+        if (!customer) return res.status(404).json({ error: 'CUSTOMER_NOT_FOUND', code: 'CUSTOMER_NOT_FOUND' });
+
+        const [existing] = await db.select({ id: customerAddresses.id }).top(1).from(customerAddresses).where(and(
+            eq(customerAddresses.customerId, customerId),
+            eq(customerAddresses.address, address),
+        ));
+        if (existing) return res.status(409).json({ error: 'ADDRESS_EXISTS', code: 'ADDRESS_EXISTS' });
+
+        const zoneId = body.zoneId || body.zone_id ? Number(body.zoneId || body.zone_id) : undefined;
+        const [created] = await db.insert(customerAddresses).output().values({
+            customerId,
+            label: String(body.label || body.addressLabel || 'Home'),
+            address,
+            lat: body.lat ?? body.latitude,
+            lng: body.lng ?? body.longitude,
+            zoneId,
+            area: body.area,
+            building: body.building,
+            floor: body.floor,
+            apartment: body.apartment,
+            landmark: body.landmark,
+            isDefault: body.isDefault === true,
+            createdAt: new Date(),
+        });
+        res.status(201).json(created);
+    } catch (error: any) {
+        res.status(500).json({ error: 'ADDRESS_CREATE_FAILED', code: 'ADDRESS_CREATE_FAILED', message: error?.message });
+    }
+};
+
+/**
  * Redeem loyalty points for a customer (Item 41)
  */
 export const redeemLoyaltyPoints = async (req: Request, res: Response) => {

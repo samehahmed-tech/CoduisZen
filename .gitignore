@@ -73,3 +73,36 @@ stream-test.xlsx
 .tmp-*
 .playwright-cli/
 *.rar
+*.zip
+*.sha256.txt
+
+# Local build / release outputs (generated, do not commit)
+payload/
+Testing/
+output/setup-*/
+/pos-menu-cards-concepts.html
+tsconfig.scratch.json
+verify-prod-detail.tmp.ts
+restoflow-erp.zip
+restoflow-erp.rar
+One Click Builder.rar
+RestoFlow-HotFix-*.zip
+Apply Latest Fixes.bat
+Apply Latest Fixes.ps1
+build_hot_fix.bat
+build_hot_fix - Copy.bat
+scripts/sameh-installer/latest-fixes/payload/database/
+scripts/sameh-installer/latest-fixes/payload/runtime/
+scripts/sameh-installer/hotfix/payload/dist/
+scripts/sameh-installer/hotfix/payload/dist-server/
+scripts/sameh-installer/latest-fixes/payload/dist/
+scripts/sameh-installer/latest-fixes/payload/dist-server/
+scripts/sameh-installer/logs/
+scripts/sameh-installer/prerequisites/SQLEXPR*.exe
+
+# Local install/debug leftovers (may contain secrets)
+tmp-installed.env
+userlist.cjs
+runtime/
+*.bak
+One Click Builder.bat

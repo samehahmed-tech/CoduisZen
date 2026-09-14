@@ -29,6 +29,102 @@ const reportRows = (value: unknown, labelKey: string): any[] => {
 
 export type DayClosePaper = 'a4' | '80mm';
 
+/**
+ * Renders a purchase order (with ordered vs received quantities) as a PDF.
+ * Supports A4 and 80mm thermal roll paper, mirroring the day-close pipeline.
+ */
+export const generatePurchaseOrderPDF = async (po: any, lang: 'ar' | 'en' = 'ar', paper: DayClosePaper = 'a4'): Promise<Buffer> => {
+    const rtl = lang === 'ar';
+    const thermal = paper === '80mm';
+    const locale = rtl ? 'ar-EG' : 'en-US';
+    const currency = po.currency || 'EGP';
+    const money = (value: unknown) => `${safeNumber(value).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    const statusLabels: Record<string, string> = rtl ? {
+        DRAFT: 'مسودة', SENT: 'مرسل', ORDERED: 'مطلوب', PENDING_APPROVAL: 'بانتظار الاعتماد',
+        PARTIAL: 'استلام جزئي', RECEIVED: 'مستلم', CLOSED: 'مغلق', CANCELLED: 'ملغي',
+    } : {};
+    const t = rtl ? {
+        title: 'أمر شراء', number: 'رقم الأمر', supplier: 'المورد', branch: 'الفرع', warehouse: 'مخزن الاستلام',
+        createdAt: 'تاريخ الإنشاء', expected: 'الاستلام المتوقع', status: 'الحالة', createdBy: 'أنشأ بواسطة',
+        item: 'الصنف', unit: 'الوحدة', ordered: 'المطلوب', received: 'المستلم', remaining: 'المتبقي',
+        unitPrice: 'سعر الوحدة', lineTotal: 'الإجمالي', subtotal: 'إجمالي الأمر', noData: 'لا توجد بنود',
+        printedAt: 'تاريخ الطباعة',
+    } : {
+        title: 'Purchase Order', number: 'PO Number', supplier: 'Supplier', branch: 'Branch', warehouse: 'Receiving Warehouse',
+        createdAt: 'Created At', expected: 'Expected Delivery', status: 'Status', createdBy: 'Created By',
+        item: 'Item', unit: 'Unit', ordered: 'Ordered', received: 'Received', remaining: 'Remaining',
+        unitPrice: 'Unit Price', lineTotal: 'Total', subtotal: 'Order Total', noData: 'No items',
+        printedAt: 'Printed At',
+    };
+    const items: any[] = Array.isArray(po.items) ? po.items : [];
+    const rowsHtml = items.length ? items.map((item) => `
+        <tr>
+            <td>${htmlEscape(item.itemName || item.itemNameAr || item.itemId)}</td>
+            <td>${htmlEscape(item.unit || '-')}</td>
+            <td class="num">${safeNumber(item.orderedQty)}</td>
+            <td class="num">${safeNumber(item.receivedQty)}</td>
+            <td class="num">${Math.max(0, safeNumber(item.orderedQty) - safeNumber(item.receivedQty))}</td>
+            <td class="num">${money(item.unitPrice)}</td>
+            <td class="num">${money(safeNumber(item.orderedQty) * safeNumber(item.unitPrice))}</td>
+        </tr>`).join('') : `<tr><td colspan="7" class="empty">${t.noData}</td></tr>`;
+    const metaRows = [
+        [t.supplier, po.supplierName || po.supplierId || '-'],
+        [t.branch, po.branchName || po.branchId || '-'],
+        [t.warehouse, po.targetWarehouseName || '-'],
+        [t.createdAt, po.createdAt ? new Date(po.createdAt).toLocaleString(locale) : '-'],
+        [t.expected, po.expectedDate ? new Date(po.expectedDate).toLocaleDateString(locale) : '-'],
+        [t.status, statusLabels[String(po.status || '').toUpperCase()] || String(po.status || '-')],
+        [t.createdBy, po.createdBy || '-'],
+        [t.printedAt, new Date().toLocaleString(locale)],
+    ].map(([label, value]) => `<div class="meta-row"><span>${htmlEscape(label)}</span><b>${htmlEscape(value)}</b></div>`).join('');
+    const pageStyle = thermal ? '@page { size:80mm auto; margin:0; }' : '@page { size:A4; margin:10mm; }';
+    const baseStyle = `
+*{box-sizing:border-box} body{margin:0;background:#fff;color:#102033;font-family:Tahoma,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.hero{background:#0b172a;color:#fff;border-radius:${thermal ? '0' : '16px'};padding:${thermal ? '8px 2mm' : '14px 18px'};margin-bottom:${thermal ? '6px' : '12px'};text-align:center}
+.hero h1{margin:0;font-size:${thermal ? '15px' : '24px'};font-weight:900}.hero p{margin:3px 0 0;font-size:${thermal ? '9px' : '11px'};color:#cbd5e1}
+.meta{display:grid;grid-template-columns:1fr;margin-bottom:${thermal ? '6px' : '12px'};gap:3px}
+.meta-row{display:flex;justify-content:space-between;gap:8px;border:1px solid #e2e8f0;border-radius:${thermal ? '0' : '10px'};padding:${thermal ? '3px 2mm' : '7px 10px'};font-size:${thermal ? '9px' : '11px'}}
+.meta-row span{color:#64748b;font-weight:800}.meta-row b{font-weight:900;text-align:${rtl ? 'left' : 'right'};overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{background:#eef4fb;color:#123c69;font-size:${thermal ? '8px' : '9.5px'};font-weight:900;padding:${thermal ? '4px 1mm' : '7px 6px'};border:1px solid #d4e2f0;text-align:${rtl ? 'right' : 'left'}}
+td{font-size:${thermal ? '8.5px' : '10px'};padding:${thermal ? '4px 1mm' : '7px 6px'};border:1px solid #e2ebf5;vertical-align:middle;overflow-wrap:anywhere;text-align:${rtl ? 'right' : 'left'}}
+td.num{text-align:center;direction:ltr}
+tbody tr:nth-child(even) td{background:#f8fbff}
+.empty{text-align:center;color:#64748b;font-weight:900;padding:14px}
+.total{margin-top:${thermal ? '6px' : '12px'};display:flex;justify-content:flex-end}
+.total div{border:2px solid #0b172a;border-radius:${thermal ? '0' : '12px'};padding:${thermal ? '5px 3mm' : '10px 18px'};font-size:${thermal ? '11px' : '15px'};font-weight:900}
+${thermal ? 'html,body{width:80mm;max-width:80mm}body{padding:2mm}' : ''}
+`;
+    const html = `<!doctype html><html lang="${lang}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8" /><style>
+${pageStyle}${baseStyle}
+</style></head><body>
+<section class="hero"><h1>${t.title} · ${htmlEscape(po.id)}</h1><p>${t.number}: ${htmlEscape(po.id)}</p></section>
+<section class="meta">${metaRows}</section>
+<table><thead><tr>
+<th style="width:${thermal ? '26%' : '30%'}">${t.item}</th><th style="width:${thermal ? '9%' : '8%'}">${t.unit}</th>
+<th style="width:${thermal ? '11%' : '10%'}">${t.ordered}</th><th style="width:${thermal ? '11%' : '10%'}">${t.received}</th>
+<th style="width:${thermal ? '11%' : '10%'}">${t.remaining}</th><th style="width:${thermal ? '15%' : '15%'}">${t.unitPrice}</th>
+<th style="width:${thermal ? '17%' : '17%'}">${t.lineTotal}</th>
+</tr></thead><tbody>${rowsHtml}</tbody></table>
+<div class="total"><div>${t.subtotal}: ${money(po.subtotal ?? items.reduce((sum, item) => sum + safeNumber(item.orderedQty) * safeNumber(item.unitPrice), 0))}</div></div>
+</body></html>`;
+    const puppeteer = await import('puppeteer');
+    const browserExecutable = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(candidate => fs.existsSync(candidate));
+    const browser = await puppeteer.default.launch({ headless: true, executablePath: browserExecutable, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+        const page = await browser.newPage();
+        if (thermal) await page.setViewport({ width: 302, height: 1200, deviceScaleFactor: 1 });
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+        if (thermal) {
+            const contentHeight = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
+            return Buffer.from(await page.pdf({ width: '80mm', height: `${contentHeight + 24}px`, printBackground: true, preferCSSPageSize: false }));
+        }
+        return Buffer.from(await page.pdf({ format: 'A4', landscape: false, printBackground: true, preferCSSPageSize: true }));
+    } finally {
+        await browser.close();
+    }
+};
+
 export const generateDayClosePDF = async (report: any, lang: 'ar' | 'en' = 'ar', paper: DayClosePaper = 'a4'): Promise<Buffer> => {
     const rtl = lang === 'ar';
     const thermal = paper === '80mm';

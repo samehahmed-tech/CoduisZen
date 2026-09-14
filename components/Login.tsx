@@ -30,6 +30,35 @@ const gradientKeyframes = `
 .animate-stagger-2 { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
 .animate-stagger-3 { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
 .animate-stagger-4 { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both; }
+/* Login is a forced-dark glass page: shield its fields from the global
+   light-theme input backgrounds (theme-overrides repaints ALL inputs with
+   light vars in light mode while this page forces white text). */
+#login-form .login-field {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  caret-color: #fbbf24;
+}
+#login-form .login-field::placeholder {
+  color: #64748b !important;
+  opacity: 1;
+}
+#login-form .login-field:focus {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+/* Fix: browser autofill paints inputs white while text stays white -> unreadable */
+#login-form input:-webkit-autofill,
+#login-form input:-webkit-autofill:hover,
+#login-form input:-webkit-autofill:focus,
+#login-form input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0 1000px #151d2b inset !important;
+  box-shadow: 0 0 0 1000px #151d2b inset !important;
+  background-color: #151d2b !important;
+  caret-color: #fbbf24;
+  transition: background-color 9999s ease-in-out 0s;
+}
 `;
 /* ??????????? Curated halal-safe restaurant backgrounds ??????????? */
 const LOGIN_BACKGROUNDS = [
@@ -542,10 +571,13 @@ const Login: React.FC = () => {
                                             <input
                                                 type="email"
                                                 required
+                                                dir="ltr"
+                                                autoComplete="email"
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
                                                 placeholder="admin@zen.com"
-                                                className={`relative w-full rounded-2xl py-3.5 pl-11 pr-5 outline-none transition-all text-sm font-medium focus:ring-2 ${lt
+                                                style={{ colorScheme: 'dark' }}
+                                                className={`login-field relative w-full rounded-2xl py-3.5 pl-11 pr-5 outline-none transition-all text-sm font-medium text-left caret-amber-300 focus:ring-2 ${lt
                                                     ? `bg-white border border-stone-200 text-slate-900 placeholder:text-slate-300 focus:${accentRing} focus:border-teal-500/40 shadow-sm`
                                                     : `bg-white/[0.03] border border-white/[0.06] text-white placeholder:text-slate-600 focus:ring-amber-400/25 focus:border-amber-400/30`
                                                     }`}
@@ -560,10 +592,12 @@ const Login: React.FC = () => {
                                             <input
                                                 type={showPassword ? 'text' : 'password'}
                                                 required
+                                                autoComplete="current-password"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 placeholder="••••••••"
-                                                className={`relative w-full rounded-2xl py-3.5 pl-11 pr-12 outline-none transition-all text-sm font-medium tracking-wider focus:ring-2 ${lt
+                                                style={{ colorScheme: 'dark' }}
+                                                className={`login-field relative w-full rounded-2xl py-3.5 pl-11 pr-12 outline-none transition-all text-sm font-medium tracking-wider caret-amber-300 focus:ring-2 ${lt
                                                     ? `bg-white border border-stone-200 text-slate-900 placeholder:text-slate-300 focus:${accentRing} focus:border-teal-500/40 shadow-sm`
                                                     : `bg-white/[0.03] border border-white/[0.06] text-white placeholder:text-slate-600 focus:ring-amber-400/25 focus:border-amber-400/30`
                                                     }`}
@@ -608,7 +642,7 @@ const Login: React.FC = () => {
                                             onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                             placeholder="000000"
                                             autoFocus
-                                            className={`relative w-full rounded-2xl py-3.5 pl-11 pr-5 outline-none transition-all text-lg font-black tracking-[0.4em] text-center focus:ring-2 ${lt
+                                                className={`login-field relative w-full rounded-2xl py-3.5 pl-11 pr-5 outline-none transition-all text-lg font-black tracking-[0.4em] text-center focus:ring-2 ${lt
                                                 ? 'bg-white border border-stone-200 text-teal-700 placeholder:text-slate-300 focus:ring-teal-500/20 focus:border-teal-500/40 shadow-sm'
                                                 : 'bg-white/[0.03] border border-white/[0.06] text-amber-300 placeholder:text-slate-600 focus:ring-amber-400/25 focus:border-amber-400/30'
                                                 }`}
@@ -633,7 +667,7 @@ const Login: React.FC = () => {
                                     (mfaRequired && mfaCode.length !== 6) ||
                                     (loginMode === 'pin' && !mfaRequired && pin.length !== 6)
                                 }
-                                className={`w-full mt-5 py-3.5 rounded-2xl font-bold text-sm tracking-wide flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:saturate-50 transition-all duration-150 group active:scale-[0.98] uppercase ${lt
+                                className={`fluid-shine w-full mt-5 py-3.5 rounded-2xl font-bold text-sm tracking-wide flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:saturate-50 transition-all duration-150 group active:scale-[0.98] uppercase ${lt
                                     ? 'bg-gradient-to-r from-teal-700 to-emerald-600 text-white shadow-lg shadow-teal-700/20 hover:shadow-xl hover:shadow-teal-700/25 disabled:hover:shadow-lg'
                                     : 'bg-gradient-to-r from-teal-500 to-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 hover:shadow-xl hover:shadow-amber-500/25 disabled:hover:shadow-lg'
                                     }`}

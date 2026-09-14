@@ -6,9 +6,10 @@
  */
 
 import { db, pool } from '../db';
-import { 
-    orders, 
-    orderItems, 
+import {
+    orders,
+    orderItems,
+    orderStatusHistory,
     customerRfmMetrics,
     customers,
     dailyBranchSummaries,
@@ -136,21 +137,39 @@ export const analyticsService = {
             const discount = Number(order.discount || 0);
 
             // 1. Update Daily Branch Summary
-            await db.insert(dailyBranchSummaries)
-                .values({
-                    branchId,
-                    date: orderDate,
-                    totalRevenue: total,
-                    netRevenue: subtotal,
-                    totalOrders: 1,
-                    totalTax: tax,
-                    totalDiscounts: discount,
-                    dineInRevenue: order.type === 'DINE_IN' ? total : 0,
-                    takeawayRevenue: order.type === 'TAKEAWAY' ? total : 0,
-                    deliveryRevenue: order.type === 'DELIVERY' ? total : 0,
-                    uniqueCustomers: order.customerId ? 1 : 0,
-                    updatedAt: new Date(),
-                });
+            await pool.query(`
+                MERGE INTO daily_branch_summaries WITH (HOLDLOCK) AS target
+                USING (SELECT $1 AS branch_id, CAST($2 AS DATE) AS [date]) AS source
+                ON target.branch_id = source.branch_id AND target.[date] = source.[date]
+                WHEN MATCHED THEN UPDATE SET
+                    total_revenue = target.total_revenue + $3,
+                    net_revenue = target.net_revenue + $4,
+                    total_orders = target.total_orders + 1,
+                    avg_order_value = (target.net_revenue + $4) / CAST(target.total_orders + 1 AS real),
+                    total_tax = target.total_tax + $5,
+                    total_discounts = target.total_discounts + $6,
+                    dine_in_revenue = target.dine_in_revenue + $7,
+                    takeaway_revenue = target.takeaway_revenue + $8,
+                    delivery_revenue = target.delivery_revenue + $9,
+                    unique_customers = target.unique_customers + $10,
+                    updated_at = GETDATE()
+                WHEN NOT MATCHED THEN INSERT (
+                    branch_id, [date], total_revenue, net_revenue, total_orders, avg_order_value,
+                    total_tax, total_discounts, dine_in_revenue, takeaway_revenue, delivery_revenue,
+                    unique_customers, created_at, updated_at
+                ) VALUES ($1, CAST($2 AS DATE), $3, $4, 1, $4, $5, $6, $7, $8, $9, $10, GETDATE(), GETDATE());
+            `, [
+                branchId,
+                orderDate,
+                total,
+                subtotal,
+                tax,
+                discount,
+                order.type === 'DINE_IN' ? total : 0,
+                order.type === 'TAKEAWAY' ? total : 0,
+                order.type === 'DELIVERY' ? total : 0,
+                order.customerId ? 1 : 0,
+            ]);
 
             // 2. Update Item Performance Snapshots
             const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
@@ -161,24 +180,53 @@ export const analyticsService = {
                 const itemCost = Number(item.cost || 0) * Number(item.quantity || 0);
                 const profit = itemTotal - itemCost;
 
-                await db.insert(itemDailySnapshots)
-                    .values({
-                        menuItemId: item.menuItemId,
-                        branchId,
-                        date: orderDate,
-                        quantitySold: Number(item.quantity || 0),
-                        totalSales: itemTotal,
-                        totalCost: itemCost,
-                        grossProfit: profit,
-                        avgPrice: Number(item.price || 0),
-                        updatedAt: new Date(),
-                    });
+                await pool.query(`
+                    MERGE INTO item_daily_snapshots WITH (HOLDLOCK) AS target
+                    USING (SELECT $1 AS menu_item_id, $2 AS branch_id, CAST($3 AS DATE) AS [date]) AS source
+                    ON target.menu_item_id = source.menu_item_id
+                        AND (target.branch_id = source.branch_id OR (target.branch_id IS NULL AND source.branch_id IS NULL))
+                        AND target.[date] = source.[date]
+                    WHEN MATCHED THEN UPDATE SET
+                        quantity_sold = target.quantity_sold + $4,
+                        total_sales = target.total_sales + $5,
+                        total_cost = target.total_cost + $6,
+                        gross_profit = target.gross_profit + $7,
+                        avg_price = (target.total_sales + $5) / NULLIF(target.quantity_sold + $4, 0),
+                        updated_at = GETDATE()
+                    WHEN NOT MATCHED THEN INSERT (
+                        menu_item_id, branch_id, [date], quantity_sold, total_sales, total_cost,
+                        gross_profit, avg_price, updated_at
+                    ) VALUES ($1, $2, CAST($3 AS DATE), $4, $5, $6, $7, $8, GETDATE());
+                `, [
+                    item.menuItemId,
+                    branchId,
+                    orderDate,
+                    Number(item.quantity || 0),
+                    itemTotal,
+                    itemCost,
+                    profit,
+                    Number(item.price || 0),
+                ]);
             }
 
             // 3. Update User Performance (Gamification)
-            const userId = order.callCenterAgentId;
-            if (userId) {
-                await this.recordUserPerformance(userId, branchId, orderDate, total, order);
+            // Attribution: whoever closed the order (DELIVERED/COMPLETED
+            // history actor) — covers cashiers, drivers' confirmations and
+            // call-center agents — falling back to the recorded agent id.
+            let performerId: string | null = order.callCenterAgentId || null;
+            try {
+                const [closingMove] = await db.select({ changedBy: orderStatusHistory.changedBy })
+                    .from(orderStatusHistory)
+                    .where(and(
+                        eq(orderStatusHistory.orderId, orderId),
+                        sql`${orderStatusHistory.status} IN ('DELIVERED', 'COMPLETED')`,
+                    ))
+                    .orderBy(desc(orderStatusHistory.createdAt))
+                    .top(1);
+                if ((closingMove as any)?.changedBy) performerId = String((closingMove as any).changedBy);
+            } catch { /* keep fallback */ }
+            if (performerId) {
+                await this.recordUserPerformance(performerId, branchId, orderDate, total, order);
             }
 
             // 4. Update Customer RFM

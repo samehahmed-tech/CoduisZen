@@ -17,7 +17,7 @@ interface SkeletonRectProps {
     className?: string;
 }
 
-const shimmer = 'animate-pulse bg-elevated';
+const shimmer = 'theme-skeleton ux-skeleton';
 
 /**
  * Inline skeleton loading primitives. Combine for custom layouts.

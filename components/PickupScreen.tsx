@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Clock, EyeOff, MapPin, MonitorPlay, Package, Search, Truck, UtensilsCrossed, Volume2, Zap } from 'lucide-react';
 import { Order, OrderStatus, OrderType } from '../types';
@@ -10,6 +11,7 @@ import { kdsApi } from '../services/api/kds';
 import LiveClock from './common/LiveClock';
 import { socketService } from '../services/socketService';
 import { useToast } from './common/ToastProvider';
+import { useConfirm } from './common/ConfirmProvider';
 import { getTableDisplayName } from '../src/utils/tableDisplay';
 
 const pCtxRef = { current: null as AudioContext | null };
@@ -170,9 +172,10 @@ const usePickupCallout = () => {
 };
 
 export const PickupScreen: React.FC = () => {
-  const { orders, fetchOrders, isLoading: ordersLoading, error: ordersError } = useOrderStore();
-  const { settings } = useAuthStore();
+  const { orders, fetchOrders, isLoading: ordersLoading, error: ordersError } = useOrderStore(useShallow((state) => ({ orders: state.orders, fetchOrders: state.fetchOrders, isLoading: state.isLoading, error: state.error })));
+  const settings = useAuthStore((state) => state.settings);
   const { success, error } = useToast();
+  const { confirm } = useConfirm();
   const lang = settings.language || 'en';
   const isAr = lang === 'ar';
 
@@ -237,7 +240,8 @@ export const PickupScreen: React.FC = () => {
     const preparing: any[] = [];
     const ready: any[] = [];
     const deliveryReady: any[] = [];
-    const branchOrders = settings.activeBranchId ? orders.filter(o => o.branchId === settings.activeBranchId) : orders;
+    const safeOrders = Array.isArray(orders) ? orders : [];
+    const branchOrders = settings.activeBranchId ? safeOrders.filter(o => o.branchId === settings.activeBranchId) : safeOrders;
 
     for (const order of branchOrders) {
       if (order.status === OrderStatus.PREPARING) {
@@ -305,6 +309,43 @@ export const PickupScreen: React.FC = () => {
     }
   }, [error, isAr, pendingHandoverIds, refreshPickupOrders, success]);
 
+  const handleBulkHandover = useCallback(async () => {
+    if (readyOrders.length === 0 || pendingHandoverIds.size > 0 || typeof window === 'undefined') return;
+    const confirmed = await confirm({
+      title: isAr ? 'تسليم كل الطلبات الجاهزة' : 'Hand over all ready orders',
+      message: isAr
+        ? `تسليم كل الطلبات الجاهزة (${readyOrders.length})؟`
+        : `Hand over all ready orders (${readyOrders.length})?`,
+      confirmText: isAr ? 'تسليم' : 'Hand over',
+      cancelText: isAr ? 'إلغاء' : 'Cancel',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    const orderIds = readyOrders.map(order => order.id).filter(Boolean);
+    setPendingHandoverIds(new Set(orderIds));
+    try {
+      let failedCount = 0;
+      for (const orderId of orderIds) {
+        try {
+          await kdsApi.handoverOrder(orderId);
+        } catch {
+          failedCount += 1;
+        }
+      }
+      setAnnouncementQueue([]);
+      clearQuickEntry(setQuickInput, quickInputValueRef);
+      await refreshPickupOrders();
+      if (failedCount > 0) {
+        error(isAr ? `تم تسليم ${orderIds.length - failedCount} من ${orderIds.length} — راجع الطلبات المتبقية` : `Handed over ${orderIds.length - failedCount} of ${orderIds.length} — review remaining orders`);
+      } else {
+        success(isAr ? 'تم تسليم كل الطلبات الجاهزة' : 'All ready orders handed over');
+      }
+    } finally {
+      setPendingHandoverIds(new Set());
+    }
+  }, [confirm, error, isAr, pendingHandoverIds.size, readyOrders, refreshPickupOrders, success]);
+
   const matchedOrder = useMemo(() => {
     const trimmed = quickInput.trim();
     if (!trimmed) return null;
@@ -362,9 +403,10 @@ export const PickupScreen: React.FC = () => {
   }, [confirmQuickHandover]);
 
   const getElapsedMins = (dateStr: string | Date) => Math.floor((lastTick - new Date(dateStr).getTime()) / 60000);
+  const loadedOrderCount = Array.isArray(orders) ? orders.length : 0;
 
   return (
-    <div className="flex flex-col h-screen w-full bg-app text-main font-sans overflow-hidden">
+    <div className="ops-fast flex flex-col h-screen w-full bg-app text-main font-sans overflow-hidden">
       <div className="shrink-0 h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-indigo-500 shadow-lg shadow-emerald-500/20" />
 
       <header className="relative z-10 flex shrink-0 flex-col items-stretch justify-between gap-2 border-b border-border/20 bg-card/60 px-3 py-2 shadow-sm backdrop-blur-2xl sm:gap-3 sm:px-6 sm:py-4 lg:flex-row lg:items-center lg:gap-4">
@@ -432,6 +474,18 @@ export const PickupScreen: React.FC = () => {
 
           <button
             type="button"
+            onClick={handleBulkHandover}
+            disabled={readyOrders.length === 0 || pendingHandoverIds.size > 0}
+            aria-label={isAr ? 'تسليم كل الطلبات الجاهزة' : 'Hand over all ready orders'}
+            className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-[10px] font-black uppercase text-emerald-600 shadow-sm transition-all hover:bg-emerald-500/20 active:scale-95 disabled:cursor-default disabled:opacity-40 sm:h-12 sm:rounded-2xl"
+            title={isAr ? 'تسليم كل الطلبات الجاهزة' : 'Hand over all ready orders'}
+          >
+            <CheckCircle2 size={18} />
+            <span className="hidden xl:inline">{isAr ? 'تسليم الكل' : 'HANDOVER ALL'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={activateAudio}
             aria-label={isAr ? 'تفعيل صوت النداء' : 'Enable callout audio'}
             className={`h-10 w-10 rounded-xl border border-border/30 flex items-center justify-center transition-all shadow-sm active:scale-95 sm:h-12 sm:w-12 sm:rounded-2xl ${audioEnabled ? 'bg-emerald-500 text-white' : 'bg-elevated text-muted hover:text-main hover:bg-main/5'}`}
@@ -477,7 +531,7 @@ export const PickupScreen: React.FC = () => {
           </div>
         )}
 
-        {ordersLoading && orders.length > 0 && (
+        {ordersLoading && loadedOrderCount > 0 && (
           <div role="status" className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center">
             <span className="rounded-b-xl border border-border/30 bg-card/95 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted shadow-sm">
               {isAr ? 'جاري تحديث الطلبات...' : 'Refreshing orders...'}
@@ -498,12 +552,12 @@ export const PickupScreen: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto p-4 pb-28 custom-scrollbar sm:pb-4">
             <AnimatePresence>
-              {ordersLoading && orders.length === 0 ? (
+              {ordersLoading && (!Array.isArray(orders) || orders.length === 0) ? (
                 <motion.div role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-muted/60">
                   <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-500/20 border-t-emerald-500" />
                   <p className="text-sm font-black uppercase tracking-widest">{isAr ? 'جاري تحميل الطلبات...' : 'Loading orders...'}</p>
                 </motion.div>
-              ) : ordersError && orders.length === 0 ? (
+              ) : ordersError && loadedOrderCount === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center px-6 text-center text-muted/70">
                   <Package size={64} className="mb-4 text-rose-500/60" />
                   <p className="text-sm font-black uppercase tracking-widest">{isAr ? 'تعذر تحميل الطلبات' : 'Orders could not be loaded'}</p>
@@ -744,7 +798,7 @@ const PickupCard = React.memo(({
                 const name = getOrderItemName(item, isAr) || (isAr ? 'صنف بدون اسم' : 'Unnamed item');
                 const quantity = Number(item?.quantity) || 1;
                 return (
-                  <div key={`${order.id}-${item?.cartId || item?.menuItemId || item?.id || index}`} className="flex items-start justify-between gap-3 text-sm">
+                  <div key={`${order.id}-item-${index}-${item?.cartId || item?.menuItemId || item?.id || 'unknown'}`} className="flex items-start justify-between gap-3 text-sm">
                     <span className="min-w-0 flex-1 truncate font-black text-main">{name}</span>
                     <span className="shrink-0 rounded-lg bg-main/5 px-2 py-0.5 text-xs font-black tabular-nums text-muted">x{quantity}</span>
                   </div>

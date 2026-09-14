@@ -4,7 +4,6 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, A
 import { aiApi } from '../../services/api/ai';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { BrainCircuit, TrendingUp, Sparkles, Loader2, Info } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 const RevenueForecastWidget: React.FC = () => {
     const { settings } = useAuthStore();
@@ -52,10 +51,8 @@ const RevenueForecastWidget: React.FC = () => {
     ];
 
     return (
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 flex flex-col shadow-xl overflow-hidden relative"
+        <div
+            className="route-enter bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 flex flex-col shadow-xl overflow-hidden relative"
         >
             {/* Background Glow */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] pointer-events-none" />
@@ -150,7 +147,7 @@ const RevenueForecastWidget: React.FC = () => {
                     </p>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 };
 

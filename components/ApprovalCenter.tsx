@@ -27,6 +27,7 @@ const TYPE_META: Record<string, { label: string; labelAr: string; icon: any; col
     VOID: { label: 'Void Order', labelAr: 'إلغاء طلب', icon: XCircle, color: 'text-red-500' },
     DISCOUNT: { label: 'Discount Override', labelAr: 'تجاوز خصم', icon: AlertTriangle, color: 'text-violet-500' },
     EXPENSE: { label: 'Expense', labelAr: 'مصروف', icon: Wallet, color: 'text-amber-500' },
+    WASTAGE: { label: 'Wastage', labelAr: 'هالك وهدر', icon: AlertTriangle, color: 'text-rose-500' },
 };
 
 const STATUS_META = {
@@ -79,6 +80,14 @@ const ApprovalCenter: React.FC = () => {
             requestedAt: { en: 'Requested at', ar: 'وقت الطلب' },
             rejectedReason: { en: 'Rejection reason', ar: 'سبب الرفض' },
             resolvedByName: { en: 'Resolved by', ar: 'تم بواسطة' },
+            itemName: { en: 'Item', ar: 'الصنف' },
+            warehouseName: { en: 'Warehouse', ar: 'المخزن' },
+            quantity: { en: 'Quantity', ar: 'الكمية' },
+            unit: { en: 'Unit', ar: 'الوحدة' },
+            reason: { en: 'Reason', ar: 'السبب' },
+            notes: { en: 'Notes', ar: 'ملاحظات' },
+            costImpact: { en: 'Cost impact', ar: 'أثر التكلفة' },
+            movementId: { en: 'Stock movement', ar: 'حركة المخزون' },
         };
         return lang === 'ar' ? (labels[key]?.ar || key) : (labels[key]?.en || key);
     };

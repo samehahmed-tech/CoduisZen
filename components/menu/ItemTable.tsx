@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Eye, EyeOff, Edit3, Copy, Archive, Trash2,
-    CheckSquare, Square, ImageIcon, AlertTriangle, TrendingDown, Flame, Package, Layers
+    CheckSquare, Square, AlertTriangle, TrendingDown, Flame, Package, Layers
 } from 'lucide-react';
 import { MenuItem } from '../../types';
+import { ItemImage } from '../../src/features/pos/components/ItemImage';
 
 interface Props {
     items: (MenuItem & { _categoryId: string; _categoryName: string; _categoryNameAr?: string })[];
@@ -170,13 +171,7 @@ const ItemTable: React.FC<Props> = ({
                                         )}
                                     </td>
                                     <td className="px-4 py-2">
-                                        {item.image ? (
-                                            <img src={item.image} alt="" className="w-8 h-8 rounded border border-gray-200 dark:border-border/30 object-cover" loading="lazy" />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded bg-gray-100 dark:bg-elevated/50 flex items-center justify-center text-gray-300 dark:text-muted/30">
-                                                <ImageIcon size={14} />
-                                            </div>
-                                        )}
+                                        <ItemImage src={item.image} name={labelFor(item)} small className="w-8 h-8 rounded border border-gray-200 dark:border-border/30" />
                                     </td>
                                     <td className="px-4 py-2" dir="rtl">
                                         <InlineInput

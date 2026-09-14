@@ -337,14 +337,17 @@ export const getSalesBySource = async (req: Request, res: Response) => {
         const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
+        // Canonical channel key (shared with channel-mix + day-close):
+        // a non-restaurant delivery_source names the aggregator, else origin.
+        const channelKey = sql<string>`case when ${orders.deliverySource} is not null and ${orders.deliverySource} <> 'restaurant' then ${orders.deliverySource} else coalesce(${orders.source}, 'pos') end`;
         const rows = await db.select({
-            source: sql<string>`coalesce(${orders.source}, 'pos')`,
+            source: channelKey,
             orderCount: sql<number>`count(*)`,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
             avgTicket: sql<number>`coalesce(avg(${orders.total}), 0)`,
         }).from(orders)
             .where(and(...conditions))
-            .groupBy(orders.source)
+            .groupBy(channelKey)
             .orderBy(sql`sum(${orders.total}) desc`);
 
         const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue), 0);

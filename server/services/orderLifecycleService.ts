@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { db } from '../db';
-import { branches, dayCloseReports, drivers, kdsTickets, managerApprovals, orderStatusHistory, orders, tables } from '../../src/db/schema';
+import { db, pool } from '../db';
+import { branches, dayCloseReports, drivers, kdsTickets, managerApprovals, orderItems, orderStatusHistory, orders, tables, warehouses } from '../../src/db/schema';
 import { evaluateOrderStatusUpdate } from './orderStatusPolicy';
 import { emitBranchEvent } from '../utils/socketEmit';
 import { webhookService } from './webhookService';
@@ -10,6 +10,8 @@ import { submitOrderToFiscal } from './fiscalSubmitService';
 import { sendWhatsAppText } from './whatsappService';
 import { whatsappAutomationService } from './whatsappAutomationService';
 import { getDateKeyInTimeZone } from '../utils/businessDate';
+import logger from '../utils/logger';
+import { reverseCogsForOrderEntry } from './financePostingService';
 
 type LifecycleUser = {
     role?: string | null;
@@ -76,7 +78,7 @@ const notifyCustomer = (order: any, status: string) => {
     if (message) sendWhatsAppText({ to: order.customerPhone, text: message }).catch(() => {});
 };
 
-const runPostTransitionEffects = (order: any, previousStatus: string, nextStatus: string) => {
+const runPostTransitionEffects = async (order: any, previousStatus: string, nextStatus: string) => {
     const branchId = order.branchId;
     if (branchId) {
         emitBranchEvent(branchId, 'order:status', {
@@ -92,6 +94,20 @@ const runPostTransitionEffects = (order: any, previousStatus: string, nextStatus
                 orderId: order.id,
                 updatedAt: order.updatedAt,
             });
+            // The sale never happened: reverse posted COGS so profit reports
+            // don't carry phantom food cost. Best-effort, never blocks.
+            reverseCogsForOrderEntry({
+                orderId: order.id,
+                branchId: order.branchId || undefined,
+            }).catch(() => undefined);
+            // Claw back loyalty points awarded for this order (best-effort).
+            if ((order as any).customerId) {
+                const { loyaltyService } = await import('./loyaltyService');
+                loyaltyService.clawbackPoints(
+                    String((order as any).customerId), Number((order as any).total || 0),
+                    String(order.id), order.branchId || undefined,
+                ).catch(() => undefined);
+            }
         }
 
         if (terminalStatuses.has(nextStatus) && order.driverId) {
@@ -215,6 +231,9 @@ export const transitionOrderStatus = async ({
                 allowedBranches: user?.allowedBranches,
                 userPermissions: user?.permissions,
                 orderType: currentOrder.type,
+                orderDriverId: (currentOrder as any).driverId,
+                deliverySource: (currentOrder as any).deliverySource,
+                orderSource: (currentOrder as any).source,
                 managerApproved,
             });
             if (!statusPolicy.ok) {
@@ -257,6 +276,50 @@ export const transitionOrderStatus = async ({
                 .where(eq(kdsTickets.orderId, orderId));
         }
 
+        // Cancelling from anywhere (POS, branch, call center) must also kill
+        // the open kitchen tickets by consequence: the KDS view hides the
+        // cancelled order, but open tickets would linger in day-close
+        // readiness + branch reprints. Terminal tickets stay untouched.
+        if (normalizedStatus === 'CANCELLED') {
+            await tx.update(kdsTickets)
+                .set({ status: 'CANCELLED', updatedAt: now })
+                .where(and(
+                    eq(kdsTickets.orderId, orderId),
+                    sql`${kdsTickets.status} NOT IN ('DELIVERED', 'CANCELLED')`,
+                ));
+            // Stock return (warn-only, never blocks the cancel): credit back
+            // what this order consumed, per line. Depleted batches are not
+            // resurrected — counts reconcile via the daily stock count.
+            try {
+                const lines = await tx.select({
+                    menuItemId: orderItems.menuItemId,
+                    sizeId: orderItems.sizeId,
+                    quantity: orderItems.quantity,
+                    modifiers: orderItems.modifiers,
+                }).from(orderItems).where(eq(orderItems.orderId, orderId));
+                const branchWarehouses = await tx.select({ id: warehouses.id }).from(warehouses)
+                    .where(eq(warehouses.branchId, currentOrder.branchId))
+                    .orderBy(sql`CASE ${warehouses.type} WHEN 'KITCHEN' THEN 0 WHEN 'MAIN' THEN 1 WHEN 'POINT_OF_SALE' THEN 2 ELSE 3 END`);
+                const fallbackWarehouseId = branchWarehouses[0]?.id;
+                const { inventoryService } = await import('./inventoryService');
+                for (const line of lines) {
+                    if (!line.menuItemId || !(Number(line.quantity || 0) > 0)) continue;
+                    await inventoryService.returnIngredients(
+                        tx, String(line.menuItemId), Number(line.quantity),
+                        orderId, changedBy || 'system',
+                        {
+                            sizeId: String((line as any).sizeId || '').trim() || undefined,
+                            selectedModifiers: Array.isArray(line.modifiers) ? line.modifiers : [],
+                            fallbackWarehouseId,
+                            reason: 'Order cancelled',
+                        },
+                    ).catch(() => undefined);
+                }
+            } catch {
+                // Return is best-effort; the cancel itself must succeed.
+            }
+        }
+
         if (terminalStatuses.has(normalizedStatus) && updatedOrder.driverId) {
             await tx.update(drivers)
                 .set({ status: 'AVAILABLE' })
@@ -273,7 +336,7 @@ export const transitionOrderStatus = async ({
     });
 
     if (result.changed) {
-        runPostTransitionEffects(result.order, result.previousStatus, normalizedStatus);
+        void runPostTransitionEffects(result.order, result.previousStatus, normalizedStatus);
     }
 
     return result.order;
@@ -284,4 +347,153 @@ export const markOrderKdsTicketsDelivered = async (orderId: string) => {
     await db.update(kdsTickets)
         .set({ status: 'DELIVERED', updatedAt: new Date() })
         .where(and(eq(kdsTickets.orderId, orderId)));
+};
+
+const sweepThrottleByBranch = new Map<string, number>();
+const SWEEP_THROTTLE_MS = 30_000;
+
+/**
+ * Self-healing cleanup: any non-terminal order whose business day is already
+ * closed gets finalized automatically (and its kitchen tickets delivered), so
+ * the kitchen/handover screens can never stay stuck on stale tickets — even if
+ * the day was closed before the finalize step existed or a close partially
+ * failed. Safe to call from polling endpoints; throttled per branch.
+ */
+export const sweepStaleBranchOrders = async (branchId?: string | null): Promise<number> => {
+    if (!branchId) return 0;
+    const now = Date.now();
+    const lastSweepAt = sweepThrottleByBranch.get(branchId) || 0;
+    if (now - lastSweepAt < SWEEP_THROTTLE_MS) return 0;
+    sweepThrottleByBranch.set(branchId, now);
+
+    try {
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+        const activeBusinessDate = branch?.businessDate;
+        if (!activeBusinessDate) return 0;
+
+        const nowDate = new Date();
+        let sweptTotal = 0;
+
+        // 1) Orphaned kitchen tickets: parent order is already terminal
+        // (settled dine-in, cancelled, delivered...) but its ticket was never
+        // closed — clear them so the kitchen screen cannot stay stuck.
+        const orphanTicketResult = await pool.query(`
+            SELECT kt.id
+            FROM kds_tickets AS kt
+            WHERE kt.branch_id = $1
+              AND kt.status NOT IN ('DELIVERED', 'CANCELLED')
+              AND EXISTS (
+                    SELECT 1
+                    FROM orders AS o
+                    WHERE o.id = kt.order_id
+                      AND o.branch_id = $1
+                      AND o.status IN ('DELIVERED', 'COMPLETED', 'CANCELLED')
+              )
+        `, [branchId]);
+        const orphanTicketRows = orphanTicketResult.rows.map((row: any) => ({ id: row.id }));
+        if (orphanTicketRows.length > 0) {
+            const ticketPlaceholders = orphanTicketRows.map((_, index) => `$${index + 2}`).join(', ');
+            await pool.query(`
+                UPDATE kds_tickets
+                SET status = 'DELIVERED', updated_at = GETDATE()
+                WHERE branch_id = $1 AND id IN (${ticketPlaceholders})
+            `, [branchId, ...orphanTicketRows.map(row => row.id)]);
+            emitBranchEvent(branchId, 'kds:update', { reason: 'ORPHAN_TICKETS_SWEPT' });
+            sweptTotal += orphanTicketRows.length;
+        }
+
+        const staleOrdersResult = await pool.query(`
+            SELECT id, type, table_id, total
+            FROM orders
+            WHERE branch_id = $1
+              AND status IN ('PENDING', 'PREPARING', 'READY', 'SERVED', 'OUT_FOR_DELIVERY')
+              AND (
+                    (business_date IS NOT NULL AND business_date < CAST($2 AS DATE))
+                    OR (business_date IS NULL AND created_at < CAST($2 AS DATE))
+              )
+        `, [branchId, activeBusinessDate]);
+        const staleOrders = staleOrdersResult.rows.map((row: any) => ({
+            id: row.id,
+            type: row.type,
+            tableId: row.table_id,
+            total: Number(row.total || 0),
+        }));
+
+        for (const order of staleOrders) {
+            // Never fabricate revenue: only paid-covered orders finalize as
+            // delivered/completed; unpaid stale orders are cancelled for
+            // manager review (history notes explain why).
+            let paidCovered = false;
+            try {
+                const paidResult = await pool.query(
+                    `SELECT COALESCE(SUM(amount), 0) AS paid FROM payments
+                     WHERE order_id = $1 AND status = 'COMPLETED'`,
+                    [order.id],
+                );
+                paidCovered = Number(paidResult.rows?.[0]?.paid || 0) + 0.01 >= order.total;
+            } catch { paidCovered = false; }
+            const nextStatus = !paidCovered
+                ? 'CANCELLED'
+                : (String(order.type || '').toUpperCase() === 'DINE_IN' ? 'COMPLETED' : 'DELIVERED');
+            await db.update(orders)
+                .set({
+                    status: nextStatus,
+                    ...(nextStatus === 'DELIVERED' ? { actualDeliveryTime: nowDate } : {}),
+                    ...(nextStatus === 'COMPLETED' ? { completedAt: nowDate } : {}),
+                    ...(nextStatus === 'CANCELLED' ? { cancelledAt: nowDate, cancelReason: 'Auto cancelled: unpaid when business day closed' } : {}),
+                    updatedAt: nowDate,
+                })
+                .where(eq(orders.id, order.id));
+            await db.insert(orderStatusHistory).values({
+                orderId: order.id,
+                status: nextStatus,
+                notes: nextStatus === 'CANCELLED'
+                    ? 'Auto cancelled: business day closed with no covering payment — review before re-fire'
+                    : 'Auto cleared: business day already closed',
+                createdAt: nowDate,
+            });
+            (order as any).sweptStatus = nextStatus;
+            if ((nextStatus === 'COMPLETED' || nextStatus === 'CANCELLED') && order.tableId) {
+                await db.update(tables)
+                    .set({ status: 'AVAILABLE', currentOrderId: null, lockedByUserId: null, updatedAt: nowDate })
+                    .where(eq(tables.id, order.tableId));
+            }
+            emitBranchEvent(branchId, 'order:status', { id: order.id, status: nextStatus });
+        }
+
+        if (staleOrders.length > 0) {
+            const orderPlaceholders = staleOrders.map((_, index) => `$${index + 2}`).join(', ');
+            await pool.query(`
+                UPDATE kds_tickets
+                SET status = 'DELIVERED', updated_at = GETDATE()
+                WHERE branch_id = $1
+                  AND order_id IN (${orderPlaceholders})
+                  AND status NOT IN ('DELIVERED', 'CANCELLED')
+            `, [branchId, ...staleOrders.map(order => order.id)]);
+            // Tickets of auto-cancelled orders must read CANCELLED, not DELIVERED.
+            const cancelledIds = staleOrders.filter(o => (o as any).sweptStatus === 'CANCELLED').map(o => o.id);
+            if (cancelledIds.length > 0) {
+                const cancelledPlaceholders = cancelledIds.map((_, index) => `$${index + 2}`).join(', ');
+                await pool.query(`
+                    UPDATE kds_tickets
+                    SET status = 'CANCELLED', updated_at = GETDATE()
+                    WHERE branch_id = $1
+                      AND order_id IN (${cancelledPlaceholders})
+                      AND status NOT IN ('DELIVERED', 'CANCELLED')
+                `, [branchId, ...cancelledIds]);
+            }
+        }
+        emitBranchEvent(branchId, 'kds:update', { reason: 'STALE_ORDERS_SWEPT' });
+
+        sweptTotal += staleOrders.length;
+        logger.info({ branchId, swept: sweptTotal, staleOrders: staleOrders.length }, 'STALE_ORDERS_SWEEP');
+        return sweptTotal;
+    } catch (error) {
+        // Never break the listing endpoints that call this — but make failures visible.
+        logger.error({ err: error, branchId }, 'STALE_ORDERS_SWEEP_FAILED');
+        return 0;
+    }
 };

@@ -37,6 +37,17 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+// ── Non-blocking Cairo font (CSP-safe: DOM-created, no inline handlers) ──
+// index.html only preloads the CSS; injecting the stylesheet here keeps font
+// fetch off the critical path. display=swap swaps it in without layout shift.
+if (typeof document !== 'undefined' && !document.querySelector('link[data-font="cairo"]')) {
+  const fontLink = document.createElement('link');
+  fontLink.rel = 'stylesheet';
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap';
+  fontLink.setAttribute('data-font', 'cairo');
+  document.head.appendChild(fontLink);
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

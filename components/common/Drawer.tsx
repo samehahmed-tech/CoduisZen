@@ -21,11 +21,6 @@ const SIZE_MAP: Record<DrawerSize, string> = {
     xl: 'max-w-xl',
 };
 
-const SLIDE_IN: Record<DrawerSide, { open: string; closed: string }> = {
-    left: { open: 'translate-x-0', closed: '-translate-x-full' },
-    right: { open: 'translate-x-0', closed: 'translate-x-full' },
-};
-
 /**
  * Slide-in Drawer panel for forms, details, and previews.
  *
@@ -51,20 +46,20 @@ const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, children, title, subti
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[9995]">
+        <div className="fixed inset-0 z-[9995]" role="dialog" aria-modal="true" aria-label={title || 'Panel'}>
             {/* Backdrop */}
-            <div className="theme-overlay absolute inset-0 transition-opacity duration-150" onClick={onClose} />
+            <div className="theme-overlay modal-backdrop-enter absolute inset-0" onClick={onClose} />
 
             {/* Panel */}
-            <div className={`theme-drawer-panel absolute top-0 ${side === 'right' ? 'right-0' : 'left-0'} h-full w-full ${SIZE_MAP[size]} ${borderSideClass} transition-transform duration-150 ${SLIDE_IN[side].open} flex flex-col`}>
+            <div className={`theme-drawer-panel absolute top-0 ${side === 'right' ? 'right-0' : 'left-0'} h-full w-full ${SIZE_MAP[size]} ${borderSideClass} flex flex-col`}>
                 {/* Header */}
                 {(title || subtitle) && (
                     <div className="theme-modal-header flex items-center justify-between p-5 shrink-0">
-                        <div>
-                            {title && <h2 className="text-base font-black text-main">{title}</h2>}
-                            {subtitle && <p className="text-[9px] font-bold text-muted uppercase tracking-widest mt-0.5">{subtitle}</p>}
+                        <div className="min-w-0">
+                            {title && <h2 className="text-[15px] font-extrabold text-main leading-snug">{title}</h2>}
+                            {subtitle && <p className="ux-section-sub mt-0.5">{subtitle}</p>}
                         </div>
-                        <button onClick={onClose} className="theme-icon-button">
+                        <button onClick={onClose} aria-label="Close panel" className="theme-icon-button touch-target shrink-0">
                             <X size={18} />
                         </button>
                     </div>

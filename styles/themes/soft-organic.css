@@ -1,0 +1,88 @@
+/* THEME 04 · SOFT ORGANIC — warm comfortable light / soft warm-charcoal dark */
+[data-theme='soft-organic'] {
+    --primary: 46, 139, 109;
+    --primary-hover: 36, 118, 92;
+    --secondary: 150, 140, 125;
+    --accent: 232, 168, 124;
+
+    --bg-app: 253, 248, 240;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 250, 243, 233;
+    --bg-elevated: 255, 252, 247;
+    --bg-global: 253, 248, 240;
+
+    --text-main: 68, 56, 44;
+    --text-muted: 150, 132, 112;
+
+    --border-color: 235, 222, 205;
+    --border-subtle: 235 222 205 / 0.6;
+    --glass-bg: 255 255 255 / 0.8;
+
+    --success: 46, 139, 109;
+    --warning: 200, 130, 40;
+    --danger: 200, 80, 70;
+    --info: 90, 150, 190;
+
+    --theme-page-bg: radial-gradient(800px 320px at 50% -10%, rgba(232,168,124,0.18), transparent 60%), linear-gradient(180deg, #fdf8f0 0%, #f7ecdd 100%);
+    --theme-card-bg: #fffdf9;
+    --theme-card-hover-bg: #fff7ec;
+    --theme-rail-bg: linear-gradient(180deg, #faf3e9 0%, #f3e7d4 100%);
+    --theme-topbar-bg: rgba(255, 253, 249, 0.8);
+    --theme-table-head-bg: #f6ecdd;
+    --theme-row-hover-bg: rgba(46, 139, 109, 0.07);
+    --theme-input-bg: #fff9f1;
+    --theme-button-bg: linear-gradient(135deg, #257a5e 0%, #2e8b6d 100%);
+    --theme-active-bg: rgba(46, 139, 109, 0.12);
+    --theme-focus-ring: rgba(46, 139, 109, 0.3);
+    --theme-popup-bg: #fffdf9;
+
+    --chart-1: 46, 139, 109;
+    --chart-2: 232, 168, 124;
+    --chart-3: 150, 170, 200;
+    --chart-4: 200, 130, 150;
+    --chart-5: 190, 160, 90;
+    --chart-grid: 235 222 205 / 0.9;
+    --chart-tooltip-bg: #fffdf9;
+}
+
+.dark [data-theme='soft-organic'],
+[data-theme='soft-organic'].dark {
+    --primary: 134, 200, 170;
+    --primary-hover: 160, 215, 190;
+    --secondary: 170, 155, 140;
+    --accent: 240, 190, 150;
+
+    --bg-app: 32, 28, 26;
+    --bg-card: 44, 39, 36;
+    --bg-sidebar: 36, 31, 29;
+    --bg-elevated: 54, 48, 44;
+    --bg-global: 32, 28, 26;
+
+    --text-main: 245, 235, 222;
+    --text-muted: 175, 158, 140;
+
+    --border-color: 75, 65, 58;
+    --border-subtle: 175 158 140 / 0.18;
+    --glass-bg: 44 39 36 / 0.8;
+
+    --theme-page-bg: radial-gradient(800px 320px at 50% -10%, rgba(240,190,150,0.08), transparent 60%), linear-gradient(180deg, #24201d 0%, #1d1917 100%);
+    --theme-card-bg: #2c2724;
+    --theme-card-hover-bg: #38302b;
+    --theme-rail-bg: linear-gradient(180deg, #241f1c 0%, #1a1614 100%);
+    --theme-topbar-bg: rgba(44, 39, 36, 0.8);
+    --theme-table-head-bg: #201b18;
+    --theme-row-hover-bg: rgba(134, 200, 170, 0.10);
+    --theme-input-bg: #38302b;
+    --theme-button-bg: linear-gradient(135deg, #257a5e 0%, #1f6b52 100%);
+    --theme-active-bg: rgba(134, 200, 170, 0.16);
+    --theme-focus-ring: rgba(134, 200, 170, 0.4);
+    --theme-popup-bg: #2c2724;
+
+    --chart-1: 134, 200, 170;
+    --chart-2: 240, 190, 150;
+    --chart-3: 150, 175, 205;
+    --chart-4: 215, 150, 165;
+    --chart-5: 205, 180, 120;
+    --chart-grid: 75 65 58 / 0.9;
+    --chart-tooltip-bg: #2c2724;
+}

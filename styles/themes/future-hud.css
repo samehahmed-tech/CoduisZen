@@ -1,0 +1,88 @@
+/* THEME 07 · FUTURE HUD — ice-panel light / deep-space dark */
+[data-theme='future-hud'] {
+    --primary: 2, 132, 199;
+    --primary-hover: 3, 105, 161;
+    --secondary: 100, 116, 139;
+    --accent: 168, 85, 247;
+
+    --bg-app: 228, 240, 250;
+    --bg-card: 255, 255, 255;
+    --bg-sidebar: 232, 243, 252;
+    --bg-elevated: 250, 253, 255;
+    --bg-global: 228, 240, 250;
+
+    --text-main: 12, 35, 60;
+    --text-muted: 95, 120, 150;
+
+    --border-color: 185, 215, 235;
+    --border-subtle: 185 215 235 / 0.6;
+    --glass-bg: 255 255 255 / 0.75;
+
+    --success: 5, 150, 105;
+    --warning: 217, 119, 6;
+    --danger: 220, 38, 38;
+    --info: 2, 132, 199;
+
+    --theme-page-bg: linear-gradient(115deg, transparent 0 40px, rgba(2,132,199,0.06) 40px 41px, transparent 41px), linear-gradient(180deg, #e6f1fa 0%, #d5e7f5 100%);
+    --theme-card-bg: rgba(255, 255, 255, 0.85);
+    --theme-card-hover-bg: #ffffff;
+    --theme-rail-bg: linear-gradient(180deg, rgba(232,243,252,0.9) 0%, rgba(205,228,245,0.9) 100%);
+    --theme-topbar-bg: rgba(255, 255, 255, 0.75);
+    --theme-table-head-bg: #0c2340;
+    --theme-row-hover-bg: rgba(2, 132, 199, 0.07);
+    --theme-input-bg: rgba(255, 255, 255, 0.9);
+    --theme-button-bg: linear-gradient(100deg, #0284c7 0%, #0369a1 70%, #7c3aed 130%);
+    --theme-active-bg: rgba(2, 132, 199, 0.10);
+    --theme-focus-ring: rgba(2, 132, 199, 0.4);
+    --theme-popup-bg: rgba(255, 255, 255, 0.96);
+
+    --chart-1: 2, 132, 199;
+    --chart-2: 168, 85, 247;
+    --chart-3: 5, 150, 105;
+    --chart-4: 217, 119, 6;
+    --chart-5: 100, 116, 139;
+    --chart-grid: 185 215 235 / 0.9;
+    --chart-tooltip-bg: #0c2340;
+}
+
+.dark [data-theme='future-hud'],
+[data-theme='future-hud'].dark {
+    --primary: 34, 211, 238;
+    --primary-hover: 103, 232, 249;
+    --secondary: 148, 163, 184;
+    --accent: 232, 121, 249;
+
+    --bg-app: 5, 8, 20;
+    --bg-card: 12, 18, 38;
+    --bg-sidebar: 7, 11, 26;
+    --bg-elevated: 18, 26, 50;
+    --bg-global: 5, 8, 20;
+
+    --text-main: 220, 235, 255;
+    --text-muted: 130, 155, 190;
+
+    --border-color: 40, 60, 100;
+    --border-subtle: 34 211 238 / 0.14;
+    --glass-bg: 12 18 38 / 0.8;
+
+    --theme-page-bg: linear-gradient(115deg, transparent 0 40px, rgba(34,211,238,0.05) 40px 41px, transparent 41px), radial-gradient(800px 300px at 50% 0%, rgba(34,211,238,0.08), transparent 60%), linear-gradient(180deg, #070b18 0%, #04060f 100%);
+    --theme-card-bg: rgba(12, 18, 38, 0.85);
+    --theme-card-hover-bg: rgba(18, 26, 50, 0.95);
+    --theme-rail-bg: linear-gradient(180deg, rgba(7,11,26,0.95) 0%, rgba(4,6,15,0.95) 100%);
+    --theme-topbar-bg: rgba(12, 18, 38, 0.75);
+    --theme-table-head-bg: #04060f;
+    --theme-row-hover-bg: rgba(34, 211, 238, 0.08);
+    --theme-input-bg: rgba(18, 26, 50, 0.9);
+    --theme-button-bg: linear-gradient(100deg, #0e7490 0%, #0369a1 70%, #6d28d9 130%);
+    --theme-active-bg: rgba(34, 211, 238, 0.12);
+    --theme-focus-ring: rgba(34, 211, 238, 0.45);
+    --theme-popup-bg: rgba(12, 18, 38, 0.97);
+
+    --chart-1: 34, 211, 238;
+    --chart-2: 232, 121, 249;
+    --chart-3: 52, 211, 153;
+    --chart-4: 251, 191, 36;
+    --chart-5: 148, 163, 184;
+    --chart-grid: 40 60 100 / 0.9;
+    --chart-tooltip-bg: #0c1226;
+}

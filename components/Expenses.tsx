@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDownRight,
+  Camera,
   CheckCircle2,
   Clock,
   FileText,
@@ -63,6 +64,13 @@ const flattenAccounts = (accounts: AccountRow[]): AccountRow[] => {
 const money = (value: number) =>
   Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const isInventoryCostAccount = (account: AccountRow) => {
+  const code = String(account.code || '');
+  const label = `${account.name || ''} ${account.nameAr || ''}`.toLowerCase();
+  return ['5000', '5100', '5110', '5140'].includes(code)
+    || /(inventory|stock|consumption|wastage|cost of goods|المخزون|استهلاك|هالك|تكلفة البضاعة)/i.test(label);
+};
+
 const Expenses: React.FC = () => {
   const { settings } = useAuthStore();
   const { showToast } = useToast();
@@ -88,11 +96,30 @@ const Expenses: React.FC = () => {
     amount: '',
     reference: '',
     notes: '',
+    receiptImage: '' as string,
   });
+
+  const handleReceiptFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast(isAr ? 'اختر صورة للإيصال' : 'Choose a receipt image', 'error');
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      showToast(isAr ? 'الصورة أكبر من 1MB — صغّرها أولاً' : 'Image over 1MB — shrink it first', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setForm((current) => ({ ...current, receiptImage: String(reader.result || '') }));
+    reader.onerror = () => showToast(isAr ? 'تعذر قراءة الصورة' : 'Could not read image', 'error');
+    reader.readAsDataURL(file);
+  };
 
   const flatAccounts = useMemo(() => flattenAccounts(accounts), [accounts]);
   const expenseAccounts = useMemo(
-    () => flatAccounts.filter((account) => account.type === 'EXPENSE' && account.allowManualJournals !== false),
+    () => flatAccounts.filter((account) => account.type === 'EXPENSE'
+      && account.allowManualJournals !== false
+      && !isInventoryCostAccount(account)),
     [flatAccounts]
   );
   const paymentAccounts = useMemo(
@@ -150,17 +177,34 @@ const Expenses: React.FC = () => {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [accountRows, journalRows, topRows] = await Promise.all([
+      const [accountRows, expenseReport, topRows] = await Promise.all([
         financeApi.getAccounts(),
-        financeApi.getJournal(250),
-        reportsApi.getTopExpenses({ startDate: monthStart(), endDate: today() }).catch(() => []),
+        reportsApi.getExpenseReport({
+          startDate: monthStart(),
+          endDate: today(),
+          branchId: settings.activeBranchId,
+          status: 'ALL',
+          limit: 250,
+        }),
+        reportsApi.getTopExpenses({ startDate: monthStart(), endDate: today(), branchId: settings.activeBranchId }).catch(() => []),
       ]);
       setAccounts(accountRows || []);
-      setJournal(journalRows || []);
+      setJournal((expenseReport?.rows || []).map((row) => ({
+        id: row.entryId,
+        date: String(row.date),
+        description: row.description,
+        amount: Number(row.amount || 0),
+        debitAccountCode: row.accountCode,
+        referenceId: row.reference,
+        referenceType: row.referenceType,
+        status: row.status,
+      })));
       setTopExpenses(topRows || []);
 
       const flat = flattenAccounts(accountRows || []);
-      const firstExpense = flat.find((account) => account.type === 'EXPENSE' && account.allowManualJournals !== false);
+      const firstExpense = flat.find((account) => account.type === 'EXPENSE'
+        && account.allowManualJournals !== false
+        && !isInventoryCostAccount(account));
       const firstPayment = flat.find((account) => account.type === 'ASSET' && account.allowManualJournals !== false);
       setForm((current) => ({
         ...current,
@@ -196,12 +240,13 @@ const Expenses: React.FC = () => {
         referenceId,
         source: 'EXPENSE',
         date: form.date,
+        metadata: form.receiptImage ? { receiptImage: form.receiptImage } : undefined,
       });
       showToast(
         isAr ? 'تم تسجيل المصروف وبانتظار الاعتماد المحاسبي' : 'Expense recorded and awaiting finance approval',
         'success'
       );
-      setForm((current) => ({ ...current, description: '', amount: '', reference: '', notes: '' }));
+      setForm((current) => ({ ...current, description: '', amount: '', reference: '', notes: '', receiptImage: '' }));
       await load();
     } catch (error: any) {
       showToast(error?.message || (isAr ? 'فشل تسجيل المصروف' : 'Failed to record expense'), 'error');
@@ -401,6 +446,31 @@ const Expenses: React.FC = () => {
                 rows={3}
                 className="w-full rounded-xl bg-elevated/50 border border-border/60 px-4 py-3 text-sm font-bold text-main outline-none focus:border-indigo-500 resize-none"
               />
+              <div>
+                <label className="flex items-center justify-center gap-2 w-full h-12 rounded-xl bg-elevated/50 border border-dashed border-border/60 text-xs font-black text-muted cursor-pointer hover:border-indigo-500 hover:text-indigo-500 transition-all">
+                  <Camera size={16} />
+                  {form.receiptImage ? (isAr ? 'تغيير صورة الإيصال' : 'Change receipt photo') : (isAr ? 'صورة الإيصال (كاميرا/ملف)' : 'Receipt photo (camera/file)')}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => { handleReceiptFile(e.target.files?.[0]); e.target.value = ''; }}
+                  />
+                </label>
+                {form.receiptImage && (
+                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-border/50 bg-elevated/30 p-2">
+                    <img src={form.receiptImage} alt="" className="w-14 h-14 rounded-lg object-cover border border-border/50" />
+                    <button
+                      type="button"
+                      onClick={() => setForm((current) => ({ ...current, receiptImage: '' }))}
+                      className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:underline"
+                    >
+                      {isAr ? 'إزالة' : 'Remove'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button

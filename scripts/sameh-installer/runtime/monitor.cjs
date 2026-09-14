@@ -36,6 +36,7 @@ function probe(url) {
 async function systemStatus() {
   const state = readJson(path.join(root, 'install-state.json'), { role: 'unknown', appUrl: 'http://127.0.0.1:3001' });
   const setup = readJson(path.join(root, 'runtime-status.json'), { warnings: [], errors: [] });
+  const update = readJson(path.join(root, 'runtime', 'update-state.json'), {});
   const [app, bridge, printersResponse] = await Promise.all([
     probe(`${state.appUrl}/api/health`), probe('http://127.0.0.1:3002/health'), probe('http://127.0.0.1:3002/printers'),
   ]);
@@ -58,7 +59,7 @@ async function systemStatus() {
   return {
     role: state.role, version: state.version || '-', url: state.appUrl, openUrl: app.reachable ? state.appUrl : '/system', app: Boolean(app.reachable), appError: app.error,
     database, bridge: Boolean(bridge.reachable && bridgeStatus.serverConnected), bridgeReachable: Boolean(bridge.reachable), bridgeStatus, printers, serverPrinting,
-    whatsapp: whatsappStatus.status === 'READY', whatsappStatus,
+    whatsapp: whatsappStatus.status === 'READY', whatsappStatus, update,
     warnings, errors: setup.errors || [], recentErrors: recentErrors(), lastRepairs: setup.lastRepairs || [], repairedAt: setup.repairedAt, updatedAt: new Date().toISOString(),
   };
 }

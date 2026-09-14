@@ -17,8 +17,8 @@ interface PaginationProps {
 const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, size = 'md' }) => {
     if (totalPages <= 1) return null;
 
-    const btnSize = size === 'sm' ? 'w-7 h-7 text-[9px]' : 'w-8 h-8 text-[10px]';
-    const iconSize = size === 'sm' ? 12 : 14;
+    const btnSize = size === 'sm' ? 'min-w-[36px] h-9 px-2 text-xs' : 'min-w-[40px] h-10 px-2.5 text-[13px]';
+    const iconSize = size === 'sm' ? 14 : 16;
 
     // Show up to 5 page buttons
     const getPages = (): number[] => {
@@ -30,24 +30,27 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
         return pages;
     };
 
-    const btn = (onClick: () => void, disabled: boolean, children: React.ReactNode, active = false) => (
+    const btn = (onClick: () => void, disabled: boolean, children: React.ReactNode, active = false, label?: string) => (
         <button
             onClick={onClick}
             disabled={disabled}
-            className={`${btnSize} rounded-xl font-black flex items-center justify-center transition-all ${active ? 'bg-primary text-white shadow-sm' : 'bg-elevated/30 text-muted hover:text-primary hover:bg-elevated border border-border/30'} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+            aria-label={label}
+            aria-current={active ? 'page' : undefined}
+            data-interaction="press"
+            className={`${btnSize} rounded-xl font-bold flex items-center justify-center transition-all duration-150 ${active ? 'bg-primary text-white shadow-sm' : 'bg-elevated/30 text-muted hover:text-primary hover:bg-elevated border border-border/30'} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
         >
             {children}
         </button>
     );
 
     return (
-        <div className="flex items-center gap-1">
-            {btn(() => onPageChange(1), currentPage === 1, <ChevronsLeft size={iconSize} />)}
-            {btn(() => onPageChange(currentPage - 1), currentPage === 1, <ChevronLeft size={iconSize} />)}
-            {getPages().map(p => btn(() => onPageChange(p), false, p, p === currentPage))}
-            {btn(() => onPageChange(currentPage + 1), currentPage === totalPages, <ChevronRight size={iconSize} />)}
-            {btn(() => onPageChange(totalPages), currentPage === totalPages, <ChevronsRight size={iconSize} />)}
-        </div>
+        <nav aria-label="Pagination" className="flex items-center gap-1.5">
+            {btn(() => onPageChange(1), currentPage === 1, <ChevronsLeft size={iconSize} />, false, 'First page')}
+            {btn(() => onPageChange(currentPage - 1), currentPage === 1, <ChevronLeft size={iconSize} />, false, 'Previous page')}
+            {getPages().map(p => btn(() => onPageChange(p), false, p, p === currentPage, `Page ${p}`))}
+            {btn(() => onPageChange(currentPage + 1), currentPage === totalPages, <ChevronRight size={iconSize} />, false, 'Next page')}
+            {btn(() => onPageChange(totalPages), currentPage === totalPages, <ChevronsRight size={iconSize} />, false, 'Last page')}
+        </nav>
     );
 };
 

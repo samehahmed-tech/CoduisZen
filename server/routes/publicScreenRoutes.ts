@@ -3,7 +3,7 @@ import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { db } from '../db';
 import { getIO } from '../socket';
 import { transitionOrderStatus } from '../services/orderLifecycleService';
-import { kdsTicketItems, kdsTickets, menuItems, orders, tables } from '../../src/db/schema';
+import { kdsTicketItems, kdsTickets, menuItems, orders, orderItems, branches, tables } from '../../src/db/schema';
 
 const router = Router();
 
@@ -262,6 +262,60 @@ router.post('/orders/:orderId/handover', async (req, res) => {
     } catch (error: any) {
         const statusCode = Number(error?.status) || 500;
         return res.status(statusCode).json({ ok: false, code: error?.code || 'PUBLIC_SCREEN_HANDOVER_FAILED', message: error?.message || 'Handover failed' });
+    }
+});
+
+/**
+ * Public customer order tracking (no auth — link-only). Returns a privacy-safe
+ * subset: no phone, no address, no payment internals. Order ids are
+ * unguessable (uuid / CC-xxxxxx), which is the access control.
+ */
+router.get('/track/:id', async (req, res) => {
+    try {
+        const orderId = getParam((req.params as any).id);
+        if (!orderId) return res.status(400).json({ ok: false, code: 'ORDER_ID_REQUIRED' });
+        const [order] = await db.select({
+            id: orders.id,
+            orderNumber: orders.orderNumber,
+            status: orders.status,
+            type: orders.type,
+            branchId: orders.branchId,
+            total: orders.total,
+            createdAt: orders.createdAt,
+            actualDeliveryTime: orders.actualDeliveryTime,
+            completedAt: orders.completedAt,
+        }).from(orders).where(eq(orders.id, orderId)).limit(1);
+        if (!order) return res.status(404).json({ ok: false, code: 'ORDER_NOT_FOUND' });
+
+        const [branch] = order.branchId
+            ? await db.select({ name: branches.name, phone: branches.phone }).from(branches).where(eq(branches.id, order.branchId)).limit(1)
+            : [];
+        const items = await db.select({
+            name: orderItems.name,
+            nameAr: orderItems.nameAr,
+            quantity: orderItems.quantity,
+        }).from(orderItems).where(eq(orderItems.orderId, orderId));
+
+        return res.json({
+            ok: true,
+            order: {
+                id: order.id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                type: order.type,
+                total: Number(order.total || 0),
+                createdAt: order.createdAt,
+                deliveredAt: order.actualDeliveryTime || order.completedAt || null,
+                branchName: (branch as any)?.name || null,
+                branchPhone: (branch as any)?.phone || null,
+                items: items.map((item: any) => ({
+                    name: item.nameAr || item.name,
+                    quantity: Number(item.quantity || 0),
+                })),
+            },
+        });
+    } catch (error: any) {
+        return res.status(500).json({ ok: false, code: 'TRACK_FAILED', message: error?.message || 'Tracking failed' });
     }
 });
 

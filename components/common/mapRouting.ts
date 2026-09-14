@@ -1,4 +1,4 @@
-import { defaultMapCenter } from './googleMaps';
+import { defaultMapCenter, osrmUrl } from './googleMaps';
 
 export type MapPoint = {
     lat?: number;
@@ -44,4 +44,43 @@ export const estimateEta = (
         etaMinutes,
         source: 'straight-line',
     };
+};
+
+export type OsrmRoute = {
+    points: Array<[number, number]>;
+    distanceKm: number;
+    etaMinutes: number;
+};
+
+/**
+ * Free road routing via OSRM (no key). Returns polyline points + real
+ * road distance/ETA, or null when unreachable (caller falls back to
+ * straight-line estimateEta).
+ */
+export const fetchOsrmRoute = async (
+    from: MapPoint,
+    to: MapPoint,
+    averageSpeedKmh = 24,
+): Promise<OsrmRoute | null> => {
+    try {
+        if (!hasPoint(from) || !hasPoint(to)) return null;
+        const url = `${osrmUrl}/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!res.ok) return null;
+        const json = await res.json();
+        const route = Array.isArray(json?.routes) ? json.routes[0] : null;
+        const coords = route?.geometry?.coordinates;
+        if (!Array.isArray(coords) || coords.length < 2) return null;
+        const distanceKm = Number(((Number(route.distance) || 0) / 1000).toFixed(2));
+        const etaMinutes = Math.max(3, Math.round(distanceKm / Math.max(8, averageSpeedKmh) * 60 + 2));
+        return {
+            points: coords
+                .filter((c: any) => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1]))
+                .map((c: any) => [c[1], c[0]] as [number, number]),
+            distanceKm,
+            etaMinutes,
+        };
+    } catch {
+        return null;
+    }
 };

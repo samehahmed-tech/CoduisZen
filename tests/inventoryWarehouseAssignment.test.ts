@@ -96,6 +96,27 @@ describe('inventory item warehouse assignment', () => {
         stockRows = await db.select().from(inventoryStock).where(eq(inventoryStock.itemId, itemId));
         expect(stockRows.map(row => [row.warehouseId, Number(row.quantity)])).toEqual([[secondWarehouseId, 4]]);
 
+        const deleteWithStock = await request(app)
+            .delete(`/api/inventory/${itemId}`)
+            .set('Authorization', auth);
+        expect(deleteWithStock.status).toBe(409);
+        expect(deleteWithStock.body.code || deleteWithStock.body.error).toBe('INVENTORY_ITEM_HAS_STOCK');
+
+        await db.update(warehouses).set({ isActive: false }).where(eq(warehouses.id, secondWarehouseId));
+        const inactiveAssignment = await request(app)
+            .put(`/api/inventory/${itemId}`)
+            .set('Authorization', auth)
+            .send({ warehouse_ids: [secondWarehouseId] });
+        expect(inactiveAssignment.status).toBe(400);
+        expect(inactiveAssignment.body.code || inactiveAssignment.body.error).toBe('INACTIVE_WAREHOUSE_ASSIGNMENT');
+
+        await db.update(inventoryStock).set({ quantity: 0 }).where(eq(inventoryStock.itemId, itemId));
+        const deleted = await request(app)
+            .delete(`/api/inventory/${itemId}`)
+            .set('Authorization', auth);
+        expect(deleted.status, JSON.stringify(deleted.body)).toBe(200);
+        expect(deleted.body.item.isActive).toBe(false);
+
         await db.delete(inventoryStock).where(eq(inventoryStock.itemId, itemId));
         await db.delete(inventoryItems).where(eq(inventoryItems.id, itemId));
         await db.delete(warehouses).where(eq(warehouses.id, firstWarehouseId));

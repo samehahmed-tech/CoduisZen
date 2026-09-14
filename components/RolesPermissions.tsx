@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import {
     UserRole, AppPermission, INITIAL_ROLE_PERMISSIONS,
 } from '../types';
+import { ROLE_I18N, getRoleLabel, getRoleDescription, roleMatchesQuery } from '../utils/roleLabels';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToast } from './Toast';
 import { nanoid } from 'nanoid';
@@ -112,37 +113,9 @@ const PERM_LABELS: Record<string, { en: string; ar: string }> = {
     CFG_MANAGE_PLATFORMS: { en: 'Manage Platforms', ar: 'إدارة المنصات' },
 };
 
-const ROLE_LABELS: Record<string, { en: string; ar: string; description: string; descriptionAr: string; isCorporate: boolean }> = {
-    SUPER_ADMIN: { en: 'Super Admin', ar: 'مدير النظام', description: 'Full system access — all permissions, all branches', descriptionAr: 'وصول كامل — كل الصلاحيات، كل الفروع', isCorporate: true },
-    OWNER: { en: 'Owner', ar: 'المالك', description: 'Business owner with broad operational & financial control', descriptionAr: 'مالك النشاط — صلاحيات تشغيلية ومالية واسعة', isCorporate: true },
-    PARTNER: { en: 'Partner', ar: 'الشريك', description: 'Partner-level access to reports & financial data', descriptionAr: 'وصول شريك — تقارير وبيانات مالية', isCorporate: true },
-    OWNER_VIEWER: { en: 'Owner Viewer', ar: 'مشاهد المالك', description: 'Read-only access to dashboards & reports', descriptionAr: 'وصول للعرض فقط — لوحات وتقارير', isCorporate: true },
-    CEO: { en: 'CEO', ar: 'الرئيس التنفيذي', description: 'Executive-level strategic overview', descriptionAr: 'نظرة استراتيجية تنفيذية', isCorporate: true },
-    COO: { en: 'COO', ar: 'مدير العمليات', description: 'Daily operations oversight', descriptionAr: 'الإشراف على العمليات اليومية', isCorporate: true },
-    GENERAL_MANAGER: { en: 'General Manager', ar: 'المدير العام', description: 'Full branch management across all departments', descriptionAr: 'إدارة كاملة للفرع عبر كل الأقسام', isCorporate: false },
-    BRANCH_MANAGER: { en: 'Branch Manager', ar: 'مدير الفرع', description: 'Manages a single branch end-to-end', descriptionAr: 'يدير فرع واحد بشكل كامل', isCorporate: false },
-    CASHIER: { en: 'Cashier', ar: 'الكاشير', description: 'POS operations & cash drawer management', descriptionAr: 'عمليات نقطة البيع والدرج النقدي', isCorporate: false },
-    WAITER: { en: 'Waiter', ar: 'النادل', description: 'Order taking & table service', descriptionAr: 'أخذ الطلبات وخدمة الطاولات', isCorporate: false },
-    CAPTAIN: { en: 'Captain', ar: 'الكابتن', description: 'Supervises service, can void orders', descriptionAr: 'يشرف على الخدمة، يمكن إلغاء الطلبات', isCorporate: false },
-    DRIVER: { en: 'Driver', ar: 'السائق', description: 'Delivery driver mobile access', descriptionAr: 'وصول تطبيق السائق للتوصيل', isCorporate: false },
-    KITCHEN_STAFF: { en: 'Kitchen Staff', ar: 'طاقم المطبخ', description: 'Kitchen display system access', descriptionAr: 'وصول شاشة المطبخ', isCorporate: false },
-    CALL_CENTER: { en: 'Call Center Agent', ar: 'موظف مركز الاتصال', description: 'Order taking via phone & CRM', descriptionAr: 'أخذ الطلبات عبر الهاتف وإدارة العملاء', isCorporate: false },
-    CALL_CENTER_MANAGER: { en: 'Call Center Manager', ar: 'مدير مركز الاتصال', description: 'Manages call center team & reports', descriptionAr: 'إدارة فريق مركز الاتصال والتقارير', isCorporate: true },
-    CASHIER_MANAGER: { en: 'Cashier Manager', ar: 'مدير الكاشير', description: 'Oversees all cashiers & POS operations', descriptionAr: 'الإشراف على الكاشير وعمليات البيع', isCorporate: false },
-    WAREHOUSE_STAFF: { en: 'Warehouse Staff', ar: 'موظف المخزن', description: 'Stock management & GRN receiving', descriptionAr: 'إدارة المخزون واستلام إذون الاستلام', isCorporate: false },
-    WAREHOUSE_DIRECTOR: { en: 'Warehouse Director', ar: 'مدير المخازن', description: 'Full warehouse & procurement control', descriptionAr: 'تحكم كامل في المخازن والمشتريات', isCorporate: true },
-    PRODUCTION_STAFF: { en: 'Production Staff', ar: 'طاقم الإنتاج', description: 'Production order execution & recipes', descriptionAr: 'تنفيذ أوامر الإنتاج والوصفات', isCorporate: false },
-    PROCUREMENT_MANAGER: { en: 'Procurement Manager', ar: 'مدير المشتريات', description: 'Purchase orders, suppliers & procurement', descriptionAr: 'أوامر الشراء، الموردين والمشتريات', isCorporate: true },
-    ACCOUNTANT: { en: 'Accountant', ar: 'المحاسب', description: 'Financial records & reporting', descriptionAr: 'السجلات المالية والتقارير', isCorporate: true },
-    COST_ACCOUNTANT: { en: 'Cost Accountant', ar: 'محاسب التكاليف', description: 'Recipe costing & inventory valuation', descriptionAr: 'تكلفة الوصفات وتقييم المخزون', isCorporate: true },
-    FINANCE_DIRECTOR: { en: 'Finance Director', ar: 'المدير المالي', description: 'Full financial control & treasury', descriptionAr: 'تحكم مالي كامل والخزانة', isCorporate: true },
-    HR_MANAGER: { en: 'HR Manager', ar: 'مدير الموارد البشرية', description: 'Employee management & attendance', descriptionAr: 'إدارة الموظفين والحضور', isCorporate: true },
-    PAYROLL_OFFICER: { en: 'Payroll Officer', ar: 'مسؤول الرواتب', description: 'Payroll processing & salary data', descriptionAr: 'معالجة الرواتب وبيانات المرتبات', isCorporate: true },
-    TREASURY_OFFICER: { en: 'Treasury Officer', ar: 'مسؤول الخزانة', description: 'Cash management & daily closing', descriptionAr: 'إدارة النقدية والإغلاق اليومي', isCorporate: true },
-    TECH_SUPPORT: { en: 'Technical Support', ar: 'الدعم الفني', description: 'System configuration & printer setup', descriptionAr: 'إعدادات النظام وإعداد الطابعات', isCorporate: true },
-    QUALITY_OFFICER: { en: 'Quality Officer', ar: 'مسؤول الجودة', description: 'Quality control & waste tracking', descriptionAr: 'مراقبة الجودة وتتبع الهدر', isCorporate: false },
-    CUSTOM: { en: 'Custom Role', ar: 'دور مخصص', description: 'Custom-defined role with selected permissions', descriptionAr: 'دور مخصص بصلاحيات محددة', isCorporate: false },
-};
+// ROLE_LABELS is now centralized in utils/roleLabels.ts (bilingual en/ar).
+// Kept as alias for backward-compat; includes legacy keys (ADMIN, MANAGER, IT...).
+const ROLE_LABELS = ROLE_I18N as unknown as Record<string, { en: string; ar: string; description: string; descriptionAr: string; isCorporate: boolean }>;
 
 // ============ Component ============
 
@@ -214,10 +187,23 @@ const RolesPermissions: React.FC = () => {
         if (custom) return { id: custom.id, name: custom.name, nameAr: custom.nameAr || custom.name, isCustom: true, isCorporate: false };
         const dbCustom = dbRoles.find(r => (r.id === selectedRoleId || r.name === selectedRoleId) && !r.isSystem);
         if (dbCustom) return { id: dbCustom.id, name: dbCustom.name, nameAr: dbCustom.nameAr || dbCustom.name, isCustom: true, isCorporate: false };
+        // Built-in: keep canonical en/ar from central map (never raw codes).
+        const label = getRoleLabel(selectedRoleId, 'en', selectedRoleId);
+        const labelAr = getRoleLabel(selectedRoleId, 'ar', selectedRoleId);
         const builtIn = ROLE_LABELS[selectedRoleId];
-        if (builtIn) return { id: selectedRoleId, name: builtIn.en, nameAr: builtIn.ar, isCustom: false, isCorporate: builtIn.isCorporate };
-        return null;
+        if (builtIn || label !== selectedRoleId) return { id: selectedRoleId, name: label, nameAr: labelAr, isCustom: false, isCorporate: builtIn?.isCorporate ?? false };
+        // Unknown/legacy key: still resolve via central aliases, fallback to raw id.
+        return { id: selectedRoleId, name: label, nameAr: labelAr, isCustom: false, isCorporate: false };
     }, [selectedRoleId, customRoles, dbRoles]);
+    const selectedRoleDisplayName = selectedRoleData
+        ? (selectedRoleData.isCustom
+            ? getRoleLabel({ name: selectedRoleData.name, nameAr: selectedRoleData.nameAr }, lang, selectedRoleData.name)
+            : getRoleLabel(selectedRoleData.id, lang, selectedRoleData.name))
+        : '';
+    const selectedRoleDescription = (() => {
+        if (!selectedRoleData || selectedRoleData.isCustom) return lang === 'ar' ? 'دور مخصص بصلاحيات محددة' : 'Custom role with custom permissions';
+        return getRoleDescription(selectedRoleData.id, lang, '');
+    })();
 
     const isRoleCustom = selectedRoleData?.isCustom || false;
     const isRoleSuperAdmin = selectedRoleId === UserRole.SUPER_ADMIN;
@@ -348,14 +334,12 @@ const RolesPermissions: React.FC = () => {
 
     const filteredRoles = useMemo(() => {
         if (!searchQuery.trim()) return allRoles;
-        const q = searchQuery.toLowerCase();
         return allRoles.filter(roleId => {
-            const label = ROLE_LABELS[roleId];
             const custom = customRoles.find(c => c.id === roleId);
-            const dbCustom = dbRoles.find(r => r.id === roleId);
-            const name = custom ? custom.name : (dbCustom ? dbCustom.name : (label?.en || roleId));
-            const nameAr = custom ? (custom.nameAr || custom.name) : (dbCustom ? (dbCustom.nameAr || dbCustom.name) : (label?.ar || roleId));
-            return name.toLowerCase().includes(q) || nameAr.toLowerCase().includes(q);
+            if (custom) return roleMatchesQuery({ name: custom.name, nameAr: custom.nameAr || custom.name }, searchQuery);
+            const dbCustom = dbRoles.find(r => r.id === roleId || r.name === roleId);
+            if (dbCustom && !dbCustom.isSystem) return roleMatchesQuery({ name: dbCustom.name, nameAr: dbCustom.nameAr || dbCustom.name }, searchQuery);
+            return roleMatchesQuery(roleId, searchQuery);
         });
     }, [allRoles, searchQuery, customRoles, dbRoles]);
 
@@ -415,10 +399,11 @@ const RolesPermissions: React.FC = () => {
                                         {deptRoles.map(roleId => {
                                             const isActive = selectedRoleId === roleId;
                                             const label = ROLE_LABELS[roleId];
+                                            const displayName = getRoleLabel(roleId, lang, roleId);
                                             return (
                                                 <button key={roleId} onClick={() => setSelectedRoleId(roleId)}
                                                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${isActive ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-muted hover:text-main hover:bg-elevated/40'}`}
-                                                    title={sidebarCollapsed ? tn(label?.en || roleId, label?.ar || roleId) : undefined}
+                                                    title={sidebarCollapsed ? displayName : undefined}
                                                 >
                                                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[8px] ${isActive ? 'bg-white/20' : 'bg-elevated/60'}`}
                                                         style={!isActive ? { backgroundColor: dept.color + '15', color: dept.color } : {}}
@@ -427,7 +412,7 @@ const RolesPermissions: React.FC = () => {
                                                     </div>
                                                     {!sidebarCollapsed && (
                                                         <div className="flex-1 text-left">
-                                                            <span className="font-black text-[9px] uppercase tracking-widest">{tn(label?.en || roleId, label?.ar || roleId)}</span>
+                                                            <span className="font-black text-[9px] uppercase tracking-widest">{displayName}</span>
                                                         </div>
                                                     )}
                                                     {!sidebarCollapsed && userCountByRole[roleId] > 0 && (
@@ -457,7 +442,7 @@ const RolesPermissions: React.FC = () => {
                                                     <UserCog size={12} />
                                                 </div>
                                                 <div className="flex-1 text-left">
-                                                    <span className="font-black text-[9px] uppercase tracking-widest">{tn(cr.name, cr.nameAr || cr.name)}</span>
+                                                    <span className="font-black text-[9px] uppercase tracking-widest">{getRoleLabel({ name: cr.name, nameAr: cr.nameAr || cr.name }, lang, cr.name)}</span>
                                                 </div>
                                                 {userCountByRole[cr.id] > 0 && (
                                                     <span className="text-[8px] font-black px-2 py-0.5 rounded-lg bg-elevated/60 text-muted">{userCountByRole[cr.id]}</span>
@@ -475,7 +460,7 @@ const RolesPermissions: React.FC = () => {
                                                     <UserCog size={12} />
                                                 </div>
                                                 <div className="flex-1 text-left">
-                                                    <span className="font-black text-[9px] uppercase tracking-widest">{tn(cr.name, cr.nameAr || cr.name)}</span>
+                                                    <span className="font-black text-[9px] uppercase tracking-widest">{getRoleLabel({ name: cr.name, nameAr: (cr as any).nameAr || cr.name }, lang, cr.name)}</span>
                                                 </div>
                                                 {userCountByRole[cr.id] > 0 && (
                                                     <span className="text-[8px] font-black px-2 py-0.5 rounded-lg bg-elevated/60 text-muted">{userCountByRole[cr.id]}</span>
@@ -508,7 +493,7 @@ const RolesPermissions: React.FC = () => {
                                 </div>
                                 <div>
                                     <h1 className="text-xl font-black text-main uppercase tracking-tight leading-none">
-                                        {selectedRoleData ? tn(selectedRoleData.name, selectedRoleData.nameAr) : ''}
+                                        {selectedRoleDisplayName}
                                     </h1>
                                     <p className="text-[9px] font-black text-muted uppercase tracking-[0.2em] mt-1">
                                         {selectedRoleData?.isCorporate ? tn('Corporate', 'مؤسسي') : tn('Branch', 'فرع')}
@@ -606,7 +591,7 @@ const RolesPermissions: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <h3 className="text-xl font-black text-main uppercase tracking-tight">
-                                                    {selectedRoleData ? tn(selectedRoleData.name, selectedRoleData.nameAr) : ''}
+                                                    {selectedRoleDisplayName}
                                                 </h3>
                                             )}
                                             {isRoleSuperAdmin && (
@@ -624,9 +609,7 @@ const RolesPermissions: React.FC = () => {
                                             )}
                                         </div>
                                         <p className="text-[10px] text-muted font-bold mt-1 max-w-lg leading-relaxed">
-                                            {selectedRoleId && ROLE_LABELS[selectedRoleId]
-                                                ? tn(ROLE_LABELS[selectedRoleId].description, ROLE_LABELS[selectedRoleId].descriptionAr)
-                                                : tn('Custom role with custom permissions', 'دور مخصص بصلاحيات محددة')}
+                                            {selectedRoleDescription}
                                         </p>
                                     </div>
                                 </div>

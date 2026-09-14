@@ -1,9 +1,9 @@
-﻿/**
+/**
  * POS - Main Point of Sale Orchestrator
  * State management + layout composition only.
  * UI is delegated to: POSToolbar, POSItemsPanel, POSCartSidebar
  */
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useOptimistic, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingBag, X, LogOut, SlidersHorizontal, ArrowUpDown, LayoutGrid, Grid2x2, Plus, UtensilsCrossed, Truck, MapPin, Keyboard, UserPlus, Phone, Smartphone } from 'lucide-react';
 import {
@@ -29,6 +29,7 @@ import { ManagerApprovalModal } from './components/ManagerApprovalModal';
 import TableManagementModal from './components/TableManagementModal';
 import ItemOptionsModal from './components/ItemOptionsModal';
 import HeldOrdersModal from './components/HeldOrdersModal';
+import POSReturnModal from './components/POSReturnModal';
 import TakeawayNameModal from './components/TakeawayNameModal';
 import POSToolbar from './components/POSToolbar';
 import POSItemsPanel from './components/POSItemsPanel';
@@ -41,6 +42,7 @@ import POSCartSidebar from './components/POSCartSidebar';
 import { printService } from '@/src/services/printService';
 import { hasCashierPrinterConfigured, POS_PRINT_STATION_KEY, printKitchenTicketsByRouting, printOrderReceipt } from '@/services/posPrintOrchestrator';
 import { useToast } from '@/components/Toast';
+import { useConfirm } from '@/components/common/ConfirmProvider';
 import { useModal } from '@/components/Modal';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 import { usePOSCatalog } from '@/hooks/usePOSCatalog';
@@ -48,8 +50,9 @@ import { usePOSKeyboardShortcuts } from '@/hooks/usePOSKeyboardShortcuts';
 
 // Services
 import { translations } from '@/services/translations';
-import { getActionableErrorMessage, shiftsApi } from '@/services/api';
+import { getActionableErrorMessage } from '@/services/api';
 import { kdsApi } from '@/services/api/kds';
+import { deliveryApi } from '@/services/api/delivery';
 
 // Stores
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -61,6 +64,7 @@ import { useFinanceStore } from '@/stores/useFinanceStore';
 
 import { generateOrderId, generateInternalId } from '@/src/utils/idGenerator';
 import { buildOrderPayment } from './orderPayment';
+import { applyPlatformMarkup, matchPlatformMarkup, type PlatformMarkup } from '@/services/platformPricing';
 import { isBelowTableMinimumSpend } from '../../utils/tableMinimumSpend';
 import { findActiveTableOrder } from '../../../utils/tableOrder';
 
@@ -110,7 +114,7 @@ const POS: React.FC = () => {
    const hasPermission = useAuthStore(state => state.hasPermission);
    const updateSettings = useAuthStore(state => state.updateSettings);
 
-   const orders = useOrderStore(state => state.orders);
+    const storeOrders = useOrderStore(state => state.orders);
    const activeCart = useOrderStore(state => state.activeCart);
    const addToCart = useOrderStore(state => state.addToCart);
    const removeFromCart = useOrderStore(state => state.removeFromCart);
@@ -119,7 +123,32 @@ const POS: React.FC = () => {
    const updateCartItemSeat = useOrderStore(state => state.updateCartItemSeat);
    const updateCartItemCourse = useOrderStore(state => state.updateCartItemCourse);
    const clearCart = useOrderStore(state => state.clearCart);
-   const placeOrder = useOrderStore(state => state.placeOrder);
+    const placeOrder = useOrderStore(state => state.placeOrder);
+    // Optimistic orders: the new ticket appears on the floor map / orders
+    // panel in the same frame as the tap. The draft carries a temp id; when
+    // the server confirms, the store prepends the real order and the
+    // transition settles — no duplicate. On failure the base never changes,
+    // so React discards the optimistic entry automatically (the error toast
+    // in the existing catch blocks still fires).
+    const [orders, addOptimisticOrder] = useOptimistic(
+       storeOrders,
+       (state: Order[], draft: Order) => [draft, ...state]
+    );
+    const [, startOrderTransition] = useTransition();
+    const placeOrderOptimistically = useCallback((draft: Order) => new Promise<Order>((resolve, reject) => {
+       startOrderTransition(async () => {
+          addOptimisticOrder({
+             ...draft,
+             id: `optimistic-${(draft as unknown as { clientSubmitKey?: string }).clientSubmitKey ?? Date.now()}`,
+             syncStatus: 'PENDING',
+          } as Order);
+          try {
+             resolve(await placeOrder(draft));
+          } catch (error) {
+             reject(error);
+          }
+       });
+    }), [placeOrder]);
    const activeOrderType = useOrderStore(state => state.activeOrderType);
    const setOrderMode = useOrderStore(state => state.setOrderMode);
    const discount = useOrderStore(state => state.discount);
@@ -160,29 +189,54 @@ const POS: React.FC = () => {
    const setPriceList = useMenuStore(state => state.setPriceList);
    const fetchMenu = useMenuStore(state => state.fetchMenu);
    const fetchPlatforms = useMenuStore(state => state.fetchPlatforms);
-   const customers = useCRMStore(state => state.customers);
-   const inventory = useInventoryStore(state => state.inventory);
-   const updateStock = useInventoryStore(state => state.updateStock);
-   const warehouses = useInventoryStore(state => state.warehouses);
-   const recordTransaction = useFinanceStore(state => state.recordTransaction);
+    const customers = useCRMStore(state => state.customers);
+    const inventory = useInventoryStore(state => state.inventory);
+    const updateStock = useInventoryStore(state => state.updateStock);
+    const warehouses = useInventoryStore(state => state.warehouses);
+    // NOTE: finance posting is SERVER-AUTHORITATIVE (postPosOrderEntry +
+    // postCogsForOrderEntry inside createOrder). The client must NOT post a
+    // second journal entry — that double-counted revenue in the GL.
 
    const branchId = settings.activeBranchId || branches.find(b => b.isActive !== false)?.id || branches[0]?.id || 'b1';
    const activeBranch = branches.find(b => b.id === branchId);
    const lang = settings.language;
+   const isAr = lang === 'ar';
    const t = translations[lang];
    const isDarkMode = settings.isDarkMode;
    const isTouchMode = settings.isTouchMode;
    const currencySymbol = settings.currencySymbol;
    const rawActiveCart = activeCart || [];
    const previousBranchIdRef = useRef(branchId);
-   const [currentPrintStationId, setCurrentPrintStationId] = useState(() => {
-      try { return localStorage.getItem(POS_PRINT_STATION_KEY) || ''; } catch { return ''; }
-   });
+    const [currentPrintStationId, setCurrentPrintStationId] = useState(() => {
+       try { return localStorage.getItem(POS_PRINT_STATION_KEY) || ''; } catch { return ''; }
+    });
 
    // --- Local State ---
    const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
    const [managedTableId, setManagedTableId] = useState<string | null>(null);
    const [deliveryCustomer, setDeliveryCustomer] = useState<Customer | null>(null);
+   const [deliveryZones, setDeliveryZones] = useState<any[]>([]);
+   const [selectedDeliveryZoneId, setSelectedDeliveryZoneId] = useState('');
+
+    // Delivery zones (system list + quick-add): branch zones + global zones.
+    useEffect(() => {
+       let cancelled = false;
+       deliveryApi.getZones(branchId).then(list => {
+          if (cancelled) return;
+          setDeliveryZones(Array.isArray(list) ? list : []);
+          setSelectedDeliveryZoneId(prev => {
+             if (prev && (list || []).some((z: any) => String(z.id) === String(prev))) return prev;
+             return '';
+          });
+       }).catch(() => { });
+       return () => { cancelled = true; };
+    }, [branchId]);
+
+    // When a delivery customer with a saved zone is picked, preselect it.
+    useEffect(() => {
+       const zid = (deliveryCustomer as any)?.zoneId;
+       if (zid) setSelectedDeliveryZoneId(String(zid));
+    }, [deliveryCustomer]);
    // cart is now activeCart from store
    const [activeCategory, setActiveCategory] = useState<string>('all');
    const [searchQuery, setSearchQuery] = useState('');
@@ -205,6 +259,7 @@ const POS: React.FC = () => {
    const [showCalculator, setShowCalculator] = useState(false);
    const [showApprovalModal, setShowApprovalModal] = useState(false);
    const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
+   const [showReturnModal, setShowReturnModal] = useState(false);
    const [showOrderNameModal, setShowOrderNameModal] = useState(false);
    const [orderName, setOrderName] = useState('');
    const [isCartOpenMobile, setIsCartOpenMobile] = useState(false);
@@ -236,8 +291,8 @@ const POS: React.FC = () => {
       notes: '',
       paymentStatus: 'UNKNOWN',
    });
-   const [orderNote, setOrderNote] = useState('');
-   const addCustomer = useCRMStore(state => state.addCustomer);
+    const [orderNote, setOrderNote] = useState('');
+    const addCustomer = useCRMStore(state => state.addCustomer);
 
 
    // --- Item Options / Discount / Void Reason State ---
@@ -249,8 +304,9 @@ const POS: React.FC = () => {
    // --- Audio Feedback Refs ---
    const scanSuccessAudioRef = useRef<HTMLAudioElement | null>(null);
    const scanErrorAudioRef = useRef<HTMLAudioElement | null>(null);
-   const activeShift = useFinanceStore(state => state.activeShift);
-   const setShift = useFinanceStore(state => state.setShift);
+    const activeShift = useFinanceStore(state => state.activeShift);
+    const setShift = useFinanceStore(state => state.setShift);
+    const refreshActiveShift = useFinanceStore(state => state.refreshActiveShift);
    const isShiftDrawerOpen = useFinanceStore(state => state.isShiftDrawerOpen);
    const setIsShiftDrawerOpen = useFinanceStore(state => state.setIsShiftDrawerOpen);
 
@@ -259,6 +315,7 @@ const POS: React.FC = () => {
    const [itemUsageMap, setItemUsageMap] = useState<Record<string, number>>({});
    const [lastAddedItemId, setLastAddedItemId] = useState<string | null>(null);
    const { showToast } = useToast();
+   const { confirm } = useConfirm();
    const { showModal } = useModal();
    const navigate = useNavigate();
 
@@ -462,6 +519,11 @@ const POS: React.FC = () => {
       }
    }, [cartPanelWidth, isPaymentPanelCollapsed]);
 
+   const searchInputRef = useRef<HTMLInputElement>(null);
+   const tableNumberBufferRef = useRef('');
+   const tableNumberTimerRef = useRef<number | null>(null);
+   const paymentPrefsRef = useRef<Partial<Record<OrderType, PaymentMethod>>>({});
+
    useEffect(() => {
       try {
          const raw = localStorage.getItem(POS_PAYMENT_PREFS_KEY);
@@ -493,11 +555,16 @@ const POS: React.FC = () => {
    // Default menu
    const activeMenuId = (menus || []).find(m => m.isDefault)?.id || (menus || [])[0]?.id;
 
-   const searchInputRef = useRef<HTMLInputElement>(null);
-   const tableNumberBufferRef = useRef('');
-   const tableNumberTimerRef = useRef<number | null>(null);
-   const paymentPrefsRef = useRef<Partial<Record<OrderType, PaymentMethod>>>({});
    // --- Derived Data ---
+   // --- Silent platform pricing (Talabat-style) ---
+   // Mirrors the server exactly: the cashier-facing unit price INCLUDES the
+   // platform markup from the moment the source is picked until the receipt.
+   // The markup never appears as a receipt line; basePrice keeps the audit.
+   const platformMarkup: PlatformMarkup | null = useMemo(
+      () => matchPlatformMarkup(deliveryPlatforms, deliverySource),
+      [deliveryPlatforms, deliverySource]
+   );
+
    const {
       categoryHotkeys,
       categoryResultCounts,
@@ -521,6 +588,7 @@ const POS: React.FC = () => {
       lang,
       searchQuery,
       safeActiveCart: rawActiveCart,
+      platformMarkup,
    });
 
    const safeActiveCart = useMemo(() => {
@@ -579,19 +647,29 @@ const POS: React.FC = () => {
       [safeActiveCart]
    );
 
-   const { cartSubtotal, cartTotal, cartTax, orderDiscountAmount } = useMemo(() => {
-      const subtotal = safeActiveCart.reduce((acc, item) => {
-         const modsPrice = (item.selectedModifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
-         return acc + (((item.price || 0) + modsPrice) * (item.quantity || 0));
-      }, 0);
-      const safeDiscount = Number(discount) || 0;
-      const orderDiscountAmount = subtotal * (safeDiscount / 100);
-      const afterDiscount = Math.max(0, subtotal - orderDiscountAmount - (itemDiscountTotal || 0));
-      const configuredTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
-      const tax = afterDiscount * configuredTaxRate;
-      const total = afterDiscount + tax + (tipAmount || 0);
-      return { cartSubtotal: subtotal, cartTotal: total, cartTax: tax, orderDiscountAmount };
-   }, [safeActiveCart, discount, tipAmount, itemDiscountTotal, settings.taxRate, activeBranch?.taxRate]);
+    const selectedDeliveryZone = useMemo(
+       () => deliveryZones.find((z: any) => String(z.id) === String(selectedDeliveryZoneId)),
+       [deliveryZones, selectedDeliveryZoneId]
+    );
+    const isRestaurantDelivery = activeOrderType === OrderType.DELIVERY && deliverySource === 'restaurant';
+    const posDeliveryFee = isRestaurantDelivery ? Number(selectedDeliveryZone?.deliveryFee || 0) : 0;
+
+    const { cartSubtotal, cartTotal, cartTax, orderDiscountAmount } = useMemo(() => {
+       // Round to 2 decimals exactly like the server (parseFloat(toFixed(2)))
+       // so the amount the cashier sees always matches the saved order.
+       const money = (value: number) => parseFloat(value.toFixed(2));
+       const subtotal = safeActiveCart.reduce((acc, item) => {
+          const modsPrice = (item.selectedModifiers || []).reduce((sum, mod) => sum + (mod.price || 0), 0);
+          return acc + (((item.price || 0) + modsPrice) * (item.quantity || 0));
+       }, 0);
+       const safeDiscount = Number(discount) || 0;
+       const orderDiscountAmount = money(subtotal * (safeDiscount / 100));
+       const afterDiscount = Math.max(0, money(subtotal - orderDiscountAmount - (itemDiscountTotal || 0)));
+       const configuredTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
+       const tax = money(afterDiscount * configuredTaxRate);
+       const total = money(afterDiscount + tax + (tipAmount || 0) + (isRestaurantDelivery ? Number(selectedDeliveryZone?.deliveryFee || 0) : 0));
+       return { cartSubtotal: money(subtotal), cartTotal: total, cartTax: tax, orderDiscountAmount };
+    }, [safeActiveCart, discount, tipAmount, itemDiscountTotal, settings.taxRate, activeBranch?.taxRate, isRestaurantDelivery, selectedDeliveryZone]);
 
    useEffect(() => {
       const hasActiveTableOrder = activeOrderType === OrderType.DINE_IN
@@ -667,29 +745,39 @@ const POS: React.FC = () => {
       }));
    }, [safeActiveCart, lang]);
 
-   // --- Shift Sync ---
-   useEffect(() => {
-      let cancelled = false;
-      const syncShift = async () => {
-         const activeBranchId = settings.activeBranchId;
-         if (!activeBranchId) {
-            if (!cancelled && activeShift) setShift(null);
-            return;
-         }
-         if (activeShift?.branchId === activeBranchId) return;
-         if (activeShift && !cancelled) setShift(null);
-         try {
-            const shift = await shiftsApi.getActive(activeBranchId);
-            if (!cancelled) setShift(shift);
-         } catch (e) {
-            if (!cancelled) {
-               setShift(null);
-            }
-         }
-      };
-      syncShift();
-      return () => { cancelled = true; };
-   }, [activeShift, settings.activeBranchId, setShift]);
+    // --- Shift Sync ---
+    // Single source of truth lives in useFinanceStore.refreshActiveShift:
+    // it only clears the shift on a definitive "no open shift" (404) and
+    // keeps the last known shift on transient failures, so the header never
+    // flashes "no shift" while a shift is actually open.
+    useEffect(() => {
+       let cancelled = false;
+       const activeBranchId = settings.activeBranchId;
+       if (!activeBranchId) {
+          if (activeShift) setShift(null);
+          return;
+       }
+       refreshActiveShift(activeBranchId).catch(() => { });
+       // Self-heal a stale "no shift": revalidate periodically and whenever
+       // the cashier returns to the screen or the connection comes back —
+       // no need to reopen the cashier anymore.
+       const revalidate = () => {
+          if (!cancelled && document.visibilityState !== 'hidden') {
+             refreshActiveShift(settings.activeBranchId || '').catch(() => { });
+          }
+       };
+       const interval = window.setInterval(revalidate, 60_000);
+       window.addEventListener('focus', revalidate);
+       window.addEventListener('online', revalidate);
+       document.addEventListener('visibilitychange', revalidate);
+       return () => {
+          cancelled = true;
+          window.clearInterval(interval);
+          window.removeEventListener('focus', revalidate);
+          window.removeEventListener('online', revalidate);
+          document.removeEventListener('visibilitychange', revalidate);
+       };
+    }, [settings.activeBranchId, refreshActiveShift]);
 
    // --- Effects ---
    useEffect(() => {
@@ -908,9 +996,33 @@ const POS: React.FC = () => {
       quantity = 1,
    ) => {
          const baseMenuItemId = resolveBaseMenuItemId(item);
+      // Single pricing choke-point: every entry path (grid, options modal,
+      // barcode) lands here. basePrice is the original menu price; the stored
+      // unit price silently includes the platform markup when active.
+      const explicitPlatform = (item as any).platformId !== undefined;
+      const base = Number((item as any).basePrice ?? item.price ?? 0);
+      const isOpen = Boolean((item as any).isOpenPrice);
+      const activeMarkup = !isOpen && !explicitPlatform ? platformMarkup : (
+         !isOpen && explicitPlatform && (item as any).platformId
+            ? { platformId: (item as any).platformId, pct: 0, fixed: Number((item as any).platformMarkup || 0) }
+            : null
+      );
+      // Modal-confirmed lines already carry final inclusive prices + audit.
+      const unitPrice = explicitPlatform
+         ? Number(item.price || 0)
+         : (activeMarkup ? applyPlatformMarkup(base, activeMarkup.pct, activeMarkup.fixed) : base);
+      const platformId = explicitPlatform ? ((item as any).platformId ?? null) : (activeMarkup?.platformId ?? null);
+      const markupAmount = explicitPlatform
+         ? Math.max(0, Number((item as any).platformMarkup || 0))
+         : Math.max(0, Math.round(((unitPrice - base) + Number.EPSILON) * 100) / 100);
       const configuredItem = {
          ...item,
          ...(baseMenuItemId ? { menuItemId: baseMenuItemId } : {}),
+         price: unitPrice,
+         basePrice: base,
+         platformId,
+         platformMarkup: markupAmount,
+         isOpenPrice: isOpen || undefined,
          selectedModifiers,
       };
       const existingItem = safeActiveCart.find((cartItem) => hasSameCartConfiguration(cartItem, configuredItem));
@@ -920,11 +1032,9 @@ const POS: React.FC = () => {
          updateCartItemQuantity(existingItem.cartId, safeQuantity);
       } else {
          addToCart({
-            ...item,
-            ...(baseMenuItemId ? { menuItemId: baseMenuItemId } : {}),
+            ...configuredItem,
             cartId: createCartId(),
             quantity: safeQuantity,
-            selectedModifiers,
          } as any);
       }
 
@@ -939,7 +1049,7 @@ const POS: React.FC = () => {
           setLastAddedItemId(prev => prev === item.id ? null : prev);
       }, 400);
 
-   }, [addToCart, safeActiveCart, trackItemUsage, updateCartItemQuantity, playAudioFeedback]);
+    }, [addToCart, safeActiveCart, trackItemUsage, updateCartItemQuantity, playAudioFeedback, platformMarkup]);
 
    // --- Barcode Scanner Integration ---
    useBarcodeScanner({
@@ -1195,8 +1305,9 @@ const POS: React.FC = () => {
       discountType: activeCoupon ? 'COUPON' : undefined,
       discountReason: activeCoupon ? `Coupon: ${activeCoupon}` : undefined,
       couponCode: activeCoupon || undefined,
-      tax: cartTax,
-      total: cartTotal,
+       tax: cartTax,
+       deliveryFee: isRestaurantDelivery ? posDeliveryFee : 0,
+       total: cartTotal,
       createdAt: new Date(),
       paymentMethod: withPayment ? selectedPaymentMethod : undefined,
       notes: buildOrderNotes(),
@@ -1206,9 +1317,10 @@ const POS: React.FC = () => {
       syncStatus: 'PENDING'
    });
 
-   const resetAfterOrderCommit = () => {
-      setDeliveryCustomer(null);
-      setDeliverySource('restaurant');
+    const resetAfterOrderCommit = () => {
+       setDeliveryCustomer(null);
+       setSelectedDeliveryZoneId('');
+       setDeliverySource('restaurant');
       setExternalOrderNumber('');
       setPlatformDeliveryDraft({ customerName: '', customerPhone: '', address: '', notes: '', paymentStatus: 'UNKNOWN' });
       setOrderNote('');
@@ -1243,6 +1355,13 @@ const POS: React.FC = () => {
 
    const [submittingOrderKey, setSubmittingOrderKey] = useState<string | null>(null);
    const submittingOrderKeyRef = useRef<string | null>(null);
+   // When an order was saved but kitchen dispatch failed, keep the cart and
+   // remember it so the next "Send to kitchen" tap RETRIES dispatch instead of
+   // creating a duplicate order.
+   const pendingDispatchRef = useRef<{ orderId: string; cartSignature: string } | null>(null);
+   const cartSignature = useCallback(() =>
+      safeActiveCart.map(item => `${item.cartId}:${item.quantity}:${item.price}`).join('|'),
+   [safeActiveCart]);
 
    const beginOrderSubmit = (prefix: string) => {
       if (submittingOrderKeyRef.current) return null;
@@ -1275,10 +1394,28 @@ const POS: React.FC = () => {
       }
       const submitKey = beginOrderSubmit('send');
       if (!submitKey) return;
+      // Retry path: the order already exists server-side and only the kitchen
+      // dispatch failed — never place the order twice for the same cart.
+      const pending = pendingDispatchRef.current;
+      const signature = cartSignature();
+      if (pending && pending.cartSignature === signature) {
+         try {
+            await fireOrderToKitchen({ id: pending.orderId } as Order);
+            pendingDispatchRef.current = null;
+            resetAfterOrderCommit();
+            showToast(lang === 'ar' ? 'تم إرسال الطلب للمطبخ بنجاح' : 'Kitchen ticket sent successfully', 'success');
+         } catch {
+            showToast(lang === 'ar' ? 'الطلب محفوظ — تعذر إرساله للمطبخ، حاول مرة أخرى' : 'Order is saved — kitchen dispatch failed, try again', 'error');
+         } finally {
+            endOrderSubmit();
+         }
+         return;
+      }
+      pendingDispatchRef.current = null;
       try {
          const draftOrder = buildDraftOrder(false);
          (draftOrder as any).clientSubmitKey = submitKey;
-         const savedOrder = await placeOrder(draftOrder);
+         const savedOrder = await placeOrderOptimistically(draftOrder);
          const changedAt = Date.now();
          const changeDetail = { orderId: savedOrder.id, status: savedOrder.status, event: 'created', changedAt };
          window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
@@ -1291,18 +1428,24 @@ const POS: React.FC = () => {
 
           try {
              await fireOrderToKitchen(savedOrder);
-          } catch {
+             pendingDispatchRef.current = null;
              resetAfterOrderCommit();
-             showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ' : 'Order saved, but kitchen dispatch failed', 'error');
+          } catch {
+             // Order IS saved: keep the cart so a retry re-dispatches the same
+             // order instead of creating a duplicate one.
+             pendingDispatchRef.current = { orderId: savedOrder.id, cartSignature: signature };
+             showToast(lang === 'ar'
+                ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ — اضغط «إرسال للمطبخ» مرة أخرى لإعادة المحاولة'
+                : 'Order saved, but kitchen dispatch failed — press Send to Kitchen again to retry', 'error');
              return;
           }
-          resetAfterOrderCommit();
          showToast(
             lang === 'ar'
                ? 'تم إرسال الطلب للمطبخ بنجاح'
                : 'Kitchen ticket sent successfully',
             'success'
          );
+         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
       } catch (error: any) {
          showToast(getActionableErrorMessage(error, lang), 'error');
       } finally {
@@ -1333,7 +1476,7 @@ const POS: React.FC = () => {
          (draftOrder as any).clientSubmitKey = submitKey;
 
          // 1. Place Order in Store (Syncs with server which now handles inventory)
-          const savedOrder = await placeOrder(draftOrder);
+          const savedOrder = await placeOrderOptimistically(draftOrder);
          const changedAt = Date.now();
          const changeDetail = { orderId: savedOrder.id, status: savedOrder.status, event: 'created', changedAt };
          window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
@@ -1345,15 +1488,8 @@ const POS: React.FC = () => {
                'warning');
          }
 
-         // 2. Record Finance Transactions (Keeping for now although this belongs to an event listener too)
-         recordTransaction({
-            date: new Date(),
-            description: `Sale - Order #${savedOrder.id}`,
-            debitAccountId: '1-1-1',
-            creditAccountId: '4-1',
-            amount: savedOrder.total,
-            referenceId: savedOrder.id
-         });
+         // Finance posting is handled server-side inside createOrder
+         // (postPosOrderEntry + postCogsForOrderEntry). No client-side journal.
 
          if (shouldAutoCompleteDirectOrder()) {
             await updateOrderStatus(savedOrder.id, OrderStatus.COMPLETED, undefined, 'Auto-completed direct order', { skipVersionCheck: true, skipPrint: true });
@@ -1389,6 +1525,12 @@ const POS: React.FC = () => {
              }
            }
            resetAfterOrderCommit();
+         // Explicit success feedback: with receipt printing disabled the
+         // cashier previously had zero confirmation that the sale went through.
+         showToast(lang === 'ar'
+            ? `تم حفظ البيع بنجاح — أوردر #${(savedOrder as any).orderNumber ?? savedOrder.id}`
+            : `Sale saved — Order #${(savedOrder as any).orderNumber ?? savedOrder.id}`, 'success');
+         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
 
       } catch (error: any) {
          showToast(getActionableErrorMessage(error, lang), 'error');
@@ -1397,13 +1539,49 @@ const POS: React.FC = () => {
       }
    };
 
-   const handleQuickPay = async () => {
-      handleSetPaymentMethod(PaymentMethod.CASH);
-      await handleSubmitOrder(PaymentMethod.CASH);
-   };
+    const handleQuickPay = async () => {
+       handleSetPaymentMethod(PaymentMethod.CASH);
+       await handleSubmitOrder(PaymentMethod.CASH);
+    };
 
-   const handleClearCart = () => {
+    // Reprint last ticket: reprints the most recent order of this branch
+    // (receipt + kitchen) when paper was lost — no duplicate order created.
+    const handleReprintLast = async () => {
+       const mine = orders
+          .filter((o: any) => !branchId || String(o.branchId) === String(branchId))
+          .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] as any;
+       if (!mine) {
+          showToast(lang === 'ar' ? 'لا يوجد طلب للطباعة' : 'No order to print', 'warning');
+          return;
+       }
+       try {
+          await printOrderReceipt({ order: mine, printers, settings, currencySymbol, lang, t, branch: branches.find((b: any) => b.id === mine.branchId) });
+          await printKitchenTicketsByRouting({
+             order: mine, categories, printers, branchId: mine.branchId,
+             maxKitchenPrinters: settings.maxKitchenPrinters, settings,
+             currencySymbol, lang, t,
+             branch: branches.find((b: any) => b.id === mine.branchId),
+          });
+          showToast(lang === 'ar' ? 'تمت إعادة الطباعة' : 'Reprinted', 'success');
+       } catch {
+          showToast(lang === 'ar' ? 'تعذرت إعادة الطباعة' : 'Reprint failed', 'error');
+       }
+    };
+
+   const handleClearCart = async () => {
       if (safeActiveCart.length === 0) return;
+      // Destructive: wiping the cart discards the cashier's current work —
+      // require an explicit confirmation first.
+      const confirmed = await confirm({
+         title: isAr ? 'تفريغ الطلب؟' : 'Clear the cart?',
+         message: isAr
+            ? `سيتم حذف ${safeActiveCart.length} صنف من الطلب الحالي ولا يمكن التراجع.`
+            : `${safeActiveCart.length} item(s) will be removed from the current order. This cannot be undone.`,
+         confirmText: isAr ? 'تفريغ' : 'Clear',
+         cancelText: isAr ? 'رجوع' : 'Keep',
+         variant: 'danger',
+      });
+      if (!confirmed) return;
 
       clearCart();
       setDeliveryCustomer(null);
@@ -1582,11 +1760,41 @@ const POS: React.FC = () => {
 
    const handleDeliverySourceChange = (source: string) => {
       const nextSource = source || 'restaurant';
+      const nextMarkup = matchPlatformMarkup(deliveryPlatforms, nextSource);
       setDeliverySource(nextSource);
       setDeliveryCustomer(null);
       setExternalOrderNumber('');
       setPlatformDeliveryDraft({ customerName: '', customerPhone: '', address: '', notes: '', paymentStatus: 'UNKNOWN' });
       if (nextSource === 'restaurant') setOrderName('');
+      // Reprice open cart lines to the newly selected source so the cashier
+      // always collects exactly what the server will charge. Open-price lines
+      // (cashier-entered) are never marked up.
+      if (safeActiveCart.length > 0) {
+         let repriced = 0;
+         safeActiveCart.forEach((line: any) => {
+            if (line.isOpenPrice || line.basePrice == null) return;
+            const base = Number(line.basePrice || 0);
+            const unit = nextMarkup ? applyPlatformMarkup(base, nextMarkup.pct, nextMarkup.fixed) : base;
+            if (Math.abs(Number(line.price || 0) - unit) < 0.005) return;
+            const updated = {
+               ...line,
+               price: unit,
+               platformId: nextMarkup?.platformId ?? null,
+               platformMarkup: Math.max(0, Math.round(((unit - base) + Number.EPSILON) * 100) / 100),
+            };
+            removeFromCart(line.cartId);
+            addToCart(updated);
+            repriced += 1;
+         });
+         if (repriced > 0) {
+            showToast(
+               lang === 'ar'
+                  ? (nextMarkup ? 'تم تحديث أسعار السلة لأسعار المنصة (شاملة النسبة)' : 'تم تحديث أسعار السلة للأسعار الأصلية')
+                  : (nextMarkup ? 'Cart repriced to platform-inclusive prices' : 'Cart repriced to original prices'),
+               'info'
+            );
+         }
+      }
    };
 
    const handleUsePlatformDelivery = () => {
@@ -1649,7 +1857,7 @@ const POS: React.FC = () => {
    }, [safeActiveCart.length, selectedTableId]);
 
    return (
-      <div className="flex h-full app-viewport pos-shell bg-app text-main transition-colors overflow-hidden min-h-0">
+      <div className="ops-fast flex h-full app-viewport pos-shell bg-app text-main transition-colors overflow-hidden min-h-0">
          {/* Hidden audio elements for scanner feedback */}
          <audio ref={scanSuccessAudioRef} preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJN3aGd3aJV7iYB0bHJ/o5aJgXR0fIiUh4R/dnl7j5CDgXl2eYqXioR8dnd+ipKEfnp0eH6WkYV+eHZ5g5OPgoB3d3d/k5GCfnp2d3+UkYJ+e3V3fpORgn56dnd/k5GCfnt1d36TkYJ+enZ3f5ORgn57dQ==" />
          <audio ref={scanErrorAudioRef} preload="auto" src="data:audio/wav;base64,UklGRrQEAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZAEAACAf3+AgIGAgIGBgYKCgoODg4SEhIWFhYaGhoeHh4iIiImIiIeHh4aGhoWFhISEg4OCgoGBgYCAgIB/f39+fn59fX18fHx7e3t6enp5eXl4eHh4d3d3d3d3eHh4eHl5eXp6ent7e3x8fH19fn5+f3+AgICBgYGCgoKDg4OEhA==" />
@@ -1750,10 +1958,20 @@ const POS: React.FC = () => {
                currencySymbol={currencySymbol}
                posMode={posMode}
                onTogglePosMode={() => setPosMode(prev => prev === 'grid' ? 'retail' : 'grid')}
+               onReprintLast={handleReprintLast}
+               onOpenReturns={() => setShowReturnModal(true)}
             />
 
-            <NoteModal
-               isOpen={!!editingItemId}
+            <POSReturnModal
+               isOpen={showReturnModal}
+               onClose={() => setShowReturnModal(false)}
+               lang={lang}
+               branchId={branchId}
+               userName={settings.currentUser?.name}
+               currencySymbol={currencySymbol}
+            />
+
+            <NoteModal               isOpen={!!editingItemId}
                onClose={() => setEditingItemId(null)}
                note={noteInput}
                onNoteChange={setNoteInput}
@@ -1827,21 +2045,32 @@ const POS: React.FC = () => {
                      />
                   </div>
                ) : showCustomerSelect ? (
-                  <CustomerSelectView
-                     customers={customers}
-                     onSelectCustomer={(c) => { setDeliveryCustomer(c); setIsCartOpenMobile(true); }}
-                     onCreateCustomer={() => setShowCustomerModal(true)}
-                     deliveryPlatforms={deliveryPlatforms}
-                     deliverySource={deliverySource}
-                     onDeliverySourceChange={handleDeliverySourceChange}
-                     externalOrderNumber={externalOrderNumber}
-                     onExternalOrderNumberChange={setExternalOrderNumber}
-                     platformDeliveryDraft={platformDeliveryDraft}
-                     onPlatformDeliveryDraftChange={setPlatformDeliveryDraft}
-                     onUsePlatformDelivery={handleUsePlatformDelivery}
-                     lang={lang}
-                     t={t}
-                  />
+                   <CustomerSelectView
+                      customers={customers}
+                      onSelectCustomer={(c) => {
+                         setDeliveryCustomer(c);
+                         const zid = (c as any)?.zoneId;
+                         if (zid) setSelectedDeliveryZoneId(String(zid));
+                         setIsCartOpenMobile(true);
+                      }}
+                      onCreateCustomer={() => setShowCustomerModal(true)}
+                      deliveryPlatforms={deliveryPlatforms}
+                      deliverySource={deliverySource}
+                      onDeliverySourceChange={handleDeliverySourceChange}
+                      externalOrderNumber={externalOrderNumber}
+                      onExternalOrderNumberChange={setExternalOrderNumber}
+                      platformDeliveryDraft={platformDeliveryDraft}
+                      onPlatformDeliveryDraftChange={setPlatformDeliveryDraft}
+                      onUsePlatformDelivery={handleUsePlatformDelivery}
+                      lang={lang}
+                      t={t}
+                      branchId={branchId}
+                      branches={branches}
+                      deliveryZones={deliveryZones}
+                      selectedZoneId={selectedDeliveryZoneId}
+                      onZoneChange={(zoneId) => setSelectedDeliveryZoneId(zoneId)}
+                      onZonesChange={setDeliveryZones}
+                   />
                ) : (
                   <div className={`pos-workspace-grid flex-1 min-h-0 h-full overflow-hidden ${desktopWorkspaceClass}`}>
                      <div className="pos-main-workspace flex h-full overflow-hidden min-h-0 min-w-0">
@@ -1994,14 +2223,21 @@ const POS: React.FC = () => {
                            cartPanelWidthClass={cartPanelWidthClass}
                             splitPayments={splitPayments}
                             customPaymentMethods={settings.customPaymentMethods}
-                           deliveryPlatforms={deliveryPlatforms}
-                           deliverySource={deliverySource}
-                           onDeliverySourceChange={handleDeliverySourceChange}
-                           externalOrderNumber={externalOrderNumber}
-                           onExternalOrderNumberChange={setExternalOrderNumber}
-                           orderNote={orderNote}
-                           onOrderNoteChange={setOrderNote}
-                        />
+                            deliveryPlatforms={deliveryPlatforms}
+                            deliverySource={deliverySource}
+                            onDeliverySourceChange={handleDeliverySourceChange}
+                            externalOrderNumber={externalOrderNumber}
+                            onExternalOrderNumberChange={setExternalOrderNumber}
+                            orderNote={orderNote}
+                            onOrderNoteChange={setOrderNote}
+                            branchId={branchId}
+                            branches={branches}
+                            deliveryZones={deliveryZones}
+                            selectedDeliveryZoneId={selectedDeliveryZoneId}
+                            onDeliveryZoneChange={(zoneId) => setSelectedDeliveryZoneId(zoneId)}
+                            onDeliveryZonesChange={setDeliveryZones}
+                            deliveryFee={posDeliveryFee}
+                         />
                      )}
                   </div>
                )}
@@ -2069,6 +2305,7 @@ const POS: React.FC = () => {
             onConfirm={handleConfirmItemOptions}
             currencySymbol={currencySymbol}
             lang={lang as any}
+            platformMarkup={platformMarkup}
          />
 
          {/* ??? Item Discount Modal ??? */}
