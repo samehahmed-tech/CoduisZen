@@ -18,9 +18,9 @@ router.post('/bridge/jobs/:jobId/fail', requirePrintGatewayToken, failJob);
 // Protected job management (for web UI)
 router.get('/bridges', authenticateToken, requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), getBridges);
 router.use('/jobs', authenticateToken);
-router.post('/jobs', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'CALL_CENTER_AGENT'), enqueueJob);
+router.post('/jobs', requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'CAFE_ADMIN', 'CALL_CENTER_AGENT'), enqueueJob);
 router.get('/jobs', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), listJobs);
-router.post('/jobs/:jobId/complete', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER'), completeJob);
+router.post('/jobs/:jobId/complete', requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'CAFE_ADMIN'), completeJob);
 router.post('/jobs/:jobId/fail', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), failJob);
 router.post('/jobs/:jobId/retry', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), retryJob);
 router.delete('/jobs/purge', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), purgeJobs);

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, inArray, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import {
     inventoryItems,
@@ -11,6 +11,7 @@ import {
     recipes,
 } from '../../../src/db/schema';
 import { orderBusinessDateFilter, orderBusinessDayExpression, parseLocalDateRange } from './reportUtils';
+import { revenueEligibleOrder } from '../../utils/orderRevenue';
 
 export const getVatReport = async (req: Request, res: Response) => {
     try {
@@ -26,6 +27,8 @@ export const getVatReport = async (req: Request, res: Response) => {
             netTotal: sql<number>`sum(subtotal - discount)`,
             taxTotal: sql<number>`sum(tax)`,
             serviceChargeTotal: sql<number>`sum(service_charge)`,
+            deliveryFeeTotal: sql<number>`coalesce(sum(${orders.deliveryFee}), 0)`,
+            discountTotal: sql<number>`coalesce(sum(${orders.discount}), 0)`,
             grandTotal: sql<number>`sum(total)`,
         }).from(orders)
             .where(
@@ -33,13 +36,24 @@ export const getVatReport = async (req: Request, res: Response) => {
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
                     inArray(orders.status, ['DELIVERED', 'COMPLETED']),
+                    isNull(orders.deletedAt),
                 ),
             );
 
+        const s: any = report[0] || {};
         res.json({
             period: { start, end },
             branchId: branchId || 'ALL',
-            summary: report[0] || { count: 0, netTotal: 0, taxTotal: 0, serviceChargeTotal: 0, grandTotal: 0 },
+            // grandTotal = sum(total) is the books truth (net + tax + service + delivery).
+            summary: {
+                count: Number(s.count || 0),
+                netTotal: Number(s.netTotal || 0),
+                taxTotal: Number(s.taxTotal || 0),
+                serviceChargeTotal: Number(s.serviceChargeTotal || 0),
+                deliveryFeeTotal: Number(s.deliveryFeeTotal || 0),
+                discountTotal: Number(s.discountTotal || 0),
+                grandTotal: Number(s.grandTotal || 0),
+            },
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -66,6 +80,11 @@ export const getPaymentMethodSummary = async (req: Request, res: Response) => {
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
                     eq(payments.status, 'COMPLETED'),
+                    // Only takings on live sale orders — payments on
+                    // CANCELLED/REFUNDED/VOID or soft-deleted orders must not
+                    // inflate the collected totals.
+                    inArray(orders.status, ['DELIVERED', 'COMPLETED']),
+                    isNull(orders.deletedAt),
                 ),
             )
             .groupBy(payments.method);
@@ -78,9 +97,10 @@ export const getPaymentMethodSummary = async (req: Request, res: Response) => {
 
 export const getFiscalSummary = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate } = req.query;
+        const { branchId, startDate, endDate } = req.query;
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        const branchScope = branchId ? eq(orders.branchId, branchId as string) : undefined;
 
         const summary = await db.select({
             totalSales: sql<number>`sum(total)`,
@@ -90,12 +110,21 @@ export const getFiscalSummary = async (req: Request, res: Response) => {
         }).from(orders)
             .where(
                 and(
+                    branchScope,
                     businessDateFilter,
                     inArray(orders.status, ['DELIVERED', 'COMPLETED']),
+                    isNull(orders.deletedAt),
                 ),
             );
 
-        const [latestOrder] = await db.select({ id: orders.id }).from(orders).orderBy(desc(orders.createdAt)).limit(1);
+        const [latestOrder] = await db.select({ id: orders.id }).from(orders)
+            .where(
+                and(
+                    branchScope,
+                    isNull(orders.deletedAt),
+                ),
+            )
+            .orderBy(desc(orders.createdAt)).limit(1);
 
         res.json({
             taxPeriod: `${start.getFullYear()}-${start.getMonth() + 1}`,
@@ -119,6 +148,7 @@ export const getDailySales = async (req: Request, res: Response) => {
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const businessDay = orderBusinessDayExpression();
+
         const rows = await db.select({
             day: businessDay,
             revenue: sql<number>`sum(${orders.total})`,
@@ -130,7 +160,8 @@ export const getDailySales = async (req: Request, res: Response) => {
                 and(
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
-                    inArray(orders.status, ['DELIVERED', 'COMPLETED']),
+                    revenueEligibleOrder(),
+                    isNull(orders.deletedAt),
                 ),
             )
             .groupBy(businessDay)
@@ -151,9 +182,13 @@ export const getHourlySales = async (req: Request, res: Response) => {
 
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
+        // Bucket by HOUR (0-23), not by minute — format 'HH:mm' produced ~1440
+        // groups per day. Wall-clock hour of creation; the range itself is
+        // business-day filtered (see orderBusinessDateFilter).
+        const hourBucket = sql<number>`datepart(hour, ${orders.createdAt})`;
         const rows = await db.select({
-            hour: sql<string>`format(${orders.createdAt}, 'HH:mm')`,
+            hour: hourBucket,
             revenue: sql<number>`sum(${orders.total})`,
             orderCount: sql<number>`count(*)`,
         }).from(orders)
@@ -161,11 +196,12 @@ export const getHourlySales = async (req: Request, res: Response) => {
                 and(
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
-                    inArray(orders.status, deliveredStatuses),
+                    revenueEligibleOrder(),
+                    isNull(orders.deletedAt),
                 ),
             )
-            .groupBy(sql`format(${orders.createdAt}, 'HH:mm')`)
-            .orderBy(sql`format(${orders.createdAt}, 'HH:mm') asc`);
+            .groupBy(hourBucket)
+            .orderBy(hourBucket);
 
         res.json(rows);
     } catch (error: any) {
@@ -194,6 +230,8 @@ export const getCashierSummary = async (req: Request, res: Response) => {
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
                     eq(payments.status, 'COMPLETED'),
+                    inArray(orders.status, ['DELIVERED', 'COMPLETED']),
+                    isNull(orders.deletedAt),
                 ),
             )
             .groupBy(sql`coalesce(${payments.processedBy}, 'System/Online')`, payments.method)
@@ -231,10 +269,12 @@ export const getRefundsReport = async (req: Request, res: Response) => {
                 and(
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
-                    inArray(orders.status, ['CANCELLED', 'REFUNDED']),
+                    inArray(orders.status, ['CANCELLED', 'REFUNDED', 'VOID']),
+                    isNull(orders.deletedAt),
                 ),
             )
-            .orderBy(desc(orders.cancelledAt));
+            // cancelledAt is NULL on REFUNDED rows — coalesce keeps ordering deterministic.
+            .orderBy(desc(sql`coalesce(${orders.cancelledAt}, ${orders.updatedAt}, ${orders.createdAt})`));
 
         res.json(refunds);
     } catch (error: any) {
@@ -251,7 +291,7 @@ export const getOverview = async (req: Request, res: Response) => {
 
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const [summary] = await db.select({
             orderCount: sql<number>`count(*)`,
             grossSales: sql<number>`coalesce(sum(${orders.total}), 0)`,
@@ -263,7 +303,8 @@ export const getOverview = async (req: Request, res: Response) => {
             and(
                 branchId ? eq(orders.branchId, branchId as string) : undefined,
                 businessDateFilter,
-                inArray(orders.status, deliveredStatuses),
+                revenueEligibleOrder(),
+                isNull(orders.deletedAt),
             ),
         );
 
@@ -289,7 +330,7 @@ export const getProfitSummary = async (req: Request, res: Response) => {
 
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const [sales] = await db.select({
             grossSales: sql<number>`coalesce(sum(${orders.total}), 0)`,
             netSales: sql<number>`coalesce(sum(${orders.subtotal} - ${orders.discount}), 0)`,
@@ -299,12 +340,17 @@ export const getProfitSummary = async (req: Request, res: Response) => {
             and(
                 branchId ? eq(orders.branchId, branchId as string) : undefined,
                 businessDateFilter,
-                inArray(orders.status, deliveredStatuses),
+                revenueEligibleOrder(),
+                isNull(orders.deletedAt),
             ),
         );
 
+        // COGS prefers the per-line cost snapshot taken at sale time
+        // (orderItems.cost) and falls back to the live catalog cost only for
+        // lines sold before snapshots existed — so price/cost edits never
+        // rewrite history. Voided lines are excluded.
         const cogsRows = await db.select({
-            cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${menuItems.cost}, 0)), 0)`,
+            cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${orderItems.cost}, ${menuItems.cost}, 0)), 0)`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
             .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
@@ -312,7 +358,9 @@ export const getProfitSummary = async (req: Request, res: Response) => {
                 and(
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
-                    inArray(orders.status, deliveredStatuses),
+                    revenueEligibleOrder(),
+                    isNull(orders.deletedAt),
+                    sql`coalesce(${orderItems.status}, '') not in ('VOID', 'VOIDED', 'CANCELLED')`,
                 ),
             );
 
@@ -346,7 +394,7 @@ export const getProfitDaily = async (req: Request, res: Response) => {
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const businessDay = orderBusinessDayExpression();
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const salesRows = await db.select({
             day: businessDay,
             revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
@@ -358,7 +406,8 @@ export const getProfitDaily = async (req: Request, res: Response) => {
                 and(
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
-                    inArray(orders.status, deliveredStatuses),
+                    revenueEligibleOrder(),
+                    isNull(orders.deletedAt),
                 ),
             )
             .groupBy(businessDay)
@@ -367,7 +416,7 @@ export const getProfitDaily = async (req: Request, res: Response) => {
         const cogsBusinessDay = orderBusinessDayExpression();
         const cogsRows = await db.select({
             day: cogsBusinessDay,
-            cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${menuItems.cost}, 0)), 0)`,
+            cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${orderItems.cost}, ${menuItems.cost}, 0)), 0)`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
             .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
@@ -375,7 +424,9 @@ export const getProfitDaily = async (req: Request, res: Response) => {
                 and(
                     branchId ? eq(orders.branchId, branchId as string) : undefined,
                     businessDateFilter,
-                    inArray(orders.status, deliveredStatuses),
+                    revenueEligibleOrder(),
+                    isNull(orders.deletedAt),
+                    sql`coalesce(${orderItems.status}, '') not in ('VOID', 'VOIDED', 'CANCELLED')`,
                 ),
             )
             .groupBy(cogsBusinessDay)
@@ -411,7 +462,7 @@ export const getFoodCostReport = async (req: Request, res: Response) => {
 
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const [menu, recs, recIngredients, inv, soldRows] = await Promise.all([
             db.select().from(menuItems),
             db.select({
@@ -438,7 +489,9 @@ export const getFoodCostReport = async (req: Request, res: Response) => {
                     and(
                         branchId ? eq(orders.branchId, branchId as string) : undefined,
                         businessDateFilter,
-                        inArray(orders.status, deliveredStatuses),
+                        revenueEligibleOrder(),
+                        isNull(orders.deletedAt),
+                        sql`coalesce(${orderItems.status}, '') not in ('VOID', 'VOIDED', 'CANCELLED')`,
                     ),
                 )
                 .groupBy(orderItems.menuItemId),

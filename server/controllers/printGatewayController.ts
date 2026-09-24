@@ -171,6 +171,8 @@ export const bridgeConnect = async (req: Request, res: Response) => {
     const gatewayId = String(req.query?.gatewayId || req.headers['x-gateway-id'] || '').trim();
     const branchId = String(req.query?.branchId || req.headers['x-branch-id'] || '').trim();
     if (!gatewayId) return res.status(400).json({ error: 'GATEWAY_ID_REQUIRED' });
-    if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
-    registerBridge(gatewayId, branchId, res);
+    // A cashier bridge may not know its branch during bootstrap. It can still
+    // receive jobs targeted to its gateway; branch-scoped polling remains the
+    // fallback for unassigned jobs.
+    registerBridge(gatewayId, branchId || '*', res);
 };

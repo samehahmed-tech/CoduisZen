@@ -40,7 +40,7 @@ const PATH_LOADER_MAP: Record<string, string> = {
     '/whatsapp': 'WhatsAppHub', '/mail': 'MailHub', '/menu': 'MenuManager', '/recipes': 'RecipeManager',
     '/receipt-designer': 'ReceiptDesigner',
     '/printers': 'PrinterManager', '/inventory': 'Inventory', '/stock-requests': 'StockRequests', '/production': 'Production',
-    '/wastage': 'WastageManager', '/inventory-intelligence': 'InventoryIntelligence',
+    '/wastage': 'WastageManager', '/butchery': 'ButcheryManager', '/inventory-intelligence': 'InventoryIntelligence',
     '/finance': 'Finance', '/treasury': 'TreasuryHub', '/expenses': 'Expenses', '/reports': 'Reports', '/fiscal': 'FiscalHub',
     '/approvals': 'ApprovalCenter', '/user-management': 'UserManagement',
     '/forensics': 'ForensicsHub', '/franchise': 'FranchiseManager',
@@ -136,6 +136,21 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
         }
     }, [filteredSections, isRouteActive]);
 
+    /* Longest-prefix wins for item highlighting: /inventory must not stay
+       lit when /inventory/suppliers is the actual page (both prefix-match).
+       Section headers keep the loose prefix check so the group still opens. */
+    const isBestRouteActive = useCallback((path: string) => {
+        if (!isRouteActive(path)) return false;
+        const [pathname] = path.split('#');
+        return !filteredSections.some((section) =>
+            section.items.some((item) => {
+                if (item.path === path) return false;
+                const [other] = item.path.split('#');
+                return other.length > pathname.length && isRouteActive(item.path);
+            })
+        );
+    }, [filteredSections, isRouteActive]);
+
     const toggleSection = useCallback((id: string) => {
         setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
     }, []);
@@ -223,7 +238,6 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
 
     const syncHasError = syncStats.failed > 0;
     const syncHasPending = syncStats.pending > 0;
-    const userInitials = user?.name?.split(' ').map((word) => word[0]).join('').substring(0, 2).toUpperCase() || 'AD';
     const totalNavItems = filteredSections.reduce((sum, section) => sum + section.items.length, 0);
 
     return (
@@ -260,14 +274,14 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                     <div className="sidebar-hero-top">
                         <button
                             type="button"
-                            className="sidebar-logomark shrink-0"
+                            className="sidebar-logomark shrink-0 overflow-hidden"
                             onClick={() => navigateTransition('/')}
                             aria-label={lang === 'ar' ? 'العودة للوحة القيادة' : 'Go to dashboard'}
                         >
-                            <span>RF</span>
+                            <img src="/logo.png?v=2" alt="Xen" className="h-full w-auto max-w-none" draggable={false} />
                         </button>
                         <div className="sidebar-text-block sidebar-brand-meta min-w-0 flex-1">
-                            <div className="text-[12px] font-extrabold tracking-tight text-main leading-none">Coduis Zen</div>
+                            <div className="text-[12px] font-extrabold tracking-tight text-main leading-none">Coduis Xen</div>
                             <div className="text-[9px] font-semibold text-muted/50 tracking-widest uppercase mt-0.5">
                                 {lang === 'ar' ? 'نظام الطعام' : 'Restaurant OS'}
                             </div>
@@ -384,7 +398,7 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                                     <div className="sidebar-section-list flex flex-col gap-0.5 overflow-hidden">
                                         {section.items.map((item, itemIdx) => {
                                             const Icon = item.icon;
-                                            const isActive = isRouteActive(item.path);
+                                            const isActive = isBestRouteActive(item.path);
                                             return (
                                                 <NavLink
                                                     key={item.id}

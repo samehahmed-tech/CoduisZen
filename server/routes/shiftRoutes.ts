@@ -2,9 +2,10 @@ import { Router } from 'express';
 import * as shiftController from '../controllers/shiftController';
 import { requireRoles } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
+import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
-const posAuth = requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'WAITER');
+const posAuth = requireRoles(...POS_FLOOR_ROLES);
 
 router.get('/active', posAuth, enforceBranch, shiftController.getActiveShift);
 router.get('/open-shifts', posAuth, enforceBranch, shiftController.getOpenShifts);

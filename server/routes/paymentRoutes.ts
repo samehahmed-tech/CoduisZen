@@ -8,7 +8,7 @@ import { requireRoles } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = express.Router();
-const paymentAccess = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'CASHIER');
+const paymentAccess = requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'CASHIER', 'CAFE_ADMIN');
 
 const sendPaymentError = (res: express.Response, error: unknown) => {
     if (error instanceof PaymentSessionError) {

@@ -141,13 +141,17 @@ export const generateKitchenTicketHTML = ({
       font-size: 20px;
       font-weight: 900;
    }
-   .k-type-badge {
-      font-size: 13px;
-      font-weight: 800;
-      padding: 2px 10px;
-      border: 2px solid #fff;
-      border-radius: 4px;
-   }
+    .k-type-badge {
+       font-size: 13px;
+       font-weight: 800;
+       line-height: 1.8;
+       padding: 4px 12px;
+       border: 2px solid #fff;
+       border-radius: 8px;
+       overflow: visible;
+       white-space: normal;
+       text-align: center;
+    }
    .k-time {
       font-size: 14px;
       font-weight: 700;

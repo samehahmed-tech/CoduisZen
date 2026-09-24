@@ -9,7 +9,7 @@ const router = Router();
 const refundRead = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR');
 const refundManage = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER_MANAGER');
 // Counter staff may REQUEST returns (approve/process stay restricted).
-const refundRequest = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER_MANAGER', 'CASHIER', 'WAITER', 'CAPTAIN', 'CALL_CENTER', 'CALL_CENTER_MANAGER');
+const refundRequest = requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'CASHIER_MANAGER', 'CASHIER', 'WAITER', 'CAPTAIN', 'CAFE_ADMIN', 'CALL_CENTER', 'CALL_CENTER_MANAGER');
 
 // Refund read
 router.get('/', refundRead, scopeBranchQuery, ctrl.getRefunds);

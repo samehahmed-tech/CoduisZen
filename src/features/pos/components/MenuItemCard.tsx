@@ -1,9 +1,45 @@
 import React, { useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
-import { ItemImage } from './ItemImage';
+import { ItemImage, NoPhoto } from './ItemImage';
 import { useZenTilt } from './useZenTilt';
 import { playPosClick } from './posClickSound';
 import { MenuItem } from '@/types';
+
+/* ═══════════════════════════════════════════════════════════════════
+   8 card designs (from menu-item-card-concept.html), theme-aware via
+   rgb(var(--…)) tokens + .dark overrides in pos-zen-cards.css.
+   density accepts legacy values and normalizes them:
+     comfortable → sahara · compact → ticket
+     ultra → kiosk · buttons → circle
+   ═══════════════════════════════════════════════════════════════════ */
+
+export type CardDesign =
+    | 'sahara' | 'typo' | 'noir' | 'ticket'
+    | 'circle' | 'kiosk' | 'pop' | 'gold';
+
+/** Legacy density ids (persisted user prefs) + new design ids. */
+export type CardDensity = CardDesign | 'comfortable' | 'compact' | 'ultra' | 'buttons';
+
+const LEGACY_DENSITY_MAP: Record<string, CardDesign> = {
+    comfortable: 'sahara',
+    compact: 'ticket',
+    ultra: 'kiosk',
+    buttons: 'circle',
+};
+
+export const CARD_DESIGNS: CardDesign[] = [
+    'sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold',
+];
+
+export const resolveCardDesign = (density?: string | null): CardDesign => {
+    if (!density) return 'sahara';
+    if ((CARD_DESIGNS as string[]).includes(density)) return density as CardDesign;
+    return LEGACY_DENSITY_MAP[density] ?? 'sahara';
+};
+
+/** Card footprint: small / medium / large (persisted POS pref). */
+export type CardSize = 'small' | 'medium' | 'large';
+export const CARD_SIZES: CardSize[] = ['small', 'medium', 'large'];
 
 interface MenuItemCardProps {
     item: MenuItem;
@@ -12,7 +48,7 @@ interface MenuItemCardProps {
     quantity?: number;
     currencySymbol: string;
     isTouchMode: boolean;
-    density?: 'comfortable' | 'compact' | 'ultra' | 'buttons';
+    density?: CardDensity;
     lang: 'en' | 'ar';
     highlighted?: boolean;
 }
@@ -41,7 +77,7 @@ const stateAttrs = (quantity: number, highlighted: boolean, isAvailable: boolean
     'data-has-image': hasImage ? 'true' : 'false',
 });
 
-/** Real photo? Empty/missing images collapse the media zone so data breathes. */
+/** Real photo? Empty/missing images collapse to the monogram state. */
 const hasItemImage = (item: MenuItem) => {
     const src = (item as any).image;
     return typeof src === 'string' ? src.trim().length > 0 : !!src;
@@ -87,13 +123,20 @@ const cardClick = (e: React.MouseEvent, isAvailable: boolean, onCardClick: () =>
     }
 };
 
+const tiltHandlers = (tilt: ReturnType<typeof useZenTilt>) => ({
+    ref: tilt.ref,
+    onPointerMove: tilt.onPointerMove,
+    onPointerLeave: tilt.onPointerLeave,
+    onPointerCancel: tilt.onPointerCancel,
+    onPointerDown: tilt.onPointerDown,
+    onPointerUp: tilt.onPointerUp,
+});
+
 /* ═══════════════════════════════════════════
-   01 · MENU POSTER  (comfortable density)
-   Warm editorial card. Paper identity, serif title,
-   photo hero, price + Add/stepper foot.
+   01 · SAHARA EDITORIAL — warm balanced hero
    ═══════════════════════════════════════════ */
 
-const PosterCard: React.FC<SharedCardProps> = ({
+const SaharaCard: React.FC<SharedCardProps> = ({
     item, displayName, isAvailable, quantity, currencySymbol, lang,
     highlighted, touch, onAdd, onRemove, onCardClick,
 }) => {
@@ -101,8 +144,11 @@ const PosterCard: React.FC<SharedCardProps> = ({
     const addLabel = isAr ? 'أضف +' : 'ADD +';
     const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
     const metaLine = getCategoryLabel(item, lang) || (isAr ? 'مميز · طازج' : 'PREMIUM · FRESH');
+    const description = getItemDescription(item, lang);
     const fixed = hasFixedPrice(item);
     const showImage = hasItemImage(item);
+    const optionsCount = getOptionsCount(item);
+    const prep = (item as any).preparationTime;
     const tilt = useZenTilt<HTMLDivElement>({ maxRX: 6, maxRY: 8 }, touch || !isAvailable);
     return (
         <div
@@ -113,45 +159,46 @@ const PosterCard: React.FC<SharedCardProps> = ({
             aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
             onClick={(e) => cardClick(e, isAvailable, onCardClick)}
             onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
-            className="zen-card zen-poster zen-tilt"
-            ref={tilt.ref}
-            onPointerMove={tilt.onPointerMove}
-            onPointerLeave={tilt.onPointerLeave}
-            onPointerCancel={tilt.onPointerCancel}
-            onPointerDown={tilt.onPointerDown}
-            onPointerUp={tilt.onPointerUp}
+            className="zen-card zen-sahara zen-tilt"
+            {...tiltHandlers(tilt)}
         >
             <span className="zen-glare" aria-hidden="true" />
-            <div className="photo">
-                {showImage ? <ItemImage src={item.image} name={displayName} className="zen-img" /> : null}
-                {item.isPopular && isAvailable && (
-                    <span className="stamp">★ {isAr ? 'الأكثر مبيعًا' : 'Best Seller'}</span>
+            <span className="zen-shine" aria-hidden="true" />
+            <div className="sh-media">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img" />
+                ) : (
+                    <NoPhoto name={displayName} />
                 )}
-                <span className="qty-dot" aria-hidden="true">{quantity}</span>
+                {item.isPopular && isAvailable && (
+                    <span className="sh-stamp">★ {isAr ? 'الأكثر مبيعًا' : 'Best Seller'}</span>
+                )}
+                {quantity > 0 && <span className="sh-qty" aria-hidden="true">{quantity}</span>}
+                {fixed && <span className="sh-price">{formatPrice(item)}<small>{currencySymbol}</small></span>}
                 {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
             </div>
-            <div className="pbody">
-                <div className="pmeta">{metaLine}</div>
+            <div className="sh-body">
+                <div className="sh-eyebrow">{metaLine}</div>
                 <h3 title={displayName}>{displayName}</h3>
-                <div className="pfoot">
-                    {fixed ? (
-                        <div className="price">{formatPrice(item)}<small>{currencySymbol}</small></div>
-                    ) : (
-                        <div className="price-note">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
-                    )}
+                {description && <div className="sh-desc">{description}</div>}
+                <div className="sh-chips" aria-hidden="true">
+                    {optionsCount > 0 && <span>{optionsCount} {isAr ? 'خيارات' : 'options'}</span>}
+                    {prep ? <span>⏱ {prep} {isAr ? 'د' : 'MIN'}</span> : null}
+                </div>
+                <div className="sh-foot">
                     {quantity > 0 ? (
-                        <div className="step" role="group" aria-label={displayName}>
-                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={16} strokeWidth={3} /></button>
+                        <div className="sh-step" role="group" aria-label={displayName}>
+                            <button className="ghost" onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={16} strokeWidth={3} /></button>
                             <b aria-live="polite">{quantity}</b>
                             <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={16} strokeWidth={3} /></button>
                         </div>
                     ) : (
                         <button
-                            className="add"
+                            className="sh-add"
                             onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
                             disabled={!isAvailable}
                         >
-                            {addLabel}
+                            {isAvailable ? addLabel : unavailableLabel}
                         </button>
                     )}
                 </div>
@@ -161,24 +208,20 @@ const PosterCard: React.FC<SharedCardProps> = ({
 };
 
 /* ═══════════════════════════════════════════
-   02 · EDGE RAIL  (compact density)
-   Dense horizontal operations row: thumb + status,
-   name, price stub, + / stepper.
+   02 · TYPO BRUTALIST — print-first, no-photo-proof
    ═══════════════════════════════════════════ */
 
-const RailCard: React.FC<SharedCardProps> = ({
+const TypoCard: React.FC<SharedCardProps> = ({
     item, displayName, isAvailable, quantity, currencySymbol, lang,
     highlighted, touch, onAdd, onRemove, onCardClick,
 }) => {
     const isAr = lang === 'ar';
+    const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
+    const catLine = getCategoryLabel(item, lang) || (isAr ? 'أصناف' : 'ITEMS');
     const description = getItemDescription(item, lang);
-    const prep = (item as any).preparationTime;
-    const statusLine = isAvailable
-        ? `● ${isAr ? 'متاح' : 'Available'}${prep ? ` · ${prep} ${isAr ? 'د' : 'MIN'}` : ''}`
-        : `● ${isAr ? 'غير متاح' : 'Unavailable'}`;
     const fixed = hasFixedPrice(item);
     const showImage = hasItemImage(item);
-    const tilt = useZenTilt<HTMLDivElement>({ maxRX: 3, maxRY: 4 }, touch || !isAvailable);
+    const tilt = useZenTilt<HTMLDivElement>({ maxRX: 4, maxRY: 5 }, touch || !isAvailable);
     return (
         <div
             {...stateAttrs(quantity, highlighted, isAvailable, showImage)}
@@ -188,70 +231,62 @@ const RailCard: React.FC<SharedCardProps> = ({
             aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
             onClick={(e) => cardClick(e, isAvailable, onCardClick)}
             onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
-            className="zen-card zen-rail zen-tilt"
-            ref={tilt.ref}
-            onPointerMove={tilt.onPointerMove}
-            onPointerLeave={tilt.onPointerLeave}
-            onPointerCancel={tilt.onPointerCancel}
-            onPointerDown={tilt.onPointerDown}
-            onPointerUp={tilt.onPointerUp}
+            className="zen-card zen-typo zen-tilt"
+            {...tiltHandlers(tilt)}
         >
             <span className="zen-glare" aria-hidden="true" />
-            <div className="rimg">
-                {showImage ? <ItemImage src={item.image} name={displayName} className="zen-img" /> : null}
-                <span className="rqty" aria-hidden="true">{quantity}</span>
-                {!isAvailable && <span className="zen-veil">{isAr ? 'غير متاح' : 'OUT'}</span>}
-            </div>
-            <div className="rinfo">
-                <div className="status">{statusLine}</div>
-                <h3 title={displayName}>{displayName}</h3>
-                <p className="sub">{description || (item.isPopular ? (isAr ? '★ صنف مميز' : '★ Popular pick') : (isAr ? 'إضافة سريعة بضغطة واحدة' : 'One-tap quick add'))}</p>
-                <div className="rbottom">
-                    {fixed ? (
-                        <div className="rprice"><small>{isAr ? 'السعر' : 'PRICE'}</small>{formatPrice(item)} <span className="cur">{currencySymbol}</span></div>
-                    ) : (
-                        <div className="rprice-note">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
-                    )}
-                    {quantity > 0 ? (
-                        <div className="step" role="group" aria-label={displayName}>
-                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
-                            <b aria-live="polite">{quantity}</b>
-                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
-                        </div>
-                    ) : (
-                        <button
-                            className="radd"
-                            onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
-                            disabled={!isAvailable}
-                            aria-label={`${isAr ? 'أضف' : 'Add'} ${displayName}`}
-                        >
-                            +
-                        </button>
-                    )}
+            <span className="zen-shine" aria-hidden="true" />
+            <div className="ty-row">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img ty-thumb" />
+                ) : (
+                    <div className="ty-thumb"><NoPhoto name={displayName} /></div>
+                )}
+                <div className="ty-head">
+                    <span className="ty-kicker">{catLine}</span>
+                    <h3 title={displayName}>{displayName}</h3>
                 </div>
+                {quantity > 0 && <span className="ty-qty" aria-hidden="true">{quantity}</span>}
             </div>
+            {description && <div className="ty-desc">{description}</div>}
+            <div className="ty-price">
+                {fixed ? <>{formatPrice(item)} <small>{currencySymbol}</small></> : <span className="ty-var">{isAr ? 'حسب الاختيار' : 'As selected'}</span>}
+            </div>
+            <div className="ty-foot">
+                {quantity > 0 ? (
+                    <div className="ty-step" role="group" aria-label={displayName}>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={16} strokeWidth={3} /></button>
+                        <b aria-live="polite">{quantity}</b>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={16} strokeWidth={3} /></button>
+                    </div>
+                ) : (
+                    <button
+                        className="ty-add"
+                        onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                        disabled={!isAvailable}
+                    >
+                        {isAvailable ? (isAr ? 'أضف للطلب +' : 'ADD TO ORDER +') : unavailableLabel}
+                    </button>
+                )}
+            </div>
+            {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
         </div>
     );
 };
 
 /* ═══════════════════════════════════════════
-   03 · GLASS TILE  (ultra density)
-   Translucent premium theme card: media, title +
-   price, chips, full-width action.
+   03 · GLASS NOIR — premium night card
    ═══════════════════════════════════════════ */
 
-const GlassCard: React.FC<SharedCardProps> = ({
+const NoirCard: React.FC<SharedCardProps> = ({
     item, displayName, isAvailable, quantity, currencySymbol, lang,
     highlighted, touch, onAdd, onRemove, onCardClick,
 }) => {
     const isAr = lang === 'ar';
+    const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
+    const metaLine = getCategoryLabel(item, lang) || (isAr ? 'مميز · طازج' : 'PREMIUM · FRESH');
     const description = getItemDescription(item, lang);
-    const optionsCount = getOptionsCount(item);
-    const prep = (item as any).preparationTime;
     const fixed = hasFixedPrice(item);
-    const unitSuffix = fixed ? `${formatPrice(item)} ${currencySymbol}` : (isAr ? 'حسب الاختيار' : 'As selected');
-    const addLabel = `${isAr ? 'أضف للطلب' : 'ADD TO TICKET'} · ${unitSuffix}`;
-    const addedLabel = `✓ ${quantity} · ${unitSuffix}`;
     const showImage = hasItemImage(item);
     const tilt = useZenTilt<HTMLDivElement>({ maxRX: 7, maxRY: 10 }, touch || !isAvailable);
     return (
@@ -263,73 +298,128 @@ const GlassCard: React.FC<SharedCardProps> = ({
             aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
             onClick={(e) => cardClick(e, isAvailable, onCardClick)}
             onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
-            className="zen-card zen-glass zen-tilt"
-            ref={tilt.ref}
-            onPointerMove={tilt.onPointerMove}
-            onPointerLeave={tilt.onPointerLeave}
-            onPointerCancel={tilt.onPointerCancel}
-            onPointerDown={tilt.onPointerDown}
-            onPointerUp={tilt.onPointerUp}
+            className="zen-card zen-noir zen-tilt"
+            {...tiltHandlers(tilt)}
         >
             <span className="zen-glare" aria-hidden="true" />
-            <div className="gmedia">
-                {showImage ? <ItemImage src={item.image} name={displayName} className="zen-img" /> : null}
-                {optionsCount > 0
-                    ? <span className="gbadge">{isAr ? `قابل للتخصيص · ${optionsCount} خيارات` : `Customizable · ${optionsCount} options`}</span>
-                    : item.isPopular && <span className="gbadge">★ {isAr ? 'مميز' : 'Popular'}</span>}
-                <span className="gqty" aria-hidden="true">{quantity}</span>
-                {!isAvailable && <span className="zen-veil">{isAr ? 'غير متاح' : 'SOLD OUT'}</span>}
-            </div>
-            <div className="gbody">
-                <div className="gtop">
-                    <h3 title={displayName}>{displayName}</h3>
+            <span className="zen-shine" aria-hidden="true" />
+            {showImage ? (
+                <ItemImage src={item.image} name={displayName} className="zen-img nr-bg" />
+            ) : (
+                <NoPhoto name={displayName} />
+            )}
+            {item.isPopular && isAvailable && (
+                <span className="nr-stamp">★ {isAr ? 'الأكثر مبيعًا' : 'Best Seller'}</span>
+            )}
+            {quantity > 0 && <span className="nr-qty" aria-hidden="true">{quantity}</span>}
+            <div className="nr-body">
+                <div className="nr-eyebrow">{metaLine}</div>
+                <h3 title={displayName}>{displayName}</h3>
+                {description && <div className="nr-desc">{description}</div>}
+                <div className="nr-foot">
                     {fixed ? (
-                        <div className="gprice">{formatPrice(item)} <small>{currencySymbol}</small></div>
+                        <div className="nr-price">{formatPrice(item)} <small>{currencySymbol}</small></div>
                     ) : (
-                        <div className="gprice-note">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
+                        <div className="nr-var">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
+                    )}
+                    {quantity > 0 ? (
+                        <div className="nr-step" role="group" aria-label={displayName}>
+                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
+                            <b aria-live="polite">{quantity}</b>
+                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
+                        </div>
+                    ) : (
+                        <button
+                            className="nr-add"
+                            onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                            disabled={!isAvailable}
+                        >
+                            {isAr ? 'أضف +' : 'ADD +'}
+                        </button>
                     )}
                 </div>
-                <div className="gsub">{description || getCategoryLabel(item, lang) || (isAr ? 'إضافة سريعة بضغطة واحدة' : 'One-tap quick add')}</div>
-                <div className="chips" aria-hidden="true">
-                    {optionsCount > 0 && <span>{isAr ? `${optionsCount} خيارات` : `${optionsCount} options`}</span>}
-                    {prep ? <span>{prep} {isAr ? 'د' : 'MIN'}</span> : <span>{isAr ? 'سريع' : 'QUICK'}</span>}
-                </div>
-                {quantity > 0 ? (
-                    <div className="gstep" role="group" aria-label={displayName}>
-                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={16} strokeWidth={3} /></button>
-                        <b aria-live="polite">{quantity > 0 ? addedLabel : addLabel}</b>
-                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={16} strokeWidth={3} /></button>
-                    </div>
-                ) : (
-                    <button
-                        className="gact"
-                        onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
-                        disabled={!isAvailable}
-                    >
-                        {addLabel}
-                    </button>
-                )}
             </div>
+            {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
         </div>
     );
 };
 
 /* ═══════════════════════════════════════════
-   04 · SPLIT ACTION  (buttons density)
-   Bold image-first card: circular price object,
-   unmistakable dual action zone.
+   04 · TICKET LEDGER — rush-hour rows
    ═══════════════════════════════════════════ */
 
-const SplitCard: React.FC<SharedCardProps> = ({
+const TicketRow: React.FC<SharedCardProps> = ({
+    item, displayName, isAvailable, quantity, currencySymbol, lang,
+    highlighted, onAdd, onRemove, onCardClick,
+}) => {
+    const isAr = lang === 'ar';
+    const optionsCount = getOptionsCount(item);
+    const prep = (item as any).preparationTime;
+    const fixed = hasFixedPrice(item);
+    const showImage = hasItemImage(item);
+    const meta = [
+        item.isPopular ? (isAr ? '★ مميز' : '★ Popular') : null,
+        optionsCount > 0 ? (isAr ? `${optionsCount} خيارات` : `${optionsCount} options`) : null,
+        prep ? `${prep} ${isAr ? 'د' : 'MIN'}` : null,
+    ].filter(Boolean).join(' · ');
+    return (
+        <div
+            {...stateAttrs(quantity, highlighted, isAvailable, showImage)}
+            role="button"
+            tabIndex={isAvailable ? 0 : -1}
+            aria-disabled={!isAvailable}
+            aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
+            onClick={(e) => cardClick(e, isAvailable, onCardClick)}
+            onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
+            className="zen-card zen-ticket"
+        >
+            {showImage ? (
+                <ItemImage src={item.image} name={displayName} className="zen-img tk-thumb" />
+            ) : (
+                <div className="tk-thumb"><NoPhoto name={displayName} /></div>
+            )}
+            <div className="tk-info">
+                <h3 title={displayName}>{displayName}</h3>
+                <p className="tk-meta">{meta || (isAr ? 'إضافة سريعة بضغطة واحدة' : 'One-tap quick add')}</p>
+            </div>
+            {fixed ? (
+                <div className="tk-price">{formatPrice(item)}<small>{currencySymbol}</small></div>
+            ) : (
+                <div className="tk-var">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
+            )}
+            {quantity > 0 ? (
+                <div className="tk-step" role="group" aria-label={displayName}>
+                    <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
+                    <b aria-live="polite">{quantity}</b>
+                    <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
+                </div>
+            ) : (
+                <button
+                    className="tk-add"
+                    onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                    disabled={!isAvailable}
+                    aria-label={`${isAr ? 'أضف' : 'Add'} ${displayName}`}
+                >
+                    <Plus size={15} strokeWidth={3} />
+                    <span>{isAvailable ? (isAr ? 'أضف' : 'ADD') : (isAr ? 'نفد' : 'OUT')}</span>
+                </button>
+            )}
+        </div>
+    );
+};
+
+/* ═══════════════════════════════════════════
+   05 · SPLIT CIRCLE — friendly touch-first
+   ═══════════════════════════════════════════ */
+
+const CircleCard: React.FC<SharedCardProps> = ({
     item, displayName, isAvailable, quantity, currencySymbol, lang,
     highlighted, touch, onAdd, onRemove, onCardClick,
 }) => {
     const isAr = lang === 'ar';
-    const description = getItemDescription(item, lang);
+    const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
+    const description = getItemDescription(item, lang) || getCategoryLabel(item, lang) || (isAr ? 'إضافة سريعة بضغطة واحدة' : 'One-tap quick add');
     const fixed = hasFixedPrice(item);
-    const addLabel = quantity > 0
-        ? `✓ ${isAr ? 'تمت الإضافة' : 'ADDED'} ×${quantity}`
-        : (isAr ? 'أضف للطلب' : 'ADD TO TICKET');
     const showImage = hasItemImage(item);
     const tilt = useZenTilt<HTMLDivElement>({ maxRX: 5, maxRY: 6 }, touch || !isAvailable);
     return (
@@ -341,73 +431,247 @@ const SplitCard: React.FC<SharedCardProps> = ({
             aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
             onClick={(e) => cardClick(e, isAvailable, onCardClick)}
             onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
-            className="zen-card zen-split zen-tilt"
-            ref={tilt.ref}
-            onPointerMove={tilt.onPointerMove}
-            onPointerLeave={tilt.onPointerLeave}
-            onPointerCancel={tilt.onPointerCancel}
-            onPointerDown={tilt.onPointerDown}
-            onPointerUp={tilt.onPointerUp}
+            className="zen-card zen-circle zen-tilt"
+            {...tiltHandlers(tilt)}
         >
             <span className="zen-glare" aria-hidden="true" />
-            <div className="smedia">
-                {showImage ? <ItemImage src={item.image} name={displayName} className="zen-img" /> : null}
-                {item.isPopular && isAvailable && (
-                    <span className="sstamp">★ {isAr ? 'مميز' : 'Popular'}</span>
+            <span className="zen-shine" aria-hidden="true" />
+            <div className="cc-wrap">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img cc-photo" />
+                ) : (
+                    <div className="cc-photo"><NoPhoto name={displayName} /></div>
                 )}
-                <span className="sqty" aria-hidden="true">{quantity}</span>
-                <div className="ring-price" aria-hidden="true">
-                    {fixed ? (
-                        <div>{formatPrice(item)}<small>{currencySymbol}</small></div>
-                    ) : (
-                        <div className="ring-price-note">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
-                    )}
+                <div className="cc-ring" aria-hidden="true">
+                    {fixed ? <>{formatPrice(item)}<small>{currencySymbol}</small></> : <span className="cc-var">{isAr ? 'حسب الاختيار' : 'As selected'}</span>}
                 </div>
-                {!isAvailable && <span className="zen-veil">{isAr ? 'غير متاح' : 'SOLD OUT'}</span>}
+                {quantity > 0 && <span className="cc-qty" aria-hidden="true">{quantity}</span>}
             </div>
-            <div className="sbody">
-                <h3 title={displayName}>{displayName}</h3>
-                <div className="sdesc">{description || getCategoryLabel(item, lang) || (isAr ? 'إضافة سريعة بضغطة واحدة' : 'One-tap quick add')}</div>
-                <div className="sactions">
-                    {quantity > 0 ? (
-                        <div className="sstep" role="group" aria-label={displayName}>
-                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={16} strokeWidth={3} /></button>
-                            <b aria-live="polite">{quantity}</b>
-                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={16} strokeWidth={3} /></button>
-                        </div>
-                    ) : (
+            <h3 title={displayName}>{displayName}</h3>
+            <div className="cc-desc">{description}</div>
+            <div className="cc-actions">
+                {quantity > 0 ? (
+                    <div className="cc-step" role="group" aria-label={displayName}>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={16} strokeWidth={3} /></button>
+                        <b aria-live="polite">{quantity}</b>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={16} strokeWidth={3} /></button>
+                    </div>
+                ) : (
+                    <>
                         <button
-                            className="sadd"
+                            className="cc-add"
                             onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
                             disabled={!isAvailable}
                         >
-                            {addLabel}
+                            {isAvailable ? (isAr ? 'أضف للطلب' : 'ADD TO TICKET') : unavailableLabel}
                         </button>
-                    )}
+                        <button
+                            className="cc-plus"
+                            onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                            disabled={!isAvailable}
+                            aria-label={`${isAr ? 'أضف' : 'Add'} ${displayName}`}
+                        >
+                            +
+                        </button>
+                    </>
+                )}
+            </div>
+            {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
+        </div>
+    );
+};
+
+/* ═══════════════════════════════════════════
+   06 · KIOSK MINI — maximum density tiles
+   ═══════════════════════════════════════════ */
+
+const KioskTile: React.FC<SharedCardProps> = ({
+    item, displayName, isAvailable, quantity, currencySymbol, lang,
+    highlighted, onAdd, onRemove, onCardClick,
+}) => {
+    const isAr = lang === 'ar';
+    const fixed = hasFixedPrice(item);
+    const showImage = hasItemImage(item);
+    return (
+        <div
+            {...stateAttrs(quantity, highlighted, isAvailable, showImage)}
+            role="button"
+            tabIndex={isAvailable ? 0 : -1}
+            aria-disabled={!isAvailable}
+            aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
+            onClick={(e) => cardClick(e, isAvailable, onCardClick)}
+            onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
+            className="zen-card zen-kiosk"
+        >
+            <div className="kk-media">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img" />
+                ) : (
+                    <NoPhoto name={displayName} />
+                )}
+                {quantity > 0 && <span className="kk-qty" aria-hidden="true">{quantity}</span>}
+                {!isAvailable && <span className="zen-veil">{isAr ? 'نفد' : 'OUT'}</span>}
+            </div>
+            <div className="kk-body">
+                <h3 title={displayName}>{displayName}</h3>
+                <div className="kk-price">{fixed ? <>{formatPrice(item)} <small>{currencySymbol}</small></> : <span className="kk-var">{isAr ? 'حسب الاختيار' : 'As selected'}</span>}</div>
+                {quantity > 0 ? (
+                    <div className="kk-step" role="group" aria-label={displayName}>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}>−</button>
+                        <b aria-live="polite">{quantity}</b>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}>+</button>
+                    </div>
+                ) : (
                     <button
-                        className="splus"
+                        className="kk-add"
                         onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
                         disabled={!isAvailable}
-                        aria-label={`${isAr ? 'أضف' : 'Add'} ${displayName}`}
                     >
-                        +
+                        {isAr ? 'أضف' : 'ADD'}
                     </button>
-                </div>
+                )}
             </div>
         </div>
     );
 };
 
 /* ═══════════════════════════════════════════
-   Main export — density selects personality.
-   comfortable → Poster · compact → Rail
-   ultra → Glass · buttons → Split
+   07 · CAFÉ POP — playful morning card
+   ═══════════════════════════════════════════ */
+
+const PopCard: React.FC<SharedCardProps> = ({
+    item, displayName, isAvailable, quantity, currencySymbol, lang,
+    highlighted, touch, onAdd, onRemove, onCardClick,
+}) => {
+    const isAr = lang === 'ar';
+    const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
+    const description = getItemDescription(item, lang);
+    const fixed = hasFixedPrice(item);
+    const showImage = hasItemImage(item);
+    const tilt = useZenTilt<HTMLDivElement>({ maxRX: 5, maxRY: 7 }, touch || !isAvailable);
+    return (
+        <div
+            {...stateAttrs(quantity, highlighted, isAvailable, showImage)}
+            role="button"
+            tabIndex={isAvailable ? 0 : -1}
+            aria-disabled={!isAvailable}
+            aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
+            onClick={(e) => cardClick(e, isAvailable, onCardClick)}
+            onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
+            className="zen-card zen-pop zen-tilt"
+            {...tiltHandlers(tilt)}
+        >
+            <span className="zen-glare" aria-hidden="true" />
+            <span className="zen-shine" aria-hidden="true" />
+            <div className="pp-media">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img" />
+                ) : (
+                    <NoPhoto name={displayName} />
+                )}
+                {fixed && <span className="pp-float">{formatPrice(item)} {currencySymbol}</span>}
+                {quantity > 0 && <span className="pp-qty" aria-hidden="true">{quantity}</span>}
+            </div>
+            <h3 title={displayName}>{displayName}</h3>
+            {description && <div className="pp-desc">{description}</div>}
+            <div className="pp-foot">
+                <div className="pp-price">{fixed ? formatPrice(item) : (isAr ? 'حسب الاختيار' : 'As selected')}</div>
+                {quantity > 0 ? (
+                    <div className="pp-step" role="group" aria-label={displayName}>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
+                        <b aria-live="polite">{quantity}</b>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
+                    </div>
+                ) : (
+                    <button
+                        className="pp-add"
+                        onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                        disabled={!isAvailable}
+                    >
+                        {isAvailable ? (isAr ? 'أضف +' : 'ADD +') : unavailableLabel}
+                    </button>
+                )}
+            </div>
+            {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
+        </div>
+    );
+};
+
+/* ═══════════════════════════════════════════
+   08 · MAISON GOLD — fine-dining card
+   ═══════════════════════════════════════════ */
+
+const GoldCard: React.FC<SharedCardProps> = ({
+    item, displayName, isAvailable, quantity, currencySymbol, lang,
+    highlighted, touch, onAdd, onRemove, onCardClick,
+}) => {
+    const isAr = lang === 'ar';
+    const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
+    const metaLine = getCategoryLabel(item, lang) || (isAr ? 'اختيار الشيف' : "CHEF'S SELECTION");
+    const description = getItemDescription(item, lang);
+    const fixed = hasFixedPrice(item);
+    const showImage = hasItemImage(item);
+    const tilt = useZenTilt<HTMLDivElement>({ maxRX: 4, maxRY: 6 }, touch || !isAvailable);
+    return (
+        <div
+            {...stateAttrs(quantity, highlighted, isAvailable, showImage)}
+            role="button"
+            tabIndex={isAvailable ? 0 : -1}
+            aria-disabled={!isAvailable}
+            aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
+            onClick={(e) => cardClick(e, isAvailable, onCardClick)}
+            onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
+            className="zen-card zen-gold zen-tilt"
+            {...tiltHandlers(tilt)}
+        >
+            <span className="zen-glare" aria-hidden="true" />
+            <span className="zen-shine" aria-hidden="true" />
+            <div className="gd-media">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img" />
+                ) : (
+                    <NoPhoto name={displayName} />
+                )}
+                <div className="gd-frame" aria-hidden="true" />
+                {quantity > 0 && <span className="gd-qty" aria-hidden="true">{quantity}</span>}
+            </div>
+            <div className="gd-body">
+                <div className="gd-eyebrow">{metaLine}</div>
+                <h3 title={displayName}>{displayName}</h3>
+                {description && <div className="gd-desc">{description}</div>}
+                <div className="gd-div" aria-hidden="true">
+                    <span className="gd-price">{fixed ? <>{formatPrice(item)} {currencySymbol}</> : (isAr ? 'حسب الاختيار' : 'As selected')}</span>
+                </div>
+                {quantity > 0 ? (
+                    <div className="gd-step" role="group" aria-label={displayName}>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
+                        <b aria-live="polite">{quantity}</b>
+                        <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
+                    </div>
+                ) : (
+                    <button
+                        className="gd-add"
+                        onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                        disabled={!isAvailable}
+                    >
+                        {isAvailable ? (isAr ? 'أضف إلى الطلب' : 'ADD TO ORDER') : unavailableLabel}
+                    </button>
+                )}
+            </div>
+            {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
+        </div>
+    );
+};
+
+/* ═══════════════════════════════════════════
+   Main export — design selects personality.
    ═══════════════════════════════════════════ */
 
 const MenuItemCard: React.FC<MenuItemCardProps> = React.memo(({
     item, onAddItem, onRemoveItem, quantity = 0,
-    currencySymbol, isTouchMode, density = 'comfortable', lang, highlighted = false,
+    currencySymbol, isTouchMode, density = 'sahara', lang, highlighted = false,
 }) => {
+    const design = resolveCardDesign(density);
     const displayName = (item as any).displayName || item.name;
     const isAvailable = (item as any).isActuallyAvailable !== false && item.isAvailable !== false;
 
@@ -420,15 +684,23 @@ const MenuItemCard: React.FC<MenuItemCardProps> = React.memo(({
         onAdd: handleAdd, onRemove: handleRemove, onCardClick: handleAdd,
     };
 
-    switch (density) {
-        case 'buttons':
-            return <SplitCard {...shared} />;
-        case 'ultra':
-            return <GlassCard {...shared} />;
-        case 'compact':
-            return <RailCard {...shared} />;
+    switch (design) {
+        case 'typo':
+            return <TypoCard {...shared} />;
+        case 'noir':
+            return <NoirCard {...shared} />;
+        case 'ticket':
+            return <TicketRow {...shared} />;
+        case 'circle':
+            return <CircleCard {...shared} />;
+        case 'kiosk':
+            return <KioskTile {...shared} />;
+        case 'pop':
+            return <PopCard {...shared} />;
+        case 'gold':
+            return <GoldCard {...shared} />;
         default:
-            return <PosterCard {...shared} />;
+            return <SaharaCard {...shared} />;
     }
 });
 

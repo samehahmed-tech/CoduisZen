@@ -209,10 +209,15 @@ const setAuthToken = (token: string) => {
     try { localStorage.setItem('auth_token', token); } catch { /* */ }
 };
 
-const handleUnauthorizedToken = (endpoint: string) => {
+const handleUnauthorizedToken = (endpoint: string, code?: string) => {
     if (endpoint.startsWith('/auth/login') || endpoint.startsWith('/auth/mfa') || endpoint.startsWith('/auth/refresh') || endpoint.startsWith('/setup/')) return;
     const hadSession = Boolean(getAuthToken() || getRefreshToken());
     if (!hadSession) return;
+    try {
+        console.warn(`[auth] session invalid (${code || 'UNKNOWN'}) at ${endpoint} — logging out`);
+    } catch {
+        // logging must never break logout
+    }
     try {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_refresh_token');
@@ -220,7 +225,7 @@ const handleUnauthorizedToken = (endpoint: string) => {
         // ignore storage errors
     }
     if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('coduiszen:auth-invalid', { detail: { endpoint } }));
+        window.dispatchEvent(new CustomEvent('coduiszen:auth-invalid', { detail: { endpoint, code: code || 'UNKNOWN' } }));
     }
 };
 
@@ -255,8 +260,8 @@ const isRetryableServiceError = (status: number, payload: any) =>
     || String(payload?.code || payload?.error || '').toUpperCase() === 'DATABASE_UNAVAILABLE';
 
 type RefreshOutcome =
-    | { token: string; transient: false }
-    | { token: null; transient: boolean };
+    | { token: string; transient: false; code?: string }
+    | { token: null; transient: boolean; code?: string };
 
 // Refresh retry: the backend restarts briefly during hotfix apply / watchdog
 // recovery. A 5xx or network failure here means "server is busy", NOT "session
@@ -293,13 +298,23 @@ const tryRefreshToken = async (): Promise<RefreshOutcome> => {
                     const data = await response.json().catch(() => ({}));
                     if (data?.token) {
                         setAuthToken(data.token);
+                        primeProactiveRefresh(data.token);
                         return { token: data.token as string, transient: false };
                     }
-                    return { token: null, transient: false };
+                    return { token: null, transient: false, code: 'EMPTY_REFRESH_RESPONSE' };
                 }
                 // Definitive: the token itself is missing/invalid/expired/revoked.
+                // Capture the server reason (SESSION_EXPIRED / INVALID_REFRESH_TOKEN /
+                // USER_INACTIVE) so kick-outs are diagnosable instead of silent.
                 if (response.status === 400 || response.status === 401) {
-                    return { token: null, transient: false };
+                    const body = await response.json().catch(() => null);
+                    const code = String(body?.error || body?.code || `HTTP_${response.status}`);
+                    try {
+                        sessionStorage.setItem('coduiszen:auth-last-refresh', JSON.stringify({ code, at: Date.now() }));
+                    } catch {
+                        // diagnostics must never break auth
+                    }
+                    return { token: null, transient: false, code };
                 }
                 // Transient (5xx while restarting, 429, ...): back off and retry.
                 if (attempt < REFRESH_RETRY_DELAYS_MS.length) {
@@ -317,12 +332,110 @@ const tryRefreshToken = async (): Promise<RefreshOutcome> => {
     return refreshPromise;
 };
 
+// ── Proactive refresh: renew the access token BEFORE it dies, so the app
+// never hits the 401 → refresh → retry storm (and its console spam) in the
+// first place. Single-flight tryRefreshToken dedupes overlapping triggers;
+// failures here are silent by design — the normal request-time 401 path
+// remains the single place that can ever log the user out.
+const PROACTIVE_REFRESH_MARGIN_MS = 90_000;
+let proactiveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const getAccessTokenExpMs = (token: string | null): number => {
+    try {
+        if (!token) return 0;
+        const part = token.split('.')[1];
+        if (!part) return 0;
+        const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+        const exp = Number(payload?.exp);
+        return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0;
+    } catch {
+        return 0;
+    }
+};
+
+export const primeProactiveRefresh = (token?: string | null) => {
+    try {
+        if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null; }
+        if (typeof window === 'undefined') return;
+        const expMs = getAccessTokenExpMs(token ?? getAuthToken());
+        if (!expMs) return;
+        const delay = expMs - Date.now() - PROACTIVE_REFRESH_MARGIN_MS;
+        if (delay <= 0) {
+            // Already inside the margin (woke from sleep, slow timer, ...):
+            // refresh now instead of waiting for the next 401.
+            void tryRefreshToken().catch(() => {});
+            return;
+        }
+        proactiveTimer = setTimeout(() => {
+            proactiveTimer = null;
+            // Success re-primes from the fresh token (see tryRefreshToken);
+            // failure stays silent — request-time 401 decides logout.
+            void tryRefreshToken().catch(() => {});
+        }, Math.min(delay, 2_147_483_647));
+    } catch {
+        // priming must never break requests
+    }
+};
+
+const maybeProactiveRefresh = (endpoint: string) => {
+    try {
+        if (!canAttemptTokenRefresh(endpoint)) return;
+        const expMs = getAccessTokenExpMs(getAuthToken());
+        if (expMs && expMs - Date.now() < PROACTIVE_REFRESH_MARGIN_MS) {
+            void tryRefreshToken().catch(() => {});
+        }
+    } catch {
+        // never break requests
+    }
+};
+
+if (typeof window !== 'undefined' && !(window as any).__coduiszenRefreshPrimer) {
+    (window as any).__coduiszenRefreshPrimer = true;
+    // Sleep/wake, locked PC, throttled tab: revalidate silently on return
+    // instead of spraying 401s across every poller.
+    document.addEventListener('visibilitychange', () => {
+        try {
+            if (document.hidden) return;
+            const expMs = getAccessTokenExpMs(getAuthToken());
+            if (expMs && expMs - Date.now() < PROACTIVE_REFRESH_MARGIN_MS) {
+                void tryRefreshToken().catch(() => {});
+            }
+        } catch {
+            // ignore
+        }
+    });
+}
+
+// ── Session heartbeat: the session must NEVER die while the user keeps the
+// app open (a cashier may stare at an idle POS for hours waiting for an
+// order — that is not "abandonment"). Every 10 minutes this silently renews
+// the access token, which also slides the server session window forward, so
+// expiresAt perpetually stays ~12h ahead. No-ops without stored tokens
+// (login page, logged out) and never logs anyone out: failures stay silent,
+// the request-time 401 path remains the sole logout decider. Hidden/minimized
+// tabs still fire (throttled but well within the window).
+const HEARTBEAT_MS = 10 * 60 * 1000;
+if (typeof window !== 'undefined' && !(window as any).__coduiszenHeartbeat) {
+    (window as any).__coduiszenHeartbeat = true;
+    window.setInterval(() => {
+        try {
+            if (!getRefreshToken()) return;
+            void tryRefreshToken().catch(() => {});
+        } catch {
+            // heartbeat must never break the app
+        }
+    }, HEARTBEAT_MS);
+}
+
 export async function apiRequest<T>(
     endpoint: string,
     options: RequestInit = {},
 ): Promise<T> {
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
     const method = String(options.method || 'GET').toUpperCase();
+    // Renew ahead of expiry so this request (and every poller behind it)
+    // rarely meets a dead access token at all.
+    maybeProactiveRefresh(endpoint);
     const cacheable = method === 'GET' && options.cache !== 'no-store';
     const cacheKey = `${url}|${getAuthToken() || ''}`;
     if (cacheable) {
@@ -406,6 +519,11 @@ export async function apiRequest<T>(
                         const retryError = await retryResponse.json().catch(() => ({ code: `HTTP_${retryResponse.status}`, message: 'Request failed' }));
                         throw toAppApiError(retryError, retryResponse.status, endpoint);
                     }
+                    // Fresh token rejected: the session died between refresh
+                    // and retry (concurrent revoke). Definitive logout.
+                    const retryBody = await retryResponse.json().catch(() => null);
+                    handleUnauthorizedToken(endpoint, String(retryBody?.error || retryBody?.code || 'SESSION_REVOKED'));
+                    throw toAppApiError(retryBody || { code: 'HTTP_401', message: 'Request failed' }, 401, endpoint);
                 } else if (outcome.transient) {
                     // Refresh failed because the server is restarting / busy
                     // (5xx, timeout, connection reset) — the session itself is
@@ -416,8 +534,13 @@ export async function apiRequest<T>(
                         503,
                         endpoint,
                     );
+                } else {
+                    // Definitive refresh failure — log out exactly once,
+                    // carrying the server reason (SESSION_EXPIRED /
+                    // INVALID_REFRESH_TOKEN / USER_INACTIVE) for diagnosis
+                    // and the login notice.
+                    handleUnauthorizedToken(endpoint, outcome.code);
                 }
-                handleUnauthorizedToken(endpoint);
             }
 
             // Backend restarting / DB reconnecting: back off and retry GETs

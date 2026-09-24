@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
+import CoverageReportView from './shared/CoverageReportView';
 
 export const OpsReports = ({ state }: any) => {
    const {
@@ -27,7 +28,7 @@ export const OpsReports = ({ state }: any) => {
       actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
       staffCostData, salesPerLaborData,
       customerRetentionData, newVsReturningData, customerFrequencyData,
-      kitchenPerformanceData, menuEngineeringData, daypartData, basketData,
+      kitchenPerformanceData, kitchenStaffData, menuEngineeringData, daypartData, basketData,
       seasonalityData, onlineOfflineData, foodCostTrendData,
       taxComplianceData, auditTrailData, cashFlowData,
       supplierPriceData, recipeCostData, abcData,
@@ -39,6 +40,7 @@ export const OpsReports = ({ state }: any) => {
       shiftProfitData, deliveryZoneData, deliveryCostData,
       journeyFunnelData, channelMixData, optimalPricingData,
       thirdPartyData, timeToFirstData,
+      unpaidOrders,
       salesSeries, peakHoursLookup, peakHoursMaxOrders,
        revenueByWeekdayMax, daypartRevenueMax, settings
    } = state;
@@ -159,6 +161,26 @@ export const OpsReports = ({ state }: any) => {
                {activeCategory === 'OPS' && activeSubReport === 'Delivery Performance' && !deliveryPerformance && (
                   <p className="text-center text-muted py-16">No delivery data available.</p>
                )}
+               {activeCategory === 'OPS' && activeSubReport === 'Unpaid Orders' && unpaidOrders && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="grid grid-cols-2 gap-4"><div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'طلبات مفتوحة' : 'Open orders'}</p><p className="text-2xl font-black text-amber-500 mt-1">{unpaidOrders.count}</p></div><div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'مستحق تحصيله' : 'Balance due'}</p><p className="text-2xl font-black text-amber-500 mt-1">{unpaidOrders.totalBalance.toLocaleString()} {currency}</p></div></div>
+                     <ReportDataTable
+                        title={isAr ? 'طلبات غير مدفوعة (مفتوحة)' : 'Unpaid open orders'}
+                        data={unpaidOrders.orders}
+                        columns={[
+                           { key: 'orderNumber', label: isAr ? 'رقم' : '#' },
+                           { key: 'type', label: isAr ? 'النوع' : 'Type' },
+                           { key: 'customerName', label: isAr ? 'العميل' : 'Customer' },
+                           { key: 'total', label: isAr ? 'الإجمالي' : 'Total', align: 'right', format: (v: any) => fmtMoney(v, currency) },
+                           { key: 'balance', label: isAr ? 'المتبقي' : 'Balance', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currency) },
+                           { key: 'status', label: isAr ? 'الحالة' : 'Status' },
+                        ]}
+                        exportFilename="unpaid-orders"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
+                  </div>
+               )}
+               {activeCategory === 'OPS' && activeSubReport === 'Unpaid Orders' && !unpaidOrders && <p className="text-center text-muted py-16">{isAr ? 'لا توجد طلبات غير مدفوعة' : 'No unpaid orders'}</p>}
                {activeCategory === 'OPS' && activeSubReport === 'Dine-in Tables' && (
                    <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150" dir={isAr ? 'rtl' : 'ltr'}>
                       <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
@@ -228,6 +250,32 @@ export const OpsReports = ({ state }: any) => {
                      </div>
                   </div>
                )}
+               {activeCategory === 'OPS' && activeSubReport === 'Kitchen Staff Performance' && kitchenStaffData && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                           { l: isAr ? 'الطاقم النشط' : 'Active Staff', v: kitchenStaffData.summary?.staffCount ?? 0 },
+                           { l: isAr ? 'تذاكر منجزة' : 'Tickets Done', v: kitchenStaffData.summary?.totalTickets ?? 0 },
+                           { l: isAr ? 'الالتزام بالوقت' : 'On-Time %', v: `${kitchenStaffData.summary?.onTimePercent ?? 0}%`, c: 'text-emerald-500' },
+                        ].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}
+                     </div>
+                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+                        <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                           <h3 className="text-xl font-black text-main">{isAr ? 'أداء طاقم المطبخ' : 'Kitchen Staff Performance'}</h3>
+                           <p className="text-xs text-muted mt-1">{isAr ? 'سرعة التحضير والالتزام بالوقت لكل موظف' : 'Prep speed and on-time rate per staff member'}</p>
+                        </div>
+                        <div className="responsive-table">
+                           <table className="w-full text-xs">
+                              <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">{isAr ? 'الموظف' : 'Staff'}</th><th className="px-6 py-5 text-right">{isAr ? 'تذاكر' : 'Tickets'}</th><th className="px-4 py-5 text-right">{isAr ? 'متوسط (د)' : 'Avg (min)'}</th><th className="px-4 py-5 text-right">{isAr ? 'في الوقت %' : 'On-Time %'}</th><th className="px-4 py-5 text-right">{isAr ? 'مستعجل' : 'Rush'}</th><th className="px-6 py-5 text-right">{isAr ? 'إعادة' : 'Remake'}</th></tr></thead>
+                              <tbody className="divide-y divide-border/30">{(kitchenStaffData.staff || []).map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.userName || r.userId}</td><td className="px-6 py-4 font-mono text-right">{r.ticketsCompleted}</td><td className="px-4 py-4 font-mono font-bold text-right">{r.avgMinutes} min</td><td className="px-4 py-4 font-mono font-bold text-right"><span className={Number(r.onTimePercent) >= 80 ? 'text-emerald-500' : Number(r.onTimePercent) >= 50 ? 'text-amber-500' : 'text-rose-500'}>{r.onTimePercent}%</span></td><td className="px-4 py-4 font-mono text-right text-muted">{r.rushCount}</td><td className="px-6 py-4 font-mono text-right text-muted">{r.remakeCount}</td></tr>)}</tbody>
+                           </table>
+                        </div>
+                        {(kitchenStaffData.staff || []).length === 0 && <p className="text-center text-muted py-16">{isAr ? 'لا توجد تذاكر منسوبة لموظف بعد — يبدأ التسجيل من أول Bump بعد التحديث.' : 'No attributed tickets yet — recording starts with the first bump after this update.'}</p>}
+                     </div>
+                     {kitchenStaffData.unattributedNote && <p className="text-[11px] font-bold text-muted">{kitchenStaffData.unattributedNote}</p>}
+                  </div>
+               )}
+               {activeCategory === 'OPS' && activeSubReport === 'Kitchen Staff Performance' && !kitchenStaffData && <p className="text-center text-muted py-16">No data.</p>}
                {activeCategory === 'OPS' && activeSubReport === 'Table Turnover' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                       <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Table Turnover Rate</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Table</th><th className="px-4 py-5 text-left">Zone</th><th className="px-6 py-5 text-right">Orders</th><th className="px-6 py-5 text-right">Turns/Day</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-8 py-5 text-right">Rev/Day</th></tr></thead><tbody className="divide-y divide-border/30">{tableTurnoverData.map((r: any) => <tr key={r.tableId} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.tableName || r.tableId}</td><td className="px-4 py-4 text-muted">{r.zoneName || '—'}</td><td className="px-6 py-4 font-mono text-right">{r.totalOrders}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.turnsPerDay}</td><td className="px-6 py-4 font-mono text-right">{r.revenue.toLocaleString()} LE</td><td className="px-8 py-4 font-mono text-right">{r.revenuePerDay} LE</td></tr>)}</tbody></table></div></div>
@@ -251,7 +299,7 @@ export const OpsReports = ({ state }: any) => {
                {activeCategory === 'OPS' && activeSubReport === 'Branch Comparison' && branchCompData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="card-primary rounded-2xl border border-blue-200 dark:border-blue-800 p-5 shadow-lg bg-blue-50/30 dark:bg-blue-950/20"><p className="text-[10px] font-black uppercase tracking-widest text-blue-400">?? Top Branch</p><p className="text-2xl font-black text-blue-500 mt-1">{branchCompData.topBranch}</p></div>
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Branch</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">Avg Ticket</th><th className="px-4 py-5 text-right">Cancelled</th><th className="px-6 py-5 text-right">Discounts</th></tr></thead><tbody className="divide-y divide-border/30">{branchCompData.branches.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.branchName}</td><td className="px-4 py-4 font-mono text-right">{r.orderCount}</td><td className="px-4 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()} LE</td><td className="px-4 py-4 font-mono text-right">{r.avgTicket} LE</td><td className="px-4 py-4 font-mono text-right text-rose-500">{r.cancelCount}</td><td className="px-6 py-4 font-mono text-right text-muted">{r.totalDiscount.toLocaleString()}</td></tr>)}</tbody></table></div></div>
+                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Branch</th><th className="px-4 py-5 text-right">Orders (eligible / all)</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">Avg Ticket</th><th className="px-4 py-5 text-right">Cancelled</th><th className="px-6 py-5 text-right">Discounts</th></tr></thead><tbody className="divide-y divide-border/30">{branchCompData.branches.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.branchName}</td><td className="px-4 py-4 font-mono text-right" title={isAr ? `الإجمالي ${r.orderCount}` : `All orders ${r.orderCount}`}>{r.eligibleOrderCount ?? r.orderCount}{r.eligibleOrderCount != null && Number(r.orderCount) !== Number(r.eligibleOrderCount) ? <span className="text-muted"> / {r.orderCount}</span> : null}</td><td className="px-4 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()} LE</td><td className="px-4 py-4 font-mono text-right">{r.avgTicket} LE</td><td className="px-4 py-4 font-mono text-right text-rose-500">{r.cancelCount}</td><td className="px-6 py-4 font-mono text-right text-muted">{r.totalDiscount.toLocaleString()}</td></tr>)}</tbody></table></div></div>
                   </div>
                )}
                {activeCategory === 'OPS' && activeSubReport === 'Branch Comparison' && !branchCompData && <p className="text-center text-muted py-16">No data.</p>}
@@ -271,7 +319,8 @@ export const OpsReports = ({ state }: any) => {
                )}
                {activeCategory === 'OPS' && activeSubReport === 'Delivery Cost vs Revenue' && deliveryCostData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Total Delivery Orders', v: deliveryCostData.summary.totalOrders }, { l: 'Revenue', v: `${deliveryCostData.summary.totalRevenue.toLocaleString()} LE` }, { l: 'Total Fees', v: `${deliveryCostData.summary.totalFees.toLocaleString()} LE`, c: 'text-amber-500' }, { l: 'Fee % of Revenue', v: `${deliveryCostData.summary.feePercentOfRevenue}%`, c: 'text-blue-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
+                     <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-700 dark:text-amber-300">{isAr ? 'حصة رسوم التوصيل فقط — بدون سائق/وقود/عمولة. ليست ربحية التوصيل الكاملة.' : 'Delivery-fee share only — excludes driver/fuel/commission. Not full delivery profitability.'}</div>
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Total Delivery Orders', v: deliveryCostData.summary.totalOrders }, { l: 'Revenue', v: `${deliveryCostData.summary.totalRevenue.toLocaleString()} LE` }, { l: isAr ? 'إجمالي رسوم التوصيل' : 'Total Delivery Fees', v: `${deliveryCostData.summary.totalFees.toLocaleString()} LE`, c: 'text-amber-500' }, { l: isAr ? 'الرسوم % من الإيراد' : 'Fee % of Revenue', v: `${deliveryCostData.summary.feePercentOfRevenue}%`, c: 'text-blue-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-6 border-b border-slate-100 dark:border-slate-800"><h3 className="text-lg font-black text-main">Daily Breakdown</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Day</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">Del. Fees</th><th className="px-6 py-5 text-right">Free</th></tr></thead><tbody className="divide-y divide-border/30">{deliveryCostData.daily.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 font-mono text-main">{r.day}</td><td className="px-4 py-4 font-mono text-right">{r.orderCount}</td><td className="px-4 py-4 font-mono text-right">{r.revenue.toLocaleString()}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.deliveryFees.toLocaleString()}</td><td className="px-6 py-4 font-mono text-right">{r.freeDeliveries}</td></tr>)}</tbody></table></div></div>
                   </div>
                )}
@@ -297,22 +346,27 @@ export const OpsReports = ({ state }: any) => {
                      <div className="grid grid-cols-2 gap-6"><div className="card-primary rounded-[2rem] border border-blue-200 dark:border-blue-800 shadow-xl p-6 bg-blue-50/30 dark:bg-blue-950/20"><h3 className="text-lg font-black text-blue-500 mb-4">?? In-House Delivery</h3><div className="space-y-2 text-xs"><div className="flex justify-between"><span className="text-muted">Orders</span><span className="font-black text-main">{thirdPartyData.inHouse.orderCount}</span></div><div className="flex justify-between"><span className="text-muted">Revenue</span><span className="font-black text-main">{thirdPartyData.inHouse.revenue.toLocaleString()} LE</span></div><div className="flex justify-between"><span className="text-muted">Avg Delivery</span><span className="font-black text-blue-500">{thirdPartyData.inHouse.avgDeliveryMinutes} min</span></div></div></div><div className="card-primary rounded-[2rem] border border-purple-200 dark:border-purple-800 shadow-xl p-6 bg-purple-50/30 dark:bg-purple-950/20"><h3 className="text-lg font-black text-purple-500 mb-4">?? 3rd Party</h3><div className="space-y-2 text-xs"><div className="flex justify-between"><span className="text-muted">Orders</span><span className="font-black text-main">{thirdPartyData.thirdParty.orderCount}</span></div><div className="flex justify-between"><span className="text-muted">Revenue</span><span className="font-black text-main">{thirdPartyData.thirdParty.revenue.toLocaleString()} LE</span></div></div></div></div>
                      {/* Call-center + platform split (from Channel Mix Trend, same period). */}
                      {Array.isArray(channelMixData) && channelMixData.length > 0 && (() => {
-                        // Channel key (server): 'call_center' for in-house calls,
-                        // platform id ('talabat'…​) for aggregator orders, 'pos'/'restaurant' otherwise.
-                        const isCC = (s: string) => {
-                           const k = String(s || '').toLowerCase();
-                           return k === 'call_center' || (k !== 'pos' && k !== 'restaurant' && k !== 'unknown');
+                        // Channel keys (server): 'call_center' = in-house calls only;
+                        // aggregator orders carry their platform id ('talabat'…),
+                        // 'pos'/'restaurant' = walk-in. Platforms are listed
+                        // separately — never folded into the call-center total.
+                        const norm = (s: string) => String(s || '').toLowerCase();
+                        const isCC = (s: string) => norm(s) === 'call_center';
+                        const isPlatform = (s: string) => {
+                           const k = norm(s);
+                           return k !== 'call_center' && k !== 'pos' && k !== 'restaurant' && k !== 'unknown' && k !== '';
                         };
-                        const rows = channelMixData.filter((r: any) => isCC(r.source));
-                        const ccOrders = rows.reduce((s: number, r: any) => s + Number(r.count || 0), 0);
-                        const ccRevenue = rows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
+                        const ccRows = channelMixData.filter((r: any) => isCC(r.source));
+                        const ccOrders = ccRows.reduce((s: number, r: any) => s + Number(r.count || 0), 0);
+                        const ccRevenue = ccRows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
                         const byPlatform: Record<string, { orders: number; revenue: number }> = {};
-                        rows.forEach((r: any) => {
+                        channelMixData.filter((r: any) => isCC(r.source) || isPlatform(r.source)).forEach((r: any) => {
                            const k = String(r.source || 'call_center');
                            byPlatform[k] = byPlatform[k] || { orders: 0, revenue: 0 };
                            byPlatform[k].orders += Number(r.count || 0);
                            byPlatform[k].revenue += Number(r.revenue || 0);
                         });
+                        const rows = [...ccRows];
                         return (
                            <div className="card-primary rounded-[2rem] border border-indigo-200 dark:border-indigo-800 shadow-xl p-6">
                               <h3 className="text-lg font-black text-main mb-1">{isAr ? 'الكول سنتر والمنصات (نفس الفترة)' : 'Call Center & Platforms (same period)'}</h3>
@@ -364,6 +418,15 @@ export const OpsReports = ({ state }: any) => {
                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Revenue', v: `${dailyFlashData.revenue.toLocaleString()} LE` }, { l: 'Orders', v: dailyFlashData.orderCount }, { l: 'Avg Ticket', v: `${dailyFlashData.avgTicket} LE` }, { l: 'Cancelled', v: dailyFlashData.cancelledOrders, c: 'text-rose-500' }, { l: 'Discounts', v: `${dailyFlashData.totalDiscount.toLocaleString()} LE`, c: 'text-amber-500' }, { l: 'Tips', v: `${dailyFlashData.totalTips.toLocaleString()} LE`, c: 'text-emerald-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                      <div className="grid grid-cols-2 gap-6"><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6"><h3 className="text-lg font-black text-main mb-3">By Type</h3>{dailyFlashData.byType.map((t: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-border/20"><span className="font-black">{t.type}</span><span className="text-muted">{t.count} orders · {t.revenue.toLocaleString()} LE</span></div>))}</div><div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl p-6"><h3 className="text-lg font-black text-main mb-3">Payments</h3>{dailyFlashData.paymentMix.map((p: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-border/20"><span className="font-black">{p.method}</span><span className="font-mono font-bold">{p.total.toLocaleString()} LE</span></div>))}</div></div>
                   </div>
+               )}
+               {activeCategory === 'OPS' && ['Reservations & No-Show', 'Driver COD Settlement', 'Approval SLA', 'Platform Commissions', 'User Activity Log', 'Delivery SLA Alerts'].includes(activeSubReport) && (
+                  <CoverageReportView
+                     reportName={activeSubReport}
+                     rows={(state as any).customReportRows?.[activeSubReport] || []}
+                     meta={(state as any).customReportMeta?.[activeSubReport]}
+                     lang={isAr ? 'ar' : 'en'}
+                     currency={currency}
+                  />
                )}
       </>
    );

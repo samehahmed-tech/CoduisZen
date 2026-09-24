@@ -20,6 +20,73 @@ const canAccessShiftBranch = (req: Request, branchId: string | null | undefined)
     return allowedBranches.has(branchId);
 };
 
+/**
+ * Orders whose tender must be EXPLAINED, not counted, in shift cash math:
+ * cancelled / voided / refunded / soft-deleted. Their COMPLETED payment
+ * rows stay in the tables (tender view), so without this the shift close
+ * silently inflates cash vs the drawer and vs the dashboard (which uses
+ * revenue-recognized semantics). We report them separately instead.
+ */
+const excludedShiftOrderCondition = () => sql`(
+    ${orders.deletedAt} is not null
+    or ${orders.status} in ('CANCELLED', 'REFUNDED', 'VOID')
+    or ${orders.status} is null
+)`;
+
+type ShiftPaymentRow = { orderId: string; method: string | null; count: number; total: number };
+
+const getExcludedShiftPayments = async (branchId: string, shiftId: string, openedAt: Date) => {
+    const legacyRows = await db.select({
+        orderId: payments.orderId,
+        method: payments.method,
+        count: sql<number>`count(*)`,
+        total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
+    }).from(payments)
+        .innerJoin(orders, eq(payments.orderId, orders.id))
+        .where(
+            and(
+                eq(orders.branchId, branchId),
+                eq(orders.shiftId, shiftId),
+                eq(payments.status, 'COMPLETED'),
+                gte(payments.createdAt, openedAt),
+                excludedShiftOrderCondition(),
+            )
+        ).groupBy(payments.orderId, payments.method);
+
+    let sessionRows: ShiftPaymentRow[] = [];
+    try {
+        sessionRows = await db.select({
+            orderId: paymentSessions.orderId,
+            method: paymentSessions.providerType,
+            count: sql<number>`count(*)`,
+            total: sql<number>`coalesce(sum(${paymentSessions.amount}), 0)`,
+        }).from(paymentSessions)
+            .innerJoin(orders, eq(paymentSessions.orderId, orders.id))
+            .where(
+                and(
+                    eq(orders.branchId, branchId),
+                    eq(orders.shiftId, shiftId),
+                    eq(paymentSessions.status, 'confirmed'),
+                    gte(paymentSessions.createdAt, openedAt),
+                    excludedShiftOrderCondition(),
+                )
+            ).groupBy(paymentSessions.orderId, paymentSessions.providerType);
+    } catch {
+        // ponytail: old client DBs may not have payment_sessions migrated.
+    }
+
+    const rows = reconcilePaymentRows(
+        legacyRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+        sessionRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
+    );
+    return {
+        orderCount: new Set([...legacyRows.map(r => r.orderId), ...sessionRows.map(r => r.orderId)]).size,
+        paymentCount: rows.reduce((sum, row) => sum + Number(row.count || 0), 0),
+        total: rows.reduce((sum, row) => sum + Number(row.total || 0), 0),
+        byMethod: rows,
+    };
+};
+
 export const openShift = async (req: Request, res: Response) => {
     try {
         const { id, openingBalance, notes } = req.body;
@@ -119,6 +186,10 @@ export const closeShift = async (req: Request, res: Response) => {
             paymentRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
             sessionRows.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
         );
+        // Tender left out of cash on purpose (cancelled/void/refunded/deleted
+        // orders) — reported separately so the cashier sees exactly why the
+        // close total differs from gross sales instead of a mystery "double".
+        const excluded = await getExcludedShiftPayments(shift[0].branchId, shiftId, shift[0].openingTime);
         const cashTotal = paymentBreakdown.find(row => row.method === 'CASH')?.total || 0;
         const expectedBalance = Number(shift[0].openingBalance) + cashTotal;
         const variance = requireShiftVarianceReason(actualNum, expectedBalance, notes);
@@ -153,6 +224,7 @@ export const closeShift = async (req: Request, res: Response) => {
                 hasDiscrepancy,
             },
             payments: paymentBreakdown,
+            excluded,
         });
     } catch (error: any) {
         res.status(Number(error?.status) || 500).json({
@@ -276,7 +348,9 @@ export const getXReport = async (req: Request, res: Response) => {
             totalServiceCharge: sql<number>`coalesce(sum(service_charge), 0)`
         }).from(orders).where(and(eq(orders.shiftId, shiftId), revenueEligibleOrder()));
 
-        // Get payment breakdown
+        // Get payment breakdown (same scope as closeShift: this shift's orders,
+        // COMPLETED rows created after opening — so the preview the cashier
+        // approves is exactly what the close will compute)
         const paymentBreakdown = await db.select({
             orderId: payments.orderId,
             method: payments.method,
@@ -284,7 +358,7 @@ export const getXReport = async (req: Request, res: Response) => {
             count: sql<number>`count(*)`
         }).from(payments)
             .innerJoin(orders, eq(payments.orderId, orders.id))
-            .where(and(eq(orders.shiftId, shiftId), eq(payments.status, 'COMPLETED')))
+            .where(and(eq(orders.shiftId, shiftId), eq(payments.status, 'COMPLETED'), gte(payments.createdAt, shift[0].openingTime)))
             .groupBy(payments.orderId, payments.method);
 
         let sessionBreakdown: Array<{ orderId: string; method: string | null; total: number; count: number }> = [];
@@ -296,7 +370,7 @@ export const getXReport = async (req: Request, res: Response) => {
                 count: sql<number>`count(*)`
             }).from(paymentSessions)
                 .innerJoin(orders, eq(paymentSessions.orderId, orders.id))
-                .where(and(eq(orders.shiftId, shiftId), eq(paymentSessions.status, 'confirmed')))
+                .where(and(eq(orders.shiftId, shiftId), eq(paymentSessions.status, 'confirmed'), gte(paymentSessions.createdAt, shift[0].openingTime)))
                 .groupBy(paymentSessions.orderId, paymentSessions.providerType);
         } catch {
             // ponytail: old client DBs may not have payment_sessions migrated; don't break shift report.
@@ -306,6 +380,7 @@ export const getXReport = async (req: Request, res: Response) => {
             paymentBreakdown.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
             sessionBreakdown.map(row => ({ ...row, count: Number(row.count), total: Number(row.total) })),
         );
+        const excluded = await getExcludedShiftPayments(shift[0].branchId, shiftId, shift[0].openingTime);
 
         const cashPayments = combinedPaymentBreakdown.find(p => p.method === 'CASH');
         const visaPayments = combinedPaymentBreakdown.find(p => ['VISA', 'CARD', 'CREDIT_CARD', 'DEBIT_CARD'].includes(String(p.method || '').toUpperCase()));
@@ -339,6 +414,7 @@ export const getXReport = async (req: Request, res: Response) => {
                 serviceChargeCollected: totalServiceCharge
             },
             payments: combinedPaymentBreakdown,
+            excluded,
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

@@ -245,8 +245,8 @@ const ItemOptionsModal: React.FC<ItemOptionsModalProps> = ({
                                         const isSelected = selectedSize?.id === size.id;
                                         return (
                                             <button
-                                                key={size.id} onClick={() => setSelectedSize(size)} disabled={!size.isAvailable}
-                                                className={`flex flex-col items-start p-3 rounded-xl transition-all border text-left active:scale-95 ${!size.isAvailable ? 'opacity-50 bg-elevated/30 border-border/10 cursor-not-allowed' : isSelected ? 'bg-indigo-500 text-white border-indigo-600 shadow-lg shadow-indigo-500/20' : 'bg-elevated/40 border-border/20 text-main hover:bg-elevated shadow-sm'}`}
+                                                key={size.id} onClick={() => setSelectedSize(size)} disabled={size.isAvailable === false}
+                                                className={`flex flex-col items-start p-3 rounded-xl transition-all border text-left active:scale-95 ${size.isAvailable === false ? 'opacity-50 bg-elevated/30 border-border/10 cursor-not-allowed' : isSelected ? 'bg-indigo-500 text-white border-indigo-600 shadow-lg shadow-indigo-500/20' : 'bg-elevated/40 border-border/20 text-main hover:bg-elevated shadow-sm'}`}
                                             >
                                                 <span className={`font-black text-sm truncate w-full ${isSelected ? 'text-white' : 'text-main'}`}>
                                                     {lang === 'ar' ? (size.nameAr || size.name) : size.name}

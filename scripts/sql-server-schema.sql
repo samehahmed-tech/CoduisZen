@@ -2476,6 +2476,8 @@ CREATE TABLE kds_tickets (
     priority            nvarchar(255)   DEFAULT 'NORMAL',
     printed_at          datetime2,
     bumped_at           datetime2,
+    completed_by        nvarchar(255),
+    completed_by_name   nvarchar(255),
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_kds_tickets PRIMARY KEY (id),
@@ -2897,20 +2899,11 @@ GO
 
 -- ============================================================================
 -- 12. DEFAULT MENU CATEGORIES
+-- Intentionally left empty: a new client's database must not ship with any
+-- demo menu groups. The client creates their own categories from Menu Management.
+-- (Infrastructure seeds such as roles, accounts, and the main branch are kept
+-- below because the application cannot operate without them.)
 -- ============================================================================
-INSERT INTO menu_categories (id, name, name_ar, sort_order, is_active)
-VALUES
-('cat-appetizer', N'Appetizers', N'مقبلات', 1, 1),
-('cat-main', N'Main Course', N'أطباق رئيسية', 2, 1),
-('cat-dessert', N'Desserts', N'حلويات', 3, 1),
-('cat-beverage', N'Beverages', N'مشروبات', 4, 1),
-('cat-hot-drink', N'Hot Drinks', N'مشروبات ساخنة', 5, 1),
-('cat-cold-drink', N'Cold Drinks', N'مشروبات باردة', 6, 1),
-('cat-sandwich', N'Sandwiches', N'ساندوتشات', 7, 1),
-('cat-salad', N'Salads', N'سلطات', 8, 1),
-('cat-soup', N'Soups', N'شوربة', 9, 1),
-('cat-extra', N'Extras', N'إضافات', 10, 1);
-GO
 
 -- ============================================================================
 -- 13. DEFAULT DELIVERY ZONE
@@ -2924,13 +2917,12 @@ VALUES
 GO
 
 -- ============================================================================
--- 14. DEFAULT PRINTER CONFIG
+-- 14. PRINTERS — intentionally NOT seeded.
+-- The client adds their own printers from Printer Management. Seeding demo
+-- printers (e.g. a fake KITCHEN printer) caused phantom kitchen tickets:
+-- unrouted KITCHEN jobs were claimed by any bridge and printed on the
+-- default printer even though the client never added a kitchen printer.
 -- ============================================================================
-INSERT INTO printers (id, name, type, address, location, branch_id, is_active, role, paper_width)
-VALUES
-('pr-intercom', N'Intercom Printer', N'NETWORK', N'192.168.1.100:9100', N'Kitchen', 'b1', 1, 'KITCHEN', 80),
-('pr-receipt', N'Cashier Receipt', N'USB', NULL, N'POS Counter', 'b1', 1, 'RECEIPT', 80);
-GO
 
 -- ============================================================================
 -- 15. POSTING RULES (GL Auto-posting)

@@ -15,7 +15,11 @@ import { writeDbError } from '../utils/dbErrors';
 
 const JWT_SECRET = requireEnv('JWT_SECRET');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+// Bookkeeping horizon for session timestamps (env-overridable). Refresh JWTs
+// themselves carry no expiry — the userSessions row is the sole authority —
+// so POS/cashier terminals stay open indefinitely; logout, revoke, role/perm
+// edits and user deactivation all still kill the session instantly.
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '30d';
 const AUTH_SESSION_TTL_HOURS = Number(process.env.AUTH_SESSION_TTL_HOURS || 12);
 const AUTH_MFA_ISSUER = process.env.AUTH_MFA_ISSUER || 'Coduis Zen';
 const AUTH_MFA_ENFORCE_ADMIN_FINANCE = process.env.AUTH_MFA_ENFORCE_ADMIN_FINANCE === 'true';
@@ -118,12 +122,16 @@ const issueAccessToken = async (user: any, req: Request, deviceName?: string) =>
         jti: tokenId,
     }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, subject: user.id });
 
+    // Refresh token carries NO expiry: the userSessions row is the sole
+    // authority (owner requirement — never log out except on explicit
+    // logout/revoke). Logout, revoke, role/permission/active edits and user
+    // deactivation all still kill the session instantly via the row.
     const refreshToken = jwt.sign({
         sub: user.id,
         sid: sessionId,
         jti: tokenId,
         purpose: 'refresh',
-    }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+    }, JWT_SECRET);
 
     return { token, refreshToken };
 };
@@ -306,7 +314,7 @@ export const getSessions = async (req: Request, res: Response) => {
             deviceName: row.deviceName,
             userAgent: row.userAgent,
             ipAddress: row.ipAddress,
-            isActive: row.isActive !== false && !row.revokedAt && new Date(row.expiresAt) > new Date(),
+            isActive: row.isActive !== false && !row.revokedAt,
             createdAt: row.createdAt,
             lastSeenAt: row.lastSeenAt,
             expiresAt: row.expiresAt,
@@ -689,14 +697,34 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
         const { refreshToken: rt } = req.body || {};
         if (!rt) return res.status(400).json({ error: 'REFRESH_TOKEN_REQUIRED' });
 
+        // Every rejection below is logged with its exact reason — refresh 401s
+        // must never be a mystery again (see server logs for auth.refresh.*).
+        const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
         let payload: any;
         try {
             payload = jwt.verify(rt, JWT_SECRET);
-        } catch {
-            return res.status(401).json({ error: 'INVALID_REFRESH_TOKEN' });
+        } catch (error: any) {
+            // Grace path for LEGACY expiring refresh tokens: jsonwebtoken
+            // throws TokenExpiredError ONLY when the signature is valid and
+            // just the exp passed — that still proves prior authentication,
+            // so the live session row below decides (re-issue, don't punish).
+            if (error?.name === 'TokenExpiredError') {
+                const decoded: any = jwt.decode(rt);
+                if (decoded?.purpose === 'refresh' && decoded?.sid && decoded?.sub && decoded?.jti) {
+                    logger.warn({ userId: decoded.sub, sessionId: decoded.sid, ip: clientIp }, 'auth.refresh.legacy-expiry-renewal');
+                    payload = decoded;
+                } else {
+                    logger.warn({ ip: clientIp }, 'auth.refresh.invalid-shape-after-expiry');
+                    return res.status(401).json({ error: 'INVALID_REFRESH_TOKEN' });
+                }
+            } else {
+                logger.warn({ ip: clientIp, reason: error?.name || 'verify-failed' }, 'auth.refresh.rejected');
+                return res.status(401).json({ error: 'INVALID_REFRESH_TOKEN' });
+            }
         }
 
         if (payload.purpose !== 'refresh') {
+            logger.warn({ ip: clientIp }, 'auth.refresh.wrong-purpose');
             return res.status(401).json({ error: 'INVALID_REFRESH_TOKEN' });
         }
 
@@ -705,10 +733,14 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
         const tokenId = payload.jti;
 
         if (!sessionId || !userId || !tokenId) {
+            logger.warn({ ip: clientIp }, 'auth.refresh.missing-claims');
             return res.status(401).json({ error: 'INVALID_REFRESH_TOKEN' });
         }
 
-        // Verify session is still active
+        // Verify session is still alive. No time-based expiry here either:
+        // only an explicit revoke/logout (or a missing row) ends a session.
+        // Revocation gets its own code so the login screen tells the truth
+        // instead of blaming "inactivity".
         const [session] = await db.select().from(userSessions).where(and(
             eq(userSessions.id, sessionId),
             eq(userSessions.userId, userId),
@@ -716,13 +748,15 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
             eq(userSessions.isActive, true),
         ));
 
-        if (!session || session.revokedAt || new Date(session.expiresAt) < new Date()) {
-            return res.status(401).json({ error: 'SESSION_EXPIRED' });
+        if (!session || session.revokedAt) {
+            logger.warn({ userId, sessionId, ip: clientIp }, 'auth.refresh.session-revoked');
+            return res.status(401).json({ error: 'SESSION_REVOKED' });
         }
 
         // Fetch user
         const [user] = await db.select().from(users).where(eq(users.id, userId));
         if (!user || user.isActive === false) {
+            logger.warn({ userId, sessionId, ip: clientIp }, 'auth.refresh.user-inactive');
             return res.status(401).json({ error: 'USER_INACTIVE' });
         }
 
@@ -737,9 +771,19 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
             jti: tokenId,
         }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, subject: user.id });
 
+        // Bookkeeping touch: expiresAt/lastSeenAt stay fresh for the admin
+        // sessions screens. They no longer gate anything — only an explicit
+        // revoke/logout ends a session (owner requirement).
+        const refreshMs = parseJwtExpiryMs(REFRESH_TOKEN_EXPIRES_IN);
+        const windowMs = AUTH_SESSION_TTL_HOURS > 0 ? AUTH_SESSION_TTL_HOURS * 60 * 60 * 1000 : refreshMs;
+        const refreshExpMs = typeof (payload as any)?.exp === 'number'
+            ? (payload as any).exp * 1000
+            : Date.now() + refreshMs;
+        const newExpiry = new Date(Math.min(Date.now() + windowMs, refreshExpMs));
+
         // Touch session
         await db.update(userSessions)
-            .set({ lastSeenAt: new Date(), updatedAt: new Date() })
+            .set({ lastSeenAt: new Date(), updatedAt: new Date(), expiresAt: newExpiry })
             .where(eq(userSessions.id, sessionId));
 
         return res.json({ token: newToken, user: sanitizeUser(user) });
@@ -967,18 +1011,19 @@ export const getAdminSessions = async (req: Request, res: Response) => {
 
         const enrichedSessions = sessions.map(s => {
             const user = userMap.get(s.userId);
-            const now = new Date();
             return {
                 ...s,
                 userName: user?.name || 'Unknown',
                 userEmail: user?.email || '',
                 userRole: user?.role || '',
-                isExpired: s.expiresAt ? new Date(s.expiresAt) < now : false,
+                // Sessions no longer expire by time — only revoke/logout ends
+                // them. Kept as false for API shape compatibility.
+                isExpired: false,
                 isRevoked: !!s.revokedAt,
             };
         });
 
-        const activeSessions = enrichedSessions.filter(s => s.isActive && !s.isExpired && !s.isRevoked);
+        const activeSessions = enrichedSessions.filter(s => s.isActive && !s.isRevoked);
 
         res.json({
             sessions: enrichedSessions,

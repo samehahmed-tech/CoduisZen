@@ -67,7 +67,7 @@ interface KdsStore {
     isLoading: boolean;
     error: string | null;
     fetchTickets: (params?: { station?: string; branchId?: string; includeServed?: boolean }) => Promise<void>;
-    bumpTicket: (id: string) => Promise<void>;
+    bumpTicket: (id: string, actor?: { id?: string; name?: string }) => Promise<void>;
     handoverOrder: (orderId: string) => Promise<void>;
     recallTicket: (id: string) => Promise<void>;
     toggleItemState: (ticketId: string, itemId: number) => Promise<void>;
@@ -97,9 +97,9 @@ export const useKdsStore = create<KdsStore>((set) => ({
             set({ error: e.message || 'Failed to fetch KDS tickets', isLoading: false });
         }
     },
-    bumpTicket: async (id: string) => {
+    bumpTicket: async (id: string, actor?: { id?: string; name?: string }) => {
         try {
-            const res: any = await kdsApi.bumpTicket(id);
+            const res: any = await kdsApi.bumpTicket(id, actor);
             const served = res?.served || res?.data?.served;
             set((state) => ({
                 tickets: served

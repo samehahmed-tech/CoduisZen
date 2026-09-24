@@ -40,7 +40,7 @@ const RecipeManager: React.FC = () => {
     const lang = (settings.language || 'ar') as 'en' | 'ar';
     const tr = (ar: string, en: string) => (lang === 'ar' ? ar : en);
     const currency = settings.currencySymbol || (lang === 'ar' ? 'ج.م' : 'EGP');
-    const restaurant = settings.restaurantName || 'RestoFlow';
+    const restaurant = settings.restaurantName || 'Xen';
     const isAr = lang === 'ar';
 
     const menuItems = useMemo(() => categories.flatMap((c) => c.items.map((i) => ({ ...i, _catId: c.id, _catName: c.name }))), [categories]);
@@ -300,7 +300,7 @@ const RecipeManager: React.FC = () => {
             const body = `<table><thead><tr><th>${tr('الصنف', 'Item')}</th><th>${tr('القسم', 'Cat')}</th><th>${tr('السعر', 'Price')}</th><th>#</th><th>${tr('تكلفة الحصة', 'Portion')}</th><th>%</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.item)}</td><td>${esc(r.cat)}</td><td>${esc(r.price)}</td><td>${r.n}</td><td>${esc(r.per)}</td><td>${esc(r.m)}</td></tr>`).join('')}</tbody></table>`;
             await downloadHtmlPdf(body, {
                 filename: `recipes-group`, title: tr('تقرير الوصفات وهندسة التكلفة', 'Recipes & cost report'),
-                restaurant, logoUrl: settings.receiptLogoUrl || '/logo.png',
+                restaurant, logoUrl: settings.receiptLogoUrl || '/logo.png?v=2',
                 metaChips: [`${filtered.length} ${tr('صنف', 'items')}`, `${tr('متوسط تكلفة الطعام', 'Avg food cost')}: ${fmt(coverage.avg, 1)}%`],
                 isArabic: isAr, orientation: 'landscape',
             });

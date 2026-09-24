@@ -112,18 +112,20 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
         setPage(1);
     };
 
+    // Export uses the raw row (not a value lookup) so formatters that need
+    // the full row (badges, currency, per-row rates) export correctly.
     const exportColumns = columns.map((c) => ({
         key: c.key,
         label: c.label,
-        format: (v: any) => {
-            if (c.exportFormat) {
-                const found = rows.find((x) => x[c.key] === v);
-                return c.exportFormat(v, found ?? ({} as any));
-            }
+        format: (v: any, row?: any) => {
+            const source = row ?? rows.find((x) => x[c.key] === v) ?? ({} as any);
+            if (c.exportFormat) return c.exportFormat(v, source);
+            if (typeof v === 'number') return String(Math.round(v * 100) / 100);
             if (c.format) {
                 try {
-                    const out = c.format(v, {} as any, 0);
-                    return typeof out === 'string' ? out : String(out ?? '');
+                    const out = c.format(v, source, 0);
+                    if (typeof out === 'string' || typeof out === 'number') return String(out ?? '');
+                    return v == null ? '' : String(v);
                 } catch {
                     return v == null ? '' : String(v);
                 }
@@ -132,19 +134,46 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
         },
     }));
 
+    // Totals row: keep raw numbers (no currency symbols) so ExcelJS keeps
+    // them numeric and summable; currency is a display-only concern.
     const exportTotals: (string | number)[] | undefined = hasTotals
         ? columns.map((c, ci) =>
-              ci === 0 ? (isAr ? 'الإجمالي' : 'TOTAL') : c.sum ? fmtMoney(totals[c.key], brandCurrency) : ''
+              ci === 0 ? (isAr ? 'الإجمالي' : 'TOTAL') : c.sum ? Math.round((totals[c.key] || 0) * 100) / 100 : ''
           )
         : undefined;
 
+    const formatTotalCell = (c: ReportColumn) => {
+        if (!c.sum) return '';
+        // Percent columns must never be summed — show blank instead.
+        if (/%|percent|rate|نسبة|معدل/i.test(`${c.key} ${c.label}`)) return '';
+        const v = totals[c.key] || 0;
+        return fmtMoney(v);
+    };
+
     const alignClass = (a?: string) => (a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left');
+
+    const restaurantLogo = (settings as any)?.receiptLogoUrl || '/logo.png?v=2';
+    const systemLogoRaw = (settings as any)?.systemLogoUrl || '/logo.png?v=2';
+    // Second mark only when it is a genuinely different image — never the
+    // same logo twice.
+    const normLogo = (u?: string) => {
+        const s = String(u || '').trim().toLowerCase();
+        if (!s || s.startsWith('data:')) return s;
+        try { return new URL(s, 'http://x').pathname.replace(/\/+$/, ''); } catch { return s; }
+    };
+    const showDualLogos = Boolean(systemLogoRaw) && normLogo(systemLogoRaw) !== normLogo(restaurantLogo);
 
     return (
         <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
             <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                    <div className="flex items-center gap-1.5" data-pdf-hide="false">
+                        <img src={restaurantLogo} alt="" className="h-10 w-auto max-w-[170px] rounded-xl border border-slate-800 object-contain bg-[#0b1b30] px-2 py-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        {showDualLogos && (
+                            <img src={systemLogoRaw} alt="" className="h-8 w-auto max-w-[130px] rounded-xl border border-[#c9a227]/60 object-contain bg-[#0b1b30] px-2 py-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        )}
+                    </div>
+                    <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary hidden items-center justify-center">
                         <Table2 size={18} />
                     </div>
                     <div>
@@ -153,7 +182,7 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted" data-pdf-hide>
                         {rows.length} {isAr ? 'صف' : 'rows'}
                     </span>
                     {rows.length > 0 && (
@@ -174,7 +203,37 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
                 </p>
             ) : (
                 <>
-                    <div className="responsive-table overflow-x-auto">
+                    {/* Full-data table for print/PDF: hidden on screen, shown in print & PDF CSS. */}
+                    <div className="report-full-print" style={{ display: 'none' }} aria-hidden>
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr>
+                                    {columns.map((c) => (
+                                        <th key={c.key}>{c.label}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sorted.map((row, i) => (
+                                    <tr key={rowKey ? rowKey(row, i) : i}>
+                                        {columns.map((c) => (
+                                            <td key={c.key}>{c.exportFormat ? c.exportFormat(row[c.key], row) : String(row[c.key] ?? '-')}</td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                            {hasTotals && (
+                                <tfoot>
+                                    <tr>
+                                        {columns.map((c, ci) => (
+                                            <td key={c.key}>{ci === 0 ? (isAr ? 'الإجمالي' : 'TOTAL') : c.sum ? String(Math.round((totals[c.key] || 0) * 100) / 100) : ''}</td>
+                                        ))}
+                                    </tr>
+                                </tfoot>
+                            )}
+                        </table>
+                    </div>
+                    <div className="report-screen-only responsive-table overflow-x-auto">
                         <table className="w-full text-xs min-w-[640px]">
                             <thead>
                                 <tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.15em]">
@@ -213,7 +272,7 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
                                     <tr className="bg-primary/5 border-t-2 border-primary/20 font-black">
                                         {columns.map((c, ci) => (
                                             <td key={c.key} className={`px-5 py-4 tabular-nums ${alignClass(c.align)}`}>
-                                                {ci === 0 ? (isAr ? 'الإجمالي' : 'TOTAL') : c.sum ? fmtMoney(totals[c.key]) : ''}
+                                                {ci === 0 ? (isAr ? 'الإجمالي' : 'TOTAL') : formatTotalCell(c)}
                                             </td>
                                         ))}
                                     </tr>
@@ -221,7 +280,7 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
                             )}
                         </table>
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-border/20">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-border/20" data-pdf-hide>
                         <span className="text-[10px] font-bold text-muted">
                             {footerNote || (totalPages > 1 ? `${isAr ? 'صفحة' : 'Page'} ${safePage} / ${totalPages}` : `${rows.length} ${isAr ? 'صف' : 'rows'}`)}
                         </span>

@@ -1,8 +1,18 @@
 import { Request, Response } from 'express';
-import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, inArray, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { inventoryItems, inventoryStock, inventoryBatches, stockMovements, warehouses } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
+
+// Optional branch scope for movement-based reports: a movement belongs to a
+// branch when either side's warehouse does.
+const movementBranchScope = (branchId: unknown) => (
+    branchId ? sql`EXISTS (
+        SELECT 1 FROM warehouses bw
+        WHERE bw.id IN (${stockMovements.fromWarehouseId}, ${stockMovements.toWarehouseId})
+          AND bw.branch_id = ${String(branchId)}
+    )` : undefined
+);
 
 export const MOVEMENT_TYPES = ['PURCHASE', 'SALE', 'SALE_CONSUMPTION', 'TRANSFER', 'WASTE', 'ADJUSTMENT', 'PRODUCTION_CONSUMPTION', 'PRODUCTION'] as const;
 
@@ -49,7 +59,12 @@ export const getStockMovementLog = async (req: Request, res: Response) => {
             unit: inventoryItems.unit,
             // Outbound-only movements (from warehouse, no destination) are stored
             // positive — sign them negative so summaries count them as OUT.
+            // TRANSFER legs carry both sides and stay positive; the explicit
+            // direction + from/to fields below disambiguate them.
             quantity: sql<number>`CASE WHEN ${stockMovements.fromWarehouseId} IS NOT NULL AND ${stockMovements.toWarehouseId} IS NULL THEN -${stockMovements.quantity} ELSE ${stockMovements.quantity} END`,
+            direction: sql<string>`CASE WHEN ${stockMovements.fromWarehouseId} IS NOT NULL AND ${stockMovements.toWarehouseId} IS NOT NULL THEN 'TRANSFER' WHEN ${stockMovements.fromWarehouseId} IS NOT NULL THEN 'OUT' ELSE 'IN' END`,
+            fromWarehouseId: stockMovements.fromWarehouseId,
+            toWarehouseId: stockMovements.toWarehouseId,
             unitCost: stockMovements.unitCost,
             totalCost: stockMovements.totalCost,
             type: stockMovements.type,
@@ -75,9 +90,24 @@ export const getStockMovementLog = async (req: Request, res: Response) => {
 
 export const getWasteLossLog = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
+
+        // WASTE is always a loss. ADJUSTMENT is bidirectional (count
+        // corrections can ADD stock) — only negative adjustments are losses.
+        // Positive adjustments are gains and must not inflate waste.
+        const lossCondition = or(
+            eq(stockMovements.type, 'WASTE'),
+            and(eq(stockMovements.type, 'ADJUSTMENT'), sql`${stockMovements.quantity} < 0`),
+        );
+        const conditions: any[] = [
+            gte(stockMovements.createdAt, start),
+            lte(stockMovements.createdAt, end),
+            lossCondition,
+        ];
+        const branchScope = movementBranchScope(branchId);
+        if (branchScope) conditions.push(branchScope);
 
         const rows = await db.select({
             id: stockMovements.id,
@@ -86,29 +116,32 @@ export const getWasteLossLog = async (req: Request, res: Response) => {
             quantity: stockMovements.quantity,
             unitCost: stockMovements.unitCost,
             totalCost: stockMovements.totalCost,
+            type: stockMovements.type,
             reason: stockMovements.reason,
             performedBy: stockMovements.performedBy,
             createdAt: stockMovements.createdAt,
         })
             .from(stockMovements)
             .innerJoin(inventoryItems, eq(stockMovements.itemId, inventoryItems.id))
-            .where(and(
-                gte(stockMovements.createdAt, start),
-                lte(stockMovements.createdAt, end),
-                inArray(stockMovements.type, ['WASTE', 'ADJUSTMENT'])
-            ))
+            .where(and(...conditions))
             .orderBy(desc(stockMovements.createdAt))
             .limit(500);
 
         const totalWasteCost = rows.reduce((s, r) => s + Number(r.totalCost || 0), 0);
-        res.json({ items: rows, totalWasteCost, count: rows.length });
+        res.json({ items: rows, totalWasteCost, count: rows.length, branchId: (branchId as string) || 'ALL' });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
 };
 
-export const getReorderAlerts = async (_req: Request, res: Response) => {
+export const getReorderAlerts = async (req: Request, res: Response) => {
     try {
+        const branchId = typeof req.query.branchId === 'string' ? req.query.branchId.trim() : '';
+        // Optional branch scope: only stock sitting in that branch's warehouses
+        // counts — otherwise branch-A stockouts hide behind branch-B surplus.
+        const stockJoin = branchId
+            ? sql`${inventoryItems.id} = ${inventoryStock.itemId} AND ${inventoryStock.warehouseId} IN (SELECT id FROM warehouses WHERE branch_id = ${branchId})`
+            : eq(inventoryItems.id, inventoryStock.itemId);
         const rows = await db.select({
             itemId: inventoryItems.id,
             itemName: inventoryItems.name,
@@ -118,12 +151,17 @@ export const getReorderAlerts = async (_req: Request, res: Response) => {
             currentStock: sql<number>`coalesce(sum(${inventoryStock.quantity}), 0)`,
         })
             .from(inventoryItems)
-            .leftJoin(inventoryStock, eq(inventoryItems.id, inventoryStock.itemId))
-            .where(eq(inventoryItems.isActive, true))
+            .leftJoin(inventoryStock, stockJoin)
+            .where(and(
+                eq(inventoryItems.isActive, true),
+                isNull(inventoryItems.deletedAt),
+            ))
             .groupBy(inventoryItems.id, inventoryItems.name, inventoryItems.unit, inventoryItems.threshold, inventoryItems.costPrice)
             .having(sql`coalesce(sum(${inventoryStock.quantity}), 0) <= ${inventoryItems.threshold}`)
             .orderBy(sql`coalesce(sum(${inventoryStock.quantity}), 0) asc`);
 
+        // Array shape preserved for the dashboard consumer; pass ?branchId=
+        // to scope the stock sum to one branch's warehouses.
         res.json(rows.map(r => ({
             ...r,
             currentStock: Number(r.currentStock),
@@ -134,11 +172,21 @@ export const getReorderAlerts = async (_req: Request, res: Response) => {
     }
 };
 
-export const getExpiringBatches = async (_req: Request, res: Response) => {
+export const getExpiringBatches = async (req: Request, res: Response) => {
     try {
         const now = new Date();
         const thirtyDaysLater = new Date();
         thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+        const branchId = typeof req.query.branchId === 'string' ? req.query.branchId.trim() : '';
+
+        const conditions: any[] = [
+            lte(inventoryBatches.expiryDate, thirtyDaysLater),
+            gte(inventoryBatches.currentQty, sql`0.01`),
+            inArray(inventoryBatches.status, ['ACTIVE', 'QUARANTINE']),
+        ];
+        if (branchId) {
+            conditions.push(sql`${inventoryBatches.warehouseId} IN (SELECT id FROM warehouses WHERE branch_id = ${branchId})`);
+        }
 
         const rows = await db.select({
             batchId: inventoryBatches.id,
@@ -153,18 +201,25 @@ export const getExpiringBatches = async (_req: Request, res: Response) => {
         })
             .from(inventoryBatches)
             .innerJoin(inventoryItems, eq(inventoryBatches.itemId, inventoryItems.id))
-            .where(and(
-                lte(inventoryBatches.expiryDate, thirtyDaysLater),
-                gte(inventoryBatches.currentQty, sql`0.01`),
-                inArray(inventoryBatches.status, ['ACTIVE', 'QUARANTINE'])
-            ))
+            .where(and(...conditions))
             .orderBy(inventoryBatches.expiryDate)
             .limit(200);
 
-        const totalAtRiskValue = rows.reduce((s, r) => s + Number(r.currentQty) * Number(r.unitCost), 0);
+        // QUARANTINE stock is not saleable — report it separately instead of
+        // folding it into the at-risk (saleable) value.
+        const activeRows = rows.filter((r) => r.status === 'ACTIVE');
+        const quarantineRows = rows.filter((r) => r.status !== 'ACTIVE');
+        const valueOf = (list: typeof rows) => list.reduce((s, r) => s + Number(r.currentQty) * Number(r.unitCost), 0);
         const alreadyExpired = rows.filter(r => new Date(r.expiryDate!) <= now).length;
 
-        res.json({ items: rows, totalAtRiskValue, alreadyExpired, totalBatches: rows.length });
+        res.json({
+            items: rows,
+            totalAtRiskValue: valueOf(activeRows),
+            quarantineValue: valueOf(quarantineRows),
+            quarantineCount: quarantineRows.length,
+            alreadyExpired,
+            totalBatches: rows.length,
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }

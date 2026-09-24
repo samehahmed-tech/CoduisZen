@@ -2,8 +2,9 @@
  * POSToolbar — Slim mode switcher + context actions + quick pay
  */
 import React from 'react';
-import { UtensilsCrossed, ShoppingBag, MapPin, Truck, LayoutGrid, Zap, Plus, QrCode, Pause, Clock, User, List, Keyboard, Printer, RotateCcw } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, MapPin, Truck, LayoutGrid, Zap, Plus, QrCode, Pause, Clock, User, List, Keyboard, Printer, RotateCcw, CircleQuestionMark } from 'lucide-react';
 import { OrderType } from '@/types';
+import POSShortcutsHelp from './POSShortcutsHelp';
 
 interface POSToolbarProps {
     activeOrderType: OrderType;
@@ -38,40 +39,33 @@ const modes = [
     { mode: OrderType.DELIVERY, icon: Truck, key: 'delivery', en: 'Delivery', ar: 'ديلفري' },
 ];
 
-const SHORTCUTS: Array<{ keys: string; en: string; ar: string }> = [
-    { keys: 'Enter', en: 'Quick pay', ar: 'دفع سريع' },
-    { keys: 'Ctrl+Enter', en: 'Send to kitchen', ar: 'إرسال للمطبخ' },
-    { keys: '/', en: 'Focus search', ar: 'البحث' },
-    { keys: 'Delete', en: 'Void order', ar: 'إلغاء الطلب' },
-    { keys: 'Alt+1…4', en: 'Order mode', ar: 'نوع الطلب' },
-    { keys: 'Alt+R', en: 'Recall held', ar: 'استدعاء معلق' },
-];
-
 const ShortcutCheatsheet: React.FC<{ isAr: boolean }> = ({ isAr }) => {
     const [open, setOpen] = React.useState(false);
+    React.useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement | null)?.tagName;
+            const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable;
+            if (!typing && (e.key === 'F1' || e.key === '?')) {
+                e.preventDefault();
+                setOpen(true);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
     return (
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 flex items-center gap-1">
             <button
-                onClick={() => setOpen((v) => !v)}
-                aria-label={isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard shortcuts'}
-                title={isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard shortcuts'}
-                className="flex items-center gap-1 px-2 h-7 rounded-lg text-muted hover:text-main bg-elevated/40 transition-colors active:scale-95"
+                onClick={() => setOpen(true)}
+                aria-label={isAr ? 'دليل الاختصارات (؟ / F1)' : 'Shortcuts help (? / F1)'}
+                title={isAr ? 'دليل الاختصارات (؟ / F1)' : 'Shortcuts help (? / F1)'}
+                className="flex items-center gap-1 px-2 h-7 rounded-lg text-main/70 bg-elevated/40 hover:text-primary hover:bg-primary/10 border border-border/40 hover:border-primary/20 transition-colors active:scale-95"
             >
-                <Keyboard size={12} />
+                <Keyboard size={14} />
+                <CircleQuestionMark size={12} className="opacity-60" />
+                <kbd className="hidden lg:inline rounded border border-border bg-elevated px-1 font-mono text-[8px] font-black opacity-70" dir="ltr">?</kbd>
             </button>
-            {open && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-                    <div className="absolute end-0 top-9 z-50 w-56 rounded-xl border border-border bg-card p-2 shadow-2xl">
-                        {SHORTCUTS.map((s) => (
-                            <div key={s.keys} className="flex items-center justify-between gap-2 px-2 py-1.5 text-[10px]">
-                                <span className="font-bold text-main">{isAr ? s.ar : s.en}</span>
-                                <kbd className="rounded-md border border-border bg-elevated px-1.5 py-0.5 font-mono font-black text-muted" dir="ltr">{s.keys}</kbd>
-                            </div>
-                        ))}
-                    </div>
-                </>
-            )}
+            <POSShortcutsHelp isOpen={open} onClose={() => setOpen(false)} lang={isAr ? 'ar' : 'en'} />
         </div>
     );
 };
@@ -109,6 +103,10 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
                     );
                 })}
             </div>
+
+            {/* Shortcuts cheatsheet — pinned right after modes so it is always
+                visible without horizontal scrolling of the toolbar. */}
+            <ShortcutCheatsheet isAr={isAr} />
 
             {/* Context Actions */}
             {activeOrderType === OrderType.DINE_IN && (
@@ -169,14 +167,12 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
 
             <div className="flex-1" />
 
-            {/* Scanner */}
+            {/* Scanner — steady status chip (no pulse: calm POS surface) */}
             <div className="shrink-0 hidden md:flex items-center gap-1 px-2 h-7 rounded-lg text-emerald-500 bg-emerald-500/5">
-                <QrCode size={11} className="animate-pulse" />
+                <QrCode size={11} />
                 <span className="text-[9px] font-bold">{isAr ? 'ماسح' : 'Scanner'}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
             </div>
-
-            {/* Shortcuts cheatsheet */}
-            <ShortcutCheatsheet isAr={isAr} />
 
             {/* Reprint last ticket */}
             {onReprintLast && (
@@ -216,9 +212,9 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
                 </button>
             )}
 
-            {/* Total + Quick Pay */}
+            {/* Total + Quick Pay — hidden below lg: cart header + FAB already show the total on small/tablet */}
             {hasCartItems && (
-                <div className="shrink-0 hidden md:flex items-center gap-1">
+                <div className="shrink-0 hidden lg:flex items-center gap-1">
                     <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-lg bg-primary/6">
                         <span className="text-[10px] font-bold text-primary/60">{isAr ? 'الإجمالي' : 'Total'}</span>
                         <span className="text-sm font-black tabular-nums text-primary">{currencySymbol}{(cartTotal || 0).toFixed(2)}</span>

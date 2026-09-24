@@ -69,9 +69,11 @@ const ItemModal: React.FC<ItemModalProps> = ({ isOpen, onClose, onSave, lang, wa
         purchaseUnit: item.purchaseUnit || item.unit,
         purchaseUnitFactor: Number(item.purchaseUnitFactor || 1) > 0 ? Number(item.purchaseUnitFactor || 1) : 1,
         bom: parseArray(item.bom).filter((ingredient): ingredient is RecipeIngredient => Boolean(
-            ingredient && typeof ingredient === 'object' && ('itemId' in ingredient)
+            ingredient && typeof ingredient === 'object' && ('itemId' in ingredient || 'inventoryItemId' in ingredient)
         )).map((ingredient) => ({
-            itemId: typeof ingredient.itemId === 'string' ? ingredient.itemId : '',
+            itemId: typeof ingredient.itemId === 'string' && ingredient.itemId
+                ? ingredient.itemId
+                : (typeof (ingredient as any).inventoryItemId === 'string' ? (ingredient as any).inventoryItemId : ''),
             quantity: Number.isFinite(Number(ingredient.quantity)) ? Number(ingredient.quantity) : 0,
             unit: typeof ingredient.unit === 'string' ? ingredient.unit : '',
         })),

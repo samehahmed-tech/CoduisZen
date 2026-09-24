@@ -9,6 +9,7 @@ import { useAuthStore } from './useAuthStore';
 import { translations } from '../services/translations';
 import { branchEntityCacheKey, fromBranchEntityCache, toBranchEntityCache } from '../src/utils/branchEntityCache';
 import { findActiveTableOrder } from '../utils/tableOrder';
+import { buildOrderDiscountPayload } from '../services/orderTotals';
 
 const isClientOnlyItemId = (value: unknown) => {
     const id = String(value || '').trim();
@@ -81,10 +82,11 @@ interface OrderState {
     // Async Actions (API)
     fetchOrders: (params?: { status?: string; branch_id?: string; date?: string; limit?: number }) => Promise<void>;
     placeOrder: (order: Order) => Promise<Order>;
-    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean; approvalId?: number }) => Promise<void>;
+    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean; approvalId?: number; paymentMethod?: string; payments?: Array<{ method: string; amount: number }> }) => Promise<void>;
     updateOrderItems: (orderId: string, data: { items: any[]; notes?: string; discount?: number; deliveryFee?: number; changedBy?: string; deliverySource?: string; paymentMethod?: string; deliveryAddress?: string; deliveryLat?: number; deliveryLng?: number; deliveryAddressLabel?: string; platformOrderId?: string; scheduledFor?: string }) => Promise<any>;
 
     fetchTables: (branchId: string) => Promise<void>;
+    refreshOrder: (orderId: string) => Promise<any>;
     updateTableStatus: (tableId: string, status: TableStatus, currentOrderId?: string) => Promise<void>;
     resetTable: (tableId: string, reason?: string) => Promise<void>;
 
@@ -143,6 +145,38 @@ const dedupeOrdersById = (orders: Order[]) => {
         byId.set(order.id, order);
     }
     return Array.from(byId.values());
+};
+
+/**
+ * Merge freshly-created server lines with the client cart lines.
+ * Server rows carry the DB row ids that transfer/split/merge match on —
+ * without this mapping the POS only knows temp cart ids and every item
+ * move fails with ORDER_ITEM_QUANTITY_UNAVAILABLE until a refresh.
+ * Client-only fields (modifiers, open-price flags) are preserved.
+ */
+const mapPlacedOrderItems = (serverItems: any, clientItems: any, orderId: string): Order['items'] => {
+    const server = Array.isArray(serverItems) ? serverItems : [];
+    const client = Array.isArray(clientItems) ? clientItems : [];
+    if (server.length === 0) return (client as Order['items']) || [];
+    return server.map((row: any, index: number) => {
+        const fallback = client[index] || {};
+        const sameLine =
+            String(row?.name || '').trim().toLowerCase() ===
+            String(fallback?.name || '').trim().toLowerCase();
+        const base = sameLine ? fallback : {};
+        const rowId = row?.id ?? row?.itemId;
+        return {
+            ...base,
+            ...row,
+            cartId: rowId !== undefined && rowId !== null && String(rowId).trim() !== ''
+                ? String(rowId)
+                : (base.cartId || `${orderId}-${index}`),
+            nameAr: row?.nameAr || row?.name_ar || base.nameAr,
+            course: row?.course ?? base.course,
+            seatNumber: row?.seatNumber ?? row?.seat_number ?? base.seatNumber,
+            selectedModifiers: row?.selectedModifiers || row?.modifiers || base.selectedModifiers || [],
+        };
+    }) as Order['items'];
 };
 
 const printCompletionReceiptIfNeeded = async (order: Order) => {
@@ -365,8 +399,7 @@ export const useOrderStore = create<OrderState>()(
                         call_center_agent_id: (order as any).callCenterAgentId || (order as any).call_center_agent_id || undefined,
                         status: order.status || 'PENDING',
                         subtotal: order.subtotal,
-                        discount: order.discount,
-                        discount_type: 'PERCENT',
+                        ...buildOrderDiscountPayload(order),
                         couponCode: order.couponCode,
                         tax: order.tax,
                         total: totalAmount,
@@ -409,7 +442,7 @@ export const useOrderStore = create<OrderState>()(
                         deliveryLng: savedOrder.delivery_lng ?? savedOrder.deliveryLng ?? order.deliveryLng,
                         deliveryAddressLabel: savedOrder.delivery_address_label || savedOrder.deliveryAddressLabel || order.deliveryAddressLabel,
                         isCallCenterOrder: savedOrder.is_call_center_order || savedOrder.isCallCenterOrder || order.isCallCenterOrder,
-                        items: savedOrder.items || order.items || [],
+                        items: mapPlacedOrderItems(savedOrder.items, order.items, savedOrder.id || order.id),
                         status: savedOrder.status || order.status,
                         shiftId: savedOrder.shift_id || savedOrder.shiftId || order.shiftId,
                         subtotal: savedOrder.subtotal ?? order.subtotal,
@@ -437,9 +470,11 @@ export const useOrderStore = create<OrderState>()(
                         timestamp: new Date()
                     });
 
-                    // Update local state
+                    // Update local state — replace any existing entry with the
+                    // same id (retry/re-dispatch must never duplicate the order,
+                    // otherwise floor-map totals count it twice).
                     set((state) => ({
-                        orders: [normalizedOrder, ...state.orders],
+                        orders: [normalizedOrder, ...state.orders.filter((o) => o.id !== normalizedOrder.id)],
                         activeCart: [],
                         discount: 0,
                         activeCoupon: null,
@@ -467,12 +502,14 @@ export const useOrderStore = create<OrderState>()(
                             notes,
                             expected_updated_at: expectedUpdatedAt,
                             approval_id: options?.approvalId,
+                            paymentMethod: options?.paymentMethod,
+                            payments: options?.payments,
                         }, { idempotencyKey: `${orderId}:${status}` });
                     } else {
                         if (options?.approvalId) throw new Error('MANAGER_APPROVAL_REQUIRES_ONLINE');
                         await syncService.queue('orderStatus', 'UPDATE', {
                             id: orderId,
-                            data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt }
+                            data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt, paymentMethod: options?.paymentMethod, payments: options?.payments }
                         });
                     }
                     eventBus.emit(AuditEventType.ORDER_STATUS_CHANGE, {
@@ -559,7 +596,11 @@ export const useOrderStore = create<OrderState>()(
                             expectedUpdatedAt: current?.updatedAt ? new Date(current.updatedAt).toISOString() : undefined,
                         })
                         : (() => { throw new Error('ORDER_EDIT_REQUIRES_ONLINE'); })();
-                    const mergedItems = Array.isArray(saved?.items) && saved.items.length > 0 ? saved.items : data.items;
+                    // Keep DB row ids mapped into cartId (see mapPlacedOrderItems)
+                    // so later transfer/split/merge calls still match.
+                    const mergedItems = Array.isArray(saved?.items) && saved.items.length > 0
+                        ? mapPlacedOrderItems(saved.items, data.items, orderId)
+                        : data.items;
                     set((state) => ({
                         orders: state.orders.map(o => o.id === orderId
                             ? {
@@ -581,6 +622,42 @@ export const useOrderStore = create<OrderState>()(
                     set({ error: error?.code || error?.message || 'ORDER_ITEMS_UPDATE_FAILED' });
                     throw error;
                 }
+            },
+
+            // Pull server truth for one order (conflict healing + pre-retry
+            // refresh). Merges totals/status/lines; the cashier's unsent cart
+            // is left untouched — callers decide what to do with it.
+            refreshOrder: async (orderId) => {
+                const fresh: any = await ordersApi.getById(orderId);
+                if (!fresh?.id) return null;
+                const mappedItems = Array.isArray(fresh.items)
+                    ? mapPlacedOrderItems(fresh.items, [], orderId)
+                    : undefined;
+                let out: any = null;
+                set((state) => ({
+                    orders: state.orders.map(o => {
+                        if (o.id !== orderId) return o;
+                        out = {
+                            ...o,
+                            status: fresh.status ?? o.status,
+                            subtotal: fresh.subtotal ?? o.subtotal,
+                            tax: fresh.tax ?? o.tax,
+                            total: fresh.total ?? o.total,
+                            discount: fresh.discount ?? o.discount,
+                            updatedAt: fresh.updated_at ? new Date(fresh.updated_at)
+                                : (fresh.updatedAt ? new Date(fresh.updatedAt) : o.updatedAt),
+                            ...(mappedItems ? { items: mappedItems } : {}),
+                        } as any;
+                        return out;
+                    }),
+                }));
+                try {
+                    const existing = await localDb.orders.get(orderId);
+                    if (existing && out) {
+                        await localDb.orders.put({ ...existing, ...out, updatedAt: new Date() } as any);
+                    }
+                } catch { /* offline cache is best-effort */ }
+                return out;
             },
 
             // ============ Local Actions ============

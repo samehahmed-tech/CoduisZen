@@ -5,6 +5,7 @@ import supplierRoutes from '../../routes/supplierRoutes';
 import purchaseOrderRoutes from '../../routes/purchaseOrderRoutes';
 import wastageRoutes from '../../routes/wastageRoutes';
 import productionRoutes from '../../routes/productionRoutes';
+import butcheryRoutes from '../../routes/butcheryRoutes';
 import barcodeRoutes from '../../routes/barcodeRoutes';
 import inventoryIntelligenceRoutes from '../../routes/inventoryIntelligenceRoutes';
 import { requireRoles } from '../../middleware/auth';
@@ -20,6 +21,7 @@ router.use('/suppliers', supplierRoutes);
 router.use('/purchase-orders', purchaseOrderRoutes);
 router.use('/wastage', wastageRoutes);
 router.use('/production', productionRoutes);
+router.use('/butchery', butcheryRoutes);
 router.use('/barcode', barcodeRoutes);
 router.use('/intelligence', inventoryIntelligenceRoutes);
 

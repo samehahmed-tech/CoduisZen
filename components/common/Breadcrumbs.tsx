@@ -9,6 +9,7 @@ import { translations } from '../../services/translations';
 import { useSystemNotifications, type SystemNotification } from '../../hooks/useSystemNotifications';
 import { useInternalMessages } from '../../hooks/useInternalMessages';
 import { usersApi } from '../../services/api/users';
+import UserAvatar from './UserAvatar';
 
 // Map of raw paths to generic translation keys
 const PATH_MAP: Record<string, string> = {
@@ -17,6 +18,7 @@ const PATH_MAP: Record<string, string> = {
     'orders': 'orders',
     'tables': 'tables',
     'production': 'production',
+    'butchery': 'production',
     'menu': 'menu',
     'inventory': 'inventory',
     'finance': 'finance',
@@ -232,7 +234,6 @@ const Breadcrumbs: React.FC = () => {
         }
     };
 
-    const userInitials = currentUser?.name?.substring(0, 2).toUpperCase() || 'RF';
     const systemDateLabel = new Intl.DateTimeFormat(isRtl ? 'ar-EG' : 'en-GB', {
         year: 'numeric',
         month: '2-digit',
@@ -431,10 +432,7 @@ const Breadcrumbs: React.FC = () => {
                         onClick={() => togglePopup('user')}
                         className="group flex items-center gap-0 rounded-xl border border-border/10 bg-elevated/40 p-1.5 shadow-sm transition-all hover:bg-elevated sm:gap-2.5 sm:pr-3 sm:rtl:pl-3 sm:rtl:pr-1.5"
                     >
-                        <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white font-bold text-[11px] shrink-0 overflow-hidden shadow-inner group-hover:scale-105 transition-transform">
-                            {userInitials}
-                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card" />
-                        </div>
+                        <UserAvatar name={currentUser?.name} src={(currentUser as any)?.avatar} size="sm" status="online" ring={false} className="group-hover:scale-105 transition-transform" />
                         <div className="hidden min-w-0 flex-col items-start pr-1 text-left rtl:text-right sm:flex">
                             <span className="text-xs font-bold text-main leading-none truncate max-w-[100px]">{currentUser?.name || 'User'}</span>
                             <span className="text-[9px] font-semibold text-muted/60 uppercase tracking-widest mt-1 truncate">{currentUser?.role}</span>
@@ -617,8 +615,8 @@ const Breadcrumbs: React.FC = () => {
                         style={{ top: anchor.top, left: anchor.left, width: anchor.width, maxWidth: 'calc(100vw - 1rem)' }}
                     >
                         <div className="theme-modal-header px-4 py-4 flex flex-col items-center">
-                            <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-lg mb-2 border-2 border-primary/20">
-                                {userInitials}
+                            <div className="mb-2">
+                                <UserAvatar name={currentUser?.name} src={(currentUser as any)?.avatar} size="lg" />
                             </div>
                             <div className="text-sm font-bold text-main truncate text-center">{currentUser?.name || 'User'}</div>
                             <div className="text-[10px] text-muted/60 uppercase tracking-widest mt-0.5 text-center">{currentUser?.role || 'Staff'}</div>

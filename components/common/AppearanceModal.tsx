@@ -78,10 +78,10 @@ const THEME_PREVIEW: Record<AppTheme, { light: PreviewPalette; dark: PreviewPale
         dark: { primary: '#fb7185', accent: '#fbbf24', bg: '#160a0e', card: '#241218', rail: '#1a0b0f', text: '#ffeef0', muted: '#b9969e', border: '#48282f', button: 'linear-gradient(135deg,#e11d48,#9f1239)' },
     },
     'industrial-ops': {
-        moodAr: 'صلابة صناعية',
-        moodEn: 'Heavy-duty ops',
-        light: { primary: '#c2410c', accent: '#ca8a04', bg: '#eef0f2', card: '#ffffff', rail: '#e8eaed', text: '#181a1c', muted: '#697076', border: '#cdd2d7', button: 'linear-gradient(180deg,#d14e14,#b23c0a)' },
-        dark: { primary: '#fb923c', accent: '#fac83c', bg: '#0f1012', card: '#191b1e', rail: '#121316', text: '#ebedf0', muted: '#969ea5', border: '#3a3e44', button: 'linear-gradient(180deg,#e05a1a,#c2410c)' },
+        moodAr: 'فلوينت هادئ',
+        moodEn: 'Calm fluent',
+        light: { primary: '#0078d4', accent: '#0078d4', bg: '#f3f3f3', card: '#ffffff', rail: '#fafafa', text: '#1b1b1b', muted: '#616161', border: '#e5e5e5', button: '#0078d4' },
+        dark: { primary: '#4cc2ff', accent: '#4cc2ff', bg: '#202020', card: '#2d2d2d', rail: '#252525', text: '#ffffff', muted: '#a3a3a3', border: '#2e2e2e', button: '#0078d4' },
     },
     'premium-hospitality': {
         moodAr: 'زمردي فاخر',

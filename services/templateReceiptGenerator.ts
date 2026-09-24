@@ -343,8 +343,8 @@ export const generateHtmlFromTemplate = ({
                     const logoUrl = cfg.url || settings.receiptLogoUrl || '';
                     if (!logoUrl || template.showLogo === false) return '';
                     return `
-                        <div class="block logo-block">
-                            <img src="${escapeHtml(logoUrl)}" alt="logo" style="max-height:${Number(cfg.maxHeight || 120)}px;max-width:100%;object-fit:contain" />
+                        <div class="block logo-block" style="padding-top:2mm;overflow:visible">
+                            <img src="${escapeHtml(logoUrl)}" alt="logo" style="max-height:${Number(cfg.maxHeight || 120)}px;max-width:100%;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto" />
                         </div>
                     `;
                 }
@@ -585,12 +585,16 @@ export const generateHtmlFromTemplate = ({
     .branch-info { font-size: ${Math.max(fontSizePx - 2, 13)}px; color: #333; font-weight: 900; }
     .receipt-title {
         text-align: center;
-        padding: 6px 0;
+        padding: 8px 6px;
         border: 1px dashed #111;
         border-radius: 4px;
         background: #f5f5f5;
         font-size: ${fontSizePx + 1}px;
         font-weight: 800;
+        line-height: 1.9;
+        letter-spacing: 0;
+        overflow: visible;
+        overflow-wrap: anywhere;
     }
     .order-meta {
         display: grid;
@@ -606,16 +610,23 @@ export const generateHtmlFromTemplate = ({
     .meta-label { font-size: ${Math.max(fontSizePx - 4, 10)}px; color: #444; font-weight: 900; text-transform: uppercase; white-space: nowrap; }
     .meta-value, .meta-time { display: block; font-weight: 900; white-space: nowrap; unicode-bidi: isolate; }
     .type-badge {
-        display: inline-block;
-        padding: 1px 4px;
-        border-radius: 2px;
-        border: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 12px;
+        border-radius: 12px;
+        border: 1.5px solid #111;
         background: #fff;
         color: #111;
         font-size: ${Math.max(fontSizePx - 2, 13)}px;
         font-weight: 900;
-        line-height: 1.25;
+        line-height: 1.9;
         min-width: 0;
+        max-width: 100%;
+        white-space: normal;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        text-align: center;
     }
     .customer-info { padding: 2px 0; }
     .info-chip { padding: 3px 0; font-weight: 900; color: #222; }
@@ -681,18 +692,21 @@ export const generateHtmlFromTemplate = ({
     .grand-total-label { text-align: ${textAlign}; }
     .grand-total-value { direction: ltr; unicode-bidi: isolate; white-space: nowrap; text-align: ${textAlignEnd}; }
     .payment-pill {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border: 1.5px solid #333;
-        border-radius: 5px;
-        padding: 5px 18px;
+        border-radius: 12px;
+        padding: 7px 18px;
         min-width: 110px;
         max-width: 100%;
         font-size: ${Math.max(fontSizePx - 2, 13)}px;
         font-weight: 900;
-        line-height: 1.25;
+        line-height: 1.8;
         /* Wrap instead of clipping: a clipped half-glyph at the 384px edge
            rasterizes as garbage marks on thermal printers. */
         white-space: normal;
+        overflow: visible;
         overflow-wrap: anywhere;
         text-align: center;
         background: #fff;
@@ -723,7 +737,7 @@ export const generateHtmlFromTemplate = ({
        framed total. Striking hierarchy, still calm to read. */
     body.receipt-royal .header-block { border: 0; padding-bottom: 6px; border-bottom: 2px solid #111; }
     body.receipt-royal .restaurant-name { font-size: ${fontSizePx + 8}px; letter-spacing: -0.5px; }
-    body.receipt-royal .receipt-title { background: #111; color: #fff; border: 0; border-radius: 0; font-size: ${fontSizePx + 4}px; letter-spacing: 1px; padding: 8px 4px; }
+    body.receipt-royal .receipt-title { background: #111; color: #fff; border: 0; border-radius: 0; font-size: ${fontSizePx + 4}px; letter-spacing: 0; line-height: 1.9; padding: 10px 6px; overflow: visible; }
     body.receipt-royal .order-meta { border: 3px solid #111; border-radius: 4px; padding: 6px 8px; }
     body.receipt-royal .order-meta .meta-block:first-child .meta-value { font-size: ${fontSizePx + 10}px; line-height: 1.1; }
     body.receipt-royal .items-header td { color: #111; border-top: 3px solid #111; border-bottom: 3px solid #111; }

@@ -12,7 +12,7 @@ const InteractionShowcase: React.FC = () => {
       <header className="theme-card p-6" data-interaction="lift">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-muted">RestoFlow UI system</p>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-muted">Xen UI system</p>
             <h1 className="mt-2 text-2xl font-black text-main">Interaction showcase</h1>
             <p className="mt-1 text-sm text-muted">{config.name}: {config.description}</p>
           </div>

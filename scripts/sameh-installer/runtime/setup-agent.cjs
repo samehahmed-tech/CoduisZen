@@ -166,6 +166,45 @@ async function ensureDatabaseWithRetry(connectionString) {
   throw lastError;
 }
 
+// Fresh-install proof: a brand-new database must contain ZERO business rows
+// (no demo categories/items/departments). If the packaged schema ever ships
+// demo data again, this surfaces it as a visible installer warning instead
+// of silently handing demo departments to a client. Infrastructure tables
+// (roles, accounts, branches, zones, settings) legitimately have rows.
+const FRESH_BUSINESS_TABLES = ['menu_categories', 'menu_items', 'departments', 'employees', 'suppliers', 'customers', 'orders', 'purchase_orders', 'inventory_items'];
+
+async function auditFreshBusinessData(connectionString) {
+  try {
+    const sql = require('mssql/msnodesqlv8');
+    const pool = await new sql.ConnectionPool({ connectionString }).connect();
+    try {
+      const found = [];
+      for (const table of FRESH_BUSINESS_TABLES) {
+        try {
+          const result = await pool.request().query(
+            `IF OBJECT_ID(N'dbo.${table}', N'U') IS NOT NULL SELECT COUNT_BIG(*) AS c FROM dbo.${table} ELSE SELECT CAST(0 AS BIGINT) AS c`
+          );
+          const count = Number(result.recordset?.[0]?.c || 0);
+          if (count > 0) found.push(`${table}: ${count}`);
+        } catch {
+          // Per-table errors must never fail an installation.
+        }
+      }
+      if (found.length) {
+        log(`fresh-db audit DIRTY: ${found.join(', ')}`);
+        return { warning: `قاعدة بيانات جديدة لكن وُجدت بيانات أعمال جاهزة (${found.join('، ')}) — النسخة المثبتة قد تحتوي Demo Data. راجع مصدر النسخة.` };
+      }
+      log('fresh-db audit CLEAN: no business rows on fresh database');
+      return {};
+    } finally {
+      await pool.close();
+    }
+  } catch (error) {
+    log(`fresh-db audit skipped: ${error?.message || error}`);
+    return {};
+  }
+}
+
 function createVerifiedBackup() {
   const backup = run(path.join(root, 'runtime', 'node.exe'), [path.join(root, 'runtime', 'database-backup.cjs')]);
   if (backup.status !== 0) throw new Error(`Initial verified database backup failed: ${publicError(backup.stderr || backup.stdout)}`);
@@ -301,9 +340,34 @@ function repairSystem() {
     if (task(name, script, schedule).status === 0) repairs.push(`تم إصلاح Task: ${name}`);
     else warnings.push(`تعذر إصلاح Task: ${name}`);
   }
-  if (fs.existsSync(path.join(root, 'hardware-bridge', '.env'))) {
+  // Rebuild a missing bridge config from the server's own token: upgrades
+  // (or manual deletion) used to leave the bridge permanently dead with
+  // nothing in the logs, and repair skipped it entirely when .env was gone.
+  const bridgeEnvFile = path.join(root, 'hardware-bridge', '.env');
+  if (!fs.existsSync(bridgeEnvFile)) {
+    try {
+      const appEnv = readEnv(path.join(root, '.env'));
+      const packageTokenFile = path.join(root, 'runtime', 'bridge-package-token');
+      const packageToken = fs.existsSync(packageTokenFile) ? fs.readFileSync(packageTokenFile, 'utf8').trim() : '';
+      const gatewayToken = appEnv.PRINT_GATEWAY_TOKEN || packageToken;
+      if (gatewayToken) {
+        writeEnv(bridgeEnvFile, {
+          SERVER_URL: state.appUrl || 'http://127.0.0.1:3001',
+          GLOBAL_CLAIM: 'true', POLL_MS: '500',
+          GATEWAY_TOKEN: gatewayToken, BRIDGE_PORT: '3002',
+        });
+        repairs.push('تمت إعادة إنشاء إعدادات Print Bridge المفقودة.');
+        log('repair: rebuilt missing hardware-bridge/.env');
+      } else {
+        warnings.push('إعدادات Print Bridge مفقودة ولا يوجد توكن — أعد التثبيت مع تفعيل Print Bridge.');
+      }
+    } catch (error) {
+      warnings.push(`تعذر إعادة إنشاء إعدادات Print Bridge: ${publicError(error)}`);
+    }
+  }
+  if (fs.existsSync(bridgeEnvFile)) {
     if (interactiveBridgeTask().status === 0) repairs.push('تم إصلاح Interactive Task الخاصة بـPrint Bridge.');
-    else warnings.push('تعذر إصلاح Interactive Task الخاصة بـPrint Bridge.');
+    else warnings.push('تعذر إنشاء Interactive Task الخاصة بـPrint Bridge.');
   }
   if (state.role === 'server' && reconcileServerFirewall().status !== 0) warnings.push('تعذر إصلاح Firewall الخاصة بالسيرفر.');
   fs.writeFileSync(path.join(root, 'runtime', 'restart.request'), new Date().toISOString());
@@ -347,12 +411,21 @@ async function install() {
     if (backupAcl.status !== 0) warnings.push('تعذر منح خدمة SQL صلاحية الكتابة داخل مجلد النسخ الاحتياطي. راجع installer.log.');
   }
 
+  // Bridge config: an existing working .env is NEVER deleted on upgrade —
+  // wiping it (old behavior when --bridge was not passed) silently killed a
+  // running bridge with no way to recover except manual reconfiguration.
+  const bridgeEnvFile = path.join(root, 'hardware-bridge', '.env');
+  const bridgeEnvExisted = fs.existsSync(bridgeEnvFile);
   if (has('bridge')) {
-    writeEnv(path.join(root, 'hardware-bridge', '.env'), {
+    writeEnv(bridgeEnvFile, {
       SERVER_URL: appUrl, GLOBAL_CLAIM: 'true', POLL_MS: '500',
       GATEWAY_TOKEN: role === 'server' ? (readEnv(path.join(root, '.env')).PRINT_GATEWAY_TOKEN || '') : packageToken, BRIDGE_PORT: '3002'
     });
-  } else if (fs.existsSync(path.join(root, 'hardware-bridge', '.env'))) fs.unlinkSync(path.join(root, 'hardware-bridge', '.env'));
+  } else if (bridgeEnvExisted && !upgrade) {
+    fs.unlinkSync(bridgeEnvFile);
+  } else if (bridgeEnvExisted && upgrade) {
+    log('upgrade: preserving existing hardware-bridge/.env (bridge flag off)');
+  }
 
   fs.writeFileSync(path.join(root, 'install-state.json'), JSON.stringify({ role, serverIp, appUrl, version: value('version'), updatedAt: new Date().toISOString() }, null, 2));
   writeStatus({ phase: 'bootstrap', warnings, errors });
@@ -376,6 +449,10 @@ async function install() {
     if (schema.missingTables?.length) throw new Error(`Missing tables after auto-repair (check logs/installer.log): ${schema.missingTables.slice(0, 20).join(', ')}`);
     resetTablesAfterUpgrade();
     if (databaseCreated) createVerifiedBackup();
+    if (databaseCreated) {
+      const audit = await auditFreshBusinessData(readEnv(path.join(root, '.env')).DATABASE_URL);
+      if (audit.warning) warnings.push(audit.warning);
+    }
     const recoveryUsers = run(path.join(root, 'runtime', 'node.exe'), [path.join(root, 'runtime', 'create-recovery-admin.cjs')]);
     if (recoveryUsers.status !== 0) throw new Error(`Recovery users setup failed: ${publicError(recoveryUsers.stderr || recoveryUsers.stdout)}`);
     const port = run(path.join(root, 'runtime', 'node.exe'), [path.join(root, 'runtime', 'port-guard.cjs'), '3001']);
@@ -387,7 +464,12 @@ async function install() {
     task('Sameh System Monitor', 'monitor.cjs'),
     task('Sameh Installer Watchdog', 'watchdog.cjs', 'MINUTE'),
   ];
-  if (has('bridge')) taskResults.push(interactiveBridgeTask());
+  // The bridge task is (re)created whenever the flag is on OR an upgrade
+  // finds a previously working bridge setup — PrepareToInstall always
+  // deletes the old task, so skipping recreation here would permanently
+  // kill the bridge on flag-less upgrades.
+  const bridgeExpected = has('bridge') || (upgrade && bridgeEnvExisted);
+  if (bridgeExpected) taskResults.push(interactiveBridgeTask());
   if (taskResults.some(result => result.status !== 0)) throw new Error('تعذر إنشاء Task أو أكثر في Task Scheduler. شغّل Installer كمسؤول.');
   if (role === 'server' && reconcileServerFirewall().status !== 0) throw new Error('تعذر ضبط Windows Firewall على Port 3001.');
   // Start through Task Scheduler so server processes stay in the hidden SYSTEM
@@ -402,11 +484,11 @@ async function install() {
     await validateRecoveryUsers(appUrl);
   }
   else if (!assessApiHealth(await probeUrl(`${appUrl}/api/health`)).ready) warnings.push(`لا يمكن الوصول لسيرفر جاهز على ${serverIp}:3001 الآن. Bridge سيستمر في المحاولة تلقائياً.`);
-  if (has('bridge')) {
+  if (bridgeExpected) {
     const printers = run('powershell.exe', ['-NoProfile', '-Command', '(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Measure-Object).Count']);
     if (Number(String(printers.stdout || '').trim()) < 1) warnings.push('لا توجد Windows Printers معرفة. أضف USB أو LAN printer من Windows ثم اضغط فحص وإصلاح داخل Monitor.');
     const bridge = await waitForBridgeReady();
-    if (!bridge.ready) warnings.push(bridge.reason);
+    if (!bridge.ready) warnings.push(`${bridge.reason} (راجع logs/print-bridge.log و Task Scheduler باسم Sameh Print Bridge)`);
   }
 
   const warningsFile = path.join(root, 'INSTALL_WARNINGS.txt');

@@ -1,9 +1,9 @@
 import React, { useOptimistic, useTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Clock, CheckCircle, Volume2, VolumeX, MonitorPlay, AlertTriangle, Play, Truck, Settings, Flame, ChefHat, Sparkles, X, UtensilsCrossed, Search, Zap, Layers, WifiOff } from 'lucide-react';
+import { Clock, CheckCircle, Volume2, VolumeX, MonitorPlay, AlertTriangle, Play, Truck, Settings, Flame, ChefHat, Sparkles, X, UtensilsCrossed, Search, Zap, Layers, WifiOff, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrderStatus } from '../types';
-import { advanceKdsTicketIdsOnce, compareKdsTicketPriority, hasNewKdsTicket, mergeKdsPriority, useKdsStore, KdsTicket } from '../stores/useKdsStore';
+import { advanceKdsTicketIdsOnce, compareKdsTicketPriority, mergeKdsPriority, useKdsStore, KdsTicket } from '../stores/useKdsStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { formatDisplayId } from '../src/utils/idGenerator';
 import { socketService } from '../services/socketService';
@@ -41,31 +41,77 @@ const getAudioCtx = () => {
   return audioCtxRef.current;
 };
 
-const playBeep = (frequency: number, duration: number, volume = 0.3) => {
+const playBeep = (frequency: number, duration: number, volume = 0.3, type: OscillatorType = 'sine', when = 0) => {
   try {
     const ctx = getAudioCtx();
+    const startAt = ctx.currentTime + when;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.frequency.value = frequency;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(volume, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + duration);
+    osc.type = type;
+    gain.gain.setValueAtTime(0.001, startAt);
+    gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.01, startAt + duration);
+    osc.start(startAt);
+    osc.stop(startAt + duration + 0.05);
   } catch { /* ignore audio errors */ }
 };
 
+/* Long, cutting attention chime (~1.6s): triangle wave carries over kitchen
+   noise far better than the old two soft sine blips. */
 const playNewOrderSound = () => {
-  playBeep(880, 0.15, 0.4);
-  setTimeout(() => playBeep(1100, 0.2, 0.5), 180);
+  const V = 0.55;
+  playBeep(660, 0.22, V, 'triangle', 0);
+  playBeep(880, 0.22, V, 'triangle', 0.24);
+  playBeep(1174, 0.34, V, 'triangle', 0.48);
+  playBeep(880, 0.22, V, 'triangle', 0.9);
+  playBeep(1174, 0.4, V, 'triangle', 1.14);
 };
 
 const playUrgentAlertSound = () => {
   playBeep(1200, 0.12, 0.5);
   setTimeout(() => playBeep(1200, 0.12, 0.5), 200);
   setTimeout(() => playBeep(1500, 0.25, 0.6), 400);
+};
+
+/* ── Arabic voice announcement ("أوردر جديد، رقم 42") ── */
+let arabicVoiceCache: SpeechSynthesisVoice | null | undefined;
+const pickArabicVoice = (): SpeechSynthesisVoice | null => {
+  try {
+    if (arabicVoiceCache !== undefined) return arabicVoiceCache;
+    const synth = window.speechSynthesis;
+    if (!synth) { arabicVoiceCache = null; return null; }
+    arabicVoiceCache = synth.getVoices().find(v => String(v.lang || '').toLowerCase().startsWith('ar')) || null;
+    return arabicVoiceCache;
+  } catch { return null; }
+};
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  try {
+    // Voices load asynchronously — refresh the cache when they arrive.
+    window.speechSynthesis.onvoiceschanged = () => { arabicVoiceCache = undefined; pickArabicVoice(); };
+  } catch { /* ignore */ }
+}
+
+/** Speak "new order number X" in Arabic. No-op when voice is off or blocked. */
+const speakNewOrder = (labels: string[]) => {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth || labels.length === 0) return;
+    const voice = pickArabicVoice();
+    // Cap the queue so a burst of tickets never talks for a minute straight.
+    for (const label of labels.slice(0, 3)) {
+      const utterance = new SpeechSynthesisUtterance(`أوردر جديد، رقم ${label}`);
+      utterance.lang = 'ar-SA';
+      utterance.rate = 0.95;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      if (voice) utterance.voice = voice;
+      synth.speak(utterance);
+    }
+  } catch { /* TTS unavailable — chime already played */ }
 };
 
 /* ???????????????????????????????????????????????????
@@ -488,6 +534,23 @@ const KDS: React.FC = () => {
     try { return localStorage.getItem('kds_sound_mode') === 'OFF' ? 'OFF' : 'ALL'; }
     catch { return 'ALL'; }
   });
+  // Voice announcement toggle (master-muted by soundMode anyway).
+  const [voiceEnabled, setVoiceEnabled] = React.useState(() => {
+    try { return localStorage.getItem('kds_voice') !== 'OFF'; }
+    catch { return true; }
+  });
+  // Local display theme: kitchen screens pick their own look without
+  // touching the global app theme. 'auto' follows the system theme.
+  const [kdsTheme, setKdsTheme] = React.useState<'auto' | 'dark' | 'light'>(() => {
+    try {
+      const saved = localStorage.getItem('kds_theme');
+      return saved === 'dark' || saved === 'light' ? saved : 'auto';
+    } catch { return 'auto'; }
+  });
+  // Offline-banner grace: a fresh mount / 1-second blip must not scream
+  // OFFLINE. Polling already covers data instantly; the banner appears only
+  // if the socket stays down past the grace window.
+  const [offlineGracePassed, setOfflineGracePassed] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [showStationSettings, setShowStationSettings] = React.useState(false);
   const [pendingBump, setPendingBump] = React.useState<string | null>(null);
@@ -513,6 +576,30 @@ const KDS: React.FC = () => {
   // Connection visibility: kitchen must KNOW when it runs on polling fallback.
   const [socketOnline, setSocketOnline] = React.useState(() => socketService.isConnected());
   const [lastSyncAt, setLastSyncAt] = React.useState<number>(Date.now());
+
+  React.useEffect(() => {
+    if (socketOnline) { setOfflineGracePassed(false); return; }
+    const timer = window.setTimeout(() => setOfflineGracePassed(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, [socketOnline]);
+
+  // Browsers gate audio + speech behind a user gesture: unlock both on the
+  // first tap/keypress so the first order of the day still announces.
+  React.useEffect(() => {
+    const unlock = () => {
+      try {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+      } catch { /* ignore */ }
+      try { pickArabicVoice(); } catch { /* ignore */ }
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -554,9 +641,26 @@ const KDS: React.FC = () => {
           (!activeBranchId || ticket.branchId === activeBranchId) &&
           (!station || ticket.routingStation === station)
         );
-        const hasNew = announceNewTickets && hasNewKdsTicket(knownTicketIdsRef.current, nextTickets);
+        const freshTickets = announceNewTickets
+          ? nextTickets.filter((ticket) => !knownTicketIdsRef.current.has(ticket.id))
+          : [];
         knownTicketIdsRef.current = new Set(nextTickets.map((ticket) => ticket.id));
-        if (hasNew && soundMode === 'ALL') playNewOrderSound();
+        if (freshTickets.length > 0 && soundMode === 'ALL') {
+          playNewOrderSound();
+          if (voiceEnabled) {
+            // One announcement per order — sibling tickets arrive together.
+            const seenOrders = new Set<string>();
+            const labels: string[] = [];
+            for (const ticket of freshTickets) {
+              const key = String(ticket.orderId || ticket.id);
+              if (seenOrders.has(key)) continue;
+              seenOrders.add(key);
+              const num = ticket.orderNumber ?? formatDisplayId(ticket).replace(/^#/, '');
+              labels.push(String(num));
+            }
+            speakNewOrder(labels);
+          }
+        }
       } finally {
         refreshInFlight = false;
       }
@@ -579,9 +683,9 @@ const KDS: React.FC = () => {
        cancelled = true;
        socketService.off('kds:update', handleKdsUpdate);
        socketService.offConnectionChange(handleConnectionChange);
-       if (pollingTimer !== null) window.clearInterval(pollingTimer);
+       if (pollingTimer !== null) window.clearInterval(timer);
     };
-  }, [fetchOrders, soundMode, activeBranchId, activeStations]);
+  }, [fetchOrders, soundMode, voiceEnabled, activeBranchId, activeStations]);
 
   // Timer tick — every 5s for elapsed time calculations
   React.useEffect(() => {
@@ -693,9 +797,35 @@ const KDS: React.FC = () => {
       if (next === 'ALL') {
         const audioContext = getAudioCtx();
         if (audioContext.state === 'suspended') void audioContext.resume().catch(() => {});
+      } else {
+        try { window.speechSynthesis?.cancel(); } catch {}
       }
       return next;
     });
+  }, []);
+
+  const toggleVoice = React.useCallback(() => {
+    setVoiceEnabled((previous) => {
+      const next = !previous;
+      try { localStorage.setItem('kds_voice', next ? 'ON' : 'OFF'); } catch {}
+      if (!next) {
+        try { window.speechSynthesis?.cancel(); } catch {}
+      }
+      return next;
+    });
+  }, []);
+
+  const cycleKdsTheme = React.useCallback(() => {
+    setKdsTheme((previous) => {
+      const next = previous === 'auto' ? 'dark' : previous === 'dark' ? 'light' : 'auto';
+      try { localStorage.setItem('kds_theme', next); } catch {}
+      return next;
+    });
+  }, []);
+
+  const setKdsThemeMode = React.useCallback((mode: 'auto' | 'dark' | 'light') => {
+    setKdsTheme(mode);
+    try { localStorage.setItem('kds_theme', mode); } catch {}
   }, []);
 
   const stationWorkload = React.useMemo(() => {
@@ -709,6 +839,8 @@ const KDS: React.FC = () => {
     return map;
   }, [activeTicketRows]);
 
+  const bumpActorId = settings.currentUser?.id;
+  const bumpActorName = settings.currentUser?.name;
   const advanceOrder = React.useCallback(async (order: any) => {
     setPendingBump(null);
     const ticketIds = Array.isArray(order.ticketIds) && order.ticketIds.length > 0
@@ -720,12 +852,14 @@ const KDS: React.FC = () => {
         const ticket = orders.find(t => t.id === ticketId);
         return ticket?.status !== OrderStatus.READY;
       });
+    // Who completed it travels with the bump so staff performance is reportable.
+    const actor = (bumpActorId || bumpActorName) ? { id: bumpActorId, name: bumpActorName } : undefined;
 
     // Instant paint first, server confirm in the background.
     startTicketTransition(async () => {
       idsToAdvance.forEach((ticketId: string) => bumpOptimistic({ id: ticketId, status: 'READY' }));
       for (const ticketId of idsToAdvance) {
-        await updateOrderStatus(ticketId);
+        await updateOrderStatus(ticketId, actor);
       }
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
     });
@@ -737,7 +871,7 @@ const KDS: React.FC = () => {
         }, 8000);
         setRecentBumps(prev => [...prev, { id: order.id, ticketIds: idsToAdvance, timeoutId: tid }]);
     }
-  }, [orders, updateOrderStatus, startTicketTransition, bumpOptimistic]);
+  }, [orders, updateOrderStatus, startTicketTransition, bumpOptimistic, bumpActorId, bumpActorName]);
 
   const completeKitchenOrder = React.useCallback(async (order: any) => {
     if (!order?.id || completingOrderIdsRef.current.has(order.id)) return;
@@ -928,9 +1062,18 @@ const KDS: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [showStationSettings, toggleFullscreen, activeOrders, highlightedIdx, completeKitchenOrder, confirmQuickComplete, toggleSoundMode]);
 
+  // Local theme scope: 'dark' forces the shared dark tokens on this subtree,
+  // 'light' re-declares light tokens (doubled class beats runtime themes),
+  // 'auto' inherits the global app theme untouched.
+  const themeScopeClass = kdsTheme === 'dark'
+    ? 'dark kds-scope-dark'
+    : kdsTheme === 'light'
+      ? 'kds-scope-light kds-scope-light'
+      : '';
+
   return (
     <div
-      className="ops-fast flex flex-col h-screen w-full font-sans"
+      className={`ops-fast flex flex-col h-screen w-full font-sans ${themeScopeClass}`}
       style={{ background: 'rgb(var(--bg-app))', color: 'rgb(var(--text-main))' }}
     >
       <AnimatePresence>
@@ -963,8 +1106,10 @@ const KDS: React.FC = () => {
           opacity: 0.7,
         }}
       />
-      {/* Connection banner — kitchen must never silently run on stale polling. */}
-      {!socketOnline && (
+      {/* Connection banner — kitchen must never silently run on stale polling.
+         Grace window hides mount flicker and 1-second blips; polling already
+         covers data from the first second. */}
+      {!socketOnline && offlineGracePassed && (
         <div
           className="shrink-0 flex items-center justify-center gap-2 px-3 py-1.5 text-center"
           style={{ background: 'rgba(var(--danger), 0.14)', borderBottom: '1px solid rgba(var(--danger), 0.4)', color: 'rgb(var(--danger))', fontSize: 12, fontWeight: 900 }}
@@ -1165,6 +1310,22 @@ const KDS: React.FC = () => {
             {soundMode === 'OFF' ? <VolumeX size={14} /> : <Volume2 size={14} />}
             <span className="hidden sm:inline">{soundMode === 'OFF' ? (isArabic ? 'صامت' : 'MUTED') : (isArabic ? 'صوت' : 'LIVE')}</span>
           </button>
+          {/* Local display theme: auto (system) → dark → light */}
+          <button
+            onClick={cycleKdsTheme}
+            className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200"
+            style={{
+              borderRadius: 'var(--theme-radius-sm, 8px)',
+              fontSize: 10, fontWeight: 900,
+              background: kdsTheme === 'auto' ? 'rgba(var(--bg-elevated), 0.5)' : 'rgba(var(--warning), 0.12)',
+              color: kdsTheme === 'auto' ? 'rgb(var(--text-muted))' : 'rgb(var(--warning))',
+              border: `1px solid ${kdsTheme === 'auto' ? 'rgba(var(--border-color), 0.2)' : 'rgba(var(--warning), 0.25)'}`,
+            }}
+            title={kdsText(isArabic, 'Display theme: follow system / dark / light', 'ثيم الشاشة: تلقائي / داكن / فاتح')}
+          >
+            {kdsTheme === 'dark' ? <Moon size={14} /> : kdsTheme === 'light' ? <Sun size={14} /> : <Sparkles size={14} />}
+            <span className="hidden sm:inline">{kdsTheme === 'dark' ? (isArabic ? 'داكن' : 'DARK') : kdsTheme === 'light' ? (isArabic ? 'فاتح' : 'LIGHT') : (isArabic ? 'تلقائي' : 'AUTO')}</span>
+          </button>
           <button
             onClick={toggleFullscreen}
             className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200"
@@ -1355,6 +1516,55 @@ const KDS: React.FC = () => {
                 </button>
               </div>
               <div className="space-y-2.5 overflow-y-auto pr-1" style={{ maxHeight: '60vh' }}>
+                {/* Display: local theme + voice announcement */}
+                <div style={{ background: 'rgba(var(--bg-elevated), 0.5)', borderRadius: 'var(--theme-radius, 12px)', padding: 14, border: '1px solid rgba(var(--border-color), 0.15)' }}>
+                  <p className="uppercase" style={{ color: 'rgb(var(--text-main))', fontWeight: 900, fontSize: 12, marginBottom: 10 }}>
+                    {kdsText(isArabic, 'Display', 'الشاشة')}
+                  </p>
+                  <div className="flex items-center gap-1.5" style={{ marginBottom: 10 }}>
+                    {([
+                      { key: 'auto' as const, label: isArabic ? 'تلقائي' : 'AUTO', icon: <Sparkles size={13} /> },
+                      { key: 'dark' as const, label: isArabic ? 'داكن' : 'DARK', icon: <Moon size={13} /> },
+                      { key: 'light' as const, label: isArabic ? 'فاتح' : 'LIGHT', icon: <Sun size={13} /> },
+                    ]).map(option => {
+                      const isActive = kdsTheme === option.key;
+                      return (
+                        <button
+                          key={option.key}
+                          onClick={() => setKdsThemeMode(option.key)}
+                          className="flex flex-1 items-center justify-center gap-1.5 uppercase"
+                          style={{
+                            padding: '8px 6px', borderRadius: 'var(--theme-radius-sm, 8px)',
+                            fontSize: 10, fontWeight: 900,
+                            background: isActive ? 'rgba(var(--warning), 0.14)' : 'transparent',
+                            color: isActive ? 'rgb(var(--warning))' : 'rgb(var(--text-muted))',
+                            border: `1px solid ${isActive ? 'rgba(var(--warning), 0.3)' : 'rgba(var(--border-color), 0.2)'}`,
+                          }}
+                        >
+                          {option.icon}
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={toggleVoice}
+                    className="flex w-full items-center justify-between"
+                    style={{
+                      padding: '9px 12px', borderRadius: 'var(--theme-radius-sm, 8px)',
+                      background: voiceEnabled ? 'rgba(var(--success), 0.1)' : 'rgba(var(--bg-elevated), 0.4)',
+                      border: `1px solid ${voiceEnabled ? 'rgba(var(--success), 0.25)' : 'rgba(var(--border-color), 0.2)'}`,
+                    }}
+                  >
+                    <span className="flex items-center gap-2" style={{ fontSize: 11, fontWeight: 900, color: 'rgb(var(--text-main))' }}>
+                      {voiceEnabled ? <Volume2 size={14} style={{ color: 'rgb(var(--success))' }} /> : <VolumeX size={14} style={{ color: 'rgb(var(--text-muted))' }} />}
+                      {kdsText(isArabic, 'Voice announcement (order number)', 'الإعلان الصوتي (رقم الأوردر)')}
+                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: voiceEnabled ? 'rgb(var(--success))' : 'rgb(var(--text-muted))' }}>
+                      {voiceEnabled ? (isArabic ? 'يعمل' : 'ON') : (isArabic ? 'متوقف' : 'OFF')}
+                    </span>
+                  </button>
+                </div>
                 <p className="text-xs font-bold leading-relaxed text-muted">
                   {kdsText(isArabic, 'Stations come from active printer routing for this branch.', 'المحطات تُقرأ من توجيه الطابعات الفعّال لهذا الفرع.')}
                 </p>

@@ -9,6 +9,12 @@ type TableLookup = {
    id: string;
 } | undefined;
 
+/** Normalize Arabic-Indic / Persian digits to Western digits. */
+export const normalizeDigits = (value: string): string =>
+   String(value || '')
+      .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+
 interface UsePOSKeyboardShortcutsOptions {
    searchInputRef: RefObject<HTMLInputElement | null>;
    tableNumberBufferRef: RefObject<string>;
@@ -36,6 +42,11 @@ interface UsePOSKeyboardShortcutsOptions {
    onVoidOrder: () => void | Promise<void>;
    onSetOrderMode: (orderType: OrderType) => void;
    onRecallShortcut: () => void;
+   onOpenHelp?: () => void;
+   onHoldOrder?: () => void;
+   onShowHeldOrders?: () => void;
+   onReprintLast?: () => void;
+   onTableNotFound?: (value: string) => void;
 }
 
 export const usePOSKeyboardShortcuts = ({
@@ -65,6 +76,11 @@ export const usePOSKeyboardShortcuts = ({
    onVoidOrder,
    onSetOrderMode,
    onRecallShortcut,
+   onOpenHelp,
+   onHoldOrder,
+   onShowHeldOrders,
+   onReprintLast,
+   onTableNotFound,
 }: UsePOSKeyboardShortcutsOptions) => {
    const commitBufferedTableNumber = useEffectEvent(() => {
       if (tableNumberTimerRef.current) {
@@ -72,12 +88,14 @@ export const usePOSKeyboardShortcuts = ({
          tableNumberTimerRef.current = null;
       }
 
-      const target = tableNumberBufferRef.current;
+      const raw = tableNumberBufferRef.current;
       tableNumberBufferRef.current = '';
+      const target = normalizeDigits(raw).replace(/\D/g, '');
       if (!target) return;
 
       const table = onFindTableByNumber(target);
       if (table) onSwitchToTable(table.id);
+      else onTableNotFound?.(target);
    });
 
    const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -86,10 +104,39 @@ export const usePOSKeyboardShortcuts = ({
       const isInput = tagName === 'INPUT';
       const isTextarea = tagName === 'TEXTAREA';
       const isContentEditable = target?.isContentEditable === true;
+      const inFloorMap = showMap && activeOrderType === OrderType.DINE_IN;
 
-      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+      // Help: F1 or "?" (Shift+/) works everywhere except while typing in inputs
+      // (except allow "?" when NOT in a text field).
+      if (!isInput && !isTextarea && !isContentEditable) {
+         if (event.key === 'F1' || event.key === '?') {
+            event.preventDefault();
+            onOpenHelp?.();
+            return;
+         }
+      }
+      // Shift+/ produces "?" on most layouts when not in input — also catch it.
+      if (!isInput && !isTextarea && !isContentEditable && event.shiftKey && event.key === '/') {
+         event.preventDefault();
+         onOpenHelp?.();
+         return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'f' || event.key.toLowerCase() === 'k')) {
          event.preventDefault();
          searchInputRef.current?.focus();
+         return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'h') {
+         event.preventDefault();
+         if (cartHasItems) onHoldOrder?.();
+         return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+         event.preventDefault();
+         onReprintLast?.();
          return;
       }
 
@@ -104,37 +151,81 @@ export const usePOSKeyboardShortcuts = ({
       }
 
       if (event.key === 'Escape') {
+         // Clear a partially typed table number first.
+         if (inFloorMap && tableNumberBufferRef.current) {
+            tableNumberBufferRef.current = '';
+            if (tableNumberTimerRef.current) {
+               window.clearTimeout(tableNumberTimerRef.current);
+               tableNumberTimerRef.current = null;
+            }
+            return;
+         }
          if (showSplitModal) onDismissSplitModal();
 
          if (cartHasItems || selectedTableId) {
             if (activeOrderType === OrderType.DINE_IN) onShowTableMap();
             else onClearCart();
          }
+         return;
       }
 
-      if (event.key >= '1' && event.key <= '9') {
-         const categoryIndex = parseInt(event.key, 10) - 1;
-         if (categoryIndex < categoryHotkeys.length) {
-            onSetActiveCategory(categoryHotkeys[categoryIndex]);
-         }
+      // Practical cashier shortcuts (work outside inputs).
+      if (event.key === 'F2') {
+         event.preventDefault();
+         if (cartHasItems && !showSplitModal) onQuickPay();
+         return;
+      }
+      if (event.key === 'F3') {
+         event.preventDefault();
+         if (cartHasItems) onHoldOrder?.();
+         return;
+      }
+      if (event.key === 'F4') {
+         event.preventDefault();
+         onShowHeldOrders?.();
+         return;
+      }
+      if (event.key === 'F9') {
+         event.preventDefault();
+         if (cartHasItems && !showSplitModal) onSendKitchen();
+         return;
       }
 
-      if (showMap && activeOrderType === OrderType.DINE_IN) {
-         const isDigit = event.key >= '0' && event.key <= '9';
-         if (isDigit) {
+      // Floor map quick-jump: typing digits opens the table. Takes priority
+      // over category hotkeys while the map is visible.
+      if (inFloorMap) {
+         const normalizedKey = normalizeDigits(event.key);
+         const isDigit = normalizedKey >= '0' && normalizedKey <= '9' && normalizedKey.length === 1;
+         if (isDigit && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
-            tableNumberBufferRef.current += event.key;
+            tableNumberBufferRef.current += normalizedKey;
             if (tableNumberTimerRef.current) {
                window.clearTimeout(tableNumberTimerRef.current);
             }
             tableNumberTimerRef.current = window.setTimeout(() => {
                commitBufferedTableNumber();
-            }, 700);
+            }, 600);
+            return;
          }
 
          if (event.key === 'Enter') {
             event.preventDefault();
             commitBufferedTableNumber();
+            return;
+         }
+
+         if (event.key === 'Backspace' && tableNumberBufferRef.current) {
+            event.preventDefault();
+            tableNumberBufferRef.current = tableNumberBufferRef.current.slice(0, -1);
+            return;
+         }
+      }
+
+      // Category hotkeys 1-9 only when NOT on the floor map (no conflict).
+      if (!inFloorMap && event.key >= '1' && event.key <= '9' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+         const categoryIndex = parseInt(event.key, 10) - 1;
+         if (categoryIndex < categoryHotkeys.length) {
+            onSetActiveCategory(categoryHotkeys[categoryIndex]);
          }
       }
 
@@ -148,21 +239,6 @@ export const usePOSKeyboardShortcuts = ({
          event.preventDefault();
          searchInputRef.current?.focus();
       }
-
-      if (event.shiftKey && event.key === 'Enter' && cartHasItems && !showSplitModal) {
-         event.preventDefault();
-         onQuickPay();
-         return;
-      }
-
-      if (event.ctrlKey && event.key === 'Enter' && cartHasItems && !showSplitModal) {
-         event.preventDefault();
-         onSendKitchen();
-         return;
-      }
-
-      if (event.key === 'Enter' && cartHasItems && !showSplitModal) onSubmitOrder();
-      if (event.key === 'Delete' && cartHasItems) onVoidOrder();
 
       if (event.altKey) {
          if (event.key === '1') {
@@ -197,13 +273,6 @@ export const usePOSKeyboardShortcuts = ({
             event.preventDefault();
             const prevIndex = currentTableIndex <= 0 ? sortedTables.length - 1 : currentTableIndex - 1;
             onSwitchToTable(sortedTables[prevIndex].id);
-         }
-         if (event.key >= '5' && event.key <= '9') {
-            const tableIndex = parseInt(event.key, 10) - 1;
-            if (tableIndex >= 0 && tableIndex < sortedTables.length) {
-               event.preventDefault();
-               onSwitchToTable(sortedTables[tableIndex].id);
-            }
          }
          if (event.key === '0') {
             event.preventDefault();

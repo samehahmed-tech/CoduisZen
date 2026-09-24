@@ -14,6 +14,7 @@
 
 /* Layout: sidebar, topbar, neo-ui shell */
 @import "./styles/layout/sidebar.css";
+@import "./styles/layout/kds-theme.css";
 @import "./styles/layout/topbar.css";
 @import "./styles/layout/neo-ui.css";
 @import "./styles/layout/pos-responsive.css";
@@ -541,4 +542,39 @@ html[data-perf-tier='lite'] .glass-shimmer:hover::after {
 html[data-perf-tier='lite'] .theme-animate-stagger {
   animation-duration: 0.15s;
   animation-delay: 0ms;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALM SURFACES — pulse/ping kill-switch (no flashing anywhere)
+   Neutralizes every looping "attention" flash app-wide: status dots,
+   urgent rings, radar pings, blinking badges/buttons (~100 spots).
+   Loading skeletons become static placeholders (same shape, no flash).
+   One-shot entrances, spinners (animate-spin) and toasts keep working.
+   Opt back in on ONE element only with .allow-pulse / .allow-ping.
+   إلغاء النبض والوميض في كل البرنامج — لعنصر واحد استخدم allow-pulse
+   ═══════════════════════════════════════════════════════════════════════════ */
+.animate-pulse,
+.animate-ping,
+.animate-pulse-soft,
+.animate-spin-slow {
+  animation: none !important;
+}
+
+/* Escape hatches — restore the loop on a single element when needed. */
+.animate-pulse.allow-pulse {
+  animation: var(--animate-pulse, pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite) !important;
+}
+.animate-ping.allow-ping {
+  animation: var(--animate-ping, ping 1s cubic-bezier(0, 0, 0.2, 1) infinite) !important;
+}
+
+/* ── Arabic joining guard ────────────────────────────────────────────
+   letter-spacing disconnects joined Arabic letters (headers/eyebrows with
+   tracking-* render as isolated glyphs), so it is force-zeroed everywhere
+   under RTL. Latin tracking is untouched in LTR. */
+[dir="rtl"],
+[dir="rtl"] *,
+[dir="rtl"] *::before,
+[dir="rtl"] *::after {
+  letter-spacing: 0 !important;
 }

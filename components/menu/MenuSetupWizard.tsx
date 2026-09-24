@@ -22,7 +22,7 @@ const MenuSetupWizard: React.FC<MenuSetupWizardProps> = ({ onComplete, onManualS
     const [previewData, setPreviewData] = useState<MenuCategory[]>([]);
 
     const t = {
-        welcomeTitle: lang === 'ar' ? 'أهلاً بك في ريستوفلو' : 'Welcome to Coduis Zen',
+        welcomeTitle: lang === 'ar' ? 'أهلاً بك في Xen' : 'Welcome to Coduis Xen',
         welcomeSub: lang === 'ar' ? 'لنقم بإعداد المنيو الخاص بك في دقائق.' : 'Let’s set up your menu in minutes.',
         getStarted: lang === 'ar' ? 'ابدأ الإعداد' : 'Get Started',
         chooseTitle: lang === 'ar' ? 'كيف تود البدء؟' : 'How would you like to start?',
@@ -58,7 +58,7 @@ const MenuSetupWizard: React.FC<MenuSetupWizardProps> = ({ onComplete, onManualS
         const colWidths = [20, 25, 25, 25, 10, 10, 15, 15, 30];
         ws['!cols'] = colWidths.map(w => ({ wch: w }));
 
-        XLSX.writeFile(wb, `Coduis Zen_Menu_Template_${lang}.xlsx`);
+        XLSX.writeFile(wb, `Coduis Xen_Menu_Template_${lang}.xlsx`);
     };
 
     // --- Excel Parsing ---

@@ -133,7 +133,7 @@ export const generateDriverTicketHTML = ({
       margin: 4px 0;
    }
    .d-order-num { font-size: 20px; font-weight: 900; }
-   .d-type-badge { font-size: 13px; font-weight: 800; padding: 2px 10px; border: 2px solid #000; border-radius: 4px; }
+    .d-type-badge { font-size: 13px; font-weight: 800; line-height: 1.8; padding: 4px 12px; border: 2px solid #000; border-radius: 8px; overflow: visible; white-space: normal; text-align: center; }
    .d-time { font-size: 14px; font-weight: 700; }
 
    .d-otp {

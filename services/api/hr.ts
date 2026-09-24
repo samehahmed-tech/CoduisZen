@@ -59,3 +59,8 @@ export const hrExtendedApi = {
     approveOvertime: (id: string) =>
         apiRequest<any>(`/hr-extended/overtime/${id}/approve`, { method: 'PUT' }),
 };
+
+export const shiftTasksApi = {
+    getTasks: () => apiRequest<any[]>('/hr-extended/shift-tasks'),
+    getRuns: () => apiRequest<any[]>('/hr-extended/shift-task-runs'),
+};

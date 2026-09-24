@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState, Suspense, lazy, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useRef, Suspense, lazy, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
@@ -14,12 +15,14 @@ import {
   DollarSign, ShoppingBag, TrendingUp, Sparkles, Package,
   AlertCircle, AlertTriangle, Wallet,
   ArrowUpRight, ArrowDownRight, UserCheck, CheckCircle2,
-  Flame, Trophy, Briefcase, Ban, ReceiptText, RefreshCcw, BrainCircuit
+  Flame, Trophy, Briefcase, Ban, ReceiptText, RefreshCcw, BrainCircuit,
+  BadgePercent, Banknote, CreditCard, Smartphone, Landmark
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import { aiApi } from '../services/api/ai';
 import { reportsApi } from '../services/api/reports';
+import { shiftsApi } from '../services/api/shifts';
 import { hrApi } from '../services/api/hr';
 import { socketService } from '../services/socketService';
 import { translations } from '../services/translations';
@@ -63,7 +66,7 @@ const parseDateKey = (value: string) => {
 
 type DashboardPayload = {
   totals: {
-    revenue: number; netRevenue: number; taxTotal: number; expenses: number; pendingExpenses: number; cogs: number; netProfit: number;
+    revenue: number; netRevenue: number; taxTotal: number; expenses: number; pendingExpenses: number; cogs: number; grossProfit: number; netProfit: number;
     paidRevenue: number; discounts: number; orderCount: number;
     avgTicket: number; uniqueCustomers: number; itemsSold: number;
     cancelled: number; cancelledValue: number; pending: number; delivered: number; cancelRate: number;
@@ -86,11 +89,98 @@ type DashboardQueryResult = {
 };
 
 const EMPTY_PAYLOAD: DashboardPayload = {
-  totals: { revenue: 0, netRevenue: 0, taxTotal: 0, expenses: 0, pendingExpenses: 0, cogs: 0, netProfit: 0, paidRevenue: 0, discounts: 0, orderCount: 0, avgTicket: 0, uniqueCustomers: 0, itemsSold: 0, cancelled: 0, cancelledValue: 0, pending: 0, delivered: 0, cancelRate: 0 },
+  totals: { revenue: 0, netRevenue: 0, taxTotal: 0, expenses: 0, pendingExpenses: 0, cogs: 0, grossProfit: 0, netProfit: 0, paidRevenue: 0, discounts: 0, orderCount: 0, avgTicket: 0, uniqueCustomers: 0, itemsSold: 0, cancelled: 0, cancelledValue: 0, pending: 0, delivered: 0, cancelRate: 0 },
   trendData: [], paymentBreakdown: [], orderTypeBreakdown: [], categoryData: [], topItems: [], branchPerformance: [], topCustomers: []
 };
 
 // --- Subcomponents for Premium UI ---
+
+const DashboardHelp: React.FC<{ text: string; label?: string }> = ({ text, label = 'Explain this metric' }) => {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCloseTimer = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+
+  const updatePosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(320, Math.max(220, window.innerWidth - 24));
+    setPosition({
+      top: Math.min(window.innerHeight - 12, rect.bottom + 8),
+      left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+    });
+  }, []);
+
+  const openHelp = () => {
+    clearCloseTimer();
+    updatePosition();
+    setOpen(true);
+  };
+
+  const scheduleClose = () => {
+    clearCloseTimer();
+    closeTimer.current = setTimeout(() => setOpen(false), 180);
+  };
+
+  useEffect(() => () => clearCloseTimer(), []);
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const reposition = () => updatePosition();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open, updatePosition]);
+
+  const tooltip = open && typeof document !== 'undefined' ? createPortal(
+    <span
+      role="tooltip"
+      onMouseEnter={clearCloseTimer}
+      onMouseLeave={scheduleClose}
+      className="pointer-events-auto rounded-xl border border-primary/20 bg-card p-3 text-start text-[11px] font-bold leading-5 text-main shadow-2xl"
+      style={{ position: 'fixed', top: position.top, left: position.left, width: 'min(320px, calc(100vw - 24px))', zIndex: 2147483647 }}
+    >
+      {text}
+    </span>,
+    document.body,
+  ) : null;
+
+  return (
+    <span className="relative z-[70] inline-flex shrink-0 align-middle" onMouseEnter={clearCloseTimer} onMouseLeave={scheduleClose}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        title={text}
+        onClick={(event) => { event.stopPropagation(); openHelp(); }}
+        onMouseEnter={openHelp}
+        onFocus={openHelp}
+        onBlur={scheduleClose}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-primary bg-primary/10 text-sm font-black leading-none text-primary transition hover:bg-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-primary/30"
+      >
+        ?
+      </button>
+      {tooltip}
+    </span>
+  );
+};
+
+const PaymentMethodIcon: React.FC<{ method: string }> = ({ method }) => {
+  const key = String(method || '').toUpperCase();
+  const Icon = key === 'CASH' || key === 'CASH_ON_DELIVERY' ? Banknote
+    : key === 'VISA' || key === 'CARD' ? CreditCard
+      : key === 'VODAFONE_CASH' || key === 'INSTAPAY' ? Smartphone : Landmark;
+  return <Icon size={15} aria-hidden="true" />;
+};
 
 interface MetricCardProps {
   label: string;
@@ -106,9 +196,11 @@ interface MetricCardProps {
   onClick?: () => void;
   trendData?: number[];
   delay?: number;
+  help?: string;
+  detail?: { label: string; value: string; help: string };
 }
 
-const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: Icon, color, trend, target, permission, lang, hasPermission, onClick, trendData, delay = 0 }) => {
+const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: Icon, color, trend, target, permission, lang, hasPermission, onClick, trendData, delay = 0, help, detail }) => {
   const progress = target ? Math.min(100, (value / target) * 100) : 0;
   
   return (
@@ -118,7 +210,7 @@ const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: 
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       aria-label={label}
-      className={`animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-hidden bg-card/60 border border-border/30 rounded-[1.5rem] p-5 lg:p-6 transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] ${onClick ? 'cursor-pointer' : ''}`}
+      className={`animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible bg-card/60 border border-border/30 rounded-[1.5rem] p-5 lg:p-6 transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] ${onClick ? 'cursor-pointer' : ''}`}
       style={{ animationFillMode: 'both', animationDelay: `${delay}ms` }}
     >
       {/* Decorative gradient corner */}
@@ -126,7 +218,7 @@ const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: 
       
       <div className="flex items-start justify-between relative z-10">
         <div>
-          <p className="text-[10px] lg:text-[11px] font-black uppercase tracking-[0.15em] text-muted mb-2">{label}</p>
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted lg:text-[11px]">{label}{help && <DashboardHelp text={help} label={`${label} explanation`} />}</p>
           <h2 className="text-xl lg:text-3xl font-black text-main tracking-tighter tabular-nums flex items-end gap-1.5">
             <SensitiveData permission={permission} hasPermission={hasPermission} lang={lang}>
               {value}
@@ -137,6 +229,13 @@ const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: 
             <div className={`flex items-center gap-1 mt-2 text-[10px] font-black uppercase tracking-wider ${trend.up ? 'text-emerald-500' : 'text-rose-500'}`}>
               {trend.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
               {trend.val}% <span className="text-muted ml-1 opacity-70">{translations[lang].vs_prev}</span>
+            </div>
+          )}
+          {detail && (
+            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-black text-muted">
+              <BadgePercent size={14} className="shrink-0 text-amber-500" />
+              <span>{detail.label}: {detail.value}</span>
+              <DashboardHelp text={detail.help} label={`${detail.label} explanation`} />
             </div>
           )}
         </div>
@@ -289,13 +388,34 @@ const Dashboard: React.FC = () => {
     queryKey: ['dashboard-secondary', viewScope, range, settings.activeBranchId],
     queryFn: async () => {
       const apiScope = (viewScope === 'YEARLY' || viewScope === 'CUSTOM') ? 'ALL' : viewScope as any;
-      const [previous, staff, shifts, reorderAlerts] = await Promise.all([
+      const [previous, staff, shifts, openShifts, reorderAlerts] = await Promise.all([
         reportsApi.getDashboardKpis({ branchId: settings.activeBranchId, startDate: range.compareStartDate, endDate: range.compareEndDate, scope: apiScope }).catch(() => EMPTY_PAYLOAD),
         hrApi.getEmployees().catch(() => []),
         reportsApi.getShiftSummary({ branchId: settings.activeBranchId, startDate: range.startDate, endDate: range.endDate }).catch(() => []),
+        shiftsApi.getOpenShifts(settings.activeBranchId).catch(() => []),
         reportsApi.getReorderAlerts().catch(() => [])
       ]);
-      return { previous, staff, shifts, reorderAlerts };
+      // An open shift is authoritative for the live dashboard even when its
+      // opening date falls outside the selected report range. Enrich it with
+      // the running X-report cash and merge it into the report rows.
+      const reportRows = Array.isArray(shifts) ? shifts : [];
+      const liveRows = Array.isArray(openShifts) ? await Promise.all(openShifts.map(async (shift: any) => {
+        const xReport = await shiftsApi.getXReport(String(shift.id), settings.activeBranchId).catch(() => null);
+        return {
+          ...shift,
+          status: 'OPEN',
+          expectedBalance: Number(xReport?.expectedCashBalance ?? xReport?.expectedCashInDrawer ?? shift.openingBalance ?? 0),
+          actualBalance: Number(xReport?.expectedCashBalance ?? xReport?.expectedCashInDrawer ?? shift.openingBalance ?? 0),
+          cashSales: Number(xReport?.cashCollected ?? 0),
+        };
+      })) : [];
+      const mergedShifts = [...reportRows];
+      for (const live of liveRows) {
+        const index = mergedShifts.findIndex((row: any) => String(row.shiftId || row.id) === String(live.id));
+        if (index >= 0) mergedShifts[index] = { ...mergedShifts[index], ...live };
+        else mergedShifts.push(live);
+      }
+      return { previous, staff, shifts: mergedShifts, reorderAlerts };
     },
     enabled: !!data?.current,
     staleTime: 5 * 60_000,
@@ -331,6 +451,9 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const shiftPollTimer = window.setInterval(() => {
+      if (mounted) void refetchSecondary();
+    }, 60_000);
     const refreshDashboard = () => {
       if (!mounted) return;
       if (refreshTimer) clearTimeout(refreshTimer);
@@ -373,6 +496,7 @@ const Dashboard: React.FC = () => {
       socketService.off('analytics:refresh', refreshDashboard);
       window.removeEventListener('restoflow:orders-changed', handleLocalOrdersChanged);
       if (refreshTimer) clearTimeout(refreshTimer);
+      window.clearInterval(shiftPollTimer);
     };
   }, [queryClient, refetch, refetchSecondary]);
 
@@ -402,8 +526,13 @@ const Dashboard: React.FC = () => {
     return entries as unknown as DashboardPayload['totals'];
   }, [payload]);
 
-  const activeShifts = useMemo(() => shifts.filter((s: any) => s.status === 'OPEN' || String(s.status || '').toLowerCase() === 'active'), [shifts]);
-  const activeCashTotal = useMemo(() => activeShifts.reduce((sum: number, s: any) => sum + num(s.expectedBalance ?? s.openingBalance), 0), [activeShifts]);
+  const activeShifts = useMemo(() => shifts.filter((s: any) => {
+    const status = String(s.status || '').toUpperCase();
+    return status === 'OPEN' || status === 'ACTIVE';
+  }), [shifts]);
+  const activeCashTotal = useMemo(() => activeShifts.reduce((sum: number, s: any) => sum + num(
+    s.expectedBalance ?? s.expectedCashBalance ?? s.expectedCashInDrawer ?? s.cashBalance ?? s.balance ?? s.openingBalance ?? 0
+  ), 0), [activeShifts]);
   const criticalAlerts = useMemo(() => reorderAlerts
     .filter((a: any) => num(a.currentStock) <= num(a.threshold))
     .sort((a: any, b: any) => num(b.deficit) - num(a.deficit)), [reorderAlerts]);
@@ -477,26 +606,14 @@ const Dashboard: React.FC = () => {
     };
   }, [prevPayload, totals]);
 
-  // Prime cost = (food + labor) / revenue. Estimated while COGS is manual.
-  const primeCost = useMemo(() => {
-    const labor = num((ext?.staffCost as any)?.staffCost);
-    const food = totals.cogs;
-    const rev = totals.revenue;
-    const pct = rev > 0 ? ((food + labor) / rev) * 100 : 0;
-    const estimated = food <= 0; // COGS still manual until BOM-live (P0-B)
-    const state: 'good' | 'warn' | 'bad' = pct <= 0 ? 'good' : pct < 60 ? 'good' : pct <= 65 ? 'warn' : 'bad';
-    return { pct, labor, food, estimated, state };
-  }, [ext, totals]);
-
   // Single most-critical alert (Zero-UI: one action, not a wall of badges).
   const criticalAlert = useMemo(() => {
     if (!hasBusinessDate) return { kind: 'date' as const, text: isAr ? 'تاريخ التشغيل غير مضبوط — راجع إغلاق اليوم' : 'Business date is not set — review Day Close', to: '/day-close' };
     if (criticalAlerts.length > 0) return { kind: 'stock' as const, text: isAr ? `${criticalAlerts[0].itemName} أوشك على النفاد (${criticalAlerts[0].currentStock} ${criticalAlerts[0].unit || ''})` : `${criticalAlerts[0].itemName} is almost out (${criticalAlerts[0].currentStock} ${criticalAlerts[0].unit || ''})`, to: '/inventory' };
     if (totals.cancelRate > 5) return { kind: 'cancel' as const, text: isAr ? `معدل الإلغاء ${totals.cancelRate.toFixed(1)}% — أعلى من الحد (5%)` : `Cancel rate ${totals.cancelRate.toFixed(1)}% — above the 5% limit`, to: '/reports' };
-    if (primeCost.pct > 65) return { kind: 'prime' as const, text: isAr ? `الـ Prime Cost ${primeCost.pct.toFixed(1)}% — فوق النطاق الآمن` : `Prime cost ${primeCost.pct.toFixed(1)}% — above the safe band`, to: '/reports' };
     if (activeShifts.length === 0) return { kind: 'shift' as const, text: isAr ? 'لا توجد شيفتات مفتوحة — تحقق من الكاشير' : 'No open shifts — check the cashier', to: '/day-close' };
     return null;
-  }, [hasBusinessDate, criticalAlerts, totals.cancelRate, primeCost, activeShifts, isAr]);
+  }, [hasBusinessDate, criticalAlerts, totals.cancelRate, activeShifts, isAr]);
 
   // Data-driven daily briefing (replaces the fake "instant fix" banner).
   const briefing = useMemo(() => {
@@ -504,14 +621,11 @@ const Dashboard: React.FC = () => {
     parts.push(isAr
       ? `إيراد ${fmtMoney(totals.revenue)} ${currencySymbol} من ${totals.orderCount} طلب (${trends.revenue.up ? '+' : '−'}${trends.revenue.val}%)`
       : `${fmtMoney(totals.revenue)} ${currencySymbol} from ${totals.orderCount} orders (${trends.revenue.up ? '+' : '−'}${trends.revenue.val}%)`);
-    if (primeCost.pct > 0) parts.push(isAr
-      ? `الـ Prime Cost ${primeCost.pct.toFixed(1)}%${primeCost.estimated ? ' (تقديري)' : ''}`
-      : `Prime cost ${primeCost.pct.toFixed(1)}%${primeCost.estimated ? ' (estimated)' : ''}`);
     if (totals.cancelRate > 0) parts.push(isAr ? `إلغاءات ${totals.cancelRate.toFixed(1)}%` : `cancels ${totals.cancelRate.toFixed(1)}%`);
     if (criticalAlerts.length > 0) parts.push(isAr ? `${criticalAlerts.length} تنبيه مخزون` : `${criticalAlerts.length} stock alerts`);
     const cta = criticalAlert ?? { kind: 'ok' as const, text: '', to: '/reports' };
     return { text: parts.join(' • '), cta };
-  }, [totals, trends, primeCost, criticalAlerts, criticalAlert, isAr, currencySymbol]);
+  }, [totals, trends, criticalAlerts, criticalAlert, isAr, currencySymbol]);
 
   // Why did revenue change? prev → volume effect − discount delta − cancel delta → current.
   const waterfall = useMemo(() => {
@@ -562,8 +676,19 @@ const Dashboard: React.FC = () => {
   const paymentMix = useMemo(() => {
     const total = payload.paymentBreakdown.reduce((s, e) => s + (Number(e.value) || 0), 0);
     if (total <= 0) return [];
-    return payload.paymentBreakdown.map(e => ({ ...e, value: Number(((Number(e.value) || 0) / total * 100).toFixed(1)) }));
+    return payload.paymentBreakdown.map(e => ({
+      ...e,
+      amount: Number(e.value) || 0,
+      value: Number(((Number(e.value) || 0) / total * 100).toFixed(1)),
+    }));
   }, [payload.paymentBreakdown]);
+
+  const paymentLabel = useCallback((method: string) => {
+    const labels: Record<string, string> = isAr
+      ? { CASH: 'نقدي', VISA: 'فيزا / بطاقة', VODAFONE_CASH: 'فودافون كاش', INSTAPAY: 'إنستا باي', SPLIT: 'دفع متعدد', CASH_ON_DELIVERY: 'نقدي عند الاستلام' }
+      : { CASH: 'Cash', VISA: 'Card / Visa', VODAFONE_CASH: 'Vodafone Cash', INSTAPAY: 'InstaPay', SPLIT: 'Split payment', CASH_ON_DELIVERY: 'Cash on delivery' };
+    return labels[String(method || '').toUpperCase()] || method || (isAr ? 'غير محدد' : 'Unknown');
+  }, [isAr]);
 
   const branchPerfRows = useMemo(() => {
     const fromPayload = (payload.branchPerformance || []) as Array<{ branchId: string; branchName: string; orders: number; revenue: number; avgTicket: number }>;
@@ -726,9 +851,6 @@ const Dashboard: React.FC = () => {
           <span className={`rounded-full px-3 py-1.5 ${activeShifts.length > 0 ? 'bg-emerald-500/15 text-emerald-600' : 'bg-slate-500/10 text-muted'}`}>
             {isAr ? `${activeShifts.length} شيفت مفتوح` : `${activeShifts.length} open shifts`}
           </span>
-          {primeCost.estimated && (
-            <span className="rounded-full bg-amber-500/15 px-3 py-1.5 text-amber-600">{isAr ? 'التكلفة تقديرية (يدوية)' : 'Costs are manual estimates'}</span>
-          )}
         </div>
 
         {/* Daily briefing — data-driven summary with a real destination CTA. */}
@@ -755,7 +877,7 @@ const Dashboard: React.FC = () => {
         {/* ZONE 1 — Decision row: 4 cards, 30 seconds. */}
         <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5" aria-label={isAr ? 'قرارات سريعة' : 'Decision row'}>
           <div className="relative overflow-hidden bg-card/60 border border-border/30 rounded-[1.5rem] p-5 transition-all hover:scale-[1.02]">
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted mb-2">{isAr ? 'إيراد اليوم' : "Today's revenue"}</p>
+            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted">{isAr ? 'إيراد اليوم' : "Today's revenue"}<DashboardHelp text={isAr ? 'إجمالي قيمة الطلبات المكتملة أو المسلّمة في الفترة الحالية مقارنة بالفترة السابقة.' : 'Total value of completed or delivered orders in the current period compared with the previous period.'} label={isAr ? 'شرح إيراد اليوم' : "Explain today's revenue"} /></p>
             <p className="text-2xl lg:text-3xl font-black text-main tracking-tighter tabular-nums">
               <SensitiveData permission={AppPermission.DATA_VIEW_REVENUE} hasPermission={hasPermission} lang={lang}>{fmtMoney(totals.revenue)}</SensitiveData>
               <span className="text-xs font-bold text-muted opacity-60"> {currencySymbol}</span>
@@ -764,20 +886,13 @@ const Dashboard: React.FC = () => {
               {trends.revenue.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trends.revenue.val}% <span className="text-muted opacity-70">{translations[lang].vs_prev}</span>
             </p>
           </div>
-          <button type="button" onClick={goToFinance} className={`relative overflow-hidden bg-card/60 border rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02] ${primeCost.state === 'bad' ? 'border-rose-500/40' : primeCost.state === 'warn' ? 'border-amber-500/40' : 'border-border/30'}`}>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted mb-2">Prime Cost</p>
-            <p className={`text-2xl lg:text-3xl font-black tracking-tighter tabular-nums ${primeCost.state === 'bad' ? 'text-rose-500' : primeCost.state === 'warn' ? 'text-amber-500' : 'text-emerald-500'}`}>
-              {primeCost.pct > 0 ? `${primeCost.pct.toFixed(1)}%` : '—'}
-            </p>
-            <p className="mt-2 text-[10px] font-bold text-muted">{isAr ? `طعام ${fmtMoney(primeCost.food)} + عمالة ${fmtMoney(primeCost.labor)}` : `food ${fmtMoney(primeCost.food)} + labor ${fmtMoney(primeCost.labor)}`}{primeCost.estimated ? (isAr ? ' (تقديري)' : ' (est.)') : ''}</p>
-          </button>
           <button type="button" onClick={() => navigate('/kds')} className="relative overflow-hidden bg-card/60 border border-border/30 rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02]">
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted mb-2">{isAr ? 'طلبات نشطة' : 'Active orders'}</p>
+            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted">{isAr ? 'طلبات نشطة' : 'Active orders'}<DashboardHelp text={isAr ? 'عدد الطلبات التي لم تكتمل بعد، ويظهر بجانبها إجمالي الطلبات في الفترة.' : 'Orders that are not completed yet, shown beside the total order count for the period.'} label={isAr ? 'شرح الطلبات النشطة' : 'Explain active orders'} /></p>
             <p className="text-2xl lg:text-3xl font-black text-main tracking-tighter tabular-nums">{totals.pending}<span className="text-sm font-bold text-muted"> / {totals.orderCount}</span></p>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-500/10"><div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400" style={{ width: `${totals.orderCount ? Math.min(100, (totals.pending / totals.orderCount) * 100) : 0}%` }} /></div>
           </button>
           <button type="button" onClick={() => criticalAlert && navigate(criticalAlert.to)} className={`relative overflow-hidden border rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02] ${criticalAlert ? 'border-rose-500/30 bg-rose-500/[0.06]' : 'border-emerald-500/30 bg-emerald-500/[0.06]'}`}>
-            <p className={`text-[10px] font-black uppercase tracking-[0.15em] mb-2 ${criticalAlert ? 'text-rose-500' : 'text-emerald-600'}`}>{isAr ? 'الأولوية القصوى' : 'Top priority'}</p>
+            <p className={`mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] ${criticalAlert ? 'text-rose-500' : 'text-emerald-600'}`}>{isAr ? 'الأولوية القصوى' : 'Top priority'}<DashboardHelp text={isAr ? 'أهم تنبيه تشغيلي حاليًا. إذا لم توجد مشكلة ستظهر رسالة أن المؤشرات مستقرة.' : 'The most important current operational alert. When there is no issue, the dashboard reports that indicators are stable.'} label={isAr ? 'شرح الأولوية القصوى' : 'Explain top priority'} /></p>
             <p className="text-sm font-black text-main leading-6 min-h-[3rem]">{criticalAlert ? criticalAlert.text : (isAr ? 'كل المؤشرات مستقرة ✓' : 'All indicators stable ✓')}</p>
             <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-primary">{criticalAlert ? (isAr ? 'اضغط للمعالجة' : 'Tap to act') : (isAr ? 'استمر' : 'Keep going')}</p>
           </button>
@@ -798,6 +913,8 @@ const Dashboard: React.FC = () => {
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
             trendData={payload.trendData.map(d => num(d.revenue))}
+            help={isAr ? 'إجمالي قيمة الطلبات المكتملة أو المسلّمة خلال الفترة المحددة، قبل خصم الخصومات والضريبة.' : 'Total value of completed or delivered orders in the selected period, before discounts and tax.'}
+            detail={{ label: isAr ? 'الخصومات' : 'Discounts', value: `${fmtMoney(totals.discounts)} ${currencySymbol}`, help: isAr ? 'إجمالي الخصومات المطبقة على الطلبات خلال الفترة المحددة. هذا المبلغ يُخصم من إجمالي المبيعات للوصول إلى صافي المبيعات.' : 'Total discounts applied to orders in the selected period. This amount is deducted from gross sales to calculate net sales.' }}
             delay={100}
           />
           <MetricCard
@@ -810,6 +927,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
+            help={isAr ? 'إجمالي الضريبة المسجلة على الطلبات المعترف بها في الفترة المحددة.' : 'Total tax recorded on recognized orders in the selected period.'}
             delay={200}
           />
           <MetricCard
@@ -822,6 +940,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
+            help={isAr ? 'المصروفات المعتمدة والمرحّلة ماليًا خلال الفترة، ولا تشمل المصروفات المعلقة.' : 'Approved and posted expenses in the period; pending expenses are excluded.'}
             delay={300}
           />
           <MetricCard
@@ -835,6 +954,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
+            help={isAr ? 'صافي المبيعات بعد الخصومات ناقص تكلفة المبيعات والمصروفات المعتمدة.' : 'Net sales after discounts minus cost of goods sold and approved expenses.'}
             delay={400}
           />
           <MetricCard
@@ -847,6 +967,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             onClick={goToFinance}
+            help={isAr ? 'عدد كل الطلبات المعترف بها في الفترة المحددة.' : 'Count of all recognized orders in the selected period.'}
             delay={500}
           />
           <MetricCard
@@ -859,6 +980,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             onClick={goToFinance}
+            help={isAr ? 'متوسط قيمة الطلب = إجمالي المبيعات ÷ عدد الطلبات.' : 'Average ticket = gross sales divided by order count.'}
             delay={600}
           />
           <MetricCard
@@ -870,6 +992,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             onClick={goToHR}
+            help={isAr ? 'عدد الموظفين النشطين حاليًا مقارنة بإجمالي الموظفين المحملين.' : 'Currently active employees compared with all loaded employees.'}
             delay={700}
           />
           <MetricCard
@@ -882,6 +1005,7 @@ const Dashboard: React.FC = () => {
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
             onClick={goToFinance}
+            help={isAr ? 'عدد الطلبات الملغاة وقيمتها خلال الفترة المحددة.' : 'Cancelled order count and their value in the selected period.'}
             delay={800}
           />
         </section>
@@ -895,6 +1019,7 @@ const Dashboard: React.FC = () => {
               <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 mb-1">
                 <Wallet size={16} />
                 {t.live_shifts_cash}
+                <DashboardHelp text={isAr ? 'رصيد النقد المتوقع في الورديات المفتوحة: رصيد بداية الوردية مضافًا إليه المدفوعات النقدية المكتملة المرتبطة بها.' : 'Expected cash in open shifts: opening balance plus completed cash payments linked to those shifts.'} label={isAr ? 'شرح خزينة الورديات' : 'Explain live shift cash'} />
               </h3>
               <div className="mt-4 flex flex-wrap items-end gap-3">
                 <p className={`text-3xl font-black tabular-nums flex items-end gap-1 ${activeShifts.length > 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
@@ -951,7 +1076,7 @@ const Dashboard: React.FC = () => {
           <div className="xl:col-span-2 bg-card/60  border border-border/30 rounded-[2rem] p-6 lg:p-8 flex flex-col shadow-xl">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h3 className="text-xl font-black text-main tracking-tight">{t.sales_trends_comparison}</h3>
+            <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{t.sales_trends_comparison}<DashboardHelp text={isAr ? 'يقارن اتجاه الإيراد بين الأيام أو الفترات المحددة والفترة السابقة.' : 'Compares revenue direction across the selected period and the comparison period.'} label={isAr ? 'شرح اتجاه المبيعات' : 'Explain sales trend'} /></h3>
                 <p className="text-xs text-muted font-bold mt-1">{t.comparison_desc}</p>
               </div>
               <div className="flex items-center gap-4">
@@ -980,7 +1105,7 @@ const Dashboard: React.FC = () => {
         {/* ZONE 2 — Where is it heading? Dayparts, peak hours, why revenue moved. */}
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" aria-label={isAr ? 'اتجاهات التشغيل' : 'Operational trends'}>
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
-            <h3 className="text-xl font-black text-main tracking-tight">{isAr ? 'الفترات (Dayparts)' : 'Dayparts'}</h3>
+            <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'الفترات (Dayparts)' : 'Dayparts'}<DashboardHelp text={isAr ? 'توزيع المبيعات والطلبات حسب فترة اليوم مثل الصباح والظهر والمساء.' : 'Sales and order distribution by parts of the day such as morning, afternoon and evening.'} label={isAr ? 'شرح فترات اليوم' : 'Explain dayparts'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{isAr ? 'أي فترة شايلة اليوم؟' : 'Which part of the day carries revenue?'}</p>
             <div className="w-full h-[260px] mt-4">
               {daypartData.length > 0 ? (
@@ -1006,7 +1131,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
-            <h3 className="text-xl font-black text-main tracking-tight">{isAr ? 'خريطة الذروة' : 'Peak map'}</h3>
+            <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'خريطة الذروة' : 'Peak map'}<DashboardHelp text={isAr ? 'توضح الأيام والساعات التي تحتوي على أكبر عدد من الطلبات.' : 'Shows the days and hours with the highest order volume.'} label={isAr ? 'شرح خريطة الذروة' : 'Explain peak map'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{viewScope === 'DAILY' ? (isAr ? 'المبيعات ساعة بساعة اليوم' : 'Hour-by-hour today') : (isAr ? 'الكثافة: يوم × ساعة' : 'Density: day × hour')}</p>
             {viewScope === 'DAILY' ? (
               <div className="w-full h-[260px] mt-4">
@@ -1043,7 +1168,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
-            <h3 className="text-xl font-black text-main tracking-tight">{isAr ? 'ليه اتغيرنا؟' : 'Why did we move?'}</h3>
+            <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'ليه اتغيرنا؟' : 'Why did we move?'}<DashboardHelp text={isAr ? 'يوضح الفرق بين إيراد الفترة الحالية والسابقة، ويقسم التغير إلى حجم الطلبات والخصومات والإلغاءات وباقي العوامل.' : 'Explains the difference between current and previous revenue by separating order volume, discounts, cancellations and other factors.'} label={isAr ? 'شرح تغير الإيراد' : 'Explain revenue movement'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{isAr ? 'تفكيك فرق الإيراد عن الفترة السابقة' : 'Revenue bridge vs previous period'}</p>
             <div className="mt-5 space-y-3">
               {waterfall.map((s, i) => (
@@ -1072,6 +1197,7 @@ const Dashboard: React.FC = () => {
                 <h3 className="text-xl font-black text-main tracking-tight flex items-center gap-3">
                   <Trophy className="text-yellow-500" />
                   {t.top_staff}
+                  <DashboardHelp text={isAr ? 'الموظفون الأكثر ارتباطًا بالطلبات والإيراد خلال الفترة المحددة.' : 'Staff members associated with the most orders and revenue in the selected period.'} label={isAr ? 'شرح أفضل الموظفين' : 'Explain top staff'} />
                 </h3>
                 <button className="text-[10px] font-black uppercase text-primary hover:underline" onClick={goToHR}>{t.view_all}</button>
               </div>
@@ -1112,6 +1238,7 @@ const Dashboard: React.FC = () => {
               <h3 className="text-xl font-black text-main tracking-tight mb-8 flex items-center gap-3">
                 <Flame className="text-orange-500" />
                 {t.trending_items}
+                <DashboardHelp text={isAr ? 'الأصناف الأكثر طلبًا حسب عدد الوحدات المباعة خلال الفترة المحددة.' : 'The most ordered items by units sold in the selected period.'} label={isAr ? 'شرح الأصناف الأكثر مبيعًا' : 'Explain trending items'} />
               </h3>
               <div className="space-y-5">
                 {payload.topItems && payload.topItems.length > 0 ? (
@@ -1143,7 +1270,7 @@ const Dashboard: React.FC = () => {
 
             {/* Platform / Order Source Breakdown */}
             <div className="bg-card/60  border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
-              <h3 className="text-xl font-black text-main tracking-tight mb-8">{t.order_source_distribution}</h3>
+              <h3 className="mb-8 flex items-center gap-2 text-xl font-black text-main tracking-tight">{t.order_source_distribution}<DashboardHelp text={isAr ? 'نسبة الطلبات حسب القناة: صالة، تيك أواي، دليفري أو مصدر خارجي.' : 'Order share by channel: dine-in, takeaway, delivery or an external source.'} label={isAr ? 'شرح مصادر الطلبات' : 'Explain order sources'} /></h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <div className="h-[250px]">
                   {orderTypePercentData.length > 0 ? (
@@ -1177,14 +1304,14 @@ const Dashboard: React.FC = () => {
         {/* ZONE 3 — What needs action? Payments, slow items, branches, cash variance. */}
         <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" aria-label={isAr ? 'تفاصيل تحتاج تدخل' : 'Details needing action'}>
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
-            <h3 className="text-lg font-black text-main tracking-tight">{isAr ? 'مزيج المدفوعات' : 'Payment mix'}</h3>
+              <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'مبيعات كل طريقة دفع' : 'Sales by payment method'} <DashboardHelp text={isAr ? 'القيمة هنا مأخوذة من سجلات المدفوعات المكتملة خلال الفترة. النسبة هي حصة كل طريقة من إجمالي المدفوعات.' : 'Values come from completed payment records in the selected period. The percentage is each method’s share of total payments.'} label={isAr ? 'شرح مزيج المدفوعات' : 'Explain payment mix'} /></h3>
             {paymentMix.length > 0 ? (
               <div className="mt-4 space-y-3">
                 {paymentMix.slice(0, 5).map((p, i) => (
                   <div key={i}>
                     <div className="flex items-center justify-between text-[11px] font-black mb-1">
-                      <span className="text-main flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />{p.name}</span>
-                      <span className="text-muted tabular-nums">{p.value}%</span>
+                      <span className="min-w-0 truncate text-main flex items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-elevated/50" style={{ color: COLORS[i % COLORS.length] }}><PaymentMethodIcon method={p.name} /></span><span className="truncate">{paymentLabel(p.name)}</span><DashboardHelp text={isAr ? `إجمالي المدفوعات المكتملة بطريقة ${paymentLabel(p.name)} خلال الفترة المحددة، مع نسبتها من إجمالي المدفوعات.` : `Completed payments using ${paymentLabel(p.name)} in the selected period, with its share of total payments.`} label={isAr ? `شرح ${paymentLabel(p.name)}` : `Explain ${paymentLabel(p.name)}`} /></span>
+                      <span className="shrink-0 text-muted tabular-nums">{fmtMoney(p.amount)} {currencySymbol} · {p.value}%</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-elevated/60">
                       <div className="h-full rounded-full" style={{ width: `${Math.min(100, p.value)}%`, backgroundColor: COLORS[i % COLORS.length] }} />
@@ -1198,7 +1325,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
-            <h3 className="text-lg font-black text-main tracking-tight">{isAr ? 'أصناف تحتاج قرار' : 'Items needing a call'}</h3>
+            <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'أصناف تحتاج قرار' : 'Items needing a call'}<DashboardHelp text={isAr ? 'الأصناف الأقل حركة خلال الفترة مع بيانات الهامش لمساعدتك في قرار التسعير أو الإيقاف.' : 'Slowest-moving items in the period with margin data to guide pricing or menu decisions.'} label={isAr ? 'شرح الأصناف البطيئة' : 'Explain slow items'} /></h3>
             <p className="text-[11px] text-muted font-bold mt-1">{isAr ? 'الأبطأ حركة + الهامش' : 'Slowest movers + margin'}</p>
             {slowItems.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -1216,7 +1343,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
-            <h3 className="text-lg font-black text-main tracking-tight">{isAr ? 'أداء الفروع' : 'Branch performance'}</h3>
+            <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'أداء الفروع' : 'Branch performance'}<DashboardHelp text={isAr ? 'مقارنة عدد الطلبات والإيراد بين الفروع خلال نفس الفترة.' : 'Compares order count and revenue across branches for the same period.'} label={isAr ? 'شرح أداء الفروع' : 'Explain branch performance'} /></h3>
             {branchPerfRows.length > 0 ? (
               <div className="mt-4 space-y-3">
                 {branchPerfRows.slice(0, 5).map((b, i) => (
@@ -1237,7 +1364,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
-            <h3 className="text-lg font-black text-main tracking-tight">{isAr ? 'فروقات الكاش (شيفتات)' : 'Cash variance (shifts)'}</h3>
+            <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'فروقات الكاش (شيفتات)' : 'Cash variance (shifts)'}<DashboardHelp text={isAr ? 'الفرق بين النقد المتوقع والنقد الفعلي المسجل عند إغلاق الوردية.' : 'Difference between expected cash and the amount counted when a shift is closed.'} label={isAr ? 'شرح فروقات الكاش' : 'Explain cash variance'} /></h3>
             {shiftVariance.length > 0 ? (
               <div className="mt-4 space-y-3">
                 {shiftVariance.map((s, i) => (
@@ -1258,9 +1385,10 @@ const Dashboard: React.FC = () => {
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 min-h-[500px] animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '1000ms', animationFillMode: 'both'}}>
           <div className="theme-card overflow-hidden flex flex-col p-8 bg-card/60 backdrop-blur-md rounded-[2rem] shadow-xl">
              <div className="flex items-center justify-between mb-8">
-               <h3 className="text-xl font-black text-main tracking-tight flex items-center gap-3">
+              <h3 className="text-xl font-black text-main tracking-tight flex items-center gap-3">
                  <Flame className="text-rose-500" />
                  {t.live_kitchen_monitor}
+                 <DashboardHelp text={isAr ? 'حالة أداء المطبخ والطلبات التي تحتاج متابعة الآن.' : 'Current kitchen performance and orders that need attention.'} label={isAr ? 'شرح أداء المطبخ' : 'Explain kitchen performance'} />
                </h3>
                <div className="flex items-center gap-2">
                  <button className="h-10 px-6 rounded-xl bg-elevated border border-border/40 text-[10px] font-black uppercase tracking-widest hover:bg-border transition-colors"
@@ -1283,6 +1411,7 @@ const Dashboard: React.FC = () => {
              <h3 className="text-xl font-black text-main tracking-tight mb-8 flex items-center gap-3">
                <Truck className="text-cyan-500" />
                {t.delivery_logistics}
+               <DashboardHelp text={isAr ? 'متابعة حالة التوصيل والطلبات الموجودة في مراحل التسليم المختلفة.' : 'Delivery status and orders currently moving through delivery stages.'} label={isAr ? 'شرح التوصيل' : 'Explain delivery logistics'} />
              </h3>
              <Suspense fallback={<div className="text-center py-8">{t.loading}</div>}>
                 <DeliveryStatusWidget />

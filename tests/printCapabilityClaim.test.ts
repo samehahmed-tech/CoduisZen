@@ -46,18 +46,22 @@ describe('capability-based print job claiming', () => {
     });
 
     it('lets any bridge claim a nowhere-registered printer after the grace period', async () => {
+        // NOTE: NETWORK/LAN jobs are intentionally claimable immediately by
+        // design (no stale-job wait), so the grace window is exercised with a
+        // LOCAL printer that no bridge registered.
+        const NOWHERE_USB = 'windows:NOWHERE-PRINTER-80C';
         await markBridgePoll(GW_A, BRANCH, [USB_ADDRESS]);
-        await enqueuePrintJob({ branchId: BRANCH, type: 'KITCHEN', content: 'net test', printerAddress: NET_ADDRESS, printerType: 'NETWORK' });
+        await enqueuePrintJob({ branchId: BRANCH, type: 'KITCHEN', content: 'usb nowhere test', printerAddress: NOWHERE_USB, printerType: 'LOCAL' });
 
-        // GW_B does NOT own NET_ADDRESS (different capability list). Within the
+        // GW_B does NOT own NOWHERE_USB (different capability list). Within the
         // 30s grace window the printer is registered nowhere, so it waits —
         // giving the real owner's bridge time to poll first.
-        const early = await claim(GW_B, ['OTHER-PRINTER:9100']);
+        const early = await claim(GW_B, ['OTHER-PRINTER']);
         expect(early).toBeNull();
 
         // Age the job past the grace window.
         await pool.query(`UPDATE print_jobs SET created_at = DATEADD(SECOND, -45, GETDATE()) WHERE branch_id = $1`, [BRANCH]);
-        const late = await claim(GW_B, ['OTHER-PRINTER:9100']);
+        const late = await claim(GW_B, ['OTHER-PRINTER']);
         expect(late?.claimed_by).toBe(GW_B);
     });
 

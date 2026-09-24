@@ -320,7 +320,10 @@ const PrinterManager: React.FC = () => {
 
     useEffect(() => {
         loadQueue();
-        const timer = window.setInterval(loadQueue, 5000);
+        // Keep the queue monitor visually close to real-time. The bridge
+        // itself claims every 500ms; a 5s UI refresh made healthy jobs look
+        // stuck in QUEUED/PROCESSING.
+        const timer = window.setInterval(loadQueue, 1000);
         return () => window.clearInterval(timer);
     }, [settings.activeBranchId]);
 

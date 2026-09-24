@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, FileSpreadsheet, FileText, Printer, X } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, Printer, X } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { downloadHtmlPdf } from '../../services/reportPdf';
+import { escReportHtml, getReportBrand, isSameLogoUrl } from '../../services/reportBrand';
 
 type Column = {
     key: string;
@@ -22,7 +23,7 @@ interface ExportButtonProps {
 }
 
 const toCSV = (data: Record<string, any>[], columns: Column[]): string => {
-    const header = columns.map(c => `"${c.label}"`).join(',');
+    const header = columns.map(c => `"${String(c.label ?? '').replace(/"/g, '""')}"`).join(',');
     const rows = data.map(row =>
         columns.map(c => {
             const val = c.format ? c.format(row[c.key]) : (row[c.key] ?? '');
@@ -57,9 +58,22 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     const [isPdfBusy, setIsPdfBusy] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const settings = useAuthStore((s) => s.settings);
-    const restaurantName = settings.restaurantName || 'Coduis Zen';
-    const logoUrl = settings.receiptLogoUrl || '/logo.png';
+    const branches = useAuthStore((s) => s.branches);
     const isArabic = (settings.language || 'en') !== 'en';
+    // Single brand source: Arabic restaurant name, system mark, branch — same
+    // identity as the main Reports center (no more English-only mini cover).
+    const brand = getReportBrand({
+        settings,
+        branchName: settings.activeBranchId
+            ? branches.find((b: any) => b.id === settings.activeBranchId)?.name || ''
+            : '',
+        reportTitle: title,
+        rangeStart: '',
+        rangeEnd: '',
+        isArabic,
+    });
+    const restaurantName = brand.restaurant;
+    const logoUrl = brand.logoUrl || '/logo.png';
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -82,21 +96,21 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     const exportDirectPdf = async () => {
         setIsPdfBusy(true);
         try {
-            const headerCells = columns.map((c) => `<th>${c.label}</th>`).join('');
+            const headerCells = columns.map((c) => `<th>${escReportHtml(c.label)}</th>`).join('');
             const bodyRows = data
                 .map(
                     (row) =>
                         `<tr>${columns
                             .map((c) => {
                                 const val = c.format ? c.format(row[c.key]) : row[c.key] ?? '';
-                                return `<td>${val}</td>`;
+                                return `<td>${escReportHtml(val)}</td>`;
                             })
                             .join('')}</tr>`
                 )
                 .join('');
             const totalsRow =
                 totals && totals.length
-                    ? `<tfoot><tr>${totals.map((v) => `<td>${v ?? ''}</td>`).join('')}</tr></tfoot>`
+                    ? `<tfoot><tr>${totals.map((v) => `<td>${escReportHtml(v ?? '')}</td>`).join('')}</tr></tfoot>`
                     : '';
             const metaLine = `${data.length} ${isArabic ? 'صف' : 'records'}`;
             await downloadHtmlPdf(
@@ -106,9 +120,13 @@ const ExportButton: React.FC<ExportButtonProps> = ({
                     title,
                     restaurant: restaurantName,
                     logoUrl,
-                    metaChips: subtitle ? [subtitle, metaLine] : [metaLine],
+                    systemLogoUrl: (brand as any).systemLogoUrl,
+                    metaChips: [brand.branch, subtitle || '', metaLine].filter(Boolean),
                     isArabic,
                     orientation: columns.length > 5 ? 'landscape' : 'portrait',
+                    systemName: brand.systemName,
+                    systemTagline: brand.systemTagline,
+                    branchName: brand.branch,
                 }
             );
         } catch {
@@ -123,12 +141,14 @@ const ExportButton: React.FC<ExportButtonProps> = ({
         const dir = isArabic ? 'rtl' : 'ltr';
         const align = isArabic ? 'right' : 'left';
         const exportedAt = new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-GB');
+        const orientation = columns.length > 5 ? 'landscape' : 'portrait';
         const styles = `
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" />
             <style>
-                @page { size: A4 landscape; margin: 11mm 10mm 14mm 10mm; }
-                body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 0; color: #0f172a; direction: ${dir}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                @page { size: A4 ${orientation}; margin: 11mm 10mm 14mm 10mm; }
+                body { font-family: 'Cairo','Segoe UI',Tahoma,Arial,sans-serif; margin: 0; color: #0f172a; direction: ${dir}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 .hz { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #0f766e; padding-bottom: 14px; margin-bottom: 14px; }
-                .hz img { width: 52px; height: 52px; object-fit: contain; }
+                .hz img { height: 52px; width: auto; max-width: 230px; object-fit: contain; background: linear-gradient(135deg,#0b1b30,#020617); border: 1px solid #c9a227; border-radius: 10px; padding: 4px 10px; }
                 .hz h1 { font-size: 20px; margin: 0; color: #10243e; }
                 .hz .sub { font-size: 11px; color: #5b6b7d; font-weight: 700; margin-top: 4px; }
                 .meta { font-size: 10px; color: #64748b; font-weight: 700; margin-bottom: 10px; }
@@ -142,25 +162,26 @@ const ExportButton: React.FC<ExportButtonProps> = ({
                 .footer { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; border-top: 1px solid #dbe4ee; padding-top: 6px; font-size: 8.5pt; color: #64748b; font-weight: 700; }
             </style>
         `;
-        const headerCells = columns.map(c => `<th>${c.label}</th>`).join('');
+        const headerCells = columns.map(c => `<th>${escReportHtml(c.label)}</th>`).join('');
         const bodyRows = data.map(row =>
             `<tr>${columns.map(c => {
                 const val = c.format ? c.format(row[c.key]) : (row[c.key] ?? '');
-                return `<td>${val}</td>`;
+                return `<td>${escReportHtml(val)}</td>`;
             }).join('')}</tr>`
         ).join('');
         const totalsRow = totals && totals.length
-            ? `<tfoot><tr>${totals.map(v => `<td>${v ?? ''}</td>`).join('')}</tr></tfoot>`
+            ? `<tfoot><tr>${totals.map(v => `<td>${escReportHtml(v ?? '')}</td>`).join('')}</tr></tfoot>`
             : '';
 
-        const html = `<!DOCTYPE html><html dir="${dir}"><head><meta charset="UTF-8"><title>${restaurantName} - ${title}</title>${styles}</head><body>
+        const html = `<!DOCTYPE html><html dir="${dir}" lang="${isArabic ? 'ar' : 'en'}"><head><meta charset="UTF-8"><title>${escReportHtml(restaurantName)} - ${escReportHtml(title)}</title>${styles}</head><body>
             <div class="hz">
-                <img src="${logoUrl}" alt="${restaurantName}" onerror="this.style.display='none'" />
-                <div><h1>${restaurantName}</h1><div class="sub">${title}</div>${subtitle ? `<div class="sub">${subtitle}</div>` : ''}</div>
+                <img src="${logoUrl}" alt="" onerror="this.style.display='none'" />
+                ${(brand as any).systemLogoUrl && !isSameLogoUrl((brand as any).systemLogoUrl, logoUrl) ? `<img src="${(brand as any).systemLogoUrl}" alt="" style="height:40px;width:auto;max-width:180px;border:1px solid #c9a227;border-radius:10px;padding:3px 6px;background:linear-gradient(135deg,#0b1b30,#020617);object-fit:contain;" onerror="this.style.display='none'" />` : ''}
+                <div><div style="font-size:9px;font-weight:800;color:#0f766e;">${escReportHtml(brand.systemName)} • ${escReportHtml(brand.systemTagline)}</div><h1>${escReportHtml(restaurantName)}</h1><div class="sub">${escReportHtml(title)}</div>${subtitle ? `<div class="sub">${escReportHtml(subtitle)}</div>` : ''}<div class="sub">${escReportHtml(brand.branch)}</div></div>
             </div>
             <div class="meta">${data.length} ${isArabic ? 'صف' : 'records'} · ${isArabic ? 'صُدّر' : 'exported'} ${exportedAt}</div>
             <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
-            <div class="footer"><span>${restaurantName}</span><span>${exportedAt}</span></div>
+            <div class="footer"><span>${escReportHtml(brand.systemName)} • ${escReportHtml(restaurantName)}</span><span>${exportedAt}</span></div>
         </body></html>`;
 
         const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
@@ -202,9 +223,9 @@ const ExportButton: React.FC<ExportButtonProps> = ({
                         <button onClick={() => void exportDirectPdf()}
                             disabled={isPdfBusy}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold text-main hover:bg-elevated/60 transition-colors text-left disabled:opacity-50">
-                            <FileText size={16} className="text-red-500" />
+                            {isPdfBusy ? <Loader2 size={16} className="text-red-500 animate-spin" /> : <FileText size={16} className="text-red-500" />}
                             <div>
-                                <p className="font-black text-[10px]">{isPdfBusy ? (isArabic ? 'جاري التجهيز...' : 'Building...') : 'PDF'}</p>
+                                <p className="font-black text-[10px]">PDF</p>
                                 <p className="text-[8px] text-muted">{isArabic ? 'تحميل مباشر بتصميم احترافي' : 'Direct designer download'}</p>
                             </div>
                         </button>

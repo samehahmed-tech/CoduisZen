@@ -1,11 +1,17 @@
 import { Request, Response } from 'express';
-import { eq, and, or, sql, gte, lte, desc } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { journalEntries, journalLines, chartOfAccounts, costCenters, users, branches } from '../../../src/db/schema';
 import { parseLocalDateRange, resolveScopedBranchId } from './reportUtils';
 
+// Branch comes only from the line's cost center — and costCenterId is
+// NULLABLE. A plain eq() on the LEFT-joined costCenters acts as an inner
+// join and silently drops every line without a cost center when a branch is
+// selected. Keep NULL-cost-center lines in scope.
 const branchJournalScope = (branchId?: string) => (
-    branchId ? eq(costCenters.branchId, branchId) : undefined
+    branchId
+        ? or(eq(costCenters.branchId, branchId), isNull(journalLines.costCenterId))
+        : undefined
 );
 
 export const getTrialBalance = async (req: Request, res: Response) => {
@@ -85,13 +91,21 @@ export const getProfitAndLoss = async (req: Request, res: Response) => {
             revenue,
             expenses,
             netProfit: revenue - expenses,
+            // GL truth only: revenue/expenses come from POSTED journal lines
+            // (COGS counts only if journalized). For order-level gross profit
+            // see the sales profit-summary report.
+            basis: 'GL_POSTED_ONLY',
+            // Detail sign matches the header: revenue positive as credit-debit,
+            // expenses positive as debit-credit (a cost, not a negative number).
             details: rows.map(r => ({
                 code: r.accountCode,
                 type: r.accountType,
                 name: r.accountName,
                 debit: Number(r.totalDebit),
                 credit: Number(r.totalCredit),
-                net: Number(r.totalCredit) - Number(r.totalDebit),
+                net: r.accountType === 'EXPENSE'
+                    ? Number(r.totalDebit) - Number(r.totalCredit)
+                    : Number(r.totalCredit) - Number(r.totalDebit),
             })),
         });
     } catch (error: any) {
@@ -118,6 +132,8 @@ export const getTopExpenses = async (req: Request, res: Response) => {
                 gte(journalEntries.date, start),
                 lte(journalEntries.date, end),
                 eq(journalEntries.status, 'POSTED'),
+                // Operating expenses only: stock COGS journals (referenceType
+                // COGS) are tracked separately, never as opex.
                 eq(journalEntries.referenceType, 'EXPENSE'),
                 eq(chartOfAccounts.type, 'EXPENSE'),
                 branchJournalScope(branchId)
@@ -126,7 +142,28 @@ export const getTopExpenses = async (req: Request, res: Response) => {
             .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`)
             .limit(20);
 
-        res.json(rows.map(r => ({ name: r.accountName, total: Number(r.total) })));
+        // Grand operating-expense total (same filters, no limit) so % shares
+        // are against ALL expenses — not 100% within the top-20 list.
+        const [grand] = await db.select({
+            total: sql<number>`coalesce(sum(${journalLines.debit}) - sum(${journalLines.credit}), 0)`,
+        })
+            .from(journalLines)
+            .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+            .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+            .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+            .where(and(
+                gte(journalEntries.date, start),
+                lte(journalEntries.date, end),
+                eq(journalEntries.status, 'POSTED'),
+                eq(journalEntries.referenceType, 'EXPENSE'),
+                eq(chartOfAccounts.type, 'EXPENSE'),
+                branchJournalScope(branchId)
+            ));
+
+        res.json({
+            items: rows.map(r => ({ name: r.accountName, total: Number(r.total) })),
+            grandTotal: Number(grand?.total || 0),
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -217,35 +254,50 @@ export const getExpenseReport = async (req: Request, res: Response) => {
             else if (c.status === 'PENDING_APPROVAL') { pendingCount = Number(c.count); pendingTotal = Number(c.total); }
         }
 
-        const byCategory = new Map<string, { code: string; name: string; nameAr: string | null; total: number; count: number }>();
-        const byDay = new Map<string, { day: string; total: number; count: number }>();
-        let total = 0;
+        // Summaries MUST aggregate the full filtered set in SQL — the page
+        // above is limited/offset, so JS-side aggregation over `rows` would
+        // under-report totals whenever pagination kicks in.
+        const [fullTotal] = await db.select({
+            total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+            count: sql<number>`count(*)`,
+        })
+            .from(journalLines)
+            .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+            .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+            .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+            .where(and(...conditions));
 
-        for (const row of rows) {
-            const amount = Number(row.amount || 0);
-            total += amount;
-            const category = byCategory.get(row.accountId) || {
-                code: row.accountCode,
-                name: row.accountName,
-                nameAr: row.accountNameAr || null,
-                total: 0,
-                count: 0,
-            };
-            category.total += amount;
-            category.count += 1;
-            byCategory.set(row.accountId, category);
+        const byCategoryRows = await db.select({
+            accountId: chartOfAccounts.id,
+            code: chartOfAccounts.code,
+            name: chartOfAccounts.name,
+            nameAr: chartOfAccounts.nameAr,
+            total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+            count: sql<number>`count(*)`,
+        })
+            .from(journalLines)
+            .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+            .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+            .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+            .where(and(...conditions))
+            .groupBy(chartOfAccounts.id, chartOfAccounts.code, chartOfAccounts.name, chartOfAccounts.nameAr);
 
-            const day = row.date ? new Date(row.date).toISOString().slice(0, 10) : 'Unknown';
-            const dayRow = byDay.get(day) || { day, total: 0, count: 0 };
-            dayRow.total += amount;
-            dayRow.count += 1;
-            byDay.set(day, dayRow);
-        }
+        const byDayRows = await db.select({
+            day: sql<string>`format(${journalEntries.date}, 'yyyy-MM-dd')`,
+            total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
+            count: sql<number>`count(*)`,
+        })
+            .from(journalLines)
+            .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
+            .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
+            .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+            .where(and(...conditions))
+            .groupBy(sql`format(${journalEntries.date}, 'yyyy-MM-dd')`);
 
         res.json({
             summary: {
-                total: Number(total.toFixed(2)),
-                count: rows.length,
+                total: Number(Number(fullTotal?.total || 0).toFixed(2)),
+                count: Number(fullTotal?.count || 0),
                 totalCount: postedCount + pendingCount,
                 postedCount,
                 postedTotal: Number(postedTotal.toFixed(2)),
@@ -255,11 +307,21 @@ export const getExpenseReport = async (req: Request, res: Response) => {
                 branchId: branchId || 'ALL',
                 hasMore: rows.length >= pageLimit,
             },
-            byCategory: Array.from(byCategory.values())
-                .map(row => ({ ...row, total: Number(row.total.toFixed(2)) }))
+            byCategory: byCategoryRows
+                .map(row => ({
+                    code: row.code,
+                    name: row.name,
+                    nameAr: row.nameAr || null,
+                    total: Number(Number(row.total || 0).toFixed(2)),
+                    count: Number(row.count || 0),
+                }))
                 .sort((a, b) => b.total - a.total),
-            byDay: Array.from(byDay.values())
-                .map(row => ({ ...row, total: Number(row.total.toFixed(2)) }))
+            byDay: byDayRows
+                .map(row => ({
+                    day: row.day || 'Unknown',
+                    total: Number(Number(row.total || 0).toFixed(2)),
+                    count: Number(row.count || 0),
+                }))
                 .sort((a, b) => a.day.localeCompare(b.day)),
             rows: rows.map(row => ({
                 ...row,

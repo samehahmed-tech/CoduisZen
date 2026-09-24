@@ -3,6 +3,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import { BadgeDollarSign, CalendarDays, Clock3, TrendingUp, Users, Wallet, ShieldAlert, TimerReset, BriefcaseBusiness } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
+import CoverageReportView from './shared/CoverageReportView';
 
 const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
 
@@ -189,12 +190,16 @@ export const HrReports = ({ state }: any) => {
       orders: Number(row.orderCount || 0),
    })), [productivityRows, t.employee]);
 
-   const executiveStats = [
+    const approvedPayroll = payrollData?.approvedTotal ?? payrollData?.totalPayroll;
+    const draftPayroll = Math.max(0, Number(payrollData?.totalPayroll || 0) - Number(approvedPayroll || 0));
+    const executiveStats = [
       {
          icon: Wallet,
          title: t.totalPayroll,
-         value: `${formatNumber(payrollData?.totalPayroll, locale, 0)} ${currency}`,
-         hint: `${formatNumber(payrollPayouts.length, locale)} ${t.employees}`,
+         value: `${formatNumber(approvedPayroll, locale, 0)} ${currency}`,
+         hint: draftPayroll > 0
+            ? `${formatNumber(payrollPayouts.length, locale)} ${t.employees} · ${lang === 'ar' ? `مسودات ${formatNumber(draftPayroll, locale, 0)}` : `drafts ${formatNumber(draftPayroll, locale, 0)}`}`
+            : `${formatNumber(payrollPayouts.length, locale)} ${t.employees}`,
          tone: 'teal',
       },
       {
@@ -342,10 +347,10 @@ export const HrReports = ({ state }: any) => {
     const renderPayroll = (ledger = false) => (
       <div className="space-y-6">
          <div className="grid gap-4 md:grid-cols-4">
-            <StatCard icon={BadgeDollarSign} title={t.totalPayroll} value={`${formatNumber(payrollData?.totalPayroll, locale, 0)} ${currency}`} hint={t.payrollHealth} />
+            <StatCard icon={BadgeDollarSign} title={t.totalPayroll} value={`${formatNumber(payrollData?.approvedTotal ?? payrollData?.totalPayroll, locale, 0)} ${currency}`} hint={t.payrollHealth} />
             <StatCard icon={Users} title={t.employees} value={formatNumber(payrollPayouts.length, locale)} hint={t.printReady} tone="blue" />
             <StatCard icon={CalendarDays} title={t.cycles} value={formatNumber(payrollCycles.length, locale)} hint={t.keyNote} tone="amber" />
-            <StatCard icon={Wallet} title={t.netPay} value={`${formatNumber(payrollPayouts.reduce((sum: number, row: any) => sum + Number(row.netPay || 0), 0), locale, 0)} ${currency}`} hint={t.payroll} tone="teal" />
+            <StatCard icon={Wallet} title={t.netPay} value={`${formatNumber(payrollData?.approvedTotal ?? payrollPayouts.reduce((sum: number, row: any) => sum + Number(row.netPay || 0), 0), locale, 0)} ${currency}`} hint={t.payroll} tone="teal" />
          </div>
 
          <TableShell title={ledger ? t.payrollLedger : t.payroll} subtitle={t.printReady}>
@@ -474,7 +479,7 @@ export const HrReports = ({ state }: any) => {
                               <td className="px-4 py-4 text-center font-bold">{formatNumber(row.workDays, locale)}</td>
                               <td className="px-4 py-4 text-center font-bold">{formatNumber(row.totalHours, locale, 1)}</td>
                               <td className="px-4 py-4 text-center font-bold text-amber-500">{formatNumber(row.overtimeHours, locale, 1)}</td>
-                              <td className="px-4 py-4 text-center font-bold text-muted">{formatNumber(row.hourlyRate, locale, 2)}</td>
+                              <td className="px-4 py-4 text-center font-bold text-muted">{formatNumber(row.effectiveHourlyRate ?? row.hourlyRate, locale, 2)}{row.rateEstimated ? <span className="ml-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black text-amber-600">{lang === 'ar' ? 'تقديري' : 'est.'}</span> : null}</td>
                               <td className="px-5 py-4 text-center font-black text-teal-600">{formatNumber(row.overtimeCost, locale, 0)} {currency}</td>
                            </tr>
                         ))}
@@ -488,6 +493,7 @@ export const HrReports = ({ state }: any) => {
 
    const renderStaffCost = () => (
       <div className="space-y-6">
+         <div className="rounded-2xl border border-border/40 bg-elevated/20 px-4 py-3 text-[11px] font-bold text-muted">{lang === 'ar' ? 'المقام إجمالي الإيراد (شامل الضريبة والخدمة) — قد يختلف عن نسب التكلفة المحسوبة على الصافي.' : 'Revenue here is gross (incl. tax/service) — may differ from net-basis cost ratios.'}{Number(staffCostData?.staffCostPercent || 0) > 100 ? (lang === 'ar' ? ' تجاوزت النسبة 100% — تحقق من الفترة.' : ' Ratio exceeds 100% — check the period.') : ''}</div>
          <div className="grid gap-4 md:grid-cols-4">
             <StatCard icon={TrendingUp} title={t.revenue} value={`${formatNumber(staffCostData?.revenue, locale, 0)} ${currency}`} hint={t.branchImpact} />
             <StatCard icon={Wallet} title={t.staffCost} value={`${formatNumber(staffCostData?.staffCost, locale, 0)} ${currency}`} hint={t.totalPayroll} tone="blue" />
@@ -565,7 +571,7 @@ export const HrReports = ({ state }: any) => {
             <StatCard icon={Users} title={t.employees} value={formatNumber(productivityRows.length, locale)} hint={t.productivityNote} />
             <StatCard icon={BadgeDollarSign} title={t.revenue} value={`${formatNumber(productivityRows.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0), locale, 0)} ${currency}`} hint={t.teamOutput} tone="blue" />
             <StatCard icon={BriefcaseBusiness} title={t.orders} value={formatNumber(productivityRows.reduce((sum: number, row: any) => sum + Number(row.orderCount || 0), 0), locale)} hint={t.keyNote} tone="amber" />
-            <StatCard icon={TrendingUp} title={t.avgTicket} value={`${formatNumber(productivityRows.length ? productivityRows.reduce((sum: number, row: any) => sum + Number(row.avgTicket || 0), 0) / productivityRows.length : 0, locale, 1)} ${currency}`} hint={t.printReady} tone="teal" />
+            <StatCard icon={TrendingUp} title={t.avgTicket} value={`${formatNumber((() => { const rev = productivityRows.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0); const ord = productivityRows.reduce((sum: number, row: any) => sum + Number(row.orderCount || 0), 0); return ord > 0 ? rev / ord : 0; })(), locale, 1)} ${currency}`} hint={t.printReady} tone="teal" />
          </div>
          <TableShell title={t.productivity} subtitle={t.productivityNote}>
             {productivityRows.length === 0 ? (
@@ -622,6 +628,17 @@ export const HrReports = ({ state }: any) => {
    if (activeSubReport === 'Staff Cost %') return renderStaffCost();
    if (activeSubReport === 'Sales per Labor Hour') return renderSalesPerHour();
    if (activeSubReport === 'Employee Productivity') return renderProductivity();
+   if (activeSubReport === 'Leave & Absence' || activeSubReport === 'Shift Tasks Completion' || activeSubReport === 'Headcount & Turnover') {
+      return (
+         <CoverageReportView
+            reportName={activeSubReport}
+            rows={(state as any).customReportRows?.[activeSubReport] || []}
+            meta={(state as any).customReportMeta?.[activeSubReport]}
+            lang={lang}
+            currency={currency}
+         />
+      );
+   }
 
    return <EmptyState text={t.noData} />;
 };

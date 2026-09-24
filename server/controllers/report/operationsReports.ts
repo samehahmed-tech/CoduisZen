@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, inArray, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, branches, drivers } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
@@ -16,22 +16,27 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
             branchId: orders.branchId,
             branchName: branches.name,
             orderCount: sql<number>`count(*)`,
+            eligibleOrderCount: sql<number>`sum(case when ${revenueEligible} then 1 else 0 end)`,
             revenue: sql<number>`coalesce(sum(case when ${revenueEligible} then ${orders.total} else 0 end), 0)`,
             avgTicket: sql<number>`coalesce(avg(case when ${revenueEligible} then ${orders.total} end), 0)`,
-            cancelledCount: sql<number>`sum(case when ${orders.status} = 'CANCELLED' then 1 else 0 end)`,
+            cancelledCount: sql<number>`sum(case when ${orders.status} in ('CANCELLED', 'REFUNDED', 'VOID') then 1 else 0 end)`,
         })
             .from(orders)
             .innerJoin(branches, eq(orders.branchId, branches.id))
             // Prefer businessDate (day-key) when present so branch performance
             // stays consistent with Day Close across timezones; createdAt fallback
             // for legacy rows.
-            .where(and(sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`))
+            .where(and(
+                sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`,
+                isNull(orders.deletedAt),
+            ))
             .groupBy(orders.branchId, branches.name)
             .orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
 
         res.json(rows.map(r => ({
             ...r,
             orderCount: Number(r.orderCount),
+            eligibleOrderCount: Number((r as any).eligibleOrderCount || 0),
             revenue: Number(Number(r.revenue).toFixed(2)),
             avgTicket: Number(Number(r.avgTicket).toFixed(2)),
             cancelledCount: Number(r.cancelledCount),

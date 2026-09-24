@@ -18,7 +18,10 @@ const fixtures = {
     cancelledOrderId: `test-revenue-cancelled-${suffix}`,
 };
 
-const today = new Date().toISOString().slice(0, 10);
+// Local calendar day (NOT UTC): the reports scope by the branch's local day,
+// so a UTC date breaks this test daily between 00:00–03:00 Cairo time.
+const nowLocal = new Date();
+const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
 
 const createResponse = () => {
     const response: any = {

@@ -58,6 +58,7 @@ export const reportsApi = {
                 expenses: number;
                 pendingExpenses: number;
                 cogs: number;
+                grossProfit: number;
                 netProfit: number;
                 paidRevenue: number;
                 discounts: number;
@@ -198,7 +199,27 @@ export const reportsApi = {
     },
     getDiscountAnalysis: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
-        return apiRequest<{ summary: { totalDiscountedOrders: number; totalOrders: number; discountRate: number; totalDiscount: number; avgDiscount: number; maxDiscount: number }; byReason: Array<{ reason: string; orderCount: number; totalDiscount: number; avgDiscount: number }>; byType: Array<{ discountType: string; orderCount: number; totalDiscount: number }> }>(`/reports/discount-analysis?${query}`);
+        return apiRequest<{ summary: { totalDiscountedOrders: number; totalOrders: number; discountRate: number; totalDiscount: number; avgDiscount: number; avgDiscountPerOrder: number; discountSalesRate: number; maxDiscount: number }; byReason: Array<{ reason: string; orderCount: number; totalDiscount: number; avgDiscount: number }>; byType: Array<{ discountType: string; orderCount: number; totalDiscount: number }> }>(`/reports/discount-analysis?${query}`);
+    },
+    getDiscountByCashier: (params: { branchId?: string; startDate: string; endDate: string }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<Array<{ cashier: string; orderCount: number; salesTotal: number; discountTotal: number; discountedOrders: number; discountRate: number; avgDiscount: number; maxDiscount: number }>>(`/reports/discount-by-cashier?${query}`);
+    },
+    getVoidsByCashier: (params: { branchId?: string; startDate: string; endDate: string }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<{ byCashier: Array<{ cashier: string; voidOrderCount: number; voidOrderValue: number; voidLineCount: number; voidLineValue: number; totalLoss: number }>; summary: { voidOrderCount: number; voidOrderValue: number; voidLineCount: number; voidLineValue: number } }>(`/reports/voids-by-cashier?${query}`);
+    },
+    getDeadStock: (params: { branchId?: string; days?: number }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<{ days: number; scope: string; items: Array<{ itemId: string; itemName: string; unit: string; onHand: number; unitCost: number; lockedValue: number; lastConsumption: string | null; neverConsumed: boolean }> }>(`/reports/dead-stock?${query}`);
+    },
+    getNegativeStock: (params: { branchId?: string }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<Array<{ itemId: string; itemName: string; unit: string; threshold: number; onHand: number; scope: string }>>(`/reports/negative-stock?${query}`);
+    },
+    getUnpaidOrders: (params: { branchId?: string }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<{ count: number; totalBalance: number; orders: Array<{ id: string; orderNumber: number; type: string; status: string; customerName: string; customerPhone: string; total: number; paid: number; balance: number; createdAt: string; businessDate: string }> }>(`/reports/unpaid-orders?${query}`);
     },
     getCancelledOrders: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
@@ -288,6 +309,10 @@ export const reportsApi = {
     getKitchenPerformance: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<Array<{ itemName: string; totalPrepared: number; avgPrepMinutes: number; minPrepMinutes: number; maxPrepMinutes: number }>>(`/reports/kitchen-performance?${query}`);
+    },
+    getKitchenStaffPerformance: (params: { branchId?: string; startDate: string; endDate: string }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<{ staff: any[]; summary: any; unattributedNote?: string }>(`/reports/kitchen-staff-performance?${query}`);
     },
     getMenuEngineering: (params: { branchId?: string; startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();

@@ -6,21 +6,23 @@ import {
     CheckSquare, Square, Package, Layers
 } from 'lucide-react';
 import { MenuItem } from '../../types';
-import { ItemImage } from '../../src/features/pos/components/ItemImage';
+import { ItemImage, NoPhoto } from '../../src/features/pos/components/ItemImage';
 import { ViewMode, DensityMode } from './MenuProfitCenter';
 
+export type CardItem = MenuItem & { _categoryId: string; _categoryName: string; _categoryNameAr?: string };
+
 interface Props {
-    item: MenuItem & { _categoryId: string; _categoryName: string; _categoryNameAr?: string };
+    item: CardItem;
     viewMode: ViewMode;
     density: DensityMode;
     isSelected: boolean;
     multiSelectMode: boolean;
-    onClick: (e: React.MouseEvent) => void;
-    onToggleAvailability: () => void;
-    onDuplicate: () => void;
-    onArchive: () => void;
-    onDelete: () => void;
-    onEdit: () => void;
+    onClick: (item: CardItem, e: React.MouseEvent) => void;
+    onToggleAvailability: (item: CardItem) => void;
+    onDuplicate: (item: CardItem) => void;
+    onArchive: (item: CardItem) => void;
+    onDelete: (item: CardItem) => void;
+    onEdit: (item: CardItem) => void;
     lang: string;
     currency: string;
     index: number;
@@ -78,7 +80,7 @@ const ItemCard: React.FC<Props> = ({
     if (viewMode === 'list') {
         return (
             <div
-                onClick={onClick}
+                onClick={(e) => onClick(item, e)}
                 className={`group flex items-center gap-4 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-white/[0.02] border-b border-gray-100 dark:border-white/[0.04] transition-colors cursor-default ${isSelected ? 'bg-blue-50 dark:bg-indigo-500/5' : ''
                     } ${!item.isAvailable ? 'opacity-50' : ''}`}
             >
@@ -88,7 +90,13 @@ const ItemCard: React.FC<Props> = ({
                     </div>
                 )}
 
-                <ItemImage src={item.image} name={itemName} small className="w-9 h-9 rounded-md border border-gray-200 dark:border-border/30 shrink-0" />
+                {item.image ? (
+                    <ItemImage src={item.image} name={itemName} small className="w-9 h-9 rounded-md border border-gray-200 dark:border-border/30 shrink-0" />
+                ) : (
+                    <div className="w-9 h-9 rounded-md border border-gray-200 dark:border-border/30 shrink-0 relative overflow-hidden np-thumb-sm">
+                        <NoPhoto name={itemName} />
+                    </div>
+                )}
 
                 {/* Name & Category */}
                 <div className="flex-1 min-w-0">
@@ -121,7 +129,7 @@ const ItemCard: React.FC<Props> = ({
 
                 {/* Status */}
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleAvailability(); }}
+                    onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }}
                     className={`p-1.5 rounded transition-colors shrink-0 ${item.isAvailable ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10' : 'text-red-500 hover:bg-red-50 dark:hover:bg-rose-500/10'}`}
                     aria-label={availabilityLabel}
                     title={availabilityLabel}
@@ -131,9 +139,9 @@ const ItemCard: React.FC<Props> = ({
 
                 {/* Actions */}
                 <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 rounded text-gray-400 hover:text-blue-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `تعديل ${itemName}` : `Edit ${itemName}`} title={lang === 'ar' ? 'تعديل' : 'Edit'}><Edit3 size={13} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onDuplicate(); }} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-main hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}><Copy size={13} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="p-1.5 rounded text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>{item.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}</button>
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1.5 rounded text-gray-400 hover:text-blue-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `تعديل ${itemName}` : `Edit ${itemName}`} title={lang === 'ar' ? 'تعديل' : 'Edit'}><Edit3 size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDuplicate(item); }} className="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-main hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}><Copy size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onArchive(item); }} className="p-1.5 rounded text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-elevated/40 transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>{item.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}</button>
                 </div>
             </div>
         );
@@ -144,7 +152,7 @@ const ItemCard: React.FC<Props> = ({
 
     return (
         <div
-            onClick={onClick}
+            onClick={(e) => onClick(item, e)}
             {...(draggableContext ? dragHandleProps : {})}
             className={`group relative bg-white dark:bg-card rounded-lg border shadow-sm transition-all duration-150 flex flex-col cursor-default overflow-hidden ${isSelected
                 ? 'border-blue-400 dark:border-indigo-500/50 ring-1 ring-blue-200 dark:ring-indigo-500/20'
@@ -159,7 +167,7 @@ const ItemCard: React.FC<Props> = ({
 
             {/* TOP: Image + Status */}
             <div className={`relative ${isCompact ? 'h-20' : 'h-28'} bg-gray-100 dark:bg-elevated/20 border-b border-gray-100 dark:border-white/[0.04] shrink-0 overflow-hidden`}>
-                <ItemImage src={item.image} name={itemName} />
+                {item.image ? <ItemImage src={item.image} name={itemName} /> : <NoPhoto name={itemName} />}
 
                 {/* Dietary Badges overlay */}
                 {item.dietaryBadges && item.dietaryBadges.length > 0 && (
@@ -243,7 +251,7 @@ const ItemCard: React.FC<Props> = ({
                     </div>
 
                     <button
-                        onClick={(e) => { e.stopPropagation(); onToggleAvailability(); }}
+                        onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }}
                         className={`p-1 rounded transition-colors ${item.isAvailable ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10' : 'text-red-500 hover:bg-red-50 dark:hover:bg-rose-500/10'}`}
                         aria-label={availabilityLabel}
                         title={availabilityLabel}
@@ -255,20 +263,20 @@ const ItemCard: React.FC<Props> = ({
 
             {/* Hover Actions */}
             <div className="absolute inset-0 bg-white/95 dark:bg-card/95 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-2 p-4 z-10 rounded-lg">
-                <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="w-full h-8 bg-blue-600 dark:bg-indigo-500 hover:bg-blue-700 dark:hover:bg-indigo-600 text-white rounded-md text-[12px] font-medium transition-colors flex items-center justify-center gap-1.5">
+                <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="w-full h-8 bg-blue-600 dark:bg-indigo-500 hover:bg-blue-700 dark:hover:bg-indigo-600 text-white rounded-md text-[12px] font-medium transition-colors flex items-center justify-center gap-1.5">
                     <Edit3 size={13} /> {lang === 'ar' ? 'تعديل' : 'Edit'}
                 </button>
                 <div className="flex w-full gap-1.5">
-                    <button onClick={(e) => { e.stopPropagation(); onToggleAvailability(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={availabilityLabel} title={availabilityLabel}>
+                    <button onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={availabilityLabel} title={availabilityLabel}>
                         {item.isAvailable ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDuplicate(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}>
+                    <button onClick={(e) => { e.stopPropagation(); onDuplicate(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}>
                         <Copy size={13} />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onArchive(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-amber-600 dark:hover:text-amber-500 rounded-md flex justify-center items-center transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>
+                    <button onClick={(e) => { e.stopPropagation(); onArchive(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-amber-600 dark:hover:text-amber-500 rounded-md flex justify-center items-center transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>
                         {item.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-red-500 rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `حذف ${itemName}` : `Delete ${itemName}`} title={lang === 'ar' ? 'حذف' : 'Delete'}>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-red-500 rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `حذف ${itemName}` : `Delete ${itemName}`} title={lang === 'ar' ? 'حذف' : 'Delete'}>
                         <Trash2 size={13} />
                     </button>
                 </div>
@@ -277,4 +285,44 @@ const ItemCard: React.FC<Props> = ({
     );
 };
 
-export default ItemCard;
+const areEqual = (prev: Props, next: Props) => {
+    const a = prev.item as any;
+    const b = next.item as any;
+    return (
+        prev.isSelected === next.isSelected &&
+        prev.multiSelectMode === next.multiSelectMode &&
+        prev.viewMode === next.viewMode &&
+        prev.density === next.density &&
+        prev.lang === next.lang &&
+        prev.currency === next.currency &&
+        prev.draggableContext === next.draggableContext &&
+        prev.onClick === next.onClick &&
+        prev.onToggleAvailability === next.onToggleAvailability &&
+        prev.onDuplicate === next.onDuplicate &&
+        prev.onArchive === next.onArchive &&
+        prev.onDelete === next.onDelete &&
+        prev.onEdit === next.onEdit &&
+        a.id === b.id &&
+        a.name === b.name &&
+        a.nameAr === b.nameAr &&
+        a.price === b.price &&
+        a.cost === b.cost &&
+        a.image === b.image &&
+        a.isAvailable === b.isAvailable &&
+        a.archivedAt === b.archivedAt &&
+        a.sortOrder === b.sortOrder &&
+        a.status === b.status &&
+        a._categoryId === b._categoryId &&
+        a._categoryName === b._categoryName &&
+        a._categoryNameAr === b._categoryNameAr &&
+        (a.tags || []).join('|') === (b.tags || []).join('|') &&
+        (a.sizes?.length || 0) === (b.sizes?.length || 0) &&
+        (a.modifierGroups?.length || 0) === (b.modifierGroups?.length || 0) &&
+        (a.dietaryBadges || []).join('|') === (b.dietaryBadges || []).join('|') &&
+        (a.salesData?.last30 || 0) === (b.salesData?.last30 || 0) &&
+        (a.salesData?.today || 0) === (b.salesData?.today || 0) &&
+        (a.salesData?.revenue30 || 0) === (b.salesData?.revenue30 || 0)
+    );
+};
+
+export default React.memo(ItemCard, areEqual);

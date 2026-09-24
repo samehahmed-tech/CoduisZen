@@ -8,7 +8,8 @@ if errorlevel 1 (
 )
 
 title RestoFlow Latest Fixes
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply Latest Fixes.ps1"
+rem Forward any arguments (e.g. -InstallDir "..." -Role cashier) to the applier.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply Latest Fixes.ps1" %*
 set "RESULT=%ERRORLEVEL%"
 echo.
 if "%RESULT%"=="0" (

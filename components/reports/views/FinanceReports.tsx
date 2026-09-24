@@ -9,13 +9,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import ExportButton from '../../common/ExportButton';
 import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
+import CoverageReportView from './shared/CoverageReportView';
 
 export const FinanceReports = ({ state }: any) => {
    const {
       activeCategory, activeSubReport, navigate,
       dailySales, profitDaily, overview, profitSummary, foodCostData,
       paymentSummary, vatReport, hourlySales, cashierSummary, refunds,
-      integrity, trialBalance, profitAndLoss, topExpenses, expenseReport,
+      integrity, trialBalance, profitAndLoss, topExpenses, topExpensesGrand, expenseReport,
       stockMovementLog, wasteLoss, reorderAlerts, expiringBatches,
       payrollData, attendanceData, overtimeData,
       customerLTV, campaignROI, branchPerformance, orderPrepTime,
@@ -127,13 +128,17 @@ export const FinanceReports = ({ state }: any) => {
                         subtitle={isAr ? 'مطابقة الإيراد والضريبة والطرق' : 'Revenue, tax and tender tie-out'}
                         data={(() => {
                            const s = vatReport?.summary || {};
+                           // Grand Total uses the books truth sum(total) — never a
+                           // hand recomputation (which used to drop delivery fees
+                           // and inflate ~3x via the totals footer).
                            const rows: any[] = [
                               { metric: isAr ? 'إجمالي المبيعات' : 'Gross Sales', value: Number(s.grandTotal || 0) },
-                              { metric: isAr ? 'الخصومات' : 'Total Discounts', value: -Number(overview?.discountTotal || 0) },
+                              { metric: isAr ? 'الخصومات' : 'Total Discounts', value: -Number(s.discountTotal ?? overview?.discountTotal ?? 0) },
                               { metric: isAr ? 'الصافي الخاضع' : 'Net Taxable', value: Number(s.netTotal || 0) },
                               { metric: isAr ? 'الضريبة' : 'VAT', value: Number(s.taxTotal || 0) },
                               { metric: isAr ? 'رسوم الخدمة' : 'Service Charge', value: Number(s.serviceChargeTotal || 0) },
-                              { metric: isAr ? 'الإجمالي العام' : 'Grand Total', value: Number(s.netTotal || 0) + Number(s.taxTotal || 0) + Number(s.serviceChargeTotal || 0) },
+                              { metric: isAr ? 'رسوم التوصيل' : 'Delivery Fees', value: Number(s.deliveryFeeTotal || 0) },
+                              { metric: isAr ? 'الإجمالي العام (الدفاتر)' : 'Grand Total (books)', value: Number(s.grandTotal || 0) },
                            ];
                            (paymentSummary || []).forEach((p: any) => rows.push({
                               metric: `${isAr ? 'طريقة' : 'Tender'}: ${p.method || p.paymentMethod || 'UNKNOWN'}`,
@@ -143,7 +148,7 @@ export const FinanceReports = ({ state }: any) => {
                         })()}
                         columns={[
                            { key: 'metric', label: isAr ? 'البند' : 'Line', sortable: false },
-                           { key: 'value', label: isAr ? 'القيمة' : 'Value', align: 'right', sum: true, sortable: false, format: (v: any) => fmtMoney(v, cur) },
+                           { key: 'value', label: isAr ? 'القيمة' : 'Value', align: 'right', sortable: false, format: (v: any) => fmtMoney(v, cur) },
                         ]}
                         exportFilename="z-report"
                         lang={isAr ? 'ar' : 'en'}
@@ -182,14 +187,27 @@ export const FinanceReports = ({ state }: any) => {
                                     <Scale size={14} className="text-emerald-500" /> Tax & Charges
                                  </h4>
                                  <div className="space-y-4">
-                                    <div className="flex justify-between items-center p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-                                       <span className="text-[11px] font-black uppercase text-emerald-600">VAT (14%)</span>
-                                       <span className="text-sm font-black text-emerald-600">+ {(vatReport?.summary?.taxTotal || 0).toLocaleString()} LE</span>
-                                    </div>
-                                    <div className="flex justify-between items-center p-4">
-                                       <span className="text-[11px] font-black uppercase text-slate-500">Service Charge ({(vatReport?.summary?.serviceChargeTotal > 0 ? '12%' : '0%')})</span>
-                                       <span className="text-sm font-black text-slate-600">+ {(vatReport?.summary?.serviceChargeTotal || 0).toLocaleString()} LE</span>
-                                    </div>
+                                    {(() => {
+                                       const s = vatReport?.summary || {};
+                                       const net = Number(s.netTotal || 0);
+                                       const vatRate = net > 0 ? (Number(s.taxTotal || 0) / net) * 100 : 0;
+                                       const svcRate = net > 0 ? (Number(s.serviceChargeTotal || 0) / net) * 100 : 0;
+                                       return (<>
+                                       <div className="flex justify-between items-center p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                                          <span className="text-[11px] font-black uppercase text-emerald-600">VAT ({vatRate.toFixed(1)}%)</span>
+                                          <span className="text-sm font-black text-emerald-600">+ {(vatReport?.summary?.taxTotal || 0).toLocaleString()} LE</span>
+                                       </div>
+                                       <div className="flex justify-between items-center p-4">
+                                          <span className="text-[11px] font-black uppercase text-slate-500">Service Charge ({svcRate.toFixed(1)}%)</span>
+                                          <span className="text-sm font-black text-slate-600">+ {(vatReport?.summary?.serviceChargeTotal || 0).toLocaleString()} LE</span>
+                                       </div>
+                                       {(Number(s.deliveryFeeTotal || 0) > 0) && (
+                                       <div className="flex justify-between items-center p-4">
+                                          <span className="text-[11px] font-black uppercase text-slate-500">{isAr ? 'رسوم التوصيل' : 'Delivery Fees'}</span>
+                                          <span className="text-sm font-black text-slate-600">+ {(s.deliveryFeeTotal || 0).toLocaleString()} LE</span>
+                                       </div>)}
+                                       </>);
+                                    })()}
                                  </div>
                               </div>
                            </div>
@@ -219,11 +237,16 @@ export const FinanceReports = ({ state }: any) => {
                               title={isAr ? 'ميزان المراجعة' : 'Trial Balance'}
                            />
                         </div>
-                        {trialBalance.length > 0 && <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-border/30 bg-card/40 px-8 py-4 text-xs font-black">
-                           <span>{isAr ? 'إجمالي المدين' : 'Total Debit'}: <b className="font-mono">{trialBalance.reduce((s: number, r: any) => s + Number(r.totalDebit || 0), 0).toLocaleString()}</b></span>
-                           <span>{isAr ? 'إجمالي الدائن' : 'Total Credit'}: <b className="font-mono">{trialBalance.reduce((s: number, r: any) => s + Number(r.totalCredit || 0), 0).toLocaleString()}</b></span>
-                           <span className="text-emerald-600">{isAr ? 'الميزان قابل للمراجعة' : 'Audit-ready account totals'}</span>
-                        </div>}
+                        {trialBalance.length > 0 && (() => {
+                           const totDr = trialBalance.reduce((s: number, r: any) => s + Number(r.totalDebit || 0), 0);
+                           const totCr = trialBalance.reduce((s: number, r: any) => s + Number(r.totalCredit || 0), 0);
+                           const balanced = Math.abs(totDr - totCr) < 0.01;
+                           return (<div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-border/30 bg-card/40 px-8 py-4 text-xs font-black">
+                           <span>{isAr ? 'إجمالي المدين' : 'Total Debit'}: <b className="font-mono">{totDr.toLocaleString()}</b></span>
+                           <span>{isAr ? 'إجمالي الدائن' : 'Total Credit'}: <b className="font-mono">{totCr.toLocaleString()}</b></span>
+                           <span className={balanced ? 'text-emerald-600' : 'text-rose-500'}>{balanced ? (isAr ? '✓ متوازن: المدين = الدائن' : '✓ Balanced: Dr = Cr') : (isAr ? `✗ فرق ${(totDr - totCr).toLocaleString()}` : `✗ Off by ${(totDr - totCr).toLocaleString()}`)}</span>
+                        </div>);
+                        })()}
                         {trialBalance.length > 0 && (
                            <div className="p-6 border-b border-border/20">
                               <ResponsiveContainer width="100%" height={200}>
@@ -302,10 +325,12 @@ export const FinanceReports = ({ state }: any) => {
                         <ReportDataTable
                            title={isAr ? 'أعلى المصروفات — جدول' : 'Top Expenses — table'}
                            data={(() => {
-                              const total = (topExpenses || []).reduce((s: number, e: any) => s + Number(e.total || 0), 0);
+                              // % against ALL operating expenses (backend grandTotal),
+                              // not 100% within the top-20 list.
+                              const grand = Number(topExpensesGrand || 0) || (topExpenses || []).reduce((s: number, e: any) => s + Number(e.total || 0), 0);
                               return [...(topExpenses || [])]
                                  .sort((a: any, b: any) => Number(b.total || 0) - Number(a.total || 0))
-                                 .map((e: any, i: number) => ({ rank: i + 1, name: e.name, total: Number(e.total || 0), pct: total > 0 ? (Number(e.total || 0) / total) * 100 : 0 }));
+                                 .map((e: any, i: number) => ({ rank: i + 1, name: e.name, total: Number(e.total || 0), pct: grand > 0 ? (Number(e.total || 0) / grand) * 100 : 0 }));
                            })()}
                            columns={[
                               { key: 'rank', label: '#', align: 'right', format: (v: any) => fmtNum(v) },
@@ -525,7 +550,7 @@ export const FinanceReports = ({ state }: any) => {
                         <div className="flex items-center justify-between border-b border-border/50 bg-elevated/30 p-6">
                            <div>
                               <h3 className="text-lg font-black text-main">{isAr ? 'تفصيل حسابات قائمة الدخل' : 'Income Statement Account Detail'}</h3>
-                              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted">{isAr ? 'الأرقام من القيود المرحّلة فقط' : 'Posted journal entries only'}</p>
+                              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted">{isAr ? 'الأرقام من القيود المرحّلة فقط — COGS يُحتسب فقط إذا رُحّل قيدياً' : 'Posted journals only — COGS counts only if journalized'}</p>
                            </div>
                            <ExportButton
                               data={(profitAndLoss.details || []).map((d: any) => ({
@@ -583,7 +608,7 @@ export const FinanceReports = ({ state }: any) => {
                         {[
                            { l: 'Total Tips', v: `${tipsData.summary.totalTips.toLocaleString()} LE` },
                            { l: 'Tipped Orders', v: tipsData.summary.orderCount },
-                           { l: 'Average Tip', v: `${tipsData.summary.avgTip} LE` },
+                           { l: isAr ? 'متوسط (لطلب مُبقشش)' : 'Avg (per tipped order)', v: `${tipsData.summary.avgTip} LE` },
                            { l: 'Max Tip', v: `${tipsData.summary.maxTip} LE` },
                         ].map((c, i) => (
                            <div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg">
@@ -611,7 +636,7 @@ export const FinanceReports = ({ state }: any) => {
 
                {activeCategory === 'FINANCE' && activeSubReport === 'Service Charge' && serviceChargeData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="grid grid-cols-3 gap-4">{[{ l: 'Total Service Charge', v: `${serviceChargeData.summary.totalServiceCharge.toLocaleString()} LE` }, { l: 'Orders with SC', v: serviceChargeData.summary.orderCount }, { l: 'Avg SC', v: `${serviceChargeData.summary.avgServiceCharge} LE` }].map((c, i) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className="text-2xl font-black text-main mt-1">{c.v}</p></div>))}</div>
+                     <div className="grid grid-cols-3 gap-4">{[{ l: 'Total Service Charge', v: `${serviceChargeData.summary.totalServiceCharge.toLocaleString()} LE` }, { l: 'Orders with SC', v: serviceChargeData.summary.orderCount }, { l: isAr ? 'متوسط (لطلب محمّل)' : 'Avg (per SC order)', v: `${serviceChargeData.summary.avgServiceCharge} LE` }].map((c, i) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className="text-2xl font-black text-main mt-1">{c.v}</p></div>))}</div>
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-6 border-b border-slate-100 dark:border-slate-800"><h3 className="text-lg font-black text-main">Daily Breakdown</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Day</th><th className="px-6 py-5 text-right">Orders</th><th className="px-8 py-5 text-right">Total SC</th></tr></thead><tbody className="divide-y divide-border/30">{serviceChargeData.daily.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.day}</td><td className="px-6 py-4 font-mono text-right">{r.count}</td><td className="px-8 py-4 font-mono font-bold text-right">{r.totalServiceCharge.toLocaleString()} LE</td></tr>)}</tbody></table></div></div>
                   </div>
                )}
@@ -645,12 +670,13 @@ export const FinanceReports = ({ state }: any) => {
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Food Cost % Trend' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Food Cost % Trend</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Day</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-6 py-5 text-right">Cost</th><th className="px-8 py-5 text-right">Food Cost %</th></tr></thead><tbody className="divide-y divide-border/30">{foodCostTrendData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.day}</td><td className="px-6 py-4 font-mono text-right">{r.revenue.toLocaleString()}</td><td className="px-6 py-4 font-mono text-right text-muted">{r.cost.toLocaleString()}</td><td className="px-8 py-4 font-mono font-bold text-right"><span className={`px-2 py-1 rounded-lg text-[9px] font-black ${r.foodCostPercent > 40 ? 'bg-rose-500/10 text-rose-500' : r.foodCostPercent > 30 ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>{r.foodCostPercent}%</span></td></tr>)}</tbody></table></div></div>
+                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-700 dark:text-amber-300">{isAr ? 'أساس إجمالي الأصناف (بدون خصم/ضريبة) — للمقارنة مع صافي المبيعات استخدم ملخص الربحية.' : 'Gross-item basis (no discount/tax) — use the profit summary for net-sales basis.'}</div><h3 className="text-xl font-black text-main">Food Cost % Trend</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Day</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-6 py-5 text-right">Cost</th><th className="px-8 py-5 text-right">Food Cost %</th></tr></thead><tbody className="divide-y divide-border/30">{foodCostTrendData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.day}</td><td className="px-6 py-4 font-mono text-right">{r.revenue.toLocaleString()}</td><td className="px-6 py-4 font-mono text-right text-muted">{r.cost.toLocaleString()}</td><td className="px-8 py-4 font-mono font-bold text-right"><span className={`px-2 py-1 rounded-lg text-[9px] font-black ${r.foodCostPercent > 40 ? 'bg-rose-500/10 text-rose-500' : r.foodCostPercent > 30 ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>{r.foodCostPercent}%</span></td></tr>)}</tbody></table></div></div>
                      {foodCostTrendData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Cash Flow Forecast' && cashFlowData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="rounded-2xl border border-blue-500/25 bg-blue-500/10 px-4 py-3 text-xs font-bold text-blue-700 dark:text-blue-300">{isAr ? 'تقدير إيراد فقط (بدون مصروفات/مدفوعات) — للتدفق الصافي استخدم قائمة الدخل.' : 'Revenue-only estimate (no opex/payouts) — use P&L for net flow.'}</div>
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <ReportDataTable
                            title={isAr ? 'السجل (12 أسبوع) — جدول' : 'History (12 wks) — table'}
@@ -730,7 +756,7 @@ export const FinanceReports = ({ state }: any) => {
                )}
                {activeCategory === 'FINANCE' && activeSubReport === 'Break-Even Analysis' && breakEvenData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Avg Monthly Revenue', v: `${breakEvenData.avgMonthlyRevenue.toLocaleString()} LE` }, { l: 'Avg Monthly Orders', v: breakEvenData.avgMonthlyOrders }, { l: 'Break-Even Revenue', v: `${breakEvenData.breakEvenRevenue.toLocaleString()} LE`, c: 'text-amber-500' }, { l: 'Break-Even Orders/Day', v: breakEvenData.breakEvenOrdersPerDay, c: 'text-rose-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: 'Avg Monthly Revenue', v: `${Number(breakEvenData.avgMonthlyRevenue || 0).toLocaleString()} LE` }, { l: 'Avg Monthly Orders', v: breakEvenData.avgMonthlyOrders ?? '—' }, { l: 'Break-Even Revenue', v: breakEvenData.breakEvenRevenue == null ? (isAr ? 'لا ينطبق (هامش غير موجب)' : 'N/A (non-positive margin)') : `${Number(breakEvenData.breakEvenRevenue).toLocaleString()} LE`, c: 'text-amber-500' }, { l: 'Break-Even Orders/Day', v: breakEvenData.breakEvenOrdersPerDay ?? (isAr ? 'لا ينطبق' : 'N/A'), c: 'text-rose-500' }].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c || 'text-main'}`}>{c.v}</p></div>))}</div>
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden"><div className="p-6 border-b border-slate-100 dark:border-slate-800"><h3 className="text-lg font-black text-main">Monthly Revenue Trend</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Month</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-8 py-5 text-right">Orders</th></tr></thead><tbody className="divide-y divide-border/30">{breakEvenData.monthly.map((m: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 font-mono text-main">{m.month}</td><td className="px-6 py-4 font-mono font-bold text-right">{m.revenue.toLocaleString()} LE</td><td className="px-8 py-4 font-mono text-right">{m.orderCount}</td></tr>)}</tbody></table></div></div>
                   </div>
                )}
@@ -758,9 +784,57 @@ export const FinanceReports = ({ state }: any) => {
 
                {activeCategory === 'FINANCE' && activeSubReport === 'Shift Profitability' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Shift Profitability</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Opened</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">Opening</th><th className="px-4 py-5 text-right">Closing</th><th className="px-4 py-5 text-right">Expected</th><th className="px-6 py-5 text-right">Variance</th></tr></thead><tbody className="divide-y divide-border/30">{shiftProfitData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 font-mono text-[10px] text-main">{r.openingTime ? new Date(r.openingTime).toLocaleString() : '-'}</td><td className="px-4 py-4 font-mono text-right">{r.orderCount}</td><td className="px-4 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.openingCash}</td><td className="px-4 py-4 font-mono text-right">{r.closingCash}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.expectedCash}</td><td className="px-6 py-4 font-mono font-bold text-right"><span className={r.variance >= 0 ? 'text-emerald-500' : 'text-rose-500'}>{r.variance >= 0 ? '+' : ''}{r.variance}</span></td></tr>)}</tbody></table></div></div>
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Shift Profitability</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Opened</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">COGS</th><th className="px-4 py-5 text-right">Gross Profit</th><th className="px-4 py-5 text-right">Opening</th><th className="px-4 py-5 text-right">Closing</th><th className="px-4 py-5 text-right">Expected</th><th className="px-6 py-5 text-right">Variance</th></tr></thead><tbody className="divide-y divide-border/30">{shiftProfitData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 font-mono text-[10px] text-main">{r.openingTime ? new Date(r.openingTime).toLocaleString() : '-'}</td><td className="px-4 py-4 font-mono text-right">{r.orderCount}</td><td className="px-4 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()}</td><td className="px-4 py-4 font-mono text-right text-muted">{Number(r.cogs || 0).toLocaleString()}</td><td className="px-4 py-4 font-mono font-bold text-right text-emerald-600">{Number(r.grossProfit ?? (Number(r.revenue || 0) - Number(r.cogs || 0))).toLocaleString()}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.openingCash}</td><td className="px-4 py-4 font-mono text-right">{r.closingCash}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.expectedCash}</td><td className="px-6 py-4 font-mono font-bold text-right"><span className={r.variance >= 0 ? 'text-emerald-500' : 'text-rose-500'}>{r.variance >= 0 ? '+' : ''}{r.variance}</span></td></tr>)}</tbody></table></div></div>
                      {shiftProfitData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
+               )}
+               {activeCategory === 'FINANCE' && activeSubReport === 'Balance Sheet' && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     {(() => {
+                        const rows = Array.isArray(trialBalance) ? trialBalance : [];
+                        const sum = (type: string, sign: 1 | -1) => rows
+                           .filter((r: any) => String(r.accountType || '').toUpperCase() === type)
+                           .reduce((s: number, r: any) => s + sign * (Number(r.totalDebit || 0) - Number(r.totalCredit || 0)), 0);
+                        const assets = sum('ASSET', 1);
+                        const liabilities = sum('LIABILITY', -1);
+                        const equity = sum('EQUITY', -1);
+                        const balanced = Math.abs(assets - (liabilities + equity)) < 0.01;
+                        return (<>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                           {[
+                              { l: isAr ? 'الأصول' : 'Assets', v: `${assets.toLocaleString()} ${cur}`, c: 'text-emerald-500' },
+                              { l: isAr ? 'الالتزامات' : 'Liabilities', v: `${liabilities.toLocaleString()} ${cur}`, c: 'text-amber-500' },
+                              { l: isAr ? 'حقوق الملكية' : 'Equity', v: `${equity.toLocaleString()} ${cur}`, c: 'text-blue-500' },
+                              { l: isAr ? 'التوازن' : 'Check', v: balanced ? (isAr ? '✓ متوازنة' : '✓ Balanced') : (isAr ? '✗ فرق' : '✗ Off balance'), c: balanced ? 'text-emerald-500' : 'text-rose-500' },
+                           ].map((c: any, i: number) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className={`text-2xl font-black mt-1 ${c.c}`}>{c.v}</p></div>))}
+                        </div>
+                        <div className="rounded-2xl border border-border/40 bg-elevated/20 px-4 py-3 text-[11px] font-bold text-muted">{isAr ? 'من ميزان المراجعة للقيود المرحّلة — الأصول = الالتزامات + حقوق الملكية.' : 'Built from the posted trial balance — Assets = Liabilities + Equity.'}</div>
+                        </>);
+                     })()}
+                     <ReportDataTable
+                        title={isAr ? 'الميزانية العمومية — جدول' : 'Balance Sheet — table'}
+                        data={(Array.isArray(trialBalance) ? trialBalance : [])
+                           .filter((r: any) => ['ASSET', 'LIABILITY', 'EQUITY'].includes(String(r.accountType || '').toUpperCase()))
+                           .map((r: any) => ({ code: r.accountCode, account: r.accountName, type: r.accountType, balance: Math.abs(Number(r.balance ?? (Number(r.totalDebit || 0) - Number(r.totalCredit || 0)))) }))}
+                        columns={[
+                           { key: 'code', label: isAr ? 'الكود' : 'Code' },
+                           { key: 'account', label: isAr ? 'الحساب' : 'Account' },
+                           { key: 'type', label: isAr ? 'النوع' : 'Type' },
+                           { key: 'balance', label: isAr ? 'الرصيد' : 'Balance', align: 'right', sum: true, format: (v: any) => fmtMoney(v, cur) },
+                        ]}
+                        exportFilename="balance-sheet"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
+                  </div>
+               )}
+               {activeCategory === 'FINANCE' && ['Treasury Cashbox', 'Custody Statement', 'Supplier Invoices', 'E-Invoice Rejections', 'Day-Close Variances'].includes(activeSubReport) && (
+                  <CoverageReportView
+                     reportName={activeSubReport}
+                     rows={(state as any).customReportRows?.[activeSubReport] || []}
+                     meta={(state as any).customReportMeta?.[activeSubReport]}
+                     lang={isAr ? 'ar' : 'en'}
+                     currency={cur}
+                  />
                )}
       </>
    );

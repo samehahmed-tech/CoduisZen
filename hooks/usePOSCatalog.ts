@@ -103,6 +103,12 @@ export function usePOSCatalog({
         return currentCategories.flatMap((category) =>
             (category.items || []).map((item) => ({
                 ...item,
+                // Canonical owner = the enclosing category. A stored
+                // categoryId can drift (offline regroup, sync replay, server
+                // duplicates); trusting it zeroed the parent's count,
+                // disabled its tab, and bounced the cashier off the category
+                // while global search still found the item.
+                categoryId: category.id,
                 displayCategory: lang === 'ar' ? (category.nameAr || category.name) : category.name,
                 displayName: lang === 'ar' ? (item.nameAr || item.name) : item.name,
                 resolvedPrice: resolveItemPrice(item),

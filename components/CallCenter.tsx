@@ -1211,6 +1211,16 @@ const CallCenter: React.FC = () => {
     };
 
     const removeFromCart = (cartId: string) => setCart(cart.filter(i => i.cartId !== cartId));
+    // Stepper minus on grid cards (mirrors POS handleRemoveOneFromCart):
+    // decrement the last matching line, dropping it at zero.
+    const handleGridRemoveOne = (menuItemId: string) => {
+        const key = String(menuItemId || '');
+        const lines = cart.filter(i => String(i?.menuItemId || i?.menu_item_id || i?.id || '') === key);
+        if (lines.length === 0) return;
+        const last = lines[lines.length - 1];
+        if (Number(last.quantity || 0) <= 1) removeFromCart(last.cartId);
+        else updateQuantity(last.cartId, -1);
+    };
     const updateCartItemNotes = (cartId: string, notes: string) => setCart(cart.map(i => i.cartId === cartId ? { ...i, notes } : i));
 
     // --- Pricing (mirrors the server: target-branch DELIVERY list + the
@@ -1518,7 +1528,9 @@ const CallCenter: React.FC = () => {
                 ].filter(Boolean).join(' | '),
                 freeDelivery: freeDelivery,
                 isUrgent: urgentFlag,
-                discount: discount,
+                // Wire contract: order.discount is money (discountAmount),
+                // never the percent — the server applies the payload type.
+                discount: discountAmount,
                 scheduledFor: scheduledFor || undefined,
             };
 
@@ -2202,7 +2214,7 @@ const CallCenter: React.FC = () => {
                                         </div>
                                         <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl p-1 shrink-0 border border-border/50 shadow-sm">
                                             <button onClick={() => setMenuDensity('comfortable')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'comfortable' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'ملصق' : 'Poster'}><LayoutGrid size={15} /></button>
-                                            <button onClick={() => setMenuDensity('compact')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'compact' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'شريط' : 'Rail'}><Rows3 size={15} /></button>
+                                            <button onClick={() => setMenuDensity('compact')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'compact' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'دفتر' : 'Ledger'}><Rows3 size={15} /></button>
                                             <button onClick={() => setMenuDensity('ultra')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'ultra' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'زجاجي' : 'Glass'}><Sparkles size={15} /></button>
                                             <button onClick={() => setMenuDensity('buttons')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'buttons' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'سبليت' : 'Split'}><Ticket size={15} /></button>
                                         </div>
@@ -2213,42 +2225,58 @@ const CallCenter: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar bg-app/20">
-                                    <MenuShortNotice count={shortVisibleCount} lang={lang} />
+                                {/* Same shell as POSItemsPanel (including the
+                                    pos-items-panel scope class that carries the
+                                    whole fixed-frame card tuning: equal 300px
+                                    frames, clamped titles, single-line descs,
+                                    hidden duplicate plus) — single bounded
+                                    scroll owner (ItemGrid), no nested scroll. */}
+                                <div className="pos-items-panel flex-1 min-h-0 overflow-hidden bg-transparent flex flex-col">
+                                    <div className="shrink-0 px-4 pt-4">
+                                        <MenuShortNotice count={shortVisibleCount} lang={lang} />
+                                    </div>
                                     {isMenuLoading && categories.length === 0 ? (
-                                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                                            {Array.from({ length: 8 }).map((_, i) => (
-                                                <div key={i} className="h-28 rounded-2xl bg-elevated/60 border border-border/30 animate-pulse" />
-                                            ))}
+                                        <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                                                {Array.from({ length: 8 }).map((_, i) => (
+                                                    <div key={i} className="h-28 rounded-2xl bg-elevated/60 border border-border/30 animate-pulse" />
+                                                ))}
+                                            </div>
                                         </div>
                                     ) : menuError && categories.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center text-center p-10 bg-card/20 border-2 border-dashed border-border/20 rounded-[2rem]">
-                                            <AlertCircle size={36} className="text-rose-500/60 mb-4" />
-                                            <h3 className="text-sm font-black text-main uppercase tracking-widest mb-2">
-                                                {lang === 'ar' ? 'تعذر تحميل المنيو' : 'Menu failed to load'}
-                                            </h3>
-                                            <p className="text-xs font-bold text-muted/70 max-w-[260px] mb-6">
-                                                {lang === 'ar' ? 'تحقق من الاتصال ثم أعد المحاولة' : 'Check connection and retry'}
-                                            </p>
-                                            <button
-                                                onClick={() => fetchMenu().catch(() => undefined)}
-                                                className="h-12 px-8 bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 active:scale-95 shadow-xl flex items-center gap-2"
-                                            >
-                                                <RefreshCcw size={15} />
-                                                {lang === 'ar' ? 'إعادة التحميل' : 'Retry'}
-                                            </button>
+                                        <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
+                                            <div className="flex flex-col items-center justify-center text-center p-10 bg-card/20 border-2 border-dashed border-border/20 rounded-[2rem]">
+                                                <AlertCircle size={36} className="text-rose-500/60 mb-4" />
+                                                <h3 className="text-sm font-black text-main uppercase tracking-widest mb-2">
+                                                    {lang === 'ar' ? 'تعذر تحميل المنيو' : 'Menu failed to load'}
+                                                </h3>
+                                                <p className="text-xs font-bold text-muted/70 max-w-[260px] mb-6">
+                                                    {lang === 'ar' ? 'تحقق من الاتصال ثم أعد المحاولة' : 'Check connection and retry'}
+                                                </p>
+                                                <button
+                                                    onClick={() => fetchMenu().catch(() => undefined)}
+                                                    className="h-12 px-8 bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 active:scale-95 shadow-xl flex items-center gap-2"
+                                                >
+                                                    <RefreshCcw size={15} />
+                                                    {lang === 'ar' ? 'إعادة التحميل' : 'Retry'}
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : pricedItems.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center text-center p-10 text-muted">
-                                            <ShoppingBag size={40} className="mb-4 opacity-30" />
-                                            <p className="text-sm font-black uppercase tracking-widest">
-                                                {itemSearchQuery
-                                                    ? (lang === 'ar' ? `لا نتائج لـ "${itemSearchQuery}"` : `No matches for "${itemSearchQuery}"`)
-                                                    : (lang === 'ar' ? 'لا توجد أصناف في المنيو' : 'No items in menu')}
-                                            </p>
+                                        <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
+                                            <div className="flex flex-col items-center justify-center text-center p-10 text-muted min-h-full">
+                                                <ShoppingBag size={40} className="mb-4 opacity-30" />
+                                                <p className="text-sm font-black uppercase tracking-widest">
+                                                    {itemSearchQuery
+                                                        ? (lang === 'ar' ? `لا نتائج لـ "${itemSearchQuery}"` : `No matches for "${itemSearchQuery}"`)
+                                                        : (lang === 'ar' ? 'لا توجد أصناف في المنيو' : 'No items in menu')}
+                                                </p>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <ItemGrid items={pricedItems} onAddItem={handleGridAdd} cartItems={cart} currencySymbol={currencySymbol} isTouchMode={false} density={menuDensity === 'buttons' ? 'buttons' : menuDensity === 'ultra' ? 'ultra' : menuDensity === 'compact' ? 'compact' : 'comfortable'} lang={lang} />
+                                        <div className="flex-1 min-h-0 overflow-hidden">
+                                            <ItemGrid items={pricedItems} onAddItem={handleGridAdd} onRemoveItem={handleGridRemoveOne} cartItems={cart} currencySymbol={currencySymbol} isTouchMode={Boolean((settings as any)?.isTouchMode)} density={menuDensity === 'buttons' ? 'buttons' : menuDensity === 'ultra' ? 'ultra' : menuDensity === 'compact' ? 'compact' : 'comfortable'} lang={lang} />
+                                        </div>
                                     )}
                                 </div>
 

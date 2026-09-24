@@ -8,7 +8,11 @@ AppId={{5C76AE62-E6AC-4CCF-A431-5A4E48494E53}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Sameh
+AppCopyright=Copyright (C) Sameh
 VersionInfoDescription=RestoFlow ERP smart installer
+VersionInfoCompany=Sameh
+VersionInfoCopyright=Copyright (C) Sameh
+VersionInfoVersion={#AppVersion}
 DefaultDirName={autopf}\Sameh\RestoFlow ERP
 DefaultGroupName=Sameh Installer
 DisableProgramGroupPage=yes
@@ -20,6 +24,12 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+WizardSizePercent=115
+WizardImageFile=assets\wizard-image.bmp
+WizardSmallImageFile=assets\wizard-small.bmp
+SetupIconFile=assets\app.ico
+UninstallDisplayIcon={app}\app.ico
+SetupMutex=SamehRestoFlowSetupMutex
 SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no
@@ -44,6 +54,7 @@ Type: files; Name: "{app}\hardware-bridge\package*.json"
 
 [Files]
 Source: "{#SourceRoot}\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "assets\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\hardware-bridge\*"; DestDir: "{app}\hardware-bridge"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceRoot}\dist\*"; DestDir: "{app}\dist"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsServer
 Source: "{#SourceRoot}\dist-server\*"; DestDir: "{app}\dist-server"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsServer

@@ -1,17 +1,23 @@
 import { Request, Response } from 'express';
-import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, inArray, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, orderItems, menuItems, menuCategories, tables, floorZones } from '../../../src/db/schema';
 import { parseLocalDateRange, orderBusinessDateFilter } from './reportUtils';
+import { revenueEligibleOrder } from '../../utils/orderRevenue';
+
+// Soft-deleted orders never count in sales analytics; voided lines never
+// count in item-level sales.
+const notDeleted = isNull(orders.deletedAt);
+const liveLine = sql`coalesce(${orderItems.status}, '') not in ('VOID', 'VOIDED', 'CANCELLED')`;
 
 export const getSalesByOrderType = async (req: Request, res: Response) => {
     try {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        const conditions: any[] = [businessDateFilter, revenueEligibleOrder(), notDeleted];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
@@ -50,24 +56,29 @@ export const getSalesByItem = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        const conditions: any[] = [businessDateFilter, revenueEligibleOrder(), notDeleted];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
+        // Cost prefers the per-line snapshot, falling back to the catalog cost
+        // so legacy lines with cost=NULL no longer report margin=100%.
         const rows = await db.select({
             menuItemId: orderItems.menuItemId,
             itemName: orderItems.name,
             qtySold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
             revenue: sql<number>`coalesce(sum(${orderItems.price} * ${orderItems.quantity}), 0)`,
-            cost: sql<number>`coalesce(sum(coalesce(${orderItems.cost}, 0) * ${orderItems.quantity}), 0)`,
+            cost: sql<number>`coalesce(sum(coalesce(${orderItems.cost}, ${menuItems.cost}, 0) * ${orderItems.quantity}), 0)`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
-            .where(and(...conditions))
-            .groupBy(orderItems.menuItemId, orderItems.name)
+            .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+            .where(and(...conditions, liveLine))
+            .groupBy(orderItems.menuItemId, orderItems.name, menuItems.cost)
             .orderBy(sql`sum(${orderItems.price} * ${orderItems.quantity}) desc`)
             .limit(100);
 
+        // NOTE: gross item sales (modifiers/discounts/tax/fees excluded) —
+        // ties to sales-by-category and food-cost-trend, NOT to order totals.
         res.json(rows.map(r => ({
             menuItemId: r.menuItemId,
             itemName: r.itemName,
@@ -87,9 +98,9 @@ export const getSalesByCategory = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        const conditions: any[] = [businessDateFilter, revenueEligibleOrder(), notDeleted];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const rows = await db.select({
@@ -97,17 +108,18 @@ export const getSalesByCategory = async (req: Request, res: Response) => {
             categoryName: menuCategories.name,
             qtySold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
             revenue: sql<number>`coalesce(sum(${orderItems.price} * ${orderItems.quantity}), 0)`,
-            cost: sql<number>`coalesce(sum(coalesce(${orderItems.cost}, 0) * ${orderItems.quantity}), 0)`,
+            cost: sql<number>`coalesce(sum(coalesce(${orderItems.cost}, ${menuItems.cost}, 0) * ${orderItems.quantity}), 0)`,
             itemCount: sql<number>`count(distinct ${orderItems.menuItemId})`,
         }).from(orderItems)
             .innerJoin(orders, eq(orderItems.orderId, orders.id))
             .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
             .leftJoin(menuCategories, eq(menuItems.categoryId, menuCategories.id))
-            .where(and(...conditions))
+            .where(and(...conditions, liveLine))
             .groupBy(menuItems.categoryId, menuCategories.name)
             .orderBy(sql`sum(${orderItems.price} * ${orderItems.quantity}) desc`);
 
         const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
+        // NOTE: gross item sales basis (see getSalesByItem).
         res.json(rows.map(r => ({
             categoryId: r.categoryId,
             categoryName: r.categoryName || 'Uncategorized',
@@ -128,11 +140,12 @@ export const getDiscountAnalysis = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const conditions: any[] = [
             businessDateFilter,
-            inArray(orders.status, deliveredStatuses),
+            revenueEligibleOrder(),
+            notDeleted,
             sql`${orders.discount} > 0`
         ];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
@@ -166,21 +179,30 @@ export const getDiscountAnalysis = async (req: Request, res: Response) => {
         }).from(orders).where(and(...conditions));
 
         // Total orders to get discount rate
-        const allConditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        const allConditions: any[] = [businessDateFilter, revenueEligibleOrder(), notDeleted];
         if (branchId && branchId !== 'undefined') allConditions.push(eq(orders.branchId, branchId as string));
         const [allOrders] = await db.select({
             totalOrders: sql<number>`count(*)`,
+            totalSubtotal: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
         }).from(orders).where(and(...allConditions));
 
+        // avgDiscount is per DISCOUNTED order; avgDiscountPerOrder + salesRate
+        // describe the whole period (no more overstating).
+        const totalOrders = Number(allOrders?.totalOrders || 0);
+        const totalDiscount = Number(summary?.totalDiscount || 0);
         res.json({
             summary: {
                 totalDiscountedOrders: Number(summary?.totalOrders || 0),
-                totalOrders: Number(allOrders?.totalOrders || 0),
-                discountRate: Number(allOrders?.totalOrders || 0) > 0
-                    ? Number(((Number(summary?.totalOrders || 0) / Number(allOrders?.totalOrders || 1)) * 100).toFixed(1))
+                totalOrders,
+                discountRate: totalOrders > 0
+                    ? Number(((Number(summary?.totalOrders || 0) / (totalOrders || 1)) * 100).toFixed(1))
                     : 0,
-                totalDiscount: Number(Number(summary?.totalDiscount || 0).toFixed(2)),
+                totalDiscount: Number(totalDiscount.toFixed(2)),
                 avgDiscount: Number(Number(summary?.avgDiscount || 0).toFixed(2)),
+                avgDiscountPerOrder: totalOrders > 0 ? Number((totalDiscount / totalOrders).toFixed(2)) : 0,
+                discountSalesRate: Number(allOrders?.totalSubtotal || 0) > 0
+                    ? Number(((totalDiscount / Number(allOrders.totalSubtotal)) * 100).toFixed(2))
+                    : 0,
                 maxDiscount: Number(Number(summary?.maxDiscount || 0).toFixed(2)),
             },
             byReason: byReason.map(r => ({
@@ -206,9 +228,11 @@ export const getCancelledOrders = async (req: Request, res: Response) => {
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
+        // Loss numerator covers every dead end: CANCELLED + REFUNDED + VOID.
         const conditions: any[] = [
             businessDateFilter,
-            eq(orders.status, 'CANCELLED'),
+            inArray(orders.status, ['CANCELLED', 'REFUNDED', 'VOID']),
+            notDeleted,
         ];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
@@ -232,7 +256,8 @@ export const getCancelledOrders = async (req: Request, res: Response) => {
             cancelledTotal: sql<number>`coalesce(sum(${orders.total}), 0)`,
         }).from(orders).where(and(...conditions));
 
-        const allConditions: any[] = [businessDateFilter];
+        // Denominator: every live order in range (so cancelRate is dead/live-total).
+        const allConditions: any[] = [businessDateFilter, notDeleted];
         if (branchId && branchId !== 'undefined') allConditions.push(eq(orders.branchId, branchId as string));
         const [allOrders] = await db.select({
             totalOrders: sql<number>`count(*)`,
@@ -277,12 +302,13 @@ export const getDeliveryPerformance = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const conditions: any[] = [
             businessDateFilter,
-            inArray(orders.status, deliveredStatuses),
+            revenueEligibleOrder(),
             eq(orders.type, 'DELIVERY'),
+            notDeleted,
         ];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
@@ -332,9 +358,9 @@ export const getSalesBySource = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
-        const conditions: any[] = [businessDateFilter, inArray(orders.status, deliveredStatuses)];
+        const conditions: any[] = [businessDateFilter, revenueEligibleOrder(), notDeleted];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         // Canonical channel key (shared with channel-mix + day-close):
@@ -368,14 +394,15 @@ export const getDineInTableAnalysis = async (req: Request, res: Response) => {
         const { startDate, endDate, branchId } = req.query;
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates are required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
-        const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+
         const businessDateFilter = orderBusinessDateFilter(startDate as string, endDate as string, start, end);
         const tableConditions: any[] = [];
         const orderConditions: any[] = [
             businessDateFilter,
-            inArray(orders.status, deliveredStatuses),
+            revenueEligibleOrder(),
             eq(orders.type, 'DINE_IN'),
             sql`${orders.tableId} is not null`,
+            notDeleted,
         ];
         if (branchId && branchId !== 'undefined') {
             tableConditions.push(eq(tables.branchId, branchId as string));
@@ -394,7 +421,12 @@ export const getDineInTableAnalysis = async (req: Request, res: Response) => {
             isVIP: tables.isVIP,
             notes: tables.notes,
         }).from(tables)
-            .leftJoin(floorZones, eq(tables.zoneId, floorZones.id))
+            // Zone branch scoped inside the JOIN so the LEFT JOIN keeps tables
+            // whose zone is missing instead of dropping them.
+            .leftJoin(floorZones, and(
+                eq(tables.zoneId, floorZones.id),
+                branchId && branchId !== 'undefined' ? eq(floorZones.branchId, branchId as string) : undefined,
+            ))
             .where(tableConditions.length ? and(...tableConditions) : undefined);
 
         const metricRows = await db.select({
@@ -419,7 +451,7 @@ export const getDineInTableAnalysis = async (req: Request, res: Response) => {
                 tableName: table.tableName || table.tableId,
                 zoneName: table.zoneName || '',
                 seats: Number(table.seats || 0),
-                status: table.status === 'AVAILABLE' ? 'AVAILABLE' : 'OCCUPIED',
+                status: table.status || 'UNKNOWN',
                 configuredDiscountPercent: Number(table.configuredDiscountPercent || 0),
                 defaultCouponCode: table.defaultCouponCode || '',
                 minSpend: Number(table.minSpend || 0),

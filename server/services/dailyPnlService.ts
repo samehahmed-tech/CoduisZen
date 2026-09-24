@@ -20,6 +20,7 @@ import { db } from '../db';
 import { dailyPnlSnapshots, orders, stockMovements, warehouses, payrollPayouts, payrollCycles, chartOfAccounts } from '../../src/db/schema';
 import { and, eq, gte, lte, isNull, not, inArray, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { revenueEligibleOrder } from '../utils/orderRevenue';
 import logger from '../utils/logger';
 
 const r2 = (v: number) => Math.round(Number(v) * 100) / 100;
@@ -44,7 +45,7 @@ export const dailyPnlService = {
             .where(and(
                 eq(orders.branchId, branchId),
                 eq(orders.businessDate, businessDate),
-                not(eq(orders.status, 'CANCELLED')),
+                revenueEligibleOrder(),
                 isNull(orders.deletedAt),
             ));
 

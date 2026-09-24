@@ -4,6 +4,20 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { reportsApi } from '../../services/api/reports';
 import { inventoryApi } from '../../services/api/inventory';
 import { productionApi, suppliersApi, purchaseOrdersApi } from '../../services/api/procurement';
+import { treasuryApi } from '../../services/api/treasury';
+import { butcheryApi } from '../../services/api/butchery';
+import { reservationsApi } from '../../services/api/reservations';
+import { complaintsApi } from '../../services/api/complaints';
+import { deliveryApi } from '../../services/api/delivery';
+import { approvalApi } from '../../services/api/approval';
+import { platformsApi } from '../../services/api/platforms';
+import { hrApi, hrExtendedApi, shiftTasksApi } from '../../services/api/hr';
+import { fiscalApi } from '../../services/api/fiscal';
+import { dayCloseApi } from '../../services/api/dayClose';
+import { whatsappApi } from '../../services/api/whatsapp';
+import { auditApi } from '../../services/api/audit';
+import { couponsApi } from '../../services/api/campaigns';
+import { inventoryApi as inventoryOpsApi } from '../../services/api/inventory';
 import { UserRole } from '../../types';
 
 // ?? Types ??
@@ -64,6 +78,7 @@ export function useReportsState() {
    const [trialBalance, setTrialBalance] = useState<any[]>([]);
    const [profitAndLoss, setProfitAndLoss] = useState<any>(null);
    const [topExpenses, setTopExpenses] = useState<any[]>([]);
+   const [topExpensesGrand, setTopExpensesGrand] = useState<number>(0);
    const [expenseReport, setExpenseReport] = useState<any>(null);
    const [stockMovementLog, setStockMovementLog] = useState<any[]>([]);
    const [stockCounts, setStockCounts] = useState<any[]>([]);
@@ -92,6 +107,11 @@ export function useReportsState() {
    const [slowMovingItems, setSlowMovingItems] = useState<any[]>([]);
    const [revenueByWeekday, setRevenueByWeekday] = useState<any[]>([]);
    const [voidItemsData, setVoidItemsData] = useState<any>(null);
+   const [discountByCashier, setDiscountByCashier] = useState<any[]>([]);
+   const [voidsByCashier, setVoidsByCashier] = useState<any>(null);
+   const [deadStock, setDeadStock] = useState<any>(null);
+   const [negativeStock, setNegativeStock] = useState<any[]>([]);
+   const [unpaidOrders, setUnpaidOrders] = useState<any>(null);
    const [tipsData, setTipsData] = useState<any>(null);
    const [serviceChargeData, setServiceChargeData] = useState<any>(null);
    const [shiftSummaryData, setShiftSummaryData] = useState<any[]>([]);
@@ -144,6 +164,10 @@ export function useReportsState() {
    const [optimalPricingData, setOptimalPricingData] = useState<any>(null);
    const [thirdPartyData, setThirdPartyData] = useState<any>(null);
    const [timeToFirstData, setTimeToFirstData] = useState<any[]>([]);
+   const [kitchenStaffData, setKitchenStaffData] = useState<any>(null);
+   // Coverage reports (feature → report): live operational APIs, no new backend.
+   const [customReportRows, setCustomReportRows] = useState<Record<string, any[]>>({});
+   const [customReportMeta, setCustomReportMeta] = useState<Record<string, any>>({});
 
    // ?? On-Demand Report Loading ??
    const loadedReports = useRef<Set<string>>(new Set());
@@ -155,7 +179,7 @@ export function useReportsState() {
    useEffect(() => {
       if (!isHrReportsOnly) return;
       if (activeCategory !== 'HR') setActiveCategory('HR');
-      if (!['HR Executive Summary', 'Payroll Summary', 'Payroll Ledger', 'Attendance & Delays', 'Attendance Exceptions', 'Overtime Report', 'Staff Cost %', 'Sales per Labor Hour', 'Employee Productivity'].includes(activeSubReport)) {
+      if (!['HR Executive Summary', 'Payroll Summary', 'Payroll Ledger', 'Attendance & Delays', 'Attendance Exceptions', 'Overtime Report', 'Staff Cost %', 'Sales per Labor Hour', 'Employee Productivity', 'Leave & Absence', 'Shift Tasks Completion'].includes(activeSubReport)) {
          setActiveSubReport('HR Executive Summary');
       }
    }, [isHrReportsOnly, activeCategory, activeSubReport]);
@@ -200,6 +224,11 @@ export function useReportsState() {
                case 'Slow-Moving Items': { const r = await reportsApi.getSlowMovingItems(params).catch(() => []); setSlowMovingItems(r as any || []); break; }
                case 'Revenue by Weekday': { const r = await reportsApi.getRevenueByWeekday(params).catch(() => []); setRevenueByWeekday(r as any || []); break; }
                case 'Void Items Log': { const r = await reportsApi.getVoidItemsLog(params).catch(() => null); setVoidItemsData(r as any); break; }
+               case 'Discounts by Cashier': { const r = await reportsApi.getDiscountByCashier(params).catch(() => []); setDiscountByCashier(r as any || []); break; }
+               case 'Voids by Cashier': { const r = await reportsApi.getVoidsByCashier(params).catch(() => null); setVoidsByCashier(r as any); break; }
+               case 'Dead Stock': { const r = await reportsApi.getDeadStock({ branchId: params.branchId, days: 60 }).catch(() => null); setDeadStock(r as any); break; }
+               case 'Negative Stock': { const r = await reportsApi.getNegativeStock({ branchId: params.branchId }).catch(() => []); setNegativeStock(r as any || []); break; }
+               case 'Unpaid Orders': { const r = await reportsApi.getUnpaidOrders({ branchId: params.branchId }).catch(() => null); setUnpaidOrders(r as any); break; }
                case 'Menu Engineering': { const r = await reportsApi.getMenuEngineering(params).catch(() => null); setMenuEngineeringData(r as any); break; }
                case 'Daypart Analysis': { const r = await reportsApi.getDaypartAnalysis(params).catch(() => []); setDaypartData(r as any || []); break; }
                case 'Basket Analysis': { const r = await reportsApi.getBasketAnalysis(params).catch(() => []); setBasketData(r as any || []); break; }
@@ -212,7 +241,13 @@ export function useReportsState() {
                case 'Z-Report / Fiscal': { const r = await reportsApi.getVat(params); setVatReport(r || null); break; }
                case 'Profit & Loss (P&L)': { const [pd, pl] = await Promise.all([reportsApi.getProfitDaily(params), reportsApi.getProfitAndLoss(params).catch(() => null)]); setProfitDaily(pd || []); setProfitAndLoss(pl as any); break; }
                case 'Trial Balance': { const r = await reportsApi.getTrialBalance(params).catch(() => []); setTrialBalance(r as any || []); break; }
-               case 'Top Expenses': { const r = await reportsApi.getTopExpenses(params).catch(() => []); setTopExpenses(r as any || []); break; }
+               case 'Top Expenses': {
+                  const r: any = await reportsApi.getTopExpenses(params).catch(() => []);
+                  // Backend returns {items, grandTotal}; older shape was a bare array.
+                  setTopExpenses(Array.isArray(r) ? r : (r?.items ?? []));
+                  setTopExpensesGrand(Number(Array.isArray(r) ? r.reduce((s: number, e: any) => s + Number(e.total || 0), 0) : (r?.grandTotal || 0)));
+                  break;
+               }
                 case 'Expense Report': { const r = await reportsApi.getExpenseReport({ ...params, status: 'ALL' }).catch(() => null); setExpenseReport(r as any); break; }
                case 'Tips Report': { const r = await reportsApi.getTipsReport(params).catch(() => null); setTipsData(r as any); break; }
                case 'Service Charge': { const r = await reportsApi.getServiceChargeReport(params).catch(() => null); setServiceChargeData(r as any); break; }
@@ -265,7 +300,7 @@ export function useReportsState() {
                case 'Staff Cost %': { const r = await reportsApi.getStaffCostVsRevenue(params).catch(() => null); setStaffCostData(r as any); break; }
                case 'Sales per Labor Hour': { const r = await reportsApi.getSalesPerLaborHour(params).catch(() => null); setSalesPerLaborData(r as any); break; }
                case 'Employee Productivity': { const r = await reportsApi.getEmployeeProductivity(params).catch(() => []); setEmpProductivityData(r as any || []); break; }
-               case 'Customer LTV': { const r = await reportsApi.getCustomerLTV(params).catch(() => []); setCustomerLTV(r as any || []); break; }
+                case 'Customer LTV': { const r = await reportsApi.getCustomerLTV(params).catch(() => []); setCustomerLTV(((r as any)?.customers ?? r) as any || []); break; }
                case 'Campaign ROI': { const r = await reportsApi.getCampaignROI().catch(() => []); setCampaignROI(r as any || []); break; }
                case 'Customer Retention': { const r = await reportsApi.getCustomerRetention(params).catch(() => null); setCustomerRetentionData(r as any); break; }
                case 'New vs Returning': { const r = await reportsApi.getNewVsReturning(params).catch(() => null); setNewVsReturningData(r as any); break; }
@@ -273,12 +308,13 @@ export function useReportsState() {
                case 'Customer Churn': { const r = await reportsApi.getCustomerChurn({ branchId: params.branchId }).catch(() => null); setChurnData(r as any); break; }
                case 'Loyalty Points': { const r = await reportsApi.getLoyaltyPoints().catch(() => null); setLoyaltyData(r as any); break; }
                case 'Promotion Impact': { const r = await reportsApi.getPromotionImpact().catch(() => []); setPromoImpactData(r as any || []); break; }
-               case 'Customer Journey Funnel': { const r = await reportsApi.getCustomerJourney().catch(() => []); setJourneyFunnelData(r as any || []); break; }
+               case 'Customer Journey Funnel': { const r = await reportsApi.getCustomerJourney().catch(() => []); setJourneyFunnelData(((r as any)?.funnel ?? r) as any || []); break; }
                case 'Branch Performance': { const r = await reportsApi.getBranchPerformance(params).catch(() => []); setBranchPerformance(r as any || []); break; }
                case 'Order Preparation Time': { const r = await reportsApi.getOrderPrepTime(params).catch(() => []); setOrderPrepTime(r as any || []); break; }
                case 'Delivery Performance': { const r = await reportsApi.getDeliveryPerformance(params).catch(() => null); setDeliveryPerformance(r as any); break; }
                case 'Dine-in Tables': { const r = await reportsApi.getDineInTableAnalysis(params).catch(() => []); setDineInTables(r as any || []); break; }
                case 'Kitchen Performance': { const r = await reportsApi.getKitchenPerformance(params).catch(() => []); setKitchenPerformanceData(r as any || []); break; }
+               case 'Kitchen Staff Performance': { const r = await reportsApi.getKitchenStaffPerformance(params).catch(() => null); setKitchenStaffData(r as any); break; }
                case 'Table Turnover': { const r = await reportsApi.getTableTurnover(params).catch(() => []); setTableTurnoverData(r as any || []); break; }
                case 'Wait Time': { const r = await reportsApi.getWaitTime(params).catch(() => null); setWaitTimeData(r as any); break; }
                case 'Driver Utilization': { const r = await reportsApi.getDriverUtilization(params).catch(() => []); setDriverUtilData(r as any || []); break; }
@@ -288,9 +324,186 @@ export function useReportsState() {
                 case '3rd Party vs In-House': { const r = await reportsApi.getThirdPartyVsInHouse(params).catch(() => null); setThirdPartyData(r as any); const cm = await reportsApi.getChannelMix(params).catch(() => []); setChannelMixData(cm as any || []); break; }
                case 'Daily Flash Report': { const r = await reportsApi.getDailyFlash({ branchId: params.branchId }).catch(() => null); setDailyFlashData(r as any); break; }
                case 'Demand Forecasting': { const r = await reportsApi.getDemandForecast({ branchId: params.branchId }).catch(() => null); setDemandForecastData(r as any); break; }
-               case 'Price Elasticity Simulator': { const r = await reportsApi.getPriceElasticity({ branchId: params.branchId }).catch(() => []); setPriceElasticityData(r as any || []); break; }
+               case 'Price Elasticity Simulator': { const r = await reportsApi.getPriceElasticity({ branchId: params.branchId }).catch(() => []); setPriceElasticityData(((r as any)?.items ?? r) as any || []); break; }
                case 'Anomaly Detection': { const r = await reportsApi.getAnomalyDetection(params).catch(() => null); setAnomalyData(r as any); break; }
                case 'Channel Mix Trend': { const r = await reportsApi.getChannelMix(params).catch(() => []); setChannelMixData(r as any || []); break; }
+               // ── Coverage reports: every ERP feature gets a report ──
+               case 'Treasury Cashbox': {
+                  const [ov, vouchers] = await Promise.all([
+                     treasuryApi.overview(params.branchId).catch(() => null),
+                     treasuryApi.vouchers(params.branchId, { limit: 300 }).catch(() => []),
+                  ]);
+                  const rows = Array.isArray(vouchers) ? vouchers : ((vouchers as any)?.items ?? []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  setCustomReportMeta((p) => ({ ...p, [activeSubReport]: ov }));
+                  break;
+               }
+               case 'Custody Statement': {
+                  const r = await treasuryApi.custody(params.branchId).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : ((r as any)?.items ?? []) }));
+                  break;
+               }
+               case 'Supplier Invoices': {
+                  const r = await purchaseOrdersApi.getSupplierInvoices({}).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Butchery Yield': {
+                  const r = await butcheryApi.yieldReport({ branchId: params.branchId, startDate: params.startDate, endDate: params.endDate }).catch(() => null);
+                  const rows = Array.isArray(r) ? r : ((r as any)?.operations ?? (r as any)?.items ?? (r ? [r] : []));
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  setCustomReportMeta((p) => ({ ...p, [activeSubReport]: r }));
+                  break;
+               }
+               case 'Inter-Branch Transfers': {
+                  const r = await inventoryOpsApi.getTransferRequests({ branchId: params.branchId }).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'GRN Variance': {
+                  const r = await purchaseOrdersApi.getGRNs({}).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Reservations & No-Show': {
+                  const r = params.branchId
+                     ? await reservationsApi.list({ branchId: params.branchId }).catch(() => [])
+                     : [];
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Driver COD Settlement': {
+                  const drivers = await deliveryApi.getDrivers({ branchId: params.branchId }).catch(() => []);
+                  const list = Array.isArray(drivers) ? drivers : [];
+                  const cashRows = await Promise.all(
+                     list.slice(0, 25).map((d: any) => deliveryApi.getDriverCash(d.id).catch(() => null))
+                  );
+                  setCustomReportRows((p) => ({
+                     ...p,
+                     [activeSubReport]: list.map((d: any, i: number) => ({ driver: d.name || d.id, ...(cashRows[i] || {}) })),
+                  }));
+                  break;
+               }
+               case 'Approval SLA': {
+                  const r = await approvalApi.getAll(params.branchId).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Platform Commissions': {
+                  const r = await platformsApi.getAll().catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Complaints & SLA': {
+                  const r = await complaintsApi.list().catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Coupon Usage': {
+                  const r = await couponsApi.getAll().catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Leave & Absence': {
+                  const r = await hrExtendedApi.getLeaveRequests({}).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(r) ? r : [] }));
+                  break;
+               }
+               case 'Shift Tasks Completion': {
+                  const [runs, tasks] = await Promise.all([
+                     shiftTasksApi.getRuns().catch(() => []),
+                     shiftTasksApi.getTasks().catch(() => []),
+                  ]);
+                  const taskNames = new Map((Array.isArray(tasks) ? tasks : []).map((t: any) => [t.id, t.name || t.title]));
+                  const rows = (Array.isArray(runs) ? runs : []).map((r: any) => ({
+                     task: taskNames.get(r.taskId) || r.taskName || r.taskId,
+                     shift: r.shiftId || '',
+                     status: r.status || (r.completedAt ? 'COMPLETED' : 'PENDING'),
+                     completedAt: r.completedAt || '',
+                     completedBy: r.completedByName || r.completedBy || '',
+                  }));
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  break;
+               }
+               case 'Balance Sheet': {
+                  // Derived from the same POSTED trial balance the TB report uses.
+                  const r: any = await reportsApi.getTrialBalance(params).catch(() => []);
+                  const rows = Array.isArray(r) ? r : [];
+                  setTrialBalance(rows);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  break;
+               }
+               case 'E-Invoice Rejections': {
+                  const logs = await fiscalApi.getLogs({ branchId: params.branchId, limit: 200 }).catch(() => []);
+                  const rows = (Array.isArray(logs) ? logs : []).filter((l: any) =>
+                     /fail|reject|error/i.test(String(l.status || '')));
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  setCustomReportMeta((p) => ({ ...p, [activeSubReport]: { total: (logs as any[]).length } }));
+                  break;
+               }
+               case 'Day-Close Variances': {
+                  const history = params.branchId
+                     ? await dayCloseApi.getHistory(params.branchId, 60).catch(() => [])
+                     : [];
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(history) ? history : [] }));
+                  break;
+               }
+               case 'Production Cost Variance': {
+                  const list = await productionApi.getOrders({ branchId: params.branchId }).catch(() => []);
+                  const rows = (Array.isArray(list) ? list : []).map((o: any) => {
+                     const req = Number(o.quantityRequested ?? o.expectedYield ?? 0);
+                     const prod = Number(o.quantityProduced ?? o.actualYield ?? 0);
+                     return {
+                        order: o.batchNumber || o.id,
+                        item: o.targetItemName || o.itemName || '',
+                        status: o.status || '',
+                        requested: req,
+                        produced: prod,
+                        variance: Number((prod - req).toFixed(2)),
+                        variancePct: req > 0 ? Number((((prod - req) / req) * 100).toFixed(1)) : null,
+                     };
+                  });
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  break;
+               }
+               case 'Headcount & Turnover': {
+                  const list = await hrApi.getEmployees().catch(() => []);
+                  const rows = (Array.isArray(list) ? list : []).map((e: any) => ({
+                     name: e.name || '',
+                     role: e.role || '',
+                     department: e.departmentName || e.department || '',
+                     status: e.isActive === false ? 'INACTIVE' : 'ACTIVE',
+                     joined: e.createdAt ? String(e.createdAt).slice(0, 10) : '',
+                  }));
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  setCustomReportMeta((p) => ({
+                     ...p,
+                     [activeSubReport]: {
+                        active: rows.filter((r) => r.status === 'ACTIVE').length,
+                        inactive: rows.filter((r) => r.status !== 'ACTIVE').length,
+                     },
+                  }));
+                  break;
+               }
+               case 'WhatsApp Inbox': {
+                  const res: any = await whatsappApi.getInbox({ limit: 200, branchId: params.branchId }).catch(() => null);
+                  const rows = res?.inbox ?? (Array.isArray(res) ? res : []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  setCustomReportMeta((p) => ({ ...p, [activeSubReport]: { total: res?.total ?? rows.length } }));
+                  break;
+               }
+               case 'User Activity Log': {
+                  const rows = await auditApi.getAll({ limit: 200 }).catch(() => []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: Array.isArray(rows) ? rows : [] }));
+                  break;
+               }
+               case 'Delivery SLA Alerts': {
+                  const res: any = await deliveryApi.getSlaAlerts({ branchId: params.branchId }).catch(() => null);
+                  const rows = res?.alerts ?? (Array.isArray(res) ? res : []);
+                  setCustomReportRows((p) => ({ ...p, [activeSubReport]: rows }));
+                  setCustomReportMeta((p) => ({ ...p, [activeSubReport]: { total: res?.total ?? rows.length } }));
+                  break;
+               }
                 default:
                    setReportError(`No loader defined for report: ${activeSubReport}`);
                    break;
@@ -321,10 +534,11 @@ export function useReportsState() {
       [activeBranchId, branches]
    );
 
+   // Backend dayOfWeek is Sunday=1..Saturday=7 — views must look up `${dayIndex + 1}-${hour}`.
    const peakHoursLookup = useMemo(() => {
       const lookup = new Map<string, { orderCount: number; revenue: number }>();
       peakHoursData.forEach((cell: any) => {
-         lookup.set(`${cell.dayOfWeek}-${cell.hour}`, { orderCount: cell.orderCount, revenue: cell.revenue });
+         lookup.set(`${Number(cell.dayOfWeek)}-${Number(cell.hour)}`, { orderCount: Number(cell.orderCount || 0), revenue: Number(cell.revenue || 0) });
       });
       return lookup;
    }, [peakHoursData]);
@@ -358,7 +572,7 @@ export function useReportsState() {
       // All data
       dailySales, profitDaily, overview, profitSummary, foodCostData,
       paymentSummary, vatReport, hourlySales, cashierSummary, refunds,
-      integrity, trialBalance, profitAndLoss, topExpenses, expenseReport,
+      integrity, trialBalance, profitAndLoss, topExpenses, topExpensesGrand, expenseReport,
        stockMovementLog, stockCounts, wasteLoss, reorderAlerts, expiringBatches,
       payrollData, attendanceData, overtimeData,
       customerLTV, campaignROI,
@@ -368,12 +582,13 @@ export function useReportsState() {
       salesBySource, dineInTables, peakHoursData,
       modifierSalesData, avgTicketTrend, salesComparisonData,
       slowMovingItems, revenueByWeekday, voidItemsData,
+      discountByCashier, voidsByCashier, deadStock, negativeStock, unpaidOrders,
       tipsData, serviceChargeData, shiftSummaryData,
        actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
        productionBatchesData, suppliersData, purchaseOrdersData,
       staffCostData, salesPerLaborData,
       customerRetentionData, newVsReturningData, customerFrequencyData,
-      kitchenPerformanceData, menuEngineeringData, daypartData, basketData,
+      kitchenPerformanceData, kitchenStaffData, menuEngineeringData, daypartData, basketData,
       seasonalityData, onlineOfflineData, foodCostTrendData,
       taxComplianceData, auditTrailData, cashFlowData,
       supplierPriceData, recipeCostData, abcData,
@@ -385,6 +600,7 @@ export function useReportsState() {
       shiftProfitData, deliveryZoneData, deliveryCostData,
       journeyFunnelData, channelMixData, optimalPricingData,
       thirdPartyData, timeToFirstData,
+      customReportRows, customReportMeta,
 
       // Computed
       salesSeries, peakHoursLookup, peakHoursMaxOrders,

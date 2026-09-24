@@ -151,11 +151,13 @@
         border-radius: var(--pos-radius) 0 0 var(--pos-radius);
     }
     [dir='rtl'] .pos-cart-sidebar {
-        right: 0;
-        left: auto;
-        transform: translateX(100%);
-        border-radius: var(--pos-radius) 0 0 var(--pos-radius);
-        box-shadow: -20px 0 60px rgba(0, 0, 0, 0.25);
+        /* RTL: cart lives on the inline-start (left) side, so dock left
+           and hide toward the left — mirroring the LTR behaviour. */
+        left: 0;
+        right: auto;
+        transform: translateX(-100%);
+        border-radius: 0 var(--pos-radius) var(--pos-radius) 0;
+        box-shadow: 20px 0 60px rgba(0, 0, 0, 0.25);
     }
     .pos-cart-sidebar.cart-open {
         transform: translateX(0);
@@ -1809,11 +1811,46 @@
 }
 
 @media (min-width: 1024px) and (max-width: 1199px) {
-    .pos-scroll > .grid {
-        grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
-        gap: 0.5rem;
+    /* Small cashier terminals: keep tiles ≥205px so Glass title+price and the
+       add-button label never squeeze. Rail rows (compact density) keep their
+       own 300px floor from ItemGrid and are excluded here. */
+    .pos-scroll > .grid:not(:has(.zen-rail)) {
+        grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+        gap: 0.625rem;
         padding: 0.625rem;
     }
+    .pos-scroll > .grid:has(.zen-rail) {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 0.625rem;
+        padding: 0.625rem;
+    }
+}
+
+/* Small terminals + tablets: icon-only toolbar labels so the mode segments,
+   context actions and quick-pay never force horizontal clipping. Full labels
+   return at ≥1100px where there is room. */
+@media (max-width: 1099px) {
+    .pos-toolbar-slim button span:not(.absolute) { display: none; }
+    .pos-toolbar-slim button { padding-inline: 0.5rem; }
+    .pos-toolbar-slim { gap: 0.375rem; }
+    /* Price-list chip in the header crowds 768–1099px; cart/search stay. */
+    .pos-header-slim div:has(> select) { display: none; }
+    /* Scanner status chip also yields room on small terminals. */
+    .pos-toolbar-slim > div.shrink-0.hidden { display: none; }
+}
+
+/* Tablet portrait/landscape with an open cart: the main column shrinks to
+   ~450–700px. Force 2 comfortable columns so cards never squeeze to unreadable
+   widths, and compact the glass tile internals to fit the fixed 282px frame. */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .pos-scroll > .grid:not(:has(.zen-rail)) {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    .pos-items-panel .zen-glass .gmedia { height: 96px; flex-basis: 96px; }
+    .pos-items-panel .zen-glass h3 { font-size: 15px; }
+    .pos-items-panel .zen-glass .gprice { font-size: 16px; }
+    .pos-items-panel .zen-glass .gact { min-height: 42px; font-size: 13px; }
+    .pos-items-panel .zen-glass .chips span { padding: 4px 8px; font-size: 10px; }
 }
 
 @media (min-width: 1024px) and (max-height: 680px) {

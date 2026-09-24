@@ -82,6 +82,9 @@ const normalizeOrder = (raw: any): Order => ({
     freeDelivery: raw.free_delivery || raw.freeDelivery,
     isUrgent: raw.is_urgent || raw.isUrgent,
     paymentMethod: raw.payment_method || raw.paymentMethod,
+    isPaid: Boolean(raw.is_paid ?? raw.isPaid),
+    paidAmount: Number(raw.paid_amount ?? raw.paidAmount ?? 0),
+    payments: Array.isArray(raw.payments) ? raw.payments : [],
     notes: raw.notes,
     kitchenNotes: raw.kitchen_notes || raw.kitchenNotes,
     deliveryNotes: raw.delivery_notes || raw.deliveryNotes,
@@ -98,7 +101,14 @@ type SortMode = 'newest' | 'oldest' | 'highest' | 'waiting';
 type ViewMode = 'list' | 'board';
 type DetailTab = 'ops' | 'items' | 'customer';
 
-const CLOSED_STATUSES = [OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED];
+const CLOSED_STATUSES = [OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED];
+
+// Revenue counts recognized revenue only (mirrors server
+// revenueRecognizedOrder): the order exists and is not dead
+// (cancelled / refunded / void). Statuses, screens and payments
+// never gate it — an open ticket is pipeline already earned.
+const isRevenueCounted = (order: Order) =>
+    !['CANCELLED', 'REFUNDED', 'VOID', 'VOIDED'].includes(String(order.status));
 const BOARD_COLUMNS: { key: string; titleAr: string; titleEn: string; statuses: OrderStatus[] }[] = [
     { key: 'PENDING', titleAr: 'معلق', titleEn: 'Pending', statuses: [OrderStatus.PENDING] },
     { key: 'PREPARING', titleAr: 'تحضير', titleEn: 'Preparing', statuses: [OrderStatus.PREPARING] },
@@ -227,6 +237,8 @@ const OrdersCenter: React.FC = () => {
         deliveryFee: isAr ? 'دليفري' : 'Delivery',
         discount: isAr ? 'خصم' : 'Discount',
         total: isAr ? 'المطلوب' : 'Total',
+        paymentMethod: isAr ? 'طريقة الدفع' : 'Payment method',
+        unpaid: isAr ? 'غير مدفوع' : 'Unpaid',
         nextAction: isAr ? 'الإجراء التالي' : 'Next action',
         quickComms: isAr ? 'تواصل سريع' : 'Quick comms',
         checklist: isAr ? 'قائمة التجهيز' : 'Packing checklist',
@@ -428,7 +440,7 @@ const OrdersCenter: React.FC = () => {
             if (slaFor(order) === 'late') acc.delayed += 1;
             if (order.type === OrderType.DELIVERY) acc.delivery += 1;
             if (order.isUrgent && !CLOSED_STATUSES.includes(order.status)) acc.urgent += 1;
-            if (![OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(order.status)) acc.revenue += Number(order.total || 0);
+            if (isRevenueCounted(order)) acc.revenue += Number(order.total || 0);
         }
         return { ...acc, avgWait: acc.waitN ? Math.round(acc.waitSum / acc.waitN) : 0, perStatus };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -994,8 +1006,9 @@ const OrdersCenter: React.FC = () => {
                 <aside
                     role={selectedOrder ? 'dialog' : undefined}
                     aria-modal={selectedOrder ? true : undefined}
+                    aria-hidden={selectedOrder ? undefined : true}
                     aria-label={selectedOrder ? copy.orderDetails : undefined}
-                    className={`z-[100] flex min-h-0 w-full flex-col border-border bg-card shadow-2xl transition-transform duration-200 max-[1100px]:fixed max-[1100px]:inset-y-0 max-[1100px]:w-full max-[1100px]:max-w-[520px] max-[1100px]:${isAr ? 'left-0 max-[1100px]:border-r' : 'right-0 max-[1100px]:border-l'} min-[1100px]:w-[420px] min-[1100px]:shrink-0 min-[1100px]:border-s ${selectedOrder ? 'translate-x-0' : `pointer-events-none max-[1100px]:${isAr ? 'max-[1100px]:-translate-x-full' : 'max-[1100px]:translate-x-full'} min-[1100px]:hidden`}`}
+                    className={`z-[100] flex min-h-0 w-full flex-col border-border bg-card shadow-2xl transition-[transform,opacity,visibility] duration-200 max-[1100px]:fixed max-[1100px]:inset-y-0 max-[1100px]:w-full max-[1100px]:max-w-[520px] max-[1100px]:${isAr ? 'left-0 max-[1100px]:border-r' : 'right-0 max-[1100px]:border-l'} min-[1100px]:w-[420px] min-[1100px]:shrink-0 min-[1100px]:border-s ${selectedOrder ? 'translate-x-0 visible opacity-100' : `pointer-events-none invisible opacity-0 max-[1100px]:${isAr ? '-translate-x-full' : 'translate-x-full'} min-[1100px]:hidden`}`}
                 >
                     {selectedOrder ? (
                         <>
@@ -1107,6 +1120,42 @@ const OrdersCenter: React.FC = () => {
                                                 {Number(selectedOrder.deliveryFee || 0) > 0 && <div className="flex justify-between text-muted"><span>{copy.deliveryFee}</span><span>{Number(selectedOrder.deliveryFee || 0).toFixed(2)}</span></div>}
                                                 {Number(selectedOrder.discount || 0) > 0 && <div className="flex justify-between text-emerald-600"><span>{copy.discount}</span><span>-{Number(selectedOrder.discount || 0).toFixed(2)}</span></div>}
                                                 <div className="flex justify-between border-t border-border pt-3 text-lg font-black text-main"><span>{copy.total}</span><span className="text-primary">{Number(selectedOrder.total || 0).toFixed(2)}</span></div>
+                                            </div>
+                                        </section>
+                                        <section className="rounded-2xl border border-border bg-app p-4">
+                                            <h3 className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-muted"><Banknote size={13} />{copy.paymentMethod}</h3>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="rounded-xl bg-primary/10 px-3 py-2 text-sm font-black text-primary">
+                                                    {selectedOrder.paymentMethod || selectedOrder.payments?.[0]?.method || copy.unpaid}
+                                                </span>
+                                                <span className="text-xs font-black text-muted">
+                                                    {Number(selectedOrder.paidAmount || selectedOrder.payments?.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) || 0).toFixed(2)} {settings.currencySymbol || 'EGP'}
+                                                </span>
+                                            </div>
+                                            {selectedOrder.payments && selectedOrder.payments.length > 1 && (
+                                                <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+                                                    {selectedOrder.payments.map((payment, index) => (
+                                                        <div key={`${payment.method}-${index}`} className="flex justify-between text-xs font-bold text-muted">
+                                                            <span>{payment.method}</span><span>{Number(payment.amount || 0).toFixed(2)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </section>
+                                        <section className="rounded-2xl border border-border bg-app p-4">
+                                            <h3 className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-muted"><ShoppingBag size={13} />{copy.items}</h3>
+                                            <div className="space-y-2">
+                                                {selectedOrder.items.length === 0 ? (
+                                                    <p className="text-xs font-bold text-muted">{isAr ? 'لا توجد أصناف مسجلة' : 'No items recorded'}</p>
+                                                ) : selectedOrder.items.map((item, index) => (
+                                                    <div key={`${item.cartId || item.id || 'item'}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-3 py-2">
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-xs font-black text-main">{isAr ? item.nameAr || item.name : item.name}</p>
+                                                            <p className="mt-0.5 text-[10px] font-bold text-muted">× {item.quantity}</p>
+                                                        </div>
+                                                        <span className="shrink-0 text-xs font-black text-primary">{Number(item.price * item.quantity || 0).toFixed(2)}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </section>
                                         {/* dates */}

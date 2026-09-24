@@ -110,3 +110,27 @@ export const calculateOrderTotalsFromOrder = (order: Partial<Order>, settings?: 
         serviceCharge: Number((order as any).serviceCharge || settings?.serviceCharge || 0),
         deliveryFee: Number((order as any).deliveryFee || 0),
     });
+
+/**
+ * Wire format for order discounts (POST /api/orders).
+ *
+ * Repo contract: `order.discount` is always MONEY (an amount), never a
+ * percent — see calculateOrderTotalsFromOrder and the receipt generators.
+ * The server applies `discount_type: 'PERCENT'` as subtotal × value / 100,
+ * so sending an amount tagged PERCENT silently inflates the discount
+ * (e.g. 15 EGP off 150 becomes a 15% / 22.50 cut).
+ *
+ * With a coupon the server computes the coupon value authoritatively from
+ * `couponCode` and stacks it on top of the manual discount, therefore the
+ * manual part must be zeroed — otherwise the client's coupon estimate
+ * would be counted twice.
+ */
+export const buildOrderDiscountPayload = (order: {
+    discount?: unknown;
+    couponCode?: unknown;
+}): { discount: number; discount_type: 'AMOUNT' | 'COUPON' } => {
+    const couponCode = String((order as any)?.couponCode || '').trim();
+    if (couponCode) return { discount: 0, discount_type: 'COUPON' };
+    const amount = Number((order as any)?.discount || 0);
+    return { discount: Number.isFinite(amount) && amount > 0 ? amount : 0, discount_type: 'AMOUNT' };
+};

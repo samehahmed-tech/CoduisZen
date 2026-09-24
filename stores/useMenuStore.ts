@@ -63,6 +63,30 @@ const INITIAL_MENUS: RestaurantMenu[] = [
     { id: 'menu-1', name: 'Main Menu', isDefault: true, status: 'ACTIVE', targetBranches: ['b1'] }
 ];
 
+// --- Item-name uniqueness is scoped to ONE category (archived excluded).
+// The same dish name may legitimately appear in several sections
+// (e.g. "Fresh Juice" under Juices and under Milkshakes), so a global
+// check falsely blocks price-only edits on such items.
+const normItemName = (v: any) => String(v || '').trim().toLowerCase();
+const normItemNameAr = (v: any) => String(v || '').trim();
+
+const findNameCollisionInCategory = (
+    categories: { id: string; name: string; nameAr?: string; items: any[] }[],
+    categoryId: string,
+    item: { id?: string; name?: string; nameAr?: string },
+) => {
+    const cat = categories.find(c => c.id === categoryId);
+    if (!cat) return null;
+    const name = normItemName(item.name);
+    const nameAr = normItemNameAr(item.nameAr);
+    const twin = cat.items.find(i =>
+        i.id !== item.id &&
+        !(i as any).archivedAt && !(i as any).deletedAt &&
+        (normItemName(i.name) === name || (nameAr !== '' && normItemNameAr((i as any).nameAr) === nameAr))
+    );
+    return twin ? { twin, categoryName: (cat as any).nameAr || cat.name } : null;
+};
+
 export const useMenuStore = create<MenuState>()(
     persist(
         (set, get) => ({
@@ -306,16 +330,10 @@ export const useMenuStore = create<MenuState>()(
             addMenuItem: async (menuId, categoryId, item) => {
                 set({ isLoading: true });
                 try {
-                    // Validation: Prevent duplicate item names across all categories
-                    const allItems = get().categories.flatMap(c => c.items);
-                    const isDuplicate = allItems.some(i =>
-                        i.id !== item.id && (
-                            i.name.trim().toLowerCase() === item.name.trim().toLowerCase() ||
-                            (i.nameAr && item.nameAr && i.nameAr.trim() === item.nameAr.trim())
-                        )
-                    );
-                    if (isDuplicate) {
-                        throw new Error('اسم الصنف موجود بالفعل. استخدم اسمًا مختلفًا.');
+                    // Validation: item names are unique within their category.
+                    const collision = findNameCollisionInCategory(get().categories, categoryId, item);
+                    if (collision) {
+                        throw new Error(`اسم الصنف موجود بالفعل في قسم "${collision.categoryName}". استخدم اسمًا مختلفًا.`);
                     }
 
                     const payload = {
@@ -381,16 +399,10 @@ export const useMenuStore = create<MenuState>()(
 
             updateMenuItem: async (menuId, categoryId, item) => {
                 try {
-                    // Validation: Prevent duplicate item names
-                    const allItems = get().categories.flatMap(c => c.items);
-                    const isDuplicate = allItems.some(i =>
-                        i.id !== item.id && (
-                            i.name.trim().toLowerCase() === item.name.trim().toLowerCase() ||
-                            (i.nameAr && item.nameAr && i.nameAr.trim() === item.nameAr.trim())
-                        )
-                    );
-                    if (isDuplicate) {
-                        throw new Error('اسم الصنف موجود بالفعل. استخدم اسمًا مختلفًا.');
+                    // Validation: item names are unique within the target category.
+                    const collision = findNameCollisionInCategory(get().categories, categoryId, item);
+                    if (collision) {
+                        throw new Error(`اسم الصنف موجود بالفعل في قسم "${collision.categoryName}". استخدم اسمًا مختلفًا.`);
                     }
 
                     const payload = {

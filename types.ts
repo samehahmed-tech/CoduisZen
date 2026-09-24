@@ -386,6 +386,9 @@ export interface Order {
   isUrgent?: boolean; // Call Center - priority order flag
   createdAt: Date;
   paymentMethod?: PaymentMethod | string;
+  paidAmount?: number;
+  changeAmount?: number;
+  isPaid?: boolean;
   payments?: PaymentRecord[];
   notes?: string;
   tipAmount?: number;
@@ -721,6 +724,8 @@ export enum UserRole {
   TREASURY_OFFICER = 'TREASURY_OFFICER',
   TECH_SUPPORT = 'TECH_SUPPORT',
   QUALITY_OFFICER = 'QUALITY_OFFICER',
+  CAFE_ADMIN = 'CAFE_ADMIN',
+  PICKUP_STAFF = 'PICKUP_STAFF',
   CUSTOM = 'CUSTOM'
 }
 
@@ -1066,6 +1071,31 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_MAIL, AppPermission.NAV_INVENTORY, AppPermission.NAV_PRODUCTION,
     AppPermission.NAV_WASTAGE, AppPermission.NAV_QUALITY,
     AppPermission.DATA_VIEW_STOCK_LEVELS,
+  ],
+
+  // --- Limited edition: Cafe Admin (POS + Reports + Inventory + Menu only) ---
+  // Hides Finance/HR/Payroll/CallCenter/CRM/Dispatch/Marketing/Forensics/Franchise/AI/Settings.
+  // No user/role management on purpose: the seller creates accounts to block self-escalation.
+  [UserRole.CAFE_ADMIN]: [
+    AppPermission.NAV_DASHBOARD,
+    AppPermission.NAV_POS, AppPermission.NAV_KDS, AppPermission.NAV_PICKUP,
+    AppPermission.NAV_ORDERS,
+    AppPermission.NAV_MENU_MANAGER, AppPermission.NAV_RECIPES, AppPermission.NAV_PRINTERS,
+    AppPermission.NAV_INVENTORY, AppPermission.NAV_WASTAGE,
+    AppPermission.NAV_REPORTS, AppPermission.NAV_MAIL,
+    AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
+    AppPermission.DATA_VIEW_STOCK_LEVELS,
+    AppPermission.OP_PLACE_ORDER, AppPermission.OP_VOID_ORDER,
+    AppPermission.OP_APPLY_DISCOUNT, AppPermission.OP_PROCESS_REFUND,
+    AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
+    AppPermission.OP_CREATE_PO, AppPermission.OP_RECEIVE_GRN,
+    AppPermission.OP_APPROVE_PO,
+    AppPermission.OP_MANAGE_CASH_DRAWER, AppPermission.OP_CLOSE_DAY,
+    AppPermission.CFG_EDIT_MENU_PRICING, AppPermission.CFG_EDIT_FLOOR_PLAN,
+  ],
+
+  [UserRole.PICKUP_STAFF]: [
+    AppPermission.NAV_MAIL, AppPermission.NAV_PICKUP,
   ],
 
   [UserRole.CUSTOM]: [],

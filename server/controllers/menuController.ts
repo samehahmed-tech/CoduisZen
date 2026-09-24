@@ -416,18 +416,24 @@ export const createItem = async (req: Request, res: Response) => {
     try {
         const { recipe, ...itemPayload } = req.body;
         const normalizedName = itemPayload.name.trim().toLowerCase();
+        // Names are unique within their category — the same dish may
+        // legitimately appear in several sections.
+        const nameDupConditions: any[] = [
+            sql`LOWER(LTRIM(RTRIM(${menuItems.name}))) = ${normalizedName}`,
+            sql`${menuItems.deletedAt} IS NULL`,
+        ];
+        if (itemPayload.categoryId) {
+            nameDupConditions.push(eq(menuItems.categoryId, itemPayload.categoryId));
+        }
         const [duplicateName] = await db.select({ id: menuItems.id })
             .from(menuItems)
-            .where(and(
-                sql`LOWER(LTRIM(RTRIM(${menuItems.name}))) = ${normalizedName}`,
-                sql`${menuItems.deletedAt} IS NULL`,
-            ));
+            .where(and(...nameDupConditions));
 
         if (duplicateName) {
             return res.status(409).json({
                 code: 'MENU_ITEM_NAME_EXISTS',
-                message: 'An item with the same name already exists.',
-                messageAr: 'يوجد صنف بنفس الاسم بالفعل.',
+                message: 'An item with the same name already exists in this section.',
+                messageAr: 'يوجد صنف بنفس الاسم في نفس القسم.',
             });
         }
 
@@ -476,20 +482,32 @@ export const updateItem = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'ITEM_ID_REQUIRED' });
         const { id: _, category_id, recipe, restore, ...updateData } = req.body; // Prevent updating ID
+
+        const [existingItem] = await db.select({ id: menuItems.id, categoryId: menuItems.categoryId })
+            .from(menuItems)
+            .where(eq(menuItems.id, id));
+        if (!existingItem) return res.status(404).json({ error: 'Item not found' });
+
         if (updateData.name) {
             const normalizedName = updateData.name.trim().toLowerCase();
+            // Names are unique within their category (target on moves).
+            const targetCategoryId = (updateData as any).categoryId || category_id || existingItem.categoryId;
+            const nameDupConditions: any[] = [
+                sql`LOWER(LTRIM(RTRIM(${menuItems.name}))) = ${normalizedName}`,
+                sql`${menuItems.id} <> ${id}`,
+                sql`${menuItems.deletedAt} IS NULL`,
+            ];
+            if (targetCategoryId) {
+                nameDupConditions.push(eq(menuItems.categoryId, targetCategoryId));
+            }
             const [duplicateName] = await db.select({ id: menuItems.id })
                 .from(menuItems)
-                .where(and(
-                    sql`LOWER(LTRIM(RTRIM(${menuItems.name}))) = ${normalizedName}`,
-                    sql`${menuItems.id} <> ${id}`,
-                    sql`${menuItems.deletedAt} IS NULL`,
-                ));
+                .where(and(...nameDupConditions));
             if (duplicateName) {
                 return res.status(409).json({
                     code: 'MENU_ITEM_NAME_EXISTS',
-                    message: 'An item with the same name already exists.',
-                    messageAr: 'يوجد صنف بنفس الاسم بالفعل.',
+                    message: 'An item with the same name already exists in this section.',
+                    messageAr: 'يوجد صنف بنفس الاسم في نفس القسم.',
                 });
             }
             updateData.name = updateData.name.trim();
@@ -568,8 +586,11 @@ export const deleteItem = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'ITEM_ID_REQUIRED' });
 
         const columns = await getTableColumns('menu_items');
-        const existing = await pool.query('select id from menu_items where id = $1 limit 1', [id]);
-        if (existing.rowCount === 0) {
+        const normalizedColumns = new Set([...columns].map((c) => c.toLowerCase()));
+        const [existing] = await db.select({ id: menuItems.id })
+            .from(menuItems)
+            .where(eq(menuItems.id, id));
+        if (!existing) {
             return res.status(404).json({
                 error: 'MENU_ITEM_NOT_FOUND',
                 code: 'MENU_ITEM_NOT_FOUND',
@@ -577,21 +598,21 @@ export const deleteItem = async (req: Request, res: Response) => {
             });
         }
 
-        const setParts = ['is_available = false'];
-        if (columns.has('deleted_at')) setParts.push('deleted_at = GETDATE()');
-        if (columns.has('updated_at')) setParts.push('updated_at = GETDATE()');
-        if (columns.has('status')) setParts.push("status = 'archived'");
+        const patch: Record<string, any> = { isAvailable: false };
+        if (normalizedColumns.has('deleted_at')) (patch as any).deletedAt = new Date();
+        if (normalizedColumns.has('updated_at')) (patch as any).updatedAt = new Date();
+        if (normalizedColumns.has('status')) (patch as any).status = 'archived';
 
-        const archived = await pool.query(
-            `update menu_items set ${setParts.join(', ')} output inserted.* where id = $1`,
-            [id],
-        );
+        const archived = await db.update(menuItems)
+            .set(patch as any)
+            .output()
+            .where(eq(menuItems.id, id));
 
         dbCacheService.invalidatePattern('menu:');
         res.json({
             message: 'Item archived successfully',
             archived: true,
-            item: archived.rows[0],
+            item: (archived as any[])[0] ?? (archived as any)?.rows?.[0],
         });
     } catch (error: any) {
         res.status(500).json({

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Activity, Ban, Building2, Check, ChevronRight, Crown, Download, Eye, EyeOff, FileText,
+    Activity, Ban, Building2, Camera, Check, ChevronRight, Crown, Download, Eye, EyeOff, FileText,
     KeyRound, Layers, LockKeyhole, MapPin, Monitor, Plus, RefreshCw, Save, Search,
     ShieldCheck, Trash2, Users, X, UserCog, Settings, Globe, FileBarChart,
 } from 'lucide-react';
@@ -11,6 +11,8 @@ import { useToast } from '@/components/common/ToastProvider';
 import { useConfirm } from '@/components/common/ConfirmProvider';
 import { AppPermission, INITIAL_ROLE_PERMISSIONS, User, UserRole, isCorporateRole } from '@/types';
 import { getRoleLabel } from '@/utils/roleLabels';
+import UserAvatar from '@/components/common/UserAvatar';
+import { fileToAvatarDataUrl } from '@/src/utils/userAvatars';
 
 type Tab = 'users' | 'access' | 'security';
 type UserForm = Partial<User> & { password?: string; pin?: string };
@@ -109,7 +111,7 @@ const arRole: Record<string, string> = {
     KITCHEN_STAFF: 'مطبخ', CALL_CENTER: 'كول سنتر', CALL_CENTER_MANAGER: 'مدير كول سنتر', WAREHOUSE_STAFF: 'مخازن',
     WAREHOUSE_DIRECTOR: 'مدير مخازن', PRODUCTION_STAFF: 'إنتاج', PROCUREMENT_MANAGER: 'مشتريات', ACCOUNTANT: 'محاسب',
     COST_ACCOUNTANT: 'محاسب تكاليف', FINANCE_DIRECTOR: 'مدير مالي', HR_MANAGER: 'موارد بشرية', PAYROLL_OFFICER: 'مرتبات',
-    TREASURY_OFFICER: 'خزنة', TECH_SUPPORT: 'دعم فني', QUALITY_OFFICER: 'جودة', CUSTOM: 'مخصص',
+    TREASURY_OFFICER: 'خزنة', TECH_SUPPORT: 'دعم فني', QUALITY_OFFICER: 'جودة', CAFE_ADMIN: 'مدير كافيه (محدود)', PICKUP_STAFF: 'شاشة التسليم', CUSTOM: 'مخصص',
 };
 
 const genId = () => `usr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -145,6 +147,26 @@ const UserManagement: React.FC = () => {
     const [newRoleName, setNewRoleName] = useState('');
     const [newRoleNameAr, setNewRoleNameAr] = useState('');
     const [showCreateRole, setShowCreateRole] = useState(false);
+    const [avatarBusy, setAvatarBusy] = useState(false);
+    const avatarInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleAvatarFile = async (file: File | undefined) => {
+        if (!file) return;
+        setAvatarBusy(true);
+        try {
+            const dataUrl = await fileToAvatarDataUrl(file);
+            setForm((prev) => ({ ...prev, avatar: dataUrl }));
+            success(isAr ? 'تم تحديث صورة البروفايل' : 'Profile photo updated');
+        } catch (err: any) {
+            const code = String(err?.message || '');
+            showError(code === 'IMAGE_TOO_LARGE'
+                ? (isAr ? 'الصورة كبيرة — اختر صورة أقل من 8MB' : 'Image too large — pick one under 8MB')
+                : (isAr ? 'تعذر قراءة الصورة — جرب صورة أخرى' : 'Could not read image — try another one'));
+        } finally {
+            setAvatarBusy(false);
+            if (avatarInputRef.current) avatarInputRef.current.value = '';
+        }
+    };
 
     useEffect(() => {
         fetchUsers();
@@ -250,6 +272,7 @@ const UserManagement: React.FC = () => {
                 assignedBranchId: form.assignedBranchId || allowedBranches[0], allowedBranches,
                 permissions: form.permissions?.length ? form.permissions : rolePermissions(role),
                 password: form.password, pin: form.pin,
+                avatar: form.avatar,
             };
             if (isEdit) await updateUserInDB(payload); else await createUser(payload);
             await fetchUsers();
@@ -398,7 +421,7 @@ const UserManagement: React.FC = () => {
                                             return (
                                                 <tr key={user.id} onClick={() => setSelectedId(user.id)} className={`cursor-pointer border-t border-border/40 ${active ? 'bg-primary/10' : 'hover:bg-elevated/40'}`}>
                                                     <td className="p-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => setChecked((prev) => selected ? prev.filter((id) => id !== user.id) : [...prev, user.id])} /></td>
-                                                    <td className="p-3"><div className="font-black text-main">{user.name}</div><div className="text-xs font-semibold text-muted truncate max-w-[180px]">{user.email || '-'}</div></td>
+                                                    <td className="p-3"><div className="flex items-center gap-2.5"><UserAvatar name={user.name} src={user.avatar} size="sm" /><div className="min-w-0"><div className="font-black text-main truncate">{user.name}</div><div className="text-xs font-semibold text-muted truncate max-w-[180px]">{user.email || '-'}</div></div></div></td>
                                                     <td className="p-3"><span className={`rounded-md px-2 py-1 text-xs font-black ${isCorporateRole(user.role) ? 'bg-amber-500/10 text-amber-600' : 'bg-blue-500/10 text-blue-500'}`}>{roleLabel(String(user.role))}</span></td>
                                                     <td className="p-3 text-xs font-bold text-muted">{branchName(user.assignedBranchId)}</td>
                                                     <td className="p-3"><span className="rounded-md bg-elevated px-2 py-1 text-xs font-black text-main">{user.permissions?.length || 0}</span></td>
@@ -420,8 +443,8 @@ const UserManagement: React.FC = () => {
                             {selectedUser ? (
                                 <div className="space-y-4">
                                     <div className="flex items-start justify-between gap-3">
-                                        <div><div className="text-lg font-black text-main">{selectedUser.name}</div><div className="text-xs font-bold text-muted truncate">{selectedUser.email || '-'}</div><div className="mt-2 flex flex-wrap gap-1"><span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-black text-primary">{roleLabel(String(selectedUser.role))}</span><span className="rounded-md bg-elevated px-2 py-1 text-xs font-bold text-muted">{branchName(selectedUser.assignedBranchId)}</span></div></div>
-                                        <button onClick={() => openEdit(selectedUser)} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white">{isAr ? 'تعديل' : 'Edit'}</button>
+                                        <div className="flex items-start gap-3 min-w-0"><UserAvatar name={selectedUser.name} src={selectedUser.avatar} size="md" /><div className="min-w-0"><div className="text-lg font-black text-main truncate">{selectedUser.name}</div><div className="text-xs font-bold text-muted truncate">{selectedUser.email || '-'}</div><div className="mt-2 flex flex-wrap gap-1"><span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-black text-primary">{roleLabel(String(selectedUser.role))}</span><span className="rounded-md bg-elevated px-2 py-1 text-xs font-bold text-muted">{branchName(selectedUser.assignedBranchId)}</span></div></div></div>
+                                        <button onClick={() => openEdit(selectedUser)} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white shrink-0">{isAr ? 'تعديل' : 'Edit'}</button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                         <InfoPill label={isAr ? 'الصلاحيات' : 'Perms'} value={String(selectedUser.permissions?.length || 0)} />
@@ -539,7 +562,7 @@ const UserManagement: React.FC = () => {
                                 <div className="mb-3 text-sm font-black text-main">{isAr ? 'المستخدم المحدد' : 'Selected user'}</div>
                                 {selectedUser ? (
                                     <div className="space-y-3">
-                                        <div className="rounded-xl bg-elevated/50 p-4"><div className="text-lg font-black text-main">{selectedUser.name}</div><div className="text-xs font-bold text-muted truncate">{selectedUser.email}</div><div className="mt-2 flex gap-2"><span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-black text-primary">{roleLabel(String(selectedUser.role))}</span><span className={`rounded-md px-2 py-1 text-xs font-black ${selectedUser.isActive !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>{selectedUser.isActive !== false ? (isAr ? 'نشط' : 'Active') : (isAr ? 'معطل' : 'Disabled')}</span></div></div>
+                                        <div className="rounded-xl bg-elevated/50 p-4 flex items-center gap-3"><UserAvatar name={selectedUser.name} src={selectedUser.avatar} size="md" /><div className="min-w-0"><div className="text-lg font-black text-main truncate">{selectedUser.name}</div><div className="text-xs font-bold text-muted truncate">{selectedUser.email}</div><div className="mt-2 flex gap-2"><span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-black text-primary">{roleLabel(String(selectedUser.role))}</span><span className={`rounded-md px-2 py-1 text-xs font-black ${selectedUser.isActive !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>{selectedUser.isActive !== false ? (isAr ? 'نشط' : 'Active') : (isAr ? 'معطل' : 'Disabled')}</span></div></div></div>
                                         <select value={selectedUser.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-border bg-app px-3 text-xs font-black text-main"><option value="">{isAr ? 'اختار مستخدم' : 'Select user'}</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name} — {roleLabel(String(u.role))}</option>)}</select>
                                         <div className="grid gap-2">
                                             <Action title={isAr ? 'إنهاء كل الجلسات' : 'Revoke all sessions'} icon={Monitor} onClick={() => securityAction('revoke')} />
@@ -575,6 +598,44 @@ const UserManagement: React.FC = () => {
                     <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
                         <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card p-4"><div className="font-black text-main">{form.id && users.some((u) => u.id === form.id) ? (isAr ? 'تعديل مستخدم' : 'Edit user') : (isAr ? 'مستخدم جديد' : 'New user')}</div><button onClick={() => setFormOpen(false)} className="rounded-md border border-border p-2"><X size={16} /></button></div>
                         <div className="grid gap-4 p-4 md:grid-cols-2">
+                            <div className="md:col-span-2 flex items-center gap-4 rounded-xl border border-border/60 bg-app/60 p-4">
+                                <UserAvatar name={form.name} src={form.avatar} size="lg" />
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-xs font-black text-main">{isAr ? 'صورة البروفايل' : 'Profile photo'}</div>
+                                    <div className="mt-0.5 text-[11px] font-bold text-muted">
+                                        {isAr ? 'تظهر بدل أيقونة البروفايل في الهيدر ونقطة البيع. تُحفظ على هذا الجهاز.' : 'Shown instead of the profile icon in the header and POS. Stored on this device.'}
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        <input
+                                            ref={avatarInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+                                        />
+                                        <button
+                                            type="button"
+                                            disabled={avatarBusy}
+                                            onClick={() => avatarInputRef.current?.click()}
+                                            className="rounded-lg bg-primary px-3 py-2 text-[11px] font-black text-white disabled:opacity-50"
+                                        >
+                                            <Camera size={13} className="inline me-1" />
+                                            {avatarBusy ? (isAr ? 'جاري المعالجة…' : 'Processing…') : (form.avatar ? (isAr ? 'تغيير الصورة' : 'Change photo') : (isAr ? 'رفع صورة' : 'Upload photo'))}
+                                        </button>
+                                        {form.avatar && (
+                                            <button
+                                                type="button"
+                                                disabled={avatarBusy}
+                                                onClick={() => setForm((prev) => ({ ...prev, avatar: undefined }))}
+                                                className="rounded-lg border border-border px-3 py-2 text-[11px] font-black text-rose-500 hover:border-rose-500/40 disabled:opacity-50"
+                                            >
+                                                <Trash2 size={13} className="inline me-1" />
+                                                {isAr ? 'إزالة' : 'Remove'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                             <Field label={isAr ? 'الاسم *' : 'Name *'} value={form.name || ''} onChange={(v) => setForm({ ...form, name: v })} />
                             <Field label={isAr ? 'البريد *' : 'Email *'} value={form.email || ''} onChange={(v) => setForm({ ...form, email: v })} placeholder="name@company.com" />
                             <Field label={isAr ? 'كلمة المرور' : 'Password'} type="password" value={form.password || ''} onChange={(v) => setForm({ ...form, password: v })} placeholder={isAr ? 'جديدة…' : 'New…'} hint={form.hasPassword ? (isAr ? 'معيّنة حالياً — اتركها فارغة للاحتفاظ بها' : 'Currently set — leave blank to keep it') : (isAr ? 'غير معيّنة لهذا المستخدم' : 'No password set for this user')} />

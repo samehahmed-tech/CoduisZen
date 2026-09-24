@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RestoFlow — 9 Menu Card Concepts · Premium UX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=Amiri:wght@700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f1ea; --surface:#fff; --surface2:#faf8f2; --ink:#1b1e23; --muted:#8b9099;
+  --line:#e8e2d3; --line2:#f1ede1;
+  --brand:#0f766e; --brandD:#0b5f59; --brandSoft:#dcf0eb;
+  --gold:#c9a227; --danger:#e11d48; --dangerSoft:#fde4ea; --ok:#16a34a; --okSoft:#ddf3e4;
+  --shadow:0 1px 2px rgba(20,22,26,.06),0 14px 34px -14px rgba(20,22,26,.22);
+  --r:20px;
+}
+[data-theme="dark"]{--bg:#0f1114; --surface:#181c20; --surface2:#1f242a; --ink:#f1ede4; --muted:#9aa1ab; --line:#2b3138; --line2:#22272d; --brand:#2dd4bf; --brandD:#5eead4; --brandSoft:rgba(45,212,191,.13); --shadow:0 2px 4px rgba(0,0,0,.5),0 18px 44px -14px rgba(0,0,0,.65)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Cairo,Inter,system-ui,sans-serif;transition:background .25s,color .25s}
+.wrap{max-width:1280px;margin:0 auto;padding:26px 20px 100px}
+.top{position:sticky;top:0;z-index:60;backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg) 84%,transparent);border-bottom:1px solid var(--line)}
+.topin{max-width:1280px;margin:0 auto;padding:12px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.logo{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#0f766e,#14b8a6);display:grid;place-items:center;color:#fff;font-weight:900;font-size:19px}
+.top h1{font-size:16px;margin:0}.top p{margin:0;font-size:12px;color:var(--muted)}
+.ctl{margin-inline-start:auto;display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:none;font-family:inherit;font-weight:800;font-size:12px;color:var(--muted);padding:7px 13px;border-radius:999px;cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:28px;box-shadow:var(--shadow);position:relative;overflow:hidden;margin-top:24px}
+.hero::after{content:"";position:absolute;inset-inline-end:-90px;top:-90px;width:280px;height:280px;background:radial-gradient(circle,rgba(20,184,166,.20),transparent 70%)}
+.hero h2{margin:0 0 8px;font-size:clamp(22px,3.4vw,32px);font-weight:900;line-height:1.4}
+.hero h2 em{font-style:normal;color:var(--brand)}
+.hero p{margin:0;color:var(--muted);font-size:14px;line-height:2;max-width:900px}
+.toc{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.toc a{font-size:12px;font-weight:800;text-decoration:none;color:var(--ink);background:var(--surface2);border:1px solid var(--line);padding:7px 13px;border-radius:999px}
+.toc a:hover{border-color:var(--brand);color:var(--brand)}
+section.block{margin-top:44px}
+.shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.snum{font-size:12px;font-weight:900;background:var(--ink);color:var(--bg);padding:5px 12px;border-radius:10px}
+.shead h3{margin:0;font-size:21px;font-weight:900}
+.tag{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--brandSoft);color:var(--brand)}
+.ssub{color:var(--muted);font-size:13.5px;line-height:2;margin:8px 0 4px;max-width:940px}
+.meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 0 16px}
+.meta b{color:var(--ink)}
+.demo{display:grid;gap:18px;grid-template-columns:repeat(3,1fr)}
+body[data-density="2"] .demo{grid-template-columns:repeat(2,1fr)}
+body[data-density="4"] .demo{grid-template-columns:repeat(4,1fr)}
+body[data-density="5"] .demo{grid-template-columns:repeat(5,1fr)}
+@media(max-width:1000px){.demo,body[data-density="4"] .demo,body[data-density="5"] .demo{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.demo{grid-template-columns:1fr!important}}
+.dlabel{font-size:11.5px;font-weight:900;color:var(--muted);letter-spacing:.05em;margin:0 0 8px}
+.note{font-size:12px;color:var(--muted);line-height:1.9;margin:10px 0 0}
+button{font-family:inherit}
+/* shared bits */
+.qty-pop{animation:pop .25s}
+@keyframes pop{40%{transform:scale(1.25)}}
+.veilx{position:absolute;inset:0;display:grid;place-items:center;background:rgba(15,17,20,.62);color:#fff;font-weight:900;font-size:14px;letter-spacing:.06em;z-index:3}
+.mono{display:grid;place-items:center;font-weight:900;color:#fff;font-size:42px}
+/* ═════ 1 · SAHARA EDITORIAL ═════ */
+.v1{background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow);transition:transform .18s,box-shadow .18s;position:relative}
+.v1:hover{transform:translateY(-4px);box-shadow:0 20px 44px -16px rgba(20,22,26,.3)}
+.v1 .im{position:relative;aspect-ratio:16/9.6;background:#d9d2bd;overflow:hidden}
+.v1 .im img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+.v1:hover .im img{transform:scale(1.06)}
+.v1 .im.noimg{background:linear-gradient(135deg,#0f766e 0%,#115e59 45%,#b45309 130%)}
+.v1 .im.noimg::after{content:attr(data-l);position:absolute;inset:0;display:grid;place-items:center;font-size:64px;font-weight:900;color:rgba(255,255,255,.9);font-family:Amiri,serif}
+.v1 .im.noimg::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.25),transparent 55%),repeating-linear-gradient(45deg,rgba(255,255,255,.06) 0 2px,transparent 2px 10px)}
+.v1 .pp{position:absolute;bottom:12px;inset-inline-start:12px;background:rgba(14,16,18,.85);color:#fff;border-radius:999px;padding:7px 14px;font-weight:900;font-size:16px;font-variant-numeric:tabular-nums}
+.v1 .pp small{font-size:11px;opacity:.7;font-weight:700}
+.v1 .st{position:absolute;top:12px;inset-inline-start:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:11px;font-weight:900;padding:6px 11px;border-radius:999px}
+.v1 .qb{position:absolute;top:12px;inset-inline-end:12px;min-width:32px;height:32px;padding:0 9px;border-radius:999px;background:var(--ink);color:var(--bg);font-weight:900;display:none;place-items:center}
+.v1[data-qty]:not([data-qty="0"]) .qb{display:grid}
+.v1 .bd{padding:14px 15px 15px}
+.v1 .eb{font-size:10.5px;font-weight:800;letter-spacing:.12em;color:var(--brand)}
+.v1 h4{margin:5px 0 2px;font-size:16.5px;font-weight:900;line-height:1.55;min-height:51px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.v1 .ds{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v1 .ch{display:flex;gap:6px;margin-top:10px}
+.v1 .ch span{font-size:11px;font-weight:800;background:var(--surface2);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:999px}
+.v1 .ft{display:flex;gap:10px;margin-top:12px}
+.v1 .add{flex:1;border:0;border-radius:14px;background:var(--brand);color:#fff;font-weight:900;font-size:15px;padding:13px;cursor:pointer}
+.v1 .add:hover{background:var(--brandD)}
+.v1 .stp{flex:1;display:none;align-items:center;justify-content:space-between;background:var(--brandSoft);border:1.5px solid var(--brand);border-radius:14px;padding:4px}
+.v1.stepped .stp{display:flex}.v1.stepped .add{display:none}
+.v1 .stp button{width:44px;height:44px;border-radius:11px;border:0;background:var(--brand);color:#fff;font-size:22px;font-weight:900;cursor:pointer}
+.v1 .stp button.g{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+.v1 .stp b{font-size:18px}
+/* ═════ 2 · TYPO / NO-PHOTO FIRST ═════ */
+.v2{background:linear-gradient(160deg,var(--surface),var(--surface2));border:1.5px solid var(--ink);border-radius:18px;padding:18px;box-shadow:5px 5px 0 var(--ink);transition:transform .15s,box-shadow .15s;position:relative;overflow:hidden}
+.v2:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 var(--ink)}
+.v2::before{content:"";position:absolute;inset:0;background-image:radial-gradient(var(--line) 1.2px,transparent 1.2px);background-size:14px 14px;opacity:.7;pointer-events:none}
+.v2>*{position:relative}
+.v2 .row{display:flex;gap:12px;align-items:center}
+.v2 .th{width:58px;height:58px;border-radius:16px;flex-shrink:0;object-fit:cover;border:1.5px solid var(--ink);background:var(--surface2)}
+.v2 .th.ph{display:grid;place-items:center;font-size:24px;font-weight:900;background:var(--brand);color:#fff;border:1.5px solid var(--ink)}
+.v2 .k{font-size:10.5px;font-weight:900;letter-spacing:.14em;background:var(--ink);color:var(--bg);display:inline-block;padding:3px 9px;border-radius:6px;margin-bottom:8px}
+.v2 h4{margin:0;font-size:19px;font-weight:900;line-height:1.5}
+.v2 .ds{font-size:12.5px;color:var(--muted);margin-top:2px}
+.v2 .pr{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;margin:12px 0 2px}
+.v2 .pr small{font-size:13px;color:var(--muted);font-weight:700}
+.v2 .ft{display:flex;gap:8px;margin-top:12px}
+.v2 .add{flex:1;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg);border-radius:12px;font-weight:900;font-size:15px;padding:12px;cursor:pointer}
+.v2 .stp{flex:1;display:none;align-items:center;justify-content:space-between;border:1.5px solid var(--ink);border-radius:12px;padding:3px;background:var(--surface)}
+.v2.stepped .stp{display:flex}.v2.stepped .add{display:none}
+.v2 .stp button{width:42px;height:42px;border-radius:9px;border:1.5px solid var(--ink);background:var(--surface);font-size:20px;font-weight:900;cursor:pointer}
+.v2 .stp button:last-child{background:var(--ink);color:var(--bg)}
+/* ═════ 3 · GLASS NOIR ═════ */
+.v3wrap{background:linear-gradient(140deg,#0b0e13,#1a2230);border-radius:22px;padding:6px}
+.v3{position:relative;border-radius:18px;overflow:hidden;color:#fff;min-height:340px;display:flex;flex-direction:column;justify-content:flex-end;isolation:isolate}
+.v3>img,.v3>.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.v3>.ph{background:linear-gradient(150deg,#134e4a,#0f766e 40%,#7c2d12 110%);display:grid;place-items:center;font-size:80px;font-weight:900;color:rgba(255,255,255,.85);font-family:Amiri,serif}
+.v3::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,rgba(5,7,10,.92) 30%,rgba(5,7,10,.35) 60%,rgba(5,7,10,.15))}
+.v3 .in{padding:16px}
+.v3 .eb{font-size:10px;letter-spacing:.2em;color:#5eead4;font-weight:800}
+.v3 h4{margin:4px 0;font-size:19px;font-weight:900}
+.v3 .ds{font-size:12px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v3 .ft{display:flex;align-items:center;gap:10px;margin-top:12px}
+.v3 .pr{font-size:23px;font-weight:900;font-variant-numeric:tabular-nums}
+.v3 .pr small{font-size:12px;color:#94a3b8}
+.v3 .add{margin-inline-start:auto;border:0;border-radius:999px;padding:12px 26px;font-weight:900;font-size:14px;cursor:pointer;color:#062a28;background:linear-gradient(135deg,#5eead4,#2dd4bf);box-shadow:0 0 22px rgba(45,212,191,.55);transition:.2s}
+.v3 .add:hover{box-shadow:0 0 32px rgba(45,212,191,.85);transform:translateY(-1px)}
+.v3 .stp{margin-inline-start:auto;display:none;align-items:center;gap:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(10px);border-radius:999px;padding:4px 4px}
+.v3.stepped .stp{display:flex}.v3.stepped .add{display:none}
+.v3 .stp button{width:38px;height:38px;border-radius:50%;border:0;font-size:19px;font-weight:900;cursor:pointer;background:#fff;color:#0b0e13}
+/* ═════ 4 · TICKET LEDGER ═════ */
+.v4{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:12px;position:relative;transition:.15s;margin-bottom:10px}
+.v4:hover{border-color:var(--brand);transform:translateX(-3px)}
+.v4 img,.v4 .lt{width:52px;height:52px;border-radius:13px;flex-shrink:0;object-fit:cover;background:var(--surface2)}
+.v4 .lt{display:grid;place-items:center;font-weight:900;font-size:20px;color:#fff;background:linear-gradient(135deg,var(--brand),#b45309)}
+.v4 .t{flex:1;min-width:0}.v4 h4{margin:0;font-size:14px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v4 p{margin:2px 0 0;font-size:11px;color:var(--muted)}
+.v4 .p{font-weight:900;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v4 .p small{font-size:11px;color:var(--muted)}
+.v4 .add{border:0;background:var(--ink);color:var(--bg);font-weight:900;font-size:13px;border-radius:11px;padding:10px 16px;cursor:pointer}
+.v4 .stp{display:none;align-items:center;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:2px}
+.v4.stepped .stp{display:flex}.v4.stepped .add{display:none}
+.v4 .stp button{width:32px;height:32px;border-radius:8px;border:0;background:var(--surface);font-weight:900;font-size:16px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+/* ═════ 5 · SPLIT CIRCLE ═════ */
+.v5{background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:20px 16px;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:.18s}
+.v5:hover{transform:translateY(-4px)}
+.v5 .cw{position:relative;width:118px;margin:2px auto 0}
+.v5 img,.v5 .cp{width:118px;height:118px;border-radius:50%;object-fit:cover;border:4px solid var(--surface2);outline:2px solid var(--line)}
+.v5 .cp{display:grid;place-items:center;font-size:44px;font-weight:900;color:#fff;background:conic-gradient(from 40deg,#0f766e,#14b8a6,#b45309,#0f766e)}
+.v5 .ring{position:absolute;bottom:-6px;inset-inline:0;margin:0 auto;width:max-content;background:var(--ink);color:var(--bg);font-weight:900;font-size:14px;border-radius:999px;padding:5px 14px;font-variant-numeric:tabular-nums;box-shadow:0 6px 14px rgba(0,0,0,.3)}
+.v5 h4{margin:16px 0 2px;font-size:15.5px;font-weight:900}
+.v5 .ds{font-size:12px;color:var(--muted)}
+.v5 .ft{display:flex;gap:8px;margin-top:14px}
+.v5 .add{flex:1;border:0;border-radius:15px;background:var(--ink);color:var(--bg);font-weight:900;padding:13px;cursor:pointer;font-size:14px}
+.v5 .plus{width:52px;border-radius:15px;border:1.5px solid var(--ink);background:transparent;font-size:22px;font-weight:900;cursor:pointer}
+.v5 .stp{flex:1;display:none;align-items:center;justify-content:space-between;background:var(--surface2);border:1.5px solid var(--ink);border-radius:15px;padding:4px}
+.v5.stepped .stp{display:flex}.v5.stepped .add,.v5.stepped .plus{display:none}
+.v5 .stp button{width:42px;height:42px;border-radius:12px;border:0;background:var(--ink);color:var(--bg);font-size:20px;font-weight:900;cursor:pointer}
+/* ═════ 6 · KIOSK MINI ═════ */
+.v6{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;transition:.15s;position:relative;text-align:center}
+.v6:hover{border-color:var(--ink);box-shadow:var(--shadow)}
+.v6:active{transform:scale(.96)}
+.v6 .im{height:96px;background:var(--surface2);position:relative;overflow:hidden}
+.v6 .im img{width:100%;height:100%;object-fit:cover}
+.v6 .im.noimg{background:repeating-linear-gradient(-45deg,var(--brandSoft) 0 8px,var(--surface2) 8px 16px);display:grid;place-items:center;font-weight:900;font-size:30px;color:var(--brand)}
+.v6 .qb2{position:absolute;top:8px;inset-inline-end:8px;background:var(--brand);color:#fff;font-size:12px;font-weight:900;min-width:26px;height:26px;border-radius:999px;display:none;place-items:center}
+.v6[data-qty]:not([data-qty="0"]) .qb2{display:grid}
+.v6 .bd{padding:9px 9px 10px}
+.v6 h4{margin:0;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v6 .p{font-size:14px;font-weight:900;margin-top:2px;font-variant-numeric:tabular-nums}
+.v6 .p small{font-size:10px;color:var(--muted)}
+.v6 .add{margin-top:8px;width:100%;border:0;border-radius:11px;background:var(--surface2);border:1.5px solid var(--line);font-weight:900;font-size:13px;padding:9px;cursor:pointer}
+.v6 .add:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.v6 .stp{margin-top:8px;display:none;align-items:center;justify-content:space-between;background:var(--ink);border-radius:11px;padding:3px;color:var(--bg)}
+.v6.stepped .stp{display:flex}.v6.stepped .add{display:none}
+.v6 .stp button{width:32px;height:32px;border-radius:8px;border:0;background:rgba(255,255,255,.16);color:inherit;font-size:17px;font-weight:900;cursor:pointer}
+/* ═════ 7 · CAFÉ POP ═════ */
+.v7{background:linear-gradient(170deg,#fff7ed,var(--surface));border:2px solid #fed7aa;border-radius:30px;padding:16px;position:relative;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+[data-theme="dark"] .v7{background:linear-gradient(170deg,#2a1d10,#191d21);border-color:#7c4a12}
+.v7:hover{transform:rotate(-.6deg) scale(1.015)}
+.v7 .im{border-radius:22px;overflow:hidden;aspect-ratio:16/10;position:relative;background:#fde7cf}
+.v7 .im img{width:100%;height:100%;object-fit:cover}
+.v7 .im.noimg{display:grid;place-items:center;background:radial-gradient(circle at 30% 30%,#fdba74,#f59e0b 60%,#9a3412);font-size:52px}
+.v7 .im.noimg::after{content:"☕"}
+.v7 .float{position:absolute;bottom:10px;inset-inline-start:10px;background:#fff;color:#9a3412;font-weight:900;font-size:13px;border-radius:999px;padding:6px 13px;box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.v7 h4{margin:12px 0 0;font-size:17px;font-weight:900}
+.v7 .ds{font-size:12px;color:var(--muted)}
+.v7 .ft{display:flex;align-items:center;gap:10px;margin-top:12px}
+.v7 .p{font-size:22px;font-weight:900;color:#c2410c}
+[data-theme="dark"] .v7 .p{color:#fdba74}
+.v7 .add{margin-inline-start:auto;border:0;cursor:pointer;font-weight:900;font-size:14px;color:#fff;background:linear-gradient(135deg,#f97316,#ea580c);padding:13px 26px;border-radius:999px;box-shadow:0 8px 18px -6px rgba(234,88,12,.6);transition:.15s}
+.v7 .add:hover{transform:scale(1.05)}
+.v7 .add:active{transform:scale(.94)}
+.v7 .stp{margin-inline-start:auto;display:none;align-items:center;gap:12px;background:#7c2d12;color:#fff;border-radius:999px;padding:4px 4px}
+.v7.stepped .stp{display:flex}.v7.stepped .add{display:none}
+.v7 .stp button{width:40px;height:40px;border-radius:50%;border:0;background:#fff;color:#7c2d12;font-size:20px;font-weight:900;cursor:pointer}
+/* ═════ 8 · MAISON GOLD ═════ */
+.v8{background:#101014;color:#ece5d3;border:1px solid #3a3223;border-radius:8px;overflow:hidden;position:relative}
+.v8 .im{aspect-ratio:16/10;overflow:hidden;position:relative;border-bottom:1px solid var(--gold)}
+.v8 .im img{width:100%;height:100%;object-fit:cover;filter:saturate(.92) contrast(1.05);transition:transform .6s}
+.v8:hover .im img{transform:scale(1.05)}
+.v8 .im.noimg{background:linear-gradient(160deg,#1c1a12,#2b2517);display:grid;place-items:center}
+.v8 .im.noimg::after{content:attr(data-l);font-family:"Playfair Display",serif;font-size:70px;color:var(--gold)}
+.v8 .frame{position:absolute;inset:10px;border:1px solid rgba(201,162,39,.5);pointer-events:none}
+.v8 .bd{padding:18px 18px 16px;text-align:center}
+.v8 .eb{font-size:10px;letter-spacing:.3em;color:var(--gold);font-weight:700}
+.v8 h4{font-family:"Playfair Display",Amiri,serif;margin:8px 0 4px;font-size:21px;font-weight:700}
+.v8 .ds{font-size:12px;color:#a89f83;font-style:italic}
+.v8 .dv{display:flex;align-items:center;gap:12px;margin:14px 0}
+.v8 .dv::before,.v8 .dv::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.v8 .pr{font-family:"Playfair Display",serif;font-size:26px;color:var(--gold)}
+.v8 .ft{display:flex;gap:10px}
+.v8 .add{flex:1;background:transparent;border:1px solid var(--gold);color:var(--gold);letter-spacing:.15em;font-size:12px;font-weight:700;padding:13px;cursor:pointer;transition:.2s}
+.v8 .add:hover{background:var(--gold);color:#101014}
+.v8 .stp{flex:1;display:none;align-items:center;justify-content:space-between;border:1px solid var(--gold);padding:3px}
+.v8.stepped .stp{display:flex}.v8.stepped .add{display:none}
+.v8 .stp button{width:42px;height:42px;background:var(--gold);border:0;color:#101014;font-size:19px;font-weight:900;cursor:pointer}
+.v8 .stp b{color:var(--gold);font-size:17px}
+/* ═════ UNIFORM SIZES — كل كروت الصف نفس المقاس ═════ */
+.demo{align-items:stretch}
+.demo>div{display:flex;flex-direction:column;min-width:0}
+.demo>div>[data-card]{flex:1}
+.v1{min-height:445px;display:flex;flex-direction:column}
+.v1 .bd{flex:1;display:flex;flex-direction:column}
+.v1 .ft{margin-top:auto;padding-top:12px}
+.v2{min-height:330px;display:flex;flex-direction:column}
+.v2 .ft{margin-top:auto;padding-top:12px}
+.demo>div>.v3wrap{flex:1;display:flex;flex-direction:column}
+.v3wrap .v3{flex:1;min-height:365px}
+.v4{min-height:78px}
+.v5{min-height:405px;display:flex;flex-direction:column}
+.v5 .ft{margin-top:auto;padding-top:14px}
+#s6 .v6{min-height:252px;display:flex;flex-direction:column}
+#s6 .v6 .bd{flex:1;display:flex;flex-direction:column}
+#s6 .v6 .add,#s6 .v6 .stp{margin-top:auto}
+#s6 .v6 .p{margin-bottom:8px}
+#s6 div[style*="grid"]{align-items:stretch;flex:1}
+.v7{min-height:405px;display:flex;flex-direction:column}
+.v7 .ft{margin-top:auto}
+.v8{min-height:490px;display:flex;flex-direction:column}
+.v8 .bd{flex:1;display:flex;flex-direction:column}
+.v8 .ft{margin-top:auto}
+/* ═════ FX: glare + shine + ripple + select + cart-glow + tilt ═════ */
+[data-card]{transform-style:preserve-3d}
+.glare{position:absolute;inset:0;border-radius:inherit;background:radial-gradient(440px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.22),transparent 62%);opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}
+[data-card]:hover .glare{opacity:1}
+.v3 .glare,.v8 .glare{background:radial-gradient(440px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.14),transparent 62%)}
+.shine{position:absolute;top:-25%;bottom:-25%;left:-90px;width:64px;transform:skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.38),transparent);z-index:6;pointer-events:none;opacity:0}
+[data-card]:hover .shine{opacity:1;animation:sweep .9s ease}
+@keyframes sweep{from{left:-90px}to{left:130%}}
+.add,.plus,.ladd,.stp button{position:relative;overflow:hidden}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.55);transform:scale(0);animation:rip .55s ease-out;pointer-events:none;z-index:9}
+@keyframes rip{to{transform:scale(3);opacity:0}}
+.selcheck{position:absolute;top:10px;left:50%;transform:translate(-50%,-10px) scale(.6);background:linear-gradient(135deg,#c9a227,#f5d76e);color:#241c05;font-size:11.5px;font-weight:900;padding:5px 15px;border-radius:999px;opacity:0;transition:.25s;z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.35);white-space:nowrap;pointer-events:none}
+[data-card].selected .selcheck{opacity:1;transform:translate(-50%,0) scale(1)}
+[data-card].selected{border-color:#c9a227!important;box-shadow:0 0 0 2px #c9a227,0 0 30px rgba(201,162,39,.5),var(--shadow)!important}
+.sel-dot{position:absolute;top:8px;inset-inline-start:8px;width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(15,17,20,.45);color:#fff;font-size:15px;font-weight:900;cursor:pointer;z-index:8;display:grid;place-items:center;backdrop-filter:blur(4px)}
+.sel-dot.on{background:#c9a227;border-color:#c9a227;color:#241c05}
+[data-card].in-cart{border-color:var(--brand)!important;box-shadow:0 0 0 2px var(--brand),0 16px 36px -12px rgba(15,118,110,.55)}
+[data-theme="dark"] [data-card].in-cart{box-shadow:0 0 0 2px var(--brand),0 0 26px rgba(45,212,191,.4)}
+.v3.in-cart,.v8.in-cart{box-shadow:0 0 0 2px var(--gold),0 0 34px rgba(201,162,39,.5)}
+html{scroll-behavior:smooth}
+.block{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.block.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.block{opacity:1!important;transform:none!important}.shine{display:none}}
+.hero{overflow:hidden}
+.hero::after{animation:drift 9s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate(-46px,44px) scale(1.25)}}
+.hint{margin-top:14px;font-size:12.5px;background:var(--brandSoft);border:1px dashed var(--brand);border-radius:12px;padding:10px 15px;line-height:2;position:relative;z-index:1}
+#selCount{font-weight:900;font-size:12.5px;padding:7px 14px;color:var(--brand);white-space:nowrap}
+.rec{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 20px;font-size:13px;line-height:2.1;color:var(--muted)}
+.rec b{color:var(--ink)}
+.foot{margin-top:26px;text-align:center;color:var(--muted);font-size:12.5px}
+.toast{position:fixed;bottom:22px;inset-inline:0;margin:0 auto;width:max-content;max-width:92vw;background:var(--ink);color:var(--bg);font-weight:800;font-size:13px;padding:12px 22px;border-radius:999px;opacity:0;transform:translateY(8px);transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:none}
+
+/* ═════ PREMIUM UX LAYER · 2026 ═════ */
+body{--mx:50%;--my:50%}
+.premium-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 0;padding:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 86%,transparent);backdrop-filter:blur(16px);border-radius:18px;box-shadow:var(--shadow);position:relative;z-index:10}
+.premium-search{flex:1;min-width:220px;position:relative}.premium-search input{width:100%;height:44px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:13px;padding:0 42px 0 14px;font:700 13px Cairo;outline:none;transition:.2s}.premium-search input:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--brandSoft)}
+.premium-search span{position:absolute;right:14px;top:10px;color:var(--muted)}
+.premium-chip{border:1px solid var(--line);background:var(--surface);color:var(--muted);height:40px;padding:0 13px;border-radius:12px;font:800 12px Cairo;cursor:pointer;transition:.2s}.premium-chip:hover,.premium-chip.on{color:var(--brand);border-color:var(--brand);background:var(--brandSoft)}
+[data-theme="dark"] .premium-toolbar{background:rgba(24,28,32,.78)}
+[data-card]{--spot:transparent;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s,border-color .22s}
+[data-card]::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(280px circle at var(--mx) var(--my),rgba(255,255,255,.14),transparent 55%);opacity:0;transition:opacity .2s;z-index:7}
+[data-card]:hover::after{opacity:1}
+[data-card].premium-focus{transform:translateY(-8px) scale(1.012)!important;box-shadow:0 28px 70px -24px rgba(15,118,110,.42),0 0 0 1px color-mix(in srgb,var(--brand) 60%,transparent)!important;z-index:12}
+[data-card].premium-hidden{display:none!important}
+.premium-kbd{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:23px;padding:0 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:7px;background:var(--surface2);font:800 10px Inter;color:var(--muted)}
+.cart-dock{position:fixed;left:50%;bottom:20px;transform:translate(-50%,140%);z-index:100;width:min(560px,calc(100vw - 28px));padding:10px 12px;border:1px solid color-mix(in srgb,var(--brand) 45%,var(--line));border-radius:20px;background:color-mix(in srgb,var(--surface) 84%,transparent);backdrop-filter:blur(20px);box-shadow:0 22px 70px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;transition:transform .38s cubic-bezier(.2,.9,.2,1)}
+.cart-dock.show{transform:translate(-50%,0)}.cart-dock .cart-icon{width:42px;height:42px;border-radius:13px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:19px}.cart-dock .cart-copy{flex:1;min-width:0}.cart-dock b{display:block;font-size:13px}.cart-dock small{color:var(--muted);font-size:11px}.cart-dock .cart-total{font:900 16px Inter;color:var(--brand)}
+.pulse-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:livepulse 1.8s infinite;margin-inline-end:6px}@keyframes livepulse{70%{box-shadow:0 0 0 7px transparent}}
+.ring-progress{position:absolute;inset:10px;border-radius:inherit;border:1px solid rgba(255,255,255,.13);pointer-events:none;opacity:.5}
+[data-card].in-cart .ring-progress{animation:orbitPulse 1.8s ease-in-out infinite}@keyframes orbitPulse{50%{transform:scale(1.012);opacity:.9}}
+@media(max-width:620px){.premium-toolbar{position:sticky;top:64px}.cart-dock{bottom:12px}}
+@media(prefers-reduced-motion:reduce){[data-card],.cart-dock,.premium-toolbar *{transition:none!important;animation:none!important}}
+
+</style>
+</head>
+<body data-density="3">
+<div class="top"><div class="topin">
+<div class="logo">◈</div>
+<div><h1 id="t1">8 مفاهيم لكارت الصنف — RestoFlow POS</h1><p id="t2">كل روح بتصميم مختلف · بصورة وبدون صورة · ملف واحد تفاعلي</p></div>
+<div class="ctl">
+<div class="seg"><button id="bAr" class="on">عربي</button><button id="bEn">EN</button></div>
+<div class="seg"><button id="bL" class="on">☀ فاتح</button><button id="bD">◐ داكن</button></div>
+<div class="seg"><span id="selCount">✓ 0 محدد</span></div><div class="seg"><button data-d="2">2</button><button data-d="3" class="on">3</button><button data-d="4">4</button><button data-d="5">5</button></div>
+</div></div></div>
+<div class="wrap">
+<div class="hero"><h2>نفس الصنف… <em>8 شخصيات.</em> اختار الروح اللي تناسب مطعمك</h2>
+<p>كل شكل تحته 3 نسخ: <b>بصورة</b> · <b>بدون صورة</b> (نفس الوضوح: اسم + سعر + إضافة) · <b>حالة خاصة</b> (عداد أو نفاد). كل الأزرار شغالة — دوّس + و − وشوف الـ stepper. وجرّب أزرار 2/3/4/5 فوق عشان تشوف الكروت بتناسب أي عدد وأي كثافة.</p><p class="hint">💡 دوس على أي كارت نفسه (مش الزر) عشان <b>تحدده</b> وتشوف الـ selected glow الذهبي · وحرّك الماوس فوق الكروت لتجربة الـ <b>3D tilt</b> · كل الكروت في الصف الواحد <b>نفس المقاس</b> بالظبط · والكارت اللي فيه عدد بياخد توهج أخضر (in-cart).</p>
+<div class="toc"><a href="#s1">1 Sahara</a><a href="#s2">2 Typo</a><a href="#s3">3 Noir</a><a href="#s4">4 Ticket</a><a href="#s5">5 Circle</a><a href="#s6">6 Kiosk</a><a href="#s7">7 Pop</a><a href="#s8">8 Gold</a></div></div>
+
+<!-- 1 -->
+<section class="block" id="s1"><div class="shead"><span class="snum">01</span><h3>Sahara Editorial — الدافئ الشامل</h3><span class="tag">الأصلح للكاجوال · متوازن</span></div>
+<p class="ssub">تأثير: صورة 16/10 بتكبر 1.06 عند الـ hover + سعر Pill زجاجي عائم. بدون صورة: تدرّج صحراوي + أول حرف بخط أميري. الأفضل لو عندك صور متفاوتة الجودة.</p>
+<div class="meta"><span><b>الصورة:</b> هيرو علوي</span><span><b>بدون صورة:</b> monogram + pattern</span><span><b>التأثير:</b> lift + zoom</span><span><b>يناسب:</b> 20–200 صنف</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة · عادي</p><div class="v1" data-card data-qty="0"><div class="im"><img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><span class="st">★ الأكثر مبيعًا</span><span class="qb">0</span><span class="pp">85 <small>ج.م</small></span></div><div class="bd"><div class="eb">بيتزا · مميز</div><h4>بيتزا مارغريتا — موزاريلا وريحان</h4><div class="ds">فرن حجري · صلصة سان مارزانو</div><div class="ch"><span>3 خيارات</span><span>⏱ 15 د</span></div><div class="ft"><button class="add">أضف +</button><div class="stp"><button class="g" data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div></div>
+<div><p class="dlabel">بدون صورة · نفس الوضوح</p><div class="v1" data-card data-qty="0"><div class="im noimg" data-l="م"></div><span class="qb" style="position:absolute">0</span><div class="bd"><div class="eb">برجر · أنجوس</div><h4>سماش برجر دبل — شيدر مدخن</h4><div class="ds">بطاطس + كول سلو</div><div class="ch"><span>2 خيارات</span><span>⏱ 10 د</span></div><div class="ft"><button class="add">أضف +</button><div class="stp"><button class="g" data-dec>−</button><b>0</b><button data-inc>+</button></div></div><div style="font-weight:900;font-size:20px;margin-top:10px">120 <small style="font-size:12px;color:var(--muted)">ج.م</small></div></div></div></div>
+<div><p class="dlabel">عداد ×2 + نفاد</p><div class="v1" data-card data-qty="2"><div class="im"><img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy" style="filter:grayscale(1)"><div class="veilx">نفدت الكمية</div><span class="qb">2</span><span class="pp">95 <small>ج.م</small></span></div><div class="bd"><div class="eb">سلطات · صحي</div><h4>سيزر بالدجاج المشوي</h4><div class="ds">روماني · بارميزان خفيف</div><div class="ft"><button class="add">أضف +</button><div class="stp"><button class="g" data-dec>−</button><b>2</b><button data-inc>+</button></div></div></div></div><p class="note">عداد ظاهر فوق + veil رمادي — القرار في ثانية.</p></div>
+</div></section>
+
+<!-- 2 -->
+<section class="block" id="s2"><div class="shead"><span class="snum">02</span><h3>Typo Brutalist — المطبعة أولًا</h3><span class="tag">مثالي بدون صور · سريع جدًا</span></div>
+<p class="ssub">مستلهم من القوائم المطبوعة السويسرية: ظل صلب 5px، شبكة نقطية، السعر بخط 34. الصورة مجرد thumb اختياري 58px — الكارت لا يعتمد عليها إطلاقًا. أخف كارت أداءً.</p>
+<div class="meta"><span><b>الصورة:</b> thumb جانبي اختياري</span><span><b>بدون صورة:</b> حرف ملوّن — نفس الشكل</span><span><b>التأثير:</b> hard-shadow shift</span><span><b>يناسب:</b> +500 صنف · مطابخ شعبية</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة thumb</p><div class="v2" data-card data-qty="0"><div class="row"><img class="th" src="https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&q=60&auto=format&fit=crop" alt=""><div><span class="k">PASTA · باستا</span><h4>ألفريدو بالدجاج والبارميزان</h4></div></div><div class="ds">كريمة طازجة · فلفل أسود مجروش</div><div class="pr">110 <small>ج.م</small></div><div class="ft"><button class="add">أضف للطلب +</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">بدون صورة · متطابق</p><div class="v2" data-card data-qty="0"><div class="row"><div class="th ph">س</div><div><span class="k">SUSHI · سوشي</span><h4>سلمون رول — 8 قطع</h4></div></div><div class="ds">أرز ياباني · صويا · زنجبيل</div><div class="pr">185 <small>ج.م</small></div><div class="ft"><button class="add">أضف للطلب +</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">عداد ×3</p><div class="v2" data-card data-qty="3"><div class="row"><div class="th ph">ت</div><div><span class="k">TACOS · تاكو</span><h4>تاكو لحم مدخن — 3 قطع</h4></div></div><div class="ds">ذرة · كزبرة · لايم</div><div class="pr">95 <small>ج.م</small></div><div class="ft"><button class="add">أضف للطلب +</button><div class="stp"><button data-dec>−</button><b>3</b><button data-inc>+</button></div></div></div><p class="note">بدون أي صورة والكارت كامل: اسم + سعر ضخم + عداد.</p></div>
+</div></section>
+
+<!-- 3 -->
+<section class="block" id="s3"><div class="shead"><span class="snum">03</span><h3>Glass Noir — الفاخر الليلي</h3><span class="tag">لاونج · سحور · ليلي</span></div>
+<p class="ssub">مستلهم من Apple TV + قوائم اللاونج: الصورة خلفية كاملة، الاسم فوق تدرّج، زر Add نيون متوهج. بدون صورة: تدرّج زمردي بحرف ضخم. تأثير التوهج Pulse خفيف.</p>
+<div class="meta"><span><b>الصورة:</b> خلفية full-bleed</span><span><b>بدون صورة:</b> تدرّج + حرف</span><span><b>التأثير:</b> neon glow</span><span><b>يناسب:</b> كافيهات مسائية</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة</p><div class="v3wrap"><div class="v3" data-card data-qty="0"><img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><div class="in"><div class="eb">COFFEE · مختصة</div><h4>فلات وايت — بن أثيوبي</h4><div class="ds">حليب مبخر · دبل شوت</div><div class="ft"><div class="pr">65 <small>ج.م</small></div><button class="add">أضف +</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div></div></div>
+<div><p class="dlabel">بدون صورة</p><div class="v3wrap"><div class="v3" data-card data-qty="0"><div class="ph">ش</div><div class="in"><div class="eb">DESSERT · حلويات</div><h4>تشيز كيك سان سيباستيان</h4><div class="ds">كراميل محروق · توت</div><div class="ft"><div class="pr">90 <small>ج.م</small></div><button class="add">أضف +</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div></div></div>
+<div><p class="dlabel">عداد ×2</p><div class="v3wrap"><div class="v3" data-card data-qty="2"><img src="https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><div class="in"><div class="eb">DESSERT · حلويات</div><h4>مولتن كيك بالفستق</h4><div class="ds">قلب سائل · آيس فانيليا</div><div class="ft"><div class="pr">105 <small>ج.م</small></div><button class="add">أضف +</button><div class="stp"><button data-dec>−</button><b>2</b><button data-inc>+</button></div></div></div></div></div><p class="note">العداد زجاجي blur فوق الصورة — لا يحجب الاسم.</p></div>
+</div></section>
+
+<!-- 4 -->
+<section class="block" id="s4"><div class="shead"><span class="snum">04</span><h3>Ticket Ledger — تذكرة الزحمة</h3><span class="tag">الأسرع في الذروة · كثافة قصوى</span></div>
+<p class="ssub">مستلهم من تذاكر المطبخ KDS: صفوف 74px، صورة 52px أو حرف، السعر + زر على نفس السطر. يعرض 3× أصناف في نفس الشاشة. بدون صورة: مربع حرف بتدرّج.</p>
+<div class="meta"><span><b>الصورة:</b> 52px يمين</span><span><b>بدون صورة:</b> حرف ملوّن</span><span><b>التأثير:</b> slide على hover</span><span><b>يناسب:</b> درايف-ثرو · فراخ/كشري</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px" class="tgrid">
+<div><p class="dlabel">بصورة ×3</p>
+<div class="v4" data-card data-qty="0"><img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&q=60&auto=format&fit=crop" alt=""><div class="t"><h4>مارغريتا</h4><p>★ مميز · 15 د</p></div><div class="p">85 <small>ج.م</small></div><button class="add">+ أضف</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div>
+<div class="v4" data-card data-qty="1"><img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&q=60&auto=format&fit=crop" alt=""><div class="t"><h4>سماش دبل</h4><p>2 خيارات · 10 د</p></div><div class="p">120 <small>ج.م</small></div><button class="add">+ أضف</button><div class="stp"><button data-dec>−</button><b>1</b><button data-inc>+</button></div></div>
+<div class="v4" data-card data-qty="0"><div class="lt">ش</div><div class="t"><h4>شاورما عربي دبل</h4><p>ثومية · مخلل</p></div><div class="p">75 <small>ج.م</small></div><button class="add">+ أضف</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div>
+</div>
+<div><p class="dlabel">بدون صور إطلاقًا + نفاد</p>
+<div class="v4" data-card data-qty="0"><div class="lt">ك</div><div class="t"><h4>كشري مصري — علبة كبيرة</h4><p>دقة · شطة · بصل مقرمش</p></div><div class="p">45 <small>ج.م</small></div><button class="add">+ أضف</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div>
+<div class="v4" data-card data-qty="4"><div class="lt">ف</div><div class="t"><h4>فول بالطحينة — فخار</h4><p>زيت حار · ليمون</p></div><div class="p">30 <small>ج.م</small></div><button class="add">+ أضف</button><div class="stp"><button data-dec>−</button><b>4</b><button data-inc>+</button></div></div>
+<div class="v4" data-card data-qty="0" style="opacity:.55"><div class="lt" style="filter:grayscale(1)">ط</div><div class="t"><h4>طاجن بامية — نفد</h4><p>غير متاح حاليًا</p></div><div class="p">70 <small>ج.م</small></div><button class="add" disabled style="opacity:.4">نفد</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div>
+<p class="note">6 صفوف في مساحة 3 كروت صور — هذه قوة الـ Ledger.</p></div>
+</div></section>
+
+<!-- 5 -->
+<section class="block" id="s5"><div class="shead"><span class="snum">05</span><h3>Split Circle — الدائري الودود</h3><span class="tag">تاتش كبير · مطاعم عائلية</span></div>
+<p class="ssub">مستلهم من Talabat + ماكدونالدز كيوسك: صورة دائرية 118px، السعر شارة عائمة، زرّان (أضف + زر + سريع). بدون صورة: دائرة conic بتدرّج وحرف.</p>
+<div class="meta"><span><b>الصورة:</b> دائرة وسط</span><span><b>بدون صورة:</b> دائرة تدرّج</span><span><b>التأثير:</b> float price ring</span><span><b>يناسب:</b> شاشات لمس</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة</p><div class="v5" data-card data-qty="0"><div class="cw"><img src="https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=400&q=65&auto=format&fit=crop" alt="" loading="lazy"><div class="ring">95 ج.م</div></div><h4>تاكو لحم مدخن</h4><div class="ds">ذرة · لايم · كزبرة</div><div class="ft"><button class="add">أضف للطلب</button><button class="plus">+</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">بدون صورة</p><div class="v5" data-card data-qty="0"><div class="cw"><div class="cp">م</div><div class="ring">85 ج.م</div></div><h4>مارغريتا كلاسيك</h4><div class="ds">موزاريلا · ريحان</div><div class="ft"><button class="add">أضف للطلب</button><button class="plus">+</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">عداد ×5</p><div class="v5" data-card data-qty="5"><div class="cw"><img src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&q=65&auto=format&fit=crop" alt="" loading="lazy"><div class="ring">185 ج.م</div></div><h4>سلمون رول — 8 قطع</h4><div class="ds">صويا · زنجبيل · واسابي</div><div class="ft"><button class="add">أضف للطلب</button><button class="plus">+</button><div class="stp"><button data-dec>−</button><b>5</b><button data-inc>+</button></div></div></div></div>
+</div></section>
+
+<!-- 6 -->
+<section class="block" id="s6"><div class="shead"><span class="snum">06</span><h3>Kiosk Mini — مكعبات الكثافة</h3><span class="tag">أكبر عدد في الشاشة · 150px</span></div>
+<p class="ssub">مستلهم من McDonald's kiosk + iPad POS: مربعات صغيرة، صورة 96px، اسم سطر واحد، سعر + زر مدمج. بدون صورة: pattern قطري + حرف. الضغطة كلها = إضافة (سريع).</p>
+<div class="meta"><span><b>الصورة:</b> شريط 96px</span><span><b>بدون صورة:</b> pattern + حرف</span><span><b>التأثير:</b> press scale .96</span><span><b>يناسب:</b> +300 صنف · كيوسك</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة ×2</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div class="v6" data-card data-qty="0"><div class="im"><img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&q=60&auto=format&fit=crop" alt="" loading="lazy"><span class="qb2">0</span></div><div class="bd"><h4>مارغريتا</h4><div class="p">85 <small>ج.م</small></div><button class="add">أضف</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div>
+<div class="v6" data-card data-qty="2"><div class="im"><img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&q=60&auto=format&fit=crop" alt="" loading="lazy"><span class="qb2">2</span></div><div class="bd"><h4>سماش دبل</h4><div class="p">120 <small>ج.م</small></div><button class="add">أضف</button><div class="stp"><button data-dec>−</button><b>2</b><button data-inc>+</button></div></div></div>
+</div></div>
+<div><p class="dlabel">بدون صورة ×2</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div class="v6" data-card data-qty="0"><div class="im noimg">ك</div><div class="bd"><h4>كشري كبير</h4><div class="p">45 <small>ج.م</small></div><button class="add">أضف</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div>
+<div class="v6" data-card data-qty="0"><div class="im noimg">ف</div><div class="bd"><h4>فول فخار</h4><div class="p">30 <small>ج.م</small></div><button class="add">أضف</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div>
+</div><p class="note">4 أصناف في مساحة كارت واحد كبير.</p></div>
+<div><p class="dlabel">مقاس أكبر (نفس الشكل يتمدد)</p><div class="v6" data-card data-qty="1" style="max-width:230px"><div class="im" style="height:130px"><img src="https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&q=65&auto=format&fit=crop" alt="" loading="lazy"><span class="qb2">1</span></div><div class="bd"><h4>مولتن فستق</h4><div class="p">105 <small>ج.م</small></div><button class="add">أضف</button><div class="stp"><button data-dec>−</button><b>1</b><button data-inc>+</button></div></div></div><p class="note">نفس المكوّن يتمدد — لا تصميم جديد للمقاسات.</p></div>
+</div></section>
+
+<!-- 7 -->
+<section class="block" id="s7"><div class="shead"><span class="snum">07</span><h3>Café Pop — المرح الصباحي</h3><span class="tag">كافيه · فطار · شبابي</span></div>
+<p class="ssub">مستلهم من Starbucks + Costa: باستيل مشمشي، زوايا 30px، زر حبة دواء برتقالي يقفز (spring). بدون صورة: شمس متدرجة + ☕. مرح لكن السعر برتقالي غامق بتباين AA.</p>
+<div class="meta"><span><b>الصورة:</b> blob مستدير</span><span><b>بدون صورة:</b> شمس + أيقونة</span><span><b>التأثير:</b> spring bounce</span><span><b>يناسب:</b> كافيهات · مخبوزات</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة</p><div class="v7" data-card data-qty="0"><div class="im"><img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><span class="float">65 ج.م</span></div><h4>فلات وايت أثيوبي</h4><div class="ds">دبل شوت · حليب مبخر</div><div class="ft"><div class="p">65</div><button class="add">أضف +</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">بدون صورة</p><div class="v7" data-card data-qty="0"><div class="im noimg"></div><h4>كرواسون زبدة فرنسي</h4><div class="ds">يُخبز كل ساعتين</div><div class="ft"><div class="p">40</div><button class="add">أضف +</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">عداد ×3</p><div class="v7" data-card data-qty="3"><div class="im"><img src="https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><span class="float">105 ج.م</span></div><h4>مولتن فستق حلبي</h4><div class="ds">قلب سائل · فانيليا</div><div class="ft"><div class="p">105</div><button class="add">أضف +</button><div class="stp"><button data-dec>−</button><b>3</b><button data-inc>+</button></div></div></div></div>
+</div></section>
+
+<!-- 8 -->
+<section class="block" id="s8"><div class="shead"><span class="snum">08</span><h3>Maison Gold — الفاين دايننج</h3><span class="tag">راقي · ذهبي · serif</span></div>
+<p class="ssub">مستلهم من قوائم الفنادق: أسود فحمي + ذهبي، خط Playfair، إطار داخلي رفيع، زوايا حادة 8px (عكس الكل — تميّز مقصود). بدون صورة: حرف serif ذهبي ضخم. الزر outline يمتلئ ذهبيًا.</p>
+<div class="meta"><span><b>الصورة:</b> سينمائية + إطار ذهبي</span><span><b>بدون صورة:</b> حرف serif</span><span><b>التأثير:</b> slow zoom 0.6s</span><span><b>يناسب:</b> fine-dining · ستيك</span></div>
+<div class="demo">
+<div><p class="dlabel">بصورة</p><div class="v8" data-card data-qty="0"><div class="im"><img src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><div class="frame"></div></div><div class="bd"><div class="eb">CHEF'S SELECTION</div><h4>سلمون مدخن بالأعشاب</h4><div class="ds">صوص الليمون والكبر — يُقدَّم مع الهليون</div><div class="dv"><span class="pr">320 ج.م</span></div><div class="ft"><button class="add">أضف إلى الطلب</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div></div>
+<div><p class="dlabel">بدون صورة</p><div class="v8" data-card data-qty="0"><div class="im noimg" data-l="و"><div class="frame"></div></div><div class="bd"><div class="eb">SIGNATURE</div><h4>واجيو — درجة A5</h4><div class="ds">ملح الهيمالايا · زبدة الأعشاب</div><div class="dv"><span class="pr">850 ج.م</span></div><div class="ft"><button class="add">أضف إلى الطلب</button><div class="stp"><button data-dec>−</button><b>0</b><button data-inc>+</button></div></div></div></div>
+<div><p class="dlabel">عداد ×1</p><div class="v8" data-card data-qty="1"><div class="im"><img src="https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=70&auto=format&fit=crop" alt="" loading="lazy"><div class="frame"></div></div><div class="bd"><div class="eb">TRUFFLE MENU</div><h4>ريزوتو بالترافل الأسود</h4><div class="ds">بارميزان 24 شهر · زيت الكمأة</div><div class="dv"><span class="pr">290 ج.م</span></div><div class="ft"><button class="add">أضف إلى الطلب</button><div class="stp"><button data-dec>−</button><b>1</b><button data-inc>+</button></div></div></div></div>
+</div></section>
+
+<div class="rec"><b>توصيتي كـ concept:</b> اعتمد <b>01 Sahara</b> كأساسي للكاجوال + <b>04 Ticket</b> كوضع زحمة (toggle كثافة)، ولو عندك لاونج مسائي أضف <b>03 Noir</b> كثيم ليلي. كلهم يشتركون في نفس العقد: <b>اسم سطرين + سعر tabular + زر 48px يتحول لعدّاد + حالة نفاد Veil</b> — فالتبديل بينهم سطر CSS واحد.<br>قولي أرقام الأشكال اللي عجبتك (مثال: 1 + 4 + 7) وأنا أطبقها على <b>POS/MenuItemCard.tsx</b> بنفس التوكنز.</div>
+<div class="foot">RestoFlow · 9 concepts · Premium UX · كل العدادات والأزرار والثيم واللغة والكثافة تفاعلية</div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),1600)}
+document.querySelectorAll('[data-card]').forEach(c=>{
+  let q=+c.dataset.qty||0;
+  const paint=()=>{c.dataset.qty=q;c.classList.toggle('stepped',q>0);
+    c.querySelectorAll('.stp b').forEach(b=>{b.textContent=q;b.classList.remove('qty-pop');void b.offsetWidth;b.classList.add('qty-pop')});
+    c.querySelectorAll('.qb,.qb2').forEach(b=>b.textContent=q)};
+  paint();
+  c.querySelectorAll('[data-inc]').forEach(b=>b.onclick=e=>{e.stopPropagation();q++;paint()});
+  c.querySelectorAll('[data-dec]').forEach(b=>b.onclick=e=>{e.stopPropagation();q=Math.max(0,q-1);paint()});
+  c.querySelectorAll('.add:not([disabled])').forEach(b=>b.onclick=e=>{e.stopPropagation();q++;paint();toast('أُضيف للطلب ×'+q)});
+  if(c.classList.contains('v6'))c.onclick=()=>{q++;paint()};
+});
+$('#bL').onclick=()=>{document.documentElement.dataset.theme='light';$('#bL').classList.add('on');$('#bD').classList.remove('on')};
+$('#bD').onclick=()=>{document.documentElement.dataset.theme='dark';$('#bD').classList.add('on');$('#bL').classList.remove('on')};
+document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{document.body.dataset.density=b.dataset.d;document.querySelectorAll('[data-d]').forEach(x=>x.classList.toggle('on',x===b))});
+let AR=true;
+const EN={add:'ADD +',cur:'EGP'};
+function setLang(ar){AR=ar;document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr';
+$('#bAr').classList.toggle('on',ar);$('#bEn').classList.toggle('on',!ar);
+$('#t1').textContent=ar?'8 مفاهيم لكارت الصنف — RestoFlow POS':'8 Item Card Concepts — RestoFlow POS';
+document.querySelectorAll('.add:not([disabled])').forEach(b=>{if(b.textContent.includes('أضف')||b.textContent.includes('ADD'))b.textContent=ar?'أضف +':'ADD +'});
+document.querySelectorAll('small').forEach(s=>{if(s.textContent.includes('ج.م')||s.textContent.includes('EGP'))s.textContent=ar?'ج.م':'EGP'});
+document.querySelectorAll('.ring').forEach(r=>{r.textContent=r.textContent.replace(ar?'EGP':'ج.م',ar?'ج.م':'EGP')});}
+$('#bAr').onclick=()=>setLang(true);$('#bEn').onclick=()=>setLang(false);
+</script>
+<script>
+(()=>{const $$=s=>[...document.querySelectorAll(s)];
+const pill=document.querySelector('#selCount');let sel=0;
+const upd=d=>{sel+=d;if(pill)pill.textContent='✓ '+sel+(document.documentElement.lang==='ar'?' محدد':' sel')};
+$$('[data-card]').forEach(c=>{
+  const g=document.createElement('div');g.className='glare';c.appendChild(g);
+  const sh=document.createElement('div');sh.className='shine';c.appendChild(sh);
+  const k=document.createElement('div');k.className='selcheck';k.textContent='✓ محدد';c.appendChild(k);
+  const sync=()=>c.classList.toggle('in-cart',(+c.dataset.qty||0)>0);sync();
+  new MutationObserver(sync).observe(c,{attributes:true,attributeFilter:['data-qty']});
+});
+$$('[data-card]').forEach(c=>{
+  const toggle=()=>{const on=!c.classList.contains('selected');c.classList.toggle('selected',on);upd(on?1:-1);
+    if(c.classList.contains('v6'))c.querySelector('.sel-dot')?.classList.toggle('on',on);
+    toast(on?'تم تحديد الصنف ✓':'أُلغي التحديد')};
+  if(c.classList.contains('v6')){
+    const d=document.createElement('button');d.className='sel-dot';d.textContent='✓';d.title='تحديد';
+    d.addEventListener('click',e=>{e.stopPropagation();toggle()});
+    c.appendChild(d);
+  }else{c.addEventListener('click',e=>{if(e.target.closest('button'))return;toggle()})}
+});
+const fine=matchMedia('(pointer:fine)').matches,calm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+if(fine&&!calm)$$('[data-card]:not(.v4):not(.v6)').forEach(c=>{
+  let raf=0;
+  c.addEventListener('pointermove',e=>{
+    const r=c.getBoundingClientRect(),px=(e.clientX-r.left)/r.width,py=(e.clientY-r.top)/r.height;
+    c.style.setProperty('--mx',(px*100).toFixed(1)+'%');c.style.setProperty('--my',(py*100).toFixed(1)+'%');
+    if(raf)return;raf=requestAnimationFrame(()=>{raf=0;
+      c.style.transform=`perspective(950px) rotateX(${((.5-py)*11).toFixed(2)}deg) rotateY(${((px-.5)*13).toFixed(2)}deg) translateY(-5px)`});
+  });
+  c.addEventListener('pointerleave',()=>{if(raf){cancelAnimationFrame(raf);raf=0}c.style.transform=''});
+});
+document.addEventListener('pointerdown',e=>{
+  const b=e.target.closest('.add,.plus,.ladd,.stp button,.sel-dot');if(!b||b.disabled)return;
+  const r=b.getBoundingClientRect(),d=Math.max(r.width,r.height,40);
+  const s=document.createElement('span');s.className='ripple';
+  s.style.cssText=`width:${d}px;height:${d}px;left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px`;
+  b.appendChild(s);setTimeout(()=>s.remove(),600);
+});
+const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}}),{threshold:.06});
+$$('.block').forEach(b=>io.observe(b));
+})();
+
+/* Premium interaction engine */
+(()=>{
+ const cards=[...document.querySelectorAll('[data-card]')];
+ cards.forEach((c,i)=>{
+   c.dataset.originalIndex=i;
+   c.addEventListener('pointermove',e=>{const r=c.getBoundingClientRect();c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%')});
+ });
+ const bar=document.createElement('div');bar.className='premium-toolbar';bar.innerHTML=`<div class="premium-search"><span>⌕</span><input id="smartSearch" placeholder="ابحث عن صنف…  /  Search item" autocomplete="off"></div><button class="premium-chip on" data-filter="all">All</button><button class="premium-chip" data-filter="cart">In Cart</button><button class="premium-chip" data-filter="fast">Quick Pick</button><span class="premium-kbd">/</span>`;
+ const hero=document.querySelector('.hero'); if(hero) hero.appendChild(bar);
+ const input=bar.querySelector('#smartSearch');
+ function filter(){const q=input.value.trim().toLowerCase();cards.forEach(c=>{const hit=!q||c.innerText.toLowerCase().includes(q);c.classList.toggle('premium-hidden',!hit)})}
+ input.addEventListener('input',filter);
+ bar.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{bar.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('on'));b.classList.add('on');const f=b.dataset.filter;cards.forEach(c=>{let show=true;if(f==='cart')show=c.classList.contains('in-cart');if(f==='fast')show=!!c.querySelector('.add,.plus,.ladd');c.classList.toggle('premium-hidden',!show)});input.value=f==='all'?'':input.value});
+ document.addEventListener('keydown',e=>{if(e.key==='/'&&!/input|textarea/i.test(document.activeElement.tagName)){e.preventDefault();input.focus()}});
+ const dock=document.createElement('div');dock.className='cart-dock';dock.innerHTML='<div class="cart-icon">🛒</div><div class="cart-copy"><b><span class="pulse-dot"></span>Live Order</b><small id="dockMeta">0 items selected</small></div><div class="cart-total" id="dockTotal">EGP 0</div>';document.body.appendChild(dock);
+ function updateDock(){let qty=0;cards.forEach(c=>{qty+=+(c.dataset.qty||0)});dock.classList.toggle('show',qty>0);dock.querySelector('#dockMeta').textContent=qty+' item'+(qty===1?'':'s')+' selected';dock.querySelector('#dockTotal').textContent='EGP '+(qty*100).toLocaleString();}
+ const obs=new MutationObserver(updateDock);cards.forEach(c=>obs.observe(c,{attributes:true,attributeFilter:['data-qty','class']}));updateDock();
+ cards.forEach(c=>c.addEventListener('click',()=>{c.classList.add('premium-focus');clearTimeout(c._pf);c._pf=setTimeout(()=>c.classList.remove('premium-focus'),520)}));
+})();
+</script>
+</body>
+</html>

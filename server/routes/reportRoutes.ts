@@ -84,6 +84,15 @@ router.get('/campaign-roi', reportController.getCampaignROI);
 // Operations
 router.get('/branch-performance', reportController.getBranchPerformance);
 router.get('/order-prep-time', reportController.getOrderPrepTime);
+router.get('/unpaid-orders', reportController.getUnpaidOrders);
+
+// Loss prevention (cashier-attributed discounts & voids)
+router.get('/discount-by-cashier', reportController.getDiscountByCashier);
+router.get('/voids-by-cashier', reportController.getVoidsByCashier);
+
+// Stock health
+router.get('/dead-stock', reportController.getDeadStock);
+router.get('/negative-stock', reportController.getNegativeStock);
 
 // Extended Sales
 router.get('/sales-by-order-type', reportController.getSalesByOrderType);
@@ -125,6 +134,7 @@ router.get('/customer-frequency', reportController.getCustomerFrequency);
 
 // Advanced Operations
 router.get('/kitchen-performance', reportController.getKitchenPerformance);
+router.get('/kitchen-staff-performance', reportController.getKitchenStaffPerformance);
 
 // Strategic Sales
 router.get('/menu-engineering', reportController.getMenuEngineeringMatrix);

@@ -55,7 +55,9 @@ describe('2026-07 client thermal receipt regression', () => {
     });
 
     it('keeps only a minimal print tail so it cannot create a blank paper section', () => {
-        expect(rendererSource).toContain('8px !important');
+        // Bottom safe-area must stay tiny (8-10px): enough for Arabic
+        // descenders + pill borders, never a blank paper section.
+        expect(rendererSource).toMatch(/padding:[^;]*?(8|10)px !important/);
         expect(rendererSource).not.toContain('48px !important');
     });
 

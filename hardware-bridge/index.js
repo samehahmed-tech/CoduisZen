@@ -32,13 +32,17 @@ const PAPER_FEED_AND_CUT = '\x1B\x64\x05\x1D\x56\x42\x00';
 const runtime = {
     serverConnected: false, lastPollAt: null, lastSuccessAt: null, lastError: null,
     lastServerError: null, lastPrintError: null, lastPrinterDiscoveryError: null, lastJobReportError: null,
-    jobsReceived: 0, printed: 0, failed: 0, activeJob: null, printers: [],
+    sseConnected: false, jobsReceived: 0, printed: 0, failed: 0, activeJob: null, printers: [],
 };
 
 const logDir = path.join(os.homedir(), '.restoflow-bridge');
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
 const logFile = path.join(logDir, 'bridge.log');
 const pendingReportsFile = path.join(logDir, 'pending-print-reports.json');
+// A successful printer write can be followed by a power loss before the
+// server receives the COMPLETED report. Keep a small durable ledger so a
+// reconnect does not print that same job again. Failed jobs are never added.
+const completedJobsFile = path.join(logDir, 'completed-print-jobs.json');
 if (fs.existsSync(logFile) && fs.statSync(logFile).size >= 5 * 1024 * 1024) {
     fs.rmSync(`${logFile}.1`, { force: true });
     fs.renameSync(logFile, `${logFile}.1`);
@@ -55,6 +59,28 @@ const loadPendingReports = () => {
     } catch { return new Map(); }
 };
 const pendingReports = loadPendingReports();
+const loadCompletedJobs = () => {
+    try {
+        const rows = JSON.parse(fs.readFileSync(completedJobsFile, 'utf8'));
+        if (!Array.isArray(rows)) return new Map();
+        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        return new Map(rows
+            .filter(row => row && row.id && Number(row.at) >= cutoff)
+            .slice(-2000)
+            .map(row => [String(row.id), Number(row.at)]));
+    } catch { return new Map(); }
+};
+const completedJobs = loadCompletedJobs();
+const saveCompletedJobs = () => {
+    const temp = `${completedJobsFile}.tmp`;
+    fs.writeFileSync(temp, JSON.stringify([...completedJobs.entries()].map(([id, at]) => ({ id, at })).slice(-2000)));
+    fs.renameSync(temp, completedJobsFile);
+};
+const rememberCompletedJob = (jobId) => {
+    completedJobs.set(String(jobId), Date.now());
+    while (completedJobs.size > 2000) completedJobs.delete(completedJobs.keys().next().value);
+    saveCompletedJobs();
+};
 const savePendingReports = () => {
     const temp = `${pendingReportsFile}.tmp`;
     fs.writeFileSync(temp, JSON.stringify([...pendingReports.values()]));
@@ -87,6 +113,100 @@ const fetchJson = async (url, options = {}) => {
 };
 
 const bridgeFetch = async (path, options = {}) => fetchJson(`${SERVER_URL}${path}`, options);
+
+// The bridge normally receives jobs over a long-lived SSE connection. This
+// removes the old 250-500ms polling race (and, more importantly, the server's
+// stale-job safety window) from the normal print path. Polling remains as a
+// low-frequency recovery path for network interruptions and old servers.
+let sseRequest = null;
+let sseRetryTimer = null;
+let lastSseHeartbeatAt = 0;
+const scheduleSseReconnect = () => {
+    if (sseRetryTimer) return;
+    runtime.sseConnected = false;
+    sseRetryTimer = setTimeout(() => {
+        sseRetryTimer = null;
+        connectSse();
+    }, 1000);
+};
+const connectSse = () => {
+    if (sseRequest || sseRetryTimer) return;
+    try {
+        const endpoint = new URL(`${SERVER_URL}/api/print-gateway/bridge/connect`);
+        endpoint.searchParams.set('gatewayId', GATEWAY_ID);
+        if (BRANCH_ID) endpoint.searchParams.set('branchId', BRANCH_ID);
+        const transport = endpoint.protocol === 'https:' ? require('https') : http;
+        const request = transport.get(endpoint, {
+            headers: {
+                Accept: 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'x-gateway-id': GATEWAY_ID,
+                ...(GATEWAY_TOKEN ? { 'x-gateway-token': GATEWAY_TOKEN } : {}),
+            },
+            timeout: BRIDGE_REQUEST_TIMEOUT_MS,
+        }, response => {
+            if (response.statusCode !== 200) {
+                log(`[sse] connect failed HTTP ${response.statusCode}`);
+                response.resume();
+                if (sseRequest === request) sseRequest = null;
+                scheduleSseReconnect();
+                return;
+            }
+            runtime.sseConnected = true;
+            runtime.serverConnected = true;
+            runtime.lastSuccessAt = new Date().toISOString();
+            runtime.lastServerError = null;
+            refreshLastError();
+            log('[sse] connected; print jobs are now push-delivered');
+
+            let buffer = '';
+            let closed = false;
+            const close = () => {
+                if (closed) return;
+                closed = true;
+                if (sseRequest === request) sseRequest = null;
+                runtime.sseConnected = false;
+                log('[sse] disconnected; reconnecting');
+                scheduleSseReconnect();
+            };
+            response.setEncoding('utf8');
+            response.on('data', chunk => {
+                buffer += chunk;
+                let separator;
+                while ((separator = buffer.indexOf('\n\n')) >= 0) {
+                    const block = buffer.slice(0, separator);
+                    buffer = buffer.slice(separator + 2);
+                    const dataLine = block.split(/\r?\n/).find(line => line.startsWith('data:'));
+                    if (!dataLine) continue;
+                    try {
+                        const payload = JSON.parse(dataLine.slice(5).trim());
+                        if (payload.event === 'print_job' && payload.job) {
+                            // Do not await here: the stream must stay readable
+                            // while the Windows spooler performs the write.
+                            dispatchPrintJob(payload.job);
+                        }
+                    } catch (error) {
+                        log(`[sse] invalid event: ${error.message}`);
+                    }
+                }
+            });
+            response.on('end', close);
+            response.on('error', close);
+        });
+        sseRequest = request;
+        request.on('timeout', () => request.destroy(new Error('SSE_TIMEOUT')));
+        request.on('error', error => {
+            if (sseRequest === request) sseRequest = null;
+            if (runtime.lastServerError !== error.message) log(`[sse] ${error.message}`);
+            runtime.lastServerError = error.message;
+            refreshLastError();
+            scheduleSseReconnect();
+        });
+    } catch (error) {
+        log(`[sse] ${error.message}`);
+        scheduleSseReconnect();
+    }
+};
 const removeTempFile = (file) => fs.rm(file, { force: true }, error => {
     if (error) log(`[cleanup] ${error.message}`);
 });
@@ -127,19 +247,48 @@ const listWindowsPrinters = () => new Promise((resolve) => {
 });
 
 // ── Print ──
+const isPdfPrinterName = (name) => /pdf|print\s*to\s*pdf|save\s*as\s*pdf/i.test(String(name || ''));
+const ensurePdfOutDir = () => {
+    const dir = path.join(os.homedir(), '.restoflow-bridge', 'pdf-out');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+};
 const printPngFile = (printerName, pngPath) => new Promise((resolve, reject) => {
+    // "Microsoft Print to PDF" via PrintDocument.Print() pops an invisible
+    // Save-As dialog that hangs the job until the 30s timeout when the bridge
+    // runs headless. Print straight to a timestamped PDF file instead — this
+    // is also what makes "primary printer = PDF" usable as a speed test.
+    const toPdfFile = isPdfPrinterName(printerName);
+    const pdfPath = toPdfFile
+        ? path.join(ensurePdfOutDir(), `receipt-${Date.now()}.pdf`)
+        : '';
     const psCommand = `
         Add-Type -AssemblyName System.Drawing
         $doc = New-Object System.Drawing.Printing.PrintDocument
         $doc.PrinterSettings.PrinterName = $env:RF_PRINTER_NAME
         $doc.OriginAtMargins = $false
         $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+        if ($env:RF_PDF_FILE -ne '') {
+            $doc.PrinterSettings.PrintToFile = $true
+            $doc.PrinterSettings.PrintFileName = $env:RF_PDF_FILE
+        }
         $image = [System.Drawing.Image]::FromFile($env:RF_PRINT_FILE)
         $doc.add_PrintPage({
             param($sender, $ev)
-            $width = $ev.PageBounds.Width
+            # UNITS WARNING: keep the default Display page unit (1/100 inch).
+            # PageBounds is expressed in hundredths of an inch (device
+            # independent) — the old code drew in the same unit and filled the
+            # paper exactly. Switching PageUnit to Pixel reinterprets ~315
+            # (hundredths) as 315px, which prints ~39mm wide on a 203dpi head
+            # instead of 80mm ("tiny receipt" regression).
+            # Safe-area offset: some drivers (incl. Print-to-PDF) clip the
+            # first rows at (0,0) — the "logo مقصوص من فوق" artifact.
+            # 6 units = 0.06in ≈ 1.5mm, negligible vs paper width.
+            $marginUnits = 6
+            $width = $ev.PageBounds.Width - ($marginUnits * 2)
             $height = [int][Math]::Ceiling($image.Height * ($width / $image.Width))
-            $ev.Graphics.DrawImage($image, 0, 0, $width, $height)
+            $ev.Graphics.FillRectangle([Drawing.Brushes]::White, $ev.PageBounds)
+            $ev.Graphics.DrawImage($image, $marginUnits, $marginUnits, $width, $height)
             $ev.HasMorePages = $false
         })
         $doc.Print()
@@ -147,11 +296,12 @@ const printPngFile = (printerName, pngPath) => new Promise((resolve, reject) => 
     `;
     execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
         timeout: 30000,
-        env: { ...process.env, RF_PRINTER_NAME: printerName, RF_PRINT_FILE: pngPath },
+        env: { ...process.env, RF_PRINTER_NAME: printerName, RF_PRINT_FILE: pngPath, RF_PDF_FILE: pdfPath },
     }, (err, stdout, stderr) => {
         if (err) {
             reject(new Error(`PowerShell print failed: ${stderr || err.message}`));
         } else {
+            if (pdfPath) log(`[print] PDF saved printer=${printerName} file=${pdfPath}`);
             resolve(true);
         }
     });
@@ -520,7 +670,15 @@ const runPrintJob = async (job) => {
     runtime.activeJob = job.id;
     runtime.jobsReceived += 1;
     try {
+        if (completedJobs.has(String(job.id))) {
+            log(`[print] duplicate delivery suppressed job=${job.id}`);
+            await reportJobStatus(job, 'complete');
+            return;
+        }
         await executePrint(job);
+        // Persist immediately after the printer write succeeds, before the
+        // network acknowledgement. This is the important power-loss guard.
+        rememberCompletedJob(job.id);
         runtime.printed += 1;
         runtime.lastPrintError = null;
         refreshLastError();
@@ -549,6 +707,29 @@ const runPrintJob = async (job) => {
     }
 };
 
+// Keep printer writes serialized. This is faster in practice than flooding
+// the Windows spooler: one order is handed off immediately, while a burst of
+// orders is drained in order without duplicate/concurrent USB writes.
+const pendingPrintJobs = [];
+let printPumpRunning = false;
+const dispatchPrintJob = (job) => {
+    if (!job?.id || inFlight.has(job.id) || pendingPrintJobs.some(item => item.id === job.id)) return;
+    pendingPrintJobs.push(job);
+    if (printPumpRunning) return;
+    printPumpRunning = true;
+    (async () => {
+        try {
+            while (pendingPrintJobs.length) {
+                const next = pendingPrintJobs.shift();
+                await runPrintJob(next);
+            }
+        } finally {
+            printPumpRunning = false;
+            if (pendingPrintJobs.length) dispatchPrintJob(pendingPrintJobs.shift());
+        }
+    })().catch(error => log(`[print] dispatch pump failed: ${error.message}`));
+};
+
 let pollInProgress = false;
 const tick = async () => {
     if (pollInProgress) return;
@@ -571,8 +752,15 @@ const tick = async () => {
         // Never claim another job while Windows Spooler is still handling the
         // previous one. Concurrent USB jobs can leave the queue stuck.
         if (runtime.activeJob) return;
+        // SSE is the real-time path. Keep a deliberately sparse poll only as
+        // a capability heartbeat and recovery path; it is never the normal
+        // source of latency for a print job.
+        if (runtime.sseConnected) {
+            if (Date.now() - lastSseHeartbeatAt < 15000) return;
+            lastSseHeartbeatAt = Date.now();
+        }
         const data = await bridgeFetch(
-            `/api/print-gateway/bridge/jobs?gatewayId=${encodeURIComponent(GATEWAY_ID)}&claimUnassigned=${CLAIM_UNASSIGNED}&global=${GLOBAL_CLAIM}${printersParam}`
+            `/api/print-gateway/bridge/jobs?gatewayId=${encodeURIComponent(GATEWAY_ID)}&claimUnassigned=${runtime.sseConnected ? 'false' : CLAIM_UNASSIGNED}&global=${GLOBAL_CLAIM}${printersParam}`
         );
         runtime.serverConnected = true;
         runtime.lastSuccessAt = new Date().toISOString();
@@ -580,7 +768,7 @@ const tick = async () => {
         refreshLastError();
         const jobs = data.jobs || [];
         for (const job of jobs) {
-            runPrintJob(job);
+            dispatchPrintJob(job);
         }
     } catch (error) {
         runtime.serverConnected = false;
@@ -621,7 +809,12 @@ const server = http.createServer(async (req, res) => {
         req.on('end', async () => {
             try {
                 const input = JSON.parse(body || '{}');
-                const printers = await listWindowsPrinters();
+                // The selected address is already known by the UI. Do not run
+                // a slow CIM/PowerShell discovery before every test print.
+                // Startup discovery and the cached capability list are enough.
+                const printers = input.printer
+                    ? []
+                    : (runtime.printers.length ? runtime.printers : await listWindowsPrinters());
                 const selected = input.printer || printers.find(p => p.isDefault)?.address || printers[0]?.address;
                 if (!selected) throw new Error('NO_WINDOWS_PRINTER_FOUND');
                 const isNetwork = input.printerType === 'NETWORK' || input.printerType === 'LAN' || (!String(selected).startsWith('windows:') && /^[^:]+(?::\d+)?$/.test(String(selected)));
@@ -655,6 +848,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
     log(`HTTP API on http://localhost:${PORT} (health + printers)`);
     listWindowsPrinters().then(printers => log(`[printers] detected=${printers.length} names=${printers.map(printer => printer.name).join(' | ')}`));
+    connectSse();
     tick();
     setInterval(tick, POLL_MS);
 });

@@ -106,6 +106,7 @@ const CSRF_BYPASS_PREFIXES = [
     // Initial bootstrap is intentionally unauthenticated and the controller
     // permanently closes it as soon as the first user exists.
     '/api/setup/bootstrap',
+    '/api/setup/verify-key',
     '/api/print-gateway/gateway',
     '/api/print-gateway/bridge',
     '/api/attendance-bridge',

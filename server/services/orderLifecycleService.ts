@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { db, pool } from '../db';
-import { branches, dayCloseReports, drivers, kdsTickets, managerApprovals, orderItems, orderStatusHistory, orders, tables, warehouses } from '../../src/db/schema';
+import { branches, dayCloseReports, drivers, kdsTickets, managerApprovals, orderItems, orderStatusHistory, orders, tables, warehouses, payments } from '../../src/db/schema';
 import { evaluateOrderStatusUpdate } from './orderStatusPolicy';
 import { emitBranchEvent } from '../utils/socketEmit';
 import { webhookService } from './webhookService';
@@ -11,7 +11,7 @@ import { sendWhatsAppText } from './whatsappService';
 import { whatsappAutomationService } from './whatsappAutomationService';
 import { getDateKeyInTimeZone } from '../utils/businessDate';
 import logger from '../utils/logger';
-import { reverseCogsForOrderEntry } from './financePostingService';
+import { postPosOrderEntry, reverseCogsForOrderEntry } from './financePostingService';
 
 type LifecycleUser = {
     role?: string | null;
@@ -30,6 +30,8 @@ type TransitionInput = {
     skipPolicy?: boolean;
     approvalId?: number;
     requireKitchenReady?: boolean;
+    paymentMethod?: string;
+    payments?: Array<{ method: string; amount: number; referenceNumber?: string }>;
 };
 
 const terminalStatuses = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED']);
@@ -157,6 +159,8 @@ export const transitionOrderStatus = async ({
     skipPolicy = false,
     approvalId,
     requireKitchenReady = false,
+    paymentMethod,
+    payments: paymentRows,
 }: TransitionInput) => {
     const normalizedStatus = String(nextStatus || '').toUpperCase();
     const result = await db.transaction(async (tx) => {
@@ -256,8 +260,42 @@ export const transitionOrderStatus = async ({
         }
 
         const now = new Date();
+        const isDineInSettlement = normalizedStatus === 'COMPLETED' && String(currentOrder.type || '').toUpperCase() === 'DINE_IN';
+        if (isDineInSettlement) {
+            const method = String(paymentMethod || '').trim();
+            if (!method) throw lifecycleError('PAYMENT_METHOD_REQUIRED', 400);
+            const rows = Array.isArray(paymentRows) && paymentRows.length > 0
+                ? paymentRows
+                : [{ method, amount: Number(currentOrder.total || 0) }];
+            const paidAmount = rows.reduce((sum, row) => sum + Number(row?.amount || 0), 0);
+            if (Math.abs(paidAmount - Number(currentOrder.total || 0)) > 0.01) throw lifecycleError('PAYMENT_TOTAL_MISMATCH', 400);
+            const existingPayments = await tx.select({ id: payments.id }).from(payments).where(eq(payments.orderId, orderId));
+            if (existingPayments.length === 0) {
+                for (let index = 0; index < rows.length; index += 1) {
+                    const row = rows[index];
+                    await tx.insert(payments).values({
+                        id: `PAY-${orderId}-CLOSE-${index + 1}`,
+                        orderId,
+                        method: String(row.method || method),
+                        amount: Number(row.amount || 0),
+                        referenceNumber: row.referenceNumber,
+                        status: 'COMPLETED',
+                        processedBy: changedBy || 'system',
+                        createdAt: now,
+                    });
+                }
+            }
+        }
         const [updatedOrder] = await tx.update(orders)
-            .set(getStatusPatch(normalizedStatus, now, notes))
+            .set({
+                ...getStatusPatch(normalizedStatus, now, notes),
+                ...(isDineInSettlement ? {
+                    paymentMethod: String(paymentMethod),
+                    isPaid: true,
+                    paidAmount: Number(currentOrder.total || 0),
+                    changeAmount: 0,
+                } : {}),
+            })
             .output()
             .where(eq(orders.id, orderId));
         if (!updatedOrder) throw new Error('ORDER_NOT_FOUND');
@@ -336,6 +374,9 @@ export const transitionOrderStatus = async ({
     });
 
     if (result.changed) {
+        if (normalizedStatus === 'COMPLETED' && String(result.order.type || '').toUpperCase() === 'DINE_IN' && paymentMethod) {
+            void postPosOrderEntry({ orderId, amount: Number(result.order.total || 0), branchId: result.order.branchId, userId: changedBy || 'system' });
+        }
         void runPostTransitionEffects(result.order, result.previousStatus, normalizedStatus);
     }
 

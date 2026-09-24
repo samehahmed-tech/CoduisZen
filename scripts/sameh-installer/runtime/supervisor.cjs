@@ -44,8 +44,30 @@ function supervise(name, file, cwd, env) {
   start();
 }
 
+// A force-killed supervisor never unlinks supervisor.pid. PIDs get recycled,
+// so "pid exists" alone is NOT proof another supervisor runs — verify the
+// command line first, otherwise one stale file wedges the whole system
+// (task exits 0, nothing ever starts, zero log output).
+function commandLineOf(pid) {
+  try {
+    const probe = spawnSync('powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+        `Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CommandLine`],
+      { encoding: 'utf8', windowsHide: true, timeout: 15000 });
+    return String(probe.stdout || '');
+  } catch { return ''; }
+}
 const previousPid = Number(fs.existsSync(pidFile) ? fs.readFileSync(pidFile, 'utf8') : 0);
-if (previousPid && processExists(previousPid)) process.exit(0);
+if (previousPid) {
+  let alive = false;
+  try { process.kill(previousPid, 0); alive = true; } catch { alive = false; }
+  const ours = alive && commandLineOf(previousPid).includes('supervisor.cjs');
+  if (ours) {
+    log(`another supervisor already running (pid ${previousPid}); exiting`);
+    process.exit(0);
+  }
+  if (alive) log(`stale supervisor.pid (pid ${previousPid} belongs to another process); starting anyway`);
+}
 fs.writeFileSync(pidFile, String(process.pid));
 process.on('exit', () => { try { fs.unlinkSync(pidFile); } catch {} });
 

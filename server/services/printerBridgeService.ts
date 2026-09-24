@@ -11,6 +11,7 @@ interface BridgeClient {
 
 const clients = new Map<string, BridgeClient>();
 const pollingBridges = new Map<string, { id: string; branchId: string; lastSeenAt: Date }>();
+const capabilitySnapshots = new Map<string, { hash: string; persistedAt: number }>();
 
 const ONLINE_WINDOW_SECONDS = 60;
 let printersTableEnsured = false;
@@ -44,11 +45,16 @@ const sanitizePrinterName = (value: unknown) => String(value || '').trim().slice
 export const markBridgePoll = async (gatewayId: string, branchId: string | undefined, printers?: string[]) => {
     pollingBridges.set(gatewayId, { id: gatewayId, branchId: branchId || '*', lastSeenAt: new Date() });
     if (!printers || printers.length === 0) return;
+    const names = Array.from(new Set(printers.map(sanitizePrinterName).filter(Boolean))).slice(0, 100);
+    const hash = names.slice().sort().join('\u001f');
+    const previous = capabilitySnapshots.get(gatewayId);
+    // The bridge polls frequently for low print latency. Do not turn every
+    // poll into a series of SQL MERGE statements when its printer list did
+    // not change; this was a major source of 10–20 second queue delays.
+    if (previous && previous.hash === hash && Date.now() - previous.persistedAt < 15_000) return;
     try {
         await ensurePrintersTable();
-        const names = Array.from(new Set(printers.map(sanitizePrinterName).filter(Boolean))).slice(0, 100);
-        for (const printerName of names) {
-            await pool.query(`
+        await Promise.all(names.map((printerName) => pool.query(`
                 MERGE bridge_printers AS target
                 USING (SELECT $1 AS gateway_id, $2 AS printer_name) AS src
                 ON target.gateway_id = src.gateway_id AND target.printer_name = src.printer_name
@@ -57,10 +63,10 @@ export const markBridgePoll = async (gatewayId: string, branchId: string | undef
                 WHEN NOT MATCHED THEN
                     INSERT (gateway_id, printer_name, branch_id, last_seen_at)
                     VALUES ($1, $2, $3, GETDATE());
-            `, [gatewayId, printerName, branchId || null]);
-        }
+            `, [gatewayId, printerName, branchId || null])));
         // Drop stale registrations (bridge gone for a week) to keep the table lean.
         await pool.query(`DELETE FROM bridge_printers WHERE gateway_id = $1 AND last_seen_at < DATEADD(DAY, -7, GETDATE())`, [gatewayId]);
+        capabilitySnapshots.set(gatewayId, { hash, persistedAt: Date.now() });
     } catch (error) {
         logger.warn({ err: error, gatewayId }, '[bridge] printer capability registration failed');
     }
@@ -83,7 +89,13 @@ export const getGatewayForPrinter = async (printerAddress: string | null | undef
         ORDER BY (CASE WHEN last_seen_at >= DATEADD(SECOND, -${ONLINE_WINDOW_SECONDS}, GETDATE()) THEN 0 ELSE 1 END) ASC,
                  last_seen_at DESC
     `, [raw, stripped, branchId || null]);
-    return rows[0]?.gateway_id || null;
+    if (rows[0]?.gateway_id) return rows[0].gateway_id;
+    // A single live bridge is an unambiguous owner for a local USB/Windows
+    // printer even if its capability heartbeat has not reached SQL yet.
+    // This removes the old 30-second fallback delay without guessing when
+    // multiple cashier bridges are online.
+    const liveBridges = getConnectedBridges().filter((bridge) => !branchId || bridge.branchId === branchId || bridge.branchId === '*');
+    return liveBridges.length === 1 ? liveBridges[0].id : null;
 };
 
 /** Full registry for the Printers UI: online state + registered printers per gateway. */
@@ -156,37 +168,86 @@ export const registerBridge = (gatewayId: string, branchId: string, res: Respons
     });
 };
 
-export const pushJobToBridge = async (jobId: string, branchId: string) => {
+/**
+ * Instant-push gate for UNASSIGNED jobs. Pushing blindly to the only live
+ * bridge misroutes tickets when the real owner connects via polling (e.g. a
+ * server SSE bridge swallowing a kitchen ticket whose USB printer lives on
+ * the cashier bridge) — the kitchen then never sees the order. So instant
+ * push is allowed only when it cannot misroute:
+ *   - the job carries no printer address (cash-drawer pulse / broadcast), or
+ *   - the capability registry shows THIS gateway owns that printer name.
+ * Anything else stays on the polling/capability path (capability match or
+ * the stale-job grace window), exactly like before.
+ */
+const shouldInstantPushUnassigned = async (gatewayId: string, jobId: string): Promise<boolean> => {
     const { rows } = await pool.query(
-        `SELECT id, type, content, content_type, printer_id, printer_address, printer_type, branch_id,
-                COALESCE(target_gateway_id, gateway_id) AS target_gateway_id
-         FROM print_jobs WHERE id = $1`,
+        `SELECT status, printer_address FROM print_jobs WHERE id = $1`,
         [jobId]
     );
     const job = rows[0];
-    if (!job) return false;
+    if (!job || String(job.status || '').toUpperCase() !== 'QUEUED') return false;
+    const addr = String(job.printer_address || '').trim();
+    if (!addr) return true;
+    await ensurePrintersTable();
+    const stripped = addr.startsWith('windows:') ? addr.slice('windows:'.length) : addr;
+    const { rows: owners } = await pool.query(
+        `SELECT TOP (1) gateway_id FROM bridge_printers
+          WHERE printer_name IN ($1, $2)
+          ORDER BY last_seen_at DESC`,
+        [addr, stripped]
+    );
+    if (owners.length === 0) return false;
+    return String(owners[0].gateway_id) === String(gatewayId);
+};
 
-    for (const [, client] of clients) {
-        if (job.target_gateway_id === client.id && (client.branchId === branchId || !branchId)) {
+export const pushJobToBridge = async (jobId: string, branchId: string) => {
+    const liveClients = Array.from(clients.values());
+    for (const client of liveClients) {
+        // Targeted jobs go to their owner bridge. Unassigned jobs stay on the
+        // safe polling/capability path unless shouldInstantPushUnassigned
+        // proves instant delivery cannot misroute (single bridge owning the
+        // printer, or an address-less broadcast like the cash drawer).
+        let allowUnassignedPush = 0;
+        if (liveClients.length === 1) {
             try {
-                const payload = {
-                    event: 'print_job',
-                    job: {
-                        id: job.id,
-                        type: job.type,
-                        content: job.content,
-                        contentType: job.content_type,
-                        printerId: job.printer_id,
-                        printerAddress: job.printer_address,
-                        printerType: job.printer_type,
-                        branchId: job.branch_id,
-                    },
-                };
-                client.res.write(`data: ${JSON.stringify(payload)}\n\n`);
-                return true;
+                allowUnassignedPush = (await shouldInstantPushUnassigned(client.id, jobId)) ? 1 : 0;
             } catch {
-                clients.delete(client.id);
+                allowUnassignedPush = 0;
             }
+        }
+        try {
+            const { rows } = await pool.query(
+                `UPDATE print_jobs
+                 SET status = 'PROCESSING', claimed_by = $2, claimed_at = GETDATE(),
+                     attempts = attempts + 1, updated_at = GETDATE()
+                 OUTPUT INSERTED.id, INSERTED.type, INSERTED.content, INSERTED.content_type,
+                        INSERTED.printer_id, INSERTED.printer_address, INSERTED.printer_type,
+                        INSERTED.branch_id, COALESCE(INSERTED.target_gateway_id, INSERTED.gateway_id) AS target_gateway_id
+                 WHERE id = $1 AND status = 'QUEUED' AND attempts < max_attempts
+                   AND (COALESCE(target_gateway_id, gateway_id) = $2
+                        OR ($4 = 1 AND COALESCE(target_gateway_id, gateway_id) IS NULL))
+                   AND ($3 IS NULL OR branch_id = $3)`,
+                [jobId, client.id, branchId || null, allowUnassignedPush]
+            );
+            const job = rows[0];
+            if (!job) continue;
+            const payload = {
+                event: 'print_job',
+                job: {
+                    id: job.id,
+                    type: job.type,
+                    content: job.content,
+                    contentType: job.content_type,
+                    printerId: job.printer_id,
+                    printerAddress: job.printer_address,
+                    printerType: job.printer_type,
+                    branchId: job.branch_id,
+                },
+            };
+            client.res.write(`data: ${JSON.stringify(payload)}\n\n`);
+            return true;
+        } catch {
+            clients.delete(client.id);
         }
     }
     return false;

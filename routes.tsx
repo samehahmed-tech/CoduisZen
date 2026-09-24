@@ -26,6 +26,12 @@ export const loaders = {
     RecipeManager: () => import('./components/RecipeManager'),
     Inventory: () => import('./src/features/inventory/Inventory'),
     StockRequests: () => import('./src/features/inventory/StockRequests'),
+    StockItems: () => import('./src/features/inventory/pages/StockItemsPage'),
+    Suppliers: () => import('./src/features/inventory/pages/SuppliersPage'),
+    Procurement: () => import('./src/features/inventory/pages/ProcurementPage'),
+    Warehouses: () => import('./src/features/inventory/pages/WarehousesPage'),
+    StockCounts: () => import('./src/features/inventory/pages/StockCountsPage'),
+    StockMovements: () => import('./src/features/inventory/pages/MovementsPage'),
     CRM: () => import('./components/CRM'),
     ZonesManager: () => import('./components/ZonesManager'),
     Finance: () => import('./components/Finance'),
@@ -40,6 +46,7 @@ export const loaders = {
     RolesPermissions: () => import('./components/RolesPermissions'),
     FloorDesigner: () => import('./components/FloorDesigner'),
     Production: () => import('./components/Production'),
+    Butchery: () => import('./components/ButcheryManager'),
     DispatchHub: () => import('./components/DispatchHub'),
     DriversHub: () => import('./components/DriversHub'),
     CampaignHub: () => import('./components/CampaignHub'),
@@ -91,6 +98,12 @@ const ReceiptDesigner = React.lazy(loaders.ReceiptDesigner);
 const RecipeManager = React.lazy(loaders.RecipeManager);
 const Inventory = React.lazy(loaders.Inventory);
 const StockRequests = React.lazy(loaders.StockRequests);
+const StockItems = React.lazy(loaders.StockItems);
+const Suppliers = React.lazy(loaders.Suppliers);
+const Procurement = React.lazy(loaders.Procurement);
+const Warehouses = React.lazy(loaders.Warehouses);
+const StockCounts = React.lazy(loaders.StockCounts);
+const StockMovements = React.lazy(loaders.StockMovements);
 const CRM = React.lazy(loaders.CRM);
 const ZonesManager = React.lazy(loaders.ZonesManager);
 const Finance = React.lazy(loaders.Finance);
@@ -105,6 +118,7 @@ const SettingsHub = React.lazy(loaders.SettingsHub);
 const RolesPermissions = React.lazy(loaders.RolesPermissions);
 const FloorDesigner = React.lazy(loaders.FloorDesigner);
 const Production = React.lazy(loaders.Production);
+const ButcheryManager = React.lazy(loaders.Butchery);
 const DispatchHub = React.lazy(loaders.DispatchHub);
 const DriversHub = React.lazy(loaders.DriversHub);
 const CampaignHub = React.lazy(loaders.CampaignHub);
@@ -211,6 +225,12 @@ export const router = createBrowserRouter([
             { path: 'recipes', element: withPermission(AppPermission.NAV_RECIPES, withSafe(RecipeManager)) },
             { path: 'receipt-designer', element: withPermission(AppPermission.NAV_PRINTERS, withSafe(ReceiptDesigner)) },
             { path: 'inventory', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(Inventory)) },
+            { path: 'inventory/items', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(StockItems)) },
+            { path: 'inventory/suppliers', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(Suppliers)) },
+            { path: 'inventory/procurement', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(Procurement)) },
+            { path: 'inventory/warehouses', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(Warehouses)) },
+            { path: 'inventory/counts', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(StockCounts)) },
+            { path: 'inventory/movements', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(StockMovements)) },
             { path: 'stock-requests', element: withPermission(AppPermission.NAV_INVENTORY, withSafe(StockRequests)) },
             { path: 'crm', element: withPermission(AppPermission.NAV_CRM, withSafe(CRM)) },
             { path: 'zones', element: withPermission(AppPermission.NAV_CALL_CENTER, withSafe(ZonesManager)) },
@@ -224,6 +244,7 @@ export const router = createBrowserRouter([
             { path: 'forensics', element: withPermission(AppPermission.NAV_FORENSICS, withSafe(ForensicsHub)) },
             { path: 'settings', element: withPermission(AppPermission.NAV_SETTINGS, withSafe(SettingsHub)) },
             { path: 'production', element: withPermission(AppPermission.NAV_PRODUCTION, withSafe(Production)) },
+            { path: 'butchery', element: withPermission(AppPermission.NAV_PRODUCTION, withSafe(ButcheryManager)) },
             { path: 'dispatch', element: withPermission(AppPermission.NAV_DISPATCH, withSafe(DispatchHub)) },
             { path: 'drivers', element: withPermission(AppPermission.NAV_DISPATCH, withSafe(DriversHub)) },
             { path: 'marketing', element: withPermission(AppPermission.NAV_MARKETING, withSafe(CampaignHub)) },

@@ -95,12 +95,12 @@ const LoadingScreen = memo(({ isConnected }: { isConnected: boolean }) => {
         <div className="flex flex-col items-center shrink-0">
           <div className="relative group mb-6 gpu">
             <div className="absolute -inset-8 bg-indigo-500/20 blur-[50px] rounded-full group-hover:bg-indigo-500/30 transition-all duration-700 delay-100" />
-            <div className="relative w-32 h-32 rounded-3xl bg-white/[0.03] backdrop-blur-md border border-white/10 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] flex items-center justify-center overflow-hidden">
+            <div className="relative w-60 h-32 rounded-3xl bg-white/[0.03] backdrop-blur-md border border-white/10 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] flex items-center justify-center overflow-hidden">
                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
-               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-indigo-800 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center justify-center relative overflow-hidden">
-                 <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%)] bg-[length:200%_200%] animate-pulse" />
-                 <span className="text-3xl font-black text-white tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">RF</span>
-               </div>
+                <div className="h-20 rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.35),0_0_24px_rgba(201,162,39,0.25)] ring-1 ring-amber-200/60 flex items-center justify-center relative overflow-hidden px-4" style={{ background: 'linear-gradient(135deg,#0b1b30 0%,#020617 100%)' }}>
+                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%)] bg-[length:200%_200%] animate-pulse pointer-events-none" />
+                  <img src="/logo.png?v=2" alt="Xen" className="relative h-14 w-auto max-w-[200px] object-contain" />
+                </div>
             </div>
           </div>
           <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/[0.03] border border-white/5 shadow-inner backdrop-blur-md">

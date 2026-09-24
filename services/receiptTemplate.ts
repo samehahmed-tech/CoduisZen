@@ -168,19 +168,20 @@ export const generateReceiptHTML = ({
    @page { margin: 0; size: 80mm auto; }
    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-   body {
-      font-family: 'Cairo', Tahoma, Arial, sans-serif;
-      font-size: 16px;
-      color: #000;
-      width: 76mm;
-      max-width: 100%;
-      margin: 0 auto;
-      padding: 2mm;
-      direction: ${dir};
-      line-height: 1.52;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-   }
+    body {
+       font-family: 'Cairo', Tahoma, Arial, sans-serif;
+       font-size: 16px;
+       color: #000;
+       width: 76mm;
+       max-width: 100%;
+       margin: 0 auto;
+       padding: 3mm 2mm 3mm;
+       direction: ${dir};
+       line-height: 1.6;
+       overflow: visible;
+       -webkit-print-color-adjust: exact;
+       print-color-adjust: exact;
+    }
 
    /* Header */
    .receipt-header {
@@ -197,19 +198,22 @@ export const generateReceiptHTML = ({
    .branch-name { font-size: 14px; font-weight: 800; color: #000; margin-top: 1px; }
    .branch-info { font-size: 12px; color: #333; font-weight: 700; margin-top: 1px; }
 
-   /* Title */
-   .receipt-title {
-      text-align: center;
-      font-size: 18px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      padding: 6px 0;
-      margin: 6px 0;
-      border: 1px dashed #555;
-      border-radius: 4px;
-      background: #f5f5f5;
-   }
+    /* Title — Arabic glyphs (diacritics) are taller than Latin: keep a roomy
+       line box and zero letter-spacing (spacing breaks Arabic shaping). */
+    .receipt-title {
+       text-align: center;
+       font-size: 18px;
+       font-weight: 900;
+       line-height: 1.9;
+       letter-spacing: 0;
+       padding: 8px 6px;
+       margin: 6px 0;
+       border: 1px dashed #555;
+       border-radius: 4px;
+       background: #f5f5f5;
+       overflow: visible;
+       overflow-wrap: anywhere;
+    }
 
    /* Order Meta */
     .order-meta {
@@ -227,39 +231,54 @@ export const generateReceiptHTML = ({
        gap: 1px;
        text-align: ${align};
    }
-   .meta-label {
-      font-size: 11px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #333;
-   }
-    .meta-value {
-       display: block;
+    .meta-label {
+       font-size: 11px;
        font-weight: 900;
-       font-size: 16px;
-       white-space: nowrap;
-       unicode-bidi: isolate;
-   }
-   .type-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      background: #fff;
-      color: #111;
-      border: 1.5px solid #111;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 900;
-      line-height: 1.25;
-      min-width: 56px;
-   }
-   .receipt-logo {
-      display: block;
-      max-width: 54mm;
-      max-height: 28mm;
-      object-fit: contain;
-      margin: 0 auto 5px;
-   }
+       letter-spacing: 0;
+       line-height: 1.6;
+       color: #333;
+    }
+     .meta-value {
+        display: block;
+        font-weight: 900;
+        font-size: 16px;
+        line-height: 1.6;
+        padding-block: 2px;
+        white-space: nowrap;
+        unicode-bidi: isolate;
+        overflow: visible;
+    }
+    /* Pill badges: Arabic needs a taller line box + vertical padding so the
+       text never sits on (or under) the border when rasterized. */
+    .type-badge {
+       display: inline-flex;
+       align-items: center;
+       justify-content: center;
+       padding: 4px 12px;
+       background: #fff;
+       color: #111;
+       border: 1.5px solid #111;
+       border-radius: 12px;
+       font-size: 12px;
+       font-weight: 900;
+       line-height: 1.9;
+       min-width: 56px;
+       max-width: 100%;
+       white-space: normal;
+       overflow: visible;
+       overflow-wrap: anywhere;
+       text-align: center;
+    }
+    .receipt-logo {
+       display: block;
+       max-width: 54mm;
+       max-height: 28mm;
+       width: auto;
+       height: auto;
+       object-fit: contain;
+       margin: 2mm auto 5px;
+       padding-top: 1mm;
+    }
 
    /* Customer Info */
    .customer-info {
@@ -377,40 +396,43 @@ export const generateReceiptHTML = ({
       font-size: 16px;
       font-weight: 800;
    }
-    .grand-total-value {
-       font-size: 22px;
-       font-weight: 900;
-       letter-spacing: -0.5px;
-       direction: ltr;
-       unicode-bidi: isolate;
-       white-space: nowrap;
-       text-align: ${alignEnd};
-   }
+     .grand-total-value {
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1.6;
+        letter-spacing: 0;
+        direction: ltr;
+        unicode-bidi: isolate;
+        white-space: nowrap;
+        overflow: visible;
+        padding-block: 2px;
+        text-align: ${alignEnd};
+    }
 
    /* Payment */
    .payment-section {
       text-align: center;
       padding: 6px 0;
    }
-    .payment-pill {
-       display: inline-flex;
-       align-items: center;
-       justify-content: center;
-       padding: 5px 16px;
-       min-width: 96px;
-       max-width: 100%;
-       border: 1.5px solid #333;
-       border-radius: 20px;
-       font-size: 14px;
-       font-weight: 800;
-       line-height: 1.25;
-       /* Wrap instead of clipping: clipped half-glyphs rasterize as garbage. */
-       white-space: normal;
-       overflow-wrap: anywhere;
-       text-align: center;
-       text-transform: uppercase;
-       letter-spacing: 0.5px;
-    }
+     .payment-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 18px;
+        min-width: 96px;
+        max-width: 100%;
+        border: 1.5px solid #333;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.8;
+        /* Wrap instead of clipping: clipped half-glyphs rasterize as garbage. */
+        white-space: normal;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        text-align: center;
+        letter-spacing: 0;
+     }
 
    /* Footer */
    .receipt-footer {

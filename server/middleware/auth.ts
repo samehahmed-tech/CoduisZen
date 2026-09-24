@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { requireEnv } from '../config/env';
 import { db } from '../db';
 import { userSessions } from '../../src/db/schema';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { isDatabaseUnavailableError, writeDatabaseUnavailable } from '../utils/dbErrors';
 
 export interface AuthUser {
@@ -45,12 +45,14 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
             return res.status(401).json({ error: 'INVALID_TOKEN_SESSION' });
         }
 
+        // No time-based expiry: a session lives until it is explicitly
+        // revoked/logged-out (owner requirement). Revocation still bites
+        // within seconds because every request re-checks the session row.
         const [session] = await db.select().from(userSessions).where(and(
             eq(userSessions.id, sessionId),
             eq(userSessions.userId, payload.sub || payload.id),
             eq(userSessions.tokenId, tokenId),
             eq(userSessions.isActive, true),
-            gt(userSessions.expiresAt, new Date()),
         ));
 
         if (!session || session.revokedAt) {

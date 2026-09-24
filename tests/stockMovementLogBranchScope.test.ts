@@ -65,7 +65,10 @@ describe('stock movement log shows PO receipts under branch scope', () => {
         });
 
         const auth = await createAuth(suffix, branchId);
-        const today = new Date().toISOString().split('T')[0];
+        // Local calendar day (NOT UTC): movement windows are local-midnight
+        // based, so a UTC date breaks this test daily 00:00–03:00 Cairo time.
+        const nowLocal = new Date();
+        const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
 
         const res = await request(app)
             .get('/api/reports/stock-movements')

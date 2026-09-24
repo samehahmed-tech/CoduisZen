@@ -196,6 +196,12 @@ export const updateOrderStatusSchema = z.object({
     expectedUpdatedAt: z.string().optional(),
     cancellationReason: z.string().max(500).optional(),
     approval_id: z.coerce.number().int().positive().optional(),
+    paymentMethod: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,39}$/).optional().nullable(),
+    payments: z.array(z.object({
+        method: z.string().trim().regex(/^[A-Z][A-Z0-9_]{1,39}$/),
+        amount: z.number().min(0),
+        referenceNumber: z.string().max(100).optional().nullable(),
+    })).optional(),
 });
 
 // ============================================================================

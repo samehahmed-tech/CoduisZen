@@ -1,5 +1,6 @@
 import type { ElementType } from 'react';
 import {
+    Activity,
     LayoutDashboard,
     ShoppingCart,
     ChefHat,
@@ -46,7 +47,8 @@ import {
     CalendarDays,
     ListTodo,
     Navigation,
-    Inbox
+    Inbox,
+    Beef
 } from 'lucide-react';
 import { AppPermission } from '../../types';
 
@@ -137,9 +139,16 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Package,
         color: 'cyan',
         items: [
-            { id: 'inventory-main', path: '/inventory', label: 'Stock Management', labelAr: 'إدارة المخزون', icon: Package, permission: AppPermission.NAV_INVENTORY, keywords: 'stock warehouse items' },
+            { id: 'inventory-main', path: '/inventory', label: 'Stock Overview', labelAr: 'نظرة المخزون', icon: Package, permission: AppPermission.NAV_INVENTORY, keywords: 'stock overview dashboard hub' },
+            { id: 'inventory-items', path: '/inventory/items', label: 'Stock Items', labelAr: 'الأصناف المخزنية', icon: Layers, permission: AppPermission.NAV_INVENTORY, keywords: 'stock items skus adjustments import' },
+            { id: 'inventory-suppliers', path: '/inventory/suppliers', label: 'Suppliers', labelAr: 'الموردين', icon: Truck, permission: AppPermission.NAV_INVENTORY, keywords: 'suppliers vendors returns' },
+            { id: 'inventory-procurement', path: '/inventory/procurement', label: 'Procurement', labelAr: 'المشتريات', icon: FileText, permission: AppPermission.NAV_INVENTORY, keywords: 'purchase orders receiving procurement' },
+            { id: 'inventory-warehouses', path: '/inventory/warehouses', label: 'Warehouses', labelAr: 'المخازن والتحويلات', icon: Building2, permission: AppPermission.NAV_INVENTORY, keywords: 'warehouses transfers branches logistics' },
+            { id: 'inventory-counts', path: '/inventory/counts', label: 'Stock Counts', labelAr: 'الجرد', icon: ClipboardCheck, permission: AppPermission.NAV_INVENTORY, keywords: 'stock count audit variance blind' },
+            { id: 'inventory-movements', path: '/inventory/movements', label: 'Movements', labelAr: 'الحركات والمسحوبات', icon: Activity, permission: AppPermission.NAV_INVENTORY, keywords: 'movements log consumption withdrawals' },
             { id: 'stock-requests', path: '/stock-requests', label: 'Stock Requests', labelAr: 'الطلبيات المخزنية', icon: ClipboardCheck, permission: AppPermission.NAV_INVENTORY, keywords: 'branch orders central warehouse supply requests' },
             { id: 'production', path: '/production', label: 'Production', labelAr: 'الإنتاج', icon: Factory, permission: AppPermission.NAV_PRODUCTION, keywords: 'prep manufacturing' },
+            { id: 'butchery', path: '/butchery', label: 'Butchery', labelAr: 'التشريح والتقطيع', icon: Beef, permission: AppPermission.NAV_PRODUCTION, keywords: 'butchery fabrication yield meat cutting تشريح تقطيع' },
             { id: 'wastage', path: '/wastage', label: 'Wastage', labelAr: 'الهالك والهدر', icon: Trash2, permission: AppPermission.NAV_WASTAGE, keywords: 'loss spoilage' },
             { id: 'inventory-intel', path: '/inventory-intelligence', label: 'Intelligence', labelAr: 'ذكاء المخزون', icon: Brain, permission: AppPermission.NAV_INVENTORY, keywords: 'forecast reorder analytics' },
         ],

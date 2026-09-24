@@ -4,7 +4,17 @@ import { generateKitchenTicketHTML } from './kitchenTicketTemplate';
 import { generateDriverTicketHTML } from './driverTicketTemplate';
 import { PrintJob, printService } from '../src/services/printService';
 import { findDefaultTemplate, findTemplateForPrinter, generateHtmlFromTemplate, selectReceiptTemplate } from './templateReceiptGenerator';
-import { createImagePrintPayload } from './receiptImageRenderer';
+import { createImagePrintPayload, preloadReceiptFonts } from './receiptImageRenderer';
+
+// Warm the Cairo font cache while the cashier works, so the first order's
+// render does not pay the download cost (was up to ~2.5s of the delay).
+if (typeof window !== 'undefined') {
+    try {
+        const warm = () => { preloadReceiptFonts().catch(() => undefined); };
+        if (document.readyState === 'complete') warm();
+        else window.addEventListener('load', warm, { once: true });
+    } catch { /* ignore */ }
+}
 
 interface KitchenPrintParams {
     order: Order;

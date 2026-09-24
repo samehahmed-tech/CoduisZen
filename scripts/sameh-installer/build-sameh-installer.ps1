@@ -15,12 +15,20 @@ $package = Get-Content (Join-Path $repo "package.json") -Raw | ConvertFrom-Json
 if (-not $Version) { $Version = $package.version }
 
 function Find-Iscc {
+    if ($env:ISCC_EXE -and (Test-Path $env:ISCC_EXE)) { return $env:ISCC_EXE }
     $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
-    foreach ($candidate in @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe")) {
+    $pf86 = ${env:ProgramFiles(x86)}
+    $pf64 = $env:ProgramFiles
+    foreach ($candidate in @(
+        (Join-Path $pf64 "Inno Setup 7\ISCC.exe"),
+        (Join-Path $pf86 "Inno Setup 7\ISCC.exe"),
+        (Join-Path $pf86 "Inno Setup 6\ISCC.exe"),
+        (Join-Path $pf64 "Inno Setup 6\ISCC.exe")
+    )) {
         if ($candidate -and (Test-Path $candidate)) { return $candidate }
     }
-    throw "Inno Setup 6 is required: https://jrsoftware.org/isdl.php"
+    throw "Inno Setup 6 or later is required: https://jrsoftware.org/isdl.php"
 }
 
 function Copy-Clean([string]$Source, [string]$Destination) {
@@ -140,7 +148,9 @@ try {
     $env:SAMEH_STAGE_DIR = $stage
     $env:SAMEH_OUTPUT_DIR = $out
     $env:SAMEH_INSTALLER_VERSION = $Version
-    & (Find-Iscc) (Join-Path $PSScriptRoot "sameh-installer.iss")
+    $iscc = Find-Iscc
+    Write-Host "Compiling installer with: $iscc" -ForegroundColor Cyan
+    & $iscc (Join-Path $PSScriptRoot "sameh-installer.iss")
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed." }
 } finally {
     Pop-Location

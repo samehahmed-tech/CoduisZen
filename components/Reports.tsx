@@ -11,6 +11,7 @@ import {
    FileText,
    Filter,
    Layers3,
+   Loader2,
    Printer,
    Search,
    Settings2,
@@ -22,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { reportsApi } from '../services/api/reports';
 import { getReportPrintCSS } from '../services/reportPrintStyles';
 import { downloadElementPdf } from '../services/reportPdf';
+import { getReportBrand, isSameLogoUrl, REPORT_PALETTE, REPORT_SYSTEM_NAME } from '../services/reportBrand';
 import { useReportsState } from './reports/useReportsState';
 const SalesReports = React.lazy(() => import('./reports/views/SalesReports').then((module) => ({ default: module.SalesReports })));
 const FinanceReports = React.lazy(() => import('./reports/views/FinanceReports').then((module) => ({ default: module.FinanceReports })));
@@ -118,11 +120,30 @@ const splitCsvMetadata = (rows: string[][]) => {
    };
 };
 
+const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+const normalizeExcelText = (value: string) => {
+   let out = String(value ?? '').trim();
+   // Arabic-Indic digits → Latin so Excel keeps them numeric.
+   out = out.replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)));
+   // Strip currency symbols / % / letters around the number (kept for display only).
+   const cleaned = out
+      .replace(/,/g, '')
+      .replace(/[^\d.\-+eE]/g, (ch, off, str) => {
+         // Keep a single leading minus and decimal point / exponent markers.
+         if (ch === '-' && off === 0) return ch;
+         return '';
+      });
+   return { display: out, cleaned };
+};
+
 const coerceExcelValue = (value: string) => {
-   const normalized = value.trim();
-   const numericCandidate = normalized.replace(/,/g, '');
+   const normalized = String(value ?? '').trim();
    if (!normalized) return '';
-   if (/^-?\d+(\.\d+)?$/.test(numericCandidate)) return Number(numericCandidate);
+   const { cleaned } = normalizeExcelText(normalized);
+   if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(cleaned) && cleaned !== '-' && cleaned !== '.' && cleaned !== '') {
+      const n = Number(cleaned);
+      if (Number.isFinite(n)) return n;
+   }
    return normalized;
 };
 
@@ -157,11 +178,19 @@ export const extractRenderedReportRows = (node: HTMLElement | null, emptyLabel: 
    if (!node) return { metadataRows: [] as string[][], tableRows: [[emptyLabel]] };
 
    const tables = Array.from(node.querySelectorAll('table'));
-   const table = tables.sort((a, b) => b.rows.length - a.rows.length)[0];
+   // Prefer the full-data print table (all rows) over the paginated screen table.
+   const fullTables = tables.filter((t) => t.closest('.report-full-print'));
+   const pool = fullTables.length ? fullTables : tables;
+   // Skip totals footers doubling: read thead/tbody only, footer handled separately.
+   const table = pool.sort((a, b) => b.rows.length - a.rows.length)[0];
    if (table) {
-      const tableRows = Array.from(table.rows)
-         .map((row) => Array.from(row.cells).map((cell) => (cell.textContent || '').trim()))
-         .filter((row) => row.some(Boolean));
+      const headRows = Array.from(table.querySelectorAll('thead tr')).map((row) =>
+         Array.from((row as HTMLTableRowElement).cells).map((cell) => (cell.textContent || '').trim())
+      );
+      const bodyRows = Array.from(table.querySelectorAll('tbody tr')).map((row) =>
+         Array.from((row as HTMLTableRowElement).cells).map((cell) => (cell.textContent || '').trim())
+      );
+      const tableRows = [...headRows, ...bodyRows].filter((row) => row.some(Boolean));
       if (tableRows.length) return { metadataRows: [] as string[][], tableRows };
    }
 
@@ -205,7 +234,10 @@ const Reports: React.FC = () => {
     // Heavy report re-renders (fetch + big tables/charts) run as a transition
     // so typing, clicking Apply, or switching reports never drops keystrokes.
     const [, startFilterTransition] = useTransition();
-    const [isExporting, setIsExporting] = useState(false);
+    // Which export is running — the clicked button itself spins until the
+    // file downloads. No overlay pages, no blocking banners.
+    const [exportingKind, setExportingKind] = useState<'csv' | 'pdf' | 'xlsx' | null>(null);
+    const isExporting = exportingKind !== null;
    const [pendingOutput, setPendingOutput] = useState<PendingOutput>(null);
 
    const visibleReportCategories = useMemo(
@@ -250,38 +282,60 @@ const Reports: React.FC = () => {
    const displaySubReportLabel = isArabic ? getReportDisplayLabel(activeSubReport) : activeSubReport;
 
    const openPrintableReport = (mode: 'print' | 'pdf' = 'print') => {
-      if (settings.autoPrintReports === false) return;
+      if (settings.autoPrintReports === false) {
+         setReportError(isArabic ? 'الطباعة من التقارير معطلة في الإعدادات — فعّلها من Settings Hub.' : 'Report printing is disabled in settings — enable it in Settings Hub.');
+         return;
+      }
       const node = printableRootRef.current;
       if (!node) return;
 
       const printWindow = window.open('', '_blank', 'width=1280,height=900');
       if (!printWindow) return;
 
-      const styleNodes = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-         .map((el) => el.outerHTML)
-         .join('\n');
-      const restaurantName = settings.restaurantName || 'Coduis Zen';
-      const dateRangeText = isArabic ? `${appliedRange.start} إلى ${appliedRange.end}` : `${appliedRange.start} to ${appliedRange.end}`;
+      const brand = getReportBrand({
+         settings,
+         branchName: activeBranchName,
+         reportTitle: displaySubReportLabel,
+         categoryLabel: displayCategoryLabel,
+         rangeStart: appliedRange.start,
+         rangeEnd: appliedRange.end,
+         isArabic,
+      });
+      const restaurantName = brand.restaurant;
+      const dateRangeText = brand.rangeText;
+      // Wide tables stay landscape; narrow summaries print portrait to save paper.
+      const tableCount = printableRootRef.current?.querySelector('.report-full-print table')?.rows?.[0]?.cells?.length
+         || printableRootRef.current?.querySelectorAll('table')[0]?.rows?.[0]?.cells?.length || 6;
+      const printOrientation = tableCount > 5 ? 'landscape' : 'portrait';
+      // Print shell carries only the branded cover CSS (no app styles leak,
+      // so dark mode can never bleed into the printout).
       const printCSS = getReportPrintCSS(restaurantName, displaySubReportLabel, dateRangeText, {
          logoUrl: settings.receiptLogoUrl || undefined,
-         orientation: 'landscape',
+         systemLogoUrl: (brand as any).systemLogoUrl,
+         orientation: printOrientation,
+         isArabic,
+         systemName: brand.systemName,
+         systemTagline: brand.systemTagline,
+         branchName: brand.branch,
       });
 
+      const escTitle = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       printWindow.document.write(`
         <html dir="${direction}" lang="${isArabic ? 'ar' : 'en'}">
           <head>
-            <title>${restaurantName} - ${displaySubReportLabel}${mode === 'pdf' ? ' PDF' : ''}</title>
-            ${styleNodes}
+            <meta charset="utf-8" />
+            <title>${escTitle(restaurantName)} - ${escTitle(displaySubReportLabel)}${mode === 'pdf' ? ' PDF' : ''}</title>
             ${printCSS}
           </head>
           <body>
             <main class="report-export-shell" style="padding:16px">
               <section class="report-export-cover">
-                <h1 class="report-export-title">${displaySubReportLabel}</h1>
+                <div class="report-export-eyebrow">${escTitle(brand.systemName)} • ${escTitle(brand.systemTagline)}</div>
+                <h1 class="report-export-title">${escTitle(displaySubReportLabel)}</h1>
                 <div class="report-export-meta">
-                  <span>${displayCategoryLabel}</span>
-                  <span>${dateRangeText}</span>
-                  <span>${activeBranchName || (isArabic ? 'كل الفروع' : 'All branches')}</span>
+                  <span>${escTitle(displayCategoryLabel)}</span>
+                  <span>${escTitle(dateRangeText)}</span>
+                  <span class="report-export-branch">${escTitle(brand.branch)}</span>
                   <span>${mode === 'pdf' ? (isArabic ? 'احفظ من نافذة الطباعة كملف PDF' : 'Save as PDF from print dialog') : (isArabic ? 'نسخة طباعة' : 'Print copy')}</span>
                 </div>
               </section>
@@ -292,7 +346,19 @@ const Reports: React.FC = () => {
       `);
       printWindow.document.close();
       printWindow.focus();
-      setTimeout(() => printWindow.print(), 400);
+      // Wait for webfonts + logos before printing so Arabic never prints as tofu.
+      try {
+         const doPrint = () => { try { printWindow.print(); } catch { /* noop */ } };
+         const imgs = Array.from(printWindow.document.images || []);
+         const imgReady = Promise.all(imgs.map((img: HTMLImageElement) => img.complete ? Promise.resolve() : new Promise((r) => { img.onload = () => r(null); img.onerror = () => r(null); setTimeout(() => r(null), 1500); })));
+         const fontsReady: any = (printWindow.document as any).fonts?.ready?.then(() => null).catch(() => null) ?? Promise.resolve();
+         void Promise.race([
+            Promise.all([imgReady, fontsReady]),
+            new Promise((r) => setTimeout(r, 1800)),
+         ]).then(() => setTimeout(doPrint, 120));
+      } catch {
+         setTimeout(() => { try { printWindow.print(); } catch { /* noop */ } }, 400);
+      }
    };
 
    useEffect(() => {
@@ -307,8 +373,12 @@ const Reports: React.FC = () => {
       if (pendingOutput.categoryId !== activeCategory || pendingOutput.reportName !== activeSubReport || isLoadingReport) return;
       const timer = window.setTimeout(() => {
          reportViewportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-         if (pendingOutput.mode === 'print' || pendingOutput.mode === 'pdf') {
-            openPrintableReport(pendingOutput.mode);
+         if (pendingOutput.mode === 'print') {
+            openPrintableReport('print');
+         } else if (pendingOutput.mode === 'pdf') {
+            // Direct designer-PDF download (same as the header PDF button) —
+            // no print dialog. Falls back to the print window on failure.
+            void downloadActivePdf();
          } else if (pendingOutput.mode === 'xlsx') {
             void exportXlsx(pendingOutput.reportName);
          }
@@ -345,7 +415,7 @@ const Reports: React.FC = () => {
          setReportError(isArabic ? 'تصدير CSV/Excel غير متاح لهذا التقرير. استخدم PDF أو الطباعة.' : 'CSV/Excel export is not available for this report. Use PDF or print.');
          return;
       }
-      setIsExporting(true);
+      setExportingKind('csv');
       setReportError(null);
       try {
          const blob = await reportsApi.exportCsv({
@@ -358,7 +428,7 @@ const Reports: React.FC = () => {
       } catch (error: any) {
          setReportError(error?.message || (isArabic ? 'تعذر تصدير ملف CSV لهذا التقرير.' : 'Failed to export CSV.'));
       } finally {
-         setIsExporting(false);
+         setExportingKind(null);
       }
    };
 
@@ -379,31 +449,51 @@ const Reports: React.FC = () => {
          openPrintableReport('pdf');
          return;
       }
-      setIsExporting(true);
+      setExportingKind('pdf');
       try {
+         const pdfBrand = getReportBrand({
+            settings,
+            branchName: activeBranchName,
+            reportTitle: displaySubReportLabel,
+            categoryLabel: displayCategoryLabel,
+            rangeStart: appliedRange.start,
+            rangeEnd: appliedRange.end,
+            isArabic,
+         });
+         const pdfTableCols = node.querySelector('.report-full-print table')?.rows?.[0]?.cells?.length
+            || node.querySelectorAll('table')[0]?.rows?.[0]?.cells?.length || 6;
          await downloadElementPdf(node, {
             filename: getSafeFileName(activeSubReport, appliedRange.start, appliedRange.end, 'pdf'),
             title: displaySubReportLabel,
-            restaurant: settings.restaurantName || 'Coduis Zen',
-            logoUrl: settings.receiptLogoUrl || '/logo.png',
+            restaurant: pdfBrand.restaurant,
+            logoUrl: settings.receiptLogoUrl || '/logo.png?v=2',
+            systemLogoUrl: (pdfBrand as any).systemLogoUrl,
             metaChips: [
                displayCategoryLabel,
-               isArabic ? `${appliedRange.start} إلى ${appliedRange.end}` : `${appliedRange.start} to ${appliedRange.end}`,
-               activeBranchName || (isArabic ? 'كل الفروع' : 'All branches'),
+               pdfBrand.rangeText,
             ],
             subtitle: isArabic ? REPORT_DESCRIPTIONS_AR[activeCategory] : REPORT_DESCRIPTIONS_EN[activeCategory],
-            orientation: 'landscape',
+            orientation: pdfTableCols > 5 ? 'landscape' : 'portrait',
             isArabic,
+            systemName: pdfBrand.systemName,
+            systemTagline: pdfBrand.systemTagline,
+            branchName: pdfBrand.branch,
          });
       } catch (error: any) {
-         // Pixel pipeline failed (huge report, blocked canvas, etc.) — classic print flow still works.
+         // Pixel pipeline failed (huge report, blocked canvas, etc.) — log
+         // for diagnosis, then fall back to the classic print flow.
+         try {
+            console.warn('[Reports] direct PDF failed, falling back to print:', error);
+         } catch {
+            // logging must never break the fallback
+         }
          try {
             openPrintableReport('pdf');
          } catch {
             setReportError(error?.message || (isArabic ? 'تعذر إنشاء ملف PDF.' : 'Failed to build PDF.'));
          }
       } finally {
-         setIsExporting(false);
+         setExportingKind(null);
       }
    };
 
@@ -413,7 +503,7 @@ const Reports: React.FC = () => {
          if (category) selectReport(category.id, reportName, 'xlsx');
          return;
       }
-      setIsExporting(true);
+      setExportingKind('xlsx');
       setReportError(null);
       try {
          let metadataRows: string[][] = [];
@@ -437,79 +527,147 @@ const Reports: React.FC = () => {
          const bodyRows = tableRows.slice(1);
          const ExcelJS = await import('exceljs');
          const workbook = new ExcelJS.Workbook();
-         workbook.creator = 'Coduis Zen';
+         const brand = getReportBrand({
+            settings,
+            branchName: activeBranchName,
+            reportTitle: isArabic ? getReportDisplayLabel(reportName) : reportName,
+            categoryLabel: displayCategoryLabel,
+            rangeStart: appliedRange.start,
+            rangeEnd: appliedRange.end,
+            isArabic,
+         });
+         const P = REPORT_PALETTE;
+         const cairo = (font: any = {}) => ({ name: 'Cairo', ...font });
+         const thinLine = { style: 'thin', color: { argb: `FF${P.line}` } } as const;
+         const fullBorder = {
+            top: thinLine, left: thinLine, bottom: thinLine, right: thinLine,
+         };
+
+         workbook.creator = REPORT_SYSTEM_NAME;
+         workbook.lastModifiedBy = REPORT_SYSTEM_NAME;
          workbook.created = new Date();
+         workbook.modified = new Date();
+         (workbook as any).company = brand.restaurant;
          workbook.views = [{ rightToLeft: isArabic } as any];
 
          const sheet = workbook.addWorksheet(isArabic ? 'التقرير' : 'Report', {
-            views: [{ rightToLeft: isArabic, state: 'frozen', ySplit: 10 }],
+            views: [{ rightToLeft: isArabic, state: 'frozen', ySplit: 5 }],
             properties: { defaultRowHeight: 24 },
          });
-         const restaurantName = settings.restaurantName || 'Coduis Zen';
-         const reportLabel = isArabic ? getReportDisplayLabel(reportName) : reportName;
+         const reportLabel = brand.reportTitle;
+         const restaurantName = brand.restaurant;
          const columnCount = Math.max(headers.length, 6);
-         // Row 1: restaurant brand + logo (skipped silently if unavailable)
+         const alignEdge = isArabic ? 'right' : 'left';
+
+         // Row 1 — system eyebrow + logo
          sheet.mergeCells(1, 1, 1, columnCount);
-         sheet.getCell(1, 1).value = restaurantName;
-         sheet.getCell(1, 1).font = { bold: true, size: 18, color: { argb: 'FF0F766E' } };
-         sheet.getCell(1, 1).alignment = { vertical: 'middle', horizontal: isArabic ? 'right' : 'left' };
-         sheet.getRow(1).height = 30;
-         const logo = await loadLogoBase64(settings.receiptLogoUrl || '/logo.png');
-         if (logo) {
+         sheet.getCell(1, 1).value = `${brand.systemName}  •  ${brand.systemTagline}`.toUpperCase();
+         sheet.getCell(1, 1).font = cairo({ bold: true, size: 9, color: { argb: `FF${P.teal}` } });
+         sheet.getCell(1, 1).alignment = { vertical: 'middle', horizontal: alignEdge };
+         sheet.getRow(1).height = 18;
+         // Dual logos: restaurant (edge) + system mark beside it. Cell-anchored
+         // (no fractional cols) so RTL/LTR both stay stable.
+         const placeLogo = async (url: string | undefined, colStart: number) => {
+            const logo = await loadLogoBase64(url || '/logo.png?v=2');
+            if (!logo) return;
             try {
                const imageId = workbook.addImage({ base64: logo.base64, extension: logo.extension });
                sheet.addImage(imageId, {
-                  tl: { col: isArabic ? columnCount - 1.6 : 0, row: 0 },
-                  br: { col: isArabic ? columnCount + 0.4 : 2, row: 1 },
+                  tl: { col: colStart, row: 0 },
+                  br: { col: colStart + 1, row: 2 },
                   editAs: 'oneCell',
                } as any);
             } catch {
                // logo placement is decorative — never fail the export
             }
+         };
+         const restaurantLogoUrl = settings.receiptLogoUrl || '/logo.png?v=2';
+         const systemLogoUrl = (brand as any).systemLogoUrl;
+         // Second mark only when it is a genuinely different image.
+         const dualLogos = !!systemLogoUrl && !isSameLogoUrl(systemLogoUrl, restaurantLogoUrl);
+         if (isArabic) {
+            await placeLogo(restaurantLogoUrl, dualLogos ? Math.max(0, columnCount - 2) : Math.max(0, columnCount - 1));
+            if (dualLogos) await placeLogo(systemLogoUrl, Math.max(0, columnCount - 1));
+         } else {
+            await placeLogo(restaurantLogoUrl, 0);
+            if (dualLogos) await placeLogo(systemLogoUrl, 1);
          }
-         sheet.mergeCells(2, 1, 4, columnCount);
-         sheet.getCell(2, 1).value = reportLabel;
-         sheet.getCell(2, 1).font = { bold: true, size: 24, color: { argb: 'FFFFFFFF' } };
-         sheet.getCell(2, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10243E' } };
-         sheet.getCell(2, 1).alignment = { vertical: 'middle', horizontal: isArabic ? 'right' : 'left' };
 
-         sheet.mergeCells(5, 1, 5, columnCount);
-         sheet.getCell(5, 1).value = isArabic
-            ? `الفترة: ${appliedRange.start} إلى ${appliedRange.end} | الفرع: ${activeBranchName || 'كل الفروع'}`
-            : `Range: ${appliedRange.start} to ${appliedRange.end} | Branch: ${activeBranchName || 'All branches'}`;
-         sheet.getCell(5, 1).font = { bold: true, size: 11, color: { argb: 'FF64748B' } };
-         sheet.getCell(5, 1).alignment = { horizontal: isArabic ? 'right' : 'left' };
+         // Row 2 — restaurant / company name
+         sheet.mergeCells(2, 1, 2, columnCount);
+         sheet.getCell(2, 1).value = restaurantName;
+         sheet.getCell(2, 1).font = cairo({ bold: true, size: 20, color: { argb: `FF${P.navy}` } });
+         sheet.getCell(2, 1).alignment = { vertical: 'middle', horizontal: alignEdge };
+         sheet.getRow(2).height = 32;
 
-         const metaEntries = [
+         // Row 3 — report title band (navy + gold rule)
+         sheet.mergeCells(3, 1, 3, columnCount);
+         sheet.getCell(3, 1).value = reportLabel;
+         sheet.getCell(3, 1).font = cairo({ bold: true, size: 15, color: { argb: `FF${P.white}` } });
+         sheet.getCell(3, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${P.navy}` } };
+         sheet.getCell(3, 1).alignment = { vertical: 'middle', horizontal: alignEdge };
+         sheet.getCell(3, 1).border = { bottom: { style: 'medium', color: { argb: `FF${P.gold}` } } };
+         sheet.getRow(3).height = 32;
+
+         // Row 4 — range / branch / category / generated band
+         sheet.mergeCells(4, 1, 4, columnCount);
+         const metaBand = [brand.rangeText, `${isArabic ? 'الفرع' : 'Branch'}: ${brand.branch}`, brand.categoryLabel, `${brand.generatedLabel}: ${brand.generatedAt}`]
+            .filter(Boolean)
+            .join('   |   ');
+         sheet.getCell(4, 1).value = metaBand;
+         sheet.getCell(4, 1).font = cairo({ bold: true, size: 10, color: { argb: `FF${P.muted}` } });
+         sheet.getCell(4, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${P.bandAlt}` } };
+         sheet.getCell(4, 1).alignment = { horizontal: alignEdge, vertical: 'middle', wrapText: true };
+         sheet.getCell(4, 1).border = {
+            top: thinLine,
+            bottom: { style: 'thin', color: { argb: `FF${P.gold}` } },
+         };
+         sheet.getRow(4).height = 24;
+
+         // KPI meta cards — wrapped across as many label/value row-pairs as
+         // needed so no KPI is ever dropped on narrow tables (old code sliced
+         // to columnCount and silently lost the rest).
+         const allMetaEntries = [
             [isArabic ? 'نوع التقرير' : 'Report type', getExportReportType(reportName)],
-            [isArabic ? 'تاريخ التصدير' : 'Exported at', new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-GB')],
-            ...metadataRows.slice(0, 4),
-         ].slice(0, columnCount);
-         metaEntries.forEach(([label, value], index) => {
-            const col = index + 1;
-            sheet.getCell(7, col).value = label;
-            sheet.getCell(7, col).font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
-            sheet.getCell(7, col).alignment = { horizontal: 'center' };
-            sheet.getCell(8, col).value = value;
-            sheet.getCell(8, col).font = { bold: true, size: 12, color: { argb: 'FF10243E' } };
-            sheet.getCell(8, col).alignment = { horizontal: 'center', wrapText: true };
-            sheet.getCell(8, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
-            sheet.getCell(8, col).border = {
-               top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-               bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-            };
+            [isArabic ? 'تاريخ التصدير' : 'Exported at', brand.generatedAt],
+            ...metadataRows,
+         ].slice(0, columnCount * 3);
+         const metaChunks: string[][][] = [];
+         for (let i = 0; i < allMetaEntries.length; i += columnCount) {
+            metaChunks.push(allMetaEntries.slice(i, i + columnCount));
+         }
+         let metaRow = 5;
+         metaChunks.forEach((chunk) => {
+            chunk.forEach(([label, value], index) => {
+               const col = index + 1;
+               const labelCell = sheet.getCell(metaRow, col);
+               labelCell.value = label;
+               labelCell.font = cairo({ bold: true, size: 9, color: { argb: `FF${P.gold}` } });
+               labelCell.alignment = { horizontal: 'center', vertical: 'middle' };
+               const valueCell = sheet.getCell(metaRow + 1, col);
+               valueCell.value = value;
+               valueCell.font = cairo({ bold: true, size: 12, color: { argb: `FF${P.navy}` } });
+               valueCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+               valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${P.white}` } };
+               valueCell.border = fullBorder;
+            });
+            sheet.getRow(metaRow).height = 18;
+            sheet.getRow(metaRow + 1).height = 26;
+            metaRow += 2;
          });
+         const headerRowNumber = metaRow;
 
-         const headerRow = sheet.getRow(10);
+         // Table header (navy + gold rule)
+         const headerRow = sheet.getRow(headerRowNumber);
          headerRow.values = headers.length ? headers : [isArabic ? 'البيان' : 'Item'];
-         headerRow.height = 30;
+         headerRow.height = 32;
          headerRow.eachCell((cell) => {
-            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+            cell.font = cairo({ bold: true, color: { argb: `FF${P.white}` }, size: 11 });
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${P.navy}` } };
             cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
             cell.border = {
-               top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-               bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+               ...fullBorder,
+               bottom: { style: 'medium', color: { argb: `FF${P.gold}` } },
             };
          });
 
@@ -523,59 +681,84 @@ const Reports: React.FC = () => {
                const isNumber = typeof value === 'number';
                if (!isNumber) columnIsNumeric[colNumber - 1] = false;
                else columnSums[colNumber - 1] += value;
-               const isNegative = isNumber && value < 0;
-               cell.font = {
+                const isNegative = isNumber && value < 0;
+                if (isNumber) cell.numFmt = '#,##0.00';
+                cell.font = cairo({
                   size: 10,
                   bold: colNumber === 1,
-                  color: { argb: isNegative ? 'FFBE123C' : 'FF142033' },
-               };
+                  color: { argb: isNegative ? `FF${P.danger}` : `FF${P.ink}` },
+               });
                cell.alignment = {
-                  horizontal: isNumber ? 'center' : isArabic ? 'right' : 'left',
+                  horizontal: isNumber ? 'center' : alignEdge,
                   vertical: 'middle',
                   wrapText: true,
                };
                if (rowIndex % 2 === 1) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${P.band}` } };
                }
-               cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
+               cell.border = fullBorder;
             });
          });
 
          if (bodyRows.length > 0 && columnIsNumeric.some(Boolean)) {
             const totalsRow = sheet.addRow(
                headers.map((_, colIndex) => {
-                  if (colIndex === 0) return isArabic ? 'الإجمالي' : 'TOTAL';
+                  if (colIndex === 0) return brand.totalLabel;
                   return columnIsNumeric[colIndex] ? Math.round(columnSums[colIndex] * 100) / 100 : '';
                })
             );
-            totalsRow.height = 26;
-            totalsRow.eachCell((cell) => {
-               cell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+             totalsRow.height = 28;
+             totalsRow.eachCell((cell) => {
+                if (typeof cell.value === 'number') cell.numFmt = '#,##0.00';
+                cell.font = cairo({ bold: true, size: 11, color: { argb: `FF${P.white}` } });
+               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${P.teal}` } };
                cell.alignment = { horizontal: 'center', vertical: 'middle' };
-               cell.border = { top: { style: 'medium', color: { argb: 'FF0F766E' } } };
+               cell.border = {
+                  ...fullBorder,
+                  top: { style: 'medium', color: { argb: `FF${P.gold}` } },
+               };
             });
          }
 
+         // Footer — system • restaurant • branch • generated
+         const footerRow = sheet.addRow([]);
+         sheet.mergeCells(footerRow.number, 1, footerRow.number, columnCount);
+         sheet.getCell(footerRow.number, 1).value =
+            `${brand.systemName}  •  ${restaurantName}  •  ${brand.branch}  •  ${brand.generatedLabel}: ${brand.generatedAt}`;
+         sheet.getCell(footerRow.number, 1).font = cairo({ italic: true, size: 9, color: { argb: `FF${P.muted}` } });
+         sheet.getCell(footerRow.number, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+         sheet.getRow(footerRow.number).height = 20;
+
+         // Arabic glyphs run wider than Latin at the same char count — weight
+         // CJK/Arabic chars ×1.8 so columns don't clip in Excel.
+         const textWidth = (s: unknown) => {
+            const str = String(s ?? '');
+            let w = 0;
+            for (const ch of str) w += /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u4E00-\u9FFF]/.test(ch) ? 1.8 : 1;
+            return w;
+         };
          const widthSource = [headers, ...bodyRows.slice(0, 200)];
          for (let colIndex = 0; colIndex < columnCount; colIndex += 1) {
-            const maxLength = Math.max(12, ...widthSource.map((row) => String(row[colIndex] ?? '').length));
-            sheet.getColumn(colIndex + 1).width = Math.min(Math.max(maxLength + 4, 14), 38);
+            const maxLength = Math.max(12, ...widthSource.map((row) => textWidth(row[colIndex])));
+            sheet.getColumn(colIndex + 1).width = Math.min(Math.max(maxLength + 5, 15), 48);
          }
          if (headers.length) {
-            sheet.autoFilter = { from: { row: 10, column: 1 }, to: { row: 10, column: headers.length } };
+            sheet.autoFilter = { from: { row: headerRowNumber, column: 1 }, to: { row: headerRowNumber, column: headers.length } };
          }
-         sheet.pageSetup = {
-            orientation: 'landscape',
-            fitToPage: true,
-            fitToWidth: 1,
-            fitToHeight: 0,
-            paperSize: 9,
-            horizontalCentered: true,
-         } as any;
+         // Freeze everything above the table header (cover + KPI cards).
+         (sheet.views as any) = [{ rightToLeft: isArabic, state: 'frozen', ySplit: headerRowNumber }];
+          sheet.pageSetup = {
+             orientation: headers.length > 5 ? 'landscape' : 'portrait',
+             fitToPage: true,
+             fitToWidth: 1,
+             fitToHeight: 0,
+             paperSize: 9,
+             horizontalCentered: true,
+             printTitlesRow: `${headerRowNumber}:${headerRowNumber}`,
+          } as any;
          sheet.headerFooter = {
-            oddHeader: `&L&\"Segoe UI,Bold\"&10 ${restaurantName} — ${reportLabel}&R&\"Segoe UI\"&9 ${appliedRange.start} : ${appliedRange.end}`,
-            oddFooter: `&L&\"Segoe UI\"&8 &D &T&C&\"Segoe UI\"&8 ${isArabic ? 'صفحة' : 'Page'} &P / &N&R&\"Segoe UI\"&8 Coduis Zen`,
+            oddHeader: `&L&\"Cairo,Bold\"&10 ${restaurantName} — ${reportLabel}&R&\"Cairo\"&9 ${appliedRange.start} : ${appliedRange.end}`,
+            oddFooter: `&L&\"Cairo\"&8 &D &T&C&\"Cairo\"&8 ${brand.pageLabel} &P / &N&R&\"Cairo\"&8 ${REPORT_SYSTEM_NAME} • ${restaurantName}`,
          };
 
          const buffer = await workbook.xlsx.writeBuffer();
@@ -586,7 +769,7 @@ const Reports: React.FC = () => {
       } catch (error: any) {
          setReportError(error?.message || (isArabic ? 'تعذر تصدير ملف Excel لهذا التقرير.' : 'Failed to export Excel.'));
       } finally {
-         setIsExporting(false);
+         setExportingKind(null);
       }
    };
 
@@ -632,15 +815,15 @@ const Reports: React.FC = () => {
 
                      <div className="flex flex-wrap gap-2">
                         <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting} className="inline-flex items-center justify-center gap-2 rounded-lg border border-success/25 bg-success/10 px-3 py-2.5 text-xs font-black text-success transition hover:bg-success/15 disabled:opacity-60" title="Excel">
-                           <FileSpreadsheet size={16} />
+                           {exportingKind === 'xlsx' ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
                            Excel
                         </button>
                         <button onClick={() => exportPdf(activeSubReport)} disabled={isExporting} className="inline-flex items-center justify-center gap-2 rounded-lg border border-danger/25 bg-danger/10 px-3 py-2.5 text-xs font-black text-danger transition hover:bg-danger/15 disabled:opacity-60">
-                           <FileText size={16} />
+                           {exportingKind === 'pdf' ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
                            PDF
                         </button>
                         <button onClick={() => exportCsv(activeSubReport)} disabled={isExporting || !canExportActiveCsv} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-app px-3 py-2.5 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title={canExportActiveCsv ? 'CSV' : (isArabic ? 'CSV غير متاح لهذا التقرير' : 'CSV unavailable for this report')}>
-                           <Download size={16} />
+                           {exportingKind === 'csv' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                            CSV
                         </button>
                         <button onClick={() => openPrintableReport('print')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-xs font-black text-white shadow-md shadow-primary/20 transition hover:bg-primary-hover">
@@ -797,10 +980,10 @@ const Reports: React.FC = () => {
                                              <Printer size={15} />
                                           </button>
                                           <button onClick={() => exportXlsx(report)} disabled={isExporting} className="rounded-md p-2 text-success transition hover:bg-success/10 disabled:opacity-50" title="Excel">
-                                             <FileSpreadsheet size={15} />
+                                             {exportingKind === 'xlsx' ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
                                           </button>
                                           <button onClick={() => exportPdf(report)} disabled={isExporting} className="rounded-md p-2 text-danger transition hover:bg-danger/10 disabled:opacity-50" title="PDF">
-                                             <FileText size={15} />
+                                             {exportingKind === 'pdf' ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
                                           </button>
                                        </div>
                                     </div>
@@ -819,12 +1002,6 @@ const Reports: React.FC = () => {
                </div>
             )}
 
-            {isExporting && (
-               <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-sm font-black text-success">
-                  {isArabic ? 'جاري تجهيز ملف التصدير...' : 'Preparing export file...'}
-               </div>
-            )}
-
             {reportError && (
                <div className="rounded-lg border border-danger/25 bg-danger/10 px-4 py-3 text-sm font-bold text-danger">
                   {reportError}
@@ -833,16 +1010,18 @@ const Reports: React.FC = () => {
 
             <section ref={reportViewportRef} className="scroll-mt-4 rounded-lg border border-border bg-card p-4 lg:p-5">
                <div ref={printableRootRef}>
-                  <div className="mb-5 flex flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-center lg:justify-between">
+                  {/* Screen-only report header: the branded cover already carries
+                     title/meta in print & PDF (both hide [data-pdf-hide]). */}
+                  <div data-pdf-hide className="mb-5 flex flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-center lg:justify-between">
                      <div>
                         <h2 className="text-lg font-black text-main">{displaySubReportLabel}</h2>
                         <p className="text-xs font-semibold text-muted">
                            {displayCategoryLabel} · {appliedRange.start} - {appliedRange.end} · {activeBranchName || (isArabic ? 'كل الفروع' : 'All branches')}
                         </p>
                      </div>
-                     <div className="flex flex-wrap items-center gap-2">
-                        <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title="Excel">Excel</button>
-                        <button onClick={() => exportPdf(activeSubReport)} disabled={isExporting} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60">PDF</button>
+                      <div className="flex flex-wrap items-center gap-2" data-pdf-hide>
+                         <button onClick={() => exportXlsx(activeSubReport)} disabled={isExporting} className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60" title="Excel">{exportingKind === 'xlsx' ? <Loader2 size={13} className="animate-spin" /> : null}Excel</button>
+                        <button onClick={() => exportPdf(activeSubReport)} disabled={isExporting} className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated disabled:opacity-60">{exportingKind === 'pdf' ? <Loader2 size={13} className="animate-spin" /> : null}PDF</button>
                         <button onClick={() => openPrintableReport('print')} className="rounded-md border border-border px-3 py-2 text-xs font-black text-main transition hover:bg-elevated">{isArabic ? 'طباعة' : 'Print'}</button>
                      </div>
                   </div>

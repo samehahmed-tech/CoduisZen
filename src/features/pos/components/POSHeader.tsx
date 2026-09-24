@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { OrderType, Customer } from '@/types';
 import { useAuthStore } from '@/stores/useAuthStore';
 import BranchContextSwitcher from '@/components/common/BranchContextSwitcher';
+import UserAvatar from '@/components/common/UserAvatar';
 
 interface POSHeaderProps {
     activeMode: OrderType;
@@ -32,7 +33,6 @@ const POSHeader: React.FC<POSHeaderProps> = React.memo(({
     const navigate = useNavigate();
     const currentUser = useAuthStore(state => state.settings.currentUser);
     const logout = useAuthStore(state => state.logout);
-    const initials = currentUser?.name?.substring(0, 2).toUpperCase() || 'AD';
 
     const [showUserMenu, setShowUserMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -130,16 +130,19 @@ const POSHeader: React.FC<POSHeaderProps> = React.memo(({
 
                 {/* User */}
                 <div className="relative" ref={menuRef}>
-                    <button onClick={() => setShowUserMenu(!showUserMenu)} className="flex items-center gap-1.5 h-8 pl-1 pr-2 rounded-lg hover:bg-elevated/60 transition-colors active:scale-95">
-                        <div className="w-6 h-6 rounded-md bg-primary text-white flex items-center justify-center text-[10px] font-black">{initials}</div>
+                    <button onClick={() => setShowUserMenu(!showUserMenu)} className="flex items-center gap-1.5 h-8 pl-1 pr-2 rounded-full hover:bg-elevated/60 transition-colors active:scale-95" aria-label={currentUser?.name || 'User profile'}>
+                        <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size="xs" />
                         <ChevronDown size={10} className={`text-muted transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                     </button>
 
                     {showUserMenu && (
-                        <div className={`absolute top-full mt-1.5 w-48 bg-card border border-border/15 shadow-xl rounded-xl z-50 overflow-hidden pos-scale-in ${isAr ? 'left-0' : 'right-0'}`}>
-                            <div className="px-4 py-3 border-b border-border/8">
-                                <div className="text-sm font-bold text-main truncate">{currentUser?.name || 'User'}</div>
-                                <div className="text-[10px] text-muted mt-0.5">{currentUser?.role || 'Staff'}</div>
+                        <div className={`absolute top-full mt-1.5 w-52 bg-card border border-border/15 shadow-xl rounded-2xl z-50 overflow-hidden pos-scale-in ${isAr ? 'left-0' : 'right-0'}`}>
+                            <div className="px-4 py-3 border-b border-border/8 flex items-center gap-3">
+                                <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size="md" />
+                                <div className="min-w-0">
+                                    <div className="text-sm font-bold text-main truncate">{currentUser?.name || 'User'}</div>
+                                    <div className="text-[10px] text-muted mt-0.5">{currentUser?.role || 'Staff'}</div>
+                                </div>
                             </div>
                             <div className="p-1.5">
                                 <button onClick={() => { setShowUserMenu(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-medium text-muted hover:text-main hover:bg-elevated/60 rounded-lg transition-colors">

@@ -21,8 +21,14 @@ export const kdsApi = {
             body: JSON.stringify({ orderId, branchId, clientHandlesPrinting }),
         }),
     
-    bumpTicket: (id: string) => 
-        apiRequest<any>(`/kds/${id}/bump`, { method: 'POST' }),
+    bumpTicket: (id: string, actor?: { id?: string; name?: string }) =>
+        apiRequest<any>(`/kds/${id}/bump`, {
+            method: 'POST',
+            body: JSON.stringify({
+                completedBy: actor?.id || undefined,
+                completedByName: actor?.name || undefined,
+            }),
+        }),
 
     handoverOrder: (orderId: string) =>
         apiRequest<any>(`/kds/orders/${orderId}/handover`, { method: 'POST' }),

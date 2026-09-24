@@ -97,6 +97,11 @@ export const claimNextPrintJob = async (params: {
             'AND (' +
             'COALESCE(target_gateway_id, gateway_id) IS NOT NULL ' +
             'OR printer_address IN (' + inList + ') ' +
+            // Network/LAN printers are addressed by IP:port and are not
+            // advertised through the Windows-printer capability registry.
+            // They must be claimable immediately; the stale 30-second guard
+            // is only needed for unassigned local/USB printer jobs.
+            "OR UPPER(COALESCE(printer_type, '')) IN ('NETWORK', 'LAN') " +
             'OR (' +
             'created_at < DATEADD(SECOND, -30, GETDATE()) ' +
             'AND NOT EXISTS (' +
@@ -179,9 +184,18 @@ const resolvePrinterTarget = async (input: EnqueuePrintJobInput) => {
 
 export const enqueuePrintJob = async (input: EnqueuePrintJobInput) => {
     await ensureTable();
+    // Never create an unassigned kitchen ticket. Without this guard, a
+    // globally-claiming bridge could eventually print it on the cashier's
+    // default printer after the stale-job timeout.
+    if (input.type === 'KITCHEN' && !input.printerId && !input.printerAddress && !input.targetGatewayId) {
+        return { id: '', pushed: false, skipped: true };
+    }
     const id = `PRNJOB-${crypto.randomUUID()}`;
     const target = await resolvePrinterTarget(input);
     const targetGatewayId = normalizeGatewayId(target.targetGatewayId);
+    if (input.type === 'KITCHEN' && !targetGatewayId && !target.printerAddress) {
+        return { id: '', pushed: false, skipped: true };
+    }
     const requestedMaxAttempts = Number(input.maxAttempts);
     const maxAttempts = Number.isFinite(requestedMaxAttempts)
         ? Math.max(1, Math.floor(requestedMaxAttempts))

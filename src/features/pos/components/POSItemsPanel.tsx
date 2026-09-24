@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Search, X, SlidersHorizontal, LayoutGrid, Rows3, Sparkles, Ticket,
+    Search, X, SlidersHorizontal, LayoutGrid, Rows3, Type, MoonStar,
+    CircleDot, LayoutDashboard, Coffee, Crown,
     ShoppingBag, Star, CheckCircle, RotateCcw, ArrowUpDown,
 } from 'lucide-react';
+import type { CardDensity, CardSize } from './MenuItemCard';
 import CategoryTabs from './CategoryTabs';
 import ItemGrid from './ItemGrid';
 import type { MenuCategory, OrderItem } from '@/types';
@@ -26,8 +28,10 @@ interface POSItemsPanelProps {
     onSetFilter: (f: 'all' | 'available' | 'popular') => void;
     itemSort: 'smart' | 'name' | 'price_asc' | 'price_desc';
     onSetSort: (s: 'smart' | 'name' | 'price_asc' | 'price_desc') => void;
-    itemDensity: 'comfortable' | 'compact' | 'ultra' | 'buttons';
-    onSetDensity: (d: 'comfortable' | 'compact' | 'ultra' | 'buttons') => void;
+    itemDensity: CardDensity;
+    onSetDensity: (d: CardDensity) => void;
+    cardSize: CardSize;
+    onSetCardSize: (s: CardSize) => void;
     showMobileFilters: boolean;
     onToggleFilters: () => void;
     onResetFilters: () => void;
@@ -36,7 +40,6 @@ interface POSItemsPanelProps {
     showCategoryStrip: boolean;
     onToggleCategoryStrip: () => void;
     isTabletViewport: boolean;
-    quickCategoryNav: any[];
     isTouchMode: boolean;
     lang: string;
     t: any;
@@ -59,9 +62,11 @@ const ToolsDropdown: React.FC<{
     onSetSort: (s: any) => void;
     itemDensity: string;
     onSetDensity: (d: any) => void;
+    cardSize: CardSize;
+    onSetCardSize: (s: CardSize) => void;
     onReset: () => void;
     lang: string;
-}> = ({ isOpen, onClose, itemSort, onSetSort, itemDensity, onSetDensity, onReset, lang }) => {
+}> = ({ isOpen, onClose, itemSort, onSetSort, itemDensity, onSetDensity, cardSize, onSetCardSize, onReset, lang }) => {
     const ref = useRef<HTMLDivElement>(null);
     const isAr = lang === 'ar';
 
@@ -76,11 +81,15 @@ const ToolsDropdown: React.FC<{
 
     if (!isOpen) return null;
 
-    const densities = [
-        { id: 'comfortable', icon: LayoutGrid, label: isAr ? 'ملصق' : 'Poster' },
-        { id: 'compact', icon: Rows3, label: isAr ? 'شريط' : 'Rail' },
-        { id: 'ultra', icon: Sparkles, label: isAr ? 'زجاجي' : 'Glass' },
-        { id: 'buttons', icon: Ticket, label: isAr ? 'سبليت' : 'Split' },
+    const densities: { id: CardDensity; icon: any; label: string }[] = [
+        { id: 'sahara', icon: LayoutGrid, label: isAr ? 'سهارا' : 'Sahara' },
+        { id: 'typo', icon: Type, label: isAr ? 'مطبعة' : 'Typo' },
+        { id: 'noir', icon: MoonStar, label: isAr ? 'ليلي' : 'Noir' },
+        { id: 'ticket', icon: Rows3, label: isAr ? 'تذكرة' : 'Ticket' },
+        { id: 'circle', icon: CircleDot, label: isAr ? 'دائري' : 'Circle' },
+        { id: 'kiosk', icon: LayoutDashboard, label: isAr ? 'كيوسك' : 'Kiosk' },
+        { id: 'pop', icon: Coffee, label: isAr ? 'بوب' : 'Pop' },
+        { id: 'gold', icon: Crown, label: isAr ? 'ذهبي' : 'Gold' },
     ];
 
     const sorts = [
@@ -91,7 +100,7 @@ const ToolsDropdown: React.FC<{
     ];
 
     return (
-        <div ref={ref} className={`absolute top-full mt-2 w-72 bg-card/95 backdrop-blur-xl border border-border/10 rounded-2xl p-4 shadow-2xl z-50 pos-scale-in ${isAr ? 'left-0' : 'right-0'}`}>
+            <div ref={ref} className={`absolute top-full mt-2 w-80 bg-card/95 backdrop-blur-xl border border-border/10 rounded-2xl p-4 shadow-2xl z-50 pos-scale-in ${isAr ? 'left-0' : 'right-0'}`}>
             <div className="space-y-4">
                 {/* Density */}
                 <div>
@@ -108,6 +117,29 @@ const ToolsDropdown: React.FC<{
                             >
                                 <v.icon size={16} className="mb-1" />
                                 <span>{v.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Card size — stays open for live compare */}
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted/60 mb-2.5">{isAr ? 'حجم الكارت' : 'Card Size'}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                        {([
+                            { id: 'small', label: isAr ? 'صغير' : 'S' },
+                            { id: 'medium', label: isAr ? 'وسط' : 'M' },
+                            { id: 'large', label: isAr ? 'كبير' : 'L' },
+                        ] as { id: CardSize; label: string }[]).map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => onSetCardSize(s.id)}
+                                className={`h-11 rounded-xl text-[11px] font-black transition-all active:scale-95 border ${cardSize === s.id
+                                    ? 'bg-primary/10 border-primary/20 text-primary shadow-sm'
+                                    : 'border-transparent text-muted hover:text-main hover:bg-elevated hover:border-border/10'
+                                }`}
+                            >
+                                {s.label}
                             </button>
                         ))}
                     </div>
@@ -152,19 +184,25 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
     categories, activeCategory, onSetCategory, categoryResultCounts, totalMatchedCount, hasActiveFiltering,
     pricedItems, cartItems, onAddItem, onRemoveItem, highlightedItemId,
     searchQuery, onSearchChange, searchInputRef, itemFilter, onSetFilter,
-    itemSort, onSetSort, itemDensity, onSetDensity, showMobileFilters, onToggleFilters, onResetFilters,
-    quickPickItems, quickCategoryNav, isTouchMode, lang, t, currencySymbol,
+    itemSort, onSetSort, itemDensity, onSetDensity, cardSize, onSetCardSize, showMobileFilters, onToggleFilters, onResetFilters,
+    quickPickItems, isTouchMode, lang, t, currencySymbol,
     isCartVisible, cartStats, cartTotal, isCartOpenMobile, onOpenCart, hasCartItems,
 }) => {
     const isAr = lang === 'ar';
     const [toolsOpen, setToolsOpen] = useState(false);
-    const quickCategories = quickCategoryNav;
+    // Full stable category list (menu order) — the old top-8 "quick nav"
+    // hid every category past #8 while global search still found its items,
+    // and reshuffled tabs on every keystroke. The strip scrolls, so show all.
+    const quickCategories = useMemo(
+        () => [...categories].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
+        [categories],
+    );
 
     return (
         <div className="pos-items-panel flex flex-1 h-full min-h-0 min-w-0 flex-col overflow-hidden bg-app">
             {/* Toolbar */}
-            <div className="pos-items-toolbar relative z-20 shrink-0 border-b border-border/5 bg-card/60 backdrop-blur-md px-4 py-3 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
-                <div className="flex items-center gap-3">
+            <div className="pos-items-toolbar relative z-20 shrink-0 border-b border-border/5 bg-card/60 backdrop-blur-md px-2 sm:px-4 py-2 sm:py-3 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
+                <div className="flex items-center gap-2 sm:gap-3">
                     {/* Search */}
                     <div className="relative min-w-0 flex-1 group">
                         <Search className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted/40 group-focus-within:text-primary transition-colors ${isAr ? 'right-3' : 'left-3'}`} size={16} />
@@ -174,7 +212,7 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
                             value={searchQuery}
                             onChange={(e) => onSearchChange(e.target.value)}
                             placeholder={t.search_placeholder}
-                            className={`h-11 w-full rounded-2xl border border-border/10 bg-elevated/40 text-[13px] font-bold text-main outline-none placeholder:text-muted/30 focus:border-primary/30 focus:bg-card focus:shadow-md focus:shadow-primary/5 transition-all duration-300 ${isAr ? 'pr-10 pl-10' : 'pl-10 pr-10'}`}
+                            className={`h-10 sm:h-11 w-full rounded-2xl border border-border/10 bg-elevated/40 text-[13px] font-bold text-main outline-none placeholder:text-muted/30 placeholder:truncate focus:border-primary/30 focus:bg-card focus:shadow-md focus:shadow-primary/5 transition-all duration-300 ${isAr ? 'pr-10 pl-10' : 'pl-10 pr-10'}`}
                         />
                         {searchQuery && (
                             <button
@@ -214,7 +252,7 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
                     <div className="relative shrink-0">
                         <button
                             onClick={() => setToolsOpen(p => !p)}
-                            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all active:scale-95 border ${toolsOpen
+                            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center transition-all active:scale-95 border ${toolsOpen
                                 ? 'bg-primary text-white shadow-md border-transparent'
                                 : 'bg-elevated/30 text-muted/70 border-border/5 hover:text-main hover:border-border/10 hover:bg-elevated'
                             }`}
@@ -228,6 +266,8 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
                             onSetSort={onSetSort}
                             itemDensity={itemDensity}
                             onSetDensity={onSetDensity}
+                            cardSize={cardSize}
+                            onSetCardSize={onSetCardSize}
                             onReset={onResetFilters}
                             lang={lang}
                         />
@@ -265,7 +305,7 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
                                 }`}
                             >
                                 {isAr ? (cat.nameAr || cat.name) : cat.name}
-                                {count > 0 && <span className={`ml-1.5 text-[10px] tabular-nums font-black ${active ? 'opacity-70 bg-white/20 px-1 rounded' : 'opacity-40'}`}>{count}</span>}
+                                {count > 0 && <span className={`ms-1.5 text-[10px] tabular-nums font-black ${active ? 'opacity-70 bg-white/20 px-1 rounded' : 'opacity-40'}`}>{count}</span>}
                             </button>
                         );
                     })}
@@ -296,6 +336,7 @@ const POSItemsPanel: React.FC<POSItemsPanelProps> = ({
                     currencySymbol={currencySymbol}
                     isTouchMode={isTouchMode}
                     density={itemDensity}
+                    cardSize={cardSize}
                     lang={lang as any}
                     highlightedItemId={highlightedItemId}
                 />

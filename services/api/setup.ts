@@ -2,6 +2,7 @@ import { apiRequest } from './core';
 
 export const setupApi = {
     status: () => apiRequest<{ needsSetup: boolean }>('/setup/status'),
+    verifyKey: (masterKey: string) => apiRequest<{ ok: boolean }>('/setup/verify-key', { method: 'POST', body: JSON.stringify({ masterKey }) }),
     bootstrap: (payload: any) => apiRequest<{ ok: boolean }>('/setup/bootstrap', { method: 'POST', body: JSON.stringify(payload) }),
     resetTestData: () => apiRequest<{ ok: boolean; truncated: number; tables: number }>('/setup/reset-test-data', { method: 'POST' }),
 };

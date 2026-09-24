@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { orders, payments, orderItems, menuItems, menuCategories, recipes, recipeIngredients, inventoryItems, branches, stockMovements, inventoryStock, inventoryBatches, warehouses, journalEntries, journalLines, chartOfAccounts, costCenters, employees, attendance, payrollCycles, payrollPayouts, customers, campaigns, shifts, managerApprovals, purchaseOrders, purchaseOrderItems, suppliers, drivers, fiscalLogs, etaDeadLetters, auditLogs } from '../../src/db/schema';
-import { eq, and, or, sql, gte, lte, inArray, desc, asc } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, inArray, desc, asc, isNull } from 'drizzle-orm';
 import PDFDocument from 'pdfkit';
 import { DELIVERED_STATUSES, DashboardScope, parseLocalDateRange, parseReportFilters, ReportGranularity, resolveScopedBranchId } from './report/reportUtils';
 import { generateHrTabularXlsx } from '../services/hrReportExportService';
@@ -21,8 +21,9 @@ export { getTipsReport, getServiceChargeReport, getShiftSummary } from './report
 export { getActualVsTheoretical, getPurchaseHistory, getInventoryValuation } from './report/advancedInventoryReports';
 export { getStaffCostVsRevenue, getSalesPerLaborHour, getEmployeeProductivity } from './report/advancedHrReports';
 export { getCustomerRetention, getNewVsReturning, getCustomerFrequency, getCustomerChurn, getLoyaltyPointsReport, getPromotionImpact } from './report/advancedCrmReports';
-export { getKitchenPerformance, getMenuEngineeringMatrix, getDaypartAnalysis, getBasketAnalysis, getTableTurnoverRate, getWaitTimeReport, getDriverUtilization, getBranchComparison } from './report/advancedOpsReports';
+export { getKitchenPerformance, getKitchenStaffPerformance, getMenuEngineeringMatrix, getDaypartAnalysis, getBasketAnalysis, getTableTurnoverRate, getWaitTimeReport, getDriverUtilization, getBranchComparison } from './report/advancedOpsReports';
 export { getSeasonalityReport, getOnlineVsOfflineTrend, getFoodCostTrend, getTaxComplianceSummary, getAuditTrailReport, getCashFlowForecast, getSupplierPriceTracking, getRecipeCostAlerts, getABCClassification } from './report/strategicReports';
+export { getDiscountByCashier, getVoidsByCashier, getDeadStock, getNegativeStock, getUnpaidOrders } from './report/auditReports';
 export { getDemandForecast, getPriceElasticity, getMenuCannibalization, getAnomalyDetection, getBreakEvenAnalysis, getPaymentReconciliation, getDailyFlashReport, getMenuItemLifecycle, getCategoryContribution, getShiftProfitability, getDeliveryZoneAnalysis, getDeliveryCostVsRevenue, getCustomerJourneyFunnel, getChannelMixTrend, getOptimalPricing, getThirdPartyVsInHouse, getTimeToFirstOrder } from './report/predictiveReports';
 
 
@@ -45,7 +46,15 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             (${orders.businessDate} IS NOT NULL AND ${orders.businessDate} >= ${startDate} AND ${orders.businessDate} <= ${endDate})
             OR (${orders.businessDate} IS NULL AND ${orders.createdAt} >= ${start} AND ${orders.createdAt} <= ${end})
         )`;
+        // Soft-deleted orders count nowhere on the dashboard — folded into
+        // the recognized-revenue fragment so all ~12 legs inherit it.
         const revenueRecognized = revenueRecognizedOrder();
+        const liveOrder = isNull(orders.deletedAt);
+        // Branch comes only from the line's cost center (nullable) — a plain
+        // eq() on the LEFT join drops every line without one when scoped.
+        const journalBranchScope = branchId
+            ? or(eq(costCenters.branchId, branchId), isNull(journalLines.costCenterId))
+            : undefined;
 
         const [overviewRows, paymentsMix, paidRevenueRows, uniqueCustomersRows, itemsSoldRows, opsStatusRows, orderTypeRows, trendRows, _allTopItemsRows, _allCategoryRows, _allBranchRows, _allTopCustomerRows, expenseRows, pendingExpenseRows, cogsRows] = await Promise.all([
             db.select({
@@ -115,7 +124,8 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
             }).from(orders).where(
                 and(
                     branchId ? eq(orders.branchId, branchId) : undefined,
-                    orderDateInRange
+                    orderDateInRange,
+                    liveOrder
                 )
             ).groupBy(orders.status),
             db.select({
@@ -226,7 +236,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     eq(journalEntries.status, 'POSTED'),
                     eq(journalEntries.referenceType, 'EXPENSE'),
                     eq(chartOfAccounts.type, 'EXPENSE'),
-                    branchId ? eq(costCenters.branchId, branchId) : undefined
+                    journalBranchScope
                 )),
             db.select({
                 pendingExpenses: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
@@ -240,7 +250,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     eq(journalEntries.status, 'PENDING_APPROVAL'),
                     eq(journalEntries.referenceType, 'EXPENSE'),
                     eq(chartOfAccounts.type, 'EXPENSE'),
-                    branchId ? eq(costCenters.branchId, branchId) : undefined
+                    journalBranchScope
                 )),
             db.select({
                 cogs: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
@@ -302,6 +312,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                 expenses: approvedExpenses,
                 pendingExpenses,
                 cogs,
+                grossProfit: netSales - cogs,
                 netProfit: netSales - cogs - approvedExpenses,
                 paidRevenue: Number(paidRevenueRows[0]?.paidRevenue || 0),
                 discounts: Number(summary.discountTotal || 0),
@@ -374,7 +385,11 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
 };
 
 const getExportSnapshot = async (branchId: string | undefined, start: Date, end: Date) => {
-    const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
+    // Same guards as the on-screen reports: revenue-eligible orders only
+    // (exists + not cancelled/refunded/void/deleted), no voided lines,
+    // cost snapshots (never live repricing) — so exports always tie to the UI.
+    const liveOrder = isNull(orders.deletedAt);
+    const liveLine = sql`coalesce(${orderItems.status}, '') not in ('VOID', 'VOIDED', 'CANCELLED')`;
     const [overview] = await db.select({
         orderCount: sql<number>`count(*)`,
         grossSales: sql<number>`coalesce(sum(${orders.total}), 0)`,
@@ -387,7 +402,8 @@ const getExportSnapshot = async (branchId: string | undefined, start: Date, end:
             branchId ? eq(orders.branchId, branchId) : undefined,
             gte(orders.createdAt, start),
             lte(orders.createdAt, end),
-            inArray(orders.status, deliveredStatuses)
+            revenueEligibleOrder(),
+            liveOrder
         )
     );
 
@@ -403,14 +419,15 @@ const getExportSnapshot = async (branchId: string | undefined, start: Date, end:
                 branchId ? eq(orders.branchId, branchId) : undefined,
                 gte(orders.createdAt, start),
                 lte(orders.createdAt, end),
-                inArray(orders.status, deliveredStatuses)
+                revenueEligibleOrder(),
+                liveOrder
             )
         )
         .groupBy(sql`FORMAT(${orders.createdAt}, 'yyyy-MM-dd')`)
         .orderBy(sql`FORMAT(${orders.createdAt}, 'yyyy-MM-dd') asc`);
 
     const [profit] = await db.select({
-        cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${menuItems.cost}, 0)), 0)`,
+        cogs: sql<number>`coalesce(sum(${orderItems.quantity} * coalesce(${orderItems.cost}, ${menuItems.cost}, 0)), 0)`,
     }).from(orderItems)
         .innerJoin(orders, eq(orderItems.orderId, orders.id))
         .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
@@ -419,7 +436,9 @@ const getExportSnapshot = async (branchId: string | undefined, start: Date, end:
                 branchId ? eq(orders.branchId, branchId) : undefined,
                 gte(orders.createdAt, start),
                 lte(orders.createdAt, end),
-                inArray(orders.status, deliveredStatuses)
+                revenueEligibleOrder(),
+                liveOrder,
+                liveLine
             )
         );
 
@@ -434,7 +453,9 @@ const getExportSnapshot = async (branchId: string | undefined, start: Date, end:
                 branchId ? eq(orders.branchId, branchId) : undefined,
                 gte(orders.createdAt, start),
                 lte(orders.createdAt, end),
-                eq(payments.status, 'COMPLETED')
+                eq(payments.status, 'COMPLETED'),
+                revenueEligibleOrder(),
+                liveOrder
             )
         )
         .groupBy(payments.method);
@@ -489,8 +510,12 @@ export const getIntegrityChecks = async (req: Request, res: Response) => {
         const paymentSum = snapshot.payments.reduce((sum: number, row: any) => sum + Number(row.total || 0), 0);
         const computedGrossProfit = Number(snapshot.overview.netSales || 0) - Number(snapshot.profit.cogs || 0);
 
+        // Payment status lives inside the aggregate (not the WHERE): filtering
+        // a LEFT JOIN in WHERE silently turns it into an INNER join, so
+        // deliveredOrders used to count paid orders only and coverage was
+        // always ~1.
         const [paymentCoverageRows] = await db.select({
-            paidOrders: sql<number>`count(distinct ${payments.orderId})`,
+            paidOrders: sql<number>`count(distinct case when ${payments.status} = 'COMPLETED' then ${payments.orderId} end)`,
             deliveredOrders: sql<number>`count(distinct ${orders.id})`,
         }).from(orders)
             .leftJoin(payments, eq(payments.orderId, orders.id))
@@ -499,8 +524,8 @@ export const getIntegrityChecks = async (req: Request, res: Response) => {
                     branchId ? eq(orders.branchId, branchId) : undefined,
                     gte(orders.createdAt, start),
                     lte(orders.createdAt, end),
-                    eq(payments.status, 'COMPLETED'),
-                    inArray(orders.status, deliveredStatuses)
+                    inArray(orders.status, deliveredStatuses),
+                    isNull(orders.deletedAt)
                 )
             );
         const coverageRatio = Number(paymentCoverageRows?.deliveredOrders || 0) > 0
@@ -624,6 +649,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
 
         switch (reportType) {
             case 'TRIAL_BALANCE': {
+                // Branch-scoped like the screen (NULL cost-center lines stay in scope).
                 const rows = await db.select({
                     code: chartOfAccounts.code, name: chartOfAccounts.name, type: chartOfAccounts.type,
                     debit: sql<number>`coalesce(sum(${journalLines.debit}), 0)`,
@@ -631,7 +657,9 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 }).from(journalLines)
                     .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
-                    .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED')))
+                    .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                    .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'),
+                        branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined))
                     .groupBy(chartOfAccounts.code, chartOfAccounts.name, chartOfAccounts.type)
                     .orderBy(chartOfAccounts.code);
                 lines.push('Code,Account,Type,Debit,Credit,Balance');
@@ -639,13 +667,17 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                 break;
             }
             case 'TOP_EXPENSES': {
+                // Operating expenses only (COGS excluded) + branch-scoped, matching the screen.
                 const rows = await db.select({
                     name: chartOfAccounts.name,
                     total: sql<number>`coalesce(sum(${journalLines.debit}) - sum(${journalLines.credit}), 0)`,
                 }).from(journalLines)
                     .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
-                    .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE')))
+                    .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
+                    .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'),
+                        eq(journalEntries.referenceType, 'EXPENSE'),
+                        branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined))
                     .groupBy(chartOfAccounts.name)
                     .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).offset(0).fetch(20);
                 lines.push('Expense Account,Total');
@@ -1190,7 +1222,7 @@ export const exportReportXlsx = async (req: Request, res: Response) => {
             });
         } else if (reportType === 'STAFF_COST_VS_REVENUE') {
             const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-            const revConditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses)];
+            const revConditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), revenueEligibleOrder()];
             if (branchId) revConditions.push(eq(orders.branchId, branchId));
             const [rev] = await db.select({ revenue: sql<number>`coalesce(sum(${orders.total}), 0)` }).from(orders).where(and(...revConditions));
             const [payroll] = await db.select({
@@ -1221,7 +1253,7 @@ export const exportReportXlsx = async (req: Request, res: Response) => {
             });
         } else if (reportType === 'SALES_PER_LABOR_HOUR') {
             const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-            const revConditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses)];
+            const revConditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), revenueEligibleOrder()];
             if (branchId) revConditions.push(eq(orders.branchId, branchId));
             const [rev] = await db.select({ revenue: sql<number>`coalesce(sum(${orders.total}), 0)` }).from(orders).where(and(...revConditions));
             const [att] = await db.select({
@@ -1251,7 +1283,7 @@ export const exportReportXlsx = async (req: Request, res: Response) => {
             });
         } else if (reportType === 'EMPLOYEE_PRODUCTIVITY') {
             const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-            const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses)];
+            const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), revenueEligibleOrder()];
             if (branchId) conditions.push(eq(orders.branchId, branchId));
             const rows = await db.select({
                 agentId: orders.callCenterAgentId,

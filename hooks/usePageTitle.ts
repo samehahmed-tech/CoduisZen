@@ -35,7 +35,7 @@ const TITLES: Record<string, { en: string; ar: string }> = {
     '/login': { en: 'Login', ar: 'تسجيل الدخول' },
 };
 
-const APP_NAME = 'Coduis Zen';
+const APP_NAME = 'Coduis Xen';
 
 export const usePageTitle = () => {
     const location = useLocation();

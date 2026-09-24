@@ -35,6 +35,18 @@
     /* Glass */
     --glass-bg: 255 255 255 / 0.85;
 
+    /* POS card per-theme spirit (overridden per theme by ThemeProvider —
+       POS_CARD_THEME_TOKENS; these are fallbacks so cards never break) */
+    --pos-theme-card-hero-bg: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), .55));
+    --pos-theme-card-hero-text: 255 255 255;
+    --pos-theme-card-hero-muted: 235 240 255;
+    --pos-theme-card-action-bg: rgb(var(--primary));
+    --pos-theme-card-action-text: 255 255 255;
+    --pos-theme-card-control-bg: rgba(0, 0, 0, 0.25);
+    --pos-theme-card-badge-bg: rgb(var(--warning));
+    --pos-theme-card-pattern-opacity: 0.15;
+    --pos-theme-card-art-ring: rgba(255, 255, 255, 0.45);
+
     /* Shape */
     --theme-radius: 8px;
     --theme-radius-sm: 4px;

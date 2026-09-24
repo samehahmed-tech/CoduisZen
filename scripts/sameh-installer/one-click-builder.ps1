@@ -17,16 +17,39 @@ $prerequisites = Join-Path $PSScriptRoot "prerequisites"
 $builder = Join-Path $PSScriptRoot "build-sameh-installer.ps1"
 $setupName = "Codeuis Setup V2.exe"
 
+function Resolve-BundledFile([string]$Primary, [string]$FileName, [string]$Label) {
+    if ($Primary -and (Test-Path $Primary)) { return $Primary }
+    $fallback = Join-Path "$env:ProgramFiles\Sameh\RestoFlow ERP" $FileName
+    if (Test-Path $fallback) {
+        Write-Host "$Label not found in prerequisites; reusing copy from installed RestoFlow: $fallback" -ForegroundColor Yellow
+        return $fallback
+    }
+    return $Primary
+}
+
 if (-not (Test-Path $builder)) {
     throw "Installer build script was not found: $builder"
+}
+
+$sqlExpress = Resolve-BundledFile (Join-Path $prerequisites "SQLEXPR_x64_ENU.exe") "SQLEXPR_x64_ENU.exe" "SQL Server Express media"
+$odbc = Join-Path $prerequisites "msodbcsql.msi"
+$vc = Join-Path $prerequisites "vc_redist.x64.exe"
+if ($AllowMissingPrerequisites) {
+    if (-not (Test-Path $sqlExpress)) { Write-Warning "SQL Server Express media not bundled; continuing without it."; $sqlExpress = "" }
+    if (-not (Test-Path $odbc)) { Write-Warning "ODBC driver not bundled; continuing without it."; $odbc = "" }
+    if (-not (Test-Path $vc)) { Write-Warning "VC redist not bundled; continuing without it."; $vc = "" }
+}
+if ($sqlExpress -and (Test-Path $sqlExpress)) { }
+elseif (-not $AllowMissingPrerequisites) {
+    throw "SQL Server Express offline media is required for a clean-PC installer. Place SQLEXPR_x64_ENU.exe in scripts\sameh-installer\prerequisites (or keep the installed RestoFlow copy), or rebuild with -AllowMissingPrerequisites."
 }
 
 $arguments = @{
     Version = $Version
     OutputPath = $OutputPath
-    SqlExpressInstaller = Join-Path $prerequisites "SQLEXPR_x64_ENU.exe"
-    OdbcDriverInstaller = Join-Path $prerequisites "msodbcsql.msi"
-    VCRedistInstaller = Join-Path $prerequisites "vc_redist.x64.exe"
+    SqlExpressInstaller = $sqlExpress
+    OdbcDriverInstaller = $odbc
+    VCRedistInstaller = $vc
 }
 
 if ($SkipBuild) { $arguments.SkipBuild = $true }

@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
-import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, inArray, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, shifts } from '../../../src/db/schema';
-import { parseLocalDateRange } from './reportUtils';
+import { orders, payments, shifts } from '../../../src/db/schema';
+import { parseLocalDateRange, orderBusinessDayExpression } from './reportUtils';
 import { revenueEligibleOrder } from '../../utils/orderRevenue';
+
+const notDeleted = isNull(orders.deletedAt);
 
 export const getTipsReport = async (req: Request, res: Response) => {
     try {
@@ -15,7 +17,7 @@ export const getTipsReport = async (req: Request, res: Response) => {
         // with the Day Close module across timezones; createdAt acts as a fallback
         // for legacy rows without a businessDate.
         const orderDateCondition = sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`;
-        const conditions: any[] = [orderDateCondition, inArray(orders.status, deliveredStatuses), sql`${orders.tipAmount} > 0`];
+        const conditions: any[] = [orderDateCondition, inArray(orders.status, deliveredStatuses), notDeleted, sql`${orders.tipAmount} > 0`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const [summary] = await db.select({
@@ -31,13 +33,15 @@ export const getTipsReport = async (req: Request, res: Response) => {
             count: sql<number>`count(*)`,
         }).from(orders).where(and(...conditions)).groupBy(orders.type).orderBy(sql`sum(${orders.tipAmount}) desc`);
 
+        // Daily buckets use the logical business day (same key as the filter).
+        const day = orderBusinessDayExpression();
         const daily = await db.select({
-            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
+            day,
             totalTips: sql<number>`coalesce(sum(${orders.tipAmount}), 0)`,
             count: sql<number>`count(*)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
-            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
+            .groupBy(day)
+            .orderBy(day);
 
         res.json({
             summary: { totalTips: Number(Number(summary?.totalTips || 0).toFixed(2)), orderCount: Number(summary?.orderCount || 0), avgTip: Number(Number(summary?.avgTip || 0).toFixed(2)), maxTip: Number(Number(summary?.maxTip || 0).toFixed(2)) },
@@ -56,7 +60,7 @@ export const getServiceChargeReport = async (req: Request, res: Response) => {
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
         const orderDateCondition = sql`(${orders.businessDate} is not null and ${orders.businessDate} >= ${startDate as string} and ${orders.businessDate} <= ${endDate as string}) or (${orders.businessDate} is null and ${orders.createdAt} >= ${start} and ${orders.createdAt} <= ${end})`;
-        const conditions: any[] = [orderDateCondition, inArray(orders.status, deliveredStatuses), sql`${orders.serviceCharge} > 0`];
+        const conditions: any[] = [orderDateCondition, inArray(orders.status, deliveredStatuses), notDeleted, sql`${orders.serviceCharge} > 0`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const [summary] = await db.select({
@@ -65,13 +69,14 @@ export const getServiceChargeReport = async (req: Request, res: Response) => {
             avgServiceCharge: sql<number>`coalesce(avg(${orders.serviceCharge}), 0)`,
         }).from(orders).where(and(...conditions));
 
+        const day = orderBusinessDayExpression();
         const daily = await db.select({
-            day: sql<string>`format(${orders.createdAt}, 'yyyy-MM-dd')`,
+            day,
             totalServiceCharge: sql<number>`coalesce(sum(${orders.serviceCharge}), 0)`,
             count: sql<number>`count(*)`,
         }).from(orders).where(and(...conditions))
-            .groupBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`)
-            .orderBy(sql`format(${orders.createdAt}, 'yyyy-MM-dd')`);
+            .groupBy(day)
+            .orderBy(day);
 
         res.json({
             summary: { totalServiceCharge: Number(Number(summary?.totalServiceCharge || 0).toFixed(2)), orderCount: Number(summary?.orderCount || 0), avgServiceCharge: Number(Number(summary?.avgServiceCharge || 0).toFixed(2)) },
@@ -116,15 +121,33 @@ export const getShiftSummary = async (req: Request, res: Response) => {
             }).from(orders).where(eq(orders.shiftId, shift.shiftId)) : [{ orderCount: 0, revenue: 0, cancelledCount: 0 }];
 
             const so = shiftOrders[0] || { orderCount: 0, revenue: 0, cancelledCount: 0 };
-            const variance = Number(shift.actualBalance || 0) - Number(shift.expectedBalance || 0);
+            const [cashPayments] = await db.select({
+                total: sql<number>`coalesce(sum(${payments.amount}), 0)`,
+            }).from(payments)
+                .innerJoin(orders, eq(payments.orderId, orders.id))
+                .where(and(
+                    eq(orders.shiftId, shift.shiftId),
+                    eq(payments.status, 'COMPLETED'),
+                    sql`upper(${payments.method}) in ('CASH', 'CASH_ON_DELIVERY')`,
+                ));
+            const cashSales = Number(cashPayments?.total || 0);
+            const calculatedExpectedBalance = Number(shift.openingBalance || 0) + cashSales;
+            // Open shifts may still have the DB default 0 in expected_balance.
+            // Calculate their live cash from the payment ledger instead of
+            // presenting a misleading zero on the dashboard.
+            const expectedBalance = String(shift.status || '').toUpperCase() === 'OPEN'
+                ? calculatedExpectedBalance
+                : Number(shift.expectedBalance || calculatedExpectedBalance);
+            const variance = Number(shift.actualBalance || 0) - expectedBalance;
             result.push({
                 ...shift,
                 orderCount: Number(so.orderCount || 0),
                 revenue: Number(Number(so.revenue || 0).toFixed(2)),
                 cancelledCount: Number(so.cancelledCount || 0),
+                cashSales: Number(cashSales.toFixed(2)),
                 variance: Number(variance.toFixed(2)),
                 openingBalance: Number(shift.openingBalance || 0),
-                expectedBalance: Number(shift.expectedBalance || 0),
+                expectedBalance: Number(expectedBalance.toFixed(2)),
                 actualBalance: Number(shift.actualBalance || 0),
             });
         }

@@ -11,6 +11,7 @@ import { settingsApi } from '../services/api/settings';
 import { localDb } from '../db/localDb';
 import { syncService } from '../services/syncService';
 import i18n from '../src/i18n';
+import { resolveAvatar, setUserAvatar as persistUserAvatar, withLocalAvatars } from '../src/utils/userAvatars';
 
 export type LoginMode = 'pin' | 'password';
 
@@ -81,6 +82,7 @@ interface AuthState {
 
     // Local Actions
     login: (user: User) => void;
+    setUserAvatar: (userId: string, dataUrl: string | null) => void;
     logout: () => void;
     updateSettings: (settings: Partial<AppSettings>) => void;
     hasPermission: (permission: AppPermission) => boolean;
@@ -194,6 +196,7 @@ export const useAuthStore = create<AuthState>()(
                         allowedBranches: user.allowedBranches || [],
                         defaultPage: user.defaultPage,
                         mfaEnabled: user.mfaEnabled === true,
+                        avatar: resolveAvatar((user as any).avatar, user.id),
                     };
 
                     set((state) => ({
@@ -240,6 +243,7 @@ export const useAuthStore = create<AuthState>()(
                         allowedBranches: user.allowedBranches || [],
                         defaultPage: user.defaultPage,
                         mfaEnabled: user.mfaEnabled === true,
+                        avatar: resolveAvatar((user as any).avatar, user.id),
                     };
                     set((state) => ({
                         token: currentToken,
@@ -301,8 +305,9 @@ export const useAuthStore = create<AuthState>()(
                                 pin: u.pinCode || u.pin || undefined,
                                 hasPassword: u.hasPassword ?? undefined,
                                 hasPin: u.hasPin ?? Boolean(u.pinCode || u.pinCodeHash),
+                                avatar: resolveAvatar(u.avatar, u.id),
                             }));
-                            set({ users, isLoading: false });
+                            set({ users: withLocalAvatars(users), isLoading: false });
                             await localDb.users.bulkPut(users);
                         } else {
                             set({ isLoading: false });
@@ -543,6 +548,9 @@ export const useAuthStore = create<AuthState>()(
                     await usersApi.create({
                         ...payload,
                     });
+                    // Avatar is terminal-local until the server supports it — persist it
+                    // alongside so the photo survives reloads and offline use.
+                    if (user.avatar) persistUserAvatar(user.id, user.avatar);
                     set((state) => ({ users: [...state.users, user], isLoading: false }));
                 } catch (error: any) {
                     set({ error: error.message, isLoading: false });
@@ -581,9 +589,18 @@ export const useAuthStore = create<AuthState>()(
                     await usersApi.update(user.id, {
                         ...payload,
                     });
-                    set((state) => ({
-                        users: state.users.map(u => u.id === user.id ? user : u)
-                    }));
+                    // Avatar is terminal-local until the server supports it.
+                    if (user.avatar) persistUserAvatar(user.id, user.avatar);
+                    set((state) => {
+                        const prev = state.users.find((u) => u.id === user.id);
+                        const merged = { ...user, avatar: user.avatar ?? prev?.avatar };
+                        return {
+                            users: state.users.map((u) => (u.id === user.id ? merged : u)),
+                            settings: state.settings.currentUser?.id === user.id
+                                ? { ...state.settings, currentUser: { ...state.settings.currentUser, ...merged } }
+                                : state.settings,
+                        };
+                    });
                 } catch (error: any) {
                     set({ error: error?.code || error?.message || 'UPDATE_USER_FAILED' });
                     throw error;
@@ -715,10 +732,30 @@ export const useAuthStore = create<AuthState>()(
 
             // ============ Local Actions ============
 
-            login: (user: User) => set((state) => ({
-                settings: { ...state.settings, currentUser: user, activeBranchId: user.assignedBranchId || state.branches[0]?.id },
-                isAuthenticated: true
-            })),
+            login: (user: User) => set((state) => {
+                const withAvatar = {
+                    ...user,
+                    avatar: resolveAvatar((user as any).avatar, user.id),
+                };
+                return {
+                    settings: { ...state.settings, currentUser: withAvatar, activeBranchId: withAvatar.assignedBranchId || state.branches[0]?.id },
+                    isAuthenticated: true,
+                };
+            }),
+
+            setUserAvatar: (userId: string, dataUrl: string | null) => {
+                persistUserAvatar(userId, dataUrl);
+                const avatar = dataUrl || undefined;
+                set((state) => ({
+                    users: state.users.map((u) => (u.id === userId ? { ...u, avatar } : u)),
+                    settings: state.settings.currentUser?.id === userId
+                        ? { ...state.settings, currentUser: { ...state.settings.currentUser, avatar } }
+                        : state.settings,
+                }));
+                // Keep the offline cache in sync (best effort).
+                const updated = get().users.find((u) => u.id === userId);
+                if (updated) localDb.users.put(updated as any).catch(() => undefined);
+            },
 
             logout: () => {
                 if (localStorage.getItem('auth_token')) {

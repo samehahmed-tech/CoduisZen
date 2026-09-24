@@ -105,32 +105,32 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                 ${shouldShowCart && isCartOpenMobile ? 'cart-open' : ''}`}
         >
             {/* Header */}
-            <div className="shrink-0 px-5 py-3.5 border-b border-border/10 bg-card/70">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-sm border border-primary/20">
-                            <ShoppingBag size={20} />
+            <div className="shrink-0 px-3 lg:px-5 py-3 lg:py-3.5 border-b border-border/10 bg-card/70">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-sm border border-primary/20">
+                            <ShoppingBag size={18} />
                         </div>
-                        <div className="min-w-0">
-                            <h3 className="text-[13px] font-black text-main truncate tracking-wide">{orderTypeLabel}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[11px] font-bold text-primary tabular-nums tracking-tight">{cartStats.qty} {isAr ? 'وحدة' : 'qty'}</span>
-                                <span className="text-[10px] text-muted/30">•</span>
-                                <span className="text-[11px] font-semibold text-muted/60 tabular-nums tracking-tight">{cartStats.lines} {isAr ? 'صنف' : 'lines'}</span>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-[12px] lg:text-[13px] font-black text-main truncate tracking-wide">{orderTypeLabel}</h3>
+                            <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                <span className="text-[11px] font-bold text-primary tabular-nums tracking-tight whitespace-nowrap">{cartStats.qty} {isAr ? 'وحدة' : 'qty'}</span>
+                                <span className="text-[10px] text-muted/30 shrink-0">•</span>
+                                <span className="text-[11px] font-semibold text-muted/60 tabular-nums tracking-tight whitespace-nowrap truncate">{cartStats.lines} {isAr ? 'صنف' : 'lines'}</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 min-w-0">
                         {/* Total */}
-                        <div className="text-right">
-                            <span className="text-2xl font-black text-main tabular-nums tracking-tighter leading-none">{(cartTotal || 0).toFixed(2)}</span>
-                            <span className="text-[10px] font-semibold text-muted/60 ml-1 mb-1">{currencySymbol}</span>
+                        <div className="text-right min-w-0">
+                            <span className="text-xl lg:text-2xl font-black text-main tabular-nums tracking-tighter leading-none whitespace-nowrap">{(cartTotal || 0).toFixed(2)}</span>
+                            <span className="text-[10px] font-semibold text-muted/60 ml-1 mb-1 whitespace-nowrap">{currencySymbol}</span>
                         </div>
 
                         {/* Close — mobile */}
-                        <button onClick={onCloseCart} className="hidden max-lg:flex w-10 h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm">
-                            <X size={20} />
+                        <button onClick={onCloseCart} className="hidden max-lg:flex w-9 h-9 lg:w-10 lg:h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm shrink-0">
+                            <X size={18} />
                         </button>
 
                         {/* Clear cart — single confirm lives in POS.handleClearCart
@@ -141,9 +141,9 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                             disabled={!hasCartItems}
                             title={isAr ? 'تفريغ السلة' : 'Clear cart'}
                             aria-label={isAr ? 'تفريغ السلة' : 'Clear cart'}
-                            className="flex w-10 h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm disabled:opacity-35 disabled:pointer-events-none"
+                            className="flex w-9 h-9 lg:w-10 lg:h-10 rounded-xl items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all active:scale-95 bg-card shadow-sm disabled:opacity-35 disabled:pointer-events-none shrink-0"
                         >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                         </button>
                     </div>
                 </div>

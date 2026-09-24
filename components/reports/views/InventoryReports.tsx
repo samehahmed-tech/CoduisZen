@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { inventoryApi } from '../../../services/api/inventory';
 import { printStockCountSession } from '../../../services/stockCountPrint';
 import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
+import CoverageReportView from './shared/CoverageReportView';
 
 export const InventoryReports = ({ state }: any) => {
    const {
@@ -42,6 +43,7 @@ export const InventoryReports = ({ state }: any) => {
       shiftProfitData, deliveryZoneData, deliveryCostData,
       journeyFunnelData, channelMixData, optimalPricingData,
       thirdPartyData, timeToFirstData,
+      deadStock, negativeStock,
       salesSeries, peakHoursLookup, peakHoursMaxOrders,
        revenueByWeekdayMax, daypartRevenueMax, settings
    } = state;
@@ -59,6 +61,7 @@ export const InventoryReports = ({ state }: any) => {
       <>
                {activeCategory === 'INVENTORY' && activeSubReport === 'COGS & Margin' && (
                   <div className="space-y-8 animate-in slide-in-from-bottom-5 duration-700">
+                     <div className="rounded-2xl border border-border/40 bg-elevated/20 px-4 py-3 text-[11px] font-bold text-muted">{isAr ? 'تكلفة البطاقات بأسعار الوصفات الحية (اليوم) — بينما COGS الفترة من لقطة البيع. قد يختلف الرقمان.' : 'Card costs use live recipe prices (today) — period COGS uses sale-time snapshots. The two can differ.'}</div>
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-card/80  rounded-[2rem] p-8 border border-border/50 shadow-2xl relative overflow-hidden group">
                            <div className="absolute -inset-1.5 bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
@@ -365,6 +368,7 @@ export const InventoryReports = ({ state }: any) => {
                )}
                {activeCategory === 'INVENTORY' && activeSubReport === 'Recipe Cost Alerts' && recipeCostData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="rounded-2xl border border-border/40 bg-elevated/20 px-4 py-3 text-[11px] font-bold text-muted">{isAr ? 'عتبات تنبيه المخزون (حرج <30% / تحذير <50%) — تختلف عن عتبات التسعير الأمثل (30/80) لأن الغرض مراقبة التكلفة لا التسعير.' : 'Stock-alert thresholds (critical <30% / warning <50%) — differ from Optimal Pricing (30/80), which is a pricing lens, not a cost watch.'}</div>
                      <div className="grid grid-cols-3 gap-4">{[{ l: '?? Critical (<30%)', v: recipeCostData.critical, c: 'text-rose-500' }, { l: '?? Warning (<50%)', v: recipeCostData.warning, c: 'text-amber-500' }, { l: '?? OK (?50%)', v: recipeCostData.ok, c: 'text-emerald-500' }].map((c, i) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-xs font-black text-muted">{c.l}</p><p className={`text-3xl font-black mt-1 ${c.c}`}>{c.v}</p></div>))}</div>
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Item</th><th className="px-4 py-5 text-right">Price</th><th className="px-4 py-5 text-right">Cost</th><th className="px-4 py-5 text-right">Margin</th><th className="px-6 py-5 text-center">Alert</th></tr></thead><tbody className="divide-y divide-border/30">{recipeCostData.items.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.menuItemName}</td><td className="px-4 py-4 font-mono text-right">{r.price}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.cost}</td><td className="px-4 py-4 font-mono text-right">{r.margin}%</td><td className="px-6 py-4 text-center"><span className={`px-2 py-1 rounded-lg text-[9px] font-black ${r.alert === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500' : r.alert === 'WARNING' ? 'bg-amber-500/10 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>{r.alert}</span></td></tr>)}</tbody></table></div></div>
                   </div>
@@ -378,6 +382,40 @@ export const InventoryReports = ({ state }: any) => {
                   </div>
                )}
                {activeCategory === 'INVENTORY' && activeSubReport === 'ABC Classification' && !abcData && <p className="text-center text-muted py-16">No data.</p>}
+               {activeCategory === 'INVENTORY' && activeSubReport === 'Dead Stock' && deadStock && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="grid grid-cols-2 gap-4"><div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'أصناف راكدة' : 'Dead items'}</p><p className="text-2xl font-black text-amber-500 mt-1">{deadStock.items.length}</p></div><div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{isAr ? 'قيمة محبوسة' : 'Locked value'}</p><p className="text-2xl font-black text-amber-500 mt-1">{deadStock.items.reduce((s: number, r: any) => s + Number(r.lockedValue || 0), 0).toLocaleString()} LE</p></div></div>
+                     <ReportDataTable
+                        title={isAr ? `مخزون راكد (لا استهلاك منذ ${deadStock.days} يوم)` : `Dead stock (no consumption in ${deadStock.days}d)`}
+                        data={deadStock.items}
+                        columns={[
+                           { key: 'itemName', label: isAr ? 'الصنف' : 'Item' },
+                           { key: 'onHand', label: isAr ? 'الرصيد' : 'On hand', align: 'right', format: (v: any) => fmtNum(v) },
+                           { key: 'lockedValue', label: isAr ? 'القيمة المحبوسة' : 'Locked value', align: 'right', sum: true, format: (v: any) => fmtMoney(v, 'LE') },
+                           { key: 'lastConsumption', label: isAr ? 'آخر استهلاك' : 'Last used', format: (v: any) => (v ? new Date(v).toLocaleDateString() : (isAr ? 'أبدًا' : 'Never')) },
+                        ]}
+                        exportFilename="dead-stock"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
+                  </div>
+               )}
+               {activeCategory === 'INVENTORY' && activeSubReport === 'Dead Stock' && !deadStock && <p className="text-center text-muted py-16">No data.</p>}
+               {activeCategory === 'INVENTORY' && activeSubReport === 'Negative Stock' && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={isAr ? 'أرصدة سالبة — بيع زيادة عن المتاح (إنذار جودة بيانات)' : 'Negative stock — oversold beyond on-hand (data-quality alarm)'}
+                        data={negativeStock}
+                        columns={[
+                           { key: 'itemName', label: isAr ? 'الصنف' : 'Item' },
+                           { key: 'onHand', label: isAr ? 'الرصيد' : 'On hand', align: 'right', format: (v: any) => fmtNum(v) },
+                           { key: 'threshold', label: isAr ? 'حد الطلب' : 'Reorder at', align: 'right', format: (v: any) => fmtNum(v) },
+                        ]}
+                        exportFilename="negative-stock"
+                        lang={isAr ? 'ar' : 'en'}
+                     />
+                     {negativeStock.length === 0 && <p className="text-center text-muted py-16">{isAr ? 'لا توجد أرصدة سالبة — ممتاز' : 'No negative stock — all clean'}</p>}
+                  </div>
+               )}
 
                {/* ============ STRATEGIC CRM ============ */}
 
@@ -499,6 +537,15 @@ export const InventoryReports = ({ state }: any) => {
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8"><h3 className="text-xl font-black text-main mb-6">Customer Journey Funnel</h3><div className="space-y-3">{journeyFunnelData.map((s: any, i: number) => { const maxW = 100; const w = s.percent; return <div key={i} className="flex items-center gap-4"><span className="text-xs font-black text-muted w-40 text-right">{s.stage}</span><div className="flex-1 relative"><div className="h-10 rounded-xl bg-blue-500/10 transition-all" style={{ width: `${w}%` }}><div className="h-full rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center px-4" style={{ width: `${Math.max(w, 5)}%` }}><span className="text-[10px] font-black text-white whitespace-nowrap">{s.count} ({s.percent}%)</span></div></div></div></div> })}</div></div>
                      {journeyFunnelData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
+               )}
+               {activeCategory === 'INVENTORY' && ['Butchery Yield', 'Inter-Branch Transfers', 'GRN Variance', 'Production Cost Variance'].includes(activeSubReport) && (
+                  <CoverageReportView
+                     reportName={activeSubReport}
+                     rows={(state as any).customReportRows?.[activeSubReport] || []}
+                     meta={(state as any).customReportMeta?.[activeSubReport]}
+                     lang={isAr ? 'ar' : 'en'}
+                     currency={settings?.currencySymbol || 'LE'}
+                  />
                )}
       </>
    );

@@ -34,7 +34,16 @@ export const useDataInit = (): InitResult => {
     const fetchMenu = useMenuStore((state) => state.fetchMenu);
 
     useEffect(() => {
-        const onInvalidToken = () => {
+        const onInvalidToken = (event?: Event) => {
+            // Persist the server reason so the login screen can explain the
+            // kick-out instead of showing a silent login form.
+            try {
+                const code = String((event as CustomEvent)?.detail?.code || 'UNKNOWN');
+                const endpoint = String((event as CustomEvent)?.detail?.endpoint || '');
+                sessionStorage.setItem('coduiszen:auth-kick', JSON.stringify({ code, endpoint, at: Date.now() }));
+            } catch {
+                // storage must never break logout
+            }
             logout();
             setError('INVALID_TOKEN');
             setIsConnected(false);

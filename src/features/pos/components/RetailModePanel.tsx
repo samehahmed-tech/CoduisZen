@@ -43,7 +43,7 @@ const RetailModePanel: React.FC<RetailModePanelProps> = ({
       {/* Search Header */}
       <div className="border-b border-border/10 bg-card/60 p-4 shrink-0">
          <div className="flex items-center gap-3 bg-app border-2 border-primary/20 focus-within:border-primary rounded-xl px-4 py-3 shadow-inner transition-colors">
-            <ScanLine className="text-primary animate-pulse" size={24} />
+            <ScanLine className="text-primary" size={24} />
             <input
                ref={inputRef}
                type="text"

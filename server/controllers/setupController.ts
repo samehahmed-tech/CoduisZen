@@ -6,6 +6,100 @@ import crypto from 'crypto';
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { toSettingValue } from '../utils/settingsStore.js';
 import { validatePassword } from '../services/passwordPolicyService';
+import { AppPermission, UserRole, INITIAL_ROLE_PERMISSIONS } from '../../types';
+
+// Coduis Master gate: the setup wizard is a dealer-only tool. The key can be
+// rotated via env without a code change; the fallback is the master password.
+const CODUIS_MASTER_KEY = process.env.CODUIS_MASTER_KEY || process.env.DEALER_SETUP_KEY || 'Chaos@$321';
+
+const readMasterKey = (body: any): string =>
+    String(body?.masterKey ?? body?.dealerKey ?? '').trim();
+
+export const verifyMasterKey = (req: Request, res: Response) => {
+    if (readMasterKey(req.body) && readMasterKey(req.body) === CODUIS_MASTER_KEY) {
+        return res.json({ ok: true });
+    }
+    return res.status(403).json({ error: 'INVALID_MASTER_KEY' });
+};
+
+// Dealer setup: only these roles may be assigned to the bootstrapped admin.
+// Anything else falls back to SUPER_ADMIN (historic behavior).
+const SETUP_ADMIN_ROLES = [
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.BRANCH_MANAGER,
+    UserRole.CAFE_ADMIN,
+] as string[];
+
+const resolveSetupAdminIdentity = (admin: any): { role: string; permissions: string[] } => {
+    const rawRole = String(admin?.role || UserRole.SUPER_ADMIN).toUpperCase().trim();
+    const role = SETUP_ADMIN_ROLES.includes(rawRole) ? rawRole : UserRole.SUPER_ADMIN;
+    const validPerms = new Set(Object.values(AppPermission) as string[]);
+    const provided = Array.isArray(admin?.permissions)
+        ? (admin.permissions as unknown[]).map((p) => String(p)).filter((p) => validPerms.has(p))
+        : [];
+    // SUPER_ADMIN bypasses all checks server-side, so it needs no stored permissions.
+    if (role === UserRole.SUPER_ADMIN) return { role, permissions: [] };
+    if (provided.length > 0) return { role, permissions: Array.from(new Set(provided)) };
+    return { role, permissions: [...(INITIAL_ROLE_PERMISSIONS[role as UserRole] || [])] };
+};
+
+const isEmailLike = (value: unknown) =>
+    typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+interface SetupStaffInput {
+    name: string;
+    email: string;
+    password?: string;
+    pin?: string;
+    role: string;
+    permissions: string[];
+    defaultPage?: string;
+}
+
+// Staff accounts the dealer creates on-site (cashier, kitchen, pickup...).
+// Throws with a *_REQUIRED / *_INVALID code message on bad input.
+const resolveSetupStaff = async (rawStaff: unknown): Promise<SetupStaffInput[]> => {
+    if (rawStaff == null) return [];
+    if (!Array.isArray(rawStaff)) throw new Error('STAFF_MUST_BE_ARRAY');
+    const validPerms = new Set(Object.values(AppPermission) as string[]);
+    const validRoles = new Set(Object.values(UserRole) as string[]);
+    const out: SetupStaffInput[] = [];
+    const seenEmails = new Set<string>();
+    const seenPins = new Set<string>();
+    for (let i = 0; i < rawStaff.length; i++) {
+        const s: any = rawStaff[i] || {};
+        const name = String(s.name || '').trim();
+        if (!name) throw new Error(`STAFF_${i}_NAME_REQUIRED`);
+        const role = String(s.role || UserRole.CASHIER).toUpperCase().trim();
+        if (!validRoles.has(role) || role === UserRole.SUPER_ADMIN || role === UserRole.CUSTOM) {
+            throw new Error(`STAFF_${i}_ROLE_INVALID`);
+        }
+        let email = String(s.email || '').trim().toLowerCase();
+        if (!email) email = `${role.toLowerCase().replace(/[^a-z0-9]+/g, '')}${i}-${Date.now().toString(36)}@pos.local`;
+        if (!isEmailLike(email)) throw new Error(`STAFF_${i}_EMAIL_INVALID`);
+        if (seenEmails.has(email)) throw new Error(`STAFF_${i}_EMAIL_DUPLICATE`);
+        seenEmails.add(email);
+        const password = String(s.password || '');
+        const pin = String(s.pin || '').trim();
+        if (!password && !pin) throw new Error(`STAFF_${i}_AUTH_REQUIRED`);
+        if (password) {
+            const pwCheck = validatePassword(password);
+            if (!pwCheck.valid) throw new Error(`STAFF_${i}_PASSWORD_POLICY_FAILED: ${pwCheck.errors.join('; ')}`);
+        }
+        if (pin) {
+            if (!/^\d{6}$/.test(pin)) throw new Error(`STAFF_${i}_PIN_MUST_BE_6_DIGITS`);
+            if (seenPins.has(pin)) throw new Error(`STAFF_${i}_PIN_DUPLICATE`);
+            seenPins.add(pin);
+        }
+        const permissions = Array.isArray(s.permissions)
+            ? Array.from(new Set((s.permissions as unknown[]).map((p) => String(p)).filter((p) => validPerms.has(p))))
+            : [...(INITIAL_ROLE_PERMISSIONS[role as UserRole] || [])];
+        const defaultPage = typeof s.defaultPage === 'string' ? s.defaultPage : undefined;
+        out.push({ name, email, password: password || undefined, pin: pin || undefined, role, permissions, defaultPage });
+    }
+    return out;
+};
 
 const tableExists = async (tableName: string) => {
     const result = await pool.query(
@@ -63,12 +157,35 @@ export const bootstrapSetup = async (req: Request, res: Response) => {
         }
 
         const body = req.body || {};
+
+        // Coduis-Master-only gate: the wizard must send the master key.
+        if (readMasterKey(body) !== CODUIS_MASTER_KEY) {
+            return res.status(403).json({ error: 'INVALID_MASTER_KEY' });
+        }
+
         const admin = body.admin || {};
         const branch = body.branch || {};
         const appSettings = body.settings || {};
         const setupPrinters = Array.isArray(body.printers) ? body.printers : [];
         const setupRoles = Array.isArray(body.roles) ? body.roles : [];
         const setupTables = Array.isArray(body.tables) ? body.tables : [];
+        let setupStaff: SetupStaffInput[] = [];
+        try {
+            setupStaff = await resolveSetupStaff(body.staff);
+        } catch (e: any) {
+            return res.status(400).json({ error: e?.message || 'STAFF_INVALID' });
+        }
+        // Staff e-mails must not collide with existing accounts.
+        if (setupStaff.length > 0) {
+            const adminEmail = String(admin.email || '').trim().toLowerCase();
+            const staffEmails = new Set([adminEmail, ...setupStaff.map((s) => s.email)]);
+            const existing = await db.select({ email: users.email }).from(users);
+            for (const row of existing) {
+                if (staffEmails.has(String(row.email || '').trim().toLowerCase())) {
+                    return res.status(409).json({ error: 'STAFF_EMAIL_ALREADY_EXISTS' });
+                }
+            }
+        }
 
         if (!admin.name || !admin.email || !admin.password) {
             return res.status(400).json({ error: 'ADMIN_FIELDS_REQUIRED' });
@@ -88,6 +205,7 @@ export const bootstrapSetup = async (req: Request, res: Response) => {
         const userId = admin.id || `user-${crypto.randomUUID()}`;
         const passwordHash = await bcrypt.hash(String(admin.password), 10);
         const defaultZoneId = `zone-${branchId}-main`;
+        const adminIdentity = resolveSetupAdminIdentity(admin);
 
         await db.transaction(async (tx) => {
             const branchValues = {
@@ -116,13 +234,36 @@ export const bootstrapSetup = async (req: Request, res: Response) => {
                 name: admin.name,
                 email: admin.email,
                 passwordHash,
-                role: 'SUPER_ADMIN',
-                permissions: [],
+                role: adminIdentity.role,
+                permissions: adminIdentity.permissions,
                 assignedBranchId: branchId,
+                allowedBranches: [branchId],
                 isActive: true,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
+
+            for (const member of setupStaff) {
+                const staffPasswordHash = member.password ? await bcrypt.hash(member.password, 10) : null;
+                const staffPinHash = member.pin ? await bcrypt.hash(member.pin, 10) : null;
+                await tx.insert(users).values({
+                    id: `user-${crypto.randomUUID()}`,
+                    name: member.name,
+                    email: member.email,
+                    passwordHash: staffPasswordHash,
+                    pinCode: member.pin || null,
+                    pinCodeHash: staffPinHash,
+                    pinLoginEnabled: Boolean(member.pin),
+                    role: member.role,
+                    permissions: member.permissions,
+                    customPermissions: (member.defaultPage ? { defaultPage: member.defaultPage } : {}) as unknown as Record<string, boolean>,
+                    assignedBranchId: branchId,
+                    allowedBranches: [branchId],
+                    isActive: true,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
 
             const settingsEntries = [
                 { key: 'restaurantName', value: appSettings.restaurantName || branch.name },
@@ -264,7 +405,7 @@ export const bootstrapSetup = async (req: Request, res: Response) => {
             console.error('[SETUP] Failed to seed COA:', seedError);
         }
 
-        res.status(201).json({ ok: true });
+        res.status(201).json({ ok: true, staffCreated: setupStaff.length });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

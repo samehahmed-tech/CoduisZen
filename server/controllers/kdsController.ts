@@ -26,6 +26,8 @@ const ensureKdsSchema = async () => {
             priority nvarchar(255) DEFAULT 'NORMAL',
             printed_at datetime2 NULL,
             bumped_at datetime2 NULL,
+            completed_by nvarchar(255) NULL,
+            completed_by_name nvarchar(255) NULL,
             created_at datetime2 DEFAULT GETDATE(),
             updated_at datetime2 DEFAULT GETDATE(),
             CONSTRAINT pk_kds_tickets PRIMARY KEY (id),
@@ -88,6 +90,14 @@ const ensureKdsSchema = async () => {
         ALTER TABLE kds_ticket_items
             ADD is_bumped bit NOT NULL
                 CONSTRAINT df_kds_ticket_items_is_bumped DEFAULT 0;
+
+        IF OBJECT_ID('kds_tickets', 'U') IS NOT NULL
+           AND COL_LENGTH('kds_tickets', 'completed_by') IS NULL
+        ALTER TABLE kds_tickets ADD completed_by nvarchar(255) NULL;
+
+        IF OBJECT_ID('kds_tickets', 'U') IS NOT NULL
+           AND COL_LENGTH('kds_tickets', 'completed_by_name') IS NULL
+        ALTER TABLE kds_tickets ADD completed_by_name nvarchar(255) NULL;
 
         IF COL_LENGTH('dbo.kds_ticket_items', 'ticket_id') IS NOT NULL
            AND COLUMNPROPERTY(OBJECT_ID('dbo.kds_ticket_items'), 'ticket_id', 'AllowsNull') = 0
@@ -542,6 +552,7 @@ export const kdsController = {
                         stationId: printers.stationId,
                         type: printers.type,
                         address: printers.address,
+                        isActive: printers.isActive,
                     })
                     .from(printers)
                     .where(inArray(printers.id, routedPrinterIds))
@@ -562,9 +573,15 @@ export const kdsController = {
                     const current = printerIdsByStation.get(station) || [];
                     current.push(printerId);
                     printerIdsByStation.set(station, Array.from(new Set(current)));
-                    return station;
+                    return printer && printer.isActive !== false ? station : '';
                 });
-                stationByMenuItemId.set(row.id, Array.from(new Set(stations.length ? stations : ['KITCHEN'])));
+                const validStations = Array.from(new Set(stations.filter(Boolean)));
+                // KDS tickets feed the kitchen SCREEN — they must always exist
+                // so the order is visible. 'KITCHEN' is the display fallback
+                // when nothing is explicitly routed. Physical PRINT jobs below
+                // are still created only for active printers, so this fallback
+                // can never print on a random printer.
+                stationByMenuItemId.set(row.id, validStations.length ? validStations : ['KITCHEN']);
             }
 
             const ticketsBuffer: any = {};
@@ -573,6 +590,8 @@ export const kdsController = {
             // menu item, so each order line lands at most once per ticket).
             orderItemsList.forEach(item => {
                 const stations = item.menuItemId ? stationByMenuItemId.get(item.menuItemId) : null;
+                // Items with no menu link (custom/ad-hoc lines) also land on
+                // the KITCHEN screen instead of vanishing.
                 const uniqueStations = Array.from(new Set(stations?.length ? stations : ['KITCHEN']));
                 for (const station of uniqueStations) {
                     if (!ticketsBuffer[station]) ticketsBuffer[station] = [];
@@ -616,11 +635,10 @@ export const kdsController = {
 
                     await tx.insert(kdsTicketItems).values(itemsToInsert);
                     const stationPrinterIds = printerIdsByStation.get(station) || [];
-                    if (stationPrinterIds.length === 0) {
-                        printJobsToCreate.push({ ticketId, station, items: ticketsBuffer[station] });
-                    } else {
-                        for (const printerId of stationPrinterIds) {
-                            printJobsToCreate.push({ ticketId, station, printerId, printer: printerById.get(printerId), items: ticketsBuffer[station] });
+                    for (const printerId of stationPrinterIds) {
+                        const printer = printerById.get(printerId);
+                        if (printer && printer.isActive !== false) {
+                            printJobsToCreate.push({ ticketId, station, printerId, printer, items: ticketsBuffer[station] });
                         }
                     }
                 }
@@ -699,9 +717,13 @@ export const kdsController = {
                 return res.json({ success: true, served: true });
             }
 
-            // 2. Mark this kitchen ticket as ready
+            // 2. Mark this kitchen ticket as ready — recording WHO completed
+            // it so kitchen staff performance is reportable. Falls back to
+            // the authenticated user when the client sends no actor.
+            const completedBy = String(req.body?.completedBy || (req.user as any)?.id || '').trim() || null;
+            const completedByName = String(req.body?.completedByName || (req.user as any)?.name || '').trim() || null;
             await db.update(kdsTickets)
-                .set({ status: 'READY', bumpedAt: new Date(), updatedAt: new Date() })
+                .set({ status: 'READY', bumpedAt: new Date(), completedBy, completedByName, updatedAt: new Date() })
                 .where(eq(kdsTickets.id, ticketId));
 
             // 3. Verify if all tickets belonging to this order are now ready
@@ -730,9 +752,10 @@ export const kdsController = {
             if (!ticket) return res.status(404).json({ error: 'TICKET_NOT_FOUND' });
             if (!canAccessBranch(req, ticket.branchId)) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });
 
-            // Restore ticket to preparing
+            // Restore ticket to preparing (completion actor is cleared too —
+            // a recalled ticket was never actually finished by anyone).
             await db.update(kdsTickets)
-                .set({ status: 'PREPARING', bumpedAt: null, updatedAt: new Date() })
+                .set({ status: 'PREPARING', bumpedAt: null, completedBy: null, completedByName: null, updatedAt: new Date() })
                 .where(eq(kdsTickets.id, ticketId));
 
             if (ticket.orderId) {

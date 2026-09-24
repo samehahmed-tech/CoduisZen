@@ -46,25 +46,59 @@ const getSocketUrl = () => {
     return window.location.origin;
 };
 
+/** Session identity inside a JWT (stable across access-token refreshes). */
+const tokenIdentity = (token: string): string => {
+    try {
+        const part = token.split('.')[1];
+        if (!part) return '';
+        const payload = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+        const sub = String(payload?.sub || payload?.id || '');
+        const sid = String(payload?.sid || payload?.sessionId || '');
+        return sub && sid ? `${sub}|${sid}` : '';
+    } catch {
+        return '';
+    }
+};
+
+const readStoredToken = (): string => {
+    try {
+        return localStorage.getItem('auth_token') || '';
+    } catch {
+        return '';
+    }
+};
+
 class SocketService {
     private socket: Socket | null = null;
     private currentBranchId: string | null = null;
-    private currentToken: string | null = null;
+    private currentIdentity: string | null = null;
     private reconnectCallbacks: Set<() => void> = new Set();
     private connectionCallbacks: Set<(connected: boolean) => void> = new Set();
     private _wasConnected = false;
 
     init(token: string) {
-        if (this.socket && this.currentToken === token) return;
-        if (this.socket && this.currentToken !== token) {
+        // Same session (e.g. a silently refreshed access token) → keep the
+        // live socket untouched. Only a different session/user rebuilds it.
+        // Comparing identity instead of the raw token is what stops the
+        // recurring "offline" flashes every token cycle.
+        const identity = tokenIdentity(token);
+        if (this.socket && identity && identity === this.currentIdentity) return;
+        if (this.socket) {
             this.socket.disconnect();
             this.socket = null;
         }
 
-        this.currentToken = token;
+        this.currentIdentity = identity || null;
         this._wasConnected = false;
         this.socket = io(getSocketUrl(), {
-            auth: { token },
+            // Function auth: EVERY handshake (initial + every auto-reconnect)
+            // carries the freshest stored token. The old object form froze
+            // the login-time token, so any reconnect after access-token
+            // expiry failed with INVALID_TOKEN forever while HTTP kept
+            // working — the classic "offline though everything is fine".
+            auth: (cb) => {
+                cb({ token: readStoredToken() });
+            },
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: Infinity,
@@ -144,7 +178,7 @@ class SocketService {
         this.socket?.disconnect();
         this.socket = null;
         this.currentBranchId = null;
-        this.currentToken = null;
+        this.currentIdentity = null;
         this._wasConnected = false;
         this.reconnectCallbacks.clear();
         this.connectionCallbacks.clear();

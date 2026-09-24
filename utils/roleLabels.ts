@@ -43,7 +43,8 @@ export const ROLE_I18N: Record<string, RoleLabelEntry> = {
     TREASURY_OFFICER: { en: 'Treasury Officer', ar: 'مسؤول الخزانة', description: 'Cash management & daily closing', descriptionAr: 'إدارة النقدية والإغلاق اليومي', isCorporate: true },
     TECH_SUPPORT: { en: 'Technical Support', ar: 'الدعم الفني', description: 'System configuration & printer setup', descriptionAr: 'إعدادات النظام وإعداد الطابعات', isCorporate: true },
     QUALITY_OFFICER: { en: 'Quality Officer', ar: 'مسؤول الجودة', description: 'Quality control & waste tracking', descriptionAr: 'مراقبة الجودة وتتبع الهدر', isCorporate: false },
-    CUSTOM: { en: 'Custom Role', ar: 'دور مخصص', description: 'Custom-defined role with selected permissions', descriptionAr: 'دور مخصص بصلاحيات محددة', isCorporate: false },
+    CAFE_ADMIN: { en: 'Cafe Admin (Limited)', ar: 'مدير كافيه (محدود)', description: 'Cafe edition — POS, reports, inventory & menu only', descriptionAr: 'نسخة الكافيه — نقطة بيع وتقارير ومخزون ومنيو فقط', isCorporate: false },
+    PICKUP_STAFF: { en: 'Handover Screen', ar: 'موظف شاشة التسليم', description: 'Pickup / handover screen operator', descriptionAr: 'مشغل شاشة التسليم للعملاء', isCorporate: false },    CUSTOM: { en: 'Custom Role', ar: 'دور مخصص', description: 'Custom-defined role with selected permissions', descriptionAr: 'دور مخصص بصلاحيات محددة', isCorporate: false },
     // Legacy / seed aliases (older DB rows use these keys)
     ADMIN: { en: 'Administrator', ar: 'مدير النظام', description: 'System administrator', descriptionAr: 'مدير النظام', isCorporate: true },
     MANAGER: { en: 'Manager', ar: 'مدير', description: 'Branch operations manager', descriptionAr: 'مدير تشغيل الفرع', isCorporate: false },

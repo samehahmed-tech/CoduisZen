@@ -91,12 +91,37 @@ const Login: React.FC = () => {
     const [mfaToken, setMfaToken] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | undefined>();
+    const [kickNotice, setKickNotice] = useState<string | undefined>();
     const [pressedKey, setPressedKey] = useState<string | null>(null);
     const [timeStr, setTimeStr] = useState('');
     const [bgImage] = useState(() => LOGIN_BACKGROUNDS[Math.floor(Math.random() * LOGIN_BACKGROUNDS.length)]);
 
     const pinInputRef = useRef<HTMLInputElement>(null);
     const isArabic = settings.language === 'ar';
+
+    // One-time kick-out notice: if the app logged out on its own (expired /
+    // revoked session), explain it instead of a silent login form.
+    useEffect(() => {
+        try {
+            const raw = sessionStorage.getItem('coduiszen:auth-kick');
+            sessionStorage.removeItem('coduiszen:auth-kick');
+            if (!raw) return;
+            const { code, at } = JSON.parse(raw);
+            if (Date.now() - Number(at || 0) > 10 * 60 * 1000) return;
+            const c = String(code || 'UNKNOWN');
+            if (c === 'SESSION_EXPIRED') {
+                setKickNotice(isArabic ? 'انتهت مدة الجلسة بسبب عدم النشاط — سجل الدخول مجددًا.' : 'Session expired after inactivity — please sign in again.');
+            } else if (c === 'SESSION_REVOKED') {
+                setKickNotice(isArabic ? 'تم إنهاء جلستك من الإدارة أو جهاز آخر — سجل الدخول مجددًا.' : 'Your session was ended by management or another device — please sign in again.');
+            } else if (c === 'USER_INACTIVE') {
+                setKickNotice(isArabic ? 'تم تعطيل هذا الحساب — تواصل مع الإدارة.' : 'This account was deactivated — contact management.');
+            } else {
+                setKickNotice(isArabic ? 'انتهت الجلسة الحالية — سجل الدخول مجددًا.' : 'Previous session ended — please sign in again.');
+            }
+        } catch {
+            // ignore malformed payloads
+        }
+    }, [isArabic]);
 
     // Live clock
     useEffect(() => {
@@ -316,13 +341,13 @@ const Login: React.FC = () => {
                         backgroundSize: '32px 32px',
                     }} />
 
-                    {/* ?? Top: Brand identity ?? */}
-                    <div className="relative z-10 flex items-center gap-3.5">
-                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center  border shadow-lg ${lt ? 'bg-white/70 border-slate-200/50 shadow-blue-100/30' : 'bg-white/5 border-white/10 shadow-black/30'}`}>
-                            <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain" />
+                    {/* ?? Top: Brand identity — wide banner shown in its natural shape ?? */}
+                    <div className="relative z-10 flex items-center gap-4">
+                        <div className="h-16 rounded-[1.25rem] flex items-center justify-center px-4 ring-2 ring-amber-300/60" style={{ background: 'linear-gradient(135deg,#0b1b30 0%,#020617 100%)', boxShadow: '0 10px 34px rgba(0,0,0,0.35), 0 0 28px rgba(201,162,39,0.35)' }}>
+                            <img src="/logo.png?v=2" alt="Logo" className="h-11 w-auto max-w-[230px] object-contain" draggable={false} />
                         </div>
                         <div>
-                            <h2 className={`text-lg font-extrabold tracking-[0.15em] uppercase ${lt ? 'text-slate-800' : 'text-white'}`}>Coduis Zen</h2>
+                            <h2 className={`text-xl font-extrabold tracking-[0.15em] uppercase ${lt ? 'text-slate-800' : 'text-white'}`}>Coduis Zen</h2>
                             <p className={`text-[9px] font-bold tracking-[0.25em] uppercase ${lt ? 'text-slate-500' : 'text-white/40'}`}>
                                 {isArabic ? 'نظام تحكم المطاعم' : 'Restaurant Control OS'}
                             </p>
@@ -386,9 +411,11 @@ const Login: React.FC = () => {
 
                     {/* ??? Top bar: Logo + Controls ??? */}
                     <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 sm:px-8 lg:px-14 py-5 z-20">
-                        {/* Mobile logo */}
+                        {/* Mobile logo — natural wide shape */}
                         <div className="flex lg:hidden items-center gap-2.5">
-                            <img src="/logo.png" alt="Logo" className="h-7 w-7 object-contain" />
+                            <span className="flex h-11 items-center justify-center rounded-xl px-2.5 shadow-lg shadow-black/20 ring-1 ring-amber-300/50" style={{ background: 'linear-gradient(135deg,#0b1b30 0%,#020617 100%)' }}>
+                                <img src="/logo.png?v=2" alt="Logo" className="h-8 w-auto max-w-[150px] object-contain" draggable={false} />
+                            </span>
                             <span className={`text-sm font-extrabold tracking-widest uppercase ${lt ? 'text-slate-700' : 'text-white/80'}`}>Coduis Zen</span>
                         </div>
                         <div className="hidden lg:block" /> {/* spacer on desktop */}
@@ -648,6 +675,14 @@ const Login: React.FC = () => {
                                                 }`}
                                         />
                                     </div>
+                                </div>
+                            )}
+
+                            {/* ??? Kick-out notice ??? */}
+                            {kickNotice && !error && (
+                                <div className={`mt-4 p-3 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2 ${lt ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-amber-500/10 border border-amber-500/20 text-amber-300'}`}>
+                                    <Sparkles size={13} className="shrink-0 opacity-70" />
+                                    {kickNotice}
                                 </div>
                             )}
 

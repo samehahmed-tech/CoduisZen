@@ -562,6 +562,20 @@ export const getAllOrders = async (req: Request, res: Response) => {
         const orderIds = trimmedOrders.map((o) => o.id);
         const tableIds = Array.from(new Set(trimmedOrders.map((o) => o.tableId).filter((id): id is string => Boolean(id))));
         const allOrderItems = await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds));
+        const allOrderPayments = await db.select().from(payments).where(inArray(payments.orderId, orderIds));
+        const paymentsByOrderId = new Map<string, any[]>();
+        for (const payment of allOrderPayments) {
+            const bucket = paymentsByOrderId.get(payment.orderId) || [];
+            bucket.push({
+                id: payment.id,
+                method: payment.method,
+                amount: payment.amount,
+                referenceNumber: payment.referenceNumber,
+                status: payment.status,
+                createdAt: payment.createdAt,
+            });
+            paymentsByOrderId.set(payment.orderId, bucket);
+        }
         const tableRows = tableIds.length > 0
             ? await db.select({ id: tables.id, name: tables.name }).from(tables).where(inArray(tables.id, tableIds))
             : [];
@@ -620,6 +634,14 @@ export const getAllOrders = async (req: Request, res: Response) => {
             ...order,
             tableName: order.tableId ? tableNamesById.get(order.tableId) || null : null,
             items: itemsByOrderId.get(order.id) || [],
+            payments: paymentsByOrderId.get(order.id) || [],
+            // Keep legacy orders consistent with the payment ledger too. Some
+            // older dine-in closes created a payment row before is_paid was
+            // backfilled on the order header.
+            isPaid: Boolean(order.isPaid) || (paymentsByOrderId.get(order.id) || []).reduce((sum, payment) => sum + Number(payment.amount || 0), 0) + 0.01 >= Number(order.total || 0),
+            paidAmount: Number(order.paidAmount || 0) > 0
+                ? order.paidAmount
+                : (paymentsByOrderId.get(order.id) || []).reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
         }));
 
         if (cursor) {
@@ -733,6 +755,10 @@ export const createOrder = async (req: Request, res: Response) => {
             orderNumber: bodyData.order_number,
             type: bodyData.type,
             source: bodyData.source,
+            // POS manual-kitchen mode must be honored server-side as well.
+            // Without this flag, the generic takeaway auto-dispatch below
+            // creates a kitchen ticket even when the cashier did not send it.
+            skipKitchenDispatch: bodyData.skipKitchenDispatch === true || bodyData.skip_kitchen_dispatch === true,
             platformOrderId: bodyData.platform_order_id || bodyData.platformOrderId,
             deliverySource: bodyData.delivery_source || bodyData.deliverySource,
             branchId: cleanOptionalReference(bodyData.branch_id || bodyData.branchId), // Handle both
@@ -1547,7 +1573,12 @@ const [createdOrExistingCustomer] = await tx
             .innerJoin(warehouses, eq(inventoryStock.warehouseId, warehouses.id))
             .where(eq(warehouses.branchId, newOrder.branchId));
 
-            return { savedOrder: newOrder, paidNow, finalStocks: stocks, cogsCost };
+            // Return the created lines with their DB ids so the client can
+            // address them later (transfer/split/merge match by row id —
+            // without this the POS only knows temp cart ids and every
+            // move fails with ORDER_ITEM_QUANTITY_UNAVAILABLE).
+            const createdItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, newOrder.id));
+            return { savedOrder: { ...newOrder, items: createdItems }, paidNow, finalStocks: stocks, cogsCost };
         });
 
         try {
@@ -1595,15 +1626,16 @@ const [createdOrExistingCustomer] = await tx
         // starts on order creation (cash is collected on handover), otherwise
         // unpaid orders stay kitchen-blind with no legal dispatch path.
         const isPosOrder = String(orderData.source || '').toLowerCase() === 'pos';
+        const skipAutoKitchenDispatch = isPosOrder && orderData.skipKitchenDispatch === true;
         const isScheduledSaved = String(savedOrder.status || '').toUpperCase() === 'SCHEDULED';
-        if (['DINE_IN', 'KIOSK'].includes(String(savedOrder.type))) {
+        if (!skipAutoKitchenDispatch && ['DINE_IN', 'KIOSK'].includes(String(savedOrder.type))) {
             await kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch((error) => {
                 console.error('[Orders] KDS auto-dispatch failed', savedOrder.id, error);
                 inventoryWarnings.push({ code: 'KDS_DISPATCH_FAILED', orderId: savedOrder.id });
             });
-        } else if (!isScheduledSaved && ['DELIVERY', 'TAKEAWAY', 'PICKUP'].includes(String(savedOrder.type))) {
+        } else if (!skipAutoKitchenDispatch && !isScheduledSaved && ['DELIVERY', 'TAKEAWAY', 'PICKUP'].includes(String(savedOrder.type))) {
             kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
-        } else if (paidNow && !isPosOrder && !isScheduledSaved) {
+        } else if (!skipAutoKitchenDispatch && paidNow && !isPosOrder && !isScheduledSaved) {
             kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
         }
         // POS prints the cashier receipt through the client orchestrator so its
@@ -1631,12 +1663,14 @@ const [createdOrExistingCustomer] = await tx
         // Finance posting stays non-blocking, but sale must be visible before COGS for the same order.
         // Scheduled orders post nothing yet — the wake step posts on fire.
         if (!isScheduledSaved) void (async () => {
-            await postPosOrderEntry({
-                orderId: savedOrder.id,
-                amount: Number(savedOrder.total || 0),
-                branchId: savedOrder.branchId,
-                userId: userId || savedOrder.callCenterAgentId || 'system',
-            });
+            if (!(String(savedOrder.type || '').toUpperCase() === 'DINE_IN' && !paidNow)) {
+                await postPosOrderEntry({
+                    orderId: savedOrder.id,
+                    amount: Number(savedOrder.total || 0),
+                    branchId: savedOrder.branchId,
+                    userId: userId || savedOrder.callCenterAgentId || 'system',
+                });
+            }
 
             await postCogsForOrderEntry({
                 orderId: savedOrder.id,
@@ -1761,7 +1795,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     };
 
     try {
-        const { status, changed_by, notes, approval_id } = req.body;
+        const { status, changed_by, notes, approval_id, paymentMethod, payments: paymentRows } = req.body;
         const expectedUpdatedAtRaw = req.body?.expected_updated_at || req.body?.expectedUpdatedAt;
         const nextStatus = String(status || '').toUpperCase();
         const orderId = getStringParam((req.params as any).id);
@@ -1800,6 +1834,8 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             changedBy: changed_by || req.user?.id,
             expectedUpdatedAt: expectedUpdatedAtRaw,
             approvalId: approval_id,
+            paymentMethod,
+            payments: paymentRows,
             user: {
                 role: req.user?.role,
                 branchId: req.user?.branchId,
@@ -1998,6 +2034,34 @@ const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id,
 // tickets are rebuilt and branch print jobs re-enqueued server-side.
 // Stock: positive per-line quantity deltas are deducted (warn-only, same
 // philosophy as creation); removed lines stay deducted like any cancel.
+/**
+ * GET /api/orders/:id — single order with lines (used to heal stale
+ * cashier carts: refresh server truth, then retry once automatically).
+ */
+export const getOrderById = async (req: Request, res: Response) => {
+    try {
+        const id = getStringParam((req.params as any).id);
+        if (!id) return res.status(400).json({ error: 'ORDER_ID_REQUIRED', code: 'ORDER_ID_REQUIRED' });
+        const [order] = await db.select().top(1).from(orders).where(eq(orders.id, id));
+        if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND', code: 'ORDER_NOT_FOUND' });
+        // Same branch scoping as the list: call-center monitors see all.
+        const explicitBranchId =
+            cleanQueryString(req.query.branch_id) ||
+            cleanQueryString(req.query.branchId);
+        const isCallCenterMonitor = req.user != null &&
+            ['CALL_CENTER', 'CALL_CENTER_MANAGER'].includes(String((req.user as any).role || ''));
+        const allowedBranchId = explicitBranchId ||
+            (!isCallCenterMonitor ? cleanQueryString(req.effectiveBranchId) : undefined);
+        if (allowedBranchId && String((order as any).branchId) !== String(allowedBranchId)) {
+            return res.status(404).json({ error: 'ORDER_NOT_FOUND', code: 'ORDER_NOT_FOUND' });
+        }
+        const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id));
+        res.json({ ...order, items });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const updateOrderItems = async (req: Request, res: Response) => {
     try {
         const orderId = getStringParam((req.params as any).id);
@@ -2014,11 +2078,26 @@ export const updateOrderItems = async (req: Request, res: Response) => {
         const [currentOrder] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
         if (!currentOrder) return res.status(404).json({ error: 'ORDER_NOT_FOUND', code: 'ORDER_NOT_FOUND' });
         const editableStatuses = ['PENDING', 'SCHEDULED'];
-        if (!editableStatuses.includes(String(currentOrder.status || '').toUpperCase())) {
-            return res.status(409).json({
-                error: 'ORDER_NOT_EDITABLE', code: 'ORDER_NOT_EDITABLE',
-                message: 'Only pending or scheduled orders can be edited. The branch already started this order — cancel it instead.',
-            });
+        const statusUpper = String(currentOrder.status || '').toUpperCase();
+        // Café reality: dine-in tickets stay open while the kitchen works, and
+        // the cashier edits them repeatedly. Allow rewriting a FIRED dine-in
+        // ticket only while it is unpaid — totals recompute from scratch, open
+        // KDS tickets rebuild, inventory moves by delta. Paid/fired tickets
+        // keep the cancel + refund flow (money already moved).
+        let unpaidDineInEdit = false;
+        if (!editableStatuses.includes(statusUpper)) {
+            const isFiredDineIn = String(currentOrder.type || '').toUpperCase() === 'DINE_IN' && statusUpper === 'PREPARING';
+            if (isFiredDineIn && !currentOrder.isPaid && Number(currentOrder.paidAmount || 0) === 0) {
+                const [paidRow] = await db.select({ id: payments.id }).top(1).from(payments)
+                    .where(and(eq(payments.orderId, orderId), eq(payments.status, 'COMPLETED')));
+                unpaidDineInEdit = !paidRow;
+            }
+            if (!unpaidDineInEdit) {
+                return res.status(409).json({
+                    error: 'ORDER_NOT_EDITABLE', code: 'ORDER_NOT_EDITABLE',
+                    message: 'Only pending/scheduled orders — or unpaid dine-in tickets — can be edited. Settle or cancel it instead.',
+                });
+            }
         }
 
         // Mutable header fields (channel/payment/address stay editable while

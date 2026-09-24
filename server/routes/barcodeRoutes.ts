@@ -7,9 +7,10 @@ import {
     lookupInventoryItemByBarcode,
 } from '../controllers/barcodeLookupController';
 import { requireRoles } from '../middleware/auth';
+import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
-const posAuth = requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'WAITER');
+const posAuth = requireRoles(...POS_FLOOR_ROLES);
 const managerAuth = requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER');
 
 // Unified barcode lookup (used by POS scanner)

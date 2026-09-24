@@ -33,12 +33,14 @@ import POSReturnModal from './components/POSReturnModal';
 import TakeawayNameModal from './components/TakeawayNameModal';
 import POSToolbar from './components/POSToolbar';
 import POSItemsPanel from './components/POSItemsPanel';
+import type { CardDensity, CardSize } from './components/MenuItemCard';
 import RetailModePanel from './components/RetailModePanel';
 import { isPlatformDeliveryValid } from './platformDeliveryValidation';
 import CategorySidebar from './components/CategorySidebar';
 import SeatModal from './components/SeatModal';
 import CourseModal from './components/CourseModal';
 import POSCartSidebar from './components/POSCartSidebar';
+import POSShortcutsHelp from './components/POSShortcutsHelp';
 import { printService } from '@/src/services/printService';
 import { hasCashierPrinterConfigured, POS_PRINT_STATION_KEY, printKitchenTicketsByRouting, printOrderReceipt } from '@/services/posPrintOrchestrator';
 import { useToast } from '@/components/Toast';
@@ -172,7 +174,9 @@ const POS: React.FC = () => {
    const fetchTables = useOrderStore(state => state.fetchTables);
    const updateTableStatus = useOrderStore(state => state.updateTableStatus);
    const resetTable = useOrderStore(state => state.resetTable);
-   const updateOrderStatus = useOrderStore(state => state.updateOrderStatus);
+    const updateOrderStatus = useOrderStore(state => state.updateOrderStatus);
+    const updateOrderItems = useOrderStore(state => state.updateOrderItems);
+    const refreshOrder = useOrderStore(state => state.refreshOrder);
    const tableDrafts = useOrderStore(state => state.tableDrafts);
    const saveTableDraft = useOrderStore(state => state.saveTableDraft);
    const loadTableDraft = useOrderStore(state => state.loadTableDraft);
@@ -249,7 +253,8 @@ const POS: React.FC = () => {
    const [categorySidebarCollapsed, setCategorySidebarCollapsed] = useState(() => false);
    const [itemFilter, setItemFilter] = useState<'all' | 'available' | 'popular'>('all');
    const [itemSort, setItemSort] = useState<'smart' | 'name' | 'price_asc' | 'price_desc'>('smart');
-   const [itemDensity, setItemDensity] = useState<'comfortable' | 'compact' | 'ultra' | 'buttons'>('compact');
+    const [itemDensity, setItemDensity] = useState<CardDensity>('ticket');
+    const [cardSize, setCardSize] = useState<CardSize>('medium');
    const [posMode, setPosMode] = useState<'grid' | 'retail'>('grid');
    const [editingItemId, setEditingItemId] = useState<string | null>(null);
    const [noteInput, setNoteInput] = useState('');
@@ -261,6 +266,7 @@ const POS: React.FC = () => {
    const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
    const [showReturnModal, setShowReturnModal] = useState(false);
    const [showOrderNameModal, setShowOrderNameModal] = useState(false);
+   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
    const [orderName, setOrderName] = useState('');
    const [isCartOpenMobile, setIsCartOpenMobile] = useState(false);
    const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -449,9 +455,12 @@ const POS: React.FC = () => {
          if (parsed?.itemSort && ['smart', 'name', 'price_asc', 'price_desc'].includes(parsed.itemSort)) {
             setItemSort(parsed.itemSort);
          }
-         if (parsed?.itemDensity && ['comfortable', 'compact', 'ultra', 'buttons'].includes(parsed.itemDensity)) {
-            setItemDensity(parsed.itemDensity);
-         }
+          if (parsed?.itemDensity && ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'].includes(parsed.itemDensity)) {
+             setItemDensity(parsed.itemDensity);
+          }
+          if (parsed?.cardSize && ['small', 'medium', 'large'].includes(parsed.cardSize)) {
+             setCardSize(parsed.cardSize);
+          }
          if (parsed?.posMode && ['grid', 'retail'].includes(parsed.posMode)) {
             setPosMode(parsed.posMode);
          }
@@ -466,12 +475,13 @@ const POS: React.FC = () => {
             itemFilter,
             itemSort,
             itemDensity,
+            cardSize,
             posMode
          }));
       } catch {
          // ignore storage errors
       }
-   }, [itemFilter, itemSort, itemDensity, posMode]);
+    }, [itemFilter, itemSort, itemDensity, cardSize, posMode]);
 
    useEffect(() => {
       try {
@@ -572,7 +582,6 @@ const POS: React.FC = () => {
       indexedItems,
       normalizedSearchQuery,
       pricedItems,
-      quickCategoryNav,
       quickPickItems,
       totalMatchedAcrossCategories,
       upsellSuggestions,
@@ -899,9 +908,13 @@ const POS: React.FC = () => {
    }, [selectedTableId, saveCurrentTableDraft, clearCart]);
 
    const findTableByNumber = useCallback((value: string) => {
-      const normalized = value.replace(/^0+/, '');
+      const toWestern = (v: string) => String(v || '')
+         .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+         .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+      const normalized = toWestern(value).replace(/\D/g, '').replace(/^0+/, '');
+      if (!normalized) return undefined;
       return tables.find((table) => {
-         const label = table.name || table.id || '';
+         const label = toWestern(table.name || table.id || '');
          const match = label.match(/\d+/);
          if (!match) return false;
          const tableNumber = match[0].replace(/^0+/, '');
@@ -1169,17 +1182,19 @@ const POS: React.FC = () => {
       }
    }, [safeActiveCart, handleUpdateQuantity]);
 
-   const performCloseTable = async (tableId: string) => {
+   const performCloseTable = async (tableId: string, selectedPaymentMethod = PaymentMethod.CASH) => {
        const activeOrder = findActiveTableOrder(orders, tables, tableId);
        try {
            if (activeOrder) {
                await updateOrderStatus(activeOrder.id, OrderStatus.COMPLETED, undefined, undefined, {
                   skipPrint: true,
                   skipVersionCheck: true,
+                  paymentMethod: selectedPaymentMethod,
+                  payments: [{ method: selectedPaymentMethod, amount: Number(activeOrder.total || 0) }],
                });
                await fetchTables(branchId);
                try {
-                  await printOrderReceipt({ order: activeOrder, printers, settings, currencySymbol, lang, t, branch: activeBranch });
+                  await printOrderReceipt({ order: { ...activeOrder, status: OrderStatus.COMPLETED, paymentMethod: selectedPaymentMethod, payments: [{ method: selectedPaymentMethod, amount: Number(activeOrder.total || 0) }] }, printers, settings, currencySymbol, lang, t, branch: activeBranch });
                } catch (printError) {
                   showToast(getActionableErrorMessage(printError, lang), 'warning');
                }
@@ -1194,8 +1209,8 @@ const POS: React.FC = () => {
        }
    };
 
-   const handleCloseTable = async (tableId: string) => {
-      await performCloseTable(tableId);
+   const handleCloseTable = async (tableId: string, selectedPaymentMethod = PaymentMethod.CASH) => {
+      await performCloseTable(tableId, selectedPaymentMethod);
    };
 
    const handleResetTable = (table: Table) => {
@@ -1314,6 +1329,7 @@ const POS: React.FC = () => {
       payments: withPayment
          ? buildOrderPayment(selectedPaymentMethod, cartTotal, splitPayments).payments
          : [],
+      ...(settings.orderManualKitchenFlow === true ? { skipKitchenDispatch: true } : {}),
       syncStatus: 'PENDING'
    });
 
@@ -1333,23 +1349,12 @@ const POS: React.FC = () => {
    };
 
    const fireOrderToKitchen = async (order: Order) => {
-      await kdsApi.dispatchOrder(order.id, branchId, true);
-      try {
-         await printKitchenTicketsByRouting({
-            order,
-            categories,
-            printers,
-            branchId,
-            maxKitchenPrinters: settings.maxKitchenPrinters,
-            settings,
-            currencySymbol,
-            lang,
-            t,
-            branch: activeBranch
-         });
-      } catch {
-         showToast(lang === 'ar' ? 'تم إرسال الطلب، لكن طابعة المطبخ غير متاحة' : 'Order sent, but kitchen printer is unavailable', 'warning');
-      }
+      // Kitchen printing has one owner: the server print queue/bridge.
+      // The old flow dispatched with clientHandlesPrinting=true and then
+      // printed locally as well. For takeaway orders the server also
+      // auto-dispatches during createOrder, so the same ticket could be
+      // printed twice (especially after a bridge reconnect).
+      await kdsApi.dispatchOrder(order.id, branchId, false);
       await updateOrderStatus(order.id, OrderStatus.PREPARING, undefined, undefined, { skipVersionCheck: true });
    };
 
@@ -1412,8 +1417,116 @@ const POS: React.FC = () => {
          return;
       }
       pendingDispatchRef.current = null;
+
+      // Dine-in table editing (café flow): the cart may rewrite the table's
+      // open ticket or purely extend it. Sending must never duplicate lines:
+      //  - linked ticket PENDING → update it in place (add/remove reconcile);
+      //  - linked ticket fired + cart only ADDS lines → new round with the
+      //    fresh lines only (server prices it authoritatively);
+      //  - linked ticket fired + cart touches fired lines → rewrite the
+      //    ticket in place (server allows unpaid dine-in edits and rebuilds
+      //    open KDS tickets, so removed lines vanish from the kitchen too).
+      // Returns { handled } — with freshOnly set, the create path below
+      // sends the supplementary round instead of the full cart.
+      const rowKeyOf = (l: any) => String(l?.cartId ?? l?.id ?? '');
+      const sendTableEdit = async (): Promise<{ handled: boolean; freshOnly?: any[] }> => {
+         if (activeOrderType !== OrderType.DINE_IN || !selectedTableId) return { handled: false };
+         const linkedTable = tables.find(t => t.id === selectedTableId);
+         const linkedOrder = linkedTable?.currentOrderId
+            ? orders.find(o => o.id === linkedTable.currentOrderId)
+            : undefined;
+         if (!linkedOrder || ['DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED'].includes(String(linkedOrder.status).toUpperCase())) {
+            return { handled: false };
+         }
+         // Captured up front: a conflict refresh must never wipe the lines
+         // the cashier just built — any retry re-sends THESE, not the cart.
+         const intendedItems = safeActiveCart as any[];
+         const intendedDiscount = orderDiscountAmount;
+         // Never throws: every outcome toasts, and no path duplicates.
+         const saveInPlace = async (orderId: string, attempt = 1): Promise<void> => {
+            try {
+               await updateOrderItems(orderId, { items: intendedItems, discount: intendedDiscount });
+               loadTableOrder(selectedTableId);
+               clearTableDraft(selectedTableId);
+               showToast(lang === 'ar' ? 'تم تحديث أصناف الترابيزة ✓' : 'Table order updated ✓', 'success');
+            } catch (error: any) {
+               const code = String(error?.code || error?.message || '');
+               if (code.includes('ORDER_VERSION_CONFLICT') && attempt === 1) {
+                  // Someone touched the ticket after we loaded it — pull
+                  // server truth, then retry ONCE automatically. The cashier
+                  // sees nothing except success in the common case.
+                  try { await refreshOrder(orderId); } catch { /* retry with local version anyway */ }
+                  await saveInPlace(orderId, 2);
+                  return;
+               }
+               if (code.includes('ORDER_VERSION_CONFLICT')) {
+                  loadTableOrder(selectedTableId);
+                  showToast(lang === 'ar' ? 'الترابيزة اتعدلت من جهاز آخر — تم تحميل أحدث نسخة' : 'Table was changed elsewhere — reloaded the latest version', 'error');
+                  return;
+               }
+               // Validation / offline / fired-meanwhile: keep the cart intact
+               // (nothing is lost) and never fall through to a duplicate.
+               showToast(getActionableErrorMessage(error, lang), 'error');
+            }
+         };
+         // Case 1: unfired ticket → always rewrite in place.
+         if (String(linkedOrder.status).toUpperCase() === 'PENDING') {
+            await saveInPlace(linkedOrder.id);
+            return { handled: true };
+         }
+         // Case 2: fired ticket → partition cart into carried vs fresh lines.
+         const linkedById = new Map((linkedOrder.items || []).map((l: any) => [rowKeyOf(l), l]));
+         const sigOf = (l: any) => `${l.menuItemId || l.menu_item_id || ''}::${l.sizeId || l.size_id || ''}::${l.quantity}::${JSON.stringify(((l.selectedModifiers || l.modifiers || []) as any[]).map(m => String(m.id || m.optionId)).sort())}`;
+         const carried = safeActiveCart.filter(l => linkedById.has(rowKeyOf(l)));
+         const fresh = safeActiveCart.filter(l => !linkedById.has(rowKeyOf(l)));
+         const touched = carried.some(l => {
+            const orig: any = linkedById.get(rowKeyOf(l));
+            return !orig || sigOf(orig) !== sigOf(l);
+         });
+         const removed = (linkedOrder.items || []).some(o => !safeActiveCart.some(l => rowKeyOf(l) === rowKeyOf(o)));
+         // Case 2a: pure addition → caller creates a fresh-only round.
+         if (!touched && !removed) {
+            if (fresh.length === 0) {
+               showToast(lang === 'ar' ? 'لا توجد أصناف جديدة للإرسال' : 'No new items to send', 'info');
+               return { handled: true };
+            }
+            return { handled: false, freshOnly: fresh };
+         }
+         // Case 2b: fired lines added/removed/changed → rewrite the ticket.
+         await saveInPlace(linkedOrder.id);
+         return { handled: true };
+      };
+
+      const tableEdit = await sendTableEdit();
+      if (tableEdit.handled) {
+         endOrderSubmit();
+         return;
+      }
+
       try {
          const draftOrder = buildDraftOrder(false);
+         if (tableEdit.freshOnly) {
+            // Supplementary round: only lines not already on fire. Totals are
+            // a client quote — the server reprices authoritatively. No coupon
+            // or table discount here: they stay on the original ticket so
+            // nothing is claimed or applied twice.
+            const freshLines = tableEdit.freshOnly as any[];
+            const money = (v: number) => parseFloat(v.toFixed(2));
+            const freshSubtotal = money(freshLines.reduce((acc, item) => {
+               const mods = ((item as any).selectedModifiers || (item as any).modifiers || [])
+                  .reduce((s: number, m: any) => s + Number(m?.price || 0), 0);
+               return acc + ((Number((item as any).price || 0) + mods) * Number((item as any).quantity || 0));
+            }, 0));
+            const freshTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
+            const freshTax = money(freshSubtotal * freshTaxRate);
+            draftOrder.items = freshLines as any;
+            draftOrder.subtotal = freshSubtotal;
+            draftOrder.tax = freshTax;
+            draftOrder.total = money(freshSubtotal + freshTax);
+            draftOrder.discountType = undefined;
+            draftOrder.discountReason = undefined;
+            draftOrder.couponCode = undefined;
+         }
          (draftOrder as any).clientSubmitKey = submitKey;
          const savedOrder = await placeOrderOptimistically(draftOrder);
          const changedAt = Date.now();
@@ -1421,10 +1534,14 @@ const POS: React.FC = () => {
          window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
          localStorage.setItem('restoflow:orders-changed', JSON.stringify(changeDetail));
 
-         if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
-             await updateTableStatus(selectedTableId, TableStatus.OCCUPIED, savedOrder.id);
-            clearTableDraft(selectedTableId);
-         }
+          if (activeOrderType === OrderType.DINE_IN && selectedTableId) {
+              await updateTableStatus(selectedTableId, TableStatus.OCCUPIED, savedOrder.id);
+             clearTableDraft(selectedTableId);
+             // Fresh-only round: reload the linked ticket so the cart carries
+             // real DB row ids — otherwise the next send would treat the just
+             // fired lines as "fresh" again and duplicate them.
+             if (tableEdit.freshOnly) loadTableOrder(selectedTableId);
+          }
 
           try {
              await fireOrderToKitchen(savedOrder);
@@ -1702,6 +1819,14 @@ const POS: React.FC = () => {
       onVoidOrder: handleVoidOrder,
       onSetOrderMode: setOrderMode,
       onRecallShortcut: handleRecallShortcut,
+      onOpenHelp: () => setShowShortcutsHelp(true),
+      onHoldOrder: handleHoldOrder,
+      onShowHeldOrders: () => setShowHeldOrdersModal(true),
+      onReprintLast: handleReprintLast,
+      onTableNotFound: (value) => showToast(
+         lang === 'ar' ? `لا توجد طاولة برقم ${value}` : `No table with number ${value}`,
+         'error'
+      ),
    });
 
    const handleApplyCoupon = async () => {
@@ -1883,6 +2008,12 @@ const POS: React.FC = () => {
             lang={lang}
          />
 
+         <POSShortcutsHelp
+            isOpen={showShortcutsHelp}
+            onClose={() => setShowShortcutsHelp(false)}
+            lang={lang}
+         />
+
          <TakeawayNameModal
             isOpen={showOrderNameModal}
             onClose={() => setShowOrderNameModal(false)}
@@ -2034,7 +2165,7 @@ const POS: React.FC = () => {
                            switchToTable(table.id);
                         }}
                         onTempBill={(table) => handleTempBill(table.id)}
-                        onCloseTable={(table) => handleCloseTable(table.id)}
+                        onCloseTable={(table) => setManagedTableId(table.id)}
                          onMergeTable={(table) => setManagedTableId(table.id)}
                          onResetTable={handleResetTable}
                          canResetTables={[UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.BRANCH_MANAGER].includes(settings.currentUser?.role as UserRole)}
@@ -2106,8 +2237,10 @@ const POS: React.FC = () => {
                            onSetFilter={setItemFilter}
                            itemSort={itemSort}
                            onSetSort={setItemSort}
-                           itemDensity={itemDensity as any}
-                           onSetDensity={setItemDensity as any}
+                            itemDensity={itemDensity as any}
+                            onSetDensity={setItemDensity as any}
+                            cardSize={cardSize}
+                            onSetCardSize={setCardSize}
                            showMobileFilters={showMobileFilters}
                            onToggleFilters={() => setShowMobileFilters(prev => !prev)}
                            onResetFilters={() => { setSearchQuery(''); setItemFilter('all'); setItemSort('smart'); }}
@@ -2116,7 +2249,6 @@ const POS: React.FC = () => {
                            showCategoryStrip={showCategoryStrip}
                            onToggleCategoryStrip={() => setShowCategoryStrip(prev => !prev)}
                            isTabletViewport={isTabletViewport}
-                           quickCategoryNav={quickCategoryNav}
                            isTouchMode={isTouchMode}
                            lang={lang}
                            t={t}

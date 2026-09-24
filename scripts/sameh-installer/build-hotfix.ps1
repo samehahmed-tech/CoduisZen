@@ -1,9 +1,12 @@
-﻿# RestoFlow Hotfix Builder
+﻿# RestoFlow Hotfix Builder — SMART package (one ZIP for server AND cashier)
 # Builds a customer-ready hotfix package from the latest source code.
+# The included applier detects the machine role at install time:
+#   server  -> dist + dist-server + hardware-bridge + runtime + database schema
+#   cashier -> hardware-bridge only (no database, no backup, bridge .env untouched)
 #
 # Output layout (matches the established hotfix convention):
 #   RestoFlow-HotFix-<version>-<yyyyMMdd-HHmm>\
-#     Apply Latest Fixes.bat / .ps1   (self-elevating applier, files-only + rollback)
+#     Apply Latest Fixes.bat / .ps1   (smart role-aware applier, files-only + rollback)
 #     README AR.txt / VERSION.txt
 #     payload\dist                     (optimized production frontend)
 #     payload\dist-server\index.cjs    (production server bundle)
@@ -23,8 +26,21 @@ param(
     [string]$OutputPath = '',
     [string]$Description = '',
     [switch]$SkipBuild,
-    [switch]$NoZip
+    [switch]$NoZip,
+    [switch]$PrintBridgeOnly
 )
+
+if ($PrintBridgeOnly) {
+    $bridgeBuilder = Join-Path $PSScriptRoot 'build-print-bridge-hotfix.ps1'
+    $bridgeArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $bridgeBuilder)
+    if ($Version) { $bridgeArgs += @('-Version', $Version) }
+    if ($OutputPath) { $bridgeArgs += @('-OutputPath', $OutputPath) }
+    if ($Description) { $bridgeArgs += @('-Description', $Description) }
+    if ($SkipBuild) { $bridgeArgs += '-SkipBuild' }
+    if ($NoZip) { $bridgeArgs += '-NoZip' }
+    & powershell.exe @bridgeArgs
+    exit $LASTEXITCODE
+}
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -80,6 +96,7 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $payload 'runtime') | Out-Null
     Copy-Item (Join-Path $PSScriptRoot 'runtime\schema-doctor.cjs') (Join-Path $payload 'runtime\schema-doctor.cjs') -Force
     Copy-Item (Join-Path $PSScriptRoot 'runtime\watchdog.cjs') (Join-Path $payload 'runtime\watchdog.cjs') -Force
+    Copy-Item (Join-Path $PSScriptRoot 'runtime\supervisor.cjs') (Join-Path $payload 'runtime\supervisor.cjs') -Force
     New-Item -ItemType Directory -Force -Path (Join-Path $payload 'database') | Out-Null
     Copy-Item (Join-Path $repo 'src\db\schema.ts') (Join-Path $payload 'database\schema.ts') -Force
 
@@ -92,12 +109,16 @@ try {
     Set-Content -LiteralPath (Join-Path $out 'VERSION.txt') -Value @($builtLine, $appLine, $newLine) -Encoding UTF8
 
     Set-Content -LiteralPath (Join-Path $out 'README AR.txt') -Value @(
-        'RestoFlow - حزمة إصلاح (Hotfix)',
+        'RestoFlow - حزمة إصلاح ذكية (Hotfix واحد للسيرفر والكاشير)',
         "التاريخ: $(Get-Date -Format 'yyyy-MM-dd HH:mm')",
         "النسخة: $Version",
         '',
-        'طريقة التثبيت على جهاز العميل:',
-        '1) انسخ مجلد الحزمة كاملاً إلى جهاز العميل.',
+        'نفس الحزمة تُستخدم على الجهازين — السكريبت يكتشف نوع الجهاز تلقائياً:',
+        '- جهاز السيرفر: يحدّث dist + dist-server + hardware-bridge + runtime + فحص قاعدة البيانات.',
+        '- جهاز الكاشير: يحدّث hardware-bridge فقط (بدون قاعدة بيانات وبدون مساس بإعدادات البريدج).',
+        '',
+        'طريقة التثبيت (على كل جهاز):',
+        '1) انسخ مجلد الحزمة كاملاً إلى الجهاز.',
         '2) شغّل: Apply Latest Fixes.bat',
         '3) وافق بـ Yes عند طلب صلاحية Administrator.',
         '4) انتظر رسالة SUCCESS (السكريبت يعمل نسخة rollback تلقائياً أولاً).',
@@ -106,7 +127,8 @@ try {
         'ملاحظات أمان (مضمّنة في السكريبت):',
         '- نسخة rollback كاملة تُحفظ في updates\rollback-<timestamp> قبل أي تغيير.',
         '- عند أي فشل تُسترجع الملفات القديمة تلقائياً.',
-        '- لا تُحذف أي بيانات (قاعدة البيانات تُنسخ احتياطياً وتُفحص فقط).'
+        '- على السيرفر: قاعدة البيانات تُنسخ احتياطياً وتُفحص فقط (لا تُحذف أي بيانات).',
+        '- على الكاشير: ملف bridge .env (التوكن وعنوان السيرفر) لا يُمس إطلاقاً.'
     ) -Encoding UTF8
 
     $assetCount = (Get-ChildItem (Join-Path $payload 'dist\assets\*.js')).Count

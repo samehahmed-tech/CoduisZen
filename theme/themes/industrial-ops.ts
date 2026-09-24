@@ -28,55 +28,56 @@ const semantic: ThemeConfig['semantic'] = {
     selection: 'rgba(var(--primary), 0.18)',
 };
 
-// ── THEME 09 · INDUSTRIAL OPERATIONS ──────────────────────────────────────
-// Powerful restaurant-ops platform (logistics / warehouse / kitchen grade):
-// robust surfaces, strong hierarchy, compact information, visible status.
-// Strongest voice on Inventory, KDS, Dispatch, Production.
+// ── THEME 09 · FLUENT (Windows-11 calm) ───────────────────────────────
+// NOTE: keeps the historical 'industrial-ops' id so saved user settings
+// keep working — the industrial look itself is fully retired.
+// Mica-like layered surfaces, signature 8px geometry, quiet Win11 blue,
+// calm ease-out motion. Strongest voice on POS, Dashboard, front-of-house.
 export const industrialOpsTheme: ThemeConfig = {
     id: 'industrial-ops',
-    name: 'Industrial Ops',
-    description: 'Heavy-duty operations: sturdy grids, bold status, mechanical clarity for KDS & inventory',
-    tags: ['Industrial', 'Operations', 'KDS', 'Warehouse', 'Sturdy'],
-    shape: { radius: '6px', radiusSm: '4px', radiusLg: '8px', radiusXl: '12px' },
-    surfaces: { blur: '0px', surfaceOpacity: 1, borderWidth: '1px', borderOpacity: 0.9 },
+    name: 'Fluent',
+    description: 'Windows-11 calm: soft mica surfaces, 8px geometry, quiet blue focus for POS & dashboard',
+    tags: ['Fluent', 'Calm', 'Windows11', 'Mica', 'Minimal'],
+    shape: { radius: '8px', radiusSm: '4px', radiusLg: '12px', radiusXl: '16px' },
+    surfaces: { blur: '24px', surfaceOpacity: 0.8, borderWidth: '1px', borderOpacity: 0.5 },
     shadows: {
-        card: '0 2px 0 rgba(20, 20, 20, 0.25), 0 4px 12px rgba(0,0,0,0.12)',
-        hover: '0 3px 0 rgba(20, 20, 20, 0.30), 0 10px 24px rgba(0,0,0,0.16)',
-        elevated: '0 4px 0 rgba(20, 20, 20, 0.30), 0 20px 48px rgba(0,0,0,0.22)',
+        card: '0 1.6px 3.6px rgba(0,0,0,0.11), 0 6.4px 28.8px rgba(0,0,0,0.08)',
+        hover: '0 3.2px 7.2px rgba(0,0,0,0.13), 0 12.8px 28.8px rgba(0,0,0,0.1)',
+        elevated: '0 6.4px 14.4px rgba(0,0,0,0.13), 0 25.6px 57.6px rgba(0,0,0,0.14)',
     },
-    motion: { style: 'crisp', easing: 'cubic-bezier(0.25, 0.8, 0.3, 1)', duration: '140ms', durationSlow: '280ms' },
-    typography: { fontWeight: 500, headingWeight: 800, letterSpacing: '0.03em' },
-    spacing: { unit: '1rem', density: 0.9, gap: '0.8rem', sectionGap: '1.4rem' },
+    motion: { style: 'ease-out', easing: 'cubic-bezier(0.33, 1, 0.68, 1)', duration: '200ms', durationSlow: '350ms' },
+    typography: { fontWeight: 400, headingWeight: 700, letterSpacing: '0em' },
+    spacing: { unit: '1rem', density: 1, gap: '1rem', sectionGap: '1.75rem' },
     components: {
-        button: { variant: 'solid', height: '2.5rem', padding: '0.55rem 1.4rem' },
-        card: { variant: 'flat' },
-        sidebar: { variant: 'solid', width: '248px', collapsedWidth: '64px' },
-        table: { density: 'dense', rowHeight: '2.75rem' },
+        button: { variant: 'soft', height: '2.5rem', padding: '0.55rem 1.4rem' },
+        card: { variant: 'glass' },
+        sidebar: { variant: 'floating', width: '248px', collapsedWidth: '64px' },
+        table: { density: 'comfortable', rowHeight: '3rem' },
         input: { variant: 'outline', height: '2.5rem' },
         modal: { variant: 'centered' },
     },
-    layout: { sidebarStyle: 'solid', cardStyle: 'flat', density: 'compact', containerPadding: '1.25rem' },
+    layout: { sidebarStyle: 'floating', cardStyle: 'glass', density: 'normal', containerPadding: '1.5rem' },
     primitives: {
         fontFamily: 'var(--font-body, Cairo, system-ui, sans-serif)',
         fontDisplay: 'var(--font-heading, Cairo, system-ui, sans-serif)',
         fontMono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSizeBase: '15px',
-        lineHeight: '1.4',
-        focusRingWidth: '3px',
-        overlayOpacity: '0.55',
+        lineHeight: '1.55',
+        focusRingWidth: '2px',
+        overlayOpacity: '0.45',
     },
     semantic,
     interaction: {
-        intensity: 'standard',
-        fast: '100ms',
-        normal: '140ms',
-        slow: '280ms',
-        easeStandard: 'cubic-bezier(0.25, 0.8, 0.3, 1)',
-        easeEmphasized: 'cubic-bezier(0.25, 0.8, 0.3, 1)',
-        easeEnter: 'cubic-bezier(0.25, 0.8, 0.3, 1)',
+        intensity: 'subtle',
+        fast: '150ms',
+        normal: '200ms',
+        slow: '350ms',
+        easeStandard: 'cubic-bezier(0.33, 1, 0.68, 1)',
+        easeEmphasized: 'cubic-bezier(0.33, 1, 0.68, 1)',
+        easeEnter: 'cubic-bezier(0.33, 1, 0.68, 1)',
         easeExit: 'cubic-bezier(0.4, 0, 1, 1)',
-        hoverDistance: '1px',
-        pressScale: '0.97',
+        hoverDistance: '0px',
+        pressScale: '0.98',
         hoverScale: '1',
     },
     effects: {

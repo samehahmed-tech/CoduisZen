@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
+import CoverageReportView from './shared/CoverageReportView';
 
 export const CrmReports = ({ state }: any) => {
    const {
@@ -142,11 +143,11 @@ export const CrmReports = ({ state }: any) => {
                             { segment: 'Total Customers', count: customerRetentionData.totalCustomers },
                             { segment: 'Returning', count: customerRetentionData.returningCustomers },
                             { segment: 'New', count: customerRetentionData.newCustomers },
-                            { segment: 'Retention Rate %', count: customerRetentionData.retentionRate },
+                            { segment: 'Retention Rate', count: customerRetentionData.retentionRate, isPct: true },
                          ]}
                          columns={[
                             { key: 'segment', label: 'Segment', sortable: false },
-                            { key: 'count', label: 'Value', align: 'right', sortable: false, format: (v: any) => fmtNum(v) },
+                            { key: 'count', label: 'Value', align: 'right', sortable: false, format: (v: any, row: any) => (row?.isPct ? `${Number(v || 0).toFixed(1)}%` : fmtNum(v)) },
                          ]}
                          exportFilename="customer-retention"
                          lang="en"
@@ -189,9 +190,11 @@ export const CrmReports = ({ state }: any) => {
 
                {activeCategory === 'CRM' && activeSubReport === 'Customer Churn' && churnData && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                     <div className="rounded-2xl border border-border/40 bg-elevated/20 px-4 py-3 text-[11px] font-bold text-muted">Total = all customers (incl. one-time buyers below); Active / At-risk / Churned cover repeat customers only.</div>
+                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                         {[
                            { l: 'Total', v: churnData.summary.total },
+                           { l: 'One-time', v: churnData.summary.oneTimeBuyers ?? '—', c: 'text-sky-500' },
                            { l: 'Active (30d)', v: churnData.summary.active, c: 'text-emerald-500' },
                            { l: 'At Risk (30-60d)', v: churnData.summary.atRisk30, c: 'text-amber-500' },
                            { l: 'At Risk (60-90d)', v: churnData.summary.atRisk60, c: 'text-orange-500' },
@@ -293,6 +296,15 @@ export const CrmReports = ({ state }: any) => {
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Campaign / Promotion Impact</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Campaign</th><th className="px-4 py-5 text-left">Type</th><th className="px-4 py-5 text-right">Reach</th><th className="px-4 py-5 text-right">Conv.</th><th className="px-4 py-5 text-right">Conv %</th><th className="px-4 py-5 text-right">Revenue</th><th className="px-4 py-5 text-right">Budget</th><th className="px-6 py-5 text-right">ROI</th></tr></thead><tbody className="divide-y divide-border/30">{(Array.isArray(promoImpactData) ? promoImpactData : []).map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.name}</td><td className="px-4 py-4 text-xs text-muted">{r.type}</td><td className="px-4 py-4 font-mono text-right">{r.reach}</td><td className="px-4 py-4 font-mono text-right">{r.conversions}</td><td className="px-4 py-4 font-mono text-right">{r.conversionRate}%</td><td className="px-4 py-4 font-mono text-right">{r.revenue.toLocaleString()}</td><td className="px-4 py-4 font-mono text-right text-muted">{r.budget.toLocaleString()}</td><td className="px-6 py-4 font-mono font-bold text-right"><span className={r.roi >= 0 ? 'text-emerald-500' : 'text-rose-500'}>{r.roi}%</span></td></tr>)}</tbody></table></div></div>
                   </div>
+               )}
+               {activeCategory === 'CRM' && ['Complaints & SLA', 'Coupon Usage', 'WhatsApp Inbox'].includes(activeSubReport) && (
+                  <CoverageReportView
+                     reportName={activeSubReport}
+                     rows={(state as any).customReportRows?.[activeSubReport] || []}
+                     meta={(state as any).customReportMeta?.[activeSubReport]}
+                     lang={(state as any).settings?.language === 'en' ? 'en' : 'ar'}
+                     currency={(state as any).settings?.currencySymbol || ''}
+                  />
                )}
       </>
    );

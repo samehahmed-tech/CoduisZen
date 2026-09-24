@@ -23,6 +23,8 @@ type StatusUpdatePayload = {
     expected_updated_at?: string;
     expectedUpdatedAt?: string;
     approval_id?: number;
+    paymentMethod?: string;
+    payments?: Array<{ method: string; amount: number }>;
 };
 
 type IdempotentOptions = {

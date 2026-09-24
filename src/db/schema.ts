@@ -1796,6 +1796,81 @@ export const productionOrderItems = mssqlTable('production_order_items', {
 ]);
 
 // ============================================================================
+// 🥩 BUTCHERY / FABRICATION (multi-output inventory transformation)
+// Reuses the production/inventory patterns: FEFO deduction for the source
+// item, aggregate stock + batch + stock_movements writes for each stockable
+// output, WASTE movements for scrap, MAC costing, branch-scoped warehouses.
+// ============================================================================
+
+export const butcheryOperations = mssqlTable('butchery_operations', {
+    id: nvarchar('id').primaryKey(),
+    reference: nvarchar('reference').notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id),
+    warehouseId: nvarchar('warehouse_id').references(() => warehouses.id).notNull(),
+    sourceItemId: nvarchar('source_item_id').references(() => inventoryItems.id).notNull(),
+    sourceQty: real('source_qty').notNull(),
+    sourceUnit: nvarchar('source_unit').notNull(),
+    sourceUnitCost: real('source_unit_cost').default(0),
+    sourceTotalCost: real('source_total_cost').default(0),
+    templateId: nvarchar('template_id'),
+    status: nvarchar('status').default('DRAFT').notNull(), // DRAFT, POSTED, CANCELLED
+    notes: nvarchar('notes'),
+    wasteReason: nvarchar('waste_reason'),
+    createdBy: nvarchar('created_by').references(() => users.id),
+    postedBy: nvarchar('posted_by').references(() => users.id),
+    cancelledBy: nvarchar('cancelled_by').references(() => users.id),
+    postedAt: datetime2('posted_at'),
+    cancelledAt: datetime2('cancelled_at'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+    updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+}, (table) => [
+    uniqueIndex('butchery_operations_reference_uq').on(table.reference),
+    index('butchery_operations_branch_status_idx').on(table.branchId, table.status, table.createdAt),
+    index('butchery_operations_source_idx').on(table.sourceItemId, table.createdAt),
+]);
+
+export const butcheryOutputs = mssqlTable('butchery_outputs', {
+    id: int('id').identity().primaryKey(),
+    operationId: nvarchar('operation_id').references(() => butcheryOperations.id).notNull(),
+    itemId: nvarchar('item_id').references(() => inventoryItems.id),
+    quantity: real('quantity').notNull(),
+    unit: nvarchar('unit').notNull(),
+    outputType: nvarchar('output_type').default('USABLE').notNull(), // USABLE, BY_PRODUCT, WASTE
+    yieldPct: real('yield_pct').default(0),
+    allocatedCost: real('allocated_cost').default(0), // unit cost allocated from source
+    totalAllocatedCost: real('total_allocated_cost').default(0),
+    warehouseId: nvarchar('warehouse_id').references(() => warehouses.id),
+    wasteReason: nvarchar('waste_reason'),
+}, (table) => [
+    index('butchery_outputs_operation_idx').on(table.operationId),
+    index('butchery_outputs_item_idx').on(table.itemId),
+]);
+
+export const butcheryTemplates = mssqlTable('butchery_templates', {
+    id: nvarchar('id').primaryKey(),
+    name: nvarchar('name').notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id),
+    sourceItemId: nvarchar('source_item_id').references(() => inventoryItems.id).notNull(),
+    isActive: bit('is_active').default(true),
+    createdBy: nvarchar('created_by').references(() => users.id),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+    updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+}, (table) => [
+    index('butchery_templates_source_idx').on(table.sourceItemId),
+]);
+
+export const butcheryTemplateLines = mssqlTable('butchery_template_lines', {
+    id: int('id').identity().primaryKey(),
+    templateId: nvarchar('template_id').references(() => butcheryTemplates.id).notNull(),
+    itemId: nvarchar('item_id').references(() => inventoryItems.id),
+    expectedPct: real('expected_pct').notNull(),
+    outputType: nvarchar('output_type').default('USABLE').notNull(), // USABLE, BY_PRODUCT, WASTE
+    unit: nvarchar('unit'),
+}, (table) => [
+    index('butchery_template_lines_template_idx').on(table.templateId),
+]);
+
+// ============================================================================
 // 🪑 RESERVATIONS
 // ============================================================================
 
@@ -2212,6 +2287,8 @@ export const kdsTickets = mssqlTable('kds_tickets', {
     priority: nvarchar('priority').default('NORMAL'), // NORMAL, RUSH, REMAKE
     printedAt: datetime2('printed_at'),
     bumpedAt: datetime2('bumped_at'), // Marked ready
+    completedBy: nvarchar('completed_by'), // User id that marked the ticket ready
+    completedByName: nvarchar('completed_by_name'), // Display name at completion time
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 });

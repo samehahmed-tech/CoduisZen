@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { and, desc, eq, gt, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '../db';
 import { branches, employees, users, userSessions } from '../../src/db/schema';
 import { INITIAL_ROLE_PERMISSIONS, UserRole } from '../../types';
@@ -422,7 +422,7 @@ export const getAllActiveSessions = async (_req: Request, res: Response) => {
             createdAt: userSessions.createdAt,
             expiresAt: userSessions.expiresAt,
         }).from(userSessions).innerJoin(users, eq(userSessions.userId, users.id))
-            .where(and(eq(userSessions.isActive, true), gt(userSessions.expiresAt, new Date())))
+            .where(and(eq(userSessions.isActive, true), isNull(userSessions.revokedAt)))
             .orderBy(desc(userSessions.lastSeenAt));
         res.json(active);
     } catch (error: any) {

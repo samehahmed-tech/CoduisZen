@@ -155,6 +155,9 @@ const MenuSidebar: React.FC<Props> = ({
                                 <p className={`text-[12px] font-medium pl-6 ${selectedCategoryId === 'all' || !selectedCategoryId ? 'text-blue-700 dark:text-indigo-400' : 'text-gray-700 dark:text-main'}`}>
                                     {lang === 'ar' ? 'كل الأقسام' : 'All Categories'}
                                 </p>
+                                <span className="text-[10px] text-gray-400 dark:text-muted/50 shrink-0 tabular-nums">
+                                    {allItems.filter(i => !i.archivedAt).length}
+                                </span>
                             </div>
 
                             <DragDropContext onDragEnd={onDragEnd}>
@@ -192,6 +195,9 @@ const MenuSidebar: React.FC<Props> = ({
                                                                             {lang === 'ar' ? (cat.nameAr || cat.name) : cat.name}
                                                                         </p>
                                                                     </div>
+                                                                    <span className="text-[10px] text-gray-400 dark:text-muted/50 shrink-0 tabular-nums">
+                                                                        {activeItems.length}
+                                                                    </span>
                                                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); onEditCategory(cat); }}
@@ -201,9 +207,6 @@ const MenuSidebar: React.FC<Props> = ({
                                                                         >
                                                                             <Edit3 size={12} />
                                                                         </button>
-                                                                        <span className="text-[10px] text-gray-400 dark:text-muted/50 shrink-0 w-4 text-center">
-                                                                            {activeItems.length}
-                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             </div>

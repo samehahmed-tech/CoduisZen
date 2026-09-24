@@ -131,7 +131,7 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
                         <div className="mt-5 sm:mt-8 text-center">
                             <div className="flex items-center justify-center gap-2 opacity-30">
                                 <Fingerprint size={16} />
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em]">{isRTL ? 'تأمين بواسطة ريستوفلو' : 'SECURED BY RESTOFLOW'}</span>
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em]">{isRTL ? 'تأمين بواسطة Xen' : 'SECURED BY XEN'}</span>
                             </div>
                         </div>
                     </div>

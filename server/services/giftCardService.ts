@@ -16,7 +16,7 @@ import { and, eq, desc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import logger from '../utils/logger';
 
-const genCode = () => `RF-${nanoid(10).toUpperCase()}`;
+const genCode = () => `XN-${nanoid(10).toUpperCase()}`;
 
 const postLedger = async (reference: string, referenceType: string, description: string, branchId: string | null, lines: { accountCode: string; debit: number; credit: number; description: string }[], createdBy?: string) => {
     try {

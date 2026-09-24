@@ -7,7 +7,7 @@ import {
    ChevronDown, Filter, Target, Megaphone, Zap, Scale, Info, Users, Clock, Box, ShieldCheck, Activity, LineChart as ChartIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { HOURS, WEEK_DAYS } from '../reportConstants';
+import { HOURS, WEEK_DAYS, formatHourLabel } from '../reportConstants';
 import ReportDataTable, { fmtMoney, fmtNum } from './shared/ReportDataTable';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { translations } from '../../../services/translations';
@@ -26,6 +26,7 @@ export const SalesReports = ({ state }: any) => {
       salesBySource, dineInTables, peakHoursData,
       modifierSalesData, avgTicketTrend, salesComparisonData,
       slowMovingItems, revenueByWeekday, voidItemsData,
+      discountByCashier, voidsByCashier,
       tipsData, serviceChargeData, shiftSummaryData,
       actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
       staffCostData, salesPerLaborData,
@@ -106,10 +107,10 @@ export const SalesReports = ({ state }: any) => {
                            <ResponsiveContainer width="100%" height={320}>
                               <ComposedChart data={hourlySales}>
                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
-                                 <XAxis dataKey="hour" tick={{ fontSize: 11, fontWeight: 700 }} />
+                                 <XAxis dataKey="hour" tick={{ fontSize: 11, fontWeight: 700 }} tickFormatter={(v: any) => formatHourLabel(v, lang)} />
                                  <YAxis yAxisId="money" tick={{ fontSize: 11, fontWeight: 700 }} />
                                  <YAxis yAxisId="orders" orientation="right" tick={{ fontSize: 11, fontWeight: 700 }} />
-                                 <Tooltip />
+                                 <Tooltip labelFormatter={(v: any) => formatHourLabel(v, lang)} />
                                  <Legend />
                                  <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="#10b981" radius={[8, 8, 0, 0]} />
                                  <Line yAxisId="orders" type="monotone" dataKey="orderCount" name="Orders" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3 }} />
@@ -119,7 +120,7 @@ export const SalesReports = ({ state }: any) => {
                         <div className="responsive-table border-t border-border/30">
                            <table className="w-full text-xs">
                               <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Hour</th><th className="px-6 py-5 text-right">Orders</th><th className="px-8 py-5 text-right">Revenue</th></tr></thead>
-                              <tbody className="divide-y divide-border/30">{hourlySales.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 font-mono text-main">{r.hour}</td><td className="px-6 py-4 font-mono text-right">{r.orderCount}</td><td className="px-8 py-4 font-mono font-bold text-right">{Number(r.revenue || 0).toLocaleString()} {currencySymbol}</td></tr>)}</tbody>
+                              <tbody className="divide-y divide-border/30">{hourlySales.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 font-mono font-bold text-main">{formatHourLabel(r.hour, lang)}</td><td className="px-6 py-4 font-mono text-right">{r.orderCount}</td><td className="px-8 py-4 font-mono font-bold text-right">{Number(r.revenue || 0).toLocaleString()} {currencySymbol}</td></tr>)}</tbody>
                            </table>
                         </div>
                         {hourlySales.length === 0 && <p className="text-center text-muted py-16">{t.no_data}</p>}
@@ -297,14 +298,14 @@ export const SalesReports = ({ state }: any) => {
                         )}
                         <div className="responsive-table">
                            <table className="w-full text-xs">
-                              <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
-                                 <th className="px-8 py-5 text-left">#</th><th className="px-6 py-5 text-left">{t.item}</th><th className="px-6 py-5 text-right">{t.qty_sold}</th><th className="px-6 py-5 text-right">{t.revenue}</th><th className="px-6 py-5 text-right">{t.cost}</th><th className="px-6 py-5 text-right">{t.profit}</th><th className="px-8 py-5 text-right">{t.margin_percent}</th>
+                              <thead><tr className={`bg-elevated/20 text-muted text-[10px] font-black ${lang === 'ar' ? '' : 'uppercase tracking-[0.2em]'}`}>
+                                 <th className="px-8 py-5 text-left">#</th><th className={`px-6 py-5 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>{t.item}</th><th className="px-6 py-5 text-right">{t.qty_sold}</th><th className="px-6 py-5 text-right">{t.revenue}</th><th className="px-6 py-5 text-right">{t.cost}</th><th className="px-6 py-5 text-right">{t.profit}</th><th className="px-8 py-5 text-right">{t.margin_percent}</th>
                               </tr></thead>
                               <tbody className="divide-y divide-border/30">
                                  {salesByItem.map((row, idx) => (
                                     <tr key={idx} className="hover:bg-elevated/40 transition-colors">
                                        <td className="px-8 py-4 font-mono text-muted">{idx + 1}</td>
-                                       <td className="px-6 py-4 text-xs font-black text-main">{row.itemName}</td>
+                                       <td className={`px-6 py-4 text-xs font-black text-main ${lang === 'ar' ? 'text-right' : 'text-left'}`}>{row.itemName}</td>
                                        <td className="px-6 py-4 font-mono text-right">{row.qtySold}</td>
                                        <td className="px-6 py-4 font-mono font-bold text-right">{row.revenue.toLocaleString()}</td>
                                        <td className="px-6 py-4 font-mono text-muted text-right">{row.cost.toLocaleString()}</td>
@@ -327,13 +328,13 @@ export const SalesReports = ({ state }: any) => {
                         </div>
                         <div className="responsive-table">
                            <table className="w-full text-xs">
-                              <thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]">
-                                 <th className="px-8 py-5 text-left">{t.category}</th><th className="px-6 py-5 text-right">{t.items}</th><th className="px-6 py-5 text-right">{t.qty_sold}</th><th className="px-6 py-5 text-right">{t.revenue}</th><th className="px-6 py-5 text-right">{t.cost}</th><th className="px-6 py-5 text-right">{t.profit}</th><th className="px-8 py-5 text-right">{t.share_percent}</th>
+                              <thead><tr className={`bg-elevated/20 text-muted text-[10px] font-black ${lang === 'ar' ? '' : 'uppercase tracking-[0.2em]'}`}>
+                                 <th className={`px-8 py-5 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>{t.category}</th><th className="px-6 py-5 text-right">{t.items}</th><th className="px-6 py-5 text-right">{t.qty_sold}</th><th className="px-6 py-5 text-right">{t.revenue}</th><th className="px-6 py-5 text-right">{t.cost}</th><th className="px-6 py-5 text-right">{t.profit}</th><th className="px-8 py-5 text-right">{t.share_percent}</th>
                               </tr></thead>
                               <tbody className="divide-y divide-border/30">
                                  {salesByCategory.map((row, idx) => (
                                     <tr key={idx} className="hover:bg-elevated/40 transition-colors">
-                                       <td className="px-8 py-4 text-xs font-black text-main">{row.categoryName}</td>
+                                       <td className={`px-8 py-4 text-xs font-black text-main ${lang === 'ar' ? 'text-right' : 'text-left'}`}>{row.categoryName}</td>
                                        <td className="px-6 py-4 font-mono text-right">{row.itemCount}</td>
                                        <td className="px-6 py-4 font-mono text-right">{row.qtySold}</td>
                                        <td className="px-6 py-4 font-mono font-bold text-right">{row.revenue.toLocaleString()}</td>
@@ -535,7 +536,8 @@ export const SalesReports = ({ state }: any) => {
                            const rows: any[] = [];
                            (WEEK_DAYS || []).forEach((day: string, di: number) => {
                               (HOURS || []).forEach((hour: number) => {
-                                 const cell = (peakHoursLookup as any)?.get ? (peakHoursLookup as any).get(`${di}-${hour}`) : null;
+                                 // Backend dayOfWeek is Sunday=1..Saturday=7 — shift the 0-based UI index.
+                                 const cell = (peakHoursLookup as any)?.get ? (peakHoursLookup as any).get(`${di + 1}-${hour}`) : null;
                                  if (cell && Number(cell.orderCount || 0) > 0) rows.push({ day, hour: `${hour}:00`, orders: cell.orderCount, revenue: cell.revenue });
                               });
                            });
@@ -559,7 +561,7 @@ export const SalesReports = ({ state }: any) => {
                               <React.Fragment key={dayIndex}>
                                  <div className="text-right pr-2 text-muted font-black flex items-center">{day}</div>
                                  {HOURS.map((hour) => {
-                                    const cell = peakHoursLookup.get(`${dayIndex}-${hour}`);
+                                    const cell = peakHoursLookup.get(`${dayIndex + 1}-${hour}`);
                                     const intensity = cell ? cell.orderCount / peakHoursMaxOrders : 0;
                                     return (
                                        <div
@@ -608,7 +610,7 @@ export const SalesReports = ({ state }: any) => {
                            { key: 'metric', label: lang === 'ar' ? 'المؤشر' : 'Metric', sortable: false },
                            { key: 'current', label: t.current_period, align: 'right', sortable: false, format: (v: any) => fmtNum(v) },
                            { key: 'compare', label: t.comparison_period, align: 'right', sortable: false, format: (v: any) => fmtNum(v) },
-                           { key: 'change', label: lang === 'ar' ? 'التغير %' : 'Change %', align: 'right', sortable: false, format: (v: any) => `${Number(v) > 0 ? '+' : ''}${Number(v || 0)}%` },
+                           { key: 'change', label: lang === 'ar' ? 'التغير %' : 'Change %', align: 'right', sortable: false, format: (v: any) => (v == null ? (lang === 'ar' ? 'لا ينطبق' : 'N/A') : `${Number(v) > 0 ? '+' : ''}${Number(v)}%`) },
                         ]}
                         exportFilename="sales-comparison"
                         lang={lang}
@@ -616,7 +618,7 @@ export const SalesReports = ({ state }: any) => {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {['current', 'compare'].map(period => (<div key={period} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">{period === 'current' ? t.current_period : t.comparison_period}</p><p className="text-xs text-muted mb-3">{salesComparisonData[period]?.period}</p>{[{ l: t.orders, v: salesComparisonData[period]?.orderCount }, { l: t.revenue, v: `${salesComparisonData[period]?.revenue?.toLocaleString()} ${currencySymbol}` }, { l: t.avg_ticket, v: `${salesComparisonData[period]?.avgTicket} ${currencySymbol}` }].map((c, i) => (<div key={i} className="flex justify-between py-1 text-xs"><span className="text-muted">{c.l}</span><span className="font-black text-main">{c.v}</span></div>))}</div>))}
                      </div>
-                     <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted mb-4">{t.change_percent}</p><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: t.orders, v: salesComparisonData.change?.orderCount }, { l: t.revenue, v: salesComparisonData.change?.revenue }, { l: t.avg_ticket, v: salesComparisonData.change?.avgTicket }, { l: t.discounts, v: salesComparisonData.change?.totalDiscount }].map((c, i) => (<div key={i} className="text-center"><p className="text-[10px] text-muted">{c.l}</p><p className={`text-2xl font-black ${Number(c.v) > 0 ? 'text-emerald-500' : Number(c.v) < 0 ? 'text-rose-500' : 'text-muted'}`}>{Number(c.v) > 0 ? '+' : ''}{c.v}%</p></div>))}</div></div>
+                     <div className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted mb-4">{t.change_percent}</p><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[{ l: t.orders, v: salesComparisonData.change?.orderCount }, { l: t.revenue, v: salesComparisonData.change?.revenue }, { l: t.avg_ticket, v: salesComparisonData.change?.avgTicket }, { l: t.discounts, v: salesComparisonData.change?.totalDiscount }].map((c, i) => (<div key={i} className="text-center"><p className="text-[10px] text-muted">{c.l}</p><p className={`text-2xl font-black ${c.v == null ? 'text-muted' : Number(c.v) > 0 ? 'text-emerald-500' : Number(c.v) < 0 ? 'text-rose-500' : 'text-muted'}`}>{c.v == null ? (lang === 'ar' ? 'لا ينطبق' : 'N/A') : `${Number(c.v) > 0 ? '+' : ''}${c.v}%`}</p></div>))}</div></div>
                   </div>
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Sales Comparison' && !salesComparisonData && <p className="text-center text-muted py-16">{t.no_data}</p>}
@@ -668,6 +670,46 @@ export const SalesReports = ({ state }: any) => {
                   </div>
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Void Items Log' && !voidItemsData && <p className="text-center text-muted py-16">{t.no_data}</p>}
+               {activeCategory === 'SALES' && activeSubReport === 'Discounts by Cashier' && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'الخصومات حسب الكاشير — مراجعة منع الخسارة' : 'Discounts by Cashier — loss-prevention review'}
+                        data={discountByCashier}
+                        columns={[
+                           { key: 'cashier', label: lang === 'ar' ? 'الكاشير (مشغّل الوردية)' : 'Cashier (shift operator)' },
+                           { key: 'orderCount', label: t.orders, align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'salesTotal', label: lang === 'ar' ? 'إجمالي المبيعات' : 'Sales total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'discountTotal', label: lang === 'ar' ? 'إجمالي الخصم' : 'Discount total', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'discountRate', label: lang === 'ar' ? 'نسبة الخصم %' : 'Discount %', align: 'right', format: (v: any) => `${v}%` },
+                           { key: 'avgDiscount', label: lang === 'ar' ? 'متوسط (لطلب مخصوم)' : 'Avg (per discounted)', align: 'right', format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'maxDiscount', label: lang === 'ar' ? 'أقصى خصم' : 'Max discount', align: 'right', format: (v: any) => fmtMoney(v, currencySymbol) },
+                        ]}
+                        exportFilename="discount-by-cashier"
+                        lang={lang}
+                     />
+                     {discountByCashier.length === 0 && <p className="text-center text-muted py-16">{t.no_data}</p>}
+                  </div>
+               )}
+               {activeCategory === 'SALES' && activeSubReport === 'Voids by Cashier' && voidsByCashier && (
+                  <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[{ l: lang === 'ar' ? 'طلبات ملغية' : 'Void orders', v: voidsByCashier.summary.voidOrderCount }, { l: lang === 'ar' ? 'قيمة الطلبات' : 'Orders value', v: `${voidsByCashier.summary.voidOrderValue.toLocaleString()} ${currencySymbol}` }, { l: lang === 'ar' ? 'سطور محذوفة' : 'Void lines', v: voidsByCashier.summary.voidLineCount }, { l: lang === 'ar' ? 'قيمة السطور' : 'Lines value', v: `${voidsByCashier.summary.voidLineValue.toLocaleString()} ${currencySymbol}` }, { l: lang === 'ar' ? 'إجمالي الخسارة' : 'Total loss', v: `${(Number(voidsByCashier.summary.voidOrderValue || 0) + Number(voidsByCashier.summary.voidLineValue || 0)).toLocaleString()} ${currencySymbol}` }].map((c, i) => (<div key={i} className="card-primary rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-lg"><p className="text-[10px] font-black uppercase tracking-widest text-muted">{c.l}</p><p className="text-2xl font-black text-rose-500 mt-1">{c.v}</p></div>))}</div>
+                     <ReportDataTable
+                        title={lang === 'ar' ? 'الملغي حسب الكاشير' : 'Voids by Cashier'}
+                        data={voidsByCashier.byCashier}
+                        columns={[
+                           { key: 'cashier', label: lang === 'ar' ? 'الكاشير' : 'Cashier' },
+                           { key: 'voidOrderCount', label: lang === 'ar' ? 'طلبات ملغية' : 'Void orders', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'voidOrderValue', label: lang === 'ar' ? 'قيمتها' : 'Orders value', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'voidLineCount', label: lang === 'ar' ? 'سطور محذوفة' : 'Void lines', align: 'right', sum: true, format: (v: any) => fmtNum(v) },
+                           { key: 'voidLineValue', label: lang === 'ar' ? 'قيمة السطور' : 'Lines value', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                           { key: 'totalLoss', label: lang === 'ar' ? 'إجمالي الخسارة' : 'Total loss', align: 'right', sum: true, format: (v: any) => fmtMoney(v, currencySymbol) },
+                        ]}
+                        exportFilename="voids-by-cashier"
+                        lang={lang}
+                     />
+                  </div>
+               )}
+               {activeCategory === 'SALES' && activeSubReport === 'Voids by Cashier' && !voidsByCashier && <p className="text-center text-muted py-16">{t.no_data}</p>}
 
                {/* ============ ADVANCED FINANCE ============ */}
 
@@ -706,13 +748,13 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Basket Analysis' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Cross-Sell / Basket Analysis</h3><p className="text-xs text-muted mt-1">Items most frequently purchased together</p></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">#</th><th className="px-6 py-5 text-left">Item Pair</th><th className="px-6 py-5 text-right">Count</th><th className="px-8 py-5 text-right">% of Orders</th></tr></thead><tbody className="divide-y divide-border/30">{basketData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 font-mono text-muted">{i + 1}</td><td className="px-6 py-4 text-xs font-black text-main">{r.pair}</td><td className="px-6 py-4 font-mono text-right">{r.count}</td><td className="px-8 py-4 font-mono font-bold text-right">{r.percentage}%</td></tr>)}</tbody></table></div></div>
+                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Cross-Sell / Basket Analysis</h3><p className="text-xs text-muted mt-1">{lang === 'ar' ? 'الأصناف الأكثر شراءً معاً — % من عينة أحدث 5000 طلب' : 'Items most frequently purchased together — % of sampled latest 5000 orders'}</p></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">#</th><th className="px-6 py-5 text-left">Item Pair</th><th className="px-6 py-5 text-right">Count</th><th className="px-8 py-5 text-right">% of Sampled Orders</th></tr></thead><tbody className="divide-y divide-border/30">{basketData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 font-mono text-muted">{i + 1}</td><td className="px-6 py-4 text-xs font-black text-main">{r.pair}</td><td className="px-6 py-4 font-mono text-right">{r.count}</td><td className="px-8 py-4 font-mono font-bold text-right">{r.percentage}%</td></tr>)}</tbody></table></div></div>
                      {basketData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Seasonality' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Monthly Seasonality</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Month</th><th className="px-6 py-5 text-right">Orders</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-8 py-5 text-right">Avg Ticket</th></tr></thead><tbody className="divide-y divide-border/30">{seasonalityData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.month}</td><td className="px-6 py-4 font-mono text-right">{r.orderCount}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()} LE</td><td className="px-8 py-4 font-mono text-right">{r.avgTicket} LE</td></tr>)}</tbody></table></div></div>
+                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Monthly Seasonality</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-8 py-5 text-left">Month</th><th className="px-6 py-5 text-right">Orders</th><th className="px-6 py-5 text-right">Revenue</th><th className="px-8 py-5 text-right">Avg Ticket</th></tr></thead><tbody className="divide-y divide-border/30">{seasonalityData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-8 py-4 text-xs font-black text-main">{r.month}{r.partial ? <span className="ml-2 rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-black text-amber-600">{lang === 'ar' ? 'شهر جزئي' : 'partial'}</span> : null}</td><td className="px-6 py-4 font-mono text-right">{r.orderCount}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.revenue.toLocaleString()} LE</td><td className="px-8 py-4 font-mono text-right">{r.avgTicket} LE</td></tr>)}</tbody></table></div></div>
                      {seasonalityData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
                )}
@@ -727,13 +769,15 @@ export const SalesReports = ({ state }: any) => {
                       <ReportDataTable
                          title={lang === 'ar' ? 'تداخل الأصناف — جدول شامل' : 'Menu Cannibalization — full table'}
                          data={[
-                            ...((cannibalizationData.declining || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'متراجع' : 'Declining', change: Number(r.qtyChangePercent || 0) }))),
-                            ...((cannibalizationData.growing || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'نامٍ' : 'Growing', change: Number(r.qtyChangePercent || 0) }))),
+                            ...((cannibalizationData.declining || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'متراجع' : 'Declining', change: r.qtyChangePercent }))),
+                            ...((cannibalizationData.growing || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'نامٍ' : 'Growing', change: r.qtyChangePercent }))),
+                            ...((cannibalizationData.newItems || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'جديد' : 'New', change: null }))),
+                            ...((cannibalizationData.discontinued || []).map((r: any) => ({ itemName: r.itemName, trend: lang === 'ar' ? 'متوقف' : 'Discontinued', change: -100 }))),
                          ]}
                          columns={[
                             { key: 'itemName', label: t.item },
                             { key: 'trend', label: lang === 'ar' ? 'الاتجاه' : 'Trend' },
-                            { key: 'change', label: lang === 'ar' ? 'تغير الكمية %' : 'Qty change %', align: 'right', format: (v: any) => `${Number(v) > 0 ? '+' : ''}${Number(v || 0)}%` },
+                            { key: 'change', label: lang === 'ar' ? 'تغير الكمية %' : 'Qty change %', align: 'right', format: (v: any) => (v == null ? (lang === 'ar' ? 'جديد' : 'New') : `${Number(v) > 0 ? '+' : ''}${Number(v)}%`) },
                          ]}
                          exportFilename="menu-cannibalization"
                          lang={lang}
@@ -741,7 +785,9 @@ export const SalesReports = ({ state }: any) => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="card-primary rounded-[2rem] border border-rose-200 dark:border-rose-800 shadow-xl p-6 bg-rose-50/30 dark:bg-rose-950/20">
                            <h3 className="text-lg font-black text-rose-500 mb-4">Declining Items ({cannibalizationData.declining.length})</h3>
-                           {cannibalizationData.declining.slice(0, 10).map((r: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-rose-100 dark:border-rose-900/30"><span className="font-black text-main">{r.itemName}</span><span className="font-mono text-rose-500">{r.qtyChangePercent}%</span></div>))}
+                           {cannibalizationData.declining.slice(0, 10).map((r: any, i: number) => (<div key={i} className="flex justify-between py-1.5 text-xs border-b border-rose-100 dark:border-rose-900/30"><span className="font-black text-main">{r.itemName}</span><span className="font-mono text-rose-500">{r.qtyChangePercent == null ? (lang === 'ar' ? 'جديد' : 'New') : `${r.qtyChangePercent}%`}</span></div>))}
+                           {((cannibalizationData.newItems || []).length > 0) && (<div className="mt-3 rounded-xl bg-sky-500/10 p-3 text-[11px] font-black text-sky-600">{lang === 'ar' ? `أصناف جديدة: ${(cannibalizationData.newItems || []).slice(0, 5).map((r: any) => r.itemName).join('، ')}${(cannibalizationData.newItems || []).length > 5 ? ` (+${(cannibalizationData.newItems || []).length - 5})` : ''}` : `New: ${(cannibalizationData.newItems || []).slice(0, 5).map((r: any) => r.itemName).join(', ')}${(cannibalizationData.newItems || []).length > 5 ? ` (+${(cannibalizationData.newItems || []).length - 5})` : ''}`}</div>)}
+                           {((cannibalizationData.discontinued || []).length > 0) && (<div className="mt-3 rounded-xl bg-slate-500/10 p-3 text-[11px] font-black text-muted">{lang === 'ar' ? `متوقفة: ${(cannibalizationData.discontinued || []).slice(0, 5).map((r: any) => r.itemName).join('، ')}${(cannibalizationData.discontinued || []).length > 5 ? ` (+${(cannibalizationData.discontinued || []).length - 5})` : ''}` : `Discontinued: ${(cannibalizationData.discontinued || []).slice(0, 5).map((r: any) => r.itemName).join(', ')}${(cannibalizationData.discontinued || []).length > 5 ? ` (+${(cannibalizationData.discontinued || []).length - 5})` : ''}`}</div>)}
                         </div>
                         <div className="card-primary rounded-[2rem] border border-emerald-200 dark:border-emerald-800 shadow-xl p-6 bg-emerald-50/30 dark:bg-emerald-950/20">
                            <h3 className="text-lg font-black text-emerald-500 mb-4">Growing Items ({cannibalizationData.growing.length})</h3>
@@ -766,7 +812,7 @@ export const SalesReports = ({ state }: any) => {
                )}
                {activeCategory === 'SALES' && activeSubReport === 'Time-to-First-Order' && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Time-to-First-Order (New Items)</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Item</th><th className="px-4 py-5 text-left">Added</th><th className="px-4 py-5 text-right">Days</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Qty</th><th className="px-6 py-5 text-right">Revenue</th></tr></thead><tbody className="divide-y divide-border/30">{timeToFirstData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.itemName}</td><td className="px-4 py-4 font-mono text-[10px] text-muted">{r.addedDate ? new Date(r.addedDate).toLocaleDateString() : '—'}</td><td className="px-4 py-4 font-mono text-right"><span className={`px-2 py-1 rounded-lg text-[9px] font-black ${r.daysToFirstOrder === null ? 'bg-rose-500/10 text-rose-500' : r.daysToFirstOrder <= 1 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{r.daysToFirstOrder !== null ? `${r.daysToFirstOrder}d` : 'None'}</span></td><td className="px-4 py-4 font-mono text-right">{r.totalOrders}</td><td className="px-4 py-4 font-mono text-right">{r.totalQty}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.totalRevenue.toLocaleString()} LE</td></tr>)}</tbody></table></div></div>
+                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"><div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"><h3 className="text-xl font-black text-main">Time-to-First-Order (New Items)</h3></div><div className="responsive-table"><table className="w-full text-xs"><thead><tr className="bg-elevated/20 text-muted text-[10px] uppercase font-black tracking-[0.2em]"><th className="px-6 py-5 text-left">Item</th><th className="px-4 py-5 text-left">Added</th><th className="px-4 py-5 text-right">Days</th><th className="px-4 py-5 text-right">Orders</th><th className="px-4 py-5 text-right">Qty</th><th className="px-6 py-5 text-right">Revenue</th></tr></thead><tbody className="divide-y divide-border/30">{timeToFirstData.map((r: any, i: number) => <tr key={i} className="hover:bg-elevated/40 transition-colors"><td className="px-6 py-4 text-xs font-black text-main">{r.itemName}</td><td className="px-4 py-4 font-mono text-[10px] text-muted">{r.addedDate ? new Date(r.addedDate).toLocaleDateString() : '—'}{r.backdated ? <span className="ml-2 rounded-md bg-violet-500/15 px-2 py-0.5 text-[9px] font-black text-violet-600">{lang === 'ar' ? 'بأثر رجعي' : 'backdated'}</span> : null}</td><td className="px-4 py-4 font-mono text-right"><span className={`px-2 py-1 rounded-lg text-[9px] font-black ${r.daysToFirstOrder === null ? 'bg-rose-500/10 text-rose-500' : r.daysToFirstOrder <= 1 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>{r.daysToFirstOrder !== null ? `${r.daysToFirstOrder}d` : 'None'}</span></td><td className="px-4 py-4 font-mono text-right">{r.totalOrders}</td><td className="px-4 py-4 font-mono text-right">{r.totalQty}</td><td className="px-6 py-4 font-mono font-bold text-right">{r.totalRevenue.toLocaleString()} LE</td></tr>)}</tbody></table></div></div>
                      {timeToFirstData.length === 0 && <p className="text-center text-muted py-16">No data.</p>}
                   </div>
                )}

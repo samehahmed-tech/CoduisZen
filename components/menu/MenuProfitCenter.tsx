@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
     Plus, UtensilsCrossed, Loader2, AlertCircle, X, Sparkles, DollarSign,
@@ -74,6 +74,12 @@ const MenuProfitCenter: React.FC = () => {
     const [selectedMenuId, setSelectedMenuId] = useState<string>(menus[0]?.id || '');
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | 'all'>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    // Debounced query: typing filters without re-rendering the grid per keystroke
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedQuery(searchQuery), 220);
+        return () => clearTimeout(t);
+    }, [searchQuery]);
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [density, setDensity] = useState<DensityMode>('comfortable');
     const [sortField, setSortField] = useState<SortField>('name');
@@ -152,9 +158,9 @@ const MenuProfitCenter: React.FC = () => {
             items = items.filter(i => i._categoryId === selectedCategoryId);
         }
 
-        // Search
-        if (searchQuery) {
-            const q = searchQuery.toLowerCase();
+        // Search (debounced)
+        if (debouncedQuery) {
+            const q = debouncedQuery.toLowerCase();
             items = items.filter(i =>
                 i.name.toLowerCase().includes(q) ||
                 i.nameAr?.toLowerCase().includes(q) ||
@@ -190,16 +196,64 @@ const MenuProfitCenter: React.FC = () => {
         });
 
         return items;
-    }, [allItems, selectedCategoryId, searchQuery, filterTag, sortField, sidebarSection]);
+    }, [allItems, selectedCategoryId, debouncedQuery, filterTag, sortField, sidebarSection]);
 
     const filteredCategories = useMemo(() => {
         if (!selectedMenu) return [];
         return categories.filter(cat => cat.menuIds.includes(selectedMenu.id));
     }, [selectedMenu, categories]);
 
+    // Open on the first category — never mount the whole menu at once
+    const didInitCategory = useRef(false);
+    useEffect(() => {
+        if (!didInitCategory.current && filteredCategories.length > 0) {
+            didInitCategory.current = true;
+            setSelectedCategoryId(filteredCategories[0].id);
+        }
+    }, [filteredCategories]);
+
+    const selectedCategory = useMemo(() => (
+        selectedCategoryId === 'all'
+            ? null
+            : filteredCategories.find(c => c.id === selectedCategoryId) ?? null
+    ), [selectedCategoryId, filteredCategories]);
+
+    // Incremental rendering: mount one page of cards, load more on demand
+    const GRID_PAGE = 48;
+    const LIST_PAGE = 120;
+    const [visibleCount, setVisibleCount] = useState(GRID_PAGE);
+    useEffect(() => {
+        setVisibleCount(viewMode === 'list' ? LIST_PAGE : GRID_PAGE);
+    }, [debouncedQuery, selectedCategoryId, selectedMenuId, filterTag, sortField, sidebarSection, viewMode]);
+    const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
+
+    // Content scroll (reset to top on category change)
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const handleSelectMenu = useCallback((id: string) => {
+        setSelectedMenuId(id);
+        const first = categories
+            .filter(c => c.menuIds.includes(id))
+            .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))[0];
+        setSelectedCategoryId(first ? first.id : 'all');
+        setSelectedItemIds(new Set());
+        setMultiSelectMode(false);
+    }, [categories]);
+
+    const handleSelectCategory = useCallback((id: string | 'all') => {
+        setSelectedCategoryId(id);
+        setSelectedItemIds(new Set());
+        setMultiSelectMode(false);
+        scrollRef.current?.scrollTo({ top: 0 });
+    }, []);
+
+    const handleEditItem = useCallback((item: MenuItem & { _categoryId: string }) => {
+        setDrawerItem({ mode: 'EDIT', menuId: selectedMenuId, categoryId: item._categoryId, item });
+    }, [selectedMenuId]);
+
     // --- Handlers ---
     const handleNewItem = () => {
-        const firstCat = filteredCategories[0];
+        const firstCat = selectedCategory ?? filteredCategories[0];
         if (!firstCat) {
             info(lang === 'ar' ? 'أضف قسم أولاً قبل إضافة صنف.' : 'Add a category before adding an item.');
             setDrawerCategory({ mode: 'ADD', category: { id: `cat-${Date.now()}`, name: '', isActive: true, menuIds: [selectedMenuId], items: [] } });
@@ -218,7 +272,7 @@ const MenuProfitCenter: React.FC = () => {
         });
     };
 
-    const handleItemClick = (item: MenuItem & { _categoryId: string }, e: React.MouseEvent) => {
+    const handleItemClick = useCallback((item: MenuItem & { _categoryId: string }, e: React.MouseEvent) => {
         if (multiSelectMode || e.shiftKey) {
             setMultiSelectMode(true);
             setSelectedItemIds(prev => {
@@ -229,7 +283,7 @@ const MenuProfitCenter: React.FC = () => {
         } else {
             setDrawerItem({ mode: 'EDIT', menuId: selectedMenuId, categoryId: item._categoryId, item });
         }
-    };
+    }, [multiSelectMode, selectedMenuId]);
 
     const handleDragItemEnd = async (result: DropResult) => {
         if (!result.destination || selectedCategoryId === 'all') return;
@@ -271,19 +325,19 @@ const MenuProfitCenter: React.FC = () => {
         }
     };
 
-    const handleToggleAvailability = (item: MenuItem & { _categoryId: string }) => {
+    const handleToggleAvailability = useCallback((item: MenuItem & { _categoryId: string }) => {
         updateMenuItem(selectedMenuId, item._categoryId, { ...item, isAvailable: !item.isAvailable });
-    };
+    }, [updateMenuItem, selectedMenuId]);
 
-    const handleDuplicate = async (item: MenuItem & { _categoryId: string }) => {
+    const handleDuplicate = useCallback(async (item: MenuItem & { _categoryId: string }) => {
         try {
             await duplicateItem(selectedMenuId, item._categoryId, item.id);
         } catch (err: any) {
             showError(err?.message || (lang === 'ar' ? 'تعذر نسخ الصنف' : 'Could not duplicate item'));
         }
-    };
+    }, [duplicateItem, selectedMenuId, lang, showError]);
 
-    const handleArchive = async (item: MenuItem & { _categoryId: string }) => {
+    const handleArchive = useCallback(async (item: MenuItem & { _categoryId: string }) => {
         try {
             if (item.archivedAt) {
                 await restoreItem(selectedMenuId, item._categoryId, item.id);
@@ -293,9 +347,9 @@ const MenuProfitCenter: React.FC = () => {
         } catch (err: any) {
             showError(err?.message || (lang === 'ar' ? 'تعذر تحديث حالة الصنف' : 'Could not update item status'));
         }
-    };
+    }, [archiveItem, restoreItem, selectedMenuId, lang, showError]);
 
-    const handleDelete = async (item: MenuItem & { _categoryId: string }) => {
+    const handleDelete = useCallback(async (item: MenuItem & { _categoryId: string }) => {
         const ok = await confirm({
             title: lang === 'ar' ? 'حذف الصنف؟' : 'Delete item?',
             message: lang === 'ar'
@@ -313,7 +367,7 @@ const MenuProfitCenter: React.FC = () => {
             showError(err?.message || (lang === 'ar' ? 'تعذر حذف الصنف' : 'Could not delete item'));
             return false;
         }
-    };
+    }, [confirm, deleteMenuItem, selectedMenuId, lang, showError]);
 
     const handleDeleteDrawerItem = async () => {
         if (!drawerItem || drawerItem.mode !== 'EDIT') return;
@@ -360,7 +414,7 @@ const MenuProfitCenter: React.FC = () => {
 
     const handleQuickAdd = async () => {
         if (!quickAdd.name.trim() || !quickAdd.price) return;
-        const firstCat = filteredCategories[0];
+        const firstCat = selectedCategory ?? filteredCategories[0];
         if (!firstCat) {
             info(lang === 'ar' ? 'أضف قسم أولاً قبل إضافة صنف.' : 'Add a category before adding an item.');
             setDrawerCategory({ mode: 'ADD', category: { id: `cat-${Date.now()}`, name: '', isActive: true, menuIds: [selectedMenuId], items: [] } });
@@ -384,8 +438,9 @@ const MenuProfitCenter: React.FC = () => {
         }
     };
 
-    // Summary stats
-    const totalRevenue = allItems.reduce((s, i) => s + (i.salesData?.revenue30 || 0), 0);
+    // Summary stats (memoized: strip renders every keystroke otherwise)
+    const totalRevenue = useMemo(() => allItems.reduce((s, i) => s + (i.salesData?.revenue30 || 0), 0), [allItems]);
+    const activeItemsCount = useMemo(() => allItems.filter(i => i.isAvailable && !i.archivedAt).length, [allItems]);
     const avgMargin = allItems.length > 0
         ? allItems.reduce((s, i) => s + (i.cost && i.price > 0 ? ((i.price - i.cost) / i.price) * 100 : 0), 0) / allItems.length
         : 0;
@@ -575,9 +630,9 @@ const MenuProfitCenter: React.FC = () => {
                     menus={menus}
                     categories={filteredCategories}
                     selectedMenuId={selectedMenuId}
-                    onSelectMenu={(id) => { setSelectedMenuId(id); setSelectedCategoryId('all'); }}
+                    onSelectMenu={handleSelectMenu}
                     selectedCategoryId={selectedCategoryId}
-                    onSelectCategory={setSelectedCategoryId}
+                    onSelectCategory={handleSelectCategory}
                     section={sidebarSection}
                     onChangeSection={setSidebarSection}
                     onAddCategory={() => setDrawerCategory({ mode: 'ADD', category: { id: `cat-${Date.now()}`, name: '', isActive: true, menuIds: [selectedMenuId], items: [] } })}
@@ -657,7 +712,7 @@ const MenuProfitCenter: React.FC = () => {
                             </div>
                             <div>
                                 <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'نشط' : 'Active'}: </span>
-                                <span className="font-medium text-emerald-600 dark:text-emerald-500">{allItems.filter(i => i.isAvailable && !i.archivedAt).length}</span>
+                                <span className="font-medium text-emerald-600 dark:text-emerald-500">{activeItemsCount}</span>
                             </div>
                             <div>
                                 <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'الهامش' : 'Avg Margin'}: </span>
@@ -672,14 +727,34 @@ const MenuProfitCenter: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* CATEGORY CONTEXT STRIP */}
+                    {selectedCategory && sidebarSection === 'menus' && (
+                        <div className="px-3 sm:px-5 py-2 border-b border-gray-100 dark:border-white/[0.04] flex items-center gap-2.5 bg-card/40 shrink-0">
+                            <span className="text-[11px] font-bold text-blue-700 dark:text-indigo-400 bg-blue-50 dark:bg-indigo-500/10 border border-blue-100 dark:border-indigo-500/20 rounded-md px-2 py-0.5 tabular-nums shrink-0">
+                                {filteredItems.length} {lang === 'ar' ? 'صنف' : 'items'}
+                            </span>
+                            <span className="text-[13px] font-semibold text-gray-800 dark:text-main truncate">
+                                {lang === 'ar' ? (selectedCategory.nameAr || selectedCategory.name) : selectedCategory.name}
+                            </span>
+                            <div className="flex-1" />
+                            <button onClick={handleNewItem} className="h-8 px-3 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0">
+                                <Plus size={14} />
+                                {lang === 'ar' ? 'صنف جديد' : 'New Item'}
+                            </button>
+                            <button onClick={() => setDrawerCategory({ mode: 'EDIT', category: selectedCategory })} className="h-8 px-3 rounded-lg border border-border/30 text-[12px] font-medium text-muted hover:text-main hover:bg-white/[0.03] transition-colors shrink-0">
+                                {lang === 'ar' ? 'تعديل القسم' : 'Edit Section'}
+                            </button>
+                        </div>
+                    )}
+
                     {/* CONTENT AREA */}
-                    <div className="flex-1 overflow-y-auto p-3 sm:p-5 pb-32 no-scrollbar">
+                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 sm:p-5 pb-32 no-scrollbar">
                         {viewMode === 'analytics' ? (
                             <AnalyticsPanel items={filteredItems} lang={lang} currency={settings.currencySymbol} />
                         ) : viewMode === 'list' ? (
                             <div className="max-w-[1600px] h-full">
                                 <ItemTable
-                                    items={filteredItems}
+                                    items={visibleItems}
                                     selectedItemIds={selectedItemIds}
                                     multiSelectMode={multiSelectMode}
                                     onToggleSelection={(id, shift) => {
@@ -697,11 +772,11 @@ const MenuProfitCenter: React.FC = () => {
                                             setSelectedItemIds(new Set(filteredItems.map(i => i.id)));
                                         }
                                     }}
-                                    onToggleAvailability={(item) => handleToggleAvailability(item)}
-                                    onDuplicate={(item) => handleDuplicate(item)}
-                                    onArchive={(item) => handleArchive(item)}
-                                    onDelete={(item) => handleDelete(item)}
-                                    onEdit={(item) => setDrawerItem({ mode: 'EDIT', menuId: selectedMenuId, categoryId: item._categoryId, item })}
+                                    onToggleAvailability={handleToggleAvailability}
+                                    onDuplicate={handleDuplicate}
+                                    onArchive={handleArchive}
+                                    onDelete={handleDelete}
+                                    onEdit={handleEditItem}
                                     onInlineUpdate={(categoryId, item) => updateMenuItem(selectedMenuId, categoryId, item)}
                                     lang={lang}
                                     currency={settings.currencySymbol}
@@ -716,12 +791,12 @@ const MenuProfitCenter: React.FC = () => {
                                             ref={provided.innerRef}
                                             className={`grid gap-4 max-w-[1600px] pb-4 ${density === 'compact' ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}`}
                                         >
-                                            {filteredItems.map((item, idx) => (
+                                            {visibleItems.map((item, idx) => (
                                                 <Draggable
                                                     key={item.id}
                                                     draggableId={item.id}
                                                     index={idx}
-                                                    isDragDisabled={selectedCategoryId === 'all' || sidebarSection !== 'menus'}
+                                                    isDragDisabled={selectedCategoryId === 'all' || sidebarSection !== 'menus' || filteredItems.length > 200}
                                                 >
                                                     {(provided, snapshot) => (
                                                         <div
@@ -736,12 +811,12 @@ const MenuProfitCenter: React.FC = () => {
                                                                 density={density}
                                                                 isSelected={selectedItemIds.has(item.id)}
                                                                 multiSelectMode={multiSelectMode}
-                                                                onClick={(e) => handleItemClick(item, e)}
-                                                                onToggleAvailability={() => handleToggleAvailability(item)}
-                                                                onDuplicate={() => handleDuplicate(item)}
-                                                                onArchive={() => handleArchive(item)}
-                                                                onDelete={() => handleDelete(item)}
-                                                                onEdit={() => setDrawerItem({ mode: 'EDIT', menuId: selectedMenuId, categoryId: item._categoryId, item })}
+                                                                onClick={handleItemClick}
+                                                                onToggleAvailability={handleToggleAvailability}
+                                                                onDuplicate={handleDuplicate}
+                                                                onArchive={handleArchive}
+                                                                onDelete={handleDelete}
+                                                                onEdit={handleEditItem}
                                                                 lang={lang}
                                                                 currency={settings.currencySymbol}
                                                                 index={idx}
@@ -801,6 +876,28 @@ const MenuProfitCenter: React.FC = () => {
                             </DragDropContext>
                         )}
 
+                        {/* Incremental footer: count + load more + DnD notice */}
+                        {viewMode !== 'analytics' && filteredItems.length > 0 && (
+                            <div className="flex flex-col items-center gap-2 py-6">
+                                <p className="text-[12px] text-gray-400 dark:text-muted/50 tabular-nums">
+                                    {lang === 'ar' ? 'عرض' : 'Showing'} {Math.min(visibleCount, filteredItems.length)} {lang === 'ar' ? 'من' : 'of'} {filteredItems.length}
+                                </p>
+                                {visibleCount < filteredItems.length && (
+                                    <button
+                                        onClick={() => setVisibleCount(c => c + (viewMode === 'list' ? LIST_PAGE : GRID_PAGE))}
+                                        className="h-10 px-8 rounded-xl border border-border/30 text-[13px] font-bold text-main hover:bg-white/[0.03] hover:border-indigo-500/40 transition-all active:scale-95"
+                                    >
+                                        {lang === 'ar' ? `عرض المزيد (${filteredItems.length - visibleCount})` : `Show more (${filteredItems.length - visibleCount})`}
+                                    </button>
+                                )}
+                                {selectedCategoryId !== 'all' && sidebarSection === 'menus' && filteredItems.length > 200 && (
+                                    <p className="text-[11px] text-amber-600 dark:text-amber-500/80">
+                                        {lang === 'ar' ? 'إعادة الترتيب بالسحب متاحة لأول 200 صنف — استخدم البحث للوصول لصنف معين.' : 'Drag reorder covers the first 200 items — use search to reach a specific item.'}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         {filteredItems.length === 0 && !searchQuery && (
                             <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <div className="w-20 h-20 rounded-[2rem] bg-indigo-500/5 flex items-center justify-center text-indigo-500/20 mb-6 border border-indigo-500/10">
@@ -848,6 +945,12 @@ const MenuProfitCenter: React.FC = () => {
                                 <p className="text-muted/40 text-[11px] mt-1">
                                     {lang === 'ar' ? 'جرب بحث مختلف' : 'Try a different search term'}
                                 </p>
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="mt-3 h-9 px-5 rounded-xl border border-border/30 text-[12px] font-bold text-main hover:bg-white/[0.03] transition-colors"
+                                >
+                                    {lang === 'ar' ? 'مسح البحث' : 'Clear search'}
+                                </button>
                             </div>
                         )}
                     </div>

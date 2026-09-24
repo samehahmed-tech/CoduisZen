@@ -13,21 +13,23 @@ export const getCustomerRetention = async (req: Request, res: Response) => {
         const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
-        // Customers in this period
-        const periodCustomers = await db.select({
+        // One query (no N+1): per-customer orders in-period vs pre-period.
+        // Branch scope applies to BOTH sides so a branch report never counts
+        // another branch's history as "returning".
+        const branchConds: any[] = [inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`];
+        if (branchId && branchId !== 'undefined') branchConds.push(eq(orders.branchId, branchId as string));
+        const cohorts = await db.select({
             customerId: orders.customerId,
-            orderCount: sql<number>`count(*)`,
-            firstOrder: sql<string>`min(${orders.createdAt})`,
-        }).from(orders).where(and(...conditions)).groupBy(orders.customerId);
+            periodOrders: sql<number>`sum(case when ${orders.createdAt} >= ${start} then 1 else 0 end)`,
+            prevOrders: sql<number>`sum(case when ${orders.createdAt} < ${start} then 1 else 0 end)`,
+        }).from(orders)
+            .where(and(...branchConds, sql`${orders.createdAt} < ${end}`))
+            .groupBy(orders.customerId);
 
-        // Customers who also ordered BEFORE this period
-        const returningIds = new Set<string>();
-        for (const c of periodCustomers) {
-            if (!c.customerId) continue;
-            const [prev] = await db.select({ cnt: sql<number>`count(*)` }).from(orders)
-                .where(and(eq(orders.customerId, c.customerId), sql`${orders.createdAt} < ${start}`, inArray(orders.status, deliveredStatuses)));
-            if (Number(prev?.cnt || 0) > 0) returningIds.add(c.customerId);
-        }
+        const periodCustomers = cohorts.filter((c) => Number(c.periodOrders) > 0);
+        const returningIds = new Set(
+            periodCustomers.filter((c) => Number(c.prevOrders) > 0).map((c) => c.customerId),
+        );
 
         const total = periodCustomers.length;
         const returning = returningIds.size;
@@ -59,11 +61,14 @@ export const getNewVsReturning = async (req: Request, res: Response) => {
             total: orders.total,
         }).from(orders).where(and(...conditions));
 
-        // Get first-ever order for each customer
+        // First-ever order per customer — branch-scoped when a branch filter
+        // is active, otherwise branch-new customers misclassify as returning.
+        const firstConds: any[] = [inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`];
+        if (branchId && branchId !== 'undefined') firstConds.push(eq(orders.branchId, branchId as string));
         const customerFirstOrder = await db.select({
             customerId: orders.customerId,
             firstOrder: sql<string>`min(${orders.createdAt})`,
-        }).from(orders).where(and(inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`)).groupBy(orders.customerId);
+        }).from(orders).where(and(...firstConds)).groupBy(orders.customerId);
 
         const firstOrderMap = new Map(customerFirstOrder.map(c => [c.customerId, new Date(c.firstOrder)]));
         let newRevenue = 0, newOrders = 0, returnRevenue = 0, returnOrders = 0;
@@ -99,7 +104,32 @@ export const getCustomerFrequency = async (req: Request, res: Response) => {
         const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
-        const customerOrders = await db.select({
+        // Distribution runs over ALL customers (no limit) — the old
+        // limit(100)-by-volume query counted only the 100 heaviest buyers, so
+        // once/twice were always ~0. Top-20 list is a separate capped query.
+        const perCustomer = db.select({
+            cnt: sql<number>`count(*)`.as('cnt'),
+        }).from(orders).where(and(...conditions))
+            .groupBy(orders.customerId).as('per_customer');
+        const freqRows = await db.select({
+            orderCount: sql<number>`"per_customer"."cnt"`,
+            customers: sql<number>`count(*)`,
+        }).from(perCustomer).groupBy(sql`"per_customer"."cnt"`);
+
+        const distribution = { once: 0, twice: 0, thrice: 0, frequent: 0, veryFrequent: 0 };
+        let totalCustomers = 0;
+        for (const f of freqRows as any[]) {
+            const bucket = Number((f as any).orderCount);
+            const n = Number((f as any).customers);
+            totalCustomers += n;
+            if (bucket === 1) distribution.once += n;
+            else if (bucket === 2) distribution.twice += n;
+            else if (bucket === 3) distribution.thrice += n;
+            else if (bucket <= 10) distribution.frequent += n;
+            else distribution.veryFrequent += n;
+        }
+
+        const topCustomers = await db.select({
             customerId: orders.customerId,
             customerName: orders.customerName,
             orderCount: sql<number>`count(*)`,
@@ -107,21 +137,12 @@ export const getCustomerFrequency = async (req: Request, res: Response) => {
         }).from(orders).where(and(...conditions))
             .groupBy(orders.customerId, orders.customerName)
             .orderBy(sql`count(*) desc`)
-            .limit(100);
-
-        const distribution = { once: 0, twice: 0, thrice: 0, frequent: 0, veryFrequent: 0 };
-        for (const c of customerOrders) {
-            const cnt = Number(c.orderCount);
-            if (cnt === 1) distribution.once++;
-            else if (cnt === 2) distribution.twice++;
-            else if (cnt === 3) distribution.thrice++;
-            else if (cnt <= 10) distribution.frequent++;
-            else distribution.veryFrequent++;
-        }
+            .limit(20);
 
         res.json({
             distribution,
-            topCustomers: customerOrders.slice(0, 20).map(c => ({
+            totalCustomers,
+            topCustomers: topCustomers.map(c => ({
                 customerId: c.customerId,
                 customerName: c.customerName || 'Unknown',
                 orderCount: Number(c.orderCount),
@@ -137,7 +158,7 @@ export const getCustomerChurn = async (req: Request, res: Response) => {
     try {
         const { branchId } = req.query;
         const deliveredStatuses = ['DELIVERED', 'COMPLETED'];
-        const conditions: any[] = [inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`];
+        const conditions: any[] = [inArray(orders.status, deliveredStatuses), sql`${orders.customerId} is not null`, sql`${orders.deletedAt} is null`];
         if (branchId && branchId !== 'undefined') conditions.push(eq(orders.branchId, branchId as string));
 
         const customerLastOrder = await db.select({
@@ -149,16 +170,20 @@ export const getCustomerChurn = async (req: Request, res: Response) => {
         }).from(orders).where(and(...conditions)).groupBy(orders.customerId, orders.customerName);
 
         const now = new Date();
-        const churn30 = customerLastOrder.filter(c => (now.getTime() - new Date(c.lastOrder).getTime()) > 30 * 86400000 && (now.getTime() - new Date(c.lastOrder).getTime()) <= 60 * 86400000);
-        const churn60 = customerLastOrder.filter(c => (now.getTime() - new Date(c.lastOrder).getTime()) > 60 * 86400000 && (now.getTime() - new Date(c.lastOrder).getTime()) <= 90 * 86400000);
-        const churn90 = customerLastOrder.filter(c => (now.getTime() - new Date(c.lastOrder).getTime()) > 90 * 86400000);
-        const active = customerLastOrder.filter(c => (now.getTime() - new Date(c.lastOrder).getTime()) <= 30 * 86400000);
+        const daysSince = (c: any) => (now.getTime() - new Date(c.lastOrder).getTime()) / 86400000;
+        // One-time buyers are not "churned" — they never came back to lose.
+        const oneTime = customerLastOrder.filter(c => Number(c.orderCount) <= 1);
+        const repeaters = customerLastOrder.filter(c => Number(c.orderCount) > 1);
+        const churn30 = repeaters.filter(c => daysSince(c) > 30 && daysSince(c) <= 60);
+        const churn60 = repeaters.filter(c => daysSince(c) > 60 && daysSince(c) <= 90);
+        const churn90 = repeaters.filter(c => daysSince(c) > 90);
+        const active = repeaters.filter(c => daysSince(c) <= 30);
 
         res.json({
-            summary: { total: customerLastOrder.length, active: active.length, atRisk30: churn30.length, atRisk60: churn60.length, churned90: churn90.length },
+            summary: { total: customerLastOrder.length, active: active.length, oneTimeBuyers: oneTime.length, atRisk30: churn30.length, atRisk60: churn60.length, churned90: churn90.length },
             atRisk: [...churn30, ...churn60, ...churn90].slice(0, 50).map(c => ({
                 customerId: c.customerId, customerName: c.customerName || 'Unknown', lastOrder: c.lastOrder,
-                daysSinceLastOrder: Math.floor((now.getTime() - new Date(c.lastOrder).getTime()) / 86400000),
+                daysSinceLastOrder: Math.floor(daysSince(c)),
                 orderCount: Number(c.orderCount), totalSpent: Number(Number(c.totalSpent).toFixed(2)),
             })),
         });
@@ -193,8 +218,11 @@ export const getLoyaltyPointsReport = async (_req: Request, res: Response) => {
         }).from(customers).orderBy(desc(customers.loyaltyPoints)).limit(20);
 
         res.json({
-            summary: { totalCustomers: Number(totals?.totalCustomers || 0), totalPoints: Number(totals?.totalPoints || 0), totalSpent: Number(Number(totals?.totalSpent || 0).toFixed(2)) },
-            tiers: tiers.map(r => ({ tier: r.tier, count: Number(r.count), totalPoints: Number(r.totalPoints), avgPoints: Number(Number(r.avgPoints).toFixed(0)), totalSpent: Number(Number(r.totalSpent).toFixed(2)) })),
+            summary: { totalCustomers: Number(totals?.totalCustomers || 0), totalPoints: Number(Number(totals?.totalPoints || 0).toFixed(0)), totalSpent: Number(Number(totals?.totalSpent || 0).toFixed(2)) },
+            // Denormalized counters (kept in sync by the order flow); NULL
+            // tier customers are genuinely untiered, not a missing bucket.
+            counterBasis: 'STORED_COUNTERS',
+            tiers: tiers.map(r => ({ tier: r.tier || 'Untiered', count: Number(r.count), totalPoints: Number(Number(r.totalPoints).toFixed(0)), avgPoints: Number(Number(r.avgPoints).toFixed(0)), totalSpent: Number(Number(r.totalSpent).toFixed(2)) })),
             topPointHolders,
         });
     } catch (error: any) {

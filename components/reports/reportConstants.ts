@@ -4,12 +4,12 @@
 import type { ReportCategory } from './useReportsState';
 
 export const REPORT_CATEGORIES: ReportCategory[] = [
-   { id: 'SALES', label: 'Sales & Revenue', color: '#10b981', icon: DollarSign, subReports: ['Daily Sales', 'Hourly Trends', 'Payment Mix', 'Cashier Summary', 'Refunds', 'Sales by Order Type', 'Sales by Item', 'Sales by Category', 'Discounts', 'Cancelled Orders', 'Sales by Source', 'Peak Hours Heatmap', 'Modifier Sales', 'Avg Ticket Trend', 'Sales Comparison', 'Slow-Moving Items', 'Revenue by Weekday', 'Void Items Log', 'Menu Engineering', 'Daypart Analysis', 'Basket Analysis', 'Seasonality', 'Online vs Offline', 'Menu Cannibalization', 'Menu Item Lifecycle', 'Category Contribution', 'Time-to-First-Order'] },
-   { id: 'FINANCE', label: 'Financials & VAT', color: '#f59e0b', icon: Scale, subReports: ['Z-Report / Fiscal', 'Profit & Loss (P&L)', 'Trial Balance', 'Expense Report', 'Top Expenses', 'Tips Report', 'Service Charge', 'Shift Summary', 'Food Cost % Trend', 'Cash Flow Forecast', 'Tax Compliance', 'Audit Trail', 'Break-Even Analysis', 'Payment Reconciliation', 'Shift Profitability'] },
-   { id: 'INVENTORY', label: 'Inventory & Supply', color: '#06b6d4', icon: Box, subReports: ['COGS & Margin', 'Stock Counts', 'Stock Movement', 'Waste/Loss Log', 'Reorder Alerts', 'Expiring Batches', 'Actual vs Theoretical', 'Purchase History', 'Purchase Orders', 'Suppliers', 'Inventory Valuation', 'Supplier Price Tracking', 'Recipe Cost Alerts', 'ABC Classification', 'Optimal Pricing', 'Production Batches'] },
-   { id: 'HR', label: 'HR & Payroll', color: '#0f766e', icon: Users, subReports: ['HR Executive Summary', 'Payroll Summary', 'Payroll Ledger', 'Attendance & Delays', 'Attendance Exceptions', 'Overtime Report', 'Staff Cost %', 'Sales per Labor Hour', 'Employee Productivity'] },
-   { id: 'CRM', label: 'Customers & CRM', color: '#ec4899', icon: Megaphone, subReports: ['Customer LTV', 'Campaign ROI', 'Customer Retention', 'New vs Returning', 'Customer Frequency', 'Customer Churn', 'Loyalty Points', 'Promotion Impact', 'Customer Journey Funnel'] },
-   { id: 'OPS', label: 'Operations', color: '#3b82f6', icon: Activity, subReports: ['Branch Performance', 'Order Preparation Time', 'Delivery Performance', 'Dine-in Tables', 'Kitchen Performance', 'Table Turnover', 'Wait Time', 'Driver Utilization', 'Branch Comparison', 'Delivery Zone Analytics', 'Delivery Cost vs Revenue', '3rd Party vs In-House'] },
+   { id: 'SALES', label: 'Sales & Revenue', color: '#10b981', icon: DollarSign, subReports: ['Daily Sales', 'Hourly Trends', 'Payment Mix', 'Cashier Summary', 'Refunds', 'Sales by Order Type', 'Sales by Item', 'Sales by Category', 'Discounts', 'Cancelled Orders', 'Sales by Source', 'Peak Hours Heatmap', 'Modifier Sales', 'Avg Ticket Trend', 'Sales Comparison', 'Slow-Moving Items', 'Revenue by Weekday', 'Void Items Log', 'Discounts by Cashier', 'Voids by Cashier', 'Menu Engineering', 'Daypart Analysis', 'Basket Analysis', 'Seasonality', 'Online vs Offline', 'Menu Cannibalization', 'Menu Item Lifecycle', 'Category Contribution', 'Time-to-First-Order'] },
+   { id: 'FINANCE', label: 'Financials & VAT', color: '#f59e0b', icon: Scale, subReports: ['Z-Report / Fiscal', 'Profit & Loss (P&L)', 'Trial Balance', 'Balance Sheet', 'Expense Report', 'Top Expenses', 'Tips Report', 'Service Charge', 'Shift Summary', 'Food Cost % Trend', 'Cash Flow Forecast', 'Tax Compliance', 'E-Invoice Rejections', 'Audit Trail', 'Break-Even Analysis', 'Payment Reconciliation', 'Shift Profitability', 'Day-Close Variances', 'Treasury Cashbox', 'Custody Statement', 'Supplier Invoices'] },
+   { id: 'INVENTORY', label: 'Inventory & Supply', color: '#06b6d4', icon: Box, subReports: ['COGS & Margin', 'Stock Counts', 'Stock Movement', 'Waste/Loss Log', 'Reorder Alerts', 'Expiring Batches', 'Actual vs Theoretical', 'Purchase History', 'Purchase Orders', 'Suppliers',    'Inventory Valuation', 'Supplier Price Tracking', 'Recipe Cost Alerts', 'ABC Classification', 'Dead Stock', 'Negative Stock', 'Optimal Pricing', 'Production Batches', 'Production Cost Variance', 'Butchery Yield', 'Inter-Branch Transfers', 'GRN Variance'] },
+   { id: 'HR', label: 'HR & Payroll', color: '#0f766e', icon: Users, subReports: ['HR Executive Summary', 'Payroll Summary', 'Payroll Ledger', 'Attendance & Delays', 'Attendance Exceptions', 'Overtime Report', 'Staff Cost %', 'Sales per Labor Hour', 'Employee Productivity', 'Headcount & Turnover', 'Leave & Absence', 'Shift Tasks Completion'] },
+   { id: 'CRM', label: 'Customers & CRM', color: '#ec4899', icon: Megaphone, subReports: ['Customer LTV', 'Campaign ROI', 'Customer Retention', 'New vs Returning', 'Customer Frequency', 'Customer Churn', 'Loyalty Points', 'Promotion Impact', 'Customer Journey Funnel', 'Complaints & SLA', 'Coupon Usage', 'WhatsApp Inbox'] },
+   { id: 'OPS', label: 'Operations', color: '#3b82f6', icon: Activity, subReports: [   'Branch Performance', 'Order Preparation Time', 'Delivery Performance', 'Dine-in Tables', 'Unpaid Orders', 'Kitchen Performance', 'Kitchen Staff Performance', 'Table Turnover', 'Wait Time', 'Driver Utilization', 'Branch Comparison', 'Delivery Zone Analytics', 'Delivery Cost vs Revenue', 'Delivery SLA Alerts', '3rd Party vs In-House', 'Reservations & No-Show', 'Driver COD Settlement', 'Approval SLA', 'Platform Commissions', 'User Activity Log'] },
    { id: 'AI', label: 'AI & Predictive', color: '#6366f1', icon: Activity, subReports: ['Daily Flash Report', 'Demand Forecasting', 'Price Elasticity Simulator', 'Anomaly Detection', 'Channel Mix Trend'] },
 ];
 
@@ -39,6 +39,9 @@ export const REPORT_DISPLAY_LABELS: Record<string, string> = {
    'Slow-Moving Items': 'الأصناف بطيئة الحركة',
    'Revenue by Weekday': 'الإيراد حسب أيام الأسبوع',
    'Void Items Log': 'سجل الأصناف المحذوفة',
+   'Discounts by Cashier': 'الخصومات حسب الكاشير',
+   'Voids by Cashier': 'الملغي حسب الكاشير',
+   'Unpaid Orders': 'طلبات غير مدفوعة',
    'Menu Engineering': 'هندسة المنيو',
    'Daypart Analysis': 'تحليل فترات اليوم',
    'Basket Analysis': 'تحليل سلة الشراء',
@@ -78,6 +81,8 @@ export const REPORT_DISPLAY_LABELS: Record<string, string> = {
    'Supplier Price Tracking': 'متابعة أسعار الموردين',
    'Recipe Cost Alerts': 'تنبيهات تكلفة الوصفات',
    'ABC Classification': 'تصنيف ABC للمخزون',
+   'Dead Stock': 'المخزون الراكد',
+   'Negative Stock': 'أرصدة سالبة (بيع زيادة)',
    'Optimal Pricing': 'التسعير الأمثل',
    'HR Executive Summary': 'الملخص التنفيذي للموارد البشرية',
    'Payroll Summary': 'ملخص الرواتب',
@@ -102,24 +107,56 @@ export const REPORT_DISPLAY_LABELS: Record<string, string> = {
    'Delivery Performance': 'أداء التوصيل',
    'Dine-in Tables': 'ترابيزات الصالة',
    'Kitchen Performance': 'أداء المطبخ',
+   'Kitchen Staff Performance': 'أداء طاقم المطبخ',
    'Table Turnover': 'دوران الترابيزات',
    'Wait Time': 'وقت الانتظار',
    'Driver Utilization': 'استغلال السائقين',
    'Branch Comparison': 'مقارنة الفروع',
    'Delivery Zone Analytics': 'تحليل مناطق التوصيل',
-   'Delivery Cost vs Revenue': 'تكلفة التوصيل مقابل الإيراد',
+   'Delivery Cost vs Revenue': 'رسوم التوصيل مقابل الإيراد',
    '3rd Party vs In-House': 'طرف ثالث مقابل توصيل داخلي',
    'Daily Flash Report': 'التقرير اليومي السريع',
    'Demand Forecasting': 'توقع الطلب',
    'Price Elasticity Simulator': 'محاكي مرونة الأسعار',
    'Anomaly Detection': 'تقرير الفحص',
    'Channel Mix Trend': 'اتجاه قنوات البيع',
+   'Treasury Cashbox': 'صندوق الخزينة',
+   'Custody Statement': 'كشف العهد',
+   'Supplier Invoices': 'فواتير الموردين',
+   'Butchery Yield': 'ناتج التقطيع (بوتشري)',
+   'Inter-Branch Transfers': 'تحويلات الفروع',
+   'GRN Variance': 'فروقات الاستلام',
+   'Reservations & No-Show': 'الحجوزات وعدم الحضور',
+   'Driver COD Settlement': 'تحصيل السائقين (COD)',
+   'Approval SLA': 'موافقات وزمن الاعتماد',
+   'Platform Commissions': 'عمولات المنصات',
+   'Complaints & SLA': 'الشكاوى وزمن الحل',
+   'Coupon Usage': 'استخدام الكوبونات',
+   'Leave & Absence': 'الإجازات والغياب',
+   'Shift Tasks Completion': 'مهام الورديات',
+   'Balance Sheet': 'الميزانية العمومية',
+   'E-Invoice Rejections': 'الفواتير الإلكترونية المرفوضة',
+   'Day-Close Variances': 'فروقات إقفال اليوم',
+   'Production Cost Variance': 'انحراف تكلفة التشغيل',
+   'Headcount & Turnover': 'القوى العاملة والدوران',
+   'WhatsApp Inbox': 'صندوق واتساب',
+   'User Activity Log': 'سجل نشاط المستخدمين',
+   'Delivery SLA Alerts': 'تنبيهات SLA للتوصيل',
 };
 
 export const getReportDisplayLabel = (label: string) => REPORT_DISPLAY_LABELS[label] || label;
 
 export const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+/** 0–23 → readable 12-hour label: "7 AM" / "7 PM" (en) or "7 ص" / "7 م" (ar). */
+export const formatHourLabel = (hour: unknown, lang: 'ar' | 'en' = 'en'): string => {
+   const h = ((Number(hour) % 24) + 24) % 24;
+   if (!Number.isFinite(h)) return String(hour ?? '');
+   const h12 = h % 12 === 0 ? 12 : h % 12;
+   const suffix = lang === 'ar' ? (h < 12 ? 'ص' : 'م') : (h < 12 ? 'AM' : 'PM');
+   return `${h12} ${suffix}`;
+};
 
 export const getExportReportType = (sub: string): string => {
    const map: Record<string, string> = {
@@ -137,7 +174,7 @@ export const getExportReportType = (sub: string): string => {
       'Shift Summary': 'SHIFT_SUMMARY', 'Actual vs Theoretical': 'ACTUAL_VS_THEORETICAL', 'Purchase History': 'PURCHASE_HISTORY',
       'Inventory Valuation': 'INVENTORY_VALUATION', 'Staff Cost %': 'STAFF_COST_VS_REVENUE', 'Sales per Labor Hour': 'SALES_PER_LABOR_HOUR',
       'Customer Retention': 'CUSTOMER_RETENTION', 'New vs Returning': 'NEW_VS_RETURNING', 'Customer Frequency': 'CUSTOMER_FREQUENCY',
-      'Kitchen Performance': 'KITCHEN_PERFORMANCE', 'Menu Engineering': 'MENU_ENGINEERING', 'Daypart Analysis': 'DAYPART_ANALYSIS',
+      'Kitchen Performance': 'KITCHEN_PERFORMANCE', 'Kitchen Staff Performance': 'KITCHEN_STAFF_PERFORMANCE', 'Menu Engineering': 'MENU_ENGINEERING', 'Daypart Analysis': 'DAYPART_ANALYSIS',
       'Basket Analysis': 'BASKET_ANALYSIS', 'Seasonality': 'SEASONALITY', 'Online vs Offline': 'ONLINE_VS_OFFLINE',
       'Food Cost % Trend': 'FOOD_COST_TREND', 'Tax Compliance': 'TAX_COMPLIANCE', 'Audit Trail': 'AUDIT_TRAIL',
       'Cash Flow Forecast': 'CASH_FLOW_FORECAST', 'Supplier Price Tracking': 'SUPPLIER_PRICE_TRACKING',
@@ -155,6 +192,17 @@ export const getExportReportType = (sub: string): string => {
       'Customer Journey Funnel': 'CUSTOMER_JOURNEY', 'Channel Mix Trend': 'CHANNEL_MIX',
       'Optimal Pricing': 'OPTIMAL_PRICING', '3rd Party vs In-House': 'THIRD_PARTY_VS_INHOUSE',
       'Time-to-First-Order': 'TIME_TO_FIRST_ORDER',
+      'Treasury Cashbox': 'TREASURY_CASHBOX', 'Custody Statement': 'CUSTODY_STATEMENT',
+      'Supplier Invoices': 'SUPPLIER_INVOICES', 'Butchery Yield': 'BUTCHERY_YIELD',
+      'Inter-Branch Transfers': 'INTER_BRANCH_TRANSFERS', 'GRN Variance': 'GRN_VARIANCE',
+      'Reservations & No-Show': 'RESERVATIONS_NOSHOW', 'Driver COD Settlement': 'DRIVER_COD',
+      'Approval SLA': 'APPROVAL_SLA', 'Platform Commissions': 'PLATFORM_COMMISSIONS',
+      'Complaints & SLA': 'COMPLAINTS_SLA', 'Coupon Usage': 'COUPON_USAGE',
+      'Leave & Absence': 'LEAVE_ABSENCE', 'Shift Tasks Completion': 'SHIFT_TASKS',
+      'Balance Sheet': 'BALANCE_SHEET', 'E-Invoice Rejections': 'EINVOICE_REJECTIONS',
+      'Day-Close Variances': 'DAYCLOSE_VARIANCES', 'Production Cost Variance': 'PROD_COST_VARIANCE',
+      'Headcount & Turnover': 'HEADCOUNT_TURNOVER', 'WhatsApp Inbox': 'WHATSAPP_INBOX',
+      'User Activity Log': 'USER_ACTIVITY', 'Delivery SLA Alerts': 'DELIVERY_SLA',
    };
    return map[sub] || sub
       .toUpperCase()
@@ -234,7 +282,6 @@ export const SUPPORTED_TABULAR_EXPORT_TYPES = new Set([
    'WAIT_TIME',
    'DRIVER_UTILIZATION',
    'BRANCH_COMPARISON',
-   'DEMAND_FORECAST',
    'PRICE_ELASTICITY',
    'MENU_CANNIBALIZATION',
    'ANOMALY_DETECTION',

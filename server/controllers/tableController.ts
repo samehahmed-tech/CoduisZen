@@ -481,27 +481,22 @@ const pickItemsToMove = async (
     const remaining = [...sourceItems];
     const picked: typeof sourceItems = [];
 
-    for (const reqItem of selectedItems) {
-        const targetId = String(reqItem?.id ?? '').trim();
-        const targetName = String(reqItem?.name || '').trim().toLowerCase();
-        const targetPrice = Number(reqItem?.price || 0);
-        let neededQty = Number(reqItem?.quantity ?? 1);
-        if (!Number.isInteger(neededQty) || neededQty <= 0) throw new Error('INVALID_ITEM_QUANTITY');
-
-        for (let i = 0; i < remaining.length && neededQty > 0; i += 1) {
+    const consumeMatches = (
+        matches: (candidate: any) => boolean,
+        neededQty: number,
+    ): { took: typeof picked; stillNeeded: number } => {
+        const took: typeof picked = [];
+        let stillNeeded = neededQty;
+        for (let i = 0; i < remaining.length && stillNeeded > 0; i += 1) {
             const candidate = remaining[i];
-            if (!candidate) continue;
-            const sameId = targetId && String(candidate.id) === targetId;
-            const sameName = String(candidate.name || '').trim().toLowerCase() === targetName;
-            const samePrice = Number(candidate.price || 0) === targetPrice;
-            if (targetId ? !sameId : (!sameName || !samePrice)) continue;
+            if (!candidate || !matches(candidate)) continue;
 
             const availableQty = Number(candidate.quantity || 0);
             if (availableQty <= 0) continue;
 
-            const takeQty = Math.min(availableQty, neededQty);
-            picked.push({ ...candidate, quantity: takeQty });
-            neededQty -= takeQty;
+            const takeQty = Math.min(availableQty, stillNeeded);
+            took.push({ ...candidate, quantity: takeQty });
+            stillNeeded -= takeQty;
 
             if (takeQty === availableQty) {
                 remaining.splice(i, 1);
@@ -510,7 +505,47 @@ const pickItemsToMove = async (
                 remaining[i] = { ...candidate, quantity: availableQty - takeQty };
             }
         }
-        if (neededQty > 0) throw new Error('ORDER_ITEM_QUANTITY_UNAVAILABLE');
+        return { took, stillNeeded };
+    };
+
+    for (const reqItem of selectedItems) {
+        const targetId = String(reqItem?.id ?? '').trim();
+        const targetName = String(reqItem?.name || '').trim().toLowerCase();
+        const targetPrice = Number(reqItem?.price || 0);
+        const neededQty = Number(reqItem?.quantity ?? 1);
+        if (!Number.isInteger(neededQty) || neededQty <= 0) throw new Error('INVALID_ITEM_QUANTITY');
+
+        // Pass 1: exact row-id match (normal path).
+        let { took, stillNeeded } = consumeMatches(
+            (candidate) => !!targetId && String(candidate.id) === targetId,
+            neededQty,
+        );
+        // Pass 2 (stale-client tolerance): the cashier's cart may still hold
+        // a temp id (order just placed, no refresh yet) — fall back to
+        // name + unit-price matching instead of failing the whole move.
+        if (stillNeeded > 0 && targetId && targetName) {
+            const fallback = consumeMatches(
+                (candidate) =>
+                    String(candidate.name || '').trim().toLowerCase() === targetName &&
+                    Number(candidate.price || 0) === targetPrice,
+                stillNeeded,
+            );
+            took = [...took, ...fallback.took];
+            stillNeeded = fallback.stillNeeded;
+        }
+        // Pass 3: legacy callers that send no id at all.
+        if (stillNeeded > 0 && !targetId && targetName) {
+            const legacy = consumeMatches(
+                (candidate) =>
+                    String(candidate.name || '').trim().toLowerCase() === targetName &&
+                    Number(candidate.price || 0) === targetPrice,
+                stillNeeded,
+            );
+            took = [...took, ...legacy.took];
+            stillNeeded = legacy.stillNeeded;
+        }
+        if (stillNeeded > 0) throw new Error('ORDER_ITEM_QUANTITY_UNAVAILABLE');
+        picked.push(...took);
     }
 
     return picked;
