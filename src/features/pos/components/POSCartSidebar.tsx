@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe2, ShoppingBag, Store, Trash2, X } from 'lucide-react';
+import { Globe2, Lock, ShoppingBag, Store, Trash2, X } from 'lucide-react';
 import CartItem from './CartItem';
 import PaymentSummary from './PaymentSummary';
 import DeliveryZonePicker from '@/components/common/DeliveryZonePicker';
@@ -75,6 +75,11 @@ interface POSCartSidebarProps {
     onDeliveryZoneChange?: (zoneId: string, zone?: any) => void;
     onDeliveryZonesChange?: (zones: any[]) => void;
     deliveryFee?: number;
+    // Previous fired rounds on the same table (read-only history). The
+    // editable cart always stays scoped to the live ticket so the
+    // send-partition logic can never duplicate them — this section only
+    // makes them VISIBLE so nothing reads as "forgotten".
+    lockedRounds?: Array<{ id: string; orderNumber?: string | number; items: OrderItem[]; total: number }>;
 }
 
 const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
@@ -92,10 +97,13 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
     externalOrderNumber, onExternalOrderNumberChange,
     orderNote, onOrderNoteChange,
     branchId, branches = [], deliveryZones = [], selectedDeliveryZoneId = '',
-    onDeliveryZoneChange, onDeliveryZonesChange, deliveryFee = 0
+    onDeliveryZoneChange, onDeliveryZonesChange, deliveryFee = 0,
+    lockedRounds = []
 }) => {
     const isAr = lang === 'ar';
     const hasCartItems = activeCart.length > 0;
+    const hasLockedRounds = lockedRounds.length > 0;
+    const lockedTotal = lockedRounds.reduce((s, r) => s + Number(r.total || 0), 0);
     const isDelivery = String(activeOrderType) === 'DELIVERY';
     const activePlatforms = deliveryPlatforms.filter((platform: any) => platform.isActive !== false);
 
@@ -228,6 +236,46 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                     </div>
                 </div>
 
+                {/* Previously fired rounds on this table — locked history.
+                    The editable cart below stays scoped to the live ticket. */}
+                {hasLockedRounds && (
+                    <div className="rounded-xl border border-border/40 bg-elevated/30 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted">
+                                <Lock size={12} />
+                                {isAr ? 'أصناف مرسلة للمطبخ' : 'Sent to kitchen'}
+                            </span>
+                            <span className="text-[10px] font-black tabular-nums text-muted">{lockedTotal.toFixed(2)} {currencySymbol}</span>
+                        </div>
+                        {lockedRounds.map(round => (
+                            <div key={round.id} className="rounded-lg bg-card/70 border border-border/20 px-2.5 py-2">
+                                <div className="mb-1 flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-black text-primary tabular-nums">
+                                        {isAr ? 'أوردر' : 'Order'} #{String(round.orderNumber ?? round.id).slice(0, 12)}
+                                    </span>
+                                    <span className="text-[10px] font-black tabular-nums text-muted">{Number(round.total || 0).toFixed(2)}</span>
+                                </div>
+                                {(round.items || []).map((item, idx) => (
+                                    <div key={`${round.id}-${(item as any).cartId || idx}`} className="flex items-center justify-between gap-2 py-0.5">
+                                        <span className="min-w-0 truncate text-[11px] font-bold text-muted">
+                                            {(item as any).name}
+                                            <span className="tabular-nums"> ×{Number((item as any).quantity || 1)}</span>
+                                        </span>
+                                        <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted/70">
+                                            {(Number((item as any).price || 0) * Number((item as any).quantity || 1)).toFixed(2)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
+                        <p className="text-[9px] font-bold leading-relaxed text-muted/70">
+                            {isAr
+                                ? `الإجمالي مع السلة الحالية: ${(lockedTotal + (cartTotal || 0)).toFixed(2)} ${currencySymbol}`
+                                : `Table total with current cart: ${(lockedTotal + (cartTotal || 0)).toFixed(2)} ${currencySymbol}`}
+                        </p>
+                    </div>
+                )}
+
                 <AnimatePresence initial={false}>
                     {filteredCartItems.map((item, idx) => (
                         <CartItem
@@ -242,7 +290,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                 </AnimatePresence>
 
                 {/* Empty state */}
-                {activeCart.length === 0 && (
+                {activeCart.length === 0 && !hasLockedRounds &&
                     <div className="h-full flex flex-col items-center justify-center py-20 px-8">
                         <div className="relative mb-6">
                             <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
@@ -258,7 +306,7 @@ const POSCartSidebar: React.FC<POSCartSidebarProps> = ({
                             {isAr ? 'استعراض القائمة' : 'Browse Menu'}
                         </button>
                     </div>
-                )}
+                }
             </div>
 
             {/* Payment Footer */}

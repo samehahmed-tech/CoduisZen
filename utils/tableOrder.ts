@@ -70,3 +70,51 @@ export const getActiveTableOrders = (
 /** Combined collectible total across a table's open tickets. */
 export const sumTableOrdersTotal = (list: Order[]): number =>
     list.reduce((sum, order) => sum + Number(order?.total || 0), 0);
+
+const roundMoney = (value: unknown): number =>
+    Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+/** Row identity shared by the POS cart partition logic (cartId wins, DB id fallback). */
+export const tableRowKeyOf = (line: any): string => String(line?.cartId ?? line?.id ?? '');
+
+/**
+ * A synthetic bill order covering EVERY open round on a table (oldest
+ * first), so temp bills, close-outs and the management modal never show
+ * "half the bill" (only the latest round). Money fields are plain sums of
+ * the stored server-priced rounds — receipt generators prefer stored
+ * tax/total when present, so the printed figures match the per-round
+ * tickets exactly.
+ */
+export const buildTableBillOrder = (tableOrders: Order[]): Order | undefined => {
+    const rounds = (tableOrders || []).filter(Boolean);
+    if (rounds.length === 0) return undefined;
+    // getActiveTableOrders returns oldest-first; the latest round carries the
+    // live link (ids, customer, branch/table context).
+    const latest = rounds[rounds.length - 1];
+    const earliest = rounds[0];
+    return {
+        ...latest,
+        items: rounds.flatMap((order) => order.items || []),
+        subtotal: roundMoney(rounds.reduce((sum, order) => sum + Number(order.subtotal || 0), 0)),
+        discount: roundMoney(rounds.reduce((sum, order) => sum + Number((order as any).discount || 0), 0)),
+        tax: roundMoney(rounds.reduce((sum, order) => sum + Number(order.tax || 0), 0)),
+        tipAmount: roundMoney(rounds.reduce((sum, order) => sum + Number(order.tipAmount || 0), 0)),
+        deliveryFee: roundMoney(rounds.reduce((sum, order) => sum + Number((order as any).deliveryFee || 0), 0)),
+        serviceCharge: roundMoney(rounds.reduce((sum, order) => sum + Number((order as any).serviceCharge || 0), 0)),
+        total: roundMoney(sumTableOrdersTotal(rounds)),
+        createdAt: earliest.createdAt,
+    } as Order;
+};
+
+/**
+ * Cart lines that are on NO saved round yet (unsent additions the cashier
+ * just built). Used by the temp bill so what the cashier sees on screen is
+ * what prints — otherwise a pre-send temp bill silently drops the new lines.
+ */
+export const getTableFreshCartLines = (cart: any[], tableOrders: Order[]): any[] => {
+    const savedKeys = new Set<string>();
+    for (const order of tableOrders || []) {
+        for (const line of order?.items || []) savedKeys.add(tableRowKeyOf(line));
+    }
+    return (cart || []).filter((line) => !savedKeys.has(tableRowKeyOf(line)));
+};

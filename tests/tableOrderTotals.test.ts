@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getActiveTableOrders, sumTableOrdersTotal } from '../utils/tableOrder';
+import {
+    buildTableBillOrder,
+    getActiveTableOrders,
+    getTableFreshCartLines,
+    sumTableOrdersTotal,
+} from '../utils/tableOrder';
 
 const table = (overrides: any = {}) => ({
     id: 'table-1',
@@ -60,5 +65,54 @@ describe('table floor-map totals', () => {
         const tables = [{ id: 'table-9', status: 'AVAILABLE', currentOrderId: null }] as any;
         const orders = [order({ id: 'x', tableId: 'table-9', total: 50 })] as any;
         expect(getActiveTableOrders(orders, tables, 'table-9')).toHaveLength(0);
+    });
+});
+
+describe('table bill aggregation (temp bill / close-out)', () => {
+    const round = (id: string, lines: Array<{ name: string; price: number; quantity: number }>, money: any) => order({
+        id,
+        items: lines.map((l, i) => ({ ...l, cartId: `${id}-row-${i}` })),
+        subtotal: money.subtotal,
+        discount: money.discount || 0,
+        tax: money.tax,
+        tipAmount: money.tip || 0,
+        total: money.total,
+        createdAt: new Date(`2026-09-16T10:${id === 'order-a' ? '00' : '05'}:00`),
+    });
+
+    it('combines every round into one bill (last-round-only printed 75 of 150)', () => {
+        const rounds = [
+            round('order-a', [{ name: 'Tea', price: 70, quantity: 1 }], { subtotal: 70, tax: 5, total: 75 }),
+            round('order-b', [{ name: 'Coffee', price: 65, quantity: 1 }], { subtotal: 65, tax: 10, total: 75 }),
+        ] as any;
+        const bill = buildTableBillOrder(rounds)!;
+        expect(bill).toBeDefined();
+        expect(bill.items).toHaveLength(2);
+        expect(bill.total).toBe(150);
+        expect(bill.subtotal).toBe(135);
+        expect(bill.tax).toBe(15);
+        // Live context comes from the latest (linked) round.
+        expect(bill.id).toBe('order-b');
+    });
+
+    it('returns undefined when there is nothing to bill', () => {
+        expect(buildTableBillOrder([])).toBeUndefined();
+    });
+
+    it('detects unsent cart lines missing from every saved round', () => {
+        const rounds = [
+            round('order-a', [{ name: 'Tea', price: 70, quantity: 1 }], { subtotal: 70, tax: 5, total: 75 }),
+        ] as any;
+        const cart = [
+            { cartId: 'order-a-row-0', name: 'Tea', price: 70, quantity: 1 },
+            { cartId: 'cart-fresh-1', name: 'Cake', price: 50, quantity: 1 },
+        ];
+        const fresh = getTableFreshCartLines(cart, rounds);
+        expect(fresh.map((l: any) => l.name)).toEqual(['Cake']);
+    });
+
+    it('treats an empty cart as fully sent', () => {
+        const rounds = [round('order-a', [], { subtotal: 0, tax: 0, total: 0 })] as any;
+        expect(getTableFreshCartLines([], rounds)).toEqual([]);
     });
 });

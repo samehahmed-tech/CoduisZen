@@ -68,7 +68,7 @@ import { generateOrderId, generateInternalId } from '@/src/utils/idGenerator';
 import { buildOrderPayment } from './orderPayment';
 import { applyPlatformMarkup, matchPlatformMarkup, type PlatformMarkup } from '@/services/platformPricing';
 import { isBelowTableMinimumSpend } from '../../utils/tableMinimumSpend';
-import { findActiveTableOrder } from '../../../utils/tableOrder';
+import { buildTableBillOrder, findActiveTableOrder, getActiveTableOrders, getTableFreshCartLines } from '../../../utils/tableOrder';
 
 const createCartId = () => generateInternalId();
 
@@ -640,10 +640,28 @@ const POS: React.FC = () => {
             ...(normalizedModifiers ? { selectedModifiers: normalizedModifiers } : {}),
          };
       });
-   }, [indexedItems, rawActiveCart]);
+    }, [indexedItems, rawActiveCart]);
 
-   useEffect(() => {
-      if (activeCategory === 'all') return;
+    // Previously fired rounds on the selected table (read-only history for
+    // the cart sidebar). The editable cart stays scoped to the live ticket so
+    // the send-partition logic can never duplicate these lines.
+    const lockedTableRounds = useMemo(() => {
+       if (activeOrderType !== OrderType.DINE_IN || !selectedTableId) return [];
+       const rounds = getActiveTableOrders(orders, tables, selectedTableId);
+       if (rounds.length <= 1) return [];
+       const linkedId = tables.find(candidate => candidate.id === selectedTableId)?.currentOrderId;
+       return rounds
+          .filter(order => order.id !== linkedId)
+          .map(order => ({
+             id: order.id,
+             orderNumber: (order as any).orderNumber ?? order.id,
+             items: order.items || [],
+             total: Number(order.total || 0),
+          }));
+    }, [activeOrderType, selectedTableId, orders, tables]);
+
+    useEffect(() => {
+       if (activeCategory === 'all') return;
       const currentCount = categoryResultCounts[activeCategory] || 0;
       if (currentCount > 0) return;
 
@@ -864,7 +882,18 @@ const POS: React.FC = () => {
       }
 
       const activeOrder = findActiveTableOrder(orders, tables, tableId);
-      if (activeOrder) {
+      const pendingDraft = tableDrafts[tableId];
+      if (activeOrder && (pendingDraft?.cart?.length ?? 0) > 0) {
+         // Unsent work was left on this table (added/removed lines never
+         // fired). Restoring it verbatim beats wiping it: the draft already
+         // contains the ticket lines plus the cashier's edits, and the send
+         // partition re-splits it against the live ticket — nothing duplicates.
+         loadTableDraft(tableId);
+         clearTableDraft(tableId);
+         setPendingTableCoupon(null);
+         setCouponCode(pendingDraft.activeCoupon || '');
+         lastCouponSubtotalRef.current = null;
+      } else if (activeOrder) {
          loadTableOrder(tableId);
          clearTableDraft(tableId);
          setPendingTableCoupon(null);
@@ -1182,21 +1211,78 @@ const POS: React.FC = () => {
       }
    }, [safeActiveCart, handleUpdateQuantity]);
 
+   // Client-side quote for cart lines that are on no saved round yet (same
+   // math as supplementary kitchen rounds: subtotal + tax at the branch rate,
+   // no discounts — discounts live on the fired tickets).
+   const priceFreshTableLines = (lines: any[]) => {
+      const money = (v: number) => parseFloat(Number(v || 0).toFixed(2));
+      const freshSubtotal = money(lines.reduce((acc, item) => {
+         const mods = ((item as any).selectedModifiers || (item as any).modifiers || [])
+            .reduce((s: number, m: any) => s + Number(m?.price || 0), 0);
+         return acc + ((Number((item as any).price || 0) + mods) * Number((item as any).quantity || 0));
+      }, 0));
+      const freshTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
+      const freshTax = money(freshSubtotal * freshTaxRate);
+      return { freshSubtotal, freshTax, freshTotal: money(freshSubtotal + freshTax) };
+   };
+
+   // Unsent lines for a table's cart context (empty unless the cashier is
+   // looking at that exact table with new lines on top of the fired rounds).
+   const getUnsentTableLines = (tableId: string, tableOrders: any[]) => {
+      if (activeOrderType !== OrderType.DINE_IN || selectedTableId !== tableId) return [];
+      return getTableFreshCartLines(safeActiveCart, tableOrders);
+   };
+
    const performCloseTable = async (tableId: string, selectedPaymentMethod = PaymentMethod.CASH) => {
-       const activeOrder = findActiveTableOrder(orders, tables, tableId);
+       // A table can hold SEVERAL open rounds (one order per kitchen send).
+       // Closing must complete every round and print ONE combined receipt —
+       // closing only the linked round abandons earlier rounds as ghosts.
+       const tableOrders = getActiveTableOrders(orders, tables, tableId);
        try {
-           if (activeOrder) {
-               await updateOrderStatus(activeOrder.id, OrderStatus.COMPLETED, undefined, undefined, {
-                  skipPrint: true,
-                  skipVersionCheck: true,
-                  paymentMethod: selectedPaymentMethod,
-                  payments: [{ method: selectedPaymentMethod, amount: Number(activeOrder.total || 0) }],
-               });
+           if (tableOrders.length > 0) {
+               const unsent = getUnsentTableLines(tableId, tableOrders);
+               if (unsent.length > 0) {
+                  showToast(lang === 'ar' ? 'أرسل الأصناف الجديدة للمطبخ أولاً قبل الإغلاق' : 'Send the new items to the kitchen before closing', 'error');
+                  return;
+               }
+               // Greedy split distribution across rounds (exact, no remainder leaks).
+               let splitPool = selectedPaymentMethod === PaymentMethod.SPLIT
+                  ? splitPayments.map(p => ({ method: String(p.method), amount: Number(p.amount || 0) }))
+                  : [];
+               for (const round of tableOrders) {
+                  const roundTotal = Number(round.total || 0);
+                  let payments: Array<{ method: string; amount: number }>;
+                  if (selectedPaymentMethod === PaymentMethod.SPLIT) {
+                     payments = [];
+                     let rest = roundTotal;
+                     while (rest > 0.005 && splitPool.length > 0) {
+                        const head = splitPool[0];
+                        const take = Math.min(rest, Number(head.amount || 0));
+                        payments.push({ method: head.method, amount: Number(take.toFixed(2)) });
+                        head.amount = Number((Number(head.amount || 0) - take).toFixed(2));
+                        rest = Number((rest - take).toFixed(2));
+                        if (head.amount <= 0.005) splitPool.shift();
+                     }
+                     if (rest > 0.005) payments.push({ method: splitPool[0]?.method || PaymentMethod.CASH, amount: Number(rest.toFixed(2)) });
+                  } else {
+                     payments = [{ method: selectedPaymentMethod, amount: roundTotal }];
+                  }
+                  await updateOrderStatus(round.id, OrderStatus.COMPLETED, undefined, undefined, {
+                     skipPrint: true,
+                     skipVersionCheck: true,
+                     paymentMethod: selectedPaymentMethod,
+                     payments,
+                  });
+               }
                await fetchTables(branchId);
-               try {
-                  await printOrderReceipt({ order: { ...activeOrder, status: OrderStatus.COMPLETED, paymentMethod: selectedPaymentMethod, payments: [{ method: selectedPaymentMethod, amount: Number(activeOrder.total || 0) }] }, printers, settings, currencySymbol, lang, t, branch: activeBranch });
-               } catch (printError) {
-                  showToast(getActionableErrorMessage(printError, lang), 'warning');
+               const billOrder = buildTableBillOrder(tableOrders);
+               if (billOrder) {
+                  const paidBill = { ...billOrder, status: OrderStatus.COMPLETED, paymentMethod: selectedPaymentMethod };
+                  try {
+                     await printOrderReceipt({ order: paidBill, printers, settings, currencySymbol, lang, t, branch: activeBranch });
+                  } catch (printError) {
+                     showToast(getActionableErrorMessage(printError, lang), 'warning');
+                  }
                }
            } else {
                await updateTableStatus(tableId, TableStatus.AVAILABLE);
@@ -1260,11 +1346,42 @@ const POS: React.FC = () => {
    };
 
    const handleTempBill = async (tableId: string) => {
-      const activeOrder = findActiveTableOrder(orders, tables, tableId);
-      if (!activeOrder) return;
+      // The temp bill covers EVERYTHING the table owes: all saved rounds plus
+      // any unsent lines currently on screen for this table. Printing only the
+      // linked (latest) round reads as "half the bill".
+      const tableOrders = getActiveTableOrders(orders, tables, tableId);
+      const freshLines = getUnsentTableLines(tableId, tableOrders);
+      const billBase = buildTableBillOrder(tableOrders);
+      if (!billBase && freshLines.length === 0) {
+         showToast(lang === 'ar' ? 'لا يوجد طلب للطباعة' : 'No order to print', 'warning');
+         return;
+      }
+      const { freshSubtotal, freshTax, freshTotal } = priceFreshTableLines(freshLines);
+      const money = (v: number) => parseFloat(Number(v || 0).toFixed(2));
+      const table = tables.find(candidate => candidate.id === tableId);
+      const billOrder: any = {
+         ...(billBase || {
+            id: `temp-${tableId}-${Date.now()}`,
+            type: OrderType.DINE_IN,
+            branchId,
+            tableId,
+            status: OrderStatus.PENDING,
+            createdAt: new Date(),
+            discount: 0,
+            tipAmount: 0,
+            deliveryFee: 0,
+            serviceCharge: 0,
+         }),
+         tableId,
+         items: [...(billBase?.items || []), ...freshLines],
+         subtotal: money(Number(billBase?.subtotal || 0) + freshSubtotal),
+         tax: money(Number(billBase?.tax || 0) + freshTax),
+         total: money(Number(billBase?.total || 0) + freshTotal),
+         tableName: (table as any)?.name || (billBase as any)?.tableName,
+      };
       try {
          await printOrderReceipt({
-            order: activeOrder,
+            order: billOrder,
             printers,
             title: t.temp_bill || 'Temporary Bill',
             settings,
@@ -1717,9 +1834,11 @@ const POS: React.FC = () => {
 
    const handleVoidOrder = () => {
       if (safeActiveCart.length === 0) return;
-      const activeTableOrder = activeOrderType === OrderType.DINE_IN && selectedTableId
-         ? findActiveTableOrder(orders, tables, selectedTableId)
-         : undefined;
+      // A table can hold several open rounds — voiding cancels ALL of them so
+      // no round is left behind as a ghost on the table.
+      const activeTableOrders = activeOrderType === OrderType.DINE_IN && selectedTableId
+         ? getActiveTableOrders(orders, tables, selectedTableId)
+         : [];
 
       showModal({
          title: t.confirm,
@@ -1729,9 +1848,9 @@ const POS: React.FC = () => {
          cancelText: t.cancel,
          onConfirm: () => {
             const cancelOrder = async (approval?: { id: number }) => {
-               if (activeTableOrder) {
+               for (const round of activeTableOrders) {
                   await updateOrderStatus(
-                     activeTableOrder.id,
+                     round.id,
                      OrderStatus.CANCELLED,
                      undefined,
                      lang === 'ar' ? 'إلغاء أوردر صالة من نقطة البيع' : 'Dine-in order cancelled from POS',
@@ -1756,7 +1875,7 @@ const POS: React.FC = () => {
                   'error',
                ));
             } else {
-               requestManagerApproval('VOID_ORDER', cancelOrder, activeTableOrder?.id);
+               requestManagerApproval('VOID_ORDER', cancelOrder, activeTableOrders[0]?.id);
             }
          }
       });
@@ -2369,6 +2488,7 @@ const POS: React.FC = () => {
                             onDeliveryZoneChange={(zoneId) => setSelectedDeliveryZoneId(zoneId)}
                             onDeliveryZonesChange={setDeliveryZones}
                             deliveryFee={posDeliveryFee}
+                            lockedRounds={lockedTableRounds}
                          />
                      )}
                   </div>

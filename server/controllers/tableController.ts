@@ -402,6 +402,68 @@ const findActiveOrderByTable = async (tx: any, tableId: string, branchId: string
     return order || null;
 };
 
+// ALL open rounds on a table, oldest first. A dine-in table holds one order
+// per kitchen send — table-level operations (transfer/split/merge/close)
+// must see every round, never just the linked (latest) one.
+const findActiveOrdersByTable = async (tx: any, tableId: string, branchId: string) => {
+    const [table] = await tx.select({ currentOrderId: tables.currentOrderId, status: tables.status })
+        .from(tables)
+        .where(and(eq(tables.id, tableId), eq(tables.branchId, branchId)))
+        .top(1);
+    if (!table || String(table.status).toUpperCase() === 'AVAILABLE') return [];
+    const rows = await tx.select().from(orders).where(and(
+        eq(orders.tableId, tableId),
+        eq(orders.branchId, branchId),
+        notInArray(orders.status, TERMINAL_ORDER_STATUSES),
+    ));
+    rows.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return rows;
+};
+
+// After items leave a table, either free it (no open rounds left) or repoint
+// its link at the latest remaining round — never leave the link dangling at
+// an emptied order while other rounds still owe money.
+const repointSourceTableLink = async (tx: any, tableId: string, branchId: string) => {
+    const remaining = await findActiveOrdersByTable(tx, tableId, branchId);
+    const live = remaining.filter((order: any) => Number(order.subtotal || 0) > 0);
+    const effective = live.length > 0 ? live : remaining;
+    if (effective.length === 0) {
+        await tx.update(tables).set({
+            status: 'AVAILABLE',
+            currentOrderId: null,
+            updatedAt: new Date(),
+        }).where(and(eq(tables.id, tableId), eq(tables.branchId, branchId)));
+        return null;
+    }
+    const latest = effective[effective.length - 1];
+    await tx.update(tables).set({
+        status: 'OCCUPIED',
+        currentOrderId: latest.id,
+        updatedAt: new Date(),
+    }).where(and(eq(tables.id, tableId), eq(tables.branchId, branchId)));
+    return latest;
+};
+
+const completeEmptiedOrder = async (tx: any, orderId: string, userId: string | undefined, notes: string) => {
+    const [order] = await tx.select({ id: orders.id, subtotal: orders.subtotal }).top(1)
+        .from(orders).where(eq(orders.id, orderId));
+    if (!order || Number(order.subtotal || 0) > 0) return null;
+    const now = new Date();
+    const [completed] = await tx.update(orders).set({
+        status: 'COMPLETED',
+        completedAt: now,
+        updatedAt: now,
+    }).output().where(eq(orders.id, orderId));
+    await tx.insert(orderStatusHistory).values({
+        orderId,
+        status: 'COMPLETED',
+        changedBy: userId,
+        notes,
+        createdAt: now,
+    });
+    return completed || null;
+};
+
 const assertTablePairInBranch = async (tx: any, sourceTableId: string, targetTableId: string, branchId: string) => {
     const rows = await tx.select({ id: tables.id }).from(tables).where(and(
         eq(tables.branchId, branchId),
@@ -470,10 +532,16 @@ const recalcOrderTotals = async (tx: any, orderId: string) => {
 
 const pickItemsToMove = async (
     tx: any,
-    sourceOrderId: string,
+    sourceOrderIds: string[],
     selectedItems: Array<{ id?: string | number; name?: string; price?: number; quantity?: number }>
 ) => {
-    const sourceItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, sourceOrderId));
+    const ids = Array.from(new Set((sourceOrderIds || []).map(String).filter(Boolean)));
+    if (ids.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
+    const rows = await tx.select().from(orderItems).where(inArray(orderItems.orderId, ids));
+    // Oldest round first so partial picks drain earlier tickets before later ones.
+    const rank = new Map(ids.map((id, index) => [id, index]));
+    const sourceItems = rows.sort((a: any, b: any) =>
+        (rank.get(String(a.orderId)) ?? 0) - (rank.get(String(b.orderId)) ?? 0));
     if (!selectedItems || selectedItems.length === 0) {
         return sourceItems;
     }
@@ -617,16 +685,20 @@ export const transferTableOrder = async (req: Request, res: Response) => {
 
         const result = await db.transaction(async (tx) => {
             await assertTablePairInBranch(tx, String(sourceTableId), String(targetTableId), branchId);
-            const sourceOrder = await findActiveOrderByTable(tx, String(sourceTableId), branchId);
-            if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
+            // Move EVERY open round — moving only the linked one would orphan
+            // earlier rounds on a table that is about to be marked AVAILABLE.
+            const sourceOrders = await findActiveOrdersByTable(tx, String(sourceTableId), branchId);
+            if (sourceOrders.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
             const targetOrder = await findActiveOrderByTable(tx, String(targetTableId), branchId);
             if (targetOrder) throw new Error('TARGET_TABLE_HAS_ACTIVE_ORDER');
 
-            const [movedOrder] = await tx.update(orders).set({
+            const movedIds = sourceOrders.map((order: any) => String(order.id));
+            await tx.update(orders).set({
                 tableId: String(targetTableId),
                 updatedAt: new Date(),
-            }).output().where(eq(orders.id, sourceOrder.id));
+            }).where(inArray(orders.id, movedIds));
+            const [movedOrder] = await tx.select().top(1).from(orders).where(eq(orders.id, movedIds[movedIds.length - 1]));
 
             await tx.update(tables).set({
                 status: 'AVAILABLE',
@@ -640,13 +712,15 @@ export const transferTableOrder = async (req: Request, res: Response) => {
                 updatedAt: new Date(),
             }).where(and(eq(tables.id, String(targetTableId)), eq(tables.branchId, branchId)));
 
-            return { movedOrder };
+            return { movedOrder, movedOrderIds: movedIds };
         });
 
         try {
             if (result.movedOrder?.branchId) {
                 const room = `branch:${result.movedOrder.branchId}`;
-                getIO().to(room).emit('order:status', { id: result.movedOrder.id, status: result.movedOrder.status });
+                for (const movedId of result.movedOrderIds || [result.movedOrder.id]) {
+                    getIO().to(room).emit('order:status', { id: movedId, status: result.movedOrder.status });
+                }
                 getIO().to(room).emit('table:status', { id: sourceTableId, status: 'AVAILABLE', currentOrderId: null });
                 getIO().to(room).emit('table:status', { id: targetTableId, status: 'OCCUPIED', currentOrderId: result.movedOrder.id });
             }
@@ -666,7 +740,7 @@ export const transferTableOrder = async (req: Request, res: Response) => {
 
 export const splitTableOrder = async (req: Request, res: Response) => {
     try {
-        const { sourceTableId, targetTableId, items, reference_id } = req.body || {};
+        const { sourceTableId, targetTableId, items, sourceOrderIds, reference_id } = req.body || {};
         const branchId = req.effectiveBranchId;
         const replayId = reference_id ? String(reference_id) : '';
         if (!sourceTableId || !targetTableId || !branchId) {
@@ -682,13 +756,21 @@ export const splitTableOrder = async (req: Request, res: Response) => {
 
         const result = await db.transaction(async (tx) => {
             await assertTablePairInBranch(tx, String(sourceTableId), String(targetTableId), branchId);
-            const sourceOrder = await findActiveOrderByTable(tx, String(sourceTableId), branchId);
-            if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
+            const sourceRounds = await findActiveOrdersByTable(tx, String(sourceTableId), branchId);
+            if (sourceRounds.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
+            const requestedIds = Array.from(new Set(
+                (Array.isArray(sourceOrderIds) ? sourceOrderIds : []).map(String).filter(Boolean),
+            ));
+            const knownIds = new Set(sourceRounds.map((order: any) => String(order.id)));
+            const effectiveIds = (requestedIds.length > 0 ? requestedIds : sourceRounds.map((order: any) => String(order.id)))
+                .filter((id) => knownIds.has(id));
+            if (effectiveIds.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
+            const sourceOrder = sourceRounds.find((order: any) => String(order.id) === effectiveIds[effectiveIds.length - 1]) || sourceRounds[sourceRounds.length - 1];
 
             const targetOrder = await findActiveOrderByTable(tx, String(targetTableId), branchId);
             if (targetOrder) throw new Error('TARGET_TABLE_HAS_ACTIVE_ORDER');
 
-            const pickedItems = await pickItemsToMove(tx, sourceOrder.id, Array.isArray(items) ? items : []);
+            const pickedItems = await pickItemsToMove(tx, effectiveIds, Array.isArray(items) ? items : []);
             if (pickedItems.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
             const [branch] = await tx.select({ businessDate: branches.businessDate }).top(1)
@@ -696,7 +778,24 @@ export const splitTableOrder = async (req: Request, res: Response) => {
             const businessDate = sourceOrder.businessDate || branch?.businessDate;
             if (!businessDate) throw new Error('BUSINESS_DATE_REQUIRED');
             const orderNumber = await allocateDailyOrderNumber(tx, branchId, businessDate);
-            const movedDiscount = movedDiscountAmount(sourceOrder, pickedItems);
+            // Discount travels proportionally with the moved lines, per round.
+            const pickedByOrder = new Map<string, any[]>();
+            for (const item of pickedItems) {
+                const key = String((item as any).orderId);
+                if (!pickedByOrder.has(key)) pickedByOrder.set(key, []);
+                pickedByOrder.get(key)!.push(item);
+            }
+            let movedDiscount = 0;
+            for (const round of sourceRounds) {
+                const picked = pickedByOrder.get(String(round.id)) || [];
+                if (picked.length === 0) continue;
+                const part = movedDiscountAmount(round, picked);
+                movedDiscount = money(movedDiscount + part);
+                await tx.update(orders).set({
+                    discount: money(Number(round.discount || 0) - part),
+                    updatedAt: new Date(),
+                }).where(eq(orders.id, round.id));
+            }
 
             const newOrderId = `split-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             const [newOrder] = await tx.insert(orders).output().values({
@@ -731,14 +830,18 @@ export const splitTableOrder = async (req: Request, res: Response) => {
                 updatedAt: new Date(),
             });
 
-            await tx.update(orders).set({
-                discount: money(Number(sourceOrder.discount || 0) - movedDiscount),
-                updatedAt: new Date(),
-            }).where(eq(orders.id, sourceOrder.id));
             await movePickedItems(tx, pickedItems, newOrder.id);
 
+            for (const round of sourceRounds) {
+                await recalcOrderTotals(tx as any, round.id);
+                await completeEmptiedOrder(tx, round.id, req.user?.id, 'Split to another table');
+            }
             const updatedSource = await recalcOrderTotals(tx as any, sourceOrder.id);
             const updatedTarget = await recalcOrderTotals(tx as any, newOrder.id);
+            // The source table stays alive while ANY round still owes money;
+            // its link repoints at the latest remaining round (an emptied
+            // linked order must not stay linked while other rounds are open).
+            await repointSourceTableLink(tx, String(sourceTableId), branchId);
 
             await tx.update(tables).set({
                 status: 'OCCUPIED',
@@ -773,7 +876,7 @@ export const splitTableOrder = async (req: Request, res: Response) => {
 
 export const mergeTableOrders = async (req: Request, res: Response) => {
     try {
-        const { sourceTableId, targetTableId, items, reference_id } = req.body || {};
+        const { sourceTableId, targetTableId, items, sourceOrderIds, reference_id } = req.body || {};
         const branchId = req.effectiveBranchId;
         const replayId = reference_id ? String(reference_id) : '';
         if (!sourceTableId || !targetTableId || !branchId) {
@@ -789,47 +892,55 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
 
         const result = await db.transaction(async (tx) => {
             await assertTablePairInBranch(tx, String(sourceTableId), String(targetTableId), branchId);
-            const sourceOrder = await findActiveOrderByTable(tx, String(sourceTableId), branchId);
-            if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
+            const sourceRounds = await findActiveOrdersByTable(tx, String(sourceTableId), branchId);
+            if (sourceRounds.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
+            const requestedIds = Array.from(new Set(
+                (Array.isArray(sourceOrderIds) ? sourceOrderIds : []).map(String).filter(Boolean),
+            ));
+            const knownIds = new Set(sourceRounds.map((order: any) => String(order.id)));
+            const effectiveIds = (requestedIds.length > 0 ? requestedIds : sourceRounds.map((order: any) => String(order.id)))
+                .filter((id) => knownIds.has(id));
+            if (effectiveIds.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
             const targetOrder = await findActiveOrderByTable(tx, String(targetTableId), branchId);
             if (!targetOrder) throw new Error('TARGET_ORDER_NOT_FOUND');
 
-            const pickedItems = await pickItemsToMove(tx, sourceOrder.id, Array.isArray(items) ? items : []);
+            const pickedItems = await pickItemsToMove(tx, effectiveIds, Array.isArray(items) ? items : []);
             if (pickedItems.length === 0) throw new Error('NO_ITEMS_SELECTED');
-            const movedDiscount = movedDiscountAmount(sourceOrder, pickedItems);
-            await tx.update(orders).set({
-                discount: money(Number(sourceOrder.discount || 0) - movedDiscount),
-                updatedAt: new Date(),
-            }).where(eq(orders.id, sourceOrder.id));
+            const pickedByOrder = new Map<string, any[]>();
+            for (const item of pickedItems) {
+                const key = String((item as any).orderId);
+                if (!pickedByOrder.has(key)) pickedByOrder.set(key, []);
+                pickedByOrder.get(key)!.push(item);
+            }
+            let movedDiscount = 0;
+            for (const round of sourceRounds) {
+                const picked = pickedByOrder.get(String(round.id)) || [];
+                if (picked.length === 0) continue;
+                const part = movedDiscountAmount(round, picked);
+                movedDiscount = money(movedDiscount + part);
+                await tx.update(orders).set({
+                    discount: money(Number(round.discount || 0) - part),
+                    updatedAt: new Date(),
+                }).where(eq(orders.id, round.id));
+            }
             await tx.update(orders).set({
                 discount: money(Number(targetOrder.discount || 0) + movedDiscount),
                 updatedAt: new Date(),
             }).where(eq(orders.id, targetOrder.id));
             await movePickedItems(tx, pickedItems, targetOrder.id);
 
-            const updatedSource = await recalcOrderTotals(tx as any, sourceOrder.id);
+            for (const round of sourceRounds) {
+                await recalcOrderTotals(tx as any, round.id);
+                await completeEmptiedOrder(tx, round.id, req.user?.id, 'Merged into another table');
+            }
+            const linkedSource = sourceRounds.find((order: any) => effectiveIds.includes(String(order.id))) || sourceRounds[sourceRounds.length - 1];
+            const updatedSource = await recalcOrderTotals(tx as any, linkedSource.id);
             const updatedTarget = await recalcOrderTotals(tx as any, targetOrder.id);
 
-            if (!updatedSource || Number(updatedSource.subtotal || 0) <= 0) {
-                await tx.update(orders).set({
-                    status: 'COMPLETED',
-                    completedAt: new Date(),
-                    updatedAt: new Date(),
-                }).where(eq(orders.id, sourceOrder.id));
-                await tx.insert(orderStatusHistory).values({
-                    orderId: sourceOrder.id,
-                    status: 'COMPLETED',
-                    changedBy: req.user?.id,
-                    notes: 'Merged into another table',
-                    createdAt: new Date(),
-                });
-                await tx.update(tables).set({
-                    status: 'AVAILABLE',
-                    currentOrderId: null,
-                    updatedAt: new Date(),
-                }).where(and(eq(tables.id, String(sourceTableId)), eq(tables.branchId, branchId)));
-            }
+            // Free the source table only when EVERY round is settled;
+            // otherwise repoint its link at the latest remaining round.
+            const sourceLink = await repointSourceTableLink(tx, String(sourceTableId), branchId);
 
             await tx.update(tables).set({
                 status: 'OCCUPIED',
@@ -837,9 +948,9 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
                 updatedAt: new Date(),
             }).where(and(eq(tables.id, String(targetTableId)), eq(tables.branchId, branchId)));
 
-            const [freshSource] = await tx.select().top(1).from(orders).where(eq(orders.id, sourceOrder.id));
+            const [freshSource] = await tx.select().top(1).from(orders).where(eq(orders.id, linkedSource.id));
             const [freshTarget] = await tx.select().top(1).from(orders).where(eq(orders.id, targetOrder.id));
-            return { sourceOrder: freshSource, targetOrder: freshTarget };
+            return { sourceOrder: freshSource, targetOrder: freshTarget, sourceTableOpen: !!sourceLink, sourceLinkId: sourceLink?.id || null };
         });
 
         try {
@@ -848,8 +959,7 @@ export const mergeTableOrders = async (req: Request, res: Response) => {
                 const room = `branch:${branchId}`;
                 if (result.sourceOrder) getIO().to(room).emit('order:status', { id: result.sourceOrder.id, status: result.sourceOrder.status });
                 if (result.targetOrder) getIO().to(room).emit('order:status', { id: result.targetOrder.id, status: result.targetOrder.status });
-                const sourceClosed = result.sourceOrder?.status === 'COMPLETED';
-                getIO().to(room).emit('table:status', { id: sourceTableId, status: sourceClosed ? 'AVAILABLE' : 'OCCUPIED', currentOrderId: sourceClosed ? null : result.sourceOrder?.id });
+                getIO().to(room).emit('table:status', { id: sourceTableId, status: result.sourceTableOpen ? 'OCCUPIED' : 'AVAILABLE', currentOrderId: result.sourceLinkId });
                 getIO().to(room).emit('table:status', { id: targetTableId, status: 'OCCUPIED', currentOrderId: result.targetOrder?.id });
             }
         } catch {

@@ -10,7 +10,7 @@ import { Table, Order, TableStatus, OrderStatus, PaymentMethod } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getTableManagementView, TableManagementMode } from '../tableManagementFlow';
 import { getActionableErrorMessage } from '@/services/api';
-import { findActiveTableOrder } from '@/utils/tableOrder';
+import { findActiveTableOrder, getActiveTableOrders, sumTableOrdersTotal } from '@/utils/tableOrder';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 interface TableManagementModalProps {
@@ -77,6 +77,18 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
         [orders, allTables, sourceTable.id],
     );
 
+    // A table can hold several open rounds (one order per kitchen send).
+    // Everything bill-related (items, totals, pay, transfer) aggregates ALL
+    // of them — the linked order alone would read as "half the bill".
+    const tableOrders = useMemo(
+        () => getActiveTableOrders(orders, allTables, sourceTable.id),
+        [orders, allTables, sourceTable.id],
+    );
+    const tableItems = useMemo(
+        () => tableOrders.flatMap(order => order.items || []),
+        [tableOrders],
+    );
+
     const availableTables = useMemo(() =>
         allTables.filter(t => t.id !== sourceTable.id && t.status === TableStatus.AVAILABLE),
         [allTables, sourceTable.id]);
@@ -93,8 +105,9 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
         ),
         [allTables, sourceTable.id]);
 
-    // Live totals per table (single active order each — never summed twice),
-    // so merge/transfer targets show their real open value.
+    // Live totals per table = sum of ALL open rounds (same aggregation as
+    // the floor map). Each order is counted once under its own table, so
+    // nothing is ever summed twice.
     const liveTotals = useMemo(() => {
         const seen = new Set<string>();
         const map: Record<string, number> = {};
@@ -103,12 +116,10 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
             seen.add(o.id);
             if (!o.tableId) continue;
             if ([OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED].includes(o.status)) continue;
-            const link = allTables.find(tb => tb.id === o.tableId)?.currentOrderId;
-            if (link && link !== o.id) continue;
-            if (map[o.tableId] === undefined) map[o.tableId] = Number(o.total || 0);
+            map[o.tableId] = Number(map[o.tableId] || 0) + Number(o.total || 0);
         }
         return map;
-    }, [orders, allTables]);
+    }, [orders]);
 
     const elapsedMinutes = useMemo(() => {
         if (!activeOrder?.createdAt) return null;
@@ -116,13 +127,13 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
     }, [activeOrder]);
     const isUrgent = !!elapsedMinutes && elapsedMinutes > URGENT_MINUTES;
 
-    const itemsCount = (activeOrder?.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
-    const orderTotal = Number(activeOrder?.total || 0);
+    const itemsCount = tableItems.reduce((s, i) => s + (i.quantity || 0), 0);
+    const orderTotal = sumTableOrdersTotal(tableOrders);
     const selectedTotal = useMemo(() =>
-        (activeOrder?.items || [])
+        tableItems
             .filter(i => selectedItems.includes(i.cartId))
             .reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0),
-        [activeOrder, selectedItems]);
+        [tableItems, selectedItems]);
 
     const toggleItem = (cartId: string) => {
         setSelectedItems(prev =>
@@ -657,15 +668,15 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
                 </div>
                 <button
                     type="button"
-                    onClick={() => setSelectedItems(selectedItems.length === (activeOrder?.items?.length ?? 0)
+                    onClick={() => setSelectedItems(selectedItems.length === (tableItems?.length ?? 0)
                         ? []
-                        : (activeOrder?.items ?? []).map(item => item.cartId))}
+                        : (tableItems ?? []).map(item => item.cartId))}
                     className="mb-3 text-[11px] font-black text-primary hover:underline"
                 >
-                    {selectedItems.length === (activeOrder?.items?.length ?? 0) ? t.clear_selection : t.select_all}
+                    {selectedItems.length === (tableItems?.length ?? 0) ? t.clear_selection : t.select_all}
                 </button>
                 <div className="space-y-2">
-                    {(activeOrder?.items ?? []).map(item => {
+                    {(tableItems ?? []).map(item => {
                         const checked = selectedItems.includes(item.cartId);
                         return (
                             <div
@@ -695,7 +706,7 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
                         );
                     })}
                 </div>
-                {(activeOrder?.items ?? []).length === 0 && (
+                {(tableItems ?? []).length === 0 && (
                     <div className="py-12 flex flex-col items-center justify-center text-muted border-2 border-dashed border-border/40 rounded-3xl bg-elevated/20">
                         <ArrowLeftRight size={30} className="opacity-20 mb-3" />
                         <p className="text-[11px] font-black uppercase tracking-widest">{t.no_items_move}</p>

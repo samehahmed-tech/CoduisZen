@@ -8,7 +8,7 @@ import { syncService } from '../services/syncService';
 import { useAuthStore } from './useAuthStore';
 import { translations } from '../services/translations';
 import { branchEntityCacheKey, fromBranchEntityCache, toBranchEntityCache } from '../src/utils/branchEntityCache';
-import { findActiveTableOrder } from '../utils/tableOrder';
+import { findActiveTableOrder, getActiveTableOrders } from '../utils/tableOrder';
 import { buildOrderDiscountPayload } from '../services/orderTotals';
 
 const isClientOnlyItemId = (value: unknown) => {
@@ -946,11 +946,15 @@ export const useOrderStore = create<OrderState>()(
                 const branchId = useAuthStore.getState().settings.activeBranchId;
                 if (!branchId) throw new Error('BRANCH_SCOPE_REQUIRED');
                 if (!navigator.onLine) throw new Error('TABLE_MANAGEMENT_REQUIRES_ONLINE');
-                const sourceOrder = findActiveTableOrder(state.orders, state.tables, sourceId);
+                // A table can hold several open rounds — selected lines may
+                // live on ANY of them, not just the linked (latest) one.
+                const sourceRounds = getActiveTableOrders(state.orders, state.tables, sourceId);
                 const targetOrder = findActiveTableOrder(state.orders, state.tables, targetId);
-                if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
+                if (sourceRounds.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
-                const itemsToMove = sourceOrder.items.filter(i => itemIds.includes(i.cartId));
+                const itemsToMove = sourceRounds.flatMap(round =>
+                    (round.items || []).filter(i => itemIds.includes(i.cartId)).map(i => ({ ...i, __roundId: round.id })),
+                );
                 if (itemsToMove.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
                 try {
@@ -960,12 +964,14 @@ export const useOrderStore = create<OrderState>()(
                         price: Number(i.price || 0),
                         quantity: Number(i.quantity || 1),
                     }));
+                    const sourceOrderIds = Array.from(new Set(itemsToMove.map(i => (i as any).__roundId)));
                     if (targetOrder) {
                         await tablesApi.merge({
                             sourceTableId: sourceId,
                             targetTableId: targetId,
                             branchId,
                             items: payloadItems,
+                            sourceOrderIds,
                             reference_id: `table-merge:${sourceId}:${targetId}:${Date.now()}`,
                         });
                     } else {
@@ -974,6 +980,7 @@ export const useOrderStore = create<OrderState>()(
                             targetTableId: targetId,
                             branchId,
                             items: payloadItems,
+                            sourceOrderIds,
                             reference_id: `table-split:${sourceId}:${targetId}:${Date.now()}`,
                         });
                     }
@@ -992,10 +999,12 @@ export const useOrderStore = create<OrderState>()(
                 const branchId = useAuthStore.getState().settings.activeBranchId;
                 if (!branchId) throw new Error('BRANCH_SCOPE_REQUIRED');
                 if (!navigator.onLine) throw new Error('TABLE_MANAGEMENT_REQUIRES_ONLINE');
-                const sourceOrder = findActiveTableOrder(state.orders, state.tables, sourceId);
-                if (!sourceOrder) throw new Error('SOURCE_ORDER_NOT_FOUND');
+                const sourceRounds = getActiveTableOrders(state.orders, state.tables, sourceId);
+                if (sourceRounds.length === 0) throw new Error('SOURCE_ORDER_NOT_FOUND');
 
-                const itemsToMove = sourceOrder.items.filter(i => itemIds.includes(i.cartId));
+                const itemsToMove = sourceRounds.flatMap(round =>
+                    (round.items || []).filter(i => itemIds.includes(i.cartId)).map(i => ({ ...i, __roundId: round.id })),
+                );
                 if (itemsToMove.length === 0) throw new Error('NO_ITEMS_SELECTED');
 
                 try {
@@ -1005,11 +1014,13 @@ export const useOrderStore = create<OrderState>()(
                         price: Number(i.price || 0),
                         quantity: Number(i.quantity || 1),
                     }));
+                    const sourceOrderIds = Array.from(new Set(itemsToMove.map(i => (i as any).__roundId)));
                     await tablesApi.split({
                         sourceTableId: sourceId,
                         targetTableId: targetId,
                         branchId,
                         items: payloadItems,
+                        sourceOrderIds,
                         reference_id: `table-split:${sourceId}:${targetId}:${Date.now()}`,
                     });
                     await get().fetchOrders({ branch_id: branchId, limit: 500 });
