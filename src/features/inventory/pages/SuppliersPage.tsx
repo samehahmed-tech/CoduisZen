@@ -8,10 +8,12 @@ const SuppliersPage: React.FC = () => {
   const {
     lang, inventoryError, clearError,
     searchQuery, setSearchQuery, filteredSuppliers,
-    supplierForm, setSupplierForm, handleUpsertSupplier, handleDeactivateSupplier,
+    supplierForm, setSupplierForm, handleUpsertSupplier, handleDeactivateSupplier, handleReactivateSupplier,
     activeInventory, activeWarehouses, suppliers,
     returnModalOpen, setReturnModalOpen, handleSupplierReturn,
   } = useInventoryWorkspace();
+  const activeSuppliers = filteredSuppliers.filter((s: any) => s.isActive !== false);
+  const inactiveSuppliers = filteredSuppliers.filter((s: any) => s.isActive === false);
 
   return (
     <InvPageShell>
@@ -79,7 +81,7 @@ const SuppliersPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredSuppliers.map((s) => (
+              {activeSuppliers.map((s) => (
                   <tr key={s.id} className="hover:bg-indigo-500/5 transition-colors group">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-4">
@@ -122,6 +124,30 @@ const SuppliersPage: React.FC = () => {
                   </td>
                 </tr>
               )}
+              {inactiveSuppliers.map((s) => (
+                  <tr key={s.id} className="opacity-60 hover:opacity-100 transition-opacity">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-500/10 text-muted flex items-center justify-center font-black text-lg border border-border/30">
+                          {(lang === 'ar' ? s.nameAr || s.name : s.name).charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-main text-[13px] uppercase tracking-tight">{lang === 'ar' ? s.nameAr || s.name : s.name}</div>
+                          <div className="text-[10px] text-muted/60 font-bold">{lang === 'ar' ? 'موقوف' : 'Suspended'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="text-[11px] font-bold text-muted">{s.phone || '-'} <span className="opacity-30">|</span> {s.email || '-'}</div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className="text-muted/50 text-xs">-</span>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <button onClick={() => handleReactivateSupplier(s.id)} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">{lang === 'ar' ? 'إعادة تفعيل' : 'Re-enable'}</button>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

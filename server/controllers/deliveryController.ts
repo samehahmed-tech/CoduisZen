@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { deliveryZones, drivers, orders, orderItems, payments, settings, driverTelemetry, driverTelemetryLatest, users, employees, driverCashLedger } from '../../src/db/schema';
+import { deliveryZones, drivers, orders, orderItems, payments, settings, driverTelemetry, driverTelemetryLatest, users, employees, driverCashLedger, customers, customerAddresses } from '../../src/db/schema';
 import { eq, and, desc, or, inArray, sql } from 'drizzle-orm';
 import { transitionOrderStatus } from '../services/orderLifecycleService';
 import { getIO } from '../socket';
@@ -164,6 +164,7 @@ const emitDriverStatus = (driver: { id: string; branchId?: string | null; status
 
 /** delivery_zones.branch_id is optional: NULL = all branches (global zone). */
 let deliveryZoneBranchNullableReady: Promise<void> | null = null;
+let deliveryZoneGeoReady: Promise<void> | null = null;
 const ensureDeliveryZoneBranchNullable = () => {
     if (!deliveryZoneBranchNullableReady) {
         deliveryZoneBranchNullableReady = db.execute(sql`
@@ -182,6 +183,22 @@ const ensureDeliveryZoneBranchNullable = () => {
     return deliveryZoneBranchNullableReady;
 };
 
+/** Older databases predate the zone center pin (lat/lng) — add them nullable. */
+const ensureDeliveryZoneGeo = () => {
+    if (!deliveryZoneGeoReady) {
+        deliveryZoneGeoReady = db.execute(sql`
+            IF COL_LENGTH('delivery_zones', 'lat') IS NULL
+                ALTER TABLE delivery_zones ADD lat real NULL;
+            IF COL_LENGTH('delivery_zones', 'lng') IS NULL
+                ALTER TABLE delivery_zones ADD lng real NULL
+        `).then(() => undefined).catch((err: any) => {
+            deliveryZoneGeoReady = null;
+            throw err;
+        });
+    }
+    return deliveryZoneGeoReady;
+};
+
 const sanitizeZonePayload = (body: any) => {
     const name = String(body?.name || '').trim();
     const nameAr = String(body?.nameAr || body?.name_ar || '').trim() || null;
@@ -197,6 +214,7 @@ const sanitizeZonePayload = (body: any) => {
 export const getAllZones = async (req: Request, res: Response) => {
     try {
         await ensureDeliveryZoneBranchNullable().catch(() => {});
+        await ensureDeliveryZoneGeo().catch(() => {});
         const branchId = getStringParam(req.query.branchId);
         const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
         const conditions: any[] = [];
@@ -228,11 +246,16 @@ export const getAvailableDrivers = async (req: Request, res: Response) => {
 
 export const getDrivers = async (req: Request, res: Response) => {
     try {
-        const { branchId, status } = req.query;
-        const conditions: any[] = [eq(drivers.isActive, true)];
+        const { branchId, status, includeInactive } = req.query;
+        const conditions: any[] = [];
+        // Disabled pilots are hidden by default; the roster toggle passes
+        // includeInactive=1 so they can be reviewed and re-enabled.
+        if (String(includeInactive || '').toLowerCase() !== '1' && String(includeInactive || '').toLowerCase() !== 'true') {
+            conditions.push(eq(drivers.isActive, true));
+        }
         if (branchId) conditions.push(eq(drivers.branchId, branchId as string));
         if (status) conditions.push(eq(drivers.status, status as string));
-        const allDrivers = await db.select().from(drivers).where(and(...conditions)).orderBy(desc(drivers.createdAt));
+        const allDrivers = await db.select().from(drivers).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(drivers.createdAt));
         res.json(allDrivers);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -587,6 +610,7 @@ export const pickupOrder = async (req: Request, res: Response) => {
         // (WhatsApp) — the pilot learns it only from the customer at handover.
         // It is never exposed to dispatch screens (collusion-proof).
         let otp: string | null = null;
+        let otpSent = false;
         try {
             await ensureDeliveryOtpColumn();
             otp = String(Math.floor(1000 + Math.random() * 9000));
@@ -594,21 +618,35 @@ export const pickupOrder = async (req: Request, res: Response) => {
             const customerPhone = String((order as any).customerPhone || '').trim();
             if (customerPhone) {
                 const { sendWhatsAppText } = await import('../services/whatsappService');
+                const { signTrackToken } = await import('../utils/trackToken');
                 const baseUrl = String(process.env.PUBLIC_TRACKING_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
-                const trackPart = baseUrl ? ` — تابع طلبك لحظة بلحظة: ${baseUrl}/t/${orderId}` : '';
+                const token = signTrackToken(orderId);
+                const trackPart = baseUrl && token ? ` — تابع طلبك لحظة بلحظة: ${baseUrl}/t/${orderId}?t=${token}` : '';
+                // Report the REAL send outcome: a swallowed failure previously
+                // returned otpSent=true while the customer got nothing, and the
+                // pilot was later blocked by OTP_MISMATCH with no warning.
                 await sendWhatsAppText({
                     to: customerPhone,
                     text: `كود استلام طلبك #${(order as any).orderNumber || orderId}: ${otp} — أعطه للطيار عند الاستلام.${trackPart}`,
-                }).catch(() => undefined);
+                });
+                otpSent = true;
             }
-        } catch { otp = null; /* OTP is enforcement-level only when stored */ }
+        } catch { otp = null; otpSent = false; /* OTP is enforcement-level only when stored */ }
         await db.update(drivers).set({ status: 'BUSY' }).where(inArray(drivers.id, driverIds));
         try {
             if (order.branchId) getIO().to(`branch:${order.branchId}`).emit('driver:status', { id: driverIds[0], status: 'BUSY' });
         } catch { /* socket optional */ }
         // Never return the OTP to the driver app: the pilot must collect it
         // from the customer at handover (sent to the customer by WhatsApp).
-        res.json({ ok: true, status: 'OUT_FOR_DELIVERY', otpSent: Boolean(otp) });
+        // When delivery failed, say so explicitly so the branch can fall back
+        // (call the customer / manager-PIN path) instead of discovering it at
+        // a blocked handover.
+        res.json({
+            ok: true,
+            status: 'OUT_FOR_DELIVERY',
+            otpSent,
+            ...(!otpSent && otp ? { otpWarning: 'WHATSAPP_SEND_FAILED' } : {}),
+        });
     } catch (error: any) {
         res.status(Number(error?.status) || 500).json({ error: error?.code || error?.message || 'PICKUP_FAILED' });
     }
@@ -760,8 +798,31 @@ export const failDelivery = async (req: Request, res: Response) => {
         const reason = String(req.body?.reason || '').trim().slice(0, 500);
         if (reason.length < 3) return res.status(400).json({ error: 'FAILURE_REASON_REQUIRED' });
 
-        const { ids: driverIds } = await resolveMyDriverIds(userId);
-        if (driverIds.length === 0) return res.status(404).json({ error: 'DRIVER_PROFILE_NOT_FOUND' });
+        let { ids: driverIds } = await resolveMyDriverIds(userId);
+        let actingAs: string = `driver:${userId}`;
+        if (driverIds.length === 0) {
+            // Dispatch-hub fallback: a manager recalling a road order the
+            // pilot cannot return themselves (mirrors the deliver fallback).
+            const role = String(req.user?.role || '').toUpperCase();
+            if (!['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CALL_CENTER_MANAGER', 'MANAGER'].includes(role)) {
+                return res.status(404).json({ error: 'DRIVER_PROFILE_NOT_FOUND' });
+            }
+            const [target] = await db.select({ driverId: orders.driverId, branchId: orders.branchId }).top(1).from(orders).where(eq(orders.id, orderId));
+            if (!target?.driverId) return res.status(404).json({ error: 'DRIVER_PROFILE_NOT_FOUND' });
+            const managerPin = String(req.body?.managerPin || '').trim();
+            if (!managerPin) return res.status(400).json({ error: 'MANAGER_PIN_REQUIRED' });
+            const approvers = await db.select({
+                id: users.id, name: users.name, role: users.role,
+                assignedBranchId: users.assignedBranchId, allowedBranches: users.allowedBranches,
+                managerPin: users.managerPin, pinCodeHash: users.pinCodeHash,
+                pinLoginEnabled: users.pinLoginEnabled, passwordHash: users.passwordHash,
+            }).from(users).where(eq(users.isActive, true));
+            const { findApproverByPin } = await import('../services/managerApprovalAuth');
+            const approver = await findApproverByPin(approvers as any, managerPin, String(target.branchId || ''));
+            if (!approver) return res.status(403).json({ error: 'INVALID_MANAGER_PIN' });
+            driverIds = [String(target.driverId)];
+            actingAs = `manager:${approver.id}`;
+        }
 
         const [order] = await db.select().top(1).from(orders).where(
             and(eq(orders.id, orderId), inArray(orders.driverId, driverIds)),
@@ -777,7 +838,7 @@ export const failDelivery = async (req: Request, res: Response) => {
             orderId,
             nextStatus: 'READY',
             notes: `Failed delivery returned to dispatch: ${reason}`,
-            changedBy: `driver:${userId}`,
+            changedBy: actingAs,
             skipPolicy: true,
             user: {
                 role: req.user?.role,
@@ -1145,6 +1206,17 @@ export const updateZone = async (req: Request, res: Response) => {
 export const deleteZone = async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
+        if (!Number.isFinite(id)) return res.status(400).json({ error: 'INVALID_ZONE_ID' });
+        // In-use guard: customers and saved addresses point at the zone —
+        // deleting would orphan fee/branch auto-pick. Deactivate instead.
+        const [usedBy] = await db.select({
+            customers: sql<number>`(SELECT COUNT(*) FROM customers WHERE zone_id = ${id})`,
+            addresses: sql<number>`(SELECT COUNT(*) FROM customer_addresses WHERE zone_id = ${id})`,
+        }).from(deliveryZones).where(eq(deliveryZones.id, id));
+        const usage = Number((usedBy as any)?.customers || 0) + Number((usedBy as any)?.addresses || 0);
+        if (usage > 0) {
+            return res.status(400).json({ error: 'ZONE_IN_USE', customers: Number((usedBy as any)?.customers || 0), addresses: Number((usedBy as any)?.addresses || 0) });
+        }
         await db.delete(deliveryZones).where(eq(deliveryZones.id, id));
         res.json({ success: true });
     } catch (e: any) {

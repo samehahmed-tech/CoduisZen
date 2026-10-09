@@ -1,0 +1,39 @@
+/* THEME · OBSIDIAN — executive dark: graphite ladder, restrained luminous accents */
+[data-theme="obsidian"] {
+    --primary: 79, 70, 229; --primary-hover: 67, 56, 202;
+    --secondary: 100, 116, 139; --accent: 79, 70, 229;
+    --bg-app: 244, 244, 245; --bg-card: 255, 255, 255; --bg-sidebar: 250, 250, 251;
+    --bg-elevated: 255, 255, 255; --bg-global: 244, 244, 245;
+    --text-main: 24, 24, 27; --text-muted: 113, 113, 122;
+    --border-color: 228, 228, 231; --border-subtle: 24 24 27 / 0.08;
+    --glass-bg: 255 255 255 / 0.85;
+    --success: 5, 150, 105; --warning: 202, 138, 4; --danger: 220, 38, 38; --info: 2, 132, 199;
+    --theme-page-bg: linear-gradient(180deg, #f4f4f5 0%, #e9e9ec 100%);
+    --theme-card-bg: #ffffff; --theme-card-hover-bg: #ffffff;
+    --theme-rail-bg: #fafafa; --theme-topbar-bg: rgba(255,255,255,0.92);
+    --theme-table-head-bg: #f0f0f2; --theme-row-hover-bg: rgba(79,70,229,0.05);
+    --theme-input-bg: #ffffff; --theme-button-bg: #4f46e5;
+    --theme-active-bg: rgba(79,70,229,0.09); --theme-focus-ring: rgba(79,70,229,0.32);
+    --theme-popup-bg: #ffffff;
+    --chart-1: 79, 70, 229; --chart-2: 2, 132, 199; --chart-3: 5, 150, 105; --chart-4: 202, 138, 4; --chart-5: 190, 18, 60;
+    --chart-grid: 24 24 27 / 0.08; --chart-tooltip-bg: rgba(255,255,255,0.97);
+}
+.dark [data-theme="obsidian"], [data-theme="obsidian"].dark {
+    --primary: 94, 106, 210; --primary-hover: 130, 143, 255;
+    --secondary: 138, 143, 152; --accent: 94, 106, 210;
+    --bg-app: 8, 9, 10; --bg-card: 15, 16, 17; --bg-sidebar: 11, 12, 13;
+    --bg-elevated: 28, 28, 31; --bg-global: 8, 9, 10;
+    --text-main: 247, 248, 248; --text-muted: 138, 143, 152;
+    --border-color: 35, 37, 42; --border-subtle: 94 106 210 / 0.16;
+    --glass-bg: 15 16 17 / 0.88;
+    --success: 39, 166, 68; --warning: 240, 191, 0; --danger: 235, 87, 87; --info: 78, 167, 252;
+    --theme-page-bg: radial-gradient(900px 380px at 50% -10%, rgba(94,106,210,0.07), transparent 60%), linear-gradient(180deg, #08090a 0%, #060708 100%);
+    --theme-card-bg: #0f1011; --theme-card-hover-bg: #141516;
+    --theme-rail-bg: #0b0c0d; --theme-topbar-bg: rgba(15,16,17,0.9);
+    --theme-table-head-bg: #08090a; --theme-row-hover-bg: rgba(94,106,210,0.07);
+    --theme-input-bg: #1c1c1f; --theme-button-bg: #5e6ad2;
+    --theme-active-bg: rgba(94,106,210,0.12); --theme-focus-ring: rgba(94,106,210,0.4);
+    --theme-popup-bg: #1c1c1f;
+    --chart-1: 94, 106, 210; --chart-2: 78, 167, 252; --chart-3: 39, 166, 68; --chart-4: 240, 191, 0; --chart-5: 235, 87, 87;
+    --chart-grid: 138 143 152 / 0.1; --chart-tooltip-bg: rgba(15,16,17,0.97);
+}

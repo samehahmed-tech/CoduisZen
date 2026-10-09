@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ChevronRight, Lock, Unlock, Fingerprint } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { approvalsApi } from '@/services/api/approval';
+import { getActionableErrorMessage } from '@/services/api/core';
 import { translations } from '@/services/translations';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -53,7 +54,7 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
                 setCredential('');
             }
         } catch (err) {
-            setError('Verification failed');
+            setError(getActionableErrorMessage(err, settings.language === 'ar' ? 'ar' : 'en'));
             setCredential('');
         } finally {
             setLoading(false);
@@ -112,10 +113,10 @@ export const ManagerApprovalModal: React.FC<ManagerApprovalModalProps> = ({ isOp
                                 inputMode={credentialType === 'password' ? 'text' : 'numeric'}
                                 autoComplete={credentialType === 'password' ? 'current-password' : 'off'}
                                 autoFocus
-                                maxLength={credentialType === 'password' ? 128 : 6}
+                                maxLength={credentialType === 'password' ? 128 : 12}
                                 value={credential}
-                                onChange={event => setCredential(credentialType === 'password' ? event.target.value : event.target.value.replace(/\D/g, '').slice(0, 6))}
-                                placeholder={credentialType === 'password' ? (isRTL ? 'اكتب باسورد المدير' : 'Enter manager password') : (isRTL ? 'اكتب PIN المدير' : 'Enter manager PIN')}
+                                onChange={event => setCredential(credentialType === 'password' ? event.target.value : event.target.value.replace(/\D/g, '').slice(0, 12))}
+                                placeholder={credentialType === 'password' ? (isRTL ? 'اكتب باسورد المدير' : 'Enter manager password') : (isRTL ? 'اكتب PIN المدير أو كود الخصم' : 'Enter manager PIN or discount code')}
                                 aria-label={credentialType === 'password' ? (isRTL ? 'باسورد المدير' : 'Manager password') : (isRTL ? 'PIN المدير' : 'Manager PIN')}
                                 className={`h-14 w-full rounded-2xl border border-border/40 bg-elevated/50 px-5 text-center font-mono text-2xl font-black text-main outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 ${credentialType === 'pin' ? 'tracking-[0.45em]' : 'tracking-normal'}`}
                             />

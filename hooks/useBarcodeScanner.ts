@@ -70,14 +70,17 @@ export function useBarcodeScanner(options: BarcodeScannerOptions) {
         if (!enabled) return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Don't intercept when typing in inputs/textareas
-            const target = e.target as HTMLElement;
-            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-            const isContentEditable = target.isContentEditable;
+            // Guard: global listener also fires for non-key events / IME /
+            // autofill where target or key may be missing. Never crash POS.
+            const target = e.target as HTMLElement | null;
+            const tagName = target?.tagName;
+            const isInput = tagName === 'INPUT' || tagName === 'TEXTAREA';
+            const isContentEditable = target?.isContentEditable === true;
 
             // Allow scanner input even in inputs if it's a scan sequence 
             // (detected by rapid keystroke timing)
-            const isScannerChar = e.key.length === 1 && /[a-zA-Z0-9\-_./]/.test(e.key);
+            const key = typeof e.key === 'string' ? e.key : '';
+            const isScannerChar = key.length === 1 && /[a-zA-Z0-9\-_./]/.test(key);
             const now = Date.now();
             const delta = now - lastInputAtRef.current;
 
@@ -116,7 +119,7 @@ export function useBarcodeScanner(options: BarcodeScannerOptions) {
             }
 
             // Enter terminates scanner sequence
-            if (e.key === 'Enter' && bufferRef.current.length >= minLength) {
+            if (key === 'Enter' && bufferRef.current.length >= minLength) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (flushTimerRef.current) window.clearTimeout(flushTimerRef.current);

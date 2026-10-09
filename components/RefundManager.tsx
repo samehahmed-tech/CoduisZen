@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { refundApi } from '../services/api/refunds';
 import { useAuthStore } from '../stores/useAuthStore';
+import { AppPermission } from '../types';
 import { translations } from '../services/translations';
 import ExportButton from './common/ExportButton';
 import { useToast } from './common/ToastProvider';
@@ -43,7 +44,8 @@ const STATUS_MAP: Record<string, { bg: string; text: string }> = {
 };
 
 const RefundManager: React.FC = () => {
-    const { settings } = useAuthStore();
+    const { settings, hasPermission } = useAuthStore();
+    const canProcessRefunds = hasPermission(AppPermission.OP_PROCESS_REFUND);
     const lang = settings.language || 'en';
     const t = translations[lang];
     const isAr = lang === 'ar';
@@ -62,6 +64,16 @@ const RefundManager: React.FC = () => {
     const [pendingAction, setPendingAction] = useState<string | null>(null);
     const [rejectRefundId, setRejectRefundId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [visibleCount, setVisibleCount] = useState(50);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedQuery(searchQuery.trim().toLowerCase());
+            setVisibleCount(50);
+        }, 250);
+        return () => window.clearTimeout(timer);
+    }, [searchQuery]);
 
     const loadRefunds = async () => {
         setIsLoading(true);
@@ -93,25 +105,41 @@ const RefundManager: React.FC = () => {
         }
     };
 
-    useEffect(() => { loadRefunds(); loadStats(); loadPolicy(); }, []);
-    useEffect(() => { loadRefunds(); }, [statusFilter]);
+    useEffect(() => { loadRefunds(); loadStats(); loadPolicy(); }, [settings.activeBranchId]);
+    useEffect(() => { loadRefunds(); }, [statusFilter, settings.activeBranchId]);
 
     const filtered = useMemo(() => {
-        if (!searchQuery) return refunds;
-        const q = searchQuery.toLowerCase();
-        return refunds.filter(r => r.orderId.toLowerCase().includes(q) || r.reason.toLowerCase().includes(q) || r.requestedByName?.toLowerCase().includes(q));
-    }, [refunds, searchQuery]);
+        if (!debouncedQuery) return refunds;
+        return refunds.filter(r => String(r.orderId || '').toLowerCase().includes(debouncedQuery) || String(r.reason || '').toLowerCase().includes(debouncedQuery) || String(r.requestedByName || '').toLowerCase().includes(debouncedQuery));
+    }, [refunds, debouncedQuery]);
+
+    const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
     const totals = useMemo(() => ({
         pending: refunds.filter(r => r.status === 'PENDING').length,
         approved: refunds.filter(r => r.status === 'APPROVED').length,
         processed: refunds.filter(r => r.status === 'PROCESSED').length,
         rejected: refunds.filter(r => r.status === 'REJECTED').length,
-        totalAmount: refunds.reduce((s, r) => s + (r.totalAmount || r.customAmount || 0), 0),
+        // Rejected requests move no money — counting them inflates exposure.
+        totalAmount: refunds
+            .filter(r => r.status !== 'REJECTED')
+            .reduce((s, r) => s + (r.totalAmount || r.customAmount || 0), 0),
     }), [refunds]);
 
+    const guardRefundPermission = () => {
+        if (canProcessRefunds) return true;
+        showError(tr('No permission to process refunds', 'لا توجد صلاحية لمعالجة الاسترداد'));
+        return false;
+    };
+
     const handleApprove = async (id: string) => {
-        if (pendingAction) return;
+        if (pendingAction || !guardRefundPermission()) return;
+        const target = refunds.find(r => r.id === id);
+        const amount = target ? (target.totalAmount || target.customAmount || 0) : 0;
+        if (!window.confirm(tr(
+            `Approve refund${amount ? ` of ${amount}` : ''}?`,
+            `الموافقة على الاسترداد${amount ? ` بمبلغ ${amount}` : ''}؟`,
+        ))) return;
         setPendingAction(`approve:${id}`);
         try { await refundApi.approveRefund(id); await loadRefunds(); await loadStats(); success(tr('Refund approved', 'تمت الموافقة على الاسترداد')); } catch (e: any) { showError(e.message); }
         finally { setPendingAction(null); }
@@ -138,7 +166,8 @@ const RefundManager: React.FC = () => {
     };
 
     const handleProcess = async (id: string) => {
-        if (pendingAction) return;
+        if (pendingAction || !guardRefundPermission()) return;
+        if (!window.confirm(tr('Execute this refund payout now?', 'تنفيذ دفع الاسترداد الآن؟'))) return;
         setPendingAction(`process:${id}`);
         try { await refundApi.processRefund(id); await loadRefunds(); await loadStats(); success(tr('Refund processed', 'تم تنفيذ الاسترداد')); } catch (e: any) { showError(e.message); }
         finally { setPendingAction(null); }
@@ -253,12 +282,12 @@ const RefundManager: React.FC = () => {
                                 <tbody className="divide-y divide-border/50">
                                     {isLoading && <tr><td colSpan={8} className="px-6 py-12 text-center text-muted text-sm">{tr('Loading...', 'جاري التحميل...')}</td></tr>}
                                     {!isLoading && filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-12 text-center text-muted text-sm">{tr('No refund requests found.', 'لا توجد طلبات استرداد.')}</td></tr>}
-                                    {filtered.map(r => {
+                                    {visible.map(r => {
                                         const st = STATUS_MAP[r.status] || STATUS_MAP.PENDING;
                                         return (
                                             <tr key={r.id} className="hover:bg-elevated/20 transition-all">
                                                 <td className="px-6 py-4">
-                                                    <p className="text-xs font-black text-main font-mono">#{r.orderId.slice(-8)}</p>
+                                                    <p className="text-xs font-black text-main font-mono">#{String(r.orderId || '').slice(-8)}</p>
                                                     <p className="text-[9px] text-muted">{r.type}</p>
                                                 </td>
                                                 <td className="px-4 py-4 text-[10px] font-bold text-main">{r.requestedByName || '—'}</td>
@@ -293,6 +322,11 @@ const RefundManager: React.FC = () => {
                             </table>
                         </div>
                     </div>
+                    {visibleCount < filtered.length && (
+                        <button onClick={() => setVisibleCount(c => c + 50)} className="w-full py-3 rounded-2xl border border-border bg-card text-[10px] font-black uppercase tracking-widest text-muted hover:text-main transition-colors">
+                            {tr(`Show more (${filtered.length - visibleCount} remaining)`, `عرض المزيد (${filtered.length - visibleCount} متبقي)`)}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -307,8 +341,8 @@ const RefundManager: React.FC = () => {
                         </div>
                         <div className="card-primary border border-border rounded-[2.5rem] p-6 shadow-sm">
                             <h3 className="text-xs font-black text-muted uppercase tracking-widest mb-4">{tr('Total Refunded', 'إجمالي المسترد')}</h3>
-                            <p className="text-4xl font-black text-rose-500">{(stats?.totalRefundedAmount || 0).toLocaleString()} <span className="text-lg text-muted">{currency}</span></p>
-                            <p className="text-[10px] text-muted mt-1">{tr('Average:', 'المتوسط:')} {(stats?.avgRefundAmount || 0).toFixed(0)} {currency}</p>
+                            <p className="text-4xl font-black text-rose-500">{(stats?.totalRefundedAmount ?? stats?.totalAmount ?? 0).toLocaleString()} <span className="text-lg text-muted">{currency}</span></p>
+                            <p className="text-[10px] text-muted mt-1">{tr('Average:', 'المتوسط:')} {(Number(stats?.avgRefundAmount || 0)).toFixed(0)} {currency}</p>
                         </div>
                         <div className="card-primary border border-border rounded-[2.5rem] p-6 shadow-sm">
                             <h3 className="text-xs font-black text-muted uppercase tracking-widest mb-4">{tr('Top Reason', 'أكثر سبب')}</h3>
@@ -318,12 +352,13 @@ const RefundManager: React.FC = () => {
                     </div>
 
                     {/* Reason Breakdown */}
-                    {stats?.reasonBreakdown && (
+                    {(stats?.reasonBreakdown || stats?.byCategory) && (
                         <div className="card-primary border border-border rounded-[2.5rem] p-6 shadow-sm">
                             <h3 className="text-xs font-black text-muted uppercase tracking-widest mb-6">{tr('Reason Breakdown', 'توزيع الأسباب')}</h3>
                             <div className="space-y-3">
-                                {(stats.reasonBreakdown || []).map((item: any, i: number) => {
-                                    const maxCount = Math.max(...(stats.reasonBreakdown || []).map((r: any) => r.count || 0), 1);
+                                {(stats.reasonBreakdown || Object.entries(stats.byCategory || {}).map(([reason, v]: any) => ({ reason, count: v.count }))).map((item: any, i: number) => {
+                                    const rows = stats.reasonBreakdown || Object.entries(stats.byCategory || {}).map(([reason, v]: any) => ({ reason, count: v.count }));
+                                    const maxCount = Math.max(...rows.map((r: any) => r.count || 0), 1);
                                     return (
                                         <div key={i} className="flex items-center gap-4">
                                             <p className="text-[10px] font-black text-muted w-36 truncate">{item.reason}</p>
@@ -350,20 +385,38 @@ const RefundManager: React.FC = () => {
                             { key: 'requireManagerApproval', label: tr('Require Manager Approval', 'يتطلب موافقة مدير'), type: 'toggle' },
                             { key: 'maxAutoApproveAmount', label: tr('Auto-Approve Limit (below this amount)', 'حد الموافقة التلقائية'), type: 'number' },
                             { key: 'allowPartialRefund', label: tr('Allow Partial Refunds', 'السماح بالاسترداد الجزئي'), type: 'toggle' },
-                        ].map(field => (
+                            { key: 'allowItemRefund', label: tr('Allow Item Refunds', 'السماح بمرتجع الأصناف'), type: 'toggle' },
+                            { key: 'autoRestockOnRefund', label: tr('Auto Restock On Refund', 'إرجاع تلقائي للمخزون'), type: 'toggle' },
+                        ].map(field => {
+                            const setPolicyField = (key: string, value: any) => {
+                                setPolicy((prev: any) => {
+                                    if (!prev) return prev;
+                                    const next = { ...prev, [key]: value };
+                                    // Keep canonical + alias keys in sync for backend compatibility
+                                    if (key === 'maxRefundDays') next.maxRefundWindowHours = Number(value) * 24;
+                                    if (key === 'maxRefundWindowHours') next.maxRefundDays = Number(value) / 24;
+                                    if (key === 'requireManagerApproval') next.requireManagerPin = Boolean(value);
+                                    if (key === 'requireManagerPin') next.requireManagerApproval = Boolean(value);
+                                    if (key === 'maxAutoApproveAmount') next.maxRefundWithoutApproval = Number(value);
+                                    if (key === 'maxRefundWithoutApproval') next.maxAutoApproveAmount = Number(value);
+                                    return next;
+                                });
+                            };
+                            return (
                             <div key={field.key} className="flex items-center justify-between p-4 bg-app rounded-2xl border border-border">
                                 <label className="text-xs font-black text-main uppercase tracking-widest">{field.label}</label>
                                 {field.type === 'toggle' ? (
-                                    <button onClick={() => setPolicy({ ...policy, [field.key]: !policy[field.key] })}
+                                    <button onClick={() => setPolicyField(field.key, !policy[field.key])}
                                         className={`w-12 h-6 rounded-full relative transition-all ${policy[field.key] ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
                                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${policy[field.key] ? 'right-1' : 'left-1'}`} />
                                     </button>
                                 ) : (
-                                    <input type="number" value={policy[field.key] || ''} onChange={e => setPolicy({ ...policy, [field.key]: Number(e.target.value) })}
+                                    <input type="number" value={policy[field.key] ?? ''} onChange={e => setPolicyField(field.key, Number(e.target.value))}
                                         className="w-24 px-3 py-2 bg-card border border-border rounded-lg text-xs font-black text-main text-center outline-none focus:border-rose-500" />
                                 )}
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     <button onClick={handleSavePolicy} className="mt-6 w-full py-3.5 bg-gradient-to-r from-rose-600 to-orange-600 text-white rounded-xl font-black uppercase text-[10px] tracking-widest hover:shadow-lg transition-shadow">
                         {t.refund_save_policy}

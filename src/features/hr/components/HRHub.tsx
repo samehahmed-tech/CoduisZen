@@ -926,6 +926,25 @@ export default function HRHub() {
         }
     };
 
+    // Final HR offboarding step: disable the employee AND their login in one
+    // atomic server call (auto-closes open attendance too). Without this,
+    // a "completed" offboarding leaves the system login working.
+    const terminateEmployeeAccess = async () => {
+        if (!selectedEmployee?.id) return;
+        const ok = window.confirm(
+            `إنهاء خدمة ${selectedEmployee.name || ''} وإيقاف دخوله للنظام نهائياً؟\nسيتم إغلاق أي حضور مفتوح وتعطيل حساب الدخول المرتبط.`,
+        );
+        if (!ok) return;
+        try {
+            await apiRequest(`/hr/employees/${selectedEmployee.id}`, { method: 'DELETE' });
+            toast.success('تم إنهاء الخدمة وإيقاف الدخول');
+            setSelectedEmployee({ ...selectedEmployee, isActive: false } as any);
+            loadData();
+        } catch (error: any) {
+            toast.error(error?.message || 'تعذر إنهاء الخدمة (يتطلب صلاحية مدير)');
+        }
+    };
+
     const submitReasonDialog = async () => {
         const reason = reasonText.trim();
         if (!reasonDialog || !reason) {
@@ -1892,6 +1911,16 @@ export default function HRHub() {
                                                         <p className="mt-1 text-[10px] font-bold text-muted">{employeeLifecycle.offboarding?.ready ? 'لا توجد موانع خروج حالية' : 'يلزم إنهاء المعلقات أولاً'}</p>
                                                     </div>
                                                 </div>
+
+                                                {employeeLifecycle.offboarding?.ready && selectedEmployee?.isActive !== false && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={terminateEmployeeAccess}
+                                                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-xs font-black text-white transition hover:bg-rose-500 active:scale-[0.98]"
+                                                    >
+                                                        إنهاء الخدمة وإيقاف الدخول
+                                                    </button>
+                                                )}
 
                                                 <div className="space-y-2">
                                                     {(employeeLifecycle.onboarding?.checklist || []).map((item: any) => (

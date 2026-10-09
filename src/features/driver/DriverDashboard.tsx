@@ -178,6 +178,7 @@ export const DriverDashboard: React.FC = () => {
         flushingRef.current = true;
         try {
             const remaining: PendingOp[] = [];
+            const dropped: Array<{ op: PendingOp; reason: string }> = [];
             for (const op of ops) {
                 try {
                     if (op.kind === 'deliver' && op.orderId) {
@@ -190,16 +191,22 @@ export const DriverDashboard: React.FC = () => {
                     // success → dropped from the queue
                 } catch (e: any) {
                     const msg = String(e?.message || '');
-                    // Terminal rejections: replaying is pointless — drop the op.
+                    // Terminal rejections: replaying is pointless — drop the op
+                    // BUT tell the pilot loudly (a reassigned-away order used
+                    // to vanish silently while they believed it would send).
                     const terminal = /DELIVERED|ORDER_NOT_|CASH_COLLECTION_MISMATCH|DELIVERY_OTP_MISMATCH|DRIVER_PROFILE_NOT_FOUND|FAILURE_REASON/.test(msg);
                     if (!terminal) {
                         remaining.push(op);
                         break; // network/unknown — retry everything later
                     }
+                    dropped.push({ op, reason: msg.split(':')[0] || 'rejected' });
                 }
             }
             savePendingOps(remaining);
             setPendingCount(remaining.length);
+            for (const { op, reason } of dropped) {
+                toast.error(`عملية معلقة سقطت (#${String(op.orderId || '').slice(-6)}): ${reason} — راجع الفرع`, { duration: 9000 });
+            }
             if (remaining.length < ops.length) {
                 fetchAssignments(true);
                 fetchMyCash();
@@ -396,14 +403,27 @@ export const DriverDashboard: React.FC = () => {
     };
 
     const updateDriverStatus = async (nextStatus: DriverStatus) => {
-        if (!driverId) return;        if (nextStatus === 'OFFLINE' && activeOrders.length > 0) {
+        if (!driverId) return;
+        if (nextStatus === 'OFFLINE' && activeOrders.length > 0) {
+            // The server refuses OFFLINE with live orders (409) — so the old
+            // "exit anyway?" promise could never be kept. Offer the only real
+            // path: return every active order to dispatch first, then exit.
             const ok = await confirm({
                 title: 'خروج ومعاك أوردرات؟',
-                message: `معاك ${activeOrders.length} أوردرات نشطة — الخروج مسموح بس بعد تسليمها أو إرجاعها للفرع. تخرج كده كده؟`,
-                confirmText: 'خروج',
+                message: `معاك ${activeOrders.length} أوردرات نشطة والخروج ممنوع قبل تسويتها. ترجعها للفرع دلوقتي وتخرج؟`,
+                confirmText: 'إرجاع وخروج',
                 cancelText: 'رجوع',
             });
             if (!ok) return;
+            try {
+                for (const order of activeOrders) {
+                    await api.delivery.failDelivery(order.id, 'Pilot exit — returned to dispatch');
+                }
+                fetchAssignments(true);
+            } catch (error: any) {
+                toast.error(error?.message || 'تعذر إرجاع الأوردرات');
+                return;
+            }
         }
         try {
             await api.delivery.updateDriverStatus(driverId, nextStatus);
@@ -426,9 +446,15 @@ export const DriverDashboard: React.FC = () => {
         });
         if (!ok) return;
         try {
-            await api.delivery.pickupOrder(order.id);
+            const pickup: any = await api.delivery.pickupOrder(order.id);
             await updateDriverStatus('BUSY');
             toast.success('تم تسجيل الاستلام — بالتوفيق');
+            // The customer OTP may not have reached WhatsApp — warn now so
+            // the pilot asks the branch to call the customer BEFORE riding
+            // out, instead of hitting a blocked handover later.
+            if (pickup && pickup.otpSent === false) {
+                toast.error('تنبيه: كود العميل لم يُرسل واتساب — كلم الفرع قبل التحرك', { duration: 8000 });
+            }
             fetchAssignments(true);
         } catch (error: any) {
             toast.error(error?.message || 'فشل تسجيل الاستلام');
@@ -549,7 +575,17 @@ export const DriverDashboard: React.FC = () => {
             });
             toast.success('تم التسليم بنجاح');
             setPodOrder(null);
-            fetchAssignments(true);
+            await fetchAssignments(true);
+            // Reconcile the status pill with reality: the server moves the
+            // pilot BUSY/RETURNING on deliver, and back to AVAILABLE when
+            // nothing remains. Without this the pill lies until a manual tap.
+            try {
+                const fresh = await api.delivery.getMyAssignments();
+                const list = Array.isArray(fresh) ? fresh : [];
+                setAssignments(list);
+                const stillActive = list.some((o: any) => [OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, 'ASSIGNED'].includes(o.status));
+                setDriverStatus(stillActive ? 'BUSY' : 'AVAILABLE');
+            } catch { /* assignments already refreshed above */ }
             fetchMyCash();
         } catch (error: any) {
             const msg = String(error?.message || '');
@@ -874,8 +910,13 @@ export const DriverDashboard: React.FC = () => {
                         const isRoad = order.status === OrderStatus.OUT_FOR_DELIVERY;
                         const isLate = elapsed > 45;
                         const cashToCollect = getCashToCollect(order);
+                        // ETA from the pilot's LIVE position — the static map
+                        // center made every ETA a branch-to-customer fantasy.
+                        const etaOrigin = currentLocation.lat && currentLocation.lng
+                            ? { lat: currentLocation.lat, lng: currentLocation.lng }
+                            : defaultMapCenter;
                         const eta = estimateEta(
-                            defaultMapCenter,
+                            etaOrigin,
                             getDeliveryPoint(order),
                             currentLocation.speedKmh && currentLocation.speedKmh > 8 ? currentLocation.speedKmh : 24,
                         );

@@ -131,9 +131,9 @@ const TableMap: React.FC<TableMapProps> = ({
         return map;
     }, [uniqueOrders, tables]);
 
-    // Primary ticket = latest open order. Drives the status chip, elapsed
-    // clock anchor for single-ticket tables, and resume/merge actions —
-    // per-order flows (close, temp bill, merge) intentionally stay single.
+    // Primary ticket = latest open order. Drives the status chip and the
+    // edit/resume actions. Bill-level flows (close, temp bill, merge, modal)
+    // aggregate ALL open rounds via getActiveTableOrders.
     const activeOrderByTable = useMemo(() => {
         const map: Record<string, Order> = {};
         Object.entries(activeOrdersByTable).forEach(([tableId, list]) => {
@@ -169,17 +169,22 @@ const TableMap: React.FC<TableMapProps> = ({
 
     const decoratedTables = useMemo(() => {
         return tables.map(table => {
-            const activeOrder = activeOrderByTable[table.id];
-            if (activeOrder) {
+            const rounds = activeOrdersByTable[table.id] || [];
+            if (rounds.length > 0) {
                 return {
                     ...table,
                     status: TableStatus.OCCUPIED,
                     currentOrderTotal: tableTotals[table.id] || 0,
                 };
             }
+            // No open rounds but a stuck occupancy status from the server:
+            // heal it to AVAILABLE so the map never shows a ghost table.
+            if (table.status !== TableStatus.AVAILABLE) {
+                return { ...table, status: TableStatus.AVAILABLE };
+            }
             return table;
         });
-    }, [tables, tableTotals, activeOrderByTable]);
+    }, [tables, tableTotals, activeOrdersByTable]);
 
     const filteredTables = useMemo(() => {
         return decoratedTables.filter((table) => {
@@ -339,11 +344,13 @@ const TableMap: React.FC<TableMapProps> = ({
         );
     };
 
-    const ActionBelt = ({ table, total, compact = false }: { table: Table; total: number; compact?: boolean }) => {
+    // hasOrders (not total > 0) decides the belt: an occupied table with a
+    // $0 ticket (comp/free items) must open management, never a second order.
+    const ActionBelt = ({ table, total, hasOrders, compact = false }: { table: Table; total: number; hasOrders: boolean; compact?: boolean }) => {
         const btn = compact
             ? 'w-9 h-9 rounded-xl'
             : 'w-10 h-10 rounded-2xl';
-        if (!(total > 0)) {
+        if (!hasOrders) {
             return (
                 <button className="w-full h-12 rounded-2xl bg-card border-2 border-dashed border-border/60 text-muted group-hover:border-primary/40 group-hover:bg-primary/5 group-hover:text-primary transition-all flex items-center justify-center gap-2.5 text-xs font-black uppercase tracking-[0.2em] shadow-sm">
                     <span className="p-1.5 rounded-lg bg-elevated group-hover:bg-primary group-hover:text-white transition-colors">
@@ -483,7 +490,7 @@ const TableMap: React.FC<TableMapProps> = ({
 
                     {/* Interactive Action Belt */}
                     <div className="mt-auto pt-4 border-t border-border/10">
-                        <ActionBelt table={table} total={total} />
+                        <ActionBelt table={table} total={total} hasOrders={(activeOrdersByTable[table.id] || []).length > 0} />
                     </div>
                 </div>
             </div>

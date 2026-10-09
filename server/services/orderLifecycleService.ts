@@ -32,6 +32,8 @@ type TransitionInput = {
     requireKitchenReady?: boolean;
     paymentMethod?: string;
     payments?: Array<{ method: string; amount: number; referenceNumber?: string }>;
+    /** SUPER_ADMIN emergency override: void terminal/old-day orders. Service enforces role. */
+    forceVoid?: boolean;
 };
 
 const terminalStatuses = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED']);
@@ -161,8 +163,15 @@ export const transitionOrderStatus = async ({
     requireKitchenReady = false,
     paymentMethod,
     payments: paymentRows,
+    forceVoid = false,
 }: TransitionInput) => {
     const normalizedStatus = String(nextStatus || '').toUpperCase();
+    const isSuperForceVoid = normalizedStatus === 'CANCELLED'
+        && forceVoid === true
+        && String(user?.role || '').toUpperCase() === 'SUPER_ADMIN';
+    const auditNotes = isSuperForceVoid
+        ? `[FORCE_VOID by ${changedBy || 'system'}] ${String(notes || '').trim()}`
+        : notes;
     const result = await db.transaction(async (tx) => {
         const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id, orderId));
         if (!currentOrder) {
@@ -191,8 +200,8 @@ export const transitionOrderStatus = async ({
                 eq(dayCloseReports.branchId, currentOrder.branchId),
                 sql`${dayCloseReports.businessDate} = CAST(${orderBusinessDate} AS DATE)`,
             ));
-        if (closedDay) throw lifecycleError('ORDER_BUSINESS_DAY_CLOSED', 409);
-        if (orderBusinessDate !== activeBusinessDate) throw lifecycleError('ORDER_HISTORY_READ_ONLY', 409);
+        if (closedDay && !isSuperForceVoid) throw lifecycleError('ORDER_BUSINESS_DAY_CLOSED', 409);
+        if (orderBusinessDate !== activeBusinessDate && !isSuperForceVoid) throw lifecycleError('ORDER_HISTORY_READ_ONLY', 409);
 
         if (requireKitchenReady) {
             const tickets = await tx.select({ status: kdsTickets.status })
@@ -224,11 +233,15 @@ export const transitionOrderStatus = async ({
             }
         }
 
+        if (isSuperForceVoid && !String(notes || '').trim()) {
+            throw lifecycleError('CANCELLATION_REASON_REQUIRED', 400);
+        }
+
         if (!skipPolicy) {
             const statusPolicy = evaluateOrderStatusUpdate({
                 currentStatus: String(currentOrder.status || ''),
                 nextStatus: normalizedStatus,
-                notes,
+                notes: auditNotes,
                 userRole: user?.role || undefined,
                 userBranchId: user?.branchId || undefined,
                 orderBranchId: currentOrder.branchId,
@@ -288,7 +301,7 @@ export const transitionOrderStatus = async ({
         }
         const [updatedOrder] = await tx.update(orders)
             .set({
-                ...getStatusPatch(normalizedStatus, now, notes),
+                ...getStatusPatch(normalizedStatus, now, auditNotes),
                 ...(isDineInSettlement ? {
                     paymentMethod: String(paymentMethod),
                     isPaid: true,
@@ -304,7 +317,7 @@ export const transitionOrderStatus = async ({
             orderId,
             status: normalizedStatus,
             changedBy,
-            notes,
+            notes: auditNotes,
             createdAt: now,
         });
 

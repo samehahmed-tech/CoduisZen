@@ -9,11 +9,14 @@ import {
     deleteRecurringTemplate,
     processDueRecurringEntries
 } from '../controllers/recurringEntriesController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
-const financeAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR', 'COST_ACCOUNTANT', 'TREASURY_OFFICER');
+const financeAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR', 'COST_ACCOUNTANT', 'TREASURY_OFFICER'],
+    ['OP_MANAGE_FINANCE'],
+);
 const accountAdmin = requireRoles('SUPER_ADMIN', 'OWNER', 'FINANCE_DIRECTOR');
 
 router.get('/accounts', financeAuth, enforceBranch, financeController.getAccounts);

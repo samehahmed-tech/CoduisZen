@@ -21,7 +21,7 @@ const PRIORITY_META: Record<string, { ar: string; en: string; badge: string }> =
     LOW: { ar: 'منخفضة', en: 'Low', badge: 'text-slate-500 bg-slate-500/10 border-slate-500/25' },
 };
 
-const BROADCAST_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER']);
+const BROADCAST_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'CALL_CENTER_MANAGER']);
 
 const fmtDate = (value: any, lang: string) => {
     if (!value) return '—';
@@ -47,14 +47,16 @@ const MailHub: React.FC = () => {
     const {
         inbox, sent, directory, unread,
         fetchInbox, fetchSent, fetchDirectory, fetchUnread, subscribeLive,
-        openMessage, toggleStar, archiveMessage, deleteSent, sendMail,
+        openMessage, toggleStar, archiveMessage, deleteSent, deleteInbox, sendMail,
     } = useMailStore(useShallow((s) => ({
         inbox: s.inbox, sent: s.sent, directory: s.directory, unread: s.unread,
         fetchInbox: s.fetchInbox, fetchSent: s.fetchSent, fetchDirectory: s.fetchDirectory,
         fetchUnread: s.fetchUnread, subscribeLive: s.subscribeLive,
         openMessage: s.openMessage, toggleStar: s.toggleStar,
-        archiveMessage: s.archiveMessage, deleteSent: s.deleteSent, sendMail: s.sendMail,
+        archiveMessage: s.archiveMessage, deleteSent: s.deleteSent, deleteInbox: s.deleteInbox, sendMail: s.sendMail,
     })));
+    // Throttle live-mail toasts: a burst of branch mail must not spam.
+    const lastMailToastAt = React.useRef(0);
 
     const [folder, setFolder] = useState<Folder>('inbox');
     const [search, setSearch] = useState('');
@@ -80,6 +82,9 @@ const MailHub: React.FC = () => {
             }
         })();
         const off = subscribeLive((msg: any) => {
+            const now = Date.now();
+            if (now - lastMailToastAt.current < 15000) return;
+            lastMailToastAt.current = now;
             toast.info(lang === 'ar' ? `📬 بريد جديد: ${msg?.subject || ''}` : `📬 New mail: ${msg?.subject || ''}`);
         });
         const t = window.setInterval(() => fetchUnread().catch(() => {}), 60000);
@@ -284,16 +289,22 @@ const MailHub: React.FC = () => {
                                 setShowCompose(true);
                             }}
                             onDelete={async () => {
+                                // Sent copies delete for everyone; inbox copies
+                                // delete only MY copy (others keep theirs).
+                                const fromSent = Boolean((detail as any)._fromSent);
                                 const ok = await confirm({
                                     title: lang === 'ar' ? 'حذف الرسالة' : 'Delete message',
-                                    message: lang === 'ar' ? 'حذف نهائي للجميع؟' : 'Delete permanently for everyone?',
+                                    message: fromSent
+                                        ? (lang === 'ar' ? 'حذف نهائي للجميع؟' : 'Delete permanently for everyone?')
+                                        : (lang === 'ar' ? 'حذف نسختك فقط؟ (الباقون يحتفظون بها)' : 'Delete only your copy? (others keep theirs)'),
                                     confirmText: lang === 'ar' ? 'حذف' : 'Delete',
                                     cancelText: lang === 'ar' ? 'تراجع' : 'Back',
                                     variant: 'danger',
                                 });
                                 if (!ok) return;
                                 try {
-                                    await deleteSent(String(detail.id));
+                                    if (fromSent) await deleteSent(String(detail.id));
+                                    else await deleteInbox(String(detail.messageId || detail.id));
                                     setDetail(null); setSelectedId(null);
                                     toast.success(lang === 'ar' ? 'تم الحذف' : 'Deleted');
                                 } catch {

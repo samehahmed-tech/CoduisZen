@@ -2,7 +2,7 @@
 import React from 'react';
 import {
     Eye, EyeOff, Edit3, Copy, Archive, ArchiveRestore, Trash2,
-    Flame, AlertTriangle, TrendingDown,
+    Flame, AlertTriangle, TrendingDown, Pencil, Check,
     CheckSquare, Square, Package, Layers
 } from 'lucide-react';
 import { MenuItem } from '../../types';
@@ -23,6 +23,8 @@ interface Props {
     onArchive: (item: CardItem) => void;
     onDelete: (item: CardItem) => void;
     onEdit: (item: CardItem) => void;
+    /** Inline quick price edit from the card (optimistic, rolls back on failure). */
+    onQuickPrice?: (item: CardItem, price: number) => void;
     lang: string;
     currency: string;
     index: number;
@@ -44,9 +46,17 @@ const getMarginColor = (margin: number | null) => {
 
 const ItemCard: React.FC<Props> = ({
     item, viewMode, density, isSelected, multiSelectMode,
-    onClick, onToggleAvailability, onDuplicate, onArchive, onDelete, onEdit,
+    onClick, onToggleAvailability, onDuplicate, onArchive, onDelete, onEdit, onQuickPrice,
     lang, currency, index, dragHandleProps, draggableContext
 }) => {
+    const [editingPrice, setEditingPrice] = React.useState(false);
+    const [priceDraft, setPriceDraft] = React.useState('');
+    const commitPrice = () => {
+        const next = Number(priceDraft);
+        setEditingPrice(false);
+        if (!Number.isFinite(next) || next < 0 || next === item.price) return;
+        onQuickPrice?.(item, Number(next.toFixed(2)));
+    };
     const margin = getMarginPercent(item);
     const sizeCount = item.sizes?.length || 0;
     const modCount = item.modifierGroups?.length || 0;
@@ -86,7 +96,7 @@ const ItemCard: React.FC<Props> = ({
             >
                 {multiSelectMode && (
                     <div className="shrink-0 cursor-pointer text-gray-400 hover:text-blue-600 dark:hover:text-indigo-400">
-                        {isSelected ? <CheckSquare size={16} className="text-blue-600 dark:text-indigo-500" /> : <Square size={16} />}
+                        {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} />}
                     </div>
                 )}
 
@@ -154,14 +164,14 @@ const ItemCard: React.FC<Props> = ({
         <div
             onClick={(e) => onClick(item, e)}
             {...(draggableContext ? dragHandleProps : {})}
-            className={`group relative bg-white dark:bg-card rounded-lg border shadow-sm transition-all duration-150 flex flex-col cursor-default overflow-hidden ${isSelected
-                ? 'border-blue-400 dark:border-indigo-500/50 ring-1 ring-blue-200 dark:ring-indigo-500/20'
+            className={`group relative bg-white dark:bg-card rounded-lg border shadow-sm transition-all duration-150 hover:-translate-y-1 flex flex-col cursor-default overflow-hidden ${isSelected
+                ? 'border-primary/60 ring-1 ring-primary/25'
                 : 'border-gray-200 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-border/40 hover:shadow-md'
                 } ${!item.isAvailable ? 'opacity-60' : ''}`}
         >
             {multiSelectMode && (
                 <div className="absolute top-2 left-2 z-20 cursor-pointer">
-                    {isSelected ? <CheckSquare size={16} className="text-blue-600 dark:text-indigo-500" /> : <Square size={16} className="text-gray-400" />}
+                    {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} className="text-gray-400" />}
                 </div>
             )}
 
@@ -192,6 +202,13 @@ const ItemCard: React.FC<Props> = ({
                 {/* Status dot */}
                 <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${item.isAvailable ? 'bg-emerald-500' : 'bg-red-400'}`} />
 
+                {/* No-photo discoverability badge */}
+                {!item.image && (
+                    <div className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded-md bg-black/55 text-white text-[9px] font-bold backdrop-blur-sm">
+                        {lang === 'ar' ? 'بلا صورة' : 'No photo'}
+                    </div>
+                )}
+
                 {/* Badge */}
                 {badge && (
                     <div className={`absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${badge.color}`}>
@@ -209,7 +226,7 @@ const ItemCard: React.FC<Props> = ({
                 {(sizeCount > 0 || modCount > 0) && (
                     <div className="flex flex-wrap gap-1.5 mb-2.5">
                         {sizeCount > 0 && (
-                            <span className="flex items-center gap-1 bg-blue-50/50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-100 dark:border-blue-500/20">
+                            <span className="flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] font-medium border border-primary/20">
                                 <Package size={10} /> {sizeCount} {lang === 'ar' ? 'أحجام' : 'Sizes'}
                             </span>
                         )}
@@ -223,9 +240,46 @@ const ItemCard: React.FC<Props> = ({
 
                 <div className="flex items-end justify-between mt-auto">
                     <div>
-                        <p className={`font-semibold text-gray-900 dark:text-main ${isCompact ? 'text-[14px]' : 'text-[15px]'}`}>
-                            {currency} {item.price.toFixed(2)}
-                        </p>
+                        {editingPrice ? (
+                            <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                    autoFocus
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    value={priceDraft}
+                                    onChange={(e) => setPriceDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') commitPrice();
+                                        if (e.key === 'Escape') setEditingPrice(false);
+                                    }}
+                                    onBlur={commitPrice}
+                                    className={`font-semibold text-gray-900 dark:text-main bg-elevated/60 border border-primary/40 rounded-md px-1.5 py-0.5 outline-none ${isCompact ? 'text-[14px] w-20' : 'text-[15px] w-24'}`}
+                                    aria-label={lang === 'ar' ? 'تعديل السعر' : 'Edit price'}
+                                />
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); commitPrice(); }}
+                                    className="p-1 rounded-md text-emerald-600 hover:bg-emerald-500/10"
+                                    aria-label={lang === 'ar' ? 'حفظ السعر' : 'Save price'}
+                                >
+                                    <Check size={13} />
+                                </button>
+                            </span>
+                        ) : (
+                            <p className={`font-semibold text-gray-900 dark:text-main ${isCompact ? 'text-[14px]' : 'text-[15px]'}`}>
+                                {currency} {item.price.toFixed(2)}
+                                {onQuickPrice && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setPriceDraft(String(item.price)); setEditingPrice(true); }}
+                                        className="ml-1.5 p-1 rounded-md text-gray-300 dark:text-muted/40 hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100"
+                                        aria-label={lang === 'ar' ? 'تعديل سريع للسعر' : 'Quick edit price'}
+                                        title={lang === 'ar' ? 'تعديل سريع للسعر' : 'Quick edit price'}
+                                    >
+                                        <Pencil size={11} />
+                                    </button>
+                                )}
+                            </p>
+                        )}
                         {item.cost && item.cost > 0 ? (
                             <p className="text-[10px] text-gray-400 dark:text-muted/50 mt-0.5">Cost: {currency}{item.cost.toFixed(2)}</p>
                         ) : null}
@@ -261,9 +315,9 @@ const ItemCard: React.FC<Props> = ({
                 </div>
             </div>
 
-            {/* Hover Actions */}
-            <div className="absolute inset-0 bg-white/95 dark:bg-card/95 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-2 p-4 z-10 rounded-lg">
-                <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="w-full h-8 bg-blue-600 dark:bg-indigo-500 hover:bg-blue-700 dark:hover:bg-indigo-600 text-white rounded-md text-[12px] font-medium transition-colors flex items-center justify-center gap-1.5">
+            {/* Hover Actions (desktop only — touch uses tap-to-open drawer) */}
+            <div className="absolute inset-0 bg-white/95 dark:bg-card/95 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-2 p-4 z-10 rounded-lg [@media(pointer:coarse)]:hidden">
+                <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="w-full h-8 bg-primary hover:brightness-110 text-white rounded-md text-[12px] font-medium transition-all flex items-center justify-center gap-1.5">
                     <Edit3 size={13} /> {lang === 'ar' ? 'تعديل' : 'Edit'}
                 </button>
                 <div className="flex w-full gap-1.5">

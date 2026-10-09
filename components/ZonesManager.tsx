@@ -35,6 +35,10 @@ const money = (value: number | string | undefined) => Number(value || 0).toLocal
 const ZonesManager: React.FC = () => {
     const settings = useAuthStore(s => s.settings);
     const branches = useAuthStore(s => s.branches);
+    // Server restricts delete to SUPER_ADMIN/OWNER — mirror it instead of
+    // showing an affordance that always 403s.
+    const userRole = String((useAuthStore(s => (s as any).user) as any)?.role || '').toUpperCase();
+    const canDeleteZones = userRole === 'SUPER_ADMIN' || userRole === 'OWNER';
     const lang = (settings.language || 'en') as 'en' | 'ar';
     const isRtl = lang === 'ar';
     const { showModal } = useModal();
@@ -156,9 +160,22 @@ const ZonesManager: React.FC = () => {
             type: 'danger',
             confirmText: lang === 'ar' ? 'نعم، احذف' : 'Yes, Delete',
             onConfirm: async () => {
-                await deliveryApi.deleteZone(id);
-                await fetchZones();
-                success(lang === 'ar' ? 'تم حذف المنطقة' : 'Zone deleted');
+                try {
+                    await deliveryApi.deleteZone(id);
+                    await fetchZones();
+                    success(lang === 'ar' ? 'تم حذف المنطقة' : 'Zone deleted');
+                } catch (err: any) {
+                    // In-use zones are protected server-side — guide toward
+                    // deactivation instead of leaving a cryptic error.
+                    const code = String(err?.code || err?.message || '');
+                    if (code.includes('ZONE_IN_USE')) {
+                        showError(lang === 'ar'
+                            ? 'المنطقة مستخدمة في عناوين عملاء — أوقف تفعيلها بدل الحذف'
+                            : 'Zone is used by customer addresses — deactivate it instead of deleting');
+                    } else {
+                        showError(err?.message || (lang === 'ar' ? 'تعذر حذف المنطقة' : 'Could not delete zone'));
+                    }
+                }
             }
         });
     };
@@ -311,9 +328,11 @@ const ZonesManager: React.FC = () => {
                                                         <button onClick={() => startEdit(zone)} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-primary/10 hover:text-primary" title={lang === 'ar' ? 'تعديل' : 'Edit'}>
                                                             <Edit2 size={16} />
                                                         </button>
-                                                        <button onClick={() => handleDelete(zone.id)} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500" title={lang === 'ar' ? 'حذف' : 'Delete'}>
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        {canDeleteZones && (
+                                                            <button onClick={() => handleDelete(zone.id)} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-500" title={lang === 'ar' ? 'حذف' : 'Delete'}>
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );

@@ -25,6 +25,8 @@ type StatusUpdatePayload = {
     approval_id?: number;
     paymentMethod?: string;
     payments?: Array<{ method: string; amount: number }>;
+    /** SUPER_ADMIN emergency force-void (terminal/old-day orders). Enforced server-side. */
+    forceVoid?: boolean;
 };
 
 type IdempotentOptions = {

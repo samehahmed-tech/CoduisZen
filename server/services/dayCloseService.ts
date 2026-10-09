@@ -27,6 +27,7 @@ import {
     stockCounts,
     driverCashLedger,
     drivers,
+    treasuryVouchers,
     journalEntries,
     journalLines,
     chartOfAccounts,
@@ -35,7 +36,7 @@ import {
     kdsTickets,
     orderStatusHistory,
 } from '../../src/db/schema';
-import { eq, and, gte, lte, desc, sql, like, or } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, sql, like, or, inArray, ne, gt } from 'drizzle-orm';
 import { createSignedAuditLog } from './auditService';
 import { emailService } from './emailService';
 import { generateDayClosePDF } from './pdfService';
@@ -136,14 +137,39 @@ interface DayCloseReadinessCheck {
     code: string;
     passed: boolean;
     blocking: boolean;
+    /** False when the admin waived this gate in Settings → Day Close. */
+    required: boolean;
     count: number;
     actionPath: string;
 }
+
+/** Mandatory gates for day close — admin-configurable from Settings. */
+export interface DayCloseRules {
+    requireStockCount: boolean;
+    requireKitchenEmpty: boolean;
+    requireVouchersClear: boolean;
+    requireCustodySettled: boolean;
+    requireDriverCash: boolean;
+    requireVarianceNote: boolean;
+    allowManagerOverride: boolean;
+}
+
+export const DEFAULT_DAY_CLOSE_RULES: DayCloseRules = {
+    requireStockCount: true,
+    requireKitchenEmpty: true,
+    requireVouchersClear: true,
+    requireCustodySettled: true,
+    requireDriverCash: true,
+    requireVarianceNote: true,
+    allowManagerOverride: true,
+};
 
 interface DayCloseReadiness {
     canClose: boolean;
     checks: DayCloseReadinessCheck[];
     blockedReasons: string[];
+    /** Effective gates (admin-configurable) — echoed so the UI can explain skips. */
+    rules?: DayCloseRules;
     openShifts?: Array<{ id: string; userId: string; userName: string; openingBalance: number; openingTime?: Date | string | null }>;
 }
 
@@ -156,6 +182,15 @@ interface DayCloseReport {
     status: DayCloseStatus;
     closedBy?: string;
     closedAt?: Date;
+    /** Written close notes (variance explanation) — set at close time. */
+    notes?: string;
+    /** Drawer reconciliation for the day (attached for exports/emails). */
+    shiftCashSummary?: {
+        shiftCount: number;
+        expectedCash: number;
+        actualCash: number;
+        variance: number;
+    };
 
     // Sales Summary
     salesSummary: {
@@ -264,6 +299,27 @@ const getSettingValue = async <T>(key: string, fallback: T): Promise<T> => {
 
 const getDayCloseRequireStockCount = () => getSettingValue<boolean>('dayCloseRequireStockCount', true);
 const getDayCloseWhatsappRecipients = () => getSettingValue<string[]>('dayCloseWhatsappRecipients', []);
+
+/**
+ * Merged day-close gates: the `dayCloseRules` object wins, falling back to
+ * the legacy `dayCloseRequireStockCount` toggle for backwards compatibility.
+ */
+const getDayCloseRules = async (): Promise<DayCloseRules> => {
+    const [rules, legacyStock] = await Promise.all([
+        getSettingValue<Partial<DayCloseRules>>('dayCloseRules', {}),
+        getDayCloseRequireStockCount(),
+    ]);
+    const r = (rules || {}) as Partial<DayCloseRules>;
+    return {
+        requireStockCount: r.requireStockCount ?? legacyStock ?? DEFAULT_DAY_CLOSE_RULES.requireStockCount,
+        requireKitchenEmpty: r.requireKitchenEmpty ?? DEFAULT_DAY_CLOSE_RULES.requireKitchenEmpty,
+        requireVouchersClear: r.requireVouchersClear ?? DEFAULT_DAY_CLOSE_RULES.requireVouchersClear,
+        requireCustodySettled: r.requireCustodySettled ?? DEFAULT_DAY_CLOSE_RULES.requireCustodySettled,
+        requireDriverCash: r.requireDriverCash ?? DEFAULT_DAY_CLOSE_RULES.requireDriverCash,
+        requireVarianceNote: r.requireVarianceNote ?? DEFAULT_DAY_CLOSE_RULES.requireVarianceNote,
+        allowManagerOverride: r.allowManagerOverride ?? DEFAULT_DAY_CLOSE_RULES.allowManagerOverride,
+    };
+};
 
 const normalizeRecipients = (items?: string[]) => (items || [])
     .map((item) => String(item || '').trim())
@@ -566,7 +622,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(...entryInstantFilter, eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(...entryInstantFilter, eq(journalEntries.status, 'POSTED'), inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .then(rows => rows[0]),
             db.select({
                 total: sql<number>`coalesce(sum(${journalLines.debit} - ${journalLines.credit}), 0)`,
@@ -574,7 +630,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(...entryInstantFilter, eq(journalEntries.status, 'PENDING_APPROVAL'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(...entryInstantFilter, eq(journalEntries.status, 'PENDING_APPROVAL'), inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .then(rows => rows[0]),
             db.select({
                 name: chartOfAccounts.name,
@@ -583,7 +639,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(...entryInstantFilter, eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(...entryInstantFilter, eq(journalEntries.status, 'POSTED'), inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .groupBy(chartOfAccounts.name)
                 .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`)
                 .offset(0).fetch(10),
@@ -597,7 +653,7 @@ export const dayCloseService = {
                 .innerJoin(journalEntries, eq(journalLines.journalEntryId, journalEntries.id))
                 .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                 .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
-                .where(and(...entryInstantFilter, eq(journalEntries.status, 'POSTED'), eq(journalEntries.referenceType, 'EXPENSE'), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
+                .where(and(...entryInstantFilter, eq(journalEntries.status, 'POSTED'), inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']), eq(chartOfAccounts.type, 'EXPENSE'), expenseBranchFilter))
                 .orderBy(desc(journalEntries.date), desc(journalLines.id))
                 .offset(0).fetch(50),
         ]);
@@ -799,8 +855,8 @@ export const dayCloseService = {
     async getCloseReadiness(branchId: string, date: string): Promise<DayCloseReadiness> {
         const { startOfDay, endOfDay } = await this.getBranchDayBounds(branchId, date);
 
-        const [requireStockCount, openShiftDetails, openShiftRows, postedStockCountRows, warehouseRows] = await Promise.all([
-            getDayCloseRequireStockCount(),
+        const [rules, openShiftDetails, openShiftRows, postedStockCountRows, warehouseRows, kitchenRows, pendingVoucherRows, custodyRows, driverCashRows] = await Promise.all([
+            getDayCloseRules(),
             db.select({
                 id: shifts.id,
                 userId: shifts.userId,
@@ -832,17 +888,52 @@ export const dayCloseService = {
             db.select({ count: sql<number>`count(*)` })
                 .from(warehouses)
                 .where(eq(warehouses.branchId, branchId)),
+            // Open kitchen tickets would strand mid-rush if the day closed.
+            db.select({ count: sql<number>`count(*)` })
+                .from(kdsTickets)
+                .where(and(
+                    eq(kdsTickets.branchId, branchId),
+                    inArray(kdsTickets.status, ['PENDING', 'PREPARING', 'READY']),
+                )),
+            // Expenses/vouchers awaiting approval must settle before close.
+            db.select({ count: sql<number>`count(*)` })
+                .from(treasuryVouchers)
+                .where(and(
+                    eq(treasuryVouchers.branchId, branchId),
+                    eq(treasuryVouchers.status, 'PENDING'),
+                )),
+            // Issued custody never returned.
+            db.select({ count: sql<number>`count(*)` })
+                .from(treasuryVouchers)
+                .where(and(
+                    eq(treasuryVouchers.branchId, branchId),
+                    like(treasuryVouchers.category, 'CUSTODY%'),
+                    ne(treasuryVouchers.status, 'COMPLETED'),
+                    ne(treasuryVouchers.status, 'REJECTED'),
+                    ne(treasuryVouchers.status, 'CANCELLED'),
+                )),
+            // Pilots still holding collected cash.
+            db.select({ count: sql<number>`count(*)` })
+                .from(drivers)
+                .where(and(
+                    eq(drivers.branchId, branchId),
+                    eq(drivers.isActive, true),
+                    gt(drivers.currentCashBalance, 0),
+                )),
         ]);
 
         const openShiftCount = Number(openShiftRows[0]?.count || 0);
         const postedStockCount = Number(postedStockCountRows[0]?.count || 0);
         const hasWarehouses = Number(warehouseRows[0]?.count || 0) > 0;
+        const stockRequired = rules.requireStockCount && hasWarehouses;
+        const stockPassed = !stockRequired || postedStockCount > 0;
 
         const checks: (DayCloseReadinessCheck & { openShifts?: any[] })[] = [
             {
                 code: 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE',
                 passed: openShiftCount === 0,
-                blocking: true,
+                blocking: openShiftCount > 0,
+                required: true,
                 count: openShiftCount,
                 actionPath: '/finance',
                 openShifts: openShiftDetails.map(s => ({
@@ -853,17 +944,59 @@ export const dayCloseService = {
                     openingTime: s.openingTime,
                 })),
             },
+            {
+                code: 'DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE',
+                passed: stockPassed,
+                blocking: stockRequired && !stockPassed,
+                required: stockRequired,
+                count: stockPassed ? 0 : 1,
+                actionPath: '/inventory',
+            },
         ];
 
-        if (requireStockCount && hasWarehouses) {
-            checks.push({
-                code: 'DAILY_STOCK_COUNT_REQUIRED_FOR_DAY_CLOSE',
-                passed: postedStockCount > 0,
-                blocking: true,
-                count: postedStockCount > 0 ? 0 : 1,
-                actionPath: '/inventory',
-            });
-        }
+        const kitchenOpen = Number(kitchenRows[0]?.count || 0);
+        const kitchenPassed = kitchenOpen === 0;
+        checks.push({
+            code: 'KITCHEN_ACTIVE_FOR_DAY_CLOSE',
+            passed: kitchenPassed || !rules.requireKitchenEmpty,
+            blocking: rules.requireKitchenEmpty && !kitchenPassed,
+            required: rules.requireKitchenEmpty,
+            count: kitchenOpen,
+            actionPath: '/kds',
+        });
+
+        const pendingVouchers = Number(pendingVoucherRows[0]?.count || 0);
+        const vouchersPassed = pendingVouchers === 0;
+        checks.push({
+            code: 'VOUCHERS_PENDING_FOR_DAY_CLOSE',
+            passed: vouchersPassed || !rules.requireVouchersClear,
+            blocking: rules.requireVouchersClear && !vouchersPassed,
+            required: rules.requireVouchersClear,
+            count: pendingVouchers,
+            actionPath: '/treasury',
+        });
+
+        const openCustody = Number(custodyRows[0]?.count || 0);
+        const custodyPassed = openCustody === 0;
+        checks.push({
+            code: 'CUSTODY_OPEN_FOR_DAY_CLOSE',
+            passed: custodyPassed || !rules.requireCustodySettled,
+            blocking: rules.requireCustodySettled && !custodyPassed,
+            required: rules.requireCustodySettled,
+            count: openCustody,
+            actionPath: '/treasury',
+        });
+
+        const driverCashOpen = Number(driverCashRows[0]?.count || 0);
+        const driverPassed = driverCashOpen === 0;
+        checks.push({
+            code: 'DRIVER_CASH_OPEN_FOR_DAY_CLOSE',
+            passed: driverPassed || !rules.requireDriverCash,
+            blocking: rules.requireDriverCash && !driverPassed,
+            required: rules.requireDriverCash,
+            count: driverCashOpen,
+            actionPath: '/dispatch',
+        });
 
         // Fiscal visibility (warn-only, never blocks): failed/pending ETA
         // submissions and dead letters would otherwise go unnoticed, since
@@ -876,6 +1009,7 @@ export const dayCloseService = {
                     code: 'FISCAL_SUBMISSIONS_OPEN_FOR_DAY_CLOSE',
                     passed: true,
                     blocking: false,
+                    required: false,
                     count: fiscalOpen,
                     actionPath: '/fiscal',
                 });
@@ -892,6 +1026,7 @@ export const dayCloseService = {
             canClose: blockedReasons.length === 0,
             checks,
             blockedReasons,
+            rules,
             openShifts: openShiftDetails.map(s => ({
                 id: s.id,
                 userId: s.userId,
@@ -1196,13 +1331,13 @@ export const dayCloseService = {
         const sideEffectHealth = await this.getSideEffectHealth(branchId, date);
         const { startOfDay, endOfDay } = this.getDayBounds(date, branch.timezone || 'Africa/Cairo');
 
-        // Collect all blocked reasons instead of throwing on first failure
+        // Collect all blocked reasons instead of throwing on first failure.
+        // Every gate below consults the admin-configurable `dayCloseRules`
+        // (Settings → Day Close) so non-essential procedures can be waived.
         const blockedReasons: string[] = [];
+        const rules = await getDayCloseRules();
 
-        // Finance, fiscal, and unpaid order checks stay visible in reports, but day close only blocks
-        // on open shifts and the optional daily posted stock count.
-
-        // === GATE 3: Open shifts ===
+        // === GATE: Open shifts ===
         // This is mandatory: a business day cannot close while any branch
         // shift is open, regardless of which client initiated the request.
         const openShifts = await db.select({ count: sql<number>`count(*)` })
@@ -1219,7 +1354,7 @@ export const dayCloseService = {
             }
         }
 
-        if (await getDayCloseRequireStockCount()) {
+        if (rules.requireStockCount) {
             // Warehouseless branches (call center) hold no stock: no count needed.
             const warehouseCount = await db.select({ count: sql<number>`count(*)` })
                 .from(warehouses)
@@ -1238,9 +1373,81 @@ export const dayCloseService = {
             }
         }
 
+        // === GATE: Kitchen must be empty (waivable) ===
+        if (rules.requireKitchenEmpty) {
+            const [kitchenOpen] = await db.select({ count: sql<number>`count(*)` })
+                .from(kdsTickets)
+                .where(and(
+                    eq(kdsTickets.branchId, branchId),
+                    inArray(kdsTickets.status, ['PENDING', 'PREPARING', 'READY']),
+                ));
+            if (Number(kitchenOpen?.count || 0) > 0) {
+                blockedReasons.push('KITCHEN_ACTIVE_FOR_DAY_CLOSE');
+            }
+        }
+
+        // === GATE: Pending treasury vouchers (waivable) ===
+        if (rules.requireVouchersClear) {
+            const [pendingVouchers] = await db.select({ count: sql<number>`count(*)` })
+                .from(treasuryVouchers)
+                .where(and(
+                    eq(treasuryVouchers.branchId, branchId),
+                    eq(treasuryVouchers.status, 'PENDING'),
+                ));
+            if (Number(pendingVouchers?.count || 0) > 0) {
+                blockedReasons.push('VOUCHERS_PENDING_FOR_DAY_CLOSE');
+            }
+        }
+
+        // === GATE: Open custody holdings (waivable) ===
+        if (rules.requireCustodySettled) {
+            const [openCustody] = await db.select({ count: sql<number>`count(*)` })
+                .from(treasuryVouchers)
+                .where(and(
+                    eq(treasuryVouchers.branchId, branchId),
+                    like(treasuryVouchers.category, 'CUSTODY%'),
+                    ne(treasuryVouchers.status, 'COMPLETED'),
+                    ne(treasuryVouchers.status, 'REJECTED'),
+                    ne(treasuryVouchers.status, 'CANCELLED'),
+                ));
+            if (Number(openCustody?.count || 0) > 0) {
+                blockedReasons.push('CUSTODY_OPEN_FOR_DAY_CLOSE');
+            }
+        }
+
+        // === GATE: Driver cash on hand (waivable) ===
+        if (rules.requireDriverCash) {
+            const [driverCash] = await db.select({ count: sql<number>`count(*)` })
+                .from(drivers)
+                .where(and(
+                    eq(drivers.branchId, branchId),
+                    eq(drivers.isActive, true),
+                    gt(drivers.currentCashBalance, 0),
+                ));
+            if (Number(driverCash?.count || 0) > 0) {
+                blockedReasons.push('DRIVER_CASH_OPEN_FOR_DAY_CLOSE');
+            }
+        }
+
+        // === GATE: Cash variance must be explained (waivable) ===
+        // A non-zero shift variance without a written note blocks close —
+        // unless the admin disabled the requirement in settings.
+        if (rules.requireVarianceNote) {
+            const cashSummary = await this.getShiftCashSummary(branchId, date);
+            if (Math.abs(Number(cashSummary?.variance || 0)) > 0.005 && !String(options?.notes || '').trim()) {
+                blockedReasons.push('CASH_VARIANCE_NOTE_REQUIRED_FOR_DAY_CLOSE');
+            }
+        }
+
         if (blockedReasons.length > 0) {
             if (!options?.overrideReason) {
                 const error = new Error('DAY_CLOSE_BLOCKED');
+                (error as any).blockedReasons = blockedReasons;
+                (error as any).rules = rules;
+                throw error;
+            }
+            if (!rules.allowManagerOverride) {
+                const error = new Error('DAY_CLOSE_OVERRIDE_DISABLED');
                 (error as any).blockedReasons = blockedReasons;
                 throw error;
             }
@@ -1341,8 +1548,16 @@ export const dayCloseService = {
             logger.warn({ err: finalizeError, branchId, date }, 'DAY_CLOSE_FINALIZE_FAILED');
         }
 
-        // Send email if configured
+        // Send email if configured (enrich the in-memory report first so the
+        // attached PDF shows the closed status, cash reconciliation + notes).
         if (options?.emailConfig) {
+            report.shiftCashSummary = {
+                shiftCount: 0,
+                expectedCash: snapshot.shiftsSnapshot.expectedCash,
+                actualCash: snapshot.shiftsSnapshot.actualCash,
+                variance: snapshot.shiftsSnapshot.variance,
+            };
+            report.notes = options?.notes;
             await this.sendDayCloseEmail(report, options.emailConfig);
         }
 
@@ -1444,6 +1659,129 @@ export const dayCloseService = {
 
         await releaseBranchTables(branchId);
         return { businessDate };
+    },
+
+    /**
+     * Reopen a wrongly-closed business day (undo close).
+     *
+     * Restores the branch to its pre-close state so the day can be worked on
+     * again:
+     *   1. Deletes the CLOSED report row (the snapshot survives in the audit
+     *      log + JSONB snapshots are re-generated on the next close).
+     *   2. Re-activates orders that day-close auto-finalized (COMPLETED/
+     *      DELIVERED orders created before the close return to their live
+     *      status; manually completed orders stay terminal — a false reopen
+     *      must never resurrect a genuinely finished ticket).
+     *   3. Rolls the branch businessDate BACK to the reopened day (only when
+     *      it sits on the day AFTER the close — never backwards past it).
+     *   4. Writes a signed DAY_REOPENED audit entry with full context.
+     *
+     * Requires a written reason; the previous businessDate is returned so the
+     * caller can show exactly what changed.
+     */
+    async reopenDay(branchId: string, date: string, userId: string, reason: string) {
+        if (!isValidDateKey(date)) throw new Error('INVALID_BUSINESS_DATE');
+        const closedReport = await this.getClosedReport(branchId, date);
+        if (!closedReport) throw new Error('DAY_NOT_CLOSED');
+        // getClosedReport returns a WRAPPED shape: the DB row key is
+        // dayCloseReportId (not .id) — deleting by .id would miss the row
+        // and the reopen would silently no-op.
+        const closedReportRowId = (closedReport as any).dayCloseReportId;
+        if (!closedReportRowId) throw new Error('DAY_NOT_CLOSED');
+
+        const [branch] = await db.select({ businessDate: branches.businessDate })
+            .from(branches)
+            .where(eq(branches.id, branchId))
+            .top(1);
+        if (!branch) throw new Error('BRANCH_NOT_FOUND');
+
+        const now = new Date();
+        const previousBusinessDate = branch.businessDate || localDateKey();
+
+        // 2. Re-activate orders auto-finalized BY THE CLOSE: terminal orders
+        // touched within the close window (last 48h). Older tickets are real
+        // completions — a false reopen must never resurrect them.
+        const finalizedOrderIds = new Set(
+            (await db.select({ id: orders.id, status: orders.status, updatedAt: orders.updatedAt })
+                .from(orders)
+                .where(and(
+                    eq(orders.branchId, branchId),
+                    sql`${orders.status} IN ('COMPLETED', 'DELIVERED')`,
+                ))).filter((o: any) => {
+                    const touched = new Date(o.updatedAt || 0).getTime();
+                    return Date.now() - touched < 48 * 60 * 60 * 1000;
+                }).map((o: any) => o.id),
+        );
+
+        await db.transaction(async (tx) => {
+            // 1. Delete the closed report (reopen = the day is workable again).
+            await tx.delete(dayCloseReports).where(eq(dayCloseReports.id, closedReportRowId));
+
+            // Reopen to the LIVE pre-close status: everything goes back to
+            // PENDING (the cashier/dispatch continues from there; kitchen
+            // tickets re-fire on the next screen load).
+            const rows = finalizedOrderIds.size > 0
+                ? await tx.select({ id: orders.id, type: orders.type, tableId: orders.tableId })
+                    .from(orders)
+                    .where(and(
+                        eq(orders.branchId, branchId),
+                        inArray(orders.id, Array.from(finalizedOrderIds)),
+                    ))
+                : [];
+            for (const order of rows) {
+                await tx.update(orders)
+                    .set({ status: 'PENDING', completedAt: null, updatedAt: now })
+                    .where(eq(orders.id, order.id));
+                await tx.insert(orderStatusHistory).values({
+                    orderId: order.id,
+                    status: 'PENDING',
+                    changedBy: userId,
+                    notes: `Day reopened: ${reason}`.slice(0, 240),
+                    createdAt: now,
+                });
+                if (order.tableId) {
+                    await tx.update(tables)
+                        .set({ status: 'OCCUPIED', currentOrderId: order.id, updatedAt: now })
+                        .where(eq(tables.id, order.tableId));
+                }
+            }
+        });
+
+        // 3. Roll the business date back to the reopened day. Normal flow:
+        // closing advanced it to date+1, so only rewind when the branch sits
+        // exactly there — never backwards past it.
+        const closeDate = toSqlDate(date);
+        closeDate.setUTCDate(closeDate.getUTCDate() + 1);
+        const expectedAfterClose = closeDate.toISOString().split('T')[0];
+        const canRevert = previousBusinessDate === expectedAfterClose || previousBusinessDate === date;
+        if (previousBusinessDate > date && canRevert) {
+            await db.update(branches)
+                .set({ businessDate: date, updatedAt: now })
+                .where(eq(branches.id, branchId));
+        }
+
+        const businessDateAfter = canRevert ? date : previousBusinessDate;
+
+        // 4. Signed audit trail.
+        await createSignedAuditLog({
+            eventType: 'DAY_REOPENED',
+            userId,
+            branchId,
+            reason: reason.slice(0, 240),
+            before: { businessDate: previousBusinessDate, closedReportId: closedReportRowId },
+            after: { businessDate: businessDateAfter, reopenedOrderIds: Array.from(finalizedOrderIds) },
+        });
+
+        try {
+            emitBranchEvent(branchId, 'kds:update', { reason: 'DAY_REOPENED' });
+        } catch { /* socket optional */ }
+
+        return {
+            businessDate: businessDateAfter,
+            previousBusinessDate,
+            reopenedOrders: finalizedOrderIds.size,
+            dateReverted: canRevert,
+        };
     },
 
     /**

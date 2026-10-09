@@ -1,4 +1,4 @@
-
+﻿
 import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
 import MainLayout from './components/MainLayout';
 import React, { Suspense } from 'react';
@@ -6,9 +6,47 @@ import { useAuthStore } from './stores/useAuthStore';
 import { AppPermission } from './types';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
+// â”€â”€ Resilient lazy loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Two real-world failure modes, both previously fatal (the whole route
+// died with "Failed to fetch dynamically imported module"):
+//   1. Server restarting mid-navigation (hotfix apply / watchdog recovery):
+//      the chunk fetch hits a dead server â†’ retry with backoff succeeds.
+//   2. New deploy while a tab is open: the running app references chunk
+//      hashes that no longer exist on disk â†’ one-time auto-reload picks
+//      the fresh build (sessionStorage guard prevents reload loops).
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const isChunkFetchFailure = (error: any) =>
+    error instanceof TypeError
+    || /failed to fetch|dynamically imported module|chunkload|loading chunk|networkerror|err_connection|load failed/i.test(String(error?.message || error || ''));
+
+const lazyImport = async (factory: () => Promise<any>, attempt = 0): Promise<any> => {
+    try {
+        return await factory();
+    } catch (error: any) {
+        if (attempt < 2 && isChunkFetchFailure(error)) {
+            await sleep([600, 1800][attempt]);
+            return lazyImport(factory, attempt + 1);
+        }
+        // Stale build: the referenced chunk hash is gone from disk. Reload
+        // once so the browser picks the fresh deploy instead of a dead route.
+        if (isChunkFetchFailure(error) && typeof window !== 'undefined') {
+            const key = 'coduiszen:chunk-reload';
+            const last = Number(sessionStorage.getItem(key) || 0);
+            if (Date.now() - last > 30_000) {
+                try { sessionStorage.setItem(key, String(Date.now())); } catch { /* ignore */ }
+                window.location.reload();
+            }
+        }
+        throw error;
+    }
+};
+
+/** React.lazy wrapper: retries transient chunk failures + auto-reloads on stale builds. */
+const lazyRoute = (factory: () => Promise<any>) => React.lazy(() => lazyImport(factory));
+
 // Login is lazy too: authenticated users (the hot path) never download it,
 // and logged-out users get the shell + login chunk only.
-const Login = React.lazy(() => import('./components/Login'));
+const Login = lazyRoute(() => import('./components/Login'));
 
 // Lazy load components for better performance
 // Export loaders for preloading
@@ -85,78 +123,78 @@ export const loaders = {
 };
 
 // Lazy load components using exported loaders
-const Dashboard = React.lazy(loaders.Dashboard);
-const AdminDashboardPage = React.lazy(loaders.AdminDashboardPage);
-const POS = React.lazy(loaders.POS);
-const CallCenter = React.lazy(loaders.CallCenter);
-const CallCenterManager = React.lazy(loaders.CallCenterManager);
-const KDS = React.lazy(loaders.KDS);
-const PickupScreen = React.lazy(loaders.PickupScreen);
-const MenuManager = React.lazy(loaders.MenuManager);
-const PrinterManager = React.lazy(loaders.PrinterManager);
-const ReceiptDesigner = React.lazy(loaders.ReceiptDesigner);
-const RecipeManager = React.lazy(loaders.RecipeManager);
-const Inventory = React.lazy(loaders.Inventory);
-const StockRequests = React.lazy(loaders.StockRequests);
-const StockItems = React.lazy(loaders.StockItems);
-const Suppliers = React.lazy(loaders.Suppliers);
-const Procurement = React.lazy(loaders.Procurement);
-const Warehouses = React.lazy(loaders.Warehouses);
-const StockCounts = React.lazy(loaders.StockCounts);
-const StockMovements = React.lazy(loaders.StockMovements);
-const CRM = React.lazy(loaders.CRM);
-const ZonesManager = React.lazy(loaders.ZonesManager);
-const Finance = React.lazy(loaders.Finance);
-const TreasuryHub = React.lazy(loaders.TreasuryHub);
-const Expenses = React.lazy(loaders.Expenses);
-const Reports = React.lazy(loaders.Reports);
-const AIInsights = React.lazy(loaders.AIInsights);
-const AIAssistant = React.lazy(loaders.AIAssistant);
+const Dashboard = lazyRoute(loaders.Dashboard);
+const AdminDashboardPage = lazyRoute(loaders.AdminDashboardPage);
+const POS = lazyRoute(loaders.POS);
+const CallCenter = lazyRoute(loaders.CallCenter);
+const CallCenterManager = lazyRoute(loaders.CallCenterManager);
+const KDS = lazyRoute(loaders.KDS);
+const PickupScreen = lazyRoute(loaders.PickupScreen);
+const MenuManager = lazyRoute(loaders.MenuManager);
+const PrinterManager = lazyRoute(loaders.PrinterManager);
+const ReceiptDesigner = lazyRoute(loaders.ReceiptDesigner);
+const RecipeManager = lazyRoute(loaders.RecipeManager);
+const Inventory = lazyRoute(loaders.Inventory);
+const StockRequests = lazyRoute(loaders.StockRequests);
+const StockItems = lazyRoute(loaders.StockItems);
+const Suppliers = lazyRoute(loaders.Suppliers);
+const Procurement = lazyRoute(loaders.Procurement);
+const Warehouses = lazyRoute(loaders.Warehouses);
+const StockCounts = lazyRoute(loaders.StockCounts);
+const StockMovements = lazyRoute(loaders.StockMovements);
+const CRM = lazyRoute(loaders.CRM);
+const ZonesManager = lazyRoute(loaders.ZonesManager);
+const Finance = lazyRoute(loaders.Finance);
+const TreasuryHub = lazyRoute(loaders.TreasuryHub);
+const Expenses = lazyRoute(loaders.Expenses);
+const Reports = lazyRoute(loaders.Reports);
+const AIInsights = lazyRoute(loaders.AIInsights);
+const AIAssistant = lazyRoute(loaders.AIAssistant);
 
-const ForensicsHub = React.lazy(loaders.ForensicsHub);
-const SettingsHub = React.lazy(loaders.SettingsHub);
-const RolesPermissions = React.lazy(loaders.RolesPermissions);
-const FloorDesigner = React.lazy(loaders.FloorDesigner);
-const Production = React.lazy(loaders.Production);
-const ButcheryManager = React.lazy(loaders.Butchery);
-const DispatchHub = React.lazy(loaders.DispatchHub);
-const DriversHub = React.lazy(loaders.DriversHub);
-const CampaignHub = React.lazy(loaders.CampaignHub);
+const ForensicsHub = lazyRoute(loaders.ForensicsHub);
+const SettingsHub = lazyRoute(loaders.SettingsHub);
+const RolesPermissions = lazyRoute(loaders.RolesPermissions);
+const FloorDesigner = lazyRoute(loaders.FloorDesigner);
+const Production = lazyRoute(loaders.Production);
+const ButcheryManager = lazyRoute(loaders.Butchery);
+const DispatchHub = lazyRoute(loaders.DispatchHub);
+const DriversHub = lazyRoute(loaders.DriversHub);
+const CampaignHub = lazyRoute(loaders.CampaignHub);
 
-const FiscalHub = React.lazy(loaders.FiscalHub);
-const DayCloseHub = React.lazy(loaders.DayCloseHub);
-const FranchiseManager = React.lazy(loaders.FranchiseManager);
-const LazySetupWizard = React.lazy(loaders.SetupWizard);
-const RefundManager = React.lazy(loaders.RefundManager);
-const WastageManager = React.lazy(loaders.WastageManager);
-const InventoryIntelligence = React.lazy(loaders.InventoryIntelligence);
-const ApprovalCenter = React.lazy(loaders.ApprovalCenter);
-const WhatsAppHub = React.lazy(loaders.WhatsAppHub);
-const MailHub = React.lazy(loaders.MailHub);
-const PlatformAggregator = React.lazy(loaders.PlatformAggregator);
-const UserManagement = React.lazy(loaders.UserManagement);
-const OrdersCenter = React.lazy(loaders.OrdersCenter);
+const FiscalHub = lazyRoute(loaders.FiscalHub);
+const DayCloseHub = lazyRoute(loaders.DayCloseHub);
+const FranchiseManager = lazyRoute(loaders.FranchiseManager);
+const LazySetupWizard = lazyRoute(loaders.SetupWizard);
+const RefundManager = lazyRoute(loaders.RefundManager);
+const WastageManager = lazyRoute(loaders.WastageManager);
+const InventoryIntelligence = lazyRoute(loaders.InventoryIntelligence);
+const ApprovalCenter = lazyRoute(loaders.ApprovalCenter);
+const WhatsAppHub = lazyRoute(loaders.WhatsAppHub);
+const MailHub = lazyRoute(loaders.MailHub);
+const PlatformAggregator = lazyRoute(loaders.PlatformAggregator);
+const UserManagement = lazyRoute(loaders.UserManagement);
+const OrdersCenter = lazyRoute(loaders.OrdersCenter);
 
-const HRHub = React.lazy(loaders.HRHub);
-const AttendanceManager = React.lazy(loaders.AttendanceManager);
-const PayrollManager = React.lazy(loaders.PayrollManager);
-const DataMigrationWizard = React.lazy(loaders.DataMigrationWizard);
-const BiometricDeviceManager = React.lazy(loaders.BiometricDeviceManager);
-const SchedulingManager = React.lazy(loaders.SchedulingManager);
-const TaskChecklistManager = React.lazy(loaders.TaskChecklistManager);
-const HRSettingsManager = React.lazy(loaders.HRSettingsManager);
-const HRUserGuide = React.lazy(loaders.HRUserGuide);
-const SelfOrderingKiosk = React.lazy(loaders.SelfOrderingKiosk);
-const TrackOrder = React.lazy(loaders.TrackOrder);
-const ReservationsHub = React.lazy(loaders.ReservationsHub);
-const ComplaintsInbox = React.lazy(loaders.ComplaintsInbox);
-const InteractionShowcase = React.lazy(loaders.InteractionShowcase);
-const DriverDashboard = React.lazy(loaders.DriverDashboard);
-const ThemeLab = React.lazy(loaders.ThemeLab);
+const HRHub = lazyRoute(loaders.HRHub);
+const AttendanceManager = lazyRoute(loaders.AttendanceManager);
+const PayrollManager = lazyRoute(loaders.PayrollManager);
+const DataMigrationWizard = lazyRoute(loaders.DataMigrationWizard);
+const BiometricDeviceManager = lazyRoute(loaders.BiometricDeviceManager);
+const SchedulingManager = lazyRoute(loaders.SchedulingManager);
+const TaskChecklistManager = lazyRoute(loaders.TaskChecklistManager);
+const HRSettingsManager = lazyRoute(loaders.HRSettingsManager);
+const HRUserGuide = lazyRoute(loaders.HRUserGuide);
+const SelfOrderingKiosk = lazyRoute(loaders.SelfOrderingKiosk);
+const TrackOrder = lazyRoute(loaders.TrackOrder);
+const ReservationsHub = lazyRoute(loaders.ReservationsHub);
+const ComplaintsInbox = lazyRoute(loaders.ComplaintsInbox);
+const InteractionShowcase = lazyRoute(loaders.InteractionShowcase);
+const DriverDashboard = lazyRoute(loaders.DriverDashboard);
+const ThemeLab = lazyRoute(loaders.ThemeLab);
 
 import PageSkeleton from './components/common/PageSkeleton';
 
-// Delayed fallback: cached chunks resolve in ms — flashing a full skeleton
+// Delayed fallback: cached chunks resolve in ms â€” flashing a full skeleton
 // for them feels like flicker, not loading. Only show the skeleton if the
 // chunk actually takes longer than 200ms.
 const Loading = () => {
@@ -305,7 +343,7 @@ export const router = createBrowserRouter([
         ),
     },
     {
-        // Public customer order tracking (no login — link-only token = order id)
+        // Public customer order tracking (no login â€” link-only token = order id)
         path: '/t/:id',
         element: (
             <ErrorBoundary>

@@ -17,6 +17,7 @@ interface InventoryState {
     warehouses: Warehouse[];
     transferMovements: any[];
     transferRequests: any[];
+    incomingTransferRequests: any[];
     isLoading: boolean;
     error: string | null;
 
@@ -45,6 +46,7 @@ interface InventoryState {
     createSupplierInDB: (supplier: Supplier) => Promise<void>;
     updateSupplierInDB: (supplier: Supplier) => Promise<void>;
     deactivateSupplierInDB: (id: string) => Promise<void>;
+    reactivateSupplierInDB: (id: string) => Promise<void>;
     createPurchaseOrderInDB: (po: PurchaseOrder, branchId: string) => Promise<void>;
     updatePurchaseOrderStatusInDB: (id: string, status: PurchaseOrder['status']) => Promise<void>;
     receivePurchaseOrderInDB: (id: string, warehouseId: string, items: { itemId: string; receivedQty: number }[]) => Promise<void>;
@@ -109,6 +111,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     warehouses: [],
     transferMovements: [],
     transferRequests: [],
+    incomingTransferRequests: [],
     isLoading: false,
     error: null,
 
@@ -190,6 +193,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
                     phone: s.phone || '',
                     email: s.email || '',
                     category: s.category || '',
+                    isActive: s.isActive !== false,
                 }));
                 set({ suppliers, isLoading: false });
                 await localDb.suppliers.bulkPut(suppliers.map(s => ({ ...s, updatedAt: Date.now() })));
@@ -522,7 +526,19 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     deactivateSupplierInDB: async (id) => {
         try {
             await suppliersApi.delete(id);
-            set((state) => ({ suppliers: state.suppliers.filter(s => s.id !== id) }));
+            // Soft-deactivate locally (server keeps the row): the roster can
+            // still show and re-enable it instead of losing it forever.
+            set((state) => ({ suppliers: state.suppliers.map(s => s.id === id ? { ...s, isActive: false } : s) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+
+    reactivateSupplierInDB: async (id) => {
+        try {
+            await suppliersApi.update(id, { isActive: true });
+            set((state) => ({ suppliers: state.suppliers.map(s => s.id === id ? { ...s, isActive: true } : s) }));
         } catch (error: any) {
             set({ error: error.message });
             throw error;
@@ -622,7 +638,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     fetchIncomingTransferRequests: async (branchId) => {
         try {
             const data = await inventoryApi.getIncomingTransferRequests(branchId);
-            set({ transferRequests: Array.isArray(data) ? data : [] });
+            // Separate slice: sharing one array made tab switches overwrite
+            // each other's lists and counts.
+            set({ incomingTransferRequests: Array.isArray(data) ? data : [] });
         } catch (error: any) {
             set({ error: error.message });
             throw error;

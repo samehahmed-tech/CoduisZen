@@ -40,6 +40,7 @@ const DispatchHub: React.FC = () => {
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
     const [podOrder, setPodOrder] = useState<Order | null>(null);
+    const [podMode, setPodMode] = useState<'deliver' | 'fail'>('deliver');
     const [podCash, setPodCash] = useState('');
     const [podBusy, setPodBusy] = useState(false);
     // Branch close-out acts as a manager fallback (no OTP in hand): requires
@@ -219,11 +220,41 @@ const DispatchHub: React.FC = () => {
     };
 
     const openPod = (order: Order) => {
+        setPodMode('deliver');
         setPodOrder(order);
         const due = getCashToCollect(order);
         setPodCash(due > 0 ? String(Math.round(due)) : '');
         setPodPin('');
         setPodReason('');
+    };
+
+    // Failed road delivery from the hub (manager recall): same PIN+reason
+    // accountability as the branch deliver path, order returns to READY.
+    const openFail = (order: Order) => {
+        setPodMode('fail');
+        setPodOrder(order);
+        setPodCash('');
+        setPodPin('');
+        setPodReason('');
+    };
+
+    const submitFail = async () => {
+        if (!podOrder || podBusy) return;
+        if (!podPin.trim() || podReason.trim().length < 3) {
+            setError(isAr ? 'أدخل PIN المدير وسبب الإرجاع' : 'Enter manager PIN and return reason');
+            return;
+        }
+        setPodBusy(true);
+        try {
+            await deliveryApi.failDelivery(podOrder.id, podReason.trim(), podPin.trim());
+            setPodOrder(null);
+            setMessage(isAr ? 'عاد الطلب للطابور' : 'Order returned to queue');
+            await refreshAll(true);
+        } catch (e: any) {
+            setError(e?.message || (isAr ? 'تعذر إرجاع الطلب' : 'Return failed'));
+        } finally {
+            setPodBusy(false);
+        }
     };
 
     const submitPod = async () => {
@@ -354,6 +385,10 @@ const DispatchHub: React.FC = () => {
                                     className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white">
                                     <CheckCircle2 size={15} />{isAr ? 'تأكيد التسليم' : 'Confirm delivered'}
                                 </button>
+                                <button onClick={() => openFail(order)}
+                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 text-xs font-black text-rose-600">
+                                    {isAr ? 'إرجاع' : 'Fail'}
+                                </button>
                             </div>
                         )}
                     </div>
@@ -362,8 +397,11 @@ const DispatchHub: React.FC = () => {
         );
     };
 
+    // Tab counts what can actually be assigned (READY/ASSIGNED) — kitchen
+    // PENDING/PREPARING rows stay listed but are not "ready".
+    const assignableCount = readyOrders.filter((o) => ['READY', 'ASSIGNED'].includes(String(o.status))).length;
     const tabs: { id: Tab; label: string; count: number }[] = [
-        { id: 'ready', label: isAr ? 'جاهز للتعيين' : 'Ready', count: readyOrders.length },
+        { id: 'ready', label: isAr ? 'جاهز للتعيين' : 'Ready', count: assignableCount },
         { id: 'road', label: isAr ? 'في الطريق' : 'On road', count: roadOrders.length },
         { id: 'alerts', label: isAr ? 'تنبيهات' : 'Alerts', count: criticalAlerts.length },
     ];
@@ -481,10 +519,11 @@ const DispatchHub: React.FC = () => {
 
             {podOrder && (() => {
                 const due = getCashToCollect(podOrder);
+                const isFail = podMode === 'fail';
                 return (
                     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center" onClick={() => !podBusy && setPodOrder(null)}>
                         <div className="w-full max-w-md rounded-3xl bg-card p-6 shadow-2xl" dir={isAr ? 'rtl' : 'ltr'} onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-lg font-black text-main">{isAr ? 'تأكيد التسليم' : 'Confirm delivery'} #{podOrder.orderNumber || podOrder.id}</h3>
+                            <h3 className="text-lg font-black text-main">{isFail ? (isAr ? 'إرجاع الطلب للطابور' : 'Return order to queue') : (isAr ? 'تأكيد التسليم' : 'Confirm delivery')} #{podOrder.orderNumber || podOrder.id}</h3>
                             <p className="mt-1 text-xs font-bold text-muted">{podOrder.customerName} · {podOrder.deliveryAddress}</p>
                             {due > 0 ? (
                                 <div className="mt-4">
@@ -516,9 +555,15 @@ const DispatchHub: React.FC = () => {
                             </div>
                             <div className="mt-5 grid grid-cols-2 gap-2">
                                 <button onClick={() => !podBusy && setPodOrder(null)} disabled={podBusy} className="h-12 rounded-2xl bg-elevated/60 text-sm font-black text-main disabled:opacity-50">{isAr ? 'رجوع' : 'Back'}</button>
-                                <button onClick={submitPod} disabled={podBusy} className="h-12 rounded-2xl bg-emerald-600 text-sm font-black text-white disabled:opacity-50">
-                                    {podBusy ? (isAr ? 'جاري...' : 'Saving...') : (isAr ? 'تأكيد' : 'Confirm')}
-                                </button>
+                                {isFail ? (
+                                    <button onClick={submitFail} disabled={podBusy} className="h-12 rounded-2xl bg-rose-600 text-sm font-black text-white disabled:opacity-50">
+                                        {podBusy ? (isAr ? 'جاري...' : 'Saving...') : (isAr ? 'إرجاع للطابور' : 'Return')}
+                                    </button>
+                                ) : (
+                                    <button onClick={submitPod} disabled={podBusy} className="h-12 rounded-2xl bg-emerald-600 text-sm font-black text-white disabled:opacity-50">
+                                        {podBusy ? (isAr ? 'جاري...' : 'Saving...') : (isAr ? 'تأكيد' : 'Confirm')}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

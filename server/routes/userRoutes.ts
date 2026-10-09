@@ -33,6 +33,7 @@ router.post('/:id/reset-password', manageUsersAuth, userController.adminResetPas
 router.get('/:id/login-history', manageUsersAuth, userController.getLoginHistory);
 router.post('/:id/toggle-active', manageUsersAuth, userController.toggleUserActive);
 router.put('/:id/permissions', manageUsersAuth, userController.updateUserPermissions);
+router.post('/:id/copy-permissions', manageUsersAuth, userController.copyUserPermissions);
 router.get('/:id/effective-permissions', manageUsersAuth, userController.getEffectivePermissions);
 router.put('/:id/branch-access', manageUsersAuth, userController.updateBranchAccess);
 

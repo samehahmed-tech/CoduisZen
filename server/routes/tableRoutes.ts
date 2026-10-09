@@ -2,14 +2,19 @@ import { Router } from 'express';
 import { getTables, getZones, saveLayout, updateTableStatus, resetTable, transferTableOrder, splitTableOrder, mergeTableOrders } from '../controllers/tableController';
 import { requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
+import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
+// Floor operations (transfer/split/merge/status) must accept every
+// operational floor role — a hardcoded subset silently 403s legitimate
+// users (OWNER, GENERAL_MANAGER, CASHIER_MANAGER, CAFE_ADMIN, ...).
+// Permission fallback stays for custom roles.
 const posAuth = requireRoleOrPermission(
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'WAITER', 'CAPTAIN'],
+    [...POS_FLOOR_ROLES],
     ['NAV_POS', 'NAV_FLOOR_PLAN', 'OP_PLACE_ORDER']
 );
 const managerAuth = requireRoleOrPermission(
-    ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER', 'CAPTAIN'],
+    [...POS_FLOOR_ROLES],
     ['CFG_EDIT_FLOOR_PLAN']
 );
 const adminResetAuth = requireRoleOrPermission(

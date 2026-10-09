@@ -82,7 +82,7 @@ interface OrderState {
     // Async Actions (API)
     fetchOrders: (params?: { status?: string; branch_id?: string; date?: string; limit?: number }) => Promise<void>;
     placeOrder: (order: Order) => Promise<Order>;
-    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean; approvalId?: number; paymentMethod?: string; payments?: Array<{ method: string; amount: number }> }) => Promise<void>;
+    updateOrderStatus: (orderId: string, status: OrderStatus, changedBy?: string, notes?: string, options?: { skipPrint?: boolean; skipVersionCheck?: boolean; approvalId?: number; paymentMethod?: string; payments?: Array<{ method: string; amount: number }>; forceVoid?: boolean }) => Promise<void>;
     updateOrderItems: (orderId: string, data: { items: any[]; notes?: string; discount?: number; deliveryFee?: number; changedBy?: string; deliverySource?: string; paymentMethod?: string; deliveryAddress?: string; deliveryLat?: number; deliveryLng?: number; deliveryAddressLabel?: string; platformOrderId?: string; scheduledFor?: string }) => Promise<any>;
 
     fetchTables: (branchId: string) => Promise<void>;
@@ -504,12 +504,13 @@ export const useOrderStore = create<OrderState>()(
                             approval_id: options?.approvalId,
                             paymentMethod: options?.paymentMethod,
                             payments: options?.payments,
+                            forceVoid: options?.forceVoid,
                         }, { idempotencyKey: `${orderId}:${status}` });
                     } else {
                         if (options?.approvalId) throw new Error('MANAGER_APPROVAL_REQUIRES_ONLINE');
                         await syncService.queue('orderStatus', 'UPDATE', {
                             id: orderId,
-                            data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt, paymentMethod: options?.paymentMethod, payments: options?.payments }
+                            data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt, paymentMethod: options?.paymentMethod, payments: options?.payments, forceVoid: options?.forceVoid }
                         });
                     }
                     eventBus.emit(AuditEventType.ORDER_STATUS_CHANGE, {

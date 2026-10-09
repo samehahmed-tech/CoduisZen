@@ -20,6 +20,7 @@ interface MailState {
     toggleStar: (id: string) => Promise<void>;
     archiveMessage: (id: string, archived?: boolean) => Promise<void>;
     deleteSent: (id: string) => Promise<void>;
+    deleteInbox: (id: string) => Promise<void>;
     subscribeLive: (onNew?: (msg: any) => void) => () => void;
     clearError: () => void;
 }
@@ -130,6 +131,14 @@ export const useMailStore = create<MailState>((set, get) => ({
     deleteSent: async (id) => {
         await mailApi.deleteSent(id);
         set((state) => ({ sent: state.sent.filter((m: any) => String(m.id) !== String(id)) }));
+    },
+
+    deleteInbox: async (id) => {
+        await mailApi.deleteInbox(id);
+        set((state) => ({
+            inbox: state.inbox.filter((m: any) => String(m.messageId) !== String(id) && String(m.id) !== String(id)),
+            unread: Math.max(0, state.unread - (state.inbox.find((m: any) => (String(m.messageId) === String(id) || String(m.id) === String(id)) && !m.isRead) ? 1 : 0)),
+        }));
     },
 
     subscribeLive: (onNew) => {

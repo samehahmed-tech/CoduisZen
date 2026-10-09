@@ -14,11 +14,11 @@ export const helmetMiddleware = helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://maps.googleapis.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://maps.googleapis.com", "https://cdn.apple-mapkit.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
-            mediaSrc: ["'self'", "data:", "blob:"],
+            mediaSrc: ["'self'", "data:", "blob:", "https://videos.pexels.com"],
             // Map/search/geo backends used by the app (tiles ride on <img>,
             // which imgSrc already allows — these cover fetch/XHR + sockets).
             connectSrc: [
@@ -28,6 +28,7 @@ export const helmetMiddleware = helmet({
                 "https://api.maptiler.com",
                 "https://router.project-osrm.org",
                 "https://maps.googleapis.com",
+                "https://cdn.apple-mapkit.com",
             ],
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],

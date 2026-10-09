@@ -28,7 +28,9 @@ const SupplierReturnModal: React.FC<SupplierReturnModalProps> = ({ isOpen, onClo
     const hasValidItems = returnItems.length > 0 && returnItems.every(item => (
         item.itemId && Number.isFinite(Number(item.quantity)) && Number(item.quantity) > 0
     ));
-    const canSave = Boolean(selectedWarehouseId) && reason.trim().length >= 3 && hasValidItems && !saving;
+    // Supplier is mandatory: without it the credit note is orphaned and
+    // untraceable to any vendor account.
+    const canSave = Boolean(selectedWarehouseId) && Boolean(selectedSupplierId) && reason.trim().length >= 3 && hasValidItems && !saving;
 
     if (!isOpen) return null;
 
@@ -115,7 +117,7 @@ const SupplierReturnModal: React.FC<SupplierReturnModalProps> = ({ isOpen, onClo
                             </select>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'المورد' : 'Supplier'}</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">{lang === 'ar' ? 'المورد *' : 'Supplier *'}</label>
                             <select
                                 value={selectedSupplierId}
                                 onChange={e => setSelectedSupplierId(e.target.value)}

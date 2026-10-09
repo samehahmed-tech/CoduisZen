@@ -17,4 +17,17 @@ describe('refund request validation', () => {
     expect(parsed.refundMethod).toBe('ORIGINAL_PAYMENT');
     expect(createRefundSchema.safeParse({ orderId: 'ORD-1', type: 'FULL', reason: ' ' }).success).toBe(false);
   });
+
+  it('accepts POS counter reason categories sent by the UI', () => {
+    for (const reasonCategory of ['CUSTOMER_COMPLAINT', 'LATE_DELIVERY'] as const) {
+      const parsed = createRefundSchema.safeParse({
+        orderId: 'ORD-1',
+        type: 'FULL',
+        reason: 'Counter return',
+        reasonCategory,
+        refundMethod: 'ORIGINAL_PAYMENT',
+      });
+      expect(parsed.success).toBe(true);
+    }
+  });
 });

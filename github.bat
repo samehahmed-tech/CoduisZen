@@ -36,9 +36,12 @@ git add -u
 git diff --cached --quiet
 if "%ERRORLEVEL%"=="0" goto :no_changes
 
-rem ---- Secret guard: never commit env files ----
+rem ---- Secret guard: never commit real env secrets ----
+rem Blocks `.env` / `.env.local` / `.env.*` EXCEPT `*.example` templates
+rem (templates carry no secrets and are safe to share).
 git diff --cached --name-only > "%TEMP%\gh_staged.txt"
-findstr /I /R /C:"\.env" "%TEMP%\gh_staged.txt" >nul
+findstr /I /R /C:"\.env" "%TEMP%\gh_staged.txt" > "%TEMP%\gh_env.txt" 2>nul
+findstr /I /V /R /C:"\.example$" "%TEMP%\gh_env.txt" >nul 2>&1
 if "%ERRORLEVEL%"=="0" goto :has_secrets
 goto :do_commit
 

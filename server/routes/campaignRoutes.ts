@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import * as campaignController from '../controllers/campaignController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
 
-const marketingAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MARKETING_MANAGER');
+const marketingAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MARKETING_MANAGER'],
+    ['OP_MANAGE_MARKETING'],
+);
 
 router.get('/', campaignController.getCampaigns);
 router.get('/stats', campaignController.getCampaignStats);

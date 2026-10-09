@@ -43,7 +43,7 @@ if (!rootElement) {
 if (typeof document !== 'undefined' && !document.querySelector('link[data-font="cairo"]')) {
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
-  fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap';
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Changa:wght@500;600;700;800&family=El+Messiri:wght@400;500;600;700&display=swap';
   fontLink.setAttribute('data-font', 'cairo');
   document.head.appendChild(fontLink);
 }

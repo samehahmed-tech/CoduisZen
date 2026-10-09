@@ -69,19 +69,43 @@ const CRM: React.FC = () => {
 
   const activeLoyaltyMembers = useMemo(() => customers.filter(c => c.loyaltyPoints > 0).length, [customers]);
   const avgLTV = useMemo(() => customers.length > 0 ? customers.reduce((s, c) => s + c.totalSpent, 0) / customers.length : 0, [customers]);
-  const atRiskProfiles = useMemo(() => customers.filter(c => {
-    if (!c.createdAt) return false;
-    const daysSince = (Date.now() - new Date(c.createdAt).getTime()) / (1000 * 3600 * 24);
-    return c.visits < 2 && daysSince > 30;
-  }).length, [customers]);
 
-  const isPhoneValid = (phone?: string) => {
-    if (!phone) return false;
-    const cleaned = phone.replace(/[\s\-()]/g, '');
-    return /^01[0-9]{9}$/.test(cleaned) || /^\+201[0-9]{9}$/.test(cleaned);
+  // One canonical phone shape (01xxxxxxxxx) shared with the call center —
+  // +20/0020 variants collapse to it so the same caller is never two rows.
+  const normalizePhone = (phone?: string | null) => {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (digits.startsWith('0020')) return '0' + digits.slice(4);
+    if (digits.startsWith('20') && digits.length === 13) return '0' + digits.slice(2);
+    return digits;
   };
 
-  const cleanPhone = (phone: string) => phone.replace(/[\s\-()]/g, '');
+  const customerOrders = (customer: any) => {
+    const phone = normalizePhone(customer?.phone);
+    return orders.filter(o =>
+      (customer?.id && o.customerId === customer.id) ||
+      (phone && normalizePhone((o as any).customerPhone) === phone),
+    );
+  };
+
+  const lastActivityOf = (customer: any): number => {
+    const orderTimes = customerOrders(customer)
+      .map(o => new Date((o as any).createdAt || 0).getTime())
+      .filter(t => Number.isFinite(t) && t > 0);
+    const created = customer?.createdAt ? new Date(customer.createdAt).getTime() : 0;
+    return Math.max(created || 0, ...orderTimes, 0);
+  };
+
+  // At risk = genuinely dormant (no order or profile touch in 30+ days),
+  // not merely "new with few visits".
+  const atRiskProfiles = useMemo(() => customers.filter(c => {
+    const last = lastActivityOf(c);
+    if (!last) return false;
+    return (Date.now() - last) / (1000 * 3600 * 24) > 30;
+  }).length, [customers, orders]);
+
+  const isPhoneValid = (phone?: string) => /^01[0-9]{9}$/.test(normalizePhone(phone));
+
+  const cleanPhone = (phone: string) => normalizePhone(phone);
 
   const handleSaveCustomer = async () => {
     const name = newCustomer.name?.trim() || '';
@@ -97,10 +121,16 @@ const CRM: React.FC = () => {
       return;
     }
 
+    const normalized = cleanPhone(phone);
+    if (customers.some(c => normalizePhone(c.phone) === normalized)) {
+      setFormError(tr('This phone is already registered.', 'هذا الرقم مسجل بالفعل.'));
+      return;
+    }
+
     try {
       await addCustomer({
         name,
-        phone: cleanPhone(phone),
+        phone: normalized,
         address: newCustomer.address?.trim(),
         loyaltyPoints: 0,
         totalSpent: 0,
@@ -218,7 +248,7 @@ const CRM: React.FC = () => {
                 <Plus size={18} /> {tr('Add Customer', 'إضافة عميل')}
               </motion.button>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => fetchCustomers()}
                 className="h-14 w-14 rounded-2xl bg-card border border-border/40 text-muted flex items-center justify-center hover:text-indigo-500 transition-all shadow-sm"
                 aria-label={tr('Refresh customers', 'تحديث العملاء')}
                 title={tr('Refresh customers', 'تحديث العملاء')}
@@ -242,16 +272,26 @@ const CRM: React.FC = () => {
             <Search className="text-muted group-focus-within:text-indigo-500 transition-colors w-6 h-6" />
           </div>
           <input
-            type="text"
+            type="search"
+            aria-label={tr('Search customers', 'بحث عن العملاء')}
             placeholder={tr('Search by name, phone, or loyalty tier...', 'بحث بالاسم أو الهاتف أو مستوى الولاء...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-16 pr-8 py-5 bg-card/60 backdrop-blur-md border border-border/40 rounded-[2rem] outline-none focus:border-indigo-500/50 transition-all font-black text-sm shadow-inner group-focus-within:bg-card"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              aria-label={tr('Clear search', 'مسح البحث')}
+              className="absolute inset-y-0 right-4 flex items-center text-muted hover:text-main transition-colors"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         {/* Dynamic Data Grid */}
-        <div className="bg-card/60 backdrop-blur-3xl rounded-[2.5rem] border border-border/40 overflow-hidden shadow-2xl relative">
+        <div className="bg-card/60 backdrop-blur-3xl rounded-[2.5rem] border border-border/40 overflow-x-auto shadow-2xl relative">
           <table className="w-full text-left">
             <thead className="bg-elevated/40 border-b border-border/30 text-[9px] font-black uppercase tracking-[0.2em] text-muted">
               <tr>
@@ -271,8 +311,11 @@ const CRM: React.FC = () => {
                       variants={itemVariants} 
                       exit={{ opacity: 0, scale: 0.95 }}
                       key={customer.id} 
-                      className="hover:bg-elevated/40 transition-colors group cursor-pointer" 
+                      className="hover:bg-elevated/40 transition-colors group cursor-pointer focus:outline-none focus-visible:bg-elevated/40" 
                       onClick={() => setSelectedCustomer(customer)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCustomer(customer); } }}
+                      aria-label={tr(`Open ${customer.name} profile`, `فتح ملف ${customer.name}`)}
                     >
                       <td className="px-8 py-5">
                         <div className="flex items-center gap-5">
@@ -319,10 +362,27 @@ const CRM: React.FC = () => {
               </AnimatePresence>
               {filteredCustomers.length === 0 && (
                 <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <td colSpan={5} className="px-8 py-32 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted opacity-30">
-                      {tr('No customer profiles found', 'لا توجد ملفات عملاء')}
+                  <td colSpan={5} className="px-8 py-24 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted opacity-60 mb-4">
+                      {searchQuery
+                        ? tr(`No matches for "${searchQuery}"`, `لا نتائج لـ "${searchQuery}"`)
+                        : tr('No customer profiles found', 'لا توجد ملفات عملاء')}
                     </p>
+                    {searchQuery ? (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="px-6 py-2.5 rounded-xl border border-border/50 text-xs font-black uppercase tracking-widest text-main hover:bg-elevated/60 transition-all"
+                      >
+                        {tr('Clear search', 'مسح البحث')}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setFormError(''); setShowAddModal(true); }}
+                        className="px-6 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/30"
+                      >
+                        {tr('Add your first customer', 'أضف أول عميل')}
+                      </button>
+                    )}
                   </td>
                 </motion.tr>
               )}
@@ -341,6 +401,11 @@ const CRM: React.FC = () => {
               animate={{ x: 0 }} 
               exit={{ x: lang === 'ar' ? '-100%' : '100%' }} 
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label={tr('Customer Profile', 'ملف العميل')}
+              onKeyDown={(e) => { if (e.key === 'Escape') setSelectedCustomer(null); }}
+              tabIndex={-1}
               className={`fixed inset-y-0 ${lang === 'ar' ? 'left-0' : 'right-0'} w-full max-w-lg bg-card border-${lang === 'ar' ? 'r' : 'l'} border-border/40 shadow-2xl z-[101] flex flex-col`}
             >
                <div className="p-8 border-b border-border/30 flex justify-between items-center bg-elevated/30 backdrop-blur">
@@ -417,15 +482,15 @@ const CRM: React.FC = () => {
                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted flex items-center gap-2 mb-4">
                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> {tr('Order History', 'سجل الطلبات')}
                   </h4>
-                  {orders.filter(o => o.customerId === selectedCustomer.id).length === 0 ? (
+                  {customerOrders(selectedCustomer).length === 0 ? (
                      <div className="p-8 text-center bg-elevated/30 rounded-3xl border border-dashed border-border/50">
                         <p className="text-[9px] font-black text-muted uppercase tracking-[0.2em] opacity-40">
                           {tr('No orders recorded for this customer.', 'لا توجد طلبات مسجلة لهذا العميل.')}
                         </p>
                      </div>
                   ) : (
-                    <div className="grid gap-3">
-                      {orders.filter(o => o.customerId === selectedCustomer.id).slice(0, 5).map((o, idx) => (
+                     <div className="grid gap-3">
+                      {customerOrders(selectedCustomer).slice(0, 5).map((o, idx) => (
                         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * idx }} key={o.id} className="flex items-center justify-between p-5 rounded-2xl bg-card border border-border/40 hover:bg-elevated/60 transition-colors shadow-sm">
                           <div>
                             <p className="text-[11px] font-black uppercase tracking-tighter">#{o.id}</p>
@@ -443,7 +508,16 @@ const CRM: React.FC = () => {
               </div>
 
               <div className="p-8 border-t border-border/30 bg-elevated/30 backdrop-blur">
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full h-16 bg-main text-app rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-black/20 flex items-center justify-center gap-3 transition-colors">
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    // Hand the customer to the call-center desk: it auto-picks
+                    // the exact phone match on mount (see crm_call_phone).
+                    try { sessionStorage.setItem('crm_call_phone', normalizePhone(selectedCustomer?.phone)); } catch { /* ignore */ }
+                    window.location.href = '/call-center';
+                  }}
+                  className="w-full h-16 bg-main text-app rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-black/20 flex items-center justify-center gap-3 transition-colors"
+                >
                   <ShoppingBag size={18} /> {tr('Start New Order', 'بدء طلب جديد')}
                 </motion.button>
               </div>

@@ -162,7 +162,7 @@ tbody tr:hover [data-row-actions], tbody tr:focus-within [data-row-actions] { op
 }
 
 /* ── Reduced motion (§20): calm, instant, still clear ── */
-@media (prefers-reduced-motion: reduce) {
+html[data-motion="off"] {
   .page-enter, .page-exit, .stagger-appear, .theme-animate-stagger, .modal-glass-enter,
   .toast-enter, .toast-exit, .animate-scale-in, .theme-drawer-panel, .skeleton-reveal,
   .ux-field-error, .ux-chip, .ux-btn { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }

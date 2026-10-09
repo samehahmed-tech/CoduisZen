@@ -204,6 +204,59 @@ const Finance: React.FC = () => {
   const [postingRuleForm, setPostingRuleForm] = useState({ documentType: 'POS_SALE', amountSource: 'TOTAL', direction: 'DEBIT', accountCode: '', conditionField: '', conditionValue: '' });
   
   const [recurringTemplates, setRecurringTemplates] = useState<any[]>([]);
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [recurringForm, setRecurringForm] = useState({
+    description: '', amount: '', recurringType: 'MONTHLY',
+    debitAccountId: '', creditAccountId: '', nextProcessDate: '',
+  });
+
+  const handleCreateRecurringTemplate = async () => {
+    const amount = Number(recurringForm.amount);
+    if (!recurringForm.description.trim()) {
+      showToast(isAr ? 'اكتب وصف القالب' : 'Enter a template description', 'error');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast(isAr ? 'المبلغ يجب أن يكون أكبر من صفر' : 'Amount must be greater than zero', 'error');
+      return;
+    }
+    if (!recurringForm.debitAccountId || !recurringForm.creditAccountId) {
+      showToast(isAr ? 'اختر حسابي المدين والدائن' : 'Select debit and credit accounts', 'error');
+      return;
+    }
+    if (recurringForm.debitAccountId === recurringForm.creditAccountId) {
+      showToast(isAr ? 'حساب المدين يختلف عن الدائن' : 'Debit and credit accounts must differ', 'error');
+      return;
+    }
+    if (!recurringForm.nextProcessDate) {
+      showToast(isAr ? 'اختر تاريخ أول تنفيذ' : 'Pick the first run date', 'error');
+      return;
+    }
+    if (pendingFinanceAction) return;
+    setPendingFinanceAction('recurring-create');
+    try {
+      await recurringApi.createTemplate({
+        description: recurringForm.description.trim(),
+        amount,
+        currency: settings.currencySymbol || 'EGP',
+        recurringType: recurringForm.recurringType as any,
+        nextProcessDate: new Date(recurringForm.nextProcessDate).toISOString(),
+        isActive: true,
+        entries: [
+          { accountId: recurringForm.debitAccountId, type: 'DEBIT', percentage: 100 },
+          { accountId: recurringForm.creditAccountId, type: 'CREDIT', percentage: 100 },
+        ],
+      });
+      setRecurringTemplates(await recurringApi.getTemplates());
+      setShowRecurringForm(false);
+      setRecurringForm({ description: '', amount: '', recurringType: 'MONTHLY', debitAccountId: '', creditAccountId: '', nextProcessDate: '' });
+      showToast(isAr ? 'تم حفظ القالب الدوري' : 'Recurring template saved', 'success');
+    } catch (err: any) {
+      showToast(err?.message || (isAr ? 'تعذر حفظ القالب' : 'Failed to save template'), 'error');
+    } finally {
+      setPendingFinanceAction(null);
+    }
+  };
 
   useEffect(() => {
     fetchFinanceData();
@@ -262,16 +315,21 @@ const Finance: React.FC = () => {
     if (activeTab === 'coa' && showArchivedAccounts) void loadArchivedAccounts();
   }, [activeTab, showArchivedAccounts]);
 
-  // Compute financial summaries
+  // Compute financial summaries from LEAF accounts only: parent balances
+  // would double-count any postings made directly on a parent.
+  const leafAccounts = useMemo(
+    () => flatAccounts.filter(a => !(a.children && a.children.length > 0)),
+    [flatAccounts],
+  );
   const financialSummary = useMemo(() => {
-    const assets = flatAccounts.filter(a => (a as any).type === 'ASSET').reduce((s, a) => s + Number(a.balance || 0), 0);
-    const liabilities = flatAccounts.filter(a => (a as any).type === 'LIABILITY').reduce((s, a) => s + Number(a.balance || 0), 0);
-    const equity = flatAccounts.filter(a => (a as any).type === 'EQUITY').reduce((s, a) => s + Number(a.balance || 0), 0);
-    const revenue = flatAccounts.filter(a => (a as any).type === 'REVENUE').reduce((s, a) => s + Number(a.balance || 0), 0);
-    const expenses = flatAccounts.filter(a => (a as any).type === 'EXPENSE').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const assets = leafAccounts.filter(a => (a as any).type === 'ASSET').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const liabilities = leafAccounts.filter(a => (a as any).type === 'LIABILITY').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const equity = leafAccounts.filter(a => (a as any).type === 'EQUITY').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const revenue = leafAccounts.filter(a => (a as any).type === 'REVENUE').reduce((s, a) => s + Number(a.balance || 0), 0);
+    const expenses = leafAccounts.filter(a => (a as any).type === 'EXPENSE').reduce((s, a) => s + Number(a.balance || 0), 0);
     const netIncome = revenue - expenses;
     return { assets, liabilities, equity, revenue, expenses, netIncome };
-  }, [flatAccounts]);
+  }, [leafAccounts]);
 
   const filteredTransactions = useMemo(() => {
     let result = transactions;
@@ -748,21 +806,29 @@ const Finance: React.FC = () => {
             <div className="p-8 animate-in slide-in-from-bottom-5 duration-150">
                <div className="bg-app/40 rounded-[2.5rem] border border-border/30 overflow-hidden shadow-2xl">
                  <div className="p-8 border-b border-border/20 flex items-center justify-between bg-elevated/30">
-                   <h3 className="text-xl font-black text-main uppercase tracking-tighter flex items-center gap-4">
-                     <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-500/20"><History size={24} /></div>
-                     {t.journal}
-                   </h3>
-                   <div className="px-4 py-2 bg-indigo-500/10 text-indigo-500 rounded-xl text-xs font-black">
-                     {transactions.length} {t.entries}
-                   </div>
-                 </div>
-                 <div className="max-h-[70vh] overflow-y-auto custom-scrollbar p-6 space-y-4">
-                    {transactions.length === 0 ? (
-                      <div className="text-center py-20 opacity-50">
-                         <History size={48} className="mx-auto mb-4 text-muted" />
-                         <p className="font-black uppercase tracking-widest text-sm">{t.noEntries}</p>
-                      </div>
-                    ) : transactions.map((tx: any) => (
+                    <h3 className="text-xl font-black text-main uppercase tracking-tighter flex items-center gap-4">
+                      <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500 border border-indigo-500/20"><History size={24} /></div>
+                      {t.journal}
+                    </h3>
+                    <div className="px-4 py-2 bg-indigo-500/10 text-indigo-500 rounded-xl text-xs font-black">
+                      {filteredTransactions.length} / {transactions.length} {t.entries}
+                    </div>
+                  </div>
+                  <div className="px-8 pt-5 flex flex-col sm:flex-row gap-3">
+                    <input value={journalSearch} onChange={(e) => setJournalSearch(e.target.value)} placeholder={isAr ? 'بحث في اليومية…' : 'Search journal…'} className="flex-1 h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold text-main outline-none placeholder:text-muted/50 focus:border-primary/60" />
+                    <input type="date" value={journalDateFrom} onChange={(e) => setJournalDateFrom(e.target.value)} className="h-11 rounded-xl border border-border bg-card px-3 text-xs font-bold text-main outline-none focus:border-primary/60" />
+                    <input type="date" value={journalDateTo} onChange={(e) => setJournalDateTo(e.target.value)} className="h-11 rounded-xl border border-border bg-card px-3 text-xs font-bold text-main outline-none focus:border-primary/60" />
+                    {(journalSearch || journalDateFrom || journalDateTo) && (
+                      <button onClick={() => { setJournalSearch(''); setJournalDateFrom(''); setJournalDateTo(''); }} className="h-11 px-4 rounded-xl border border-border text-xs font-black text-muted hover:text-main">{isAr ? 'مسح' : 'Clear'}</button>
+                    )}
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto custom-scrollbar p-6 space-y-4">
+                     {filteredTransactions.length === 0 ? (
+                       <div className="text-center py-20 opacity-50">
+                          <History size={48} className="mx-auto mb-4 text-muted" />
+                          <p className="font-black uppercase tracking-widest text-sm">{transactions.length === 0 ? t.noEntries : (isAr ? 'لا نتائج مطابقة للفلتر' : 'No entries match the filter')}</p>
+                       </div>
+                     ) : filteredTransactions.map((tx: any) => (
                        <div key={tx.id} className="p-6 bg-card/40 border border-border/30 rounded-3xl shrink-0 group hover:border-indigo-500/30 transition-all shadow-lg">
                          <div className="flex justify-between items-start mb-4">
                             <div>
@@ -814,7 +880,7 @@ const Finance: React.FC = () => {
                      {t.recurringTemplates}
                    </h3>
                    <div className="flex gap-3">
-                     <button className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg">
+                     <button onClick={() => setShowRecurringForm((v: boolean) => !v)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg">
                        {t.addTemplate}
                      </button>
                       <button onClick={async () => {
@@ -834,8 +900,30 @@ const Finance: React.FC = () => {
                       </button>
                    </div>
                  </div>
-                 <div className="max-h-[70vh] overflow-y-auto custom-scrollbar p-6 space-y-4">
-                    {recurringTemplates.length === 0 ? (
+                  {showRecurringForm && (
+                     <div className="mx-6 mt-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <input value={recurringForm.description} onChange={(e) => setRecurringForm({ ...recurringForm, description: e.target.value })} placeholder={isAr ? 'الوصف *' : 'Description *'} className="h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold text-main outline-none placeholder:text-muted/50 focus:border-indigo-500" />
+                        <input type="number" min={0} step="0.01" value={recurringForm.amount} onChange={(e) => setRecurringForm({ ...recurringForm, amount: e.target.value })} placeholder={isAr ? 'المبلغ *' : 'Amount *'} className="h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold tabular-nums text-main outline-none placeholder:text-muted/50 focus:border-indigo-500" />
+                        <select value={recurringForm.recurringType} onChange={(e) => setRecurringForm({ ...recurringForm, recurringType: e.target.value })} className="h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold text-main outline-none focus:border-indigo-500">
+                           {['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].map((f) => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                        <select value={recurringForm.debitAccountId} onChange={(e) => setRecurringForm({ ...recurringForm, debitAccountId: e.target.value })} className="h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold text-main outline-none focus:border-indigo-500">
+                           <option value="">{isAr ? 'حساب المدين *' : 'Debit account *'}</option>
+                           {leafAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code ? `${a.code} — ` : ''}{a.name}</option>)}
+                        </select>
+                        <select value={recurringForm.creditAccountId} onChange={(e) => setRecurringForm({ ...recurringForm, creditAccountId: e.target.value })} className="h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold text-main outline-none focus:border-indigo-500">
+                           <option value="">{isAr ? 'حساب الدائن *' : 'Credit account *'}</option>
+                           {leafAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.code ? `${a.code} — ` : ''}{a.name}</option>)}
+                        </select>
+                        <input type="date" value={recurringForm.nextProcessDate} onChange={(e) => setRecurringForm({ ...recurringForm, nextProcessDate: e.target.value })} className="h-11 rounded-xl border border-border bg-card px-4 text-xs font-bold text-main outline-none focus:border-indigo-500" />
+                        <div className="sm:col-span-2 lg:col-span-3 flex gap-2 justify-end">
+                           <button onClick={() => setShowRecurringForm(false)} className="px-5 py-2.5 rounded-xl border border-border text-xs font-black text-muted hover:text-main">{isAr ? 'إلغاء' : 'Cancel'}</button>
+                           <button onClick={handleCreateRecurringTemplate} disabled={Boolean(pendingFinanceAction)} className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50">{isAr ? 'حفظ القالب' : 'Save template'}</button>
+                        </div>
+                     </div>
+                  )}
+                  <div className="max-h-[70vh] overflow-y-auto custom-scrollbar p-6 space-y-4">
+                     {recurringTemplates.length === 0 ? (
                       <div className="text-center py-20 opacity-50">
                          <RefreshCw size={48} className="mx-auto mb-4 text-muted" />
                          <p className="font-black uppercase tracking-widest text-sm">{t.noRecurring}</p>

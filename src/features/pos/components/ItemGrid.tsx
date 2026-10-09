@@ -108,6 +108,12 @@ const ItemGrid: React.FC<ItemGridProps> = React.memo(({
             medium: 'grid-cols-2 gap-2 p-2.5 sm:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] sm:gap-3 sm:p-3',
             large: 'grid-cols-1 gap-2.5 p-2.5 min-[480px]:grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(250px,1fr))] sm:gap-3 sm:p-3',
         },
+        // Vitrine: gallery presence, slightly wider floor.
+        vitrine: {
+            small: 'grid-cols-2 gap-1.5 p-2 sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:gap-2 sm:p-2',
+            medium: 'grid-cols-2 gap-2 p-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-3 sm:p-3',
+            large: 'grid-cols-1 gap-2.5 p-2.5 min-[480px]:grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] sm:gap-3 sm:p-3',
+        },
         // Sahara + fallback: balanced photo cards.
         sahara: {
             small: 'grid-cols-3 gap-1.5 p-2 sm:grid-cols-[repeat(auto-fill,minmax(118px,1fr))] sm:gap-2 sm:p-2',
@@ -119,7 +125,6 @@ const ItemGrid: React.FC<ItemGridProps> = React.memo(({
     const gridClass = (GRID_CLASSES[design] ?? GRID_CLASSES.sahara)[cardSize] ?? GRID_CLASSES.sahara.medium;
 
     const intrinsicSize = (() => {
-        if (design === 'ticket') return cardSize === 'small' ? 'auto 60px' : cardSize === 'large' ? 'auto 92px' : 'auto 78px';
         if (design === 'kiosk') return cardSize === 'small' ? 'auto 160px' : cardSize === 'large' ? 'auto 300px' : 'auto 240px';
         return cardSize === 'small' ? 'auto 220px' : cardSize === 'large' ? 'auto 460px' : 'auto 340px';
     })();

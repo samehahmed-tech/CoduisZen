@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Clock, EyeOff, MapPin, MonitorPlay, Package, Search, Truck, UtensilsCrossed, Volume2, Zap } from 'lucide-react';
@@ -172,6 +173,8 @@ const usePickupCallout = () => {
 };
 
 export const PickupScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const openDispatchScreen = useCallback(() => navigate('/dispatch'), [navigate]);
   const { orders, fetchOrders, isLoading: ordersLoading, error: ordersError } = useOrderStore(useShallow((state) => ({ orders: state.orders, fetchOrders: state.fetchOrders, isLoading: state.isLoading, error: state.error })));
   const settings = useAuthStore((state) => state.settings);
   const { success, error } = useToast();
@@ -279,7 +282,9 @@ export const PickupScreen: React.FC = () => {
     speak(nextOrder).finally(() => {
       window.setTimeout(() => {
         setCallingOrderId(null);
-        setAnnouncementQueue(prev => prev.length > 0 ? prev : readyOrdersRef.current);
+        // Never refill from readyOrdersRef here: the queue effect above
+        // already enqueues newly-ready orders. Refilling repeats every
+        // callout indefinitely.
       }, 1800);
     });
   }, [announcementQueue, audioEnabled, callingOrderId, speak]);
@@ -610,6 +615,7 @@ export const PickupScreen: React.FC = () => {
                             order={order}
                             onCall={() => undefined}
                             onHandover={() => undefined}
+                            onOpenDispatch={openDispatchScreen}
                             isAr={isAr}
                             elapsed={getElapsedMins(order.createdAt)}
                             isReady={false}
@@ -666,6 +672,7 @@ const PickupCard = React.memo(({
   order,
   onCall,
   onHandover,
+  onOpenDispatch,
   isAr,
   elapsed,
   isReady,
@@ -678,6 +685,7 @@ const PickupCard = React.memo(({
   order: Order;
   onCall: () => void;
   onHandover: () => void;
+  onOpenDispatch?: () => void;
   isAr: boolean;
   elapsed: number;
   isReady: boolean;
@@ -871,10 +879,17 @@ const PickupCard = React.memo(({
           {isAr ? 'قيد التحضير في المطبخ' : 'Preparing in kitchen'}
         </div>
       ) : isDeliveryReady ? (
-        <div className="flex items-center justify-center gap-2 border-t border-sky-500/10 bg-sky-500/10 px-6 py-4 text-xs font-black uppercase tracking-[0.18em] text-sky-600">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenDispatch?.();
+          }}
+          className="flex w-full items-center justify-center gap-2 border-t border-sky-500/10 bg-sky-500/10 px-6 py-4 text-xs font-black uppercase tracking-[0.18em] text-sky-600 transition-all hover:bg-sky-500 hover:text-white active:scale-[0.99]"
+        >
           <Truck size={16} />
           {isAr ? 'يتسلم من شاشة التوصيل' : 'Send from dispatch screen'}
-        </div>
+        </button>
       ) : (
         <button
           type="button"

@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import * as budgetController from '../controllers/budgetController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
 
-const financeAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR');
+const financeAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR'],
+    ['OP_MANAGE_BUDGETS'],
+);
 
 // Read
 router.get('/', budgetController.getBudgets);

@@ -390,7 +390,7 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
     );
 
     const renderActions = () => (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="p-4 lg:p-6 grid grid-cols-1 gap-3 bg-card overflow-y-auto pos-scroll">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="p-4 lg:p-6 grid grid-cols-1 gap-3 bg-card overflow-y-auto pos-scroll min-h-0 max-h-[calc(100dvh-15rem)]">
             {/* Hero: edit + pay */}
             <div className="grid grid-cols-1 gap-3">
                 {activeOrder && (
@@ -595,7 +595,7 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
             : targetStatus === TableStatus.AVAILABLE ? availableTables : occupiedTables;
         return (
             <motion.div initial={{ opacity: 0, x: isRTL ? -20 : 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: isRTL ? 20 : -20 }} className="flex h-full min-h-0 flex-col bg-card">
-                <div className="flex-1 overflow-y-auto pos-scroll p-4 lg:p-6">
+                <div className="flex-1 min-h-0 overflow-y-auto pos-scroll p-4 lg:p-6 max-h-[36dvh] sm:max-h-[44dvh] lg:max-h-[52dvh]">
                     <div className="flex items-center justify-between gap-3 mb-3">
                         <h3 className="text-[11px] font-black text-muted uppercase tracking-widest flex items-center gap-2">
                             <Users size={15} className="text-primary" /> {t.select_target}
@@ -650,7 +650,7 @@ const TableManagementModal: React.FC<TableManagementModalProps> = ({
 
     const renderItemSelector = () => (
         <motion.div initial={{ opacity: 0, x: isRTL ? -20 : 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: isRTL ? 20 : -20 }} className="flex h-full min-h-0 flex-col bg-card">
-            <div className="flex-1 overflow-y-auto pos-scroll p-4 lg:p-6">
+            <div className="flex-1 min-h-0 overflow-y-auto pos-scroll p-4 lg:p-6 max-h-[36dvh] sm:max-h-[44dvh] lg:max-h-[52dvh]">
                 <div className="flex items-center justify-between gap-3 mb-3">
                     <h3 className="text-[11px] font-black text-muted uppercase tracking-widest flex items-center gap-2">
                         <ShoppingCart size={15} className="text-primary" /> {t.select_items}

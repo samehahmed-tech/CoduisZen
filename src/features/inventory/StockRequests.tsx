@@ -48,8 +48,17 @@ const StockRequests: React.FC = () => {
     const { confirm } = useConfirm();
     const toast = useToast();
 
+    const userRole = useAuthStore((s: any) => String(s.user?.role || '').toUpperCase());
+    // Review/dispatch/receive move other branches' stock: warehouse managers
+    // and above. Creators can still file and cancel their own requests.
+    const canReviewStockRequests = ['SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'WAREHOUSE_DIRECTOR', 'WAREHOUSE_STAFF', 'CAFE_ADMIN'].includes(userRole);
+    const denyStockReview = () => {
+        toast.error(lang === 'ar' ? 'مراجعة الطلبيات لمسؤولي المخازن فقط' : 'Request review is restricted to warehouse staff');
+        return false;
+    };
+
     const {
-        inventory, warehouses, transferRequests,
+        inventory, warehouses, transferRequests, incomingTransferRequests,
         fetchInventory, fetchWarehouses,
         fetchTransferRequests, fetchIncomingTransferRequests,
         createTransferRequest, approveTransferRequest,
@@ -59,6 +68,7 @@ const StockRequests: React.FC = () => {
             inventory: s.inventory,
             warehouses: s.warehouses,
             transferRequests: s.transferRequests,
+            incomingTransferRequests: s.incomingTransferRequests,
             fetchInventory: s.fetchInventory,
             fetchWarehouses: s.fetchWarehouses,
             fetchTransferRequests: s.fetchTransferRequests,
@@ -110,21 +120,25 @@ const StockRequests: React.FC = () => {
 
     useEffect(() => { load(); }, [load]);
 
+    // Each tab reads its own slice — sharing one array used to let a tab
+    // switch overwrite the other tab's list and counts.
+    const visibleRequests = tab === 'mine' ? (transferRequests || []) : (incomingTransferRequests || []);
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return (transferRequests || []).filter((r: any) => {
+        return visibleRequests.filter((r: any) => {
             if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
             if (!q) return true;
             const hay = `${r.id} ${branchName(r.branchId)} ${warehouseName(r.destinationWarehouseId)} ${(r.items || []).map((i: any) => i.itemName).join(' ')}`.toLowerCase();
             return hay.includes(q);
         });
-    }, [transferRequests, statusFilter, search]);
+    }, [visibleRequests, statusFilter, search]);
 
     const counts = useMemo(() => {
-        const c: Record<string, number> = { ALL: (transferRequests || []).length };
-        for (const r of transferRequests || []) c[r.status] = (c[r.status] || 0) + 1;
+        const c: Record<string, number> = { ALL: visibleRequests.length };
+        for (const r of visibleRequests) c[r.status] = (c[r.status] || 0) + 1;
         return c;
-    }, [transferRequests]);
+    }, [visibleRequests]);
 
     const runAction = async (id: string, fn: () => Promise<any>, okMsg: string) => {
         setBusyId(id);
@@ -146,9 +160,12 @@ const StockRequests: React.FC = () => {
     };
 
     const handleCancel = (r: any) => {
+        const inTransit = String(r.status) === 'DISPATCHED';
         confirm({
             title: lang === 'ar' ? 'إلغاء الطلبية' : 'Cancel request',
-            message: lang === 'ar' ? `إلغاء الطلبية ${r.id}؟ سيتم تحرير أي كميات محجوزة.` : `Cancel request ${r.id}? Reserved quantities will be released.`,
+            message: inTransit
+                ? (lang === 'ar' ? `إلغاء الطلبية ${r.id} وهي في الطريق؟ سيتم تحرير الحجوزات — تأكد أن البضاعة لم تُستلم.` : `Cancel request ${r.id} while in transit? Reservations release — confirm goods were not received.`)
+                : (lang === 'ar' ? `إلغاء الطلبية ${r.id}؟ سيتم تحرير أي كميات محجوزة.` : `Cancel request ${r.id}? Reserved quantities will be released.`),
             confirmText: lang === 'ar' ? 'إلغاء الطلبية' : 'Cancel request',
             cancelText: lang === 'ar' ? 'تراجع' : 'Back',
             variant: 'danger',
@@ -157,9 +174,18 @@ const StockRequests: React.FC = () => {
         });
     };
 
-    const reviewRequest = transferRequests.find((r: any) => r.id === reviewId) || null;
+    const guardReviewAction = () => {
+        if (canReviewStockRequests) return true;
+        denyStockReview();
+        return false;
+    };
 
-    if (loading && (transferRequests || []).length === 0) return <PageSkeleton type="table" rows={6} />;
+    const reviewRequest = visibleRequests.find((r: any) => r.id === reviewId)
+        || transferRequests.find((r: any) => r.id === reviewId)
+        || incomingTransferRequests.find((r: any) => r.id === reviewId)
+        || null;
+
+    if (loading && visibleRequests.length === 0) return <PageSkeleton type="table" rows={6} />;
 
     return (
         <div className="px-4 md:px-8 lg:px-10 py-6 space-y-6 max-w-7xl mx-auto">
@@ -267,7 +293,7 @@ const StockRequests: React.FC = () => {
                                         {r.status === 'REQUESTED' && tab === 'incoming' && (
                                             <button
                                                 disabled={busy}
-                                                onClick={() => setReviewId(r.id)}
+                                                onClick={() => { if (guardReviewAction()) setReviewId(r.id); }}
                                                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition-all disabled:opacity-50"
                                             >
                                                 <Search size={14} />
@@ -277,7 +303,7 @@ const StockRequests: React.FC = () => {
                                         {r.status === 'RESERVED' && (
                                             <button
                                                 disabled={busy}
-                                                onClick={() => runAction(r.id, () => dispatchTransferRequest(r.id), lang === 'ar' ? 'تم صرف الطلبية' : 'Request dispatched')}
+                                                onClick={() => { if (guardReviewAction()) runAction(r.id, () => dispatchTransferRequest(r.id), lang === 'ar' ? 'تم صرف الطلبية' : 'Request dispatched'); }}
                                                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black transition-all disabled:opacity-50"
                                             >
                                                 <Truck size={14} />
@@ -287,14 +313,14 @@ const StockRequests: React.FC = () => {
                                         {r.status === 'DISPATCHED' && (
                                             <button
                                                 disabled={busy}
-                                                onClick={() => runAction(r.id, () => receiveTransferRequest(r.id), lang === 'ar' ? 'تم استلام الطلبية' : 'Request received')}
+                                                onClick={() => { if (guardReviewAction()) runAction(r.id, () => receiveTransferRequest(r.id), lang === 'ar' ? 'تم استلام الطلبية' : 'Request received'); }}
                                                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-all disabled:opacity-50"
                                             >
                                                 <PackageCheck size={14} />
                                                 {lang === 'ar' ? 'استلام' : 'Receive'}
                                             </button>
                                         )}
-                                        {['REQUESTED', 'RESERVED'].includes(r.status) && (
+                                        {['REQUESTED', 'RESERVED', 'DISPATCHED'].includes(r.status) && (
                                             <button
                                                 disabled={busy}
                                                 onClick={() => handleCancel(r)}
@@ -370,6 +396,7 @@ const StockRequests: React.FC = () => {
                     request={reviewRequest}
                     warehouses={warehouses}
                     inventory={inventory}
+                    onRefreshStock={() => fetchInventory().catch(() => {})}
                     branchName={branchName(rSafe(reviewRequest)?.branchId)}
                     onClose={() => setReviewId(null)}
                     onApprove={async (sourceWarehouseId, lines) => {
@@ -538,7 +565,8 @@ const ReviewModal: React.FC<{
     onClose: () => void;
     onApprove: (sourceWarehouseId: string, lines: Array<{ itemId: string; approvedQty: number }>) => Promise<void>;
     onCancelRequest: () => Promise<void>;
-}> = ({ lang, request, warehouses, inventory, branchName, onClose, onApprove, onCancelRequest }) => {
+    onRefreshStock?: () => void;
+}> = ({ lang, request, warehouses, inventory, branchName, onClose, onApprove, onCancelRequest, onRefreshStock }) => {
     const candidates = useMemo(() => {
         const list = (warehouses || []).filter((w: any) => w.isActive !== false && w.branchId !== request.branchId);
         return [...list].sort((a: any, b: any) => (a.type === 'MAIN' ? -1 : 0) - (b.type === 'MAIN' ? -1 : 0));
@@ -555,12 +583,25 @@ const ReviewModal: React.FC<{
         return Number(item?.warehouseQuantities?.find((wq: any) => wq.warehouseId === sourceId)?.quantity || 0);
     };
 
+    // Stock snapshot refreshes on open and whenever the source warehouse
+    // changes — approving against a stale snapshot over-reserves.
+    React.useEffect(() => { onRefreshStock?.(); }, [sourceId]);
     const lines = (request.items || []).map((it: any) => ({ itemId: it.itemId, approvedQty: Number(edits[it.itemId] ?? it.requestedQty) }));
     const totalApproved = lines.reduce((s: number, l: any) => s + (l.approvedQty > 0 ? l.approvedQty : 0), 0);
     const shortfalls = lines.filter((l: any) => l.approvedQty > stockOf(l.itemId));
 
     const submit = async (asIs: boolean) => {
         if (!sourceId || saving) return;
+        // "Accept as-is" previously bypassed the shortfall guard entirely.
+        // It now needs an explicit override when stock can't cover it.
+        if (asIs) {
+            const gaps = (request.items || []).filter((it: any) => Number(it.requestedQty) > stockOf(it.itemId));
+            if (gaps.length > 0 && !window.confirm(lang === 'ar'
+                ? `يوجد عجز في ${gaps.length} أصناف عن المتاح — قبول رغم العجز؟ (سيفشل الصرف لاحقاً)`
+                : `${gaps.length} lines exceed available stock — accept anyway? (dispatch will fail later)`)) {
+                return;
+            }
+        }
         setSaving(true);
         try {
             const payload = asIs

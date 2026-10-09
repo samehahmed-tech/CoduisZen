@@ -133,6 +133,8 @@ CREATE TABLE branches (
     phone               nvarchar(max),
     email               nvarchar(max),
     is_active           bit             DEFAULT 1,
+    lat                 real            NULL,
+    lng                 real            NULL,
     timezone            nvarchar(max)   DEFAULT 'Africa/Cairo',
     currency            nvarchar(max)   DEFAULT 'EGP',
     tax_rate            real            DEFAULT 14,
@@ -156,6 +158,8 @@ CREATE TABLE delivery_zones (
     min_order_amount    real            DEFAULT 0,
     estimated_time      int             DEFAULT 45,
     is_active           bit             DEFAULT 1,
+    lat                 real            NULL,
+    lng                 real            NULL,
     CONSTRAINT pk_delivery_zones PRIMARY KEY (id),
     CONSTRAINT fk_delivery_zones_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
 );

@@ -14,13 +14,17 @@
 
 /* Layout: sidebar, topbar, neo-ui shell */
 @import "./styles/layout/sidebar.css";
+@import "./styles/layout/sidebar-worlds.css";
 @import "./styles/layout/kds-theme.css";
 @import "./styles/layout/topbar.css";
 @import "./styles/layout/neo-ui.css";
 @import "./styles/layout/pos-responsive.css";
 @import "./styles/layout/pos-tilt-card.css";
 @import "./styles/layout/pos-zen-cards.css";
+@import "./styles/layout/dashboard-x.css";
+@import "./styles/themes/dashboard-personalities.css";
 @import "./styles/layout/tiles.css";
+@import "./styles/layout/responsive-plus.css";
 
 /* Globals: glass tokens first, then premium, scrollbar, wallpaper */
 @import "./styles/globals/glass-surfaces.css";
@@ -34,6 +38,7 @@
    rules keep winning via higher specificity. */
 @import "./styles/engine/theme-overrides.css";
 @import "./styles/engine/theme-operations.css";
+@import "./styles/engine/theme-worlds.css";
 
 /* UX Elevation LAST: unifies motion/hierarchy/a11y without changing identity. */
 @import "./styles/engine/ux-elevation.css";
@@ -42,6 +47,12 @@
    view-transition polish. Rest states identical; reduced-motion + lite-tier
    guards live inside the file. */
 @import "./styles/engine/fluid-motion.css";
+@import "./styles/engine/dashboard-hover.css";
+@import "./styles/engine/background-engine.css";
+@import "./styles/engine/motion-fx.css";
+
+/* Responsive guardrails LAST: phone-only safety net, wins over layout. */
+@import "./styles/layout/responsive-guard.css";
 
 @theme {
   --font-sans: "Cairo", system-ui, sans-serif;
@@ -307,7 +318,7 @@ h6,
 /* ═══════════════════════════════════════════════════════════════════════════
    ACCESSIBILITY
    ═══════════════════════════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
+html[data-motion="off"] {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

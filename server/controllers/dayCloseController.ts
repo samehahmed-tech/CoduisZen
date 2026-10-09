@@ -93,6 +93,12 @@ const buildExportReport = async (branchId: string, date: string) => {
     if (!report.fiscalHealth) report.fiscalHealth = await dayCloseService.getFiscalHealth(branchId, date);
     if (!report.financeHealth) report.financeHealth = await dayCloseService.getFinanceHealth(branchId, date);
     if (!report.sideEffectHealth) report.sideEffectHealth = await dayCloseService.getSideEffectHealth(branchId, date);
+    if (!(report as any).shiftCashSummary) {
+        const closedShifts = (report as any).closedSnapshot?.shifts;
+        (report as any).shiftCashSummary = closedShifts?.expectedCash !== undefined
+            ? { expectedCash: Number(closedShifts.expectedCash || 0), actualCash: Number(closedShifts.actualCash || 0), variance: Number(closedShifts.variance ?? 0) }
+            : await dayCloseService.getShiftCashSummary(branchId, date);
+    }
     return report;
 };
 
@@ -154,6 +160,17 @@ export const closeDay = async (req: Request, res: Response) => {
                 blockedReasons: error.blockedReasons || [],
                 details: {
                     blockedReasons: error.blockedReasons || [],
+                    rules: (error as any).rules,
+                },
+            });
+        }
+        if (error?.message === 'DAY_CLOSE_OVERRIDE_DISABLED') {
+            return res.status(403).json({
+                error: error.message,
+                message: 'Manager override is disabled in day-close settings',
+                blockedReasons: error.blockedReasons || [],
+                details: {
+                    blockedReasons: error.blockedReasons || [],
                 },
             });
         }
@@ -197,6 +214,31 @@ export const updateBusinessDate = async (req: Request, res: Response) => {
         if (code === 'OPEN_SHIFTS_EXIST_FOR_BUSINESS_DATE_CHANGE' || code === 'BUSINESS_DATE_ALREADY_CLOSED') {
             return res.status(409).json({ error: code });
         }
+        res.status(500).json({ error: code });
+    }
+};
+
+/**
+ * Reopen a wrongly-closed business day (undo close).
+ * POST /api/day-close/:branchId/:date/reopen
+ * Manager-only (route gate). Requires a written reason.
+ */
+export const reopenDay = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.params.branchId as string;
+        const date = req.params.date as string;
+        const userId = req.user?.id;
+        const reason = String(req.body?.reason || '').trim();
+        if (!branchId || !date) return res.status(400).json({ error: 'BRANCH_ID_AND_DATE_REQUIRED' });
+        if (!userId) return res.status(401).json({ error: 'AUTH_REQUIRED' });
+        if (reason.length < 3) return res.status(400).json({ error: 'REOPEN_REASON_REQUIRED' });
+
+        const result = await dayCloseService.reopenDay(branchId, date, userId, reason);
+        res.json({ success: true, message: 'Business day reopened', ...result });
+    } catch (error: any) {
+        const code = String(error?.message || 'DAY_REOPEN_FAILED');
+        if (code === 'INVALID_BUSINESS_DATE' || code === 'REOPEN_REASON_REQUIRED') return res.status(400).json({ error: code });
+        if (code === 'DAY_NOT_CLOSED' || code === 'BRANCH_NOT_FOUND') return res.status(404).json({ error: code });
         res.status(500).json({ error: code });
     }
 };

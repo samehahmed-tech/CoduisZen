@@ -1,571 +1,252 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl" data-theme="light">
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RestoFlow — Dashboard Concept</title>
+<title>Coduis Xen — Dashboard Concept v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-/* ============ TOKENS ============ */
-:root{
-  --bg:#f3f1ea; --surface:#ffffff; --surface2:#faf8f2; --ink:#1b1e23; --muted:#8b9099;
-  --line:#e8e2d3; --line2:#f0ebdd;
-  --brand:#4f46e5; --brand2:#0ea5e9; --brand-soft:rgba(79,70,229,.10);
-  --ok:#16a34a; --ok-soft:rgba(22,163,74,.12);
-  --warn:#d97706; --warn-soft:rgba(217,119,6,.13);
-  --bad:#e11d48; --bad-soft:rgba(225,29,72,.10);
-  --gold:#b45309;
-  --r:20px; --r-sm:14px;
-  --shadow:0 1px 2px rgba(20,22,26,.05),0 14px 34px -16px rgba(20,22,26,.20);
-  --shadow-sm:0 1px 2px rgba(20,22,26,.07);
-  --sidebar-w:248px;
-}
-[data-theme="dark"]{
-  --bg:#0c0f16; --surface:#141923; --surface2:#191f2c; --ink:#f1ede4; --muted:#98a0ae;
-  --line:#263041; --line2:#1e2534;
-  --brand:#818cf8; --brand2:#38bdf8; --brand-soft:rgba(129,140,248,.13);
-  --ok:#4ade80; --ok-soft:rgba(74,222,128,.12);
-  --warn:#fbbf24; --warn-soft:rgba(251,191,36,.13);
-  --bad:#fb7185; --bad-soft:rgba(251,113,133,.12);
-  --gold:#fbbf24;
-  --shadow:0 2px 4px rgba(0,0,0,.45),0 18px 44px -14px rgba(0,0,0,.6);
-  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Cairo,system-ui,sans-serif;transition:background .25s,color .25s;-webkit-font-smoothing:antialiased}
-.num{font-variant-numeric:tabular-nums}
-button{font-family:inherit}
-/* ============ SHELL ============ */
-.shell{display:flex;min-height:100vh}
-/* ---- Sidebar ---- */
-.side{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-inline-end:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;z-index:60;transition:width .22s,transform .25s}
-.brand{display:flex;align-items:center;gap:11px;padding:20px 18px 14px}
-.logo{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#4f46e5,#0ea5e9);display:grid;place-items:center;color:#fff;font-weight:900;font-size:19px;flex-shrink:0;box-shadow:0 6px 14px -6px rgba(79,70,229,.6)}
-.brand b{font-size:16px;display:block;line-height:1.2}
-.brand small{color:var(--muted);font-size:11px}
-.navlabel{font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--muted);padding:12px 22px 6px}
-.nav{display:flex;flex-direction:column;gap:2px;padding:0 12px;overflow-y:auto}
-.nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;color:var(--muted);text-decoration:none;font-weight:700;font-size:13.5px;transition:.15s;position:relative;white-space:nowrap}
-.nav a:hover{background:var(--surface2);color:var(--ink)}
-.nav a.on{background:var(--brand-soft);color:var(--brand)}
-.nav a.on::before{content:"";position:absolute;inset-inline-start:-12px;top:8px;bottom:8px;width:4px;border-radius:99px;background:var(--brand)}
-.nav a .ico{width:22px;text-align:center;font-size:17px;flex-shrink:0}
-.nav a .bdg{margin-inline-start:auto;background:var(--bad);color:#fff;font-size:10.5px;font-weight:900;min-width:22px;height:22px;border-radius:99px;display:grid;place-items:center;padding:0 6px}
-.nav a .bdg.blue{background:var(--brand)}
-.sidefoot{margin-top:auto;padding:14px;border-top:1px solid var(--line2)}
-.branchcard{background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:11px 12px;display:flex;gap:10px;align-items:center}
-.branchcard .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px var(--ok-soft);flex-shrink:0;animation:blink 2s infinite}
-@keyframes blink{50%{opacity:.55}}
-.branchcard b{font-size:12.5px;display:block}
-.branchcard small{color:var(--muted);font-size:11px}
-.userchip{display:flex;gap:10px;align-items:center;margin-top:10px;padding:4px}
-.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;display:grid;place-items:center;font-weight:900;font-size:14px;flex-shrink:0}
-.userchip b{font-size:12.5px;display:block}.userchip small{color:var(--muted);font-size:11px}
-/* ---- Main ---- */
-.main{flex:1;min-width:0;display:flex;flex-direction:column}
-.topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:12px 26px;display:flex;align-items:center;gap:12px}
-.menubtn{display:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:18px;cursor:pointer}
-.search{flex:1;max-width:420px;position:relative}
-.search input{width:100%;height:44px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:13px;padding:0 42px 0 14px;font:700 13px Cairo;outline:none;transition:.2s}
-[dir="rtl"] .search input{padding:0 14px 0 42px}
-.search input:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
-.search .sico{position:absolute;top:11px;font-size:17px;color:var(--muted);inset-inline-start:14px}
-.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
-.seg button{border:0;background:none;color:var(--muted);font-weight:800;font-size:12px;padding:8px 16px;border-radius:999px;cursor:pointer;transition:.15s;white-space:nowrap}
-.seg button.on{background:var(--ink);color:var(--bg)}
-.clock{text-align:center;line-height:1.3;min-width:86px}
-.clock b{font-size:16px;display:block}.clock small{color:var(--muted);font-size:11px}
-.iconbtn{width:44px;height:44px;border-radius:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;font-size:18px;position:relative;transition:.15s;display:grid;place-items:center}
-.iconbtn:hover{border-color:var(--brand);color:var(--brand)}
-.iconbtn .ping{position:absolute;top:10px;inset-inline-end:11px;width:9px;height:9px;border-radius:50%;background:var(--bad);border:2px solid var(--surface)}
-.wrap{padding:24px 26px 70px;max-width:1460px;width:100%;margin:0 auto}
-/* ---- Hero strip ---- */
-.hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px}
-.hero h2{margin:0;font-size:clamp(20px,2.6vw,27px);font-weight:900}
-.hero h2 .wave{display:inline-block;animation:wave 2.4s infinite;transform-origin:70% 70%}
-@keyframes wave{0%,60%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-8deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-4deg)}}
-.hero p{margin:2px 0 0;color:var(--muted);font-size:13px}
-.hero .sp{flex:1}
-.btn{border:0;border-radius:13px;font-weight:900;font-size:13.5px;padding:12px 20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s;text-decoration:none}
-.btn.pri{background:var(--brand);color:#fff;box-shadow:0 8px 18px -8px var(--brand)}
-.btn.pri:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.btn.gho{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
-.btn.gho:hover{border-color:var(--brand);color:var(--brand)}
-.statuspill{display:inline-flex;align-items:center;gap:8px;background:var(--ok-soft);color:var(--ok);font-weight:900;font-size:12px;border-radius:999px;padding:8px 15px}
-.statuspill i{width:8px;height:8px;border-radius:50%;background:currentColor;animation:blink 1.6s infinite}
-/* ---- Grid + cards ---- */
-.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow-sm);padding:20px;min-width:0;position:relative;overflow:hidden}
-.card h4{margin:0;font-size:14.5px;font-weight:900}
-.card .sub{margin:3px 0 0;font-size:12px;color:var(--muted)}
-.chead{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
-.chead .more{margin-inline-start:auto;color:var(--muted);background:none;border:0;font-size:16px;cursor:pointer;letter-spacing:2px;line-height:1}
-.s4{grid-column:span 3}.s6{grid-column:span 6}.s8{grid-column:span 8}.s12{grid-column:span 12}
-/* KPI */
-.kpi{display:flex;flex-direction:column;gap:2px}
-.kpi .top{display:flex;align-items:center;gap:10px}
-.kpi .kico{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:19px;flex-shrink:0}
-.k1 .kico{background:var(--brand-soft);color:var(--brand)}
-.k2 .kico{background:var(--ok-soft);color:var(--ok)}
-.k3 .kico{background:var(--warn-soft);color:var(--warn)}
-.k4 .kico{background:var(--bad-soft);color:var(--bad)}
-.kpi .t{font-size:12px;color:var(--muted);font-weight:700}
-.kpi .v{font-size:clamp(22px,2.2vw,29px);font-weight:900;line-height:1.25}
-.kpi .v small{font-size:13px;color:var(--muted);font-weight:700}
-.kpi .row{display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap}
-.delta{font-size:11.5px;font-weight:900;border-radius:99px;padding:3px 10px;display:inline-flex;align-items:center;gap:4px}
-.delta.up{background:var(--ok-soft);color:var(--ok)}
-.delta.dn{background:var(--bad-soft);color:var(--bad)}
-.vs{font-size:11px;color:var(--muted)}
-.spark{margin-top:10px}
-/* Chart */
-.tabs{display:flex;gap:4px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:3px}
-.tabs button{border:0;background:none;font-size:12px;font-weight:800;color:var(--muted);padding:7px 14px;border-radius:8px;cursor:pointer}
-.tabs button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
-.chartwrap{position:relative;margin-top:6px}
-#revchart{width:100%;height:290px;display:block}
-.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;font-weight:800;border-radius:10px;padding:7px 12px;transform:translate(-50%,-115%);white-space:nowrap;opacity:0;transition:opacity .12s;z-index:5}
-.tip small{opacity:.65;font-weight:700}
-.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted);font-weight:700}
-.legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-inline-end:6px}
-/* Live ops */
-.livehead{display:flex;align-items:center;gap:8px}
-.livedot{width:9px;height:9px;border-radius:50%;background:var(--bad);animation:blink 1.2s infinite}
-.opgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
-.op{background:var(--surface2);border:1px solid var(--line2);border-radius:var(--r-sm);padding:12px;text-align:center}
-.op b{font-size:19px;display:block}
-.op span{font-size:11px;color:var(--muted);font-weight:700}
-.op .bar{height:6px;border-radius:99px;background:var(--line2);margin-top:8px;overflow:hidden}
-.op .bar i{display:block;height:100%;border-radius:99px;transition:width .6s}
-.feed{display:flex;flex-direction:column;gap:8px;max-height:228px;overflow:hidden;margin-top:4px}
-.feed .it{display:flex;gap:10px;align-items:center;background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:9px 11px;font-size:12px;animation:slidein .4s}
-@keyframes slidein{from{opacity:0;transform:translateY(-8px)}}
-.feed .it .a{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:15px;flex-shrink:0;font-weight:900;color:#fff}
-.feed .it b{display:block;font-size:12.5px}
-.feed .it small{color:var(--muted);font-size:11px}
-.feed .it .pr{margin-inline-start:auto;font-weight:900;font-size:13px;white-space:nowrap}
-/* Lists */
-.rank{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line2)}
-.rank:last-child{border:0}
-.rank .n{width:28px;height:28px;border-radius:9px;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center;font-weight:900;font-size:12px;flex-shrink:0;color:var(--muted)}
-.rank:first-child .n{background:var(--gold);border-color:transparent;color:#fff}
-.rank .t{flex:1;min-width:0}
-.rank .t b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rank .t small{color:var(--muted);font-size:11px}
-.rank .r{text-align:end}
-.rank .r b{font-size:13.5px;display:block}
-.rank .qb{height:5px;border-radius:99px;background:var(--line2);margin-top:6px;overflow:hidden;min-width:90px}
-.rank .qb i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
-/* Donut */
-.donutbox{display:flex;align-items:center;gap:18px;margin-top:6px}
-.donut{position:relative;width:150px;height:150px;flex-shrink:0}
-.donut svg{transform:rotate(-90deg)}
-.donut .ctr{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
-.donut .ctr b{font-size:21px}
-.donut .ctr small{color:var(--muted);font-size:11px}
-.lgnd{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
-.lgnd .r{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700}
-.lgnd .r i{width:11px;height:11px;border-radius:4px;flex-shrink:0}
-.lgnd .r b{margin-inline-start:auto}
-/* Bars */
-.barrow{margin:13px 0}
-.barrow .lr{display:flex;font-size:12.5px;font-weight:800;margin-bottom:6px}
-.barrow .lr b{margin-inline-start:auto}
-.barrow .tr{height:10px;border-radius:99px;background:var(--line2);overflow:hidden}
-.barrow .tr i{display:block;height:100%;border-radius:99px;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
-/* Table */
-.tblwrap{overflow-x:auto;margin:0 -20px;padding:0 20px}
-table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
-th{text-align:start;font-size:11px;color:var(--muted);font-weight:800;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:11px 10px;border-bottom:1px solid var(--line2);font-weight:700;white-space:nowrap}
-tr:last-child td{border:0}
-tbody tr{transition:.12s}
-tbody tr:hover{background:var(--surface2)}
-.bname{display:flex;align-items:center;gap:10px}
-.bname .av{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:900;font-size:13px;flex-shrink:0}
-.pill{font-size:11px;font-weight:900;border-radius:99px;padding:4px 11px}
-.pill.ok{background:var(--ok-soft);color:var(--ok)}
-.pill.warn{background:var(--warn-soft);color:var(--warn)}
-.mbar{height:6px;border-radius:99px;background:var(--line2);overflow:hidden;min-width:100px}
-.mbar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2))}
-/* Alerts */
-.alert{display:flex;gap:11px;padding:11px;border:1px solid var(--line2);border-radius:var(--r-sm);margin-bottom:10px;background:var(--surface2);align-items:flex-start}
-.alert .ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:16px;flex-shrink:0}
-.alert.r .ic{background:var(--bad-soft);color:var(--bad)}
-.alert.y .ic{background:var(--warn-soft);color:var(--warn)}
-.alert.b .ic{background:var(--brand-soft);color:var(--brand)}
-.alert b{font-size:12.5px;display:block}
-.alert small{color:var(--muted);font-size:11.5px;display:block;margin-top:1px}
-.alert .act{margin-inline-start:auto;display:flex;gap:6px;flex-shrink:0}
-.alert .act button{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:11px;font-weight:900;border-radius:9px;padding:7px 12px;cursor:pointer}
-.alert .act button:hover{border-color:var(--brand);color:var(--brand)}
-.alert .act button.solid{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-/* Staff */
-.staffrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
-.staff{display:flex;align-items:center;gap:9px;background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:7px 12px 7px 7px;font-size:12px;font-weight:800}
-[dir="rtl"] .staff{padding:7px 7px 7px 12px}
-.staff .avatar{width:30px;height:30px;font-size:12px}
-.staff small{color:var(--ok);font-size:10.5px}
-.health{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--muted);font-weight:700;flex-wrap:wrap}
-.health .ok{color:var(--ok)}
-/* Toast */
-.toast{position:fixed;bottom:22px;inset-inline:0;margin:0 auto;width:max-content;max-width:92vw;background:var(--ink);color:var(--bg);font-weight:800;font-size:13px;padding:12px 22px;border-radius:999px;box-shadow:var(--shadow);z-index:200;display:flex;gap:9px;align-items:center;opacity:0;transform:translateY(12px);transition:.3s;pointer-events:none}
-.toast.show{opacity:1;transform:none}
-/* Overlay for mobile drawer */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55;opacity:0;pointer-events:none;transition:.25s}
-.scrim.show{opacity:1;pointer-events:auto}
-/* ============ RESPONSIVE ============ */
-@media(max-width:1380px){.s4{grid-column:span 6}.s8,.s6{grid-column:span 12}}
-@media(max-width:1180px){
-  :root{--sidebar-w:78px}
-  .side{width:78px}
-  .side .brand b,.side .brand small,.nav a span.tx,.nav a .bdg,.navlabel,.sidefoot .branchcard div,.sidefoot .userchip div{display:none}
-  .nav a{justify-content:center;padding:12px}
-  .sidefoot .branchcard,.sidefoot .userchip{justify-content:center}
-  .brand{justify-content:center;padding:20px 0 14px}
-}
-@media(max-width:900px){
-  .side{position:fixed;inset-inline-start:0;transform:translateX(100%);width:264px;box-shadow:var(--shadow)}
-  [dir="ltr"] .side{transform:translateX(-100%)}
-  .side.open{transform:none}
-  .side .brand b,.side .brand small,.nav a span.tx,.nav a .bdg,.navlabel,.sidefoot .branchcard div,.sidefoot .userchip div{display:block}
-  .nav a{justify-content:flex-start}
-  .nav a span.tx{display:inline}
-  .menubtn{display:grid}
-  .wrap{padding:16px 14px 70px}
-  .topbar{padding:10px 14px;flex-wrap:wrap}
-  .search{order:5;flex-basis:100%;max-width:none}
-  .clock{display:none}
-  .s4{grid-column:span 6}
-  .kpi .v{font-size:20px}
-  .card{padding:16px}
-  /* Branches table -> stacked cards */
-  .tblwrap{overflow:visible;margin:0;padding:0}
-  table,thead,tbody,tr,td{display:block;min-width:0}
-  thead{display:none}
-  tbody tr{background:var(--surface2);border:1px solid var(--line2);border-radius:14px;margin-bottom:10px;padding:6px 12px}
-  tbody tr td{border:0;padding:7px 2px;display:flex;align-items:center;gap:8px}
-  tbody tr td::before{content:attr(data-l);font-size:11px;color:var(--muted);font-weight:700;min-width:74px}
-}
-@media(max-width:560px){
-  .s4{grid-column:span 12}
-  .hero .btn span.bt{display:none}
-  .hero .btn{padding:12px 14px}
-  .opgrid{grid-template-columns:1fr 1fr}
-  .donutbox{flex-direction:column}
-  .seg button{padding:8px 11px;font-size:11.5px}
-}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:root{--bg:#07090e;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.09);--txt:#f1f5f9;--mut:#93a3b8;--amber:#fbbf24;--teal:#2dd4bf;--rose:#fb7185;--ind:#818cf8;--grn:#34d399}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Tajawal","Cairo",system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100dvh;padding-bottom:44px;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(1000px 480px at 82% -10%,rgba(251,191,36,.08),transparent 60%),radial-gradient(900px 560px at 4% 108%,rgba(45,212,191,.09),transparent 60%),radial-gradient(700px 500px at 50% 55%,rgba(129,140,248,.05),transparent 65%)}
+.tick{position:relative;z-index:1;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02);font-size:11px;font-weight:700;color:var(--mut);padding:7px 0}
+.tick .in{display:inline-block;animation:mq 28s linear infinite}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(50%)}}
+html[dir="ltr"] .tick .in{animation-name:mql}
+@keyframes mql{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tick b{color:var(--txt)}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:12px 22px;background:rgba(7,9,14,.78);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.logo{font-family:"Cairo";font-weight:900;letter-spacing:.1em;font-size:15px}
+.logo b{color:var(--amber)}
+.cmd{flex:1;min-width:140px;max-width:420px;display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:12px;padding:8px 13px;font-size:12px;color:var(--mut);cursor:text}
+.cmd kbd{margin-inline-start:auto;font-size:10px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;background:rgba(255,255,255,.05);font-family:inherit}
+.tabs{display:flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:3px}
+.tabs button{border:0;background:transparent;color:var(--mut);font-family:inherit;font-size:11.5px;font-weight:800;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.2s}
+.tabs button.on{background:linear-gradient(135deg,rgba(251,191,36,.25),rgba(45,212,191,.16));color:#fff;box-shadow:inset 0 0 0 1px rgba(251,191,36,.4)}
+.chipbtn{cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--mut);border-radius:12px;padding:8px 13px;font-size:11px;font-weight:800;font-family:inherit}
+.chipbtn:hover{color:#fff;border-color:rgba(251,191,36,.5)}
+select.chipbtn{appearance:none}
+select.chipbtn option{background:#141821;color:#f1f5f9}
+.wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:20px 22px;display:flex;flex-direction:column;gap:16px}
+.grid12{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.c4{grid-column:span 4}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
+@media(max-width:1100px){.c4,.c8,.c6{grid-column:span 6}}
+@media(max-width:760px){.c4,.c8,.c6{grid-column:span 12}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;backdrop-filter:blur(14px);animation:up .55s cubic-bezier(.16,1,.3,1) both;transition:transform .22s,border-color .22s,box-shadow .22s}
+.card:hover{transform:translateY(-3px);border-color:rgba(251,191,36,.28);box-shadow:0 18px 44px -20px rgba(0,0,0,.7)}
+.card h3{font-family:"Cairo";font-size:15px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.card h3 .tag{font-size:9.5px;font-family:"Tajawal";font-weight:800;color:#0b0f0e;background:var(--amber);border-radius:999px;padding:2px 9px}
+.card .sub{font-size:11.5px;color:var(--mut);margin-bottom:12px}
+.hero-num{font-family:"Cairo";font-weight:900;font-size:clamp(38px,4.5vw,58px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.hero-num small{font-size:14px;color:var(--mut);font-weight:700}
+.hero-dlt{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:rgba(52,211,153,.12);color:var(--grn);margin-top:8px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:15px 16px;animation:up .55s cubic-bezier(.16,1,.3,1) both;transition:transform .2s,border-color .2s}
+.kpi:hover{transform:translateY(-3px);border-color:rgba(251,191,36,.3)}
+.kpi .lab{font-size:11px;color:var(--mut);font-weight:700}
+.kpi .val{font-family:"Cairo";font-size:24px;font-weight:800;margin:5px 0 3px;font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:11px;color:var(--mut)}
+.dlt{font-size:11px;font-weight:800}
+.dlt.up{color:var(--grn)}.dlt.dn{color:var(--rose)}
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rings{display:flex;gap:18px;justify-content:space-around;margin:6px 0 4px;flex-wrap:wrap}
+.ring{text-align:center}
+.ring .rl{font-size:11px;color:var(--mut);font-weight:700;margin-top:6px}
+.ring .rv{font-size:12px;font-weight:800}
+.cta{display:block;text-align:center;margin-top:10px;font-size:12px;font-weight:800;color:#0b0f0e;background:linear-gradient(135deg,var(--amber),#f59e0b);border-radius:12px;padding:10px;transition:filter .2s}
+.cta:hover{filter:brightness(1.1)}
+.rowbar{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:12px}
+.rowbar .nm{width:112px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowbar .tr{flex:1;height:9px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.rowbar .tr i{display:block;height:100%;border-radius:99px;animation:grow 1s cubic-bezier(.16,1,.3,1) both}
+@keyframes grow{from{width:0 !important}}
+.rowbar .vl{width:76px;text-align:end;font-weight:800;font-variant-numeric:tabular-nums}
+.feed{display:flex;flex-direction:column;gap:9px;max-height:320px;overflow:hidden}
+.fitem{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:13px;padding:9px 12px;font-size:12px;font-weight:700;animation:up .4s both;transition:border-color .2s}
+.fitem:hover{border-color:rgba(251,191,36,.35)}
+.fitem .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;background:linear-gradient(135deg,rgba(251,191,36,.3),rgba(45,212,191,.25));flex-shrink:0}
+.fitem .st{font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.st.new{background:rgba(129,140,248,.15);color:var(--ind)}.st.prep{background:rgba(251,191,36,.15);color:var(--amber)}.st.rdy{background:rgba(52,211,153,.15);color:var(--grn)}.st.out{background:rgba(45,212,191,.15);color:var(--teal)}
+.fitem time{margin-inline-start:auto;color:var(--mut);font-size:10.5px}
+.alert{display:flex;gap:10px;align-items:flex-start;border-radius:13px;padding:10px 12px;font-size:12px;font-weight:700;margin-bottom:9px;border:1px solid;transition:transform .2s}
+.alert:hover{transform:translateX(-3px)}
+html[dir="ltr"] .alert:hover{transform:translateX(3px)}
+.alert.crit{background:rgba(251,113,133,.07);border-color:rgba(251,113,133,.25)}
+.alert.warn{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.25)}
+.alert.ok{background:rgba(52,211,153,.07);border-color:rgba(52,211,153,.25)}
+.alert button{margin-inline-start:auto;flex-shrink:0;font-size:10.5px;font-weight:800;border-radius:9px;padding:5px 11px;border:0;cursor:pointer;background:rgba(255,255,255,.1);color:var(--txt);font-family:inherit}
+.alert button:hover{background:rgba(255,255,255,.18)}
+.gauge-row{display:flex;align-items:center;gap:14px}
+.bar-v{display:flex;align-items:flex-end;gap:7px;height:130px;padding-top:8px}
+.bar-v .b{flex:1;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,var(--amber),rgba(251,191,36,.22));min-height:6px;animation:growh 1s cubic-bezier(.16,1,.3,1) both;transition:filter .2s}
+.bar-v .b:hover{filter:brightness(1.3)}
+@keyframes growh{from{height:0 !important}}
+.donut{display:flex;align-items:center;gap:16px}
+.legs{display:flex;flex-direction:column;gap:8px;font-size:12px;font-weight:700;flex:1}
+.legs div{display:flex;align-items:center;gap:8px}
+.legs i{width:10px;height:10px;border-radius:3px}
+.legs b{margin-inline-start:auto;font-variant-numeric:tabular-nums}
+.kv{display:flex;justify-content:space-between;font-size:12px;padding:8px 0;border-bottom:1px dashed rgba(255,255,255,.08);font-weight:700}
+.kv:last-child{border:0}
+.kv b{font-variant-numeric:tabular-nums}
+svg.chart{width:100%;height:auto;display:block}
+.area-path{stroke-dasharray:1200;stroke-dashoffset:1200;animation:draw 2s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.fadein{animation:fade 1.2s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.livedot{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;color:var(--grn)}
+.livedot::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--grn);box-shadow:0 0 8px var(--grn);animation:bl 1.6s infinite}
+@keyframes bl{50%{opacity:.35}}
+.wf{display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:10px}
+.wf .w{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.wf .col{width:100%;border-radius:9px 9px 4px 4px;animation:growh 1s cubic-bezier(.16,1,.3,1) both}
+.wf small{font-size:10px;color:var(--mut);font-weight:700;text-align:center}
+.wf b{font-size:11px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
-<div class="shell">
-  <!-- ===== Sidebar ===== -->
-  <aside class="side" id="side">
-    <div class="brand"><div class="logo">◈</div><div><b>RestoFlow</b><small>فرع مدينة نصر</small></div></div>
-    <div class="navlabel">القائمة</div>
-    <nav class="nav" id="mainnav">
-      <a href="#" class="on"><span class="ico">◧</span><span class="tx">اللوحة الرئيسية</span></a>
-      <a href="#"><span class="ico">🧾</span><span class="tx">الطلبات</span><span class="bdg">18</span></a>
-      <a href="#"><span class="ico">🍳</span><span class="tx">المطبخ</span><span class="bdg blue">6</span></a>
-      <a href="#"><span class="ico">🪑</span><span class="tx">الطاولات</span></a>
-      <a href="#"><span class="ico">📦</span><span class="tx">المخزون</span></a>
-      <a href="#"><span class="ico">👥</span><span class="tx">الموظفين</span></a>
-      <a href="#"><span class="ico">🚴</span><span class="tx">التوصيل</span></a>
-      <a href="#"><span class="ico">📊</span><span class="tx">التقارير</span></a>
-      <a href="#"><span class="ico">⚙️</span><span class="tx">الإعدادات</span></a>
-    </nav>
-    <div class="sidefoot">
-      <div class="branchcard"><span class="dot"></span><div><b>فرع مدينة نصر</b><small>وردية مفتوحة · 14:32</small></div></div>
-      <div class="userchip"><div class="avatar">م</div><div><b>محمد الشيف</b><small>مدير الفرع</small></div></div>
-    </div>
-  </aside>
-  <div class="scrim" id="scrim"></div>
-
-  <!-- ===== Main ===== -->
-  <div class="main">
-    <div class="topbar">
-      <button class="menubtn" id="menubtn">☰</button>
-      <div class="search"><span class="sico">⌕</span><input id="gsearch" placeholder="ابحث عن صنف، طلب، عميل…  ( / )"></div>
-      <div class="seg" id="periodseg">
-        <button data-p="day" class="on">اليوم</button><button data-p="week">أسبوع</button><button data-p="month">شهر</button>
+<div class="tick"><span class="in" id="ticker"></span></div>
+<header class="top">
+  <div class="logo">CODUIS <b>XEN</b></div>
+  <div class="cmd">🔍 <span data-i18n="sb">Search orders, items, reports…</span><kbd>Ctrl K</kbd></div>
+  <div class="tabs" id="rangeTabs"><button class="on" data-i18n="d1">Today</button><button data-i18n="d2">Week</button><button data-i18n="d3">Month</button></div>
+  <select class="chipbtn" id="themeSel"><option value="ember">Ember Noir</option><option value="saffron">Saffron Souk</option><option value="dune">Midnight Dune</option><option value="matcha">Matcha Garden</option><option value="rose">Rose Patissier</option><option value="abyss">Abyss Teal</option><option value="porcelain">Porcelain Mist</option><option value="cocoa">Cocoa Truffle</option><option value="neon">Neon Bazaar</option><option value="olive">Olive Grove</option></select>
+  <button class="chipbtn" id="langBtn">العربية</button>
+</header>
+<div class="wrap">
+  <div class="grid12">
+    <div class="card c8"><h3><span data-i18n="c1">Revenue pulse</span> <span class="tag">LIVE</span></h3><p class="sub" data-i18n="c1s">Today vs yesterday · Nasr City + all branches</p>
+      <div class="hero-num"><span class="count" data-v="48250">0</span> <small>EGP</small></div>
+      <div class="hero-dlt">▲ 12.4% <span data-i18n="vs">vs yesterday</span></div>
+      <svg class="chart" viewBox="0 0 600 170" style="margin-top:10px"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf24" stop-opacity=".45"/><stop offset="1" stop-color="#fbbf24" stop-opacity="0"/></linearGradient></defs>
+      <g stroke="rgba(255,255,255,.07)"><line x1="0" y1="35" x2="600" y2="35"/><line x1="0" y1="75" x2="600" y2="75"/><line x1="0" y1="115" x2="600" y2="115"/><line x1="0" y1="155" x2="600" y2="155"/></g>
+      <path class="fadein" d="M0,135 L75,126 L150,130 L225,108 L300,112 L375,86 L450,90 L525,54 L600,62 L600,170 L0,170 Z" fill="url(#ag)"/>
+      <path class="area-path" d="M0,135 L75,126 L150,130 L225,108 L300,112 L375,86 L450,90 L525,54 L600,62" fill="none" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+      <path d="M0,145 L75,140 L150,143 L225,128 L300,131 L375,115 L450,117 L525,98 L600,102" fill="none" stroke="#93a3b8" stroke-width="1.5" stroke-dasharray="5 5" opacity=".7"/></svg></div>
+    <div class="card c4"><h3>↩️ <span data-i18n="c3">Refunds watch</span></h3><p class="sub" data-i18n="c3s">Leak radar — act before it grows</p>
+      <div class="rings">
+        <div class="ring"><svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"/><circle cx="48" cy="48" r="40" fill="none" stroke="#fb7185" stroke-width="10" stroke-linecap="round" stroke-dasharray="40 251" transform="rotate(-90 48 48)"/><text x="48" y="54" text-anchor="middle" fill="#f1f5f9" font-size="17" font-weight="800">3.8%</text></svg><div class="rl" data-i18n="k4">Refunds</div><div class="rv">1,840 EGP</div></div>
+        <div class="ring"><svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"/><circle cx="48" cy="48" r="40" fill="none" stroke="#fbbf24" stroke-width="10" stroke-linecap="round" stroke-dasharray="32 251" transform="rotate(-90 48 48)"/><text x="48" y="54" text-anchor="middle" fill="#f1f5f9" font-size="17" font-weight="800">3.2%</text></svg><div class="rl" data-i18n="k5">Cancel rate</div><div class="rv">21 orders</div></div>
       </div>
-      <div class="clock"><b id="clock">--:--</b><small id="dateline"></small></div>
-      <button class="iconbtn" id="themebtn" title="ليلي / نهاري">◐<span class="ping"></span></button>
-      <button class="iconbtn" title="الملف">م</button>
-    </div>
-
-    <div class="wrap">
-      <div class="hero">
-        <div>
-          <h2><span class="wave">👋</span> <span id="greet">مساء الخير يا محمد</span></h2>
-          <p id="herosub">الأحد 23 سبتمبر 2026 · مقارنة بالأمس · فرع مدينة نصر</p>
-        </div>
-        <div class="sp"></div>
-        <span class="statuspill"><i></i><span id="shiftpill">وردية مفتوحة · الكاشير 1</span></span>
-        <a class="btn pri" href="#" onclick="return toast('فتح شاشة طلب جديد 🧾')">+ <span class="bt">طلب جديد</span></a>
-        <a class="btn gho" href="#" onclick="return toast('تقرير الإغلاق اليومي 📊')">▤ <span class="bt">تقرير</span></a>
-      </div>
-
-      <!-- KPI x4 -->
-      <div class="grid" style="margin-bottom:18px">
-        <div class="card s4 kpi k1">
-          <div class="top"><div class="kico">₪</div><div><div class="t">إيراد اليوم</div></div></div>
-          <div class="v num"><span id="k-rev">0</span> <small>ج.م</small></div>
-          <div class="row"><span class="delta up" id="k-rev-d">▲ 0%</span><span class="vs">مقارنة بالأمس</span></div>
-          <svg class="spark" id="sp-rev" width="100%" height="38" preserveAspectRatio="none"></svg>
-        </div>
-        <div class="card s4 kpi k2">
-          <div class="top"><div class="kico">◈</div><div><div class="t">صافي الربح</div></div></div>
-          <div class="v num"><span id="k-prof">0</span> <small>ج.م</small></div>
-          <div class="row"><span class="delta up" id="k-prof-d">▲ 0%</span><span class="vs">هامش <b id="k-margin" class="num">0%</b></span></div>
-          <svg class="spark" id="sp-prof" width="100%" height="38" preserveAspectRatio="none"></svg>
-        </div>
-        <div class="card s4 kpi k3">
-          <div class="top"><div class="kico">🧾</div><div><div class="t">عدد الطلبات</div></div></div>
-          <div class="v num"><span id="k-ord">0</span></div>
-          <div class="row"><span class="delta dn" id="k-ord-d">▼ 0%</span><span class="vs">ملغي <b id="k-canc" class="num">0</b></span></div>
-          <svg class="spark" id="sp-ord" width="100%" height="38" preserveAspectRatio="none"></svg>
-        </div>
-        <div class="card s4 kpi k4">
-          <div class="top"><div class="kico">🎫</div><div><div class="t">متوسط الفاتورة</div></div></div>
-          <div class="v num"><span id="k-avg">0</span> <small>ج.م</small></div>
-          <div class="row"><span class="delta up" id="k-avg-d">▲ 0%</span><span class="vs">أصناف مباعة <b id="k-items" class="num">0</b></span></div>
-          <svg class="spark" id="sp-avg" width="100%" height="38" preserveAspectRatio="none"></svg>
-        </div>
-      </div>
-
-      <!-- Chart + Live -->
-      <div class="grid" style="margin-bottom:18px">
-        <div class="card s8">
-          <div class="chead">
-            <div><h4>أداء الإيراد</h4><p class="sub" id="chartsub">الساعة × الإيراد — اليوم</p></div>
-            <div class="more">•••</div>
-            <div class="tabs" id="charttabs" style="margin-inline-start:auto">
-              <button data-m="rev" class="on">إيراد</button><button data-m="ord">طلبات</button><button data-m="prof">صافي</button>
-            </div>
-          </div>
-          <div class="chartwrap"><svg id="revchart"></svg><div class="tip" id="charttip"></div></div>
-          <div class="legend"><span><i style="background:#4f46e5"></i><span id="lg-a">اليوم</span></span><span><i style="background:#c9c4bb"></i><span id="lg-b">الأمس</span></span></div>
-        </div>
-        <div class="card s4">
-          <div class="chead"><div class="livehead"><span class="livedot"></span><div><h4>التشغيل الآن</h4><p class="sub">مباشر من المطبخ والكاشير</p></div></div><div class="more">•••</div></div>
-          <div class="opgrid">
-            <div class="op"><b class="num" id="op-kit">0</b><span>في المطبخ</span><div class="bar"><i id="op-kit-b" style="background:var(--warn);width:0%"></i></div></div>
-            <div class="op"><b class="num" id="op-rid">0</b><span>طيارين شغالين</span><div class="bar"><i id="op-rid-b" style="background:var(--brand);width:0%"></i></div></div>
-            <div class="op"><b class="num" id="op-tab">0%</b><span>إشغال الطاولات</span><div class="bar"><i id="op-tab-b" style="background:var(--ok);width:0%"></i></div></div>
-            <div class="op"><b class="num" id="op-wait">0′</b><span>متوسط الانتظار</span><div class="bar"><i id="op-wait-b" style="background:var(--bad);width:0%"></i></div></div>
-          </div>
-          <div class="feed" id="livefeed"></div>
-        </div>
-      </div>
-
-      <!-- Top / Donut / Pay -->
-      <div class="grid" style="margin-bottom:18px">
-        <div class="card s4">
-          <div class="chead"><div><h4>الأعلى مبيعًا</h4><p class="sub">حسب الإيراد · <span id="toprange">اليوم</span></p></div><div class="more">•••</div></div>
-          <div id="toplist"></div>
-        </div>
-        <div class="card s4">
-          <div class="chead"><div><h4>الأقسام</h4><p class="sub">توزيع الإيراد حسب القسم</p></div><div class="more">•••</div></div>
-          <div class="donutbox">
-            <div class="donut"><svg id="donut" width="150" height="150" viewBox="0 0 150 150"></svg><div class="ctr"><b class="num" id="donut-t">0</b><small>ألف ج.م</small></div></div>
-            <div class="lgnd" id="donut-l"></div>
-          </div>
-        </div>
-        <div class="card s4">
-          <div class="chead"><div><h4>طرق الدفع</h4><p class="sub">نقدي × شبكة × محافظ</p></div><div class="more">•••</div></div>
-          <div id="paybars"></div>
-        </div>
-      </div>
-
-      <!-- Branches + Alerts -->
-      <div class="grid" style="margin-bottom:18px">
-        <div class="card s8">
-          <div class="chead"><div><h4>أداء الفروع</h4><p class="sub">مقارنة لحظية بين الفروع</p></div><div class="more">•••</div></div>
-          <div class="tblwrap"><table>
-            <thead><tr><th>الفرع</th><th>الطلبات</th><th>الإيراد</th><th>متوسط الفاتورة</th><th>الحالة</th></tr></thead>
-            <tbody id="branchbody"></tbody>
-          </table></div>
-        </div>
-        <div class="card s4">
-          <div class="chead"><div><h4>يحتاج تدخل ⚠️</h4><p class="sub">مرتبة حسب الخطورة</p></div><div class="more">•••</div></div>
-          <div id="alerts"></div>
-        </div>
-      </div>
-
-      <!-- Staff -->
-      <div class="grid">
-        <div class="card s12">
-          <div class="chead"><div><h4>الفريق الآن</h4><p class="sub"><span id="staffn">0</span> على رأس العمل · وردية المساء</p></div><div class="more">•••</div></div>
-          <div class="staffrow" id="staffrow"></div>
-          <div class="health"><span class="ok">● الأنظمة سليمة</span><span>·</span><span>الطابعة المطبخية متصلة</span><span>·</span><span>آخر نسخة احتياطية 02:00</span><span>·</span><span>البوابة البنكية طبيعية</span></div>
-        </div>
-      </div>
-    </div>
+      <a class="cta" data-i18n="cta">Review 5 pending refunds →</a></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="lab">🧾 <span data-i18n="k2">Orders</span></div><div class="val"><span class="count" data-v="312">0</span></div><div class="dlt up">▲ 8.1%</div></div>
+    <div class="kpi"><div class="lab">🎫 <span data-i18n="k3">Avg ticket</span></div><div class="val"><span class="count" data-v="155">0</span> <small>EGP</small></div><div class="dlt up">▲ 3.9%</div></div>
+    <div class="kpi"><div class="lab">📈 <span data-i18n="n1">Net revenue</span></div><div class="val"><span class="count" data-v="41280">0</span> <small>EGP</small></div><div class="dlt up">▲ 9.6%</div></div>
+    <div class="kpi"><div class="lab">💵 <span data-i18n="n4">Shift cash</span></div><div class="val"><span class="count" data-v="12900">0</span> <small>EGP</small></div><div class="dlt up">✓ <span data-i18n="bal">balanced</span></div></div>
+  </div>
+  <div class="grid12">
+    <div class="card c4"><h3 data-i18n="c2">Payment mix</h3><p class="sub" data-i18n="c2s">Share of completed payments</p>
+      <div class="donut"><svg width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="16"/><circle cx="60" cy="60" r="46" fill="none" stroke="#fbbf24" stroke-width="16" stroke-dasharray="150 289" stroke-linecap="round" transform="rotate(-90 60 60)"/><circle cx="60" cy="60" r="46" fill="none" stroke="#2dd4bf" stroke-width="16" stroke-dasharray="80 289" stroke-dashoffset="-150" stroke-linecap="round" transform="rotate(-90 60 60)"/><circle cx="60" cy="60" r="46" fill="none" stroke="#818cf8" stroke-width="16" stroke-dasharray="59 289" stroke-dashoffset="-230" stroke-linecap="round" transform="rotate(-90 60 60)"/></svg>
+      <div class="legs"><div><i style="background:#fbbf24"></i><span data-i18n="p1">Cash</span><b>52%</b></div><div><i style="background:#2dd4bf"></i><span data-i18n="p2">Card</span><b>28%</b></div><div><i style="background:#818cf8"></i><span data-i18n="p3">Wallets</span><b>20%</b></div></div></div></div>
+    <div class="card c4"><h3><span class="livedot"></span> <span data-i18n="c4">Live operations</span></h3><p class="sub" data-i18n="c4s">Kitchen, drivers and open orders now</p>
+      <div class="kv"><span data-i18n="o1">Kitchen load</span><b>18 / 24</b></div>
+      <div class="rowbar"><span class="nm">KDS</span><div class="tr"><i style="width:75%;background:linear-gradient(90deg,#2dd4bf,#fbbf24)"></i></div><span class="vl">75%</span></div>
+      <div class="kv"><span data-i18n="o2">Drivers out</span><b>6 · 2 idle</b></div>
+      <div class="kv"><span data-i18n="o3">Open orders</span><b style="color:var(--amber)">23</b></div>
+      <div class="kv"><span data-i18n="o4">Avg prep</span><b>14 min</b></div></div>
+    <div class="card c4"><h3 data-i18n="c5">Action inbox</h3><p class="sub" data-i18n="c5s">Triage by severity, act inline</p>
+      <div class="alert crit"><span>⚠️</span><span data-i18n="a1">Refund spike: grill 4 returns today.</span><button data-i18n="b1">Check</button></div>
+      <div class="alert warn"><span>⏱️</span><span data-i18n="a2">3 deliveries late 15+ min.</span><button data-i18n="b2">Call</button></div>
+      <div class="alert ok"><span>✅</span><span data-i18n="a3">Shift cash balanced.</span><button data-i18n="b3">View</button></div></div>
+    <div class="card c6"><h3 data-i18n="c6">Live order stream</h3><p class="sub" data-i18n="c6s">Every ticket as it fires</p><div class="feed" id="feed"></div></div>
+    <div class="card c6"><h3 data-i18n="c7">Top items</h3><p class="sub" data-i18n="c7s">By quantity today</p>
+      <div class="rowbar"><span class="nm">🍔 Smash Burger</span><div class="tr"><i style="width:100%;background:#fbbf24"></i></div><span class="vl">84</span></div>
+      <div class="rowbar"><span class="nm">🍕 Margherita</span><div class="tr"><i style="width:72%;background:#fb7185"></i></div><span class="vl">61</span></div>
+      <div class="rowbar"><span class="nm">🥤 Mojito</span><div class="tr"><i style="width:55%;background:#2dd4bf"></i></div><span class="vl">46</span></div>
+      <div class="rowbar"><span class="nm">🍰 Molten Cake</span><div class="tr"><i style="width:38%;background:#818cf8"></i></div><span class="vl">32</span></div>
+      <div class="kv"><span data-i18n="dp0">Dayparts</span><b>🌅18% · ☀️38% · 🌇32% · 🌙12%</b></div>
+      <div class="kv"><span data-i18n="nr0">New vs returning</span><b><span style="color:var(--teal)">142 new</span> · <span style="color:var(--amber)">170 back</span></b></div></div>
+    <div class="card c6"><h3 data-i18n="c8">Branch race</h3><p class="sub" data-i18n="c8s">Revenue leaderboard, same period</p>
+      <div class="rowbar"><span class="nm">Nasr City 🥇</span><div class="tr"><i style="width:100%;background:linear-gradient(90deg,#fbbf24,#f59e0b)"></i></div><span class="vl">21.4k</span></div>
+      <div class="rowbar"><span class="nm">Maadi 🥈</span><div class="tr"><i style="width:76%;background:linear-gradient(90deg,#2dd4bf,#0d9488)"></i></div><span class="vl">16.2k</span></div>
+      <div class="rowbar"><span class="nm">Zamalek 🥉</span><div class="tr"><i style="width:58%;background:linear-gradient(90deg,#818cf8,#6366f1)"></i></div><span class="vl">12.4k</span></div>
+      <div class="kv"><span data-i18n="w0">Why moved?</span><b style="color:var(--grn)">+6,200 · volume +8,200</b></div></div>
+    <div class="card c6"><h3 data-i18n="c9">Peak rhythm</h3><p class="sub" data-i18n="c9s">Orders per hour — staff it</p>
+      <div class="bar-v" id="hours"></div></div>
   </div>
 </div>
-<div class="toast" id="toast"></div>
-
 <script>
-/* ================= DATA (periods) ================= */
-const D = {
-day:{
- rev:48250,revD:12.4,prof:16870,profD:9.1,margin:35,ord:342,ordD:-2.3,canc:9,avg:141,avgD:6.8,items:1214,
- labels:['10ص','12م','2م','4م','6م','8م','10م','12ص'],
- a:[1.2,3.8,7.4,5.1,4.2,9.8,12.6,4.1], b:[1.0,3.2,6.1,5.6,4.8,8.4,10.2,3.6],
- oa:[8,22,48,31,26,61,79,25], ob:[7,19,40,33,29,52,64,21],
- pa:[.4,1.2,2.6,1.7,1.4,3.4,4.4,1.4], pb:[.35,1.1,2.2,1.9,1.6,2.9,3.6,1.2],
- range:'اليوم', chartsub:'الساعة × الإيراد — اليوم', lgA:'اليوم', lgB:'الأمس',
- top:[['سماش برجر دبل',214,'18.2K'],['بيتزا مارغريتا',186,'15.8K'],['شاورما عربي',172,'12.9K'],['مولتن فستق',98,'10.3K'],['فلات وايت',143,'9.3K']],
- cats:[['برجر',34,'#4f46e5'],['بيتزا',26,'#0ea5e9'],['مشويات',18,'#f59e0b'],['حلويات',12,'#ec4899'],['مشروبات',10,'#10b981']],
- pay:[['نقدي',46,'#16a34a'],['شبكة مدى',32,'#4f46e5'],['محافظ',14,'#0ea5e9'],['آجل',8,'#f59e0b']],
- kit:14,rid:5,tab:72,wait:18,
- feed:[['#4821','طاولة 12 · 3 أصناف','385','🧾','#4f46e5','منذ دقيقة'],['#4820','دليفري · المعادي','520','🚴','#0ea5e9','منذ 3 دقائق'],['#4819','تيك أواي','240','🛍️','#f59e0b','منذ 6 دقائق']],
- branches:[['مدينة نصر',342,'48.2K',141,'ممتاز','ok','M'],['مصر الجديدة',268,'36.4K',136,'ممتاز','ok','هـ'],['المعادي',191,'24.8K',130,'جيد','warn','م'],['الشيخ زايد',142,'17.1K',120,'يحتاج دعم','warn','ز']],
- alerts:[['r','🔥','5 أصناف 86 (نفدت)','فراخ بروست · عيش كيزر · صوص مدخن','إدارة',''],
-  ['y','📦','مخزون حرج: 8 خامات','جبنة موزاريلا تكفي يومين فقط','اطلب','solid'],
-  ['y','⏳','3 خصومات تنتظر اعتماد','أكبرها 450 ج.م — طاولة 7','راجع',''],
-  ['b','🤖','توقع الذكاء الاصطناعي','ذروة 8–10م اليوم أعلى من المعتاد 18%','جهّز','']],
- staff:[['أحمد','كاشير','م'],['سارة','مطبخ','س'],['كريم','طيار','ك'],['منى','استقبال','ن'],['طارق','مشويات','ط'],['ليلى','حلويات','ل'],['عمر','طيار','ع'],['هبة','كاشير','هـ']]
-},
-week:{
- rev:312400,revD:8.2,prof:104300,profD:6.4,margin:33,ord:2318,ordD:4.1,canc:61,avg:135,avgD:2.2,items:8340,
- labels:['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة'],
- a:[38,42,35,33,36,52,76], b:[36,39,34,35,33,47,64],
- oa:[280,310,260,250,270,390,560], ob:[265,290,255,260,250,350,480],
- pa:[12.6,14,11.5,11,12,17.5,25.7], pb:[11.9,13,11.2,11.6,11,15.6,21.8],
- range:'آخر 7 أيام', chartsub:'اليوم × الإيراد — آخر أسبوع', lgA:'هذا الأسبوع', lgB:'الماضي',
- top:[['سماش برجر دبل',1412,'120K'],['بيتزا مارغريتا',1204,'102K'],['شاورما عربي',1102,'82K'],['فلات وايت',986,'64K'],['مولتن فستق',640,'67K']],
- cats:[['برجر',33,'#4f46e5'],['بيتزا',27,'#0ea5e9'],['مشويات',17,'#f59e0b'],['حلويات',13,'#ec4899'],['مشروبات',10,'#10b981']],
- pay:[['نقدي',44,'#16a34a'],['شبكة مدى',34,'#4f46e5'],['محافظ',15,'#0ea5e9'],['آجل',7,'#f59e0b']],
- kit:9,rid:7,tab:64,wait:16,
- feed:[['#4812','دليفري · مدينة نصر','610','🚴','#0ea5e9','منذ دقيقتين'],['#4811','طاولة 4 · 5 أصناف','730','🧾','#4f46e5','منذ 5 دقائق']],
- branches:[['مدينة نصر',2318,'312K',135,'ممتاز','ok','M'],['مصر الجديدة',1840,'241K',131,'ممتاز','ok','هـ'],['المعادي',1290,'168K',130,'جيد','warn','م'],['الشيخ زايد',940,'118K',126,'يحتاج دعم','warn','ز']],
- alerts:[['r','🔥','3 أصناف 86 (نفدت)','صوص مدخن · عيش بريوش','إدارة',''],
-  ['y','📦','مخزون حرج: 5 خامات','الموزاريلا تحت حد الأمان','اطلب','solid'],
-  ['b','🤖','توقع الأسبوع القادم','نمو 6% مع مباراة الجمعة','جهّز','']],
- staff:[['أحمد','كاشير','م'],['سارة','مطبخ','س'],['كريم','طيار','ك'],['منى','استقبال','ن'],['طارق','مشويات','ط'],['ليلى','حلويات','ل']]
-},
-month:{
- rev:1290000,revD:15.7,prof:419000,profD:12.9,margin:32,ord:9480,ordD:9.4,canc:214,avg:136,avgD:3.1,items:34120,
- labels:['1','5','9','13','17','21','25','29'],
- a:[38,44,41,47,52,58,66,72], b:[34,37,39,40,44,48,55,60],
- oa:[280,330,310,350,390,430,490,540], ob:[260,280,290,300,330,360,410,450],
- pa:[12,14.5,13.5,15.5,17,19,21.5,23.5], pb:[11,12,13,13.2,14.5,15.8,18,19.5],
- range:'سبتمبر', chartsub:'اليوم × الإيراد — سبتمبر', lgA:'سبتمبر', lgB:'أغسطس',
- top:[['سماش برجر دبل',5820,'495K'],['بيتزا مارغريتا',5010,'425K'],['شاورما عربي',4480,'336K'],['فلات وايت',4020,'261K'],['مولتن فستق',2610,'274K']],
- cats:[['برجر',32,'#4f46e5'],['بيتزا',28,'#0ea5e9'],['مشويات',17,'#f59e0b'],['حلويات',13,'#ec4899'],['مشروبات',10,'#10b981']],
- pay:[['نقدي',43,'#16a34a'],['شبكة مدى',35,'#4f46e5'],['محافظ',15,'#0ea5e9'],['آجل',7,'#f59e0b']],
- kit:11,rid:9,tab:68,wait:17,
- feed:[['#4790','طاولة 9 · 4 أصناف','540','🧾','#4f46e5','منذ 4 دقائق']],
- branches:[['مدينة نصر',9480,'1.29M',136,'ممتاز','ok','M'],['مصر الجديدة',7520,'985K',131,'ممتاز','ok','هـ'],['المعادي',5210,'690K',132,'جيد','warn','م'],['الشيخ زايد',3810,'478K',125,'يحتاج دعم','warn','ز']],
- alerts:[['y','📦','مراجعة موردين','أسعار الدواجن +9% هذا الشهر','راجع','solid'],
-  ['b','🤖','توقع أكتوبر','موسم المدارس يرفع الغداء 12%','خطط','']],
- staff:[['أحمد','كاشير','م'],['سارة','مطبخ','س'],['كريم','طيار','ك'],['منى','استقبال','ن'],['طارق','مشويات','ط']]
-}};
-/* ================= STATE ================= */
-let P='day', M='rev';
-const $=s=>document.querySelector(s);
-const fmt=n=>Math.round(n).toLocaleString('en-US');
-function toast(m){const t=$('#toast');t.innerHTML='✓ '+m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),1900);return false}
-/* count-up */
-function count(el,to,{dur=900,dec=0}={}){const st=performance.now(),from=0;function f(t){const p=Math.min(1,(t-st)/dur),e=1-Math.pow(1-p,3),v=from+(to-from)*e;el.textContent=dec?v.toFixed(dec):fmt(v);if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
-/* sparkline */
-function spark(id,data,color){const s=document.getElementById(id),W=220,H=38;s.setAttribute('viewBox',`0 0 ${W} ${H}`);const mx=Math.max(...data),mn=Math.min(...data),rg=(mx-mn)||1;const pts=data.map((v,i)=>`${(i/(data.length-1)*W).toFixed(1)},${(H-4-((v-mn)/rg)*(H-10)).toFixed(1)}`).join(' ');s.innerHTML=`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><polygon points="0,${H} ${pts} ${W},${H}" fill="${color}22"/>`}
-/* main chart */
-const NS='http://www.w3.org/2000/svg';
-function smooth(pts){let d=`M${pts[0][0]},${pts[0][1]}`;for(let i=0;i<pts.length-1;i++){const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p1[1])/6;const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;d+=`C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0]},${p2[1]}`}return d}
-function drawChart(){
-  const d=D[P],svg=$('#revchart');
-  const W=svg.clientWidth||800,H=290,pl=8,pr=8,pt=14,pb=30;
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  const A=M==='rev'?d.a:M==='ord'?d.oa:d.pa, B=M==='rev'?d.b:M==='ord'?d.ob:d.pb;
-  const col=M==='ord'?'#0ea5e9':M==='prof'?'#16a34a':'#4f46e5';
-  const mx=Math.max(...A,...B)*1.12;
-  const X=i=>pl+(i/(d.labels.length-1))*(W-pl-pr), Y=v=>pt+(1-v/mx)*(H-pt-pb);
-  let g='';
-  for(let i=0;i<=4;i++){const y=pt+(H-pt-pb)*i/4;g+=`<line x1="${pl}" y1="${y}" x2="${W-pr}" y2="${y}" stroke="currentColor" opacity=".08"/>`}
-  const pa=A.map((v,i)=>[X(i),Y(v)]),pb=B.map((v,i)=>[X(i),Y(v)]);
-  const id='ag'+M;
-  svg.innerHTML=`<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".32"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>${g}
-  <text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="currentColor" opacity=".45">${d.labels.join(' · ')}</text>
-  <path d="${smooth(pb)}" fill="none" stroke="#c9c4bb" stroke-width="2" stroke-dasharray="5 5" opacity=".8"/>
-  <path d="${smooth(pa)}L${X(A.length-1)},${H-pb}L${X(0)},${H-pb}Z" fill="url(#${id})"/>
-  <path id="mainline" d="${smooth(pa)}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round"/>
-  <circle id="hov" r="5" fill="${col}" stroke="#fff" stroke-width="2.5" style="display:none"/>
-  ${pa.map((p,i)=>`<circle class="hot" data-i="${i}" cx="${p[0]}" cy="${p[1]}" r="14" fill="transparent"/>`).join('')}`;
-  document.querySelector('#lg-a').textContent=d.lgA;document.querySelector('#lg-b').textContent=d.lgB;
-  $('#chartsub').textContent=d.chartsub+(M==='ord'?' — عدد الطلبات':M==='prof'?' — صافي الربح':'');
-  const tip=$('#charttip'),hov=svg.querySelector('#hov');
-  svg.querySelectorAll('.hot').forEach(c=>{
-    c.addEventListener('pointerenter',()=>{const i=+c.dataset.i;hov.setAttribute('cx',pa[i][0]);hov.setAttribute('cy',pa[i][1]);hov.style.display='block';
-      tip.style.opacity=1;tip.style.left=(pa[i][0]/W*100)+'%';tip.style.top=(pa[i][1]/H*100)+'%';
-      tip.innerHTML=`${d.labels[i]} · <b class="num">${A[i]}</b> <small>${M==='ord'?'طلب':'ألف ج.م'}</small>`});
-    c.addEventListener('pointerleave',()=>{hov.style.display='none';tip.style.opacity=0});
-  });
+var STR = {
+ar: { sb: "ابحث طلب، صنف، تقرير…", d1: "اليوم", d2: "الأسبوع", d3: "الشهر", c1: "نبض الإيراد", c1s: "اليوم مقابل أمس", vs: "مقابل أمس",
+c3: "رادار المرتجعات", c3s: "رادار التسريب — تحرك قبل ما يكبر", k4: "المرتجعات", k5: "معدل الإلغاء", cta: "راجع 5 مرتجعات معلقة ←",
+k2: "الطلبات", k3: "متوسط الفاتورة", n1: "صافي الإيراد", n4: "نقدية الشيفت", bal: "متوازنة", c2: "مزيج الدفع", c2s: "حصة المدفوعات المكتملة", p1: "كاش", p2: "بطاقات", p3: "محافظ",
+c4: "عمليات حية", c4s: "المطبخ والطيارين والمفتوح الآن", o1: "ضغط المطبخ", o2: "طيارون بالخارج", o3: "طلبات مفتوحة", o4: "متوسط التحضير",
+c5: "صندوق الإجراءات", c5s: "فرز بالخطورة ونفذ فورا", a1: "قفزة مرتجعات: 4 من الجريل اليوم.", a2: "3 دليفري متأخر 15+ دقيقة.", a3: "عهدة الشيفت متوازنة.", b1: "افحص", b2: "اتصل", b3: "عرض",
+c6: "بث الطلبات", c6s: "كل تيكت لحظة بلحظة", c7: "الأصناف الأعلى", c7s: "بالكمية اليوم", dp0: "فترات اليوم", nr0: "جدد مقابل راجعين",
+c8: "سباق الفروع", c8s: "ترتيب الإيراد لنفس الفترة", w0: "ليه اتحركنا؟", c9: "إيقاع الذروة", c9s: "طلبات كل ساعة — وظف عليها",
+tick: [["إيراد اليوم", "48,250 جنيه ▲12%"], ["طلبات مفتوحة الآن", "23"], ["مرتجعات معلقة", "5 بانتظار الاعتماد"], ["طيارون بالخارج", "6"], ["معدل الإلغاء", "3.2% آمن"], ["ذروة متوقعة", "7–9 مساء"]] },
+en: { sb: "Search orders, items, reports…", d1: "Today", d2: "Week", d3: "Month", c1: "Revenue pulse", c1s: "Today vs yesterday", vs: "vs yesterday",
+c3: "Refunds radar", c3s: "Leak radar — act before it grows", k4: "Refunds", k5: "Cancel rate", cta: "Review 5 pending refunds →",
+k2: "Orders", k3: "Avg ticket", n1: "Net revenue", n4: "Shift cash", bal: "balanced", c2: "Payment mix", c2s: "Share of completed payments", p1: "Cash", p2: "Card", p3: "Wallets",
+c4: "Live operations", c4s: "Kitchen, drivers and open orders now", o1: "Kitchen load", o2: "Drivers out", o3: "Open orders", o4: "Avg prep",
+c5: "Action inbox", c5s: "Triage by severity, act inline", a1: "Refund spike: 4 grill returns today.", a2: "3 deliveries late 15+ min.", a3: "Shift cash balanced.", b1: "Check", b2: "Call", b3: "View",
+c6: "Live order stream", c6s: "Every ticket as it fires", c7: "Top items", c7s: "By quantity today", dp0: "Dayparts", nr0: "New vs returning",
+c8: "Branch race", c8s: "Revenue leaderboard, same period", w0: "Why moved?", c9: "Peak rhythm", c9s: "Orders per hour — staff it",
+tick: [["Revenue today", "EGP 48,250 ▲12%"], ["Open orders now", "23"], ["Pending refunds", "5 awaiting approval"], ["Drivers out", "6"], ["Cancel rate", "3.2% safe"], ["Expected rush", "7–9 PM"]] }
+};
+var THEMES = {
+ember: { bg: "#07090e", card: "rgba(255,255,255,.05)", line: "rgba(255,255,255,.09)", txt: "#f1f5f9", mut: "#93a3b8", amber: "#fbbf24", teal: "#2dd4bf", rose: "#fb7185", ind: "#818cf8", grn: "#34d399" },
+saffron: { bg: "#faf3e3", card: "rgba(255,255,255,.7)", line: "rgba(120,80,20,.15)", txt: "#3e2c16", mut: "#968064", amber: "#b45309", teal: "#0f766e", rose: "#e11d48", ind: "#7c3aed", grn: "#16a34a" },
+dune: { bg: "#070d1f", card: "rgba(255,255,255,.045)", line: "rgba(255,255,255,.09)", txt: "#ebf0fc", mut: "#8c9bbe", amber: "#fbbf24", teal: "#2dd4bf", rose: "#fb7185", ind: "#60a5fa", grn: "#34d399" },
+matcha: { bg: "#f7f6ec", card: "rgba(255,255,255,.7)", line: "rgba(60,90,20,.15)", txt: "#26321c", mut: "#788269", amber: "#65a30d", teal: "#0d9488", rose: "#e11d48", ind: "#7c3aed", grn: "#16a34a" },
+rose: { bg: "#fdf2f5", card: "rgba(255,255,255,.7)", line: "rgba(150,40,80,.14)", txt: "#3e1c2a", mut: "#967d8c", amber: "#e11d48", teal: "#0d9488", rose: "#be123c", ind: "#a855f7", grn: "#16a34a" },
+abyss: { bg: "#04141a", card: "rgba(255,255,255,.045)", line: "rgba(255,255,255,.09)", txt: "#e4f5f3", mut: "#87aaa6", amber: "#fbbf24", teal: "#2dd4bf", rose: "#fb7185", ind: "#38bdf8", grn: "#34d399" },
+porcelain: { bg: "#f7f8fa", card: "rgba(255,255,255,.75)", line: "rgba(20,40,80,.12)", txt: "#0f172a", mut: "#64748b", amber: "#334155", teal: "#0284c7", rose: "#e11d48", ind: "#6366f1", grn: "#16a34a" },
+cocoa: { bg: "#140e0a", card: "rgba(255,255,255,.045)", line: "rgba(255,255,255,.09)", txt: "#f8f0e4", mut: "#b9a08a", amber: "#f59e0b", teal: "#2dd4bf", rose: "#fb7185", ind: "#a78bfa", grn: "#34d399" },
+neon: { bg: "#0d0618", card: "rgba(255,255,255,.045)", line: "rgba(255,255,255,.09)", txt: "#f2ecff", mut: "#afa0d2", amber: "#fbbf24", teal: "#22d3ee", rose: "#f472b6", ind: "#a78bfa", grn: "#34d399" },
+olive: { bg: "#f4f5ec", card: "rgba(255,255,255,.7)", line: "rgba(80,90,40,.15)", txt: "#2a301c", mut: "#7d8269", amber: "#7d8f3a", teal: "#0d9488", rose: "#e11d48", ind: "#7c3aed", grn: "#16a34a" }
+};
+var lang = "ar";
+function setLang(l) {
+  lang = l;
+  document.documentElement.lang = l;
+  document.documentElement.dir = l === "ar" ? "rtl" : "ltr";
+  document.getElementById("langBtn").textContent = l === "ar" ? "English" : "العربية";
+  document.querySelectorAll("[data-i18n]").forEach(function (el) { var k = el.getAttribute("data-i18n"); if (STR[l][k]) el.textContent = STR[l][k]; });
+  buildTicker();
 }
-/* donut */
-function drawDonut(){const d=D[P],svg=$('#donut'),R=62,C=2*Math.PI*R;let off=0,html='';
-  d.cats.forEach(([n,v,c])=>{const len=v/100*C;html+=`<circle cx="75" cy="75" r="${R}" fill="none" stroke="${c}" stroke-width="17" stroke-dasharray="${len.toFixed(1)} ${(C-len).toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" stroke-linecap="butt" style="transition:stroke-dasharray 1s"/>`;off+=len});
-  svg.innerHTML=`<circle cx="75" cy="75" r="${R}" fill="none" stroke="currentColor" opacity=".08" stroke-width="17"/>`+html;
-  $('#donut-t').textContent=(P==='day'?'48':P==='week'?'312':'1290');
-  $('#donut-l').innerHTML=d.cats.map(([n,v,c])=>`<div class="r"><i style="background:${c}"></i>${n}<b class="num">${v}%</b></div>`).join('');
+document.getElementById("langBtn").onclick = function () { setLang(lang === "ar" ? "en" : "ar"); };
+function applyTheme(id) {
+  var t = THEMES[id] || THEMES.ember, r = document.documentElement.style;
+  ["bg", "card", "line", "txt", "mut", "amber", "teal", "rose", "ind", "grn"].forEach(function (k) { r.setProperty("--" + k, t[k]); });
+  document.body.style.background = t.bg;
 }
-/* lists */
-function renderLists(){const d=D[P];
-  const mx=Math.max(...d.top.map(t=>parseFloat(t[2])));
-  $('#toplist').innerHTML=d.top.map(([n,q,r],i)=>`<div class="rank"><span class="n">${i+1}</span><div class="t"><b>${n}</b><small class="num">${q} طلب</small></div><div class="r"><b class="num">${r} ج.م</b><div class="qb"><i style="width:${(parseFloat(r)/mx*100).toFixed(0)}%"></i></div></div></div>`).join('');
-  $('#toprange').textContent=d.range;
-  $('#paybars').innerHTML=d.pay.map(([n,v,c])=>`<div class="barrow"><div class="lr">${n}<b class="num">${v}%</b></div><div class="tr"><i data-w="${v}" style="background:${c}"></i></div></div>`).join('');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelectorAll('#paybars i').forEach(i=>i.style.width=i.dataset.w+'%')));
-  $('#branchbody').innerHTML=d.branches.map(([n,o,r,a,s,cls,av])=>`<tr><td data-l="الفرع"><span class="bname"><span class="av" style="background:linear-gradient(135deg,var(--brand),var(--brand2))">${av}</span>${n}</span></td><td data-l="الطلبات" class="num">${o}</td><td data-l="الإيراد" class="num">${r}</td><td data-l="المتوسط" class="num">${a}</td><td data-l="الحالة"><span class="pill ${cls}">${s}</span></td></tr>`).join('');
-  $('#alerts').innerHTML=d.alerts.map(([k,ic,t,s,b,sol])=>`<div class="alert ${k}"><span class="ic">${ic}</span><div><b>${t}</b><small>${s}</small></div><div class="act"><button class="${sol}" onclick="return toast('${b} ✓')">${b}</button></div></div>`).join('');
-  $('#staffrow').innerHTML=d.staff.map(([n,r,a])=>`<span class="staff"><span class="avatar">${a}</span>${n} · ${r} <small>●</small></span>`).join('');
-  $('#staffn').textContent=d.staff.length;
+document.getElementById("themeSel").onchange = function (e) { applyTheme(e.target.value); };
+function buildTicker() {
+  var html = "";
+  STR[lang].tick.forEach(function (t) { html += "<span style=\"margin:0 26px\">" + t[0] + ": <b>" + t[1] + "</b></span>●"; });
+  document.getElementById("ticker").innerHTML = html + html;
 }
-/* KPIs */
-function renderKpis(){const d=D[P];
-  count($('#k-rev'),d.rev);count($('#k-prof'),d.prof);count($('#k-ord'),d.ord);count($('#k-avg'),d.avg);count($('#k-items'),d.items);count($('#k-canc'),d.canc);$('#k-margin').textContent=d.margin+'%';
-  const set=(id,v)=>{const e=$(id);e.textContent=(v>=0?'▲ ':'▼ ')+Math.abs(v)+'%';e.className='delta '+(v>=0?'up':'dn')};
-  set('#k-rev-d',d.revD);set('#k-prof-d',d.profD);set('#k-ord-d',d.ordD);set('#k-avg-d',d.avgD);
-  const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-  spark('sp-rev',d.a,'#4f46e5');spark('sp-prof',d.pa,'#16a34a');spark('sp-ord',d.oa,'#0ea5e9');spark('sp-avg',d.pa,'#e11d48');
-  $('#op-kit').textContent=d.kit;$('#op-kit-b').style.width=Math.min(100,d.kit*6)+'%';
-  $('#op-rid').textContent=d.rid;$('#op-rid-b').style.width=Math.min(100,d.rid*14)+'%';
-  $('#op-tab').textContent=d.tab+'%';$('#op-tab-b').style.width=d.tab+'%';
-  $('#op-wait').textContent=d.wait+'′';$('#op-wait-b').style.width=Math.min(100,d.wait*4)+'%';
+function countUp(el) {
+  var target = parseFloat(el.getAttribute("data-v")), t0 = null;
+  function step(t) { if (!t0) t0 = t; var p = Math.min((t - t0) / 1300, 1); el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString(); if (p < 1) requestAnimationFrame(step); }
+  requestAnimationFrame(step);
 }
-function renderAll(){renderKpis();drawChart();drawDonut();renderLists()}
-/* live feed */
-const NAMES=[['طاولة 5 · صنفان','310'],['دليفري · زهراء','455'],['تيك أواي','180'],['طاولة 2 · 4 أصناف','620'],['دليفري · عباس','295']];
-const EMO=[['🧾','#4f46e5'],['🚴','#0ea5e9'],['🛍️','#f59e0b']];
-let fn=4822;
-function pushFeed(auto){const f=$('#livefeed');const [t,p]=NAMES[Math.floor(Math.random()*NAMES.length)],e=EMO[Math.floor(Math.random()*EMO.length)];
-  const div=document.createElement('div');div.className='it';
-  div.innerHTML=`<span class="a" style="background:${e[1]}">${e[0]}</span><div><b>#${fn++} · ${t}</b><small>الآن · فرع مدينة نصر</small></div><span class="pr num">${p} ج.م</span>`;
-  f.prepend(div);while(f.children.length>4)f.lastChild.remove();
-  if(auto){const k=$('#k-rev');k.textContent=fmt(parseFloat(k.textContent.replace(/,/g,''))+ +p);toast('طلب جديد #'+(fn-1)+' · '+p+' ج.م')}
+var feedData = [["#4821", "🍔", "Smash ×2", "new", "New"], ["#4820", "🍕", "Margherita+Mojito", "prep", "Preparing"], ["#4819", "🍰", "Molten ×3", "rdy", "Ready"], ["#4818", "🛵", "Delivery · Maadi", "out", "On way"], ["#4817", "🥗", "Caesar", "prep", "Preparing"]];
+var feed = document.getElementById("feed"), fi = 0;
+function pushFeed() {
+  var d = feedData[fi % feedData.length]; fi++;
+  var div = document.createElement("div"); div.className = "fitem";
+  var now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  div.innerHTML = "<span class=\"av\">" + d[1] + "</span><b>" + d[0] + "</b><span>" + d[2] + "</span><span class=\"st " + d[3] + "\">" + d[4] + "</span><time>" + now + "</time>";
+  feed.prepend(div);
+  while (feed.children.length > 5) feed.removeChild(feed.lastChild);
 }
-/* clock + greeting */
-function tick(){const n=new Date();$('#clock').textContent=n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
-  $('#dateline').textContent=n.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'});
-  const h=n.getHours();$('#greet').textContent=(h<12?'صباح الخير':h<17?'نهارك سعيد':'مساء الخير')+' يا محمد'}
-/* events */
-document.querySelectorAll('#periodseg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#periodseg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');P=b.dataset.p;renderAll()});
-document.querySelectorAll('#charttabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#charttabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');M=b.dataset.m;drawChart()});
-$('#themebtn').onclick=()=>{const h=document.documentElement;h.dataset.theme=h.dataset.theme==='light'?'dark':'light'};
-$('#menubtn').onclick=()=>{$('#side').classList.add('open');$('#scrim').classList.add('show')};
-$('#scrim').onclick=()=>{$('#side').classList.remove('open');$('#scrim').classList.remove('show')};
-document.addEventListener('keydown',e=>{if(e.key==='/'&&!/input/i.test(document.activeElement.tagName)){e.preventDefault();$('#gsearch').focus()}});
-/* init */
-(function init(){const d=D.day;$('#livefeed').innerHTML=d.feed.map(([id,t,p,e,c,when])=>`<div class="it"><span class="a" style="background:${c}">${e}</span><div><b>${id} · ${t}</b><small>${when} · فرع مدينة نصر</small></div><span class="pr num">${p} ج.م</span></div>`).join('');
-  tick();setInterval(tick,20000);renderAll();setInterval(()=>pushFeed(true),14000);
-  window.addEventListener('resize',()=>drawChart());
-})();
+for (var k = 0; k < 4; k++) pushFeed();
+setInterval(pushFeed, 4000);
+var hours = [4, 6, 9, 14, 22, 35, 48, 62, 55, 70, 88, 100, 92, 78, 64, 50, 44, 58, 74, 66, 40, 25, 14, 8];
+var hb = document.getElementById("hours");
+hours.forEach(function (h, i) { var d = document.createElement("div"); d.className = "b"; d.style.height = h + "%"; d.style.animationDelay = (i * 40) + "ms"; d.title = h; hb.appendChild(d); });
+var tabs = document.querySelectorAll("#rangeTabs button");
+tabs.forEach(function (b) { b.onclick = function () { tabs.forEach(function (x) { x.classList.remove("on"); }); b.classList.add("on"); document.querySelectorAll(".count").forEach(countUp); }; });
+setLang("ar");
+document.querySelectorAll(".count").forEach(countUp);
 </script>
 </body>
 </html>

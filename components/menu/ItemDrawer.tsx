@@ -63,6 +63,21 @@ export const ItemDrawer: React.FC<Props> = ({
       .slice(0, 30);
   }, [inventory, lang, recipeIngredientSearch]);
 
+  // Unsaved-changes guard: compare live form against the opened snapshot.
+  // Declared BEFORE the Escape effect below — its deps array reads requestClose eagerly.
+  const isDirty = useMemo(() => {
+    try {
+      return JSON.stringify({ ...item, __cat: activeCategoryId }) !== JSON.stringify({ ...initialItem, __cat: initialCategoryId });
+    } catch {
+      return false;
+    }
+  }, [item, activeCategoryId, initialItem, initialCategoryId]);
+
+  const requestClose = () => {
+    if (isDirty && !window.confirm(lang === 'ar' ? 'تغييرات غير محفوظة — تجاهلها والخروج؟' : 'Unsaved changes — discard and exit?')) return;
+    onClose();
+  };
+
   useEffect(() => {
     setItem({ ...initialItem });
     setActiveCategoryId(initialCategoryId);
@@ -71,7 +86,7 @@ export const ItemDrawer: React.FC<Props> = ({
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
 
     document.body.style.overflow = "hidden";
@@ -80,7 +95,7 @@ export const ItemDrawer: React.FC<Props> = ({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   const update = (changes: Partial<MenuItem>) => setItem((prev) => ({ ...prev, ...changes }));
 
@@ -291,7 +306,7 @@ export const ItemDrawer: React.FC<Props> = ({
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[9000] bg-slate-950/70 backdrop-blur-md animate-fade-in" onClick={onClose} />
+      <div className="fixed inset-0 z-[9000] bg-slate-950/70 backdrop-blur-md animate-fade-in" onClick={requestClose} />
       
       <div
         role="dialog"
@@ -315,6 +330,11 @@ export const ItemDrawer: React.FC<Props> = ({
                 <span className="glass-badge glass-badge-primary">
                   {mode === "EDIT" ? (lang === 'ar' ? 'تعديل مباشر' : 'Live Edit') : (lang === 'ar' ? 'منتج جديد' : 'New Product')}
                 </span>
+                {isDirty && (
+                  <span className="glass-badge bg-amber-500/10 text-amber-600 border-amber-500/30">
+                    {lang === 'ar' ? 'تغييرات غير محفوظة' : 'Unsaved changes'}
+                  </span>
+                )}
                 <span className="text-xs font-bold text-muted/70 flex items-center gap-1">
                   <Tag size={12}/> {categories.find(c => c.id === activeCategoryId)?.name || "Uncategorized"}
                 </span>
@@ -331,7 +351,7 @@ export const ItemDrawer: React.FC<Props> = ({
                   <span className="hidden sm:inline">{lang === "ar" ? "تكرار" : "Duplicate"}</span>
                 </button>
               )}
-              <button onClick={onClose} className="w-10 h-10 rounded-xl bg-elevated/60 border border-border/30 flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors">
+              <button onClick={requestClose} className="w-10 h-10 rounded-xl bg-elevated/60 border border-border/30 flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors">
                 <X size={20} />
               </button>
           </div>
@@ -1087,7 +1107,7 @@ export const ItemDrawer: React.FC<Props> = ({
         {/* Bottom Actions Bar */}
         <div className="shrink-0 p-2.5 sm:p-5 sm:px-8 border-t border-border/30 bg-card/90 backdrop-blur-xl relative z-20">
            <div className="flex items-center gap-2 sm:gap-3 max-w-4xl mx-auto w-full">
-                 <button onClick={onClose} className="h-11 sm:h-12 w-11 sm:w-auto sm:px-8 shrink-0 rounded-xl font-black text-xs uppercase tracking-widest text-muted bg-elevated/60 border border-border/40 hover:text-main hover:bg-elevated hover:shadow-sm transition-all" aria-label={lang === 'ar' ? 'رجوع' : 'Cancel'}>
+                  <button onClick={requestClose} className="h-11 sm:h-12 w-11 sm:w-auto sm:px-8 shrink-0 rounded-xl font-black text-xs uppercase tracking-widest text-muted bg-elevated/60 border border-border/40 hover:text-main hover:bg-elevated hover:shadow-sm transition-all" aria-label={lang === 'ar' ? 'رجوع' : 'Cancel'}>
                     <X size={17} className="sm:hidden mx-auto" />
                     <span className="hidden sm:inline">
                     {lang === 'ar' ? 'رجوع' : 'Cancel'}

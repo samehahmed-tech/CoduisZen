@@ -16,7 +16,8 @@ import {
   AlertCircle, AlertTriangle, Wallet,
   ArrowUpRight, ArrowDownRight, UserCheck, CheckCircle2,
   Flame, Trophy, Briefcase, Ban, ReceiptText, RefreshCcw, BrainCircuit,
-  BadgePercent, Banknote, CreditCard, Smartphone, Landmark
+  BadgePercent, Banknote, CreditCard, Smartphone, Landmark, Plus,
+  UtensilsCrossed, BarChart3, Users, Settings
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +25,8 @@ import { aiApi } from '../services/api/ai';
 import { reportsApi } from '../services/api/reports';
 import { shiftsApi } from '../services/api/shifts';
 import { hrApi } from '../services/api/hr';
+import { refundApi } from '../services/api/refunds';
+import { ordersApi } from '../services/api/orders';
 import { socketService } from '../services/socketService';
 import { translations } from '../services/translations';
 
@@ -201,65 +204,74 @@ interface MetricCardProps {
 }
 
 const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: Icon, color, trend, target, permission, lang, hasPermission, onClick, trendData, delay = 0, help, detail }) => {
-  const progress = target ? Math.min(100, (value / target) * 100) : 0;
-  
+  const numericValue = Number(String(value ?? '').replace(/[^0-9.\-]/g, ''));
+  const progress = target && Number.isFinite(numericValue) ? Math.min(100, (numericValue / target) * 100) : 0;
+
   return (
-    <div 
+    <div
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       aria-label={label}
-      className={`animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible bg-card/60 border border-border/30 rounded-[1.5rem] p-5 lg:p-6 transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] ${onClick ? 'cursor-pointer' : ''}`}
+      className={`dx-metric animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible bg-card/60 border border-border/30 rounded-[1.5rem] p-5 h-full transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] ${onClick ? 'cursor-pointer' : ''}`}
       style={{ animationFillMode: 'both', animationDelay: `${delay}ms` }}
     >
       {/* Decorative gradient corner */}
-      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br transition-opacity duration-150 opacity-20 group-hover:opacity-30 blur-3xl`} style={{ background: color }} />
-      
-      <div className="flex items-start justify-between relative z-10">
-        <div>
-          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted lg:text-[11px]">{label}{help && <DashboardHelp text={help} label={`${label} explanation`} />}</p>
-          <h2 className="text-xl lg:text-3xl font-black text-main tracking-tighter tabular-nums flex items-end gap-1.5">
-            <SensitiveData permission={permission} hasPermission={hasPermission} lang={lang}>
-              {value}
-            </SensitiveData>
-            {subValue && <span className="text-xs font-bold text-muted mb-1 opacity-60">{subValue}</span>}
-          </h2>
-          {trend && (
-            <div className={`flex items-center gap-1 mt-2 text-[10px] font-black uppercase tracking-wider ${trend.up ? 'text-emerald-500' : 'text-rose-500'}`}>
-              {trend.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-              {trend.val}% <span className="text-muted ml-1 opacity-70">{translations[lang].vs_prev}</span>
-            </div>
-          )}
-          {detail && (
-            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-black text-muted">
-              <BadgePercent size={14} className="shrink-0 text-amber-500" />
-              <span>{detail.label}: {detail.value}</span>
-              <DashboardHelp text={detail.help} label={`${detail.label} explanation`} />
-            </div>
-          )}
-        </div>
-        <div className={`p-4 rounded-2xl border flex items-center justify-center shadow-lg transition-transform duration-150 group-hover:rotate-12`} style={{ borderColor: `${color}30`, backgroundColor: `${color}15`, color }}>
+      <div className={`absolute top-0 right-0 w-28 h-28 bg-gradient-to-br transition-opacity duration-150 opacity-25 group-hover:opacity-40 blur-3xl`} style={{ background: color }} />
+      {/* Per-card color wash (posted-design tinted cards) */}
+      <div className="absolute inset-0 rounded-[inherit] pointer-events-none" style={{ background: `linear-gradient(160deg, ${color}2b, transparent 55%)` }} />
+
+      <div className="flex items-start justify-between gap-3 relative z-10">
+        <div className={`p-3.5 rounded-2xl border flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110`} style={{ borderColor: `${color}40`, backgroundColor: `${color}1c`, color, boxShadow: `0 8px 22px ${color}30` }}>
           <Icon size={24} />
         </div>
+        {trend ? (
+          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${trend.up ? 'bg-emerald-500/12 text-emerald-500' : 'bg-rose-500/12 text-rose-500'}`}>
+            {trend.up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+            {trend.val}%
+          </div>
+        ) : (
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-muted bg-elevated/60 border border-border/20">
+            {translations[lang].vs_prev}
+          </span>
+        )}
       </div>
-      
+
+      <p className="mt-3 mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted lg:text-[11px]">{label}{help && <DashboardHelp text={help} label={`${label} explanation`} />}</p>
+      <h2 className="text-2xl lg:text-[1.7rem] font-black text-main tracking-tighter tabular-nums flex items-end gap-1.5">
+        <SensitiveData permission={permission} hasPermission={hasPermission} lang={lang}>
+          {value}
+        </SensitiveData>
+        {subValue && <span className="text-xs font-bold text-muted mb-1 opacity-60">{subValue}</span>}
+      </h2>
+
       {trendData && trendData.length > 0 && (
-        <Suspense fallback={null}>
-          <MetricSparkline values={trendData} color={color} gradientId={`spark-${label.replace(/\s+/g, '-')}`} />
-        </Suspense>
+        <div className="mt-2 -mb-1 opacity-90 group-hover:opacity-100 transition-opacity">
+          <Suspense fallback={null}>
+            <MetricSparkline values={trendData} color={color} gradientId={`spark-${label.replace(/\s+/g, '-')}`} />
+          </Suspense>
+        </div>
+      )}
+
+      {detail && (
+        <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black text-muted border border-border/25 bg-elevated/50 rounded-full px-2.5 py-1">
+          <BadgePercent size={13} className="shrink-0 text-amber-500" />
+          <span>{detail.label}: {detail.value}</span>
+          <DashboardHelp text={detail.help} label={`${detail.label} explanation`} />
+        </div>
       )}
 
       {target && (
-        <div className="mt-5 pt-4 border-t border-border/10 relative z-10">
-          <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-muted mb-2">
+        <div className="mt-4 pt-3 border-t border-border/10 relative z-10">
+          <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-muted mb-1.5">
             <span>{translations[lang].target_achieved}</span>
             <span className={progress >= 100 ? 'text-emerald-500' : 'text-primary'}>{Math.round(progress)}%</span>
           </div>
-          <div className="h-2 w-full bg-elevated/40 rounded-full overflow-hidden border border-border/10">
-            <div 
+          <div className="h-1.5 w-full bg-elevated/40 rounded-full overflow-hidden border border-border/10">
+            <div
               className={`h-full transition-all duration-1000 ease-out rounded-full shadow-[0_0_12px_rgba(0,0,0,0.1)] ${progress >= 100 ? 'bg-gradient-to-r from-emerald-500 to-green-400' : 'bg-gradient-to-r from-primary to-accent'}`}
-              style={{ width: `${progress}%` }} 
+              style={{ width: `${progress}%` }}
             />
           </div>
         </div>
@@ -429,7 +441,7 @@ const Dashboard: React.FC = () => {
     enabled: !!data?.current,
     queryFn: async () => {
       const p = { branchId: settings.activeBranchId, startDate: range.startDate, endDate: range.endDate };
-      const [hourly, daypart, heat, branchPerf, byItem, empProd, staffCost, discounts, cancelled, demand, newVsRet] = await Promise.all([
+      const [hourly, daypart, heat, branchPerf, byItem, empProd, staffCost, discounts, cancelled, demand, newVsRet, refunds] = await Promise.all([
         reportsApi.getHourlySales(p).catch(() => []),
         reportsApi.getDaypartAnalysis(p).catch(() => []),
         reportsApi.getPeakHoursHeatmap(p).catch(() => []),
@@ -441,8 +453,9 @@ const Dashboard: React.FC = () => {
         reportsApi.getCancelledOrders(p).catch(() => null),
         reportsApi.getDemandForecast({ branchId: settings.activeBranchId }).catch(() => null),
         reportsApi.getNewVsReturning(p).catch(() => null),
+        refundApi.getStats(p.branchId, p.startDate, p.endDate).catch(() => null),
       ]);
-      return { hourly, daypart, heat, branchPerf, byItem, empProd, staffCost, discounts, cancelled, demand, newVsRet };
+      return { hourly, daypart, heat, branchPerf, byItem, empProd, staffCost, discounts, cancelled, demand, newVsRet, refunds };
     },
     staleTime: 5 * 60_000,
     placeholderData: keepPreviousData,
@@ -683,6 +696,20 @@ const Dashboard: React.FC = () => {
     }));
   }, [payload.paymentBreakdown]);
 
+  // Refunds radar — same system data (refund service), wired into the dashboard.
+  const refundStats = useMemo(() => {
+    const r = ((ext as any)?.refunds || {}) as any;
+    const amount = Number(r.totalRefundedAmount ?? r.totalAmount ?? 0);
+    const rate = totals.revenue > 0 ? (amount / totals.revenue) * 100 : 0;
+    return {
+      amount,
+      rate,
+      pending: Number(r.pendingCount ?? 0),
+      count: Number(r.totalRefunds ?? 0),
+      topReason: (r.topReason as string | null) || null,
+    };
+  }, [(ext as any)?.refunds, totals.revenue]);
+
   const paymentLabel = useCallback((method: string) => {
     const labels: Record<string, string> = isAr
       ? { CASH: 'نقدي', VISA: 'فيزا / بطاقة', VODAFONE_CASH: 'فودافون كاش', INSTAPAY: 'إنستا باي', SPLIT: 'دفع متعدد', CASH_ON_DELIVERY: 'نقدي عند الاستلام' }
@@ -713,10 +740,72 @@ const Dashboard: React.FC = () => {
 
   const newVsReturning = useMemo(() => (ext?.newVsRet as any) || null, [ext]);
 
+  // Latest orders strip (same orders API, newest first).
+  const { data: recentOrders } = useQuery({
+    queryKey: ['dashboard-recent', settings.activeBranchId],
+    enabled: !!data?.current,
+    queryFn: async () => {
+      const rows = await ordersApi.getAll({ branch_id: settings.activeBranchId, limit: 8 } as any).catch(() => []);
+      const arr = Array.isArray(rows) ? rows : [];
+      return arr
+        .slice()
+        .sort((a: any, b: any) => +new Date(b.createdAt || b.created_at || 0) - +new Date(a.createdAt || a.created_at || 0))
+        .slice(0, 5);
+    },
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+
+  // Hero rotating tips (system advice, smooth modern cycle). MUST stay above
+  // the early return — hooks order must not change between renders.
+  const heroTips = useMemo(() => isAr ? [
+    'راجع المرتجعات المعلقة قبل إغلاق اليوم لتسييل نظيف.',
+    'الجرد اليومي المرحّل شرط إقفال اليوم — لا تؤجله.',
+    'معدل الإلغاء فوق 5%؟ راجع المطبخ والكاشير فوراً.',
+    'انسخ نسخة احتياطية قبل أي تحديث للسيستم.',
+    'اربط كل طلب بالعميل لبناء ولاء يعيده إليك.',
+    'ذروة 7–9 مساءً: جهّز طاقمك ومخزونك مبكراً.',
+  ] : [
+    'Review pending refunds before day close for a clean settle.',
+    'A posted daily stock count is required to close the day.',
+    'Cancel rate above 5%? Check kitchen and cashier now.',
+    'Back up before any system update.',
+    'Link every order to its customer to build returning loyalty.',
+    'Peak 7–9 PM: prep staff and stock early.',
+  ], [isAr]);
+  const [heroTip, setHeroTip] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setHeroTip((i) => (i + 1) % heroTips.length), 4500);
+    return () => clearInterval(id);
+  }, [heroTips.length]);
+
   if (isLoading && !data) return <PageSkeleton />;
 
+  // Xen pointer-tracking glow on metric cards (motion setting aware).
+  const handleDxPointer = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (typeof document !== 'undefined' && document.documentElement.dataset.motion === 'off') return;
+    const card = (e.target as HTMLElement).closest('.dx-metric') as HTMLElement | null;
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    card.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+
   return (
-    <div className="relative min-h-screen bg-app overflow-hidden">
+    <div onPointerMove={handleDxPointer} className="dx relative min-h-screen bg-app overflow-hidden">
+      <div className="dx-ticker" aria-hidden="true">
+        <span className="in">
+          {[0, 1].map((dup) => (
+            <span key={dup}>
+              <span style={{ margin: '0 26px' }}>{isAr ? 'إيراد الفترة' : 'Period revenue'}: <b>{fmtMoney(totals.revenue)} {currencySymbol}</b></span>●
+              <span style={{ margin: '0 26px' }}>{isAr ? 'الطلبات' : 'Orders'}: <b>{totals.orderCount}</b></span>●
+              <span style={{ margin: '0 26px' }}>{isAr ? 'معدل الإلغاء' : 'Cancel rate'}: <b>{totals.cancelRate.toFixed(1)}%</b></span>●
+              <span style={{ margin: '0 26px' }}>{isAr ? 'صافي الربح' : 'Net profit'}: <b>{fmtMoney(totals.netProfit)} {currencySymbol}</b></span>●
+              <span style={{ margin: '0 26px' }}>{isAr ? 'المصروفات' : 'Expenses'}: <b>{fmtMoney(totals.expenses)} {currencySymbol}</b></span>●
+            </span>
+          ))}
+        </span>
+      </div>
       {/* Visual Effects Overlay — static: same colors/position, isolated in
           its own paint layer (contain: strict) so it never repaints with
           scrolling content. The pulse on 120-150px blurs was the most
@@ -853,6 +942,113 @@ const Dashboard: React.FC = () => {
           </span>
         </div>
 
+        {/* HERO v6 — command strip: greeting + today + visual + revenue */}
+        <section className="hx" aria-label={isAr ? 'نبض اليوم' : "Today's pulse"}>
+          <div className="hx-greet">
+            <span className="hx-avatar" aria-hidden="true">{String(settings.currentUser?.name || '★').trim().charAt(0)}</span>
+            <div className="hx-greet-tx">
+              <p className="hx-hello" title={settings.currentUser?.name || ''}>{isAr ? `مرحباً، ${settings.currentUser?.name || ''} 👋` : `Welcome, ${settings.currentUser?.name || ''} 👋`}</p>
+              <p className="hx-wish">{isAr ? 'نتمنى لك يوماً مثمراً' : 'Wishing you a productive day'}</p>
+              <div className="hx-clock">
+                <span className="hx-chiplet tabular-nums" dir="ltr">{new Date(nowTick).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                <span className="hx-chiplet hx-chiplet-biz">{isAr ? `التشغيل ${activeBusinessDate}` : `Biz ${activeBusinessDate}`}</span>
+              </div>
+            </div>
+          </div>
+          <div className="hx-today">
+            <p className="hx-label">{isAr ? 'ملخص اليوم' : "Today's summary"}</p>
+            <div className="hx-rings">
+              {[
+                { label: isAr ? 'إجمالي المبيعات' : 'Revenue', value: totals.revenue, target: targets.revenue, display: `${fmtMoney(totals.revenue)} ${currencySymbol}` },
+                { label: isAr ? 'عدد الطلبات' : 'Orders', value: totals.orderCount, target: targets.orders, display: `${totals.orderCount} ${isAr ? 'طلب' : 'orders'}` },
+              ].map((r) => {
+                const pct = r.target > 0 ? Math.min(100, (r.value / r.target) * 100) : 0;
+                return (
+                  <div className="hx-ring" key={r.label}>
+                    <svg width="76" height="76" viewBox="0 0 96 96" role="img" aria-label={`${r.label} ${Math.round(pct)}%`}>
+                      <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="11" />
+                      <circle cx="48" cy="48" r="40" fill="none" stroke="rgb(var(--primary))" strokeWidth="11" strokeLinecap="round"
+                        strokeDasharray={`${pct * 2.513} 251.4`} transform="rotate(-90 48 48)" className="hx-arc" />
+                      <text x="48" y="55" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">{Math.round(pct)}%</text>
+                    </svg>
+                    <span>{r.label}</span>
+                    <b>{r.display}</b>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="hx-visual" aria-hidden="true">
+            <span className="dx-orb dx-orb-a" />
+            <span className="dx-orb dx-orb-b" />
+            <span className="dx-orb dx-orb-c" />
+            <div className="hx-tip">
+              <span className="hx-tip-ic">💡</span>
+              <p key={heroTip} className="hx-tip-tx">{heroTips[heroTip % heroTips.length]}</p>
+              <div className="hx-tip-dots" aria-hidden="true">
+                {heroTips.map((_, i) => (
+                  <i key={i} className={i === heroTip % heroTips.length ? 'on' : ''} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="hx-rev">
+            <p className="hx-label">{isAr ? 'إجمالي الإيرادات' : 'Total revenue'}</p>
+            <h2 className="hx-num">
+              <SensitiveData permission={AppPermission.DATA_VIEW_REVENUE} hasPermission={hasPermission} lang={lang}>
+                {fmtMoney(totals.revenue)}
+              </SensitiveData>
+              <small>{currencySymbol}</small>
+            </h2>
+            {trends.revenue && (
+              <span className={`hx-chip ${trends.revenue.up ? 'up' : 'dn'}`}>
+                {trends.revenue.up ? '▲' : '▼'} {trends.revenue.val}% {translations[lang].vs_prev}
+              </span>
+            )}
+            <div className="hx-ministats">
+              <div><b>{totals.orderCount}</b><span>{isAr ? 'طلب' : 'orders'}</span></div>
+              <div><b>{fmtMoney(totals.avgTicket)}</b><span>{isAr ? 'متوسط الفاتورة' : 'avg ticket'}</span></div>
+              <div><b>{fmtMoney(totals.netProfit)}</b><span>{isAr ? 'صافي الربح' : 'net profit'}</span></div>
+            </div>
+            <button type="button" onClick={goToFinance} className="hx-btn">
+              {isAr ? 'التقارير التفصيلية' : 'Detailed reports'}
+            </button>
+          </div>
+        </section>
+
+        {/* Status strip: live order mix + refunds shortcut (same data) */}
+        <div className="dx2-status" aria-label={isAr ? 'حالة الطلبات' : 'Order status'}>
+          <button type="button" onClick={() => navigate('/pos')} className="dx2-allbtn">
+            {isAr ? 'عرض جميع الطلبات' : 'View all orders'}
+          </button>
+          <div className="dx2-segwrap">
+            {(() => {
+              const total = Math.max(1, totals.orderCount);
+              const d = Math.round((totals.delivered / total) * 100);
+              const p = Math.round((totals.pending / total) * 100);
+              const c = Math.max(0, 100 - d - p);
+              return (
+                <>
+                  <div className="dx-seg">
+                    <span style={{ width: `${d}%`, background: 'linear-gradient(90deg,#10b981,#34d399)' }} />
+                    <span style={{ width: `${p}%`, background: 'linear-gradient(90deg,#f59e0b,#fbbf24)' }} />
+                    <span style={{ width: `${c}%`, background: 'linear-gradient(90deg,#f43f5e,#fb7185)' }} />
+                  </div>
+                  <div className="dx-seg-labels">
+                    <span>🟢 {isAr ? 'مسلّم' : 'Served'} {totals.delivered}</span>
+                    <span>🟡 {isAr ? 'قيد التحضير' : 'Preparing'} {totals.pending}</span>
+                    <span>🔴 {isAr ? 'ملغي' : 'Cancelled'} {totals.cancelled}</span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          <button type="button" onClick={() => navigate('/refunds')} className="dx2-refchip">
+            {isAr ? `↩ المرتجعات ${refundStats.rate.toFixed(1)}%` : `↩ Refunds ${refundStats.rate.toFixed(1)}%`}
+            {refundStats.pending > 0 && <b>{refundStats.pending}</b>}
+          </button>
+        </div>
+
         {/* Daily briefing — data-driven summary with a real destination CTA. */}
         <div className="flex animate-in slide-in-from-top-4 fade-in duration-1000 bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-indigo-500/15 border-y border-indigo-500/30 p-5 lg:p-6 items-center gap-5 shadow-[0_0_40px_-10px_rgba(99,102,241,0.2)] rounded-2xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
@@ -876,23 +1072,44 @@ const Dashboard: React.FC = () => {
 
         {/* ZONE 1 — Decision row: 4 cards, 30 seconds. */}
         <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5" aria-label={isAr ? 'قرارات سريعة' : 'Decision row'}>
-          <div className="relative overflow-hidden bg-card/60 border border-border/30 rounded-[1.5rem] p-5 transition-all hover:scale-[1.02]">
-            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted">{isAr ? 'إيراد اليوم' : "Today's revenue"}<DashboardHelp text={isAr ? 'إجمالي قيمة الطلبات المكتملة أو المسلّمة في الفترة الحالية مقارنة بالفترة السابقة.' : 'Total value of completed or delivered orders in the current period compared with the previous period.'} label={isAr ? 'شرح إيراد اليوم' : "Explain today's revenue"} /></p>
-            <p className="text-2xl lg:text-3xl font-black text-main tracking-tighter tabular-nums">
-              <SensitiveData permission={AppPermission.DATA_VIEW_REVENUE} hasPermission={hasPermission} lang={lang}>{fmtMoney(totals.revenue)}</SensitiveData>
-              <span className="text-xs font-bold text-muted opacity-60"> {currencySymbol}</span>
-            </p>
-            <p className={`mt-2 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider ${trends.revenue.up ? 'text-emerald-500' : 'text-rose-500'}`}>
-              {trends.revenue.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trends.revenue.val}% <span className="text-muted opacity-70">{translations[lang].vs_prev}</span>
-            </p>
-          </div>
-          <button type="button" onClick={() => navigate('/kds')} className="relative overflow-hidden bg-card/60 border border-border/30 rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02]">
-            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted">{isAr ? 'طلبات نشطة' : 'Active orders'}<DashboardHelp text={isAr ? 'عدد الطلبات التي لم تكتمل بعد، ويظهر بجانبها إجمالي الطلبات في الفترة.' : 'Orders that are not completed yet, shown beside the total order count for the period.'} label={isAr ? 'شرح الطلبات النشطة' : 'Explain active orders'} /></p>
-            <p className="text-2xl lg:text-3xl font-black text-main tracking-tighter tabular-nums">{totals.pending}<span className="text-sm font-bold text-muted"> / {totals.orderCount}</span></p>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-500/10"><div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400" style={{ width: `${totals.orderCount ? Math.min(100, (totals.pending / totals.orderCount) * 100) : 0}%` }} /></div>
+          <MetricCard
+            label={isAr ? 'إيراد اليوم' : "Today's revenue"}
+            value={fmtMoney(totals.revenue)}
+            subValue={currencySymbol}
+            icon={DollarSign}
+            color="var(--color-primary)"
+            trend={trends.revenue}
+            lang={lang}
+            hasPermission={hasPermission}
+            permission={AppPermission.DATA_VIEW_REVENUE}
+            onClick={goToFinance}
+            trendData={payload.trendData.map(d => num(d.revenue))}
+            help={isAr ? 'إجمالي قيمة الطلبات المكتملة أو المسلّمة في الفترة الحالية مقارنة بالفترة السابقة.' : 'Total value of completed or delivered orders in the current period compared with the previous period.'}
+            delay={0}
+          />
+          <button type="button" onClick={() => navigate('/kds')} className="dx-metric animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible bg-card/60 border border-border/30 rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] h-full" style={{ animationFillMode: 'both', animationDelay: '100ms' }}>
+            <div className="flex items-start justify-between gap-3 relative z-10">
+              <div className="p-3.5 rounded-2xl border flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" style={{ borderColor: '#f59e0b40', backgroundColor: '#f59e0b1c', color: '#f59e0b', boxShadow: '#f59e0b30 0 8px 22px' }}>
+                <ChefHat size={24} />
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/12 border border-amber-500/20">
+                {isAr ? 'مباشر' : 'LIVE'}
+              </span>
+            </div>
+            <p className="mt-3 mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted lg:text-[11px]">{isAr ? 'طلبات نشطة' : 'Active orders'}<span title={isAr ? 'عدد الطلبات التي لم تكتمل بعد، ويظهر بجانبها إجمالي الطلبات في الفترة.' : 'Orders that are not completed yet, shown beside the total order count for the period.'} className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/40 text-[10px] font-black text-muted">؟</span></p>
+            <p className="text-2xl lg:text-[1.7rem] font-black text-main tracking-tighter tabular-nums">{totals.pending}<span className="text-sm font-bold text-muted"> / {totals.orderCount}</span></p>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-amber-500/10 border border-border/10"><div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400 transition-all duration-1000" style={{ width: `${totals.orderCount ? Math.min(100, (totals.pending / totals.orderCount) * 100) : 0}%` }} /></div>
           </button>
-          <button type="button" onClick={() => criticalAlert && navigate(criticalAlert.to)} className={`relative overflow-hidden border rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02] ${criticalAlert ? 'border-rose-500/30 bg-rose-500/[0.06]' : 'border-emerald-500/30 bg-emerald-500/[0.06]'}`}>
-            <p className={`mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] ${criticalAlert ? 'text-rose-500' : 'text-emerald-600'}`}>{isAr ? 'الأولوية القصوى' : 'Top priority'}<DashboardHelp text={isAr ? 'أهم تنبيه تشغيلي حاليًا. إذا لم توجد مشكلة ستظهر رسالة أن المؤشرات مستقرة.' : 'The most important current operational alert. When there is no issue, the dashboard reports that indicators are stable.'} label={isAr ? 'شرح الأولوية القصوى' : 'Explain top priority'} /></p>
+          <button type="button" onClick={() => criticalAlert && navigate(criticalAlert.to)} className={`dx-metric animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible border rounded-[1.5rem] p-5 text-start transition-all hover:scale-[1.02] active:scale-[0.98] h-full ${criticalAlert ? 'border-rose-500/30 bg-rose-500/[0.06]' : 'border-emerald-500/30 bg-emerald-500/[0.06]'}`} style={{ animationFillMode: 'both', animationDelay: '200ms' }}>
+            <div className="flex items-start justify-between gap-3 relative z-10">
+              <div className="p-3.5 rounded-2xl border flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" style={criticalAlert ? { borderColor: '#f43f5e40', backgroundColor: '#f43f5e1c', color: '#f43f5e', boxShadow: '#f43f5e30 0 8px 22px' } : { borderColor: '#10b98140', backgroundColor: '#10b9811c', color: '#10b981', boxShadow: '#10b98130 0 8px 22px' }}>
+                {criticalAlert ? <AlertTriangle size={24} /> : <CheckCircle2 size={24} />}
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${criticalAlert ? 'text-rose-500 bg-rose-500/12 border border-rose-500/20' : 'text-emerald-500 bg-emerald-500/12 border border-emerald-500/20'}`}>
+                {criticalAlert ? (isAr ? 'عاجل' : 'URGENT') : (isAr ? 'مستقر' : 'STABLE')}
+              </span>
+            </div>
+            <p className={`mt-3 mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] ${criticalAlert ? 'text-rose-500' : 'text-emerald-600'}`}>{isAr ? 'الأولوية القصوى' : 'Top priority'}<span title={isAr ? 'أهم تنبيه تشغيلي حاليًا. إذا لم توجد مشكلة ستظهر رسالة أن المؤشرات مستقرة.' : 'The most important current operational alert. When there is no issue, the dashboard reports that indicators are stable.'} className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/40 text-[10px] font-black text-muted">؟</span></p>
             <p className="text-sm font-black text-main leading-6 min-h-[3rem]">{criticalAlert ? criticalAlert.text : (isAr ? 'كل المؤشرات مستقرة ✓' : 'All indicators stable ✓')}</p>
             <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-primary">{criticalAlert ? (isAr ? 'اضغط للمعالجة' : 'Tap to act') : (isAr ? 'استمر' : 'Keep going')}</p>
           </button>
@@ -1069,11 +1286,75 @@ const Dashboard: React.FC = () => {
           </div>
         </section>
 
+        {/* PULSE ROW — sales curve + latest orders + quick actions (same data) */}
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-5" aria-label={isAr ? 'نبض التشغيل' : 'Operations pulse'}>
+          <div className="dx2-panel xl:col-span-1">
+            <div className="dx2-panelhead">
+              <h3>{isAr ? 'المبيعات خلال آخر 7 أيام' : 'Sales over the last 7 days'}</h3>
+            </div>
+            <div className="w-full h-[260px] mt-2">
+              <Suspense fallback={<div className="h-full w-full rounded-2xl bg-elevated/30 animate-pulse" aria-label={t.loading} />}>
+                <RevenueTrendChart data={chartData} comparisonLabel={comparisonLabel} currentLabel={t.current} />
+              </Suspense>
+            </div>
+          </div>
+          <div className="dx2-panel xl:col-span-1">
+            <div className="dx2-panelhead">
+              <h3>{isAr ? 'أحدث الطلبات' : 'Latest orders'}</h3>
+              <button type="button" onClick={() => navigate('/pos')} className="dx2-link">{isAr ? 'عرض الكل' : 'View all'}</button>
+            </div>
+            <div className="dx2-orders">
+              {(recentOrders || []).length === 0 && (
+                <p className="dx2-empty">{isAr ? 'لا طلبات بعد في الفترة' : 'No orders yet in this period'}</p>
+              )}
+              {(recentOrders || []).map((o: any) => {
+                const st = String(o.status || '').toUpperCase();
+                const pill = st.includes('CANCEL') ? 'dx2-st-cancel' : st.includes('DELIVER') || st.includes('COMPLET') || st.includes('SERV') ? 'dx2-st-ok' : st.includes('PREP') || st.includes('KITCHEN') || st.includes('NEW') || st.includes('PEND') ? 'dx2-st-warn' : 'dx2-st-info';
+                const when = o.createdAt || o.created_at;
+                const time = when ? new Date(when).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+                const id = o.orderNumber ?? o.order_number ?? String(o.id || '').slice(-6);
+                return (
+                  <div className="dx2-order" key={String(o.id)}>
+                    <span className={`dx2-st ${pill}`}>{o.status || '—'}</span>
+                    <b className="dx2-oid">#{id}</b>
+                    <span className="dx2-ototal">{fmtMoney(Number(o.total || 0))} {currencySymbol}</span>
+                    <time>{time}</time>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="dx2-panel xl:col-span-1">
+            <div className="dx2-panelhead">
+              <h3>{isAr ? 'قائمة سريعة' : 'Quick actions'}</h3>
+            </div>
+            <div className="dx2-quick">
+              {[
+                { icon: Plus, label: isAr ? 'طلب جديد' : 'New order', to: '/pos', tint: '#10b981' },
+                { icon: UtensilsCrossed, label: isAr ? 'إدارة الأصناف' : 'Menu items', to: '/menu', tint: '#f59e0b' },
+                { icon: Package, label: isAr ? 'المخزون' : 'Inventory', to: '/inventory', tint: '#8b5cf6' },
+                { icon: BarChart3, label: isAr ? 'التقارير' : 'Reports', to: '/reports', tint: '#f97316' },
+                { icon: Truck, label: isAr ? 'الموردين' : 'Suppliers', to: '/inventory/suppliers', tint: '#06b6d4' },
+                { icon: Users, label: isAr ? 'الموظفين' : 'Staff', to: '/hr', tint: '#ec4899' },
+                { icon: Settings, label: isAr ? 'الإعدادات' : 'Settings', to: '/settings', tint: '#64748b' },
+                { icon: ChefHat, label: isAr ? 'المطبخ' : 'Kitchen', to: '/kds', tint: '#84cc16' },
+              ].map((a) => (
+                <button key={a.to} type="button" onClick={() => navigate(a.to)} className="dx2-tile">
+                  <span className="dx2-tileic" style={{ backgroundColor: `${a.tint}22`, color: a.tint }}>
+                    <a.icon size={19} />
+                  </span>
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ?? Row 3: Deep Analytics & Forecasting ?? */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '800ms', animationFillMode: 'both'}}>
           
           {/* Main Chart: Revenue Comparison */}
-          <div className="xl:col-span-2 bg-card/60  border border-border/30 rounded-[2rem] p-6 lg:p-8 flex flex-col shadow-xl">
+          <div className="xl:col-span-2 bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 flex flex-col shadow-xl">
             <div className="flex items-center justify-between mb-8">
               <div>
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{t.sales_trends_comparison}<DashboardHelp text={isAr ? 'يقارن اتجاه الإيراد بين الأيام أو الفترات المحددة والفترة السابقة.' : 'Compares revenue direction across the selected period and the comparison period.'} label={isAr ? 'شرح اتجاه المبيعات' : 'Explain sales trend'} /></h3>
@@ -1104,7 +1385,7 @@ const Dashboard: React.FC = () => {
 
         {/* ZONE 2 — Where is it heading? Dayparts, peak hours, why revenue moved. */}
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" aria-label={isAr ? 'اتجاهات التشغيل' : 'Operational trends'}>
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'الفترات (Dayparts)' : 'Dayparts'}<DashboardHelp text={isAr ? 'توزيع المبيعات والطلبات حسب فترة اليوم مثل الصباح والظهر والمساء.' : 'Sales and order distribution by parts of the day such as morning, afternoon and evening.'} label={isAr ? 'شرح فترات اليوم' : 'Explain dayparts'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{isAr ? 'أي فترة شايلة اليوم؟' : 'Which part of the day carries revenue?'}</p>
             <div className="w-full h-[260px] mt-4">
@@ -1130,7 +1411,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'خريطة الذروة' : 'Peak map'}<DashboardHelp text={isAr ? 'توضح الأيام والساعات التي تحتوي على أكبر عدد من الطلبات.' : 'Shows the days and hours with the highest order volume.'} label={isAr ? 'شرح خريطة الذروة' : 'Explain peak map'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{viewScope === 'DAILY' ? (isAr ? 'المبيعات ساعة بساعة اليوم' : 'Hour-by-hour today') : (isAr ? 'الكثافة: يوم × ساعة' : 'Density: day × hour')}</p>
             {viewScope === 'DAILY' ? (
@@ -1167,7 +1448,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'ليه اتغيرنا؟' : 'Why did we move?'}<DashboardHelp text={isAr ? 'يوضح الفرق بين إيراد الفترة الحالية والسابقة، ويقسم التغير إلى حجم الطلبات والخصومات والإلغاءات وباقي العوامل.' : 'Explains the difference between current and previous revenue by separating order volume, discounts, cancellations and other factors.'} label={isAr ? 'شرح تغير الإيراد' : 'Explain revenue movement'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{isAr ? 'تفكيك فرق الإيراد عن الفترة السابقة' : 'Revenue bridge vs previous period'}</p>
             <div className="mt-5 space-y-3">
@@ -1192,7 +1473,7 @@ const Dashboard: React.FC = () => {
         {/* ?? Row 4: Team, Top Items & Sources ?? */}
         <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '900ms', animationFillMode: 'both'}}>
             {/* Top Employees */}
-            <div className="bg-card/60  border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
+            <div className="bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-black text-main tracking-tight flex items-center gap-3">
                   <Trophy className="text-yellow-500" />
@@ -1234,7 +1515,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Trending Items Today */}
-            <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
+            <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
               <h3 className="text-xl font-black text-main tracking-tight mb-8 flex items-center gap-3">
                 <Flame className="text-orange-500" />
                 {t.trending_items}
@@ -1245,7 +1526,7 @@ const Dashboard: React.FC = () => {
                   payload.topItems.slice(0, 5).map((item, idx) => {
                     const maxQty = Math.max(1, payload.topItems[0]?.qty || 1);
                     const progress = Math.min(100, (item.qty / maxQty) * 100);
-                    return (
+  return (
                       <div key={item.name} className="relative group">
                         <div className="flex justify-between items-end mb-1.5 relative z-10">
                           <span className="text-[11px] font-black uppercase text-main truncate pr-2">{idx + 1}. {item.name}</span>
@@ -1269,7 +1550,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Platform / Order Source Breakdown */}
-            <div className="bg-card/60  border border-border/30 rounded-[2rem] p-6 lg:p-8 shadow-xl">
+            <div className="bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
               <h3 className="mb-8 flex items-center gap-2 text-xl font-black text-main tracking-tight">{t.order_source_distribution}<DashboardHelp text={isAr ? 'نسبة الطلبات حسب القناة: صالة، تيك أواي، دليفري أو مصدر خارجي.' : 'Order share by channel: dine-in, takeaway, delivery or an external source.'} label={isAr ? 'شرح مصادر الطلبات' : 'Explain order sources'} /></h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <div className="h-[250px]">
@@ -1303,7 +1584,7 @@ const Dashboard: React.FC = () => {
 
         {/* ZONE 3 — What needs action? Payments, slow items, branches, cash variance. */}
         <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" aria-label={isAr ? 'تفاصيل تحتاج تدخل' : 'Details needing action'}>
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
               <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'مبيعات كل طريقة دفع' : 'Sales by payment method'} <DashboardHelp text={isAr ? 'القيمة هنا مأخوذة من سجلات المدفوعات المكتملة خلال الفترة. النسبة هي حصة كل طريقة من إجمالي المدفوعات.' : 'Values come from completed payment records in the selected period. The percentage is each method’s share of total payments.'} label={isAr ? 'شرح مزيج المدفوعات' : 'Explain payment mix'} /></h3>
             {paymentMix.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -1324,7 +1605,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
             <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'أصناف تحتاج قرار' : 'Items needing a call'}<DashboardHelp text={isAr ? 'الأصناف الأقل حركة خلال الفترة مع بيانات الهامش لمساعدتك في قرار التسعير أو الإيقاف.' : 'Slowest-moving items in the period with margin data to guide pricing or menu decisions.'} label={isAr ? 'شرح الأصناف البطيئة' : 'Explain slow items'} /></h3>
             <p className="text-[11px] text-muted font-bold mt-1">{isAr ? 'الأبطأ حركة + الهامش' : 'Slowest movers + margin'}</p>
             {slowItems.length > 0 ? (
@@ -1342,7 +1623,7 @@ const Dashboard: React.FC = () => {
             <button type="button" onClick={() => navigate('/reports')} className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary hover:underline">{isAr ? 'هندسة المنيو الكاملة' : 'Full menu engineering'}</button>
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
             <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'أداء الفروع' : 'Branch performance'}<DashboardHelp text={isAr ? 'مقارنة عدد الطلبات والإيراد بين الفروع خلال نفس الفترة.' : 'Compares order count and revenue across branches for the same period.'} label={isAr ? 'شرح أداء الفروع' : 'Explain branch performance'} /></h3>
             {branchPerfRows.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -1363,7 +1644,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] p-6 shadow-xl">
+          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
             <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'فروقات الكاش (شيفتات)' : 'Cash variance (shifts)'}<DashboardHelp text={isAr ? 'الفرق بين النقد المتوقع والنقد الفعلي المسجل عند إغلاق الوردية.' : 'Difference between expected cash and the amount counted when a shift is closed.'} label={isAr ? 'شرح فروقات الكاش' : 'Explain cash variance'} /></h3>
             {shiftVariance.length > 0 ? (
               <div className="mt-4 space-y-3">

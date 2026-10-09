@@ -243,8 +243,9 @@ export const useCallCenterState = () => {
             setDiscountViolations(Array.isArray(discountAbuseData?.violations) ? discountAbuseData.violations : []);
             setLastRefresh(new Date());
         } catch (e: any) {
+            // Never wipe good data on a transient failure — a single failed
+            // sub-request used to blank the entire supervisor board.
             setError(e?.message || 'Failed to load call center overview');
-            setOrders([]); setDeliveryOrders([]); setDrivers([]); setEscalations([]); setCoachingNotes([]); setDiscountViolations([]);
         } finally {
             setIsLoading(false);
         }
@@ -357,10 +358,11 @@ export const useCallCenterState = () => {
         return map;
     }, [coachingNotes]);
 
-    /* ── Driver Statistics ──────────────────────────────────────── */
+    /* ── Driver Statistics (full delivery pipeline, not just call-center
+       origin — POS-origin delivery load counts toward pilot capacity) ── */
     const activeOrdersByDriver = React.useMemo(() => {
         const m = new Map<string, AnyOrder[]>();
-        for (const o of orders) {
+        for (const o of deliveryOrders) {
             const driverId = getOrderDriver(o);
             if (!driverId) continue;
             if (['DELIVERED', 'CANCELLED'].includes(getOrderStatus(o))) continue;
@@ -369,12 +371,12 @@ export const useCallCenterState = () => {
             m.set(driverId, arr);
         }
         return m;
-    }, [orders]);
+    }, [deliveryOrders]);
 
     const driverStats = React.useMemo(() => {
         return drivers.map(d => {
             const id = String(d.id || '');
-            const assigned = orders.filter(o => getOrderDriver(o) === id);
+            const assigned = deliveryOrders.filter(o => getOrderDriver(o) === id);
             const deliveredOrders = assigned.filter(o => getOrderStatus(o) === 'DELIVERED');
             const activeOrders = activeOrdersByDriver.get(id) || [];
             const deliveryTimes = deliveredOrders.map(o => {
@@ -402,7 +404,7 @@ export const useCallCenterState = () => {
                 isDelayed: currentWait > 45,
             };
         }).sort((a, b) => b.activeCount - a.activeCount);
-    }, [drivers, orders, activeOrdersByDriver, branches]);
+    }, [drivers, deliveryOrders, activeOrdersByDriver, branches]);
 
     /* ── Branch Comparison ──────────────────────────────────────── */
     const branchComparison = React.useMemo(() => {
@@ -441,7 +443,9 @@ export const useCallCenterState = () => {
     /* ── Live delivery pipeline (all branches, any source) ────────── */
     const ACTIVE_DELIVERY_STATUSES = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
     const activeDeliveries = React.useMemo(() => {
-        const terminal = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED', 'VOID', 'REFUNDED']);
+        // SCHEDULED is future work, not live pipeline — matches DispatchHub
+        // so the same order can't read "active" here and invisible there.
+        const terminal = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED', 'VOID', 'REFUNDED', 'SCHEDULED']);
         return deliveryOrders
             .filter(o => !terminal.has(getOrderStatus(o)))
             .map(o => {
@@ -571,10 +575,12 @@ export const useCallCenterState = () => {
         }
     };
 
-    /* ── Export to CSV ──────────────────────────────────────────── */
+    /* ── Export to CSV (desk orders + full delivery pipeline) ─────── */
     const exportCSV = () => {
         const headers = ['Order #', 'Status', 'Customer', 'Phone', 'Address', 'Agent', 'Total', 'Discount', 'Date'];
-        const rows = orders.map(o => [
+        const seen = new Set(orders.map(o => String(o.id)));
+        const all = [...orders, ...deliveryOrders.filter(o => !seen.has(String(o.id)))];
+        const rows = all.map(o => [
             getOrderNumber(o), getOrderStatus(o), getCustomerName(o), getCustomerPhone(o),
             getDeliveryAddress(o), getOrderAgent(o), getOrderTotal(o).toFixed(2),
             getOrderDiscount(o).toFixed(2), getOrderDate(o).toLocaleString(),

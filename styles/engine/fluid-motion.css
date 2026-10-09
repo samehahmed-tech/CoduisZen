@@ -159,7 +159,7 @@
 /* ── Safety rails ── */
 
 /* Reduced motion: everything becomes instant. */
-@media (prefers-reduced-motion: reduce) {
+html[data-motion="off"] {
   .fluid-stagger > *,
   .fluid-enter,
   .fluid-pop,

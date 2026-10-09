@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, Package, CheckCircle2, AlertTriangle, DollarSign, RefreshCw, Plus, X, Send, Hash } from 'lucide-react';
+import { FileText, Package, CheckCircle2, AlertTriangle, DollarSign, RefreshCw, Plus, X, Send, Hash, Printer } from 'lucide-react';
 import { useInventoryStore } from '@/stores/useInventoryStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToast } from '@/components/Toast';
@@ -63,6 +63,15 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
             unit: string;
         }>;
     }>(null);
+    const [invoiceDraft, setInvoiceDraft] = useState<null | {
+        grn: any;
+        items: Array<{ itemId: string; qty: number; unitPrice: number; total: number }>;
+        subtotal: number;
+        number: string;
+        dueDate: string;
+        tax: number;
+        discount: number;
+    }>(null);
 
     const refreshAll = useCallback(async () => {
         setLoading(true);
@@ -94,9 +103,11 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
         return new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
     }, [suppliers]);
 
+    // Branch warehouse only — never silently fall back to another branch's
+    // warehouse (that posted receipts to the wrong stock).
     const resolveWarehouseId = (branchId?: string) => {
         const branchWarehouse = warehouses.find((warehouse) => warehouse.branchId === branchId);
-        return branchWarehouse?.id || warehouses[0]?.id;
+        return branchWarehouse?.id;
     };
 
     const handleAddPOItem = () => {
@@ -164,6 +175,9 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
             const po = await purchaseOrdersApi.getById(poId);
             const branchId = po.branchId || activeBranchId;
             const warehouseId = po.targetWarehouseId || resolveWarehouseId(branchId);
+            if (!warehouseId) {
+                throw new Error(t('Set the receiving warehouse on the PO (or create one for this branch) before receiving', 'حدد مخزن الاستلام في أمر الشراء (أو أنشئ مخزناً للفرع) قبل الاستلام'));
+            }
             const items = (po.items || [])
                 .map((item: any) => {
                     const orderedQty = Number(item.orderedQty || 0);
@@ -210,6 +224,28 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
         }
     };
 
+    const handlePrintPO = async (poId: string, paper: 'a4' | '80mm' = 'a4') => {
+        try {
+            const blob = await purchaseOrdersApi.getPdf(poId, lang, paper);
+            const url = URL.createObjectURL(blob);
+            const win = window.open(url, '_blank');
+            if (!win) {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `PO-${poId}-${paper}.pdf`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 30000);
+                return;
+            }
+            setTimeout(() => {
+                try { win.focus(); win.print(); } catch { /* viewer still printable manually */ }
+            }, 800);
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (error: any) {
+            showToast(error?.message || t('Failed to prepare PO document', 'تعذر تجهيز مستند أمر الشراء'), 'error');
+        }
+    };
+
     const submitReceiveGRN = async () => {
         if (!receiveDraft) return;
         const branchId = receiveDraft.po.branchId || activeBranchId;
@@ -224,7 +260,7 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                 itemId: item.itemId,
                 poItemId: item.poItemId,
                 receivedQty: item.receivedQty,
-                unitPrice: item.unitPrice,
+                unitPrice: Number.isFinite(item.actualUnitPrice) ? Number(item.actualUnitPrice) : Number(item.unitPrice || 0),
                 batchNumber: `${receiveDraft.referenceNumber}-${item.itemId}`,
             }));
         if (!branchId || !items.length || hasInvalidQuantity) {
@@ -256,37 +292,55 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
     };
 
     const handleCreateInvoice = async (grn: any) => {
+        const existingInvoice = invoices.find((invoice) => invoice.grnId === grn.id);
+        if (existingInvoice) {
+            showToast(t('A supplier invoice already exists for this GRN', 'يوجد فاتورة مورد بالفعل لإذن الاستلام هذا'), 'error');
+            return;
+        }
+        const items = (grn.items || []).map((item: any) => ({
+            itemId: item.itemId,
+            qty: Number(item.receivedQty || 0),
+            unitPrice: Number(item.unitPrice || 0),
+            total: Number(item.receivedQty || 0) * Number(item.unitPrice || 0),
+        }));
+        const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0);
+        setInvoiceDraft({
+            grn,
+            items,
+            subtotal,
+            number: `SI-${grn.id}`,
+            dueDate: '',
+            tax: 0,
+            discount: 0,
+        });
+    };
+
+    const submitInvoice = async () => {
+        if (!invoiceDraft || loading) return;
+        const number = invoiceDraft.number.trim();
+        if (!number) {
+            showToast(t('Supplier invoice number is required', 'رقم فاتورة المورد مطلوب'), 'error');
+            return;
+        }
+        const tax = Math.max(0, Number(invoiceDraft.tax) || 0);
+        const discount = Math.min(Math.max(0, Number(invoiceDraft.discount) || 0), invoiceDraft.subtotal);
         setLoading(true);
         try {
-            const existingInvoice = invoices.find((invoice) => invoice.grnId === grn.id);
-            if (existingInvoice) throw new Error(t('A supplier invoice already exists for this GRN', 'يوجد فاتورة مورد بالفعل لإذن الاستلام هذا'));
-
-            const items = (grn.items || []).map((item: any) => ({
-                itemId: item.itemId,
-                qty: Number(item.receivedQty || 0),
-                unitPrice: Number(item.unitPrice || 0),
-                total: Number(item.receivedQty || 0) * Number(item.unitPrice || 0),
-            }));
-            const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0);
-            // ponytail: invoice edit UI should own tax/discount adjustments; GRN conversion defaults clean.
-            const tax = 0;
-            const discount = 0;
-
             await purchaseOrdersApi.createSupplierInvoice({
-                supplierId: grn.supplierId,
-                grnId: grn.id,
-                invoiceNumber: `SI-${grn.id}`,
+                supplierId: invoiceDraft.grn.supplierId,
+                grnId: invoiceDraft.grn.id,
+                invoiceNumber: number,
                 date: new Date().toISOString(),
-                dueDate: null,
-                subtotal,
+                dueDate: invoiceDraft.dueDate || null,
+                subtotal: invoiceDraft.subtotal,
                 tax,
                 discount,
-                total: subtotal + tax - discount,
-                items,
+                total: invoiceDraft.subtotal + tax - discount,
+                items: invoiceDraft.items,
                 userId: currentUser?.id,
-                notes: grn.notes || null,
+                notes: invoiceDraft.grn.notes || null,
             });
-
+            setInvoiceDraft(null);
             showToast(t('Supplier invoice saved to database', 'تم حفظ فاتورة المورد'), 'success');
             await refreshAll();
             setActiveSection('INVOICES');
@@ -449,8 +503,8 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                 <p className="text-xs text-muted font-bold mt-2">{t('Click "Create PO" to start.', 'اضغط "أمر شراء جديد" للبدء.')}</p>
                             </div>
                         ) : (
-                            <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm">
-                                <table className="w-full text-left text-sm">
+                            <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+                                <table className="w-full text-start text-sm min-w-[720px]">
                                     <thead className="bg-elevated/40 text-muted uppercase font-black text-[10px] tracking-widest">
                                         <tr>
                                             <th className="px-6 py-4">{t('PO Number', 'رقم الأمر')}</th>
@@ -470,13 +524,46 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                                         {po.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-xs font-bold text-muted">{(po.items || []).length}</td>
+                                                <td className="px-6 py-4 text-xs font-bold text-muted">
+                                                    {(() => {
+                                                        const items = po.items || [];
+                                                        const ordered = items.reduce((s: number, i: any) => s + Number(i.orderedQty || 0), 0);
+                                                        const received = items.reduce((s: number, i: any) => s + Number(i.receivedQty || 0), 0);
+                                                        const pct = ordered > 0 ? Math.min(100, Math.round((received / ordered) * 100)) : 0;
+                                                        return (
+                                                            <span className="inline-flex flex-col gap-1">
+                                                                <span>{items.length} · {pct}%</span>
+                                                                <span className="block h-1.5 w-20 overflow-hidden rounded-full bg-elevated">
+                                                                    <span className="block h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                                                                </span>
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    {String(po.status || '').toUpperCase() === 'DRAFT' ? (
+                                                    <div className="inline-flex items-center gap-2 justify-end">
+                                                    <button
+                                                        onClick={() => handlePrintPO(po.id, 'a4')}
+                                                        disabled={loading}
+                                                        className="px-3 py-2 bg-slate-500/10 text-slate-400 rounded-lg text-[10px] font-black uppercase hover:bg-slate-500 hover:text-white transition-all disabled:opacity-60 flex items-center gap-1.5"
+                                                        title={t('Print / download PO document (A4)', 'طباعة / تحميل مستند أمر الشراء (A4)')}
+                                                    >
+                                                        <Printer size={13} /> A4
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handlePrintPO(po.id, '80mm')}
+                                                        disabled={loading}
+                                                        className="px-3 py-2 bg-slate-500/10 text-slate-400 rounded-lg text-[10px] font-black uppercase hover:bg-slate-500 hover:text-white transition-all disabled:opacity-60 flex items-center gap-1.5"
+                                                        title={t('Thermal receipt (80mm)', 'إيصال حراري (80مم)')}
+                                                    >
+                                                        <Printer size={13} /> 80
+                                                    </button>
+                                                    {['DRAFT', 'APPROVED'].includes(String(po.status || '').toUpperCase()) ? (
                                                         <button
                                                             onClick={() => handleSendPO(po.id)}
                                                             disabled={loading}
-                                                            className="px-4 py-2 bg-indigo-500/10 text-indigo-500 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-500 hover:text-white transition-all disabled:opacity-60"
+                                                            className="px-4 py-2 min-h-[44px] inline-flex items-center bg-indigo-500/10 text-indigo-500 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-500 hover:text-white transition-all disabled:opacity-60"
+                                                            title={String(po.status || '').toUpperCase() === 'APPROVED' ? t('Approved — send to supplier to enable receiving', 'معتمد — أرسله للمورد لتفعيل الاستلام') : undefined}
                                                         >
                                                             {t('Send PO', 'إرسال الأمر')}
                                                         </button>
@@ -484,11 +571,12 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                                         <button
                                                             onClick={() => handleReceiveGRN(po.id)}
                                                             disabled={loading || !['SENT', 'PARTIAL', 'ORDERED'].includes(String(po.status || '').toUpperCase())}
-                                                            className="px-4 py-2 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-sm disabled:opacity-60"
+                                                            className="px-4 py-2 min-h-[44px] inline-flex items-center bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-sm disabled:opacity-60"
                                                         >
                                                             {t('Receive GRN', 'استلام')}
                                                         </button>
                                                     )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -512,8 +600,8 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                 <p className="text-xs text-muted font-bold mt-2">{t('Receive a purchase order to generate a GRN.', 'استلم أمر شراء لإنشاء إذن استلام.')}</p>
                             </div>
                         ) : (
-                            <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm">
-                                <table className="w-full text-left text-sm">
+                            <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+                                <table className="w-full text-start text-sm min-w-[720px]">
                                     <thead className="bg-elevated/40 text-muted uppercase font-black text-[10px] tracking-widest">
                                         <tr>
                                             <th className="px-6 py-4">{t('GRN', 'إذن الاستلام')}</th>
@@ -572,13 +660,14 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                 <p className="text-xs text-muted font-bold mt-2">{t('Create an invoice from a GRN to continue.', 'أنشئ فاتورة من إذن استلام للمتابعة')}</p>
                             </div>
                         ) : (
-                            <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm">
-                                <table className="w-full text-left text-sm">
+                            <div className="responsive-table border border-border/10 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+                                <table className="w-full text-start text-sm min-w-[720px]">
                                     <thead className="bg-elevated/40 text-muted uppercase font-black text-[10px] tracking-widest">
                                         <tr>
                                             <th className="px-6 py-4">{t('Bill ID', 'رقم الفاتورة')}</th>
                                             <th className="px-6 py-4">{t('Invoice Number', 'رقم الفاتورة')}</th>
                                             <th className="px-6 py-4">{t('Date', 'التاريخ')}</th>
+                                            <th className="px-6 py-4">{t('Due', 'الاستحقاق')}</th>
                                             <th className="px-6 py-4">{t('Total', 'الإجمالي')}</th>
                                             <th className="px-6 py-4">{t('Status', 'الحالة')}</th>
                                             <th className="px-6 py-4 text-right">{t('Actions', 'الإجراءات')}</th>
@@ -590,6 +679,18 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                                 <td className="px-6 py-4 font-mono font-black text-main">{invoice.id}</td>
                                                 <td className="px-6 py-4 font-black uppercase text-xs">{invoice.invoiceNumber}</td>
                                                 <td className="px-6 py-4 text-xs font-bold text-muted">{new Date(invoice.date).toLocaleDateString()}</td>
+                                                <td className="px-6 py-4 text-xs font-bold">
+                                                    {invoice.dueDate ? (() => {
+                                                        const overdue = new Date(invoice.dueDate).getTime() < Date.now()
+                                                            && invoice.status !== 'APPROVED' && invoice.status !== 'PAID';
+                                                        return (
+                                                            <span className={`rounded-lg px-2 py-1 ${overdue ? 'bg-rose-500/10 text-rose-500' : 'text-muted'}`}>
+                                                                {new Date(invoice.dueDate).toLocaleDateString()}
+                                                                {overdue ? ` · ${t('overdue', 'متأخر')}` : ''}
+                                                            </span>
+                                                        );
+                                                    })() : <span className="text-muted">—</span>}
+                                                </td>
                                                 <td className="px-6 py-4 font-black tabular-nums text-rose-500">{Number(invoice.total || 0).toLocaleString()}</td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
@@ -614,7 +715,7 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                                                                 if (ok) handleApproveInvoice(invoice.id);
                                                             }}
                                                             disabled={loading}
-                                                            className="px-4 py-2 bg-emerald-500 border border-emerald-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-lg active:scale-95 disabled:opacity-60"
+                                                            className="px-4 py-2 min-h-[44px] inline-flex items-center bg-emerald-500 border border-emerald-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-emerald-600 transition-all shadow-lg active:scale-95 disabled:opacity-60"
                                                         >
                                                             {t('Override & Approve', 'اعتماد الفاتورة')}
                                                         </button>
@@ -634,6 +735,66 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                     </div>
                 )}
             </div>
+            {invoiceDraft && (() => {
+                const tax = Math.max(0, Number(invoiceDraft.tax) || 0);
+                const discount = Math.min(Math.max(0, Number(invoiceDraft.discount) || 0), invoiceDraft.subtotal);
+                const total = invoiceDraft.subtotal + tax - discount;
+                const set = (patch: Partial<typeof invoiceDraft>) => setInvoiceDraft(current => current ? { ...current, ...patch } : current);
+                return (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4">
+                    <div className="card-primary w-full max-w-lg rounded-3xl border border-border/30 p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
+                        <div className="mb-5 flex items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-black text-main">{t('New supplier invoice', 'فاتورة مورد جديدة')}</h3>
+                                <p className="text-xs font-bold text-muted">GRN #{invoiceDraft.grn.id} · {invoiceDraft.items.length} {t('lines', 'بند')}</p>
+                            </div>
+                            <button type="button" onClick={() => setInvoiceDraft(null)} className="p-2 text-muted hover:text-main" aria-label={t('Close', 'إغلاق')}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="mb-1 block text-[11px] font-black text-muted">{t('Supplier invoice number *', 'رقم فاتورة المورد *')}</label>
+                                <input value={invoiceDraft.number} onChange={(e) => set({ number: e.target.value })} dir="ltr"
+                                    placeholder="INV-2024-001"
+                                    className="w-full rounded-xl border border-border/30 bg-card px-3 py-2.5 text-sm font-black text-main outline-none focus:border-primary" />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-[11px] font-black text-muted">{t('Due date', 'تاريخ الاستحقاق')}</label>
+                                <input type="date" value={invoiceDraft.dueDate} onChange={(e) => set({ dueDate: e.target.value })}
+                                    className="w-full rounded-xl border border-border/30 bg-card px-3 py-2.5 text-sm font-bold text-main outline-none focus:border-primary" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-black text-muted">{t('Tax', 'الضريبة')}</label>
+                                    <input type="number" min="0" step="0.01" value={invoiceDraft.tax}
+                                        onChange={(e) => set({ tax: Math.max(0, Number(e.target.value) || 0) })}
+                                        className="w-full rounded-xl border border-border/30 bg-card px-3 py-2.5 text-sm font-black text-main outline-none focus:border-primary" />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-black text-muted">{t('Discount (max subtotal)', 'الخصم (بحد الأقصى الإجمالي الفرعي)')}</label>
+                                    <input type="number" min="0" step="0.01" value={invoiceDraft.discount}
+                                        onChange={(e) => set({ discount: Math.min(Math.max(0, Number(e.target.value) || 0), invoiceDraft.subtotal) })}
+                                        className="w-full rounded-xl border border-border/30 bg-card px-3 py-2.5 text-sm font-black text-main outline-none focus:border-primary" />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between rounded-xl bg-elevated/60 border border-border/20 px-4 py-3 text-sm font-black">
+                                <span className="text-muted">{t('Subtotal', 'الإجمالي الفرعي')}: {invoiceDraft.subtotal.toFixed(2)}</span>
+                                <span className="text-main tabular-nums">{t('Total', 'الإجمالي')}: {total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div className="mt-6 flex gap-3">
+                            <button type="button" onClick={() => setInvoiceDraft(null)} className="flex-1 rounded-xl bg-elevated px-4 py-3 text-xs font-black text-muted">
+                                {t('Cancel', 'إلغاء')}
+                            </button>
+                            <button type="button" onClick={submitInvoice} disabled={loading || !invoiceDraft.number.trim()} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black text-white disabled:opacity-50">
+                                {loading ? t('Saving...', 'جاري الحفظ...') : t('Save invoice', 'حفظ الفاتورة')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
             {receiveDraft && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4">
                     <div className="card-primary w-full max-w-2xl rounded-3xl border border-border/30 p-6 shadow-2xl">
@@ -648,32 +809,63 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
                         </div>
 
                         <div className="max-h-[50vh] space-y-3 overflow-y-auto">
-                            {receiveDraft.items.map((item, index) => (
+                            {receiveDraft.items.map((item, index) => {
+                                const poPrice = Number(item.unitPrice || 0);
+                                const actualPrice = Number.isFinite(item.actualUnitPrice) ? Number(item.actualUnitPrice) : poPrice;
+                                const variance = poPrice > 0 ? ((actualPrice - poPrice) / poPrice) * 100 : 0;
+                                return (
                                 <div key={item.poItemId} className="grid grid-cols-[1fr_auto] items-center gap-4 rounded-2xl border border-border/20 bg-elevated/30 p-4">
                                     <div>
                                         <p className="font-black text-main">{item.itemName}</p>
                                         <p className="text-[11px] font-bold text-muted">
                                             {t('Ordered', 'المطلوب')}: {item.orderedQty} {item.unit} · {t('Received', 'المستلم')}: {item.alreadyReceivedQty} {item.unit} · {t('Remaining', 'المتبقي')}: {item.remainingQty} {item.unit}
                                         </p>
+                                        <p className="text-[11px] font-bold text-muted mt-1">
+                                            {t('PO price', 'سعر الأمر')}: {poPrice.toFixed(2)}
+                                            {Math.abs(variance) >= 0.5 && (
+                                                <span className={`ms-2 rounded-lg px-2 py-0.5 text-[10px] font-black ${variance > 0 ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                                    {variance > 0 ? '▲' : '▼'} {Math.abs(variance).toFixed(1)}%
+                                                </span>
+                                            )}
+                                        </p>
                                     </div>
-                                    <input
-                                        aria-label={`${t('Receive quantity', 'كمية الاستلام')} ${item.itemName}`}
-                                        type="number"
-                                        min="0"
-                                        max={item.remainingQty}
-                                        step="0.001"
-                                        value={item.receivedQty}
-                                        onChange={(event) => {
-                                            const receivedQty = Number(event.target.value);
-                                            setReceiveDraft(current => current ? {
-                                                ...current,
-                                                items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, receivedQty } : line),
-                                            } : current);
-                                        }}
-                                        className="w-28 rounded-xl border border-border/30 bg-card px-3 py-2 text-center font-black text-main"
-                                    />
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            aria-label={`${t('Actual unit price', 'سعر الوحدة الفعلي')} ${item.itemName}`}
+                                            title={t('Actual unit price (supplier invoice may differ from PO)', 'سعر الوحدة الفعلي (قد تختلف فاتورة المورد عن الأمر)')}
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={actualPrice}
+                                            onChange={(event) => {
+                                                const actualUnitPrice = Number(event.target.value);
+                                                setReceiveDraft(current => current ? {
+                                                    ...current,
+                                                    items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, actualUnitPrice } : line),
+                                                } : current);
+                                            }}
+                                            className="w-24 rounded-xl border border-border/30 bg-card px-3 py-2 text-center font-black text-main"
+                                        />
+                                        <input
+                                            aria-label={`${t('Receive quantity', 'كمية الاستلام')} ${item.itemName}`}
+                                            type="number"
+                                            min="0"
+                                            max={item.remainingQty}
+                                            step="0.001"
+                                            value={item.receivedQty}
+                                            onChange={(event) => {
+                                                const receivedQty = Number(event.target.value);
+                                                setReceiveDraft(current => current ? {
+                                                    ...current,
+                                                    items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, receivedQty } : line),
+                                                } : current);
+                                            }}
+                                            className="w-28 rounded-xl border border-border/30 bg-card px-3 py-2 text-center font-black text-main"
+                                        />
+                                    </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <div className="mt-6 flex gap-3">

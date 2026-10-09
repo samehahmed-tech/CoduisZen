@@ -16,14 +16,30 @@ type TrackedOrder = {
     items: Array<{ name: string; quantity: number }>;
 };
 
-const STEPS = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+const DELIVERY_STEPS = ['PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+const COUNTER_STEPS = ['PENDING', 'PREPARING', 'READY', 'COMPLETED'];
+const DINEIN_STEPS = ['PENDING', 'PREPARING', 'COMPLETED'];
 
-const stepIndex = (status: string) => {
-    const s = String(status || '').toUpperCase();
-    if (s === 'COMPLETED') return 4;
-    const i = STEPS.indexOf(s);
+const stepsForType = (type: string) => {
+    const t = String(type || '').toUpperCase();
+    if (t === 'DELIVERY') return DELIVERY_STEPS;
+    if (t === 'DINE_IN') return DINEIN_STEPS;
+    return COUNTER_STEPS;
+};
+
+const stepLabelsForType = (type: string): string[] => {
+    const t = String(type || '').toUpperCase();
+    if (t === 'DINE_IN') return ['تم الاستلام', 'قيد التحضير', 'تم التقديم'];
+    if (t === 'DELIVERY') return ['تم الاستلام', 'قيد التحضير', 'جاهز', 'في الطريق', 'تم التوصيل'];
+    return ['تم الاستلام', 'قيد التحضير', 'جاهز', 'تم الاستلام'];
+};
+
+const stepIndex = (status: string, steps: string[]) => {
+    const i = steps.indexOf(String(status || '').toUpperCase());
     return i === -1 ? 0 : i;
 };
+
+const DEAD_STATUSES = ['CANCELLED', 'REFUNDED', 'VOID', 'VOIDED'];
 
 const TrackOrder: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -34,7 +50,9 @@ const TrackOrder: React.FC = () => {
     const load = React.useCallback(async () => {
         if (!id) return;
         try {
-            const res: any = await apiRequest(`/public-screens/track/${encodeURIComponent(id)}`);
+            // Signed link (?t=); legacy token-less links are rejected server-side.
+            const search = typeof window !== 'undefined' ? window.location.search : '';
+            const res: any = await apiRequest(`/public-screens/track/${encodeURIComponent(id)}${search}`);
             if (res?.ok && res?.order) {
                 setOrder(res.order);
                 setError('');
@@ -55,8 +73,10 @@ const TrackOrder: React.FC = () => {
     }, [load]);
 
     const status = String(order?.status || '').toUpperCase();
-    const cancelled = status === 'CANCELLED';
-    const idx = stepIndex(status);
+    const dead = DEAD_STATUSES.includes(status);
+    const steps = stepsForType(order?.type || '');
+    const labels = stepLabelsForType(order?.type || '');
+    const idx = stepIndex(status, steps);
     const icons = [Clock, ChefHat, Package, Truck, CheckCircle2];
 
     return (
@@ -79,24 +99,23 @@ const TrackOrder: React.FC = () => {
                             #{order.orderNumber ?? String(order.id).slice(-6)}
                         </h1>
 
-                        {cancelled ? (
+                        {dead ? (
                             <div className="mt-6 rounded-2xl bg-rose-500/10 border border-rose-500/30 p-4 text-center font-black text-rose-500">
-                                تم إلغاء الطلب — تواصل مع الفرع للتفاصيل
+                                {status === 'REFUNDED' ? 'تم استرداد الطلب — تواصل مع الفرع للتفاصيل' : 'تم إلغاء الطلب — تواصل مع الفرع للتفاصيل'}
                             </div>
                         ) : (
                             <div className="mt-6 space-y-0">
-                                {STEPS.map((s, i) => {
+                                {steps.map((s, i) => {
                                     const done = i < idx;
                                     const current = i === idx;
-                                    const Icon = icons[i];
-                                    const labels = ['تم الاستلام', 'قيد التحضير', 'جاهز', 'في الطريق', 'تم التوصيل'];
+                                    const Icon = icons[Math.min(i, icons.length - 1)];
                                     return (
                                         <div key={s} className="flex gap-3">
                                             <div className="flex flex-col items-center">
                                                 <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 ${done || current ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-border text-muted'}`}>
                                                     <Icon size={16} />
                                                 </div>
-                                                {i < STEPS.length - 1 && (
+                                                {i < steps.length - 1 && (
                                                     <div className={`w-0.5 h-6 ${i < idx ? 'bg-emerald-500' : 'bg-border'}`} />
                                                 )}
                                             </div>

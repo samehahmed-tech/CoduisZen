@@ -80,6 +80,29 @@ try {
     try { $tokenGenerator.GetBytes($tokenBytes) } finally { $tokenGenerator.Dispose() }
     $bridgeToken = [Convert]::ToBase64String($tokenBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
     Set-Content -Path (Join-Path $stage "runtime\bridge-package-token") -Value $bridgeToken -NoNewline
+    # Ship verified MapKit keys so Apple Maps works with zero manual steps:
+    # stage\server.env.add (MAPKIT_* only) lands next to the installed server
+    # and the server reads it as a fallback when the process env lacks keys.
+    # Values come from the build machine's .env.local (gitignored, never committed).
+    $mapkitLines = @()
+    foreach ($envFile in @((Join-Path $repo '.env.local'), (Join-Path $repo '.env'))) {
+        if (-not (Test-Path -LiteralPath $envFile)) { continue }
+        foreach ($raw in (Get-Content -LiteralPath $envFile)) {
+            $line = $raw.Trim()
+            if ($line -match '^(MAPKIT_TEAM_ID|MAPKIT_KEY_ID|MAPKIT_PRIVATE_KEY)\s*=') {
+                $key = $Matches[1]
+                $already = @($mapkitLines | Where-Object { $_ -match "^$key\s*=" }).Count
+                if ($already -eq 0) { $mapkitLines += $raw }
+            }
+        }
+        if ((@($mapkitLines | Where-Object { $_ -match '^MAPKIT_TEAM_ID\s*=' }).Count) -gt 0) { break }
+    }
+    if ($mapkitLines.Count -gt 0) {
+        Set-Content -LiteralPath (Join-Path $stage 'server.env.add') -Value $mapkitLines -Encoding UTF8
+        Write-Host '>> Staged server.env.add (MapKit keys ship with this setup).' -ForegroundColor Green
+    } else {
+        Write-Host '>> No MAPKIT_* keys found in .env.local/.env — maps will use the OSM fallback until keys are set.' -ForegroundColor Yellow
+    }
     New-Item -ItemType Directory -Force -Path (Join-Path $stage "database") | Out-Null
     Copy-Item (Join-Path $repo "scripts\sql-server-schema.sql") (Join-Path $stage "database\empty-schema.sql") -Force
     Copy-Item (Join-Path $repo "scripts\sqlserver-schema-repair.sql") (Join-Path $stage "database\schema-repair.sql") -Force

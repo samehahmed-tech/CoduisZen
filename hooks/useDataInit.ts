@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../stores/useAuthStore';
+import { subscribeAuthEvents } from '../services/authSync';
 import { useMenuStore } from '../stores/useMenuStore';
 import { checkHealth } from '../services/api/core';
 import { syncService } from '../services/syncService';
@@ -50,7 +51,27 @@ export const useDataInit = (): InitResult => {
         };
 
         window.addEventListener('coduiszen:auth-invalid', onInvalidToken as EventListener);
-        return () => window.removeEventListener('coduiszen:auth-invalid', onInvalidToken as EventListener);
+        // Cross-tab sync: a logout/expired event from a sibling tab applies
+        // here WITHOUT rebroadcasting (loop-free) and WITHOUT waiting for
+        // our own API call to fail first.
+        const unsubscribeAuthSync = subscribeAuthEvents((event) => {
+            const state = useAuthStore.getState();
+            if (!state.isAuthenticated && !state.settings.currentUser) return;
+            if (event.type === 'session-expired') {
+                try {
+                    sessionStorage.setItem('coduiszen:auth-kick', JSON.stringify({ code: event.code, endpoint: 'cross-tab', at: Date.now() }));
+                } catch {
+                    // storage must never break logout
+                }
+            }
+            state.logout({ broadcast: false });
+            setError('INVALID_TOKEN');
+            setIsConnected(false);
+        });
+        return () => {
+            window.removeEventListener('coduiszen:auth-invalid', onInvalidToken as EventListener);
+            unsubscribeAuthSync();
+        };
     }, [logout]);
 
     useEffect(() => {

@@ -65,4 +65,5 @@ export const mailApi = {
     unreadCount: () => apiRequest<{ unread: number }>('/mail/unread-count'),
     directory: () => apiRequest<Array<{ id: string; name: string; role: string; branchId?: string | null }>>('/mail/directory'),
     deleteSent: (id: string) => apiRequest<{ success: boolean }>(`/mail/sent/${id}`, { method: 'DELETE' }),
+    deleteInbox: (id: string) => apiRequest<{ success: boolean }>(`/mail/inbox/${id}`, { method: 'DELETE' }),
 };

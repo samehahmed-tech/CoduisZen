@@ -1,4 +1,4 @@
-import { apiRequest } from './core';
+import { apiRequest, apiRequestBlob } from './core';
 
 export const suppliersApi = {
     getAll: (active?: boolean) => apiRequest<any[]>(`/suppliers${active ? '?active=true' : ''}`),
@@ -14,6 +14,9 @@ export const purchaseOrdersApi = {
         return apiRequest<any[]>(`/purchase-orders${query ? `?${query}` : ''}`);
     },
     getById: (id: string) => apiRequest<any>(`/purchase-orders/${id}`),
+    /** Branded PO document (A4 or 80mm thermal), Cairo + Latin digits. */
+    getPdf: (id: string, lang: 'ar' | 'en' = 'ar', paper: 'a4' | '80mm' = 'a4') =>
+        apiRequestBlob(`/purchase-orders/${id}/pdf?lang=${lang}&paper=${paper}`),
     getGRNs: (params?: { supplierId?: string; poId?: string }) => {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<any[]>(`/purchase-orders/grn${query ? `?${query}` : ''}`);

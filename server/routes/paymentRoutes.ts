@@ -4,11 +4,15 @@ import { db } from '../db';
 import { orders } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../utils/logger';
-import { requireRoles } from '../middleware/auth';
+import { requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = express.Router();
-const paymentAccess = requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'CASHIER', 'CAFE_ADMIN');
+// Reverse = void-like money-out; permission fallback keeps screen grants effective.
+const paymentAccess = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER_MANAGER', 'CASHIER', 'CAFE_ADMIN'],
+    ['OP_VOID_ORDER', 'OP_PROCESS_REFUND'],
+);
 
 const sendPaymentError = (res: express.Response, error: unknown) => {
     if (error instanceof PaymentSessionError) {

@@ -11,7 +11,10 @@ import { settingsApi } from '../services/api/settings';
 import { localDb } from '../db/localDb';
 import { syncService } from '../services/syncService';
 import i18n from '../src/i18n';
-import { resolveAvatar, setUserAvatar as persistUserAvatar, withLocalAvatars } from '../src/utils/userAvatars';
+import { fetchServerAvatarMap, getUserAvatar, resolveAvatar, saveServerAvatar, setUserAvatar as persistUserAvatar, withLocalAvatars } from '../src/utils/userAvatars';
+import { socketService } from '../src/services/socketService';
+import { broadcastAuthEvent, makeAuthSyncEvent } from '../services/authSync';
+import { migrateThemeId } from '../theme/engine/migrate';
 
 export type LoginMode = 'pin' | 'password';
 
@@ -83,7 +86,9 @@ interface AuthState {
     // Local Actions
     login: (user: User) => void;
     setUserAvatar: (userId: string, dataUrl: string | null) => void;
-    logout: () => void;
+    /** Pull cross-terminal photos from the server map into users + header. */
+    syncAvatarsFromServer: () => Promise<void>;
+    logout: (opts?: { broadcast?: boolean }) => void;
     updateSettings: (settings: Partial<AppSettings>) => void;
     hasPermission: (permission: AppPermission) => boolean;
     setActiveBranch: (branchId: string) => void;
@@ -112,9 +117,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     language: 'ar',
     isDarkMode: true,
     isTouchMode: false,
+    motionEffects: true,
     layoutMode: 'classic',
-    theme: 'aurora-glass',
+    theme: 'meridian',
     accentColor: '#6366f1',
+    density: 'comfortable',
+    motionLevel: 'full',
     branchAddress: '',
     phone: '',
     receiptLogoUrl: '',
@@ -137,6 +145,21 @@ const DEFAULT_SETTINGS: AppSettings = {
     endOfDayEmailRecipients: [],
     dayCloseRequireStockCount: true,
     dayCloseWhatsappRecipients: [],
+    dayCloseRules: {
+        requireStockCount: true,
+        requireKitchenEmpty: true,
+        requireVouchersClear: true,
+        requireCustodySettled: true,
+        requireDriverCash: true,
+        requireVarianceNote: true,
+        allowManagerOverride: true,
+    },
+    posItemDensity: 'typo',
+    posCardSize: 'medium',
+    posMode: 'grid',
+    ccItemDensity: 'typo',
+    ccCardSize: 'medium',
+    ccPosMode: 'grid',
 };
 
 // Only keep ONE admin user for first login - rest comes from database
@@ -207,6 +230,7 @@ export const useAuthStore = create<AuthState>()(
                     }));
                     syncService.init();
                     syncService.syncPending();
+                    void get().syncAvatarsFromServer();
                     return mappedUser;
                 } catch (error: any) {
                     set({ error: error.message || 'Login failed', isLoading: false });
@@ -250,6 +274,7 @@ export const useAuthStore = create<AuthState>()(
                         settings: { ...state.settings, currentUser: mappedUser, activeBranchId: mappedUser.assignedBranchId || state.branches[0]?.id },
                         isAuthenticated: true
                     }));
+                    void get().syncAvatarsFromServer();
                 } catch (error: any) {
                     const cachedUser = get().settings.currentUser;
                     const status = Number(error?.status || 0);
@@ -308,6 +333,7 @@ export const useAuthStore = create<AuthState>()(
                                 avatar: resolveAvatar(u.avatar, u.id),
                             }));
                             set({ users: withLocalAvatars(users), isLoading: false });
+                            void get().syncAvatarsFromServer();
                             await localDb.users.bulkPut(users);
                         } else {
                             set({ isLoading: false });
@@ -413,14 +439,35 @@ export const useAuthStore = create<AuthState>()(
 
             fetchSettings: async () => {
                 try {
+                    const VALID_DENSITIES = ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'];
+                    const pickDensity = (v: any, fallback: string) => (typeof v === 'string' && VALID_DENSITIES.includes(v) ? v : fallback);
+                    const pickSize = (v: any, fallback: 'small' | 'medium' | 'large') => (['small', 'medium', 'large'].includes(v) ? v : fallback);
+                    const pickMode = (v: any, fallback: 'grid' | 'retail') => (['grid', 'retail'].includes(v) ? v : fallback);
+                    const applyUserPrefsOverlay = (base: any, data: Record<string, any>, userId?: string) => {
+                        const blob = (userId && data[`userprefs_${userId}`]) || {};
+                        const src = { ...data, ...blob };
+                        return {
+                            ...base,
+                            isDarkMode: src.isDarkMode ?? base.isDarkMode ?? true,
+                            motionEffects: src.motionEffects ?? base.motionEffects ?? true,
+                            theme: migrateThemeId(src.theme || base.theme),
+                            posItemDensity: pickDensity(src.posItemDensity, base.posItemDensity || 'typo'),
+                            posCardSize: pickSize(src.posCardSize, base.posCardSize || 'medium'),
+                            posMode: pickMode(src.posMode, base.posMode || 'grid'),
+                            ccItemDensity: pickDensity(src.ccItemDensity ?? src.posItemDensity, base.ccItemDensity || 'typo'),
+                            ccCardSize: pickSize(src.ccCardSize ?? src.posCardSize, base.ccCardSize || 'medium'),
+                            ccPosMode: pickMode(src.ccPosMode ?? src.posMode, base.ccPosMode || 'grid'),
+                        };
+                    };
                     if (navigator.onLine) {
                         const data = await settingsApi.getAll();
                         if (Object.keys(data).length > 0) {
                             if (Array.isArray(data.receiptTemplates)) {
                                 localStorage.setItem('coduiszen_receipt_templates', JSON.stringify(data.receiptTemplates));
                             }
+                            const userId = get().settings.currentUser?.id;
                             set((state) => ({
-                                settings: {
+                                settings: applyUserPrefsOverlay({
                                     ...state.settings,
                                     restaurantName: data.restaurantName || state.settings.restaurantName,
                                     phone: data.phone || state.settings.phone,
@@ -441,8 +488,9 @@ export const useAuthStore = create<AuthState>()(
                                     taxRate: data.taxRate ?? state.settings.taxRate,
                                     serviceCharge: data.serviceCharge ?? state.settings.serviceCharge,
                                     language: data.language || state.settings.language,
-                                    isDarkMode: data.isDarkMode ?? state.settings.isDarkMode,
-                                    theme: data.theme || state.settings.theme,
+                                    isDarkMode: data.isDarkMode ?? state.settings.isDarkMode ?? true,
+                                    motionEffects: data.motionEffects ?? state.settings.motionEffects ?? true,
+                                    theme: migrateThemeId(data.theme || state.settings.theme),
                                     currencySymbol: data.currencySymbol || state.settings.currencySymbol,
                                     isTouchMode: data.isTouchMode ?? state.settings.isTouchMode,
                                     customRoles: data.customRoles ?? state.settings.customRoles,
@@ -451,16 +499,17 @@ export const useAuthStore = create<AuthState>()(
                                      endOfDayEmailRecipients: data.endOfDayEmailRecipients ?? state.settings.endOfDayEmailRecipients,
                                      dayCloseRequireStockCount: data.dayCloseRequireStockCount ?? state.settings.dayCloseRequireStockCount,
                                      dayCloseWhatsappRecipients: data.dayCloseWhatsappRecipients ?? state.settings.dayCloseWhatsappRecipients,
-                                 }
-                             }));
+                                 }, data, userId),
+                            }));
                             await localDb.settings.put({ key: 'app', value: data, updatedAt: Date.now() });
                         }
                     } else {
                         const cached = await localDb.settings.get('app');
                         if (cached?.value) {
                             const data = cached.value;
+                            const userId = get().settings.currentUser?.id;
                             set((state) => ({
-                                settings: {
+                                settings: applyUserPrefsOverlay({
                                     ...state.settings,
                                     restaurantName: data.restaurantName || state.settings.restaurantName,
                                     phone: data.phone || state.settings.phone,
@@ -480,8 +529,9 @@ export const useAuthStore = create<AuthState>()(
                                     taxRate: data.taxRate ?? state.settings.taxRate,
                                     serviceCharge: data.serviceCharge ?? state.settings.serviceCharge,
                                     language: data.language || state.settings.language,
-                                    isDarkMode: data.isDarkMode ?? state.settings.isDarkMode,
-                                    theme: data.theme || state.settings.theme,
+                                    isDarkMode: data.isDarkMode ?? state.settings.isDarkMode ?? true,
+                                    motionEffects: data.motionEffects ?? state.settings.motionEffects ?? true,
+                                    theme: migrateThemeId(data.theme || state.settings.theme),
                                     currencySymbol: data.currencySymbol || state.settings.currencySymbol,
                                     isTouchMode: data.isTouchMode ?? state.settings.isTouchMode,
                                      customRoles: data.customRoles ?? state.settings.customRoles,
@@ -490,8 +540,8 @@ export const useAuthStore = create<AuthState>()(
                                      endOfDayEmailRecipients: data.endOfDayEmailRecipients ?? state.settings.endOfDayEmailRecipients,
                                      dayCloseRequireStockCount: data.dayCloseRequireStockCount ?? state.settings.dayCloseRequireStockCount,
                                      dayCloseWhatsappRecipients: data.dayCloseWhatsappRecipients ?? state.settings.dayCloseWhatsappRecipients,
-                                 }
-                             }));
+                                 }, data, userId),
+                            }));
                         }
                     }
                 } catch (error) {
@@ -550,7 +600,13 @@ export const useAuthStore = create<AuthState>()(
                     });
                     // Avatar is terminal-local until the server supports it — persist it
                     // alongside so the photo survives reloads and offline use.
-                    if (user.avatar) persistUserAvatar(user.id, user.avatar);
+                    // Always sync (set or delete) so clearing the photo sticks too.
+                    persistUserAvatar(user.id, user.avatar || null);
+                    if (user.avatar) {
+                        void saveServerAvatar(user.id, user.avatar);
+                    } else {
+                        void saveServerAvatar(user.id, null);
+                    }
                     set((state) => ({ users: [...state.users, user], isLoading: false }));
                 } catch (error: any) {
                     set({ error: error.message, isLoading: false });
@@ -590,7 +646,13 @@ export const useAuthStore = create<AuthState>()(
                         ...payload,
                     });
                     // Avatar is terminal-local until the server supports it.
-                    if (user.avatar) persistUserAvatar(user.id, user.avatar);
+                    // Always sync (set or delete) so clearing the photo sticks too.
+                    persistUserAvatar(user.id, user.avatar || null);
+                    if (user.avatar) {
+                        void saveServerAvatar(user.id, user.avatar);
+                    } else {
+                        void saveServerAvatar(user.id, null);
+                    }
                     set((state) => {
                         const prev = state.users.find((u) => u.id === user.id);
                         const merged = { ...user, avatar: user.avatar ?? prev?.avatar };
@@ -756,18 +818,54 @@ export const useAuthStore = create<AuthState>()(
                 const updated = get().users.find((u) => u.id === userId);
                 if (updated) localDb.users.put(updated as any).catch(() => undefined);
             },
+            syncAvatarsFromServer: async () => {
+                const map = await fetchServerAvatarMap();
+                const ids = Object.keys(map);
+                if (!ids.length) return;
+                ids.forEach((id) => {
+                    if (map[id] && !getUserAvatar(id)) persistUserAvatar(id, map[id]);
+                });
+                set((s) => {
+                    const cu = s.settings.currentUser;
+                    const nextCu = cu && !cu.avatar && cu.id && map[cu.id] ? { ...cu, avatar: map[cu.id] } : cu;
+                    let usersChanged = false;
+                    const users = s.users.map((u) => {
+                        if (!u.avatar && u.id && map[u.id]) {
+                            usersChanged = true;
+                            return { ...u, avatar: map[u.id] };
+                        }
+                        return u;
+                    });
+                    if (nextCu === cu && !usersChanged) return s;
+                    return { ...s, users, settings: { ...s.settings, currentUser: nextCu } };
+                });
+            },
 
-            logout: () => {
+            logout: (opts?: { broadcast?: boolean }) => {
+                const hadSession = Boolean(
+                    get().isAuthenticated
+                    || get().settings.currentUser
+                    || (typeof localStorage !== 'undefined' && (localStorage.getItem('auth_token') || localStorage.getItem('auth_refresh_token'))),
+                );
                 if (localStorage.getItem('auth_token')) {
                     authApi.logout().catch(() => undefined);
                 }
                 localStorage.removeItem('auth_token');
                 localStorage.removeItem('auth_refresh_token');
+                try {
+                    socketService.disconnect();
+                } catch { /* socket must never break logout */ }
                 set((state) => ({
                     settings: { ...state.settings, currentUser: undefined, activeBranchId: undefined },
                     isAuthenticated: false,
                     token: null
                 }));
+                // Cross-tab sync: only the tab where logout was EXPLICITLY
+                // initiated broadcasts. Receivers call logout({ broadcast: false }).
+                // The hadSession gate keeps repeated/no-op logouts loop-free.
+                if (opts?.broadcast !== false && hadSession) {
+                    broadcastAuthEvent(makeAuthSyncEvent('logout'));
+                }
             },
 
             updateSettings: (newSettings) => {
@@ -785,11 +883,33 @@ export const useAuthStore = create<AuthState>()(
                     document.documentElement.dir = newSettings.language === 'ar' ? 'rtl' : 'ltr';
                 }
 
-                // Sync to database in background
+                // Sync to database in background (global + per-user overlay so
+                // POS view, dark/light, theme follow the user across devices).
+                const userId = get().settings.currentUser?.id;
+                const PERSISTED_PREF_KEYS = ['isDarkMode', 'theme', 'language', 'isTouchMode', 'motionEffects', 'layoutMode', 'posItemDensity', 'posCardSize', 'posMode', 'ccItemDensity', 'ccCardSize', 'ccPosMode'] as const;
+                const prefSlice: Record<string, any> = {};
+                for (const k of PERSISTED_PREF_KEYS) {
+                    if (k in newSettings) prefSlice[k] = (newSettings as any)[k];
+                }
                 if (navigator.onLine) {
                     settingsApi.updateBulk(newSettings).catch(() => undefined);
+                    if (userId && Object.keys(prefSlice).length > 0) {
+                        const merged = { ...prefSlice };
+                        try {
+                            const cached = localStorage.getItem(`coduiszen_userprefs_${userId}`);
+                            if (cached) Object.assign(merged, JSON.parse(cached), prefSlice);
+                        } catch { /* ignore */ }
+                        settingsApi.update(`userprefs_${userId}`, merged, 'userprefs', userId).catch(() => undefined);
+                    }
                 } else {
                     syncService.queue('settingsBulk', 'UPDATE', newSettings).catch(() => undefined);
+                }
+                if (userId && Object.keys(prefSlice).length > 0) {
+                    try {
+                        const cached = localStorage.getItem(`coduiszen_userprefs_${userId}`);
+                        const prev = cached ? JSON.parse(cached) : {};
+                        localStorage.setItem(`coduiszen_userprefs_${userId}`, JSON.stringify({ ...prev, ...prefSlice }));
+                    } catch { /* ignore */ }
                 }
                 localDb.settings.put({ key: 'app', value: { ...get().settings, ...newSettings }, updatedAt: Date.now() }).catch(() => undefined);
             },
@@ -908,6 +1028,17 @@ export const useAuthStore = create<AuthState>()(
                 state.updateSettings({
                     customRoles: (state.settings.customRoles || []).map(r => r.id === id ? { ...r, name, nameAr, permissions } : r)
                 });
+                const me = get().settings.currentUser;
+                if (me && me.role === id) {
+                    const added = me.customOverrides?.added || [];
+                    const removed = me.customOverrides?.removed || [];
+                    const merged = [...new Set([...(permissions as AppPermission[]).filter(p => !removed.includes(p)), ...added])];
+                    set((s) => ({
+                        settings: s.settings.currentUser?.id === me.id
+                            ? { ...s.settings, currentUser: { ...s.settings.currentUser, permissions: merged } as any }
+                            : s.settings,
+                    }));
+                }
             },
 
             deleteCustomRole: async (id) => {
@@ -937,6 +1068,21 @@ export const useAuthStore = create<AuthState>()(
                 const customRole = (state.settings.customRoles || []).find(r => r.id === roleId);
                 const normId = String(roleId).startsWith('role_') ? String(roleId) : `role_${String(roleId).toLowerCase()}`;
                 const normName = String(roleId).toUpperCase();
+                // Editing a role must take effect immediately — even for users
+                // already logged in whose permission snapshot would otherwise
+                // keep shadowing the change until their next login.
+                const refreshSelfPermissions = (editedId: string, base: AppPermission[]) => {
+                    const me = get().settings.currentUser;
+                    if (!me || me.role !== editedId) return;
+                    const added = me.customOverrides?.added || [];
+                    const removed = me.customOverrides?.removed || [];
+                    const merged = [...new Set([...base.filter(p => !removed.includes(p)), ...added])];
+                    set((s) => ({
+                        settings: s.settings.currentUser?.id === me.id
+                            ? { ...s.settings, currentUser: { ...s.settings.currentUser, permissions: merged } as any }
+                            : s.settings,
+                    }));
+                };
 
                 if (navigator.onLine) {
                     let lastErr: any = null;
@@ -992,6 +1138,7 @@ export const useAuthStore = create<AuthState>()(
                     state.updateSettings({
                         customRoles: (state.settings.customRoles || []).map(r => r.id === roleId ? { ...r, permissions } : r)
                     });
+                    refreshSelfPermissions(roleId, permissions);
                 } else {
                     state.updateSettings({
                         rolePermissionOverrides: {
@@ -999,6 +1146,7 @@ export const useAuthStore = create<AuthState>()(
                             [roleId]: permissions
                         }
                     });
+                    refreshSelfPermissions(roleId, permissions);
                 }
             },
         }),

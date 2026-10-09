@@ -2,10 +2,16 @@ import { Router } from 'express';
 import { validate } from '../middleware/validate';
 import { createMenuItemSchema, updateMenuItemSchema } from '../middleware/validation';
 import * as menuController from '../controllers/menuController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
-const managerAuth = requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER');
+// Menu mutations additionally honor an explicit CFG_EDIT_MENU_PRICING grant
+// (the same permission the AI action guard and editor UIs check).
+// OWNER was missing here entirely (an owner could not edit the menu).
+const managerAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER'],
+    ['CFG_EDIT_MENU_PRICING'],
+);
 
 router.get('/categories', menuController.getAllCategories);
 router.post('/categories', managerAuth, menuController.createCategory);

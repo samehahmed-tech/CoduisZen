@@ -56,7 +56,7 @@ export const generateReceiptHTML = ({
    const totals = calculateOrderTotalsFromOrder(order, settings);
    const subtotal = totals.subtotal;
    const totalItemDiscounts = totals.itemDiscountTotal;
-   const itemRows = (order.items || []).map((item, idx) => {
+   const itemRows = (order.items || []).map((item) => {
       const modsPrice = (item.selectedModifiers || []).reduce((s, m) => s + (m.price || 0), 0);
       const unitPrice = (item.price || 0) + modsPrice;
       const lineGross = unitPrice * (item.quantity || 1);
@@ -82,10 +82,8 @@ export const generateReceiptHTML = ({
          ? `<div class="item-discount">${isAr ? '\u062e\u0635\u0645' : 'Disc'}: -${itemDiscount.toFixed(2)}</div>`
          : '';
 
-      const rowBg = idx % 2 === 0 ? '' : ' class="alt-row"';
-
       return `
-         <tr${rowBg}>
+         <tr>
             <td class="col-item">
                <span class="item-name">${name}</span>
                ${modLines}${noteLine}${discountLine}
@@ -153,6 +151,9 @@ export const generateReceiptHTML = ({
    if (order.deliveryAddress) {
       customerBlock += `<div class="info-chip">${order.deliveryAddress}</div>`;
    }
+   if ((order as any).cashierName) {
+      customerBlock += `<div class="info-chip">${isAr ? 'الكاشير' : 'Cashier'}: <strong>${(order as any).cashierName}</strong></div>`;
+   }
    if (order.notes) {
       customerBlock += `<div class="info-chip order-note">${order.notes}</div>`;
    }
@@ -177,7 +178,8 @@ export const generateReceiptHTML = ({
        margin: 0 auto;
        padding: 3mm 2mm 3mm;
        direction: ${dir};
-       line-height: 1.6;
+       line-height: 1.55;
+       font-weight: 600;
        overflow: visible;
        -webkit-print-color-adjust: exact;
        print-color-adjust: exact;
@@ -195,8 +197,8 @@ export const generateReceiptHTML = ({
       letter-spacing: -0.5px;
       line-height: 1.2;
    }
-   .branch-name { font-size: 14px; font-weight: 800; color: #000; margin-top: 1px; }
-   .branch-info { font-size: 12px; color: #333; font-weight: 700; margin-top: 1px; }
+   .branch-name { font-size: 14px; font-weight: 900; color: #000; margin-top: 1px; }
+   .branch-info { font-size: 12px; color: #000; font-weight: 800; margin-top: 1px; }
 
     /* Title — Arabic glyphs (diacritics) are taller than Latin: keep a roomy
        line box and zero letter-spacing (spacing breaks Arabic shaping). */
@@ -208,21 +210,21 @@ export const generateReceiptHTML = ({
        letter-spacing: 0;
        padding: 8px 6px;
        margin: 6px 0;
-       border: 1px dashed #555;
-       border-radius: 4px;
-       background: #f5f5f5;
+       border: 3px double #000;
+       border-radius: 0;
+       background: #fff;
+       color: #000;
        overflow: visible;
        overflow-wrap: anywhere;
     }
 
    /* Order Meta */
-    .order-meta {
+   .order-meta {
        display: grid;
        grid-template-columns: minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.35fr);
       align-items: flex-start;
-      gap: 4px;
-      padding: 6px 0;
-      border-bottom: 1px dashed #555;
+      gap: 6px;
+      padding: 8px 0 10px;
    }
     .meta-block {
        display: flex;
@@ -236,7 +238,7 @@ export const generateReceiptHTML = ({
        font-weight: 900;
        letter-spacing: 0;
        line-height: 1.6;
-       color: #333;
+       color: #000;
     }
      .meta-value {
         display: block;
@@ -256,8 +258,8 @@ export const generateReceiptHTML = ({
        justify-content: center;
        padding: 4px 12px;
        background: #fff;
-       color: #111;
-       border: 1.5px solid #111;
+       color: #000;
+       border: 2px solid #000;
        border-radius: 12px;
        font-size: 12px;
        font-weight: 900;
@@ -291,8 +293,8 @@ export const generateReceiptHTML = ({
       color: #000;
    }
    .order-note {
-      font-style: italic;
-      color: #333; font-weight: 700;
+      font-weight: 800;
+      color: #000;
    }
 
    /* Items Table */
@@ -304,12 +306,12 @@ export const generateReceiptHTML = ({
    }
    .items-header td {
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      color: #333;
+      color: #000;
       padding: 4px 0;
-      border-bottom: 2px solid #222;
+      border-bottom: 3px solid #000;
    }
     .col-item { text-align: ${align}; width: 44%; }
     .col-qty  { text-align: center; width: 14%; }
@@ -322,45 +324,45 @@ export const generateReceiptHTML = ({
        font-variant-numeric: tabular-nums;
     }
    .items-table td {
-      padding: 5px 2px;
-      border-bottom: 1px dashed #999;
+      padding: 7px 2px;
+      border-bottom: 1px dotted #000;
       vertical-align: top;
       font-size: 15px;
       overflow-wrap: anywhere;
       word-break: normal;
    }
-   .alt-row td { background: #f0f0f0; }
    .item-name { font-weight: 900; font-size: 17px; display: block; line-height: 1.42; }
    .item-mod {
       font-size: 13px;
-      color: #666;
+      color: #000;
+      font-weight: 800;
       padding-${align}: 8px;
       line-height: 1.3;
    }
-   .mod-price { color: #555; }
+   .mod-price { color: #000; font-weight: 800; }
    .item-note {
       font-size: 13px;
-      color: #888;
-      font-style: italic;
+      color: #000;
+      font-weight: 800;
       padding-${align}: 8px;
       margin-top: 1px;
    }
    .item-discount {
       font-size: 13px;
-      color: #2e7d32;
-      font-weight: 600;
+      color: #000;
+      font-weight: 900;
       padding-${align}: 8px;
    }
 
    /* Separator */
    .dashed-sep {
       border: none;
-      border-top: 1px dashed #666;
+      border-top: 2px dashed #000;
       margin: 6px 0;
    }
    .thick-sep {
       border: none;
-      border-top: 2px solid #222;
+      border-top: 3px solid #000;
       margin: 8px 0;
    }
 
@@ -372,12 +374,12 @@ export const generateReceiptHTML = ({
    .summary-line td {
       padding: 3px 0;
       font-size: 14px;
-      font-weight: 600;
-      color: #444;
+      font-weight: 800;
+      color: #000;
    }
     .summary-line td:first-child { text-align: ${align}; }
     .summary-line td:last-child { text-align: ${alignEnd}; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
-   .discount-row td { color: #2e7d32; }
+   .discount-row td { color: #000; font-weight: 900; }
 
    /* Grand Total */
    .grand-total {
@@ -394,7 +396,7 @@ export const generateReceiptHTML = ({
    }
    .grand-total-label {
       font-size: 16px;
-      font-weight: 800;
+      font-weight: 900;
    }
      .grand-total-value {
         font-size: 22px;
@@ -421,10 +423,10 @@ export const generateReceiptHTML = ({
         padding: 7px 18px;
         min-width: 96px;
         max-width: 100%;
-        border: 1.5px solid #333;
-        border-radius: 20px;
+        border: 2.5px solid #000;
+        border-radius: 0;
         font-size: 14px;
-        font-weight: 800;
+        font-weight: 900;
         line-height: 1.8;
         /* Wrap instead of clipping: clipped half-glyphs rasterize as garbage. */
         white-space: normal;
@@ -461,21 +463,21 @@ export const generateReceiptHTML = ({
    }
    .footer-thanks {
       font-size: 15px;
-      font-weight: 800;
+      font-weight: 900;
       margin-bottom: 2px;
    }
    .footer-sub {
       font-size: 12px;
-      color: #333; font-weight: 700;
+      color: #000; font-weight: 800;
    }
    .tax-id-line {
       font-size: 11px;
-      color: #555; font-weight: 700;
+      color: #000; font-weight: 800;
       margin-top: 4px;
    }
    .powered-by {
       font-size: 10px;
-      color: #777; font-weight: 700;
+      color: #000; font-weight: 800;
       margin-top: 8px;
       letter-spacing: 0.5px;
    }

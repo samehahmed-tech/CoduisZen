@@ -9,26 +9,27 @@ import { MenuItem } from '@/types';
    8 card designs (from menu-item-card-concept.html), theme-aware via
    rgb(var(--…)) tokens + .dark overrides in pos-zen-cards.css.
    density accepts legacy values and normalizes them:
-     comfortable → sahara · compact → ticket
+     comfortable → sahara · compact → vitrine · ticket → vitrine
      ultra → kiosk · buttons → circle
    ═══════════════════════════════════════════════════════════════════ */
 
 export type CardDesign =
-    | 'sahara' | 'typo' | 'noir' | 'ticket'
+    | 'sahara' | 'typo' | 'noir' | 'vitrine'
     | 'circle' | 'kiosk' | 'pop' | 'gold';
 
 /** Legacy density ids (persisted user prefs) + new design ids. */
-export type CardDensity = CardDesign | 'comfortable' | 'compact' | 'ultra' | 'buttons';
+export type CardDensity = CardDesign | 'comfortable' | 'compact' | 'ultra' | 'buttons' | 'ticket';
 
 const LEGACY_DENSITY_MAP: Record<string, CardDesign> = {
     comfortable: 'sahara',
-    compact: 'ticket',
+    compact: 'vitrine',
+    ticket: 'vitrine',
     ultra: 'kiosk',
     buttons: 'circle',
 };
 
 export const CARD_DESIGNS: CardDesign[] = [
-    'sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold',
+    'sahara', 'typo', 'noir', 'vitrine', 'circle', 'kiosk', 'pop', 'gold',
 ];
 
 export const resolveCardDesign = (density?: string | null): CardDesign => {
@@ -345,23 +346,20 @@ const NoirCard: React.FC<SharedCardProps> = ({
 };
 
 /* ═══════════════════════════════════════════
-   04 · TICKET LEDGER — rush-hour rows
+   04 · VITRINE SHOWCASE — full-bleed gallery card
    ═══════════════════════════════════════════ */
 
-const TicketRow: React.FC<SharedCardProps> = ({
+const VitrineCard: React.FC<SharedCardProps> = ({
     item, displayName, isAvailable, quantity, currencySymbol, lang,
-    highlighted, onAdd, onRemove, onCardClick,
+    highlighted, touch, onAdd, onRemove, onCardClick,
 }) => {
     const isAr = lang === 'ar';
-    const optionsCount = getOptionsCount(item);
-    const prep = (item as any).preparationTime;
+    const unavailableLabel = isAr ? 'غير متاح' : 'SOLD OUT';
+    const metaLine = getCategoryLabel(item, lang) || (isAr ? 'مميز · طازج' : 'PREMIUM · FRESH');
+    const description = getItemDescription(item, lang);
     const fixed = hasFixedPrice(item);
     const showImage = hasItemImage(item);
-    const meta = [
-        item.isPopular ? (isAr ? '★ مميز' : '★ Popular') : null,
-        optionsCount > 0 ? (isAr ? `${optionsCount} خيارات` : `${optionsCount} options`) : null,
-        prep ? `${prep} ${isAr ? 'د' : 'MIN'}` : null,
-    ].filter(Boolean).join(' · ');
+    const tilt = useZenTilt<HTMLDivElement>({ maxRX: 5, maxRY: 7 }, touch || !isAvailable);
     return (
         <div
             {...stateAttrs(quantity, highlighted, isAvailable, showImage)}
@@ -371,39 +369,47 @@ const TicketRow: React.FC<SharedCardProps> = ({
             aria-label={`${displayName}, ${priceText(item, lang)} ${currencySymbol}${quantity > 0 ? `, ${quantity}` : ''}`}
             onClick={(e) => cardClick(e, isAvailable, onCardClick)}
             onKeyDown={(e) => cardKeyDown(e, isAvailable, onCardClick)}
-            className="zen-card zen-ticket"
+            className="zen-card zen-vitrine zen-tilt"
+            {...tiltHandlers(tilt)}
         >
-            {showImage ? (
-                <ItemImage src={item.image} name={displayName} className="zen-img tk-thumb" />
-            ) : (
-                <div className="tk-thumb"><NoPhoto name={displayName} /></div>
-            )}
-            <div className="tk-info">
-                <h3 title={displayName}>{displayName}</h3>
-                <p className="tk-meta">{meta || (isAr ? 'إضافة سريعة بضغطة واحدة' : 'One-tap quick add')}</p>
+            <span className="zen-glare" aria-hidden="true" />
+            <span className="zen-shine" aria-hidden="true" />
+            <div className="vt-media">
+                {showImage ? (
+                    <ItemImage src={item.image} name={displayName} className="zen-img" />
+                ) : (
+                    <NoPhoto name={displayName} />
+                )}
+                <span className="vt-scrim" aria-hidden="true" />
+                {item.isPopular && isAvailable && (
+                    <span className="vt-stamp">★ {isAr ? 'الأكثر مبيعًا' : 'Best Seller'}</span>
+                )}
+                {quantity > 0 && <span className="vt-qty" aria-hidden="true">{quantity}</span>}
+                {fixed && <span className="vt-price">{formatPrice(item)}<small>{currencySymbol}</small></span>}
+                {!isAvailable && <span className="zen-veil">{unavailableLabel}</span>}
             </div>
-            {fixed ? (
-                <div className="tk-price">{formatPrice(item)}<small>{currencySymbol}</small></div>
-            ) : (
-                <div className="tk-var">{isAr ? 'حسب الاختيار' : 'As selected'}</div>
-            )}
-            {quantity > 0 ? (
-                <div className="tk-step" role="group" aria-label={displayName}>
-                    <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
-                    <b aria-live="polite">{quantity}</b>
-                    <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
+            <div className="vt-body">
+                <div className="vt-eyebrow">{metaLine}</div>
+                <h3 title={displayName}>{displayName}</h3>
+                {description && <div className="vt-desc">{description}</div>}
+                <div className="vt-foot">
+                    {quantity > 0 ? (
+                        <div className="vt-step" role="group" aria-label={displayName}>
+                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onRemove(); }} aria-label={isAr ? 'إنقاص' : 'Decrease'}><Minus size={15} strokeWidth={3} /></button>
+                            <b aria-live="polite">{quantity}</b>
+                            <button onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }} aria-label={isAr ? 'زيادة' : 'Increase'}><Plus size={15} strokeWidth={3} /></button>
+                        </div>
+                    ) : (
+                        <button
+                            className="vt-add"
+                            onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
+                            disabled={!isAvailable}
+                        >
+                            {isAvailable ? (isAr ? 'أضف +' : 'ADD +') : unavailableLabel}
+                        </button>
+                    )}
                 </div>
-            ) : (
-                <button
-                    className="tk-add"
-                    onClick={(e) => { e.stopPropagation(); pressFeedback(); onAdd(); }}
-                    disabled={!isAvailable}
-                    aria-label={`${isAr ? 'أضف' : 'Add'} ${displayName}`}
-                >
-                    <Plus size={15} strokeWidth={3} />
-                    <span>{isAvailable ? (isAr ? 'أضف' : 'ADD') : (isAr ? 'نفد' : 'OUT')}</span>
-                </button>
-            )}
+            </div>
         </div>
     );
 };
@@ -689,8 +695,8 @@ const MenuItemCard: React.FC<MenuItemCardProps> = React.memo(({
             return <TypoCard {...shared} />;
         case 'noir':
             return <NoirCard {...shared} />;
-        case 'ticket':
-            return <TicketRow {...shared} />;
+        case 'vitrine':
+            return <VitrineCard {...shared} />;
         case 'circle':
             return <CircleCard {...shared} />;
         case 'kiosk':

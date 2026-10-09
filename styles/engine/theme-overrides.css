@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   THEME PERSONALITIES (V6.0) — 10 distinct visual universes
-   Aurora Glass · Midnight Command · Neo Brutal · Soft Organic ·
-   Editorial Luxury · Terminal Ops · Future HUD · Bento SaaS ·
-   Industrial Ops · Premium Hospitality
-   Each theme re-skins geometry, surfaces, motion, density and component
-   grammar — not just color. Generic compliance layer lives at the bottom.
+   THEME PERSONALITIES (V6.0) — RETIRED as personality layer.
+   All [data-theme] blocks below target retired ids (V6 generation and the
+   V7 first-wave ids) and NO LONGER MATCH any live theme, so they are dead
+   CSS. Live personalities now live in styles/engine/theme-worlds.css
+   (keyed by the 10 live V7 ids).
+   Kept unmodified for safe rollback; delete when worlds are confirmed.
+   Generic compliance layer lives at the bottom.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .theme-btn-primary, .theme-btn-secondary, .card-primary {
@@ -701,10 +702,10 @@ html.dark,
     border-color: rgba(var(--primary), 0.28);
 }
 
-[data-theme='neo-brutal'] .theme-icon-button { border-radius: 2px; border-width: 2px; }
-[data-theme='soft-organic'] .theme-icon-button { border-radius: 999px; }
-[data-theme='terminal-ops'] .theme-icon-button { border-radius: 4px; font-family: ui-monospace, Menlo, monospace; }
-[data-theme='future-hud'] .theme-icon-button { border-radius: 6px; border-left: 2px solid rgb(var(--primary)); }
+[data-theme='command'] .theme-icon-button { border-radius: 4px; font-family: ui-monospace, Menlo, monospace; }
+[data-theme='material-x'] .theme-icon-button { border-radius: 999px; }
+[data-theme='obsidian'] .theme-icon-button { border-radius: 6px; border-left: 2px solid rgb(var(--primary)); }
+[data-theme='touch'] .theme-icon-button { border-radius: 8px; border-width: 2px; min-width: 44px; min-height: 44px; }
 
 .theme-input,
 input.theme-input,
@@ -760,35 +761,74 @@ textarea::placeholder {
 .recharts-cartesian-grid line { stroke: rgb(var(--chart-grid, 148 163 184 / 0.35)); }
 .recharts-cartesian-axis-tick text { fill: rgb(var(--text-muted)); }
 .recharts-tooltip-cursor { stroke: rgba(var(--primary), 0.4); fill: rgba(var(--primary), 0.06); }
-/* Dark-tooltip themes need light text on colored tooltip surfaces */
-[data-theme='neo-brutal'] .recharts-default-tooltip,
-[data-theme='terminal-ops'] .recharts-default-tooltip,
-[data-theme='industrial-ops'] .recharts-default-tooltip,
-[data-theme='future-hud'] .recharts-default-tooltip {
-    color: #fff !important;
-}
-[data-theme='neo-brutal'] .recharts-tooltip-label,
-[data-theme='terminal-ops'] .recharts-tooltip-label,
-[data-theme='industrial-ops'] .recharts-tooltip-label,
-[data-theme='future-hud'] .recharts-tooltip-label { color: #fff !important; }
-.dark [data-theme='neo-brutal'] .recharts-default-tooltip,
-.dark [data-theme='neo-brutal'] .recharts-tooltip-label { color: #0f0f0f !important; }
+/* Dark-tooltip themes inherit readable text from vars; no per-theme overrides. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    THEME-AWARE BADGES / TABS / SCROLLBARS
    ═══════════════════════════════════════════════════════════════════════════ */
-[data-theme='neo-brutal'] .theme-badge { border-radius: 2px !important; border-width: 2px !important; font-weight: 800 !important; text-transform: uppercase; }
-[data-theme='soft-organic'] .theme-badge { border-radius: 999px !important; }
-[data-theme='terminal-ops'] .theme-badge { border-radius: 4px !important; font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; }
-[data-theme='future-hud'] .theme-badge { border-radius: 4px !important; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid rgba(var(--primary), 0.5) !important; }
-[data-theme='editorial-luxury'] .theme-badge { border-radius: 2px !important; letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px !important; }
-[data-theme='industrial-ops'] .theme-badge { border-radius: 4px !important; font-weight: 800 !important; text-transform: uppercase; border-left-width: 3px !important; }
+[data-theme='touch'] .theme-badge { border-radius: 6px !important; border-width: 2px !important; font-weight: 800 !important; text-transform: uppercase; }
+[data-theme='material-x'] .theme-badge { border-radius: 999px !important; }
+[data-theme='command'] .theme-badge { border-radius: 4px !important; font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; }
+[data-theme='obsidian'] .theme-badge { border-radius: 4px !important; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid rgba(var(--primary), 0.5) !important; }
+[data-theme='canvas'] .theme-badge { border-radius: 2px !important; letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px !important; }
+[data-theme='meridian'] .theme-badge { border-radius: 4px !important; font-weight: 800 !important; text-transform: uppercase; border-left-width: 3px !important; }
 
-[data-theme='neo-brutal'] .theme-tab-active { border-radius: 2px !important; box-shadow: 3px 3px 0 rgba(15,15,15,0.9); }
-[data-theme='soft-organic'] .theme-tab-active { border-radius: 999px !important; }
-[data-theme='midnight-command'] .theme-tab-active,
-[data-theme='terminal-ops'] .theme-tab-active { border-radius: 6px !important; }
-[data-theme='future-hud'] .theme-tab-active { border-radius: 0 !important; box-shadow: inset 0 -2px 0 rgb(var(--primary)); background: linear-gradient(180deg, transparent, rgba(var(--primary), 0.14)) !important; }
-[data-theme='editorial-luxury'] .theme-tab-active { border-radius: 0 !important; box-shadow: inset 0 -2px 0 rgb(var(--text-main)); background: transparent !important; }
+[data-theme='touch'] .theme-tab-active { border-radius: 6px !important; box-shadow: 3px 3px 0 rgba(15,15,15,0.9); }
+[data-theme='material-x'] .theme-tab-active { border-radius: 999px !important; }
+[data-theme='command'] .theme-tab-active { border-radius: 6px !important; }
+[data-theme='obsidian'] .theme-tab-active { border-radius: 0 !important; box-shadow: inset 0 -2px 0 rgb(var(--primary)); background: linear-gradient(180deg, transparent, rgba(var(--primary), 0.14)) !important; }
+[data-theme='canvas'] .theme-tab-active { border-radius: 0 !important; box-shadow: inset 0 -2px 0 rgb(var(--text-main)); background: transparent !important; }
 
 [data-theme] { scrollbar-color: rgba(var(--primary), 0.55) transparent; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   V2 RAIL RESTORATION — the theme-catalog rename retired the old ids, but
+   the rail/active-item blocks above still target them, so migrated themes
+   lost their sidebar voice. Each block below ports the retired predecessor
+   (per theme/engine/migrate.ts) to its living V2 id. Single predecessor per
+   V2 keeps one aesthetic voice; where two predecessors merged (command),
+   the later-generation rule wins ties, matching the old file order.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* glassline ← aurora-glass: frosted floating rail */
+[data-theme='glassline'] .workspace-rail {
+    background: rgba(var(--bg-card), 0.55) !important;
+    backdrop-filter: blur(28px) saturate(1.6);
+    border-radius: 0 20px 20px 0;
+}
+
+/* command ← midnight-command (rail) + terminal-ops (active wins ties) */
+[data-theme='command'] .workspace-rail {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+[data-theme='command'] .sidebar-nav-item-active {
+    background: rgba(var(--primary), 0.14) !important;
+    border-radius: 4px;
+    box-shadow: inset 2px 0 0 rgb(var(--primary));
+    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+
+/* acrylic ← soft-organic: soft asymmetric rail radius */
+[data-theme='acrylic'] .workspace-rail { border-radius: 0 28px 28px 0; }
+
+/* obsidian ← future-hud: directional glow rail + active */
+[data-theme='obsidian'] .sidebar-nav-item-active {
+    background: linear-gradient(90deg, rgba(var(--primary), 0.22), transparent) !important;
+    border-radius: 0 8px 8px 0;
+    box-shadow: inset 2px 0 0 rgb(var(--primary));
+}
+[data-theme='obsidian'] .workspace-rail { border-right: 1px solid rgba(var(--primary), 0.25); }
+
+/* fluent-pro ← industrial-ops: hard left-edge active marker */
+[data-theme='fluent-pro'] .sidebar-nav-item-active {
+    background: rgba(var(--primary), 0.14) !important;
+    border-radius: 4px;
+    border-left: 3px solid rgb(var(--primary));
+}
+
+/* meridian ← premium-hospitality: warm rail hairline */
+[data-theme='meridian'] .workspace-rail {
+    background: linear-gradient(180deg, var(--theme-rail-bg), var(--theme-rail-bg)) !important;
+    border-right: 1px solid rgba(var(--accent), 0.25);
+}

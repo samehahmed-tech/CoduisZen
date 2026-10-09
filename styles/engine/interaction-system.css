@@ -47,7 +47,7 @@
 .theme-skeleton { background: linear-gradient(100deg, color-mix(in srgb, var(--semantic-surface-raised) 80%, transparent), color-mix(in srgb, var(--semantic-interactive-primary) 10%, transparent), color-mix(in srgb, var(--semantic-surface-raised) 80%, transparent)); background-size: 220% 100%; animation: skeleton-shift 1.4s var(--ease-standard) infinite; }
 @keyframes skeleton-shift { to { background-position: -220% 0; } }
 
-@media (prefers-reduced-motion: reduce) {
+html[data-motion="off"] {
   *, *::before, *::after { animation-duration: var(--motion-reduced) !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: var(--motion-reduced) !important; }
   [data-interaction~="lift"]:hover { transform: none; }
 }

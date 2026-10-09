@@ -63,13 +63,14 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PER-THEME TOKEN OVERRIDES — Each personality tunes the glass levels.
-   Glassy worlds (aurora, hud, bento, organic, hospitality) go deep;
-   technical/flat worlds (command, terminal, brutal, industrial, editorial)
-   stay sharp with near-zero blur.
+   Full-glass worlds (glassline, material-x) go deep; frosted worlds
+   (mint, velvet, clay) stay controlled; technical/flat worlds (terminal,
+   ledger, fluent, mica, neon) stay sharp with near-zero blur.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Glassy flagship: Aurora Glass */
-[data-theme='aurora-glass'] {
+/* Full-glass flagships */
+[data-theme='glassline'],
+[data-theme='material-x'] {
     --glass-0-blur: 10px; --glass-0-opacity: 0.74;
     --glass-1-blur: 28px; --glass-1-opacity: 0.58;
     --glass-2-blur: 44px; --glass-2-opacity: 0.48;
@@ -85,8 +86,10 @@
         inset 0 -1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.dark [data-theme='aurora-glass'],
-[data-theme='aurora-glass'].dark {
+.dark [data-theme='glassline'],
+[data-theme='glassline'].dark,
+.dark [data-theme='material-x'],
+[data-theme='material-x'].dark {
     --glass-0-opacity: 0.68;
     --glass-1-opacity: 0.50;
     --glass-2-opacity: 0.42;
@@ -97,11 +100,10 @@
         inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* Secondary glass worlds: controlled frost */
-[data-theme='future-hud'],
-[data-theme='bento-saas'],
-[data-theme='soft-organic'],
-[data-theme='premium-hospitality'] {
+/* Secondary frost worlds: controlled frost */
+[data-theme='acrylic'],
+[data-theme='obsidian'],
+[data-theme='tiles'] {
     --glass-1-blur: 16px; --glass-1-opacity: 0.72;
     --glass-2-blur: 32px; --glass-2-opacity: 0.62;
     --glass-3-blur: 48px; --glass-3-opacity: 0.50;
@@ -110,11 +112,11 @@
 }
 
 /* Flat/technical worlds — minimal blur, high opacity, zero decoration */
-[data-theme='midnight-command'],
-[data-theme='terminal-ops'],
-[data-theme='neo-brutal'],
-[data-theme='industrial-ops'],
-[data-theme='editorial-luxury'] {
+[data-theme='meridian'],
+[data-theme='command'],
+[data-theme='canvas'],
+[data-theme='fluent-pro'],
+[data-theme='touch'] {
     --glass-1-blur: 0px; --glass-1-opacity: 0.96;
     --glass-2-blur: 4px; --glass-2-opacity: 0.94;
     --glass-3-blur: 8px; --glass-3-opacity: 0.92;

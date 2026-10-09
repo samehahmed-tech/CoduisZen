@@ -158,8 +158,10 @@ const SelfOrderingKiosk: React.FC = () => {
   const totals = useMemo(() => calculateOrderTotals({
     items: activeCart,
     taxRate,
-    serviceCharge: 0,
-  }), [activeCart, taxRate]);
+    // Match server repricing (recalcOrderTotals adds the branch service
+    // charge) so the kiosk quote equals the cashier total.
+    serviceCharge: Number((settings as any).serviceCharge || 0),
+  }), [activeCart, taxRate, (settings as any).serviceCharge]);
   const cartQty = activeCart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
   const paymentMethods = useMemo(() => [
@@ -194,7 +196,9 @@ const SelfOrderingKiosk: React.FC = () => {
     setSelectedItem(null);
   };
 
-  const submitOrder = async (method: string) => {
+  // The counter collects payment on arrival — the tapped method only chooses
+  // which confirmation button the customer pressed, never a settled tender.
+  const submitOrder = async () => {
     if (activeCart.length === 0 || isPlacingOrder) return;
     if (!settings.activeBranchId) {
       setOrderError(tr('This kiosk is not linked to a branch. Ask a cashier for help.', 'هذا الكشك غير مربوط بفرع. اطلب مساعدة الكاشير.'));
@@ -203,6 +207,9 @@ const SelfOrderingKiosk: React.FC = () => {
     setOrderError('');
     setIsPlacingOrder(true);
     try {
+      // "Pay at counter" means UNPAID: never set paymentMethod here, or the
+      // order enters KDS/finance looking settled. The counter collects with
+      // the payment method of record when the customer arrives.
       const result = await placeOrder({
         id: globalThis.crypto?.randomUUID?.() || `kiosk-order-${Date.now()}`,
         type: OrderType.KIOSK,
@@ -214,7 +221,7 @@ const SelfOrderingKiosk: React.FC = () => {
         tax: totals.tax,
         serviceCharge: totals.serviceCharge,
         total: totals.total,
-        paymentMethod: method,
+        isPaid: false,
         createdAt: new Date(),
       } as any);
       setKitchenWarning(Boolean(result.warnings?.some(warning => warning.code === 'KDS_DISPATCH_FAILED')));
@@ -312,7 +319,7 @@ const SelfOrderingKiosk: React.FC = () => {
               {paymentMethods.map(method => {
                 const Icon = method.icon;
                 return (
-                  <button key={method.id} type="button" disabled={isPlacingOrder} onClick={() => submitOrder(method.id)}>
+                  <button key={method.id} type="button" disabled={isPlacingOrder} onClick={() => submitOrder()}>
                     <Icon size={40} />
                     <strong>{method.label}</strong>
                     <span>{tr('Order now, pay at counter', 'اطلب الآن وادفع عند الكاشير')}</span>

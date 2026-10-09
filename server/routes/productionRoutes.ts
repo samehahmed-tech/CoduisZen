@@ -1,12 +1,18 @@
 import { Router } from 'express';
 import * as productionController from '../controllers/productionController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
 
-const productionAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PRODUCTION_STAFF');
-const productionManage = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER');
+const productionAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PRODUCTION_STAFF'],
+    ['OP_MANAGE_PRODUCTION'],
+);
+const productionManage = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
+    ['OP_MANAGE_PRODUCTION'],
+);
 
 router.get('/orders', productionAuth, enforceBranch, productionController.getProductionOrders);
 router.post('/orders', productionAuth, enforceBranch, productionController.createProductionOrder);

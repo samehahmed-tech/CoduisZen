@@ -228,6 +228,11 @@ export const sendWhatsAppCampaign = async (req: Request, res: Response) => {
         if (String((status as any)?.status || '').toUpperCase() === 'DISABLED') {
             return res.status(503).json({ error: 'WHATSAPP_DISABLED', message: 'WhatsApp engine is disabled. Set WHATSAPP_PROVIDER=whatsapp-web.js and restart.' });
         }
+        // Queuing while the session is not READY just grows a dead queue —
+        // refuse with the live status instead of accepting silently.
+        if (String((status as any)?.status || '').toUpperCase() !== 'READY') {
+            return res.status(409).json({ error: 'WHATSAPP_NOT_READY', message: 'Link your phone first — scan the QR, then retry.', status: (status as any)?.status });
+        }
         const { targets, text, isMarketing } = req.body;
         if (!Array.isArray(targets) || !text) {
             return res.status(400).json({ error: 'Targets and text are required' });

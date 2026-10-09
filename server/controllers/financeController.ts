@@ -508,7 +508,10 @@ export const approveJournalEntry = async (req: Request, res: Response) => {
         const entry = await db.select().top(1).from(journalEntries).where(eq(journalEntries.id, id));
         
         if (entry.length === 0) return res.status(404).json({ error: 'Entry not found' });
-        if (entry[0].createdBy && entry[0].createdBy === req.user?.id) {
+        // Maker/checker: the requester cannot approve their own entry —
+        // except SUPER_ADMIN (emergency override, still recorded as approver).
+        if (entry[0].createdBy && entry[0].createdBy === req.user?.id
+            && String(req.user?.role || '').toUpperCase() !== 'SUPER_ADMIN') {
             return res.status(403).json({ error: 'MAKER_CANNOT_APPROVE_OWN_ENTRY' });
         }
         if (req.effectiveBranchId) {

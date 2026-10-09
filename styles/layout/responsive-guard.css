@@ -1,0 +1,118 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE GUARDRAILS — phones only (<=768px), management pages only.
+   Scoped to `.workspace-shell:not(.pos-ui)`: fullscreen ops screens
+   (POS/KDS/Pickup/CallCenter/Driver) keep their own purpose-built layouts.
+   Desktop is untouched (media query). Uses exact-token `[class~=...]`
+   matching so `md:grid-cols-4`-style responsive grids are never disturbed —
+   only grids that are unconditionally 3+ columns on all viewports collapse.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* No page may scroll sideways: inner regions scroll instead. */
+  .workspace-shell:not(.pos-ui),
+  .workspace-shell:not(.pos-ui) main {
+    overflow-x: clip;
+  }
+
+  /* Unconditional 3-6 column grids collapse to 2 columns. */
+  .workspace-shell:not(.pos-ui) [class~='grid-cols-3'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace-shell:not(.pos-ui) [class~='grid-cols-4'],
+  .workspace-shell:not(.pos-ui) [class~='grid-cols-5'],
+  .workspace-shell:not(.pos-ui) [class~='grid-cols-6'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Any table that would overflow scrolls inside its card instead of
+     breaking the page. No-op when the table already fits. */
+  .workspace-shell:not(.pos-ui) table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .workspace-shell:not(.pos-ui) thead,
+  .workspace-shell:not(.pos-ui) tbody {
+    display: table;
+    width: 100%;
+  }
+
+  /* Media never exceeds the viewport. Applies only to unsized images;
+     sized ones like logos carry explicit sizing classes and keep them.
+     Charts svg/canvas with explicit heights are excluded: recharts
+     manages its own sizing. */
+  .workspace-shell:not(.pos-ui) img:not([class*='h-']),
+  .workspace-shell:not(.pos-ui) video {
+    max-width: 100%;
+    height: auto;
+  }
+  .workspace-shell:not(.pos-ui) pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* Long identifiers/URLs wrap instead of forcing overflow. */
+  .workspace-shell:not(.pos-ui) .tabular-nums {
+    overflow-wrap: anywhere;
+  }
+
+  /* ── Scroll smoothness: fixed attachment repaints the whole page per
+     scroll frame on mobile GPUs — scroll attachment paints once. ── */
+  .workspace-shell[data-wallpaper]:not([data-wallpaper='none']) {
+    background-attachment: scroll;
+  }
+
+  /* ── Scroll smoothness: giant ambient blurs (100-150px) are repainted
+     whenever content scrolls over them. Shrink + fade on phones. ── */
+  .workspace-shell:not(.pos-ui) [class*='blur-[100px]'],
+  .workspace-shell:not(.pos-ui) [class*='blur-[120px]'],
+  .workspace-shell:not(.pos-ui) [class*='blur-[150px]'] {
+    filter: blur(48px);
+    opacity: 0.55;
+  }
+
+  /* ── Scroll smoothness: heavy frosted layers get cheaper on phones.
+     Same look language, fraction of the GPU cost. ── */
+  .workspace-shell:not(.pos-ui) .backdrop-blur-2xl {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .workspace-shell:not(.pos-ui) .backdrop-blur-3xl {
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  /* ── Scroll smoothness: cap theme glass blur radii on phones. Flagship
+     themes go up to 82px frost per card — a full-screen repaint cost on
+     every scroll frame. 18-26px keeps the frost identity at a fraction
+     of the GPU load. Desktop values untouched. ── */
+  .workspace-shell:not(.pos-ui) {
+    --glass-2-blur: 18px;
+    --glass-3-blur: 22px;
+    --glass-4-blur: 26px;
+    --rail-blur: 20px;
+  }
+
+  /* Opt-in: skip offscreen rendering for long below-fold lists/cards. */
+  .workspace-shell:not(.pos-ui) .cv-phone {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
+
+  /* Dashboard hero micro-rows wrap on narrow phones instead of squeezing. */  .workspace-shell:not(.pos-ui) .hx-ministats {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .workspace-shell:not(.pos-ui) .hx-rings {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* Notched phones: the sticky topbar starts under the status bar in
+     fullscreen/PWA mode. Respect the safe area on phones only. */
+  .workspace-shell:not(.pos-ui) .workspace-topbar {
+    padding-top: var(--safe-top, 0px);
+    height: calc(52px + var(--safe-top, 0px));
+  }
+}

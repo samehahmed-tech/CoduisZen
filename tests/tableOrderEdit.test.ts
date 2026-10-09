@@ -211,6 +211,46 @@ describe('Table order edit (remove line reconciles totals)', () => {
         expect(rows).toHaveLength(1);
     });
 
+    it('rewrites an unpaid READY dine-in ticket (kitchen finished, not settled)', async () => {
+        const dineRes = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                type: 'DINE_IN',
+                branchId: F.branchId,
+                shiftId: F.shiftId,
+                items: [
+                    { menu_item_id: F.itemA, name: 'Table Edit Item A', quantity: 2, price: 100 },
+                ],
+                subtotal: 200,
+                tax: 0,
+                total: 200,
+            });
+        expect(dineRes.status).toBe(201);
+        const dineId = dineRes.body.id as string;
+
+        for (const status of ['PREPARING', 'READY']) {
+            const fireRes = await request(app)
+                .put(`/api/orders/${dineId}/status`)
+                .set('Authorization', `Bearer ${token}`)
+                .send({ status });
+            expect(fireRes.status).toBe(200);
+        }
+
+        const editRes = await request(app)
+            .put(`/api/orders/${dineId}/items`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                items: [
+                    { menu_item_id: F.itemA, name: 'Table Edit Item A', quantity: 2, price: 100 },
+                    { menu_item_id: F.itemB, name: 'Table Edit Item B', quantity: 1, price: 50 },
+                ],
+            });
+        expect(editRes.status).toBe(200);
+        expect(editRes.body.items).toHaveLength(2);
+        expect(Number(editRes.body.subtotal)).toBe(250);
+    });
+
     it('refuses item edits on non-dine-in fired tickets', async () => {
         const fireRes = await request(app)
             .put(`/api/orders/${orderId}/status`)

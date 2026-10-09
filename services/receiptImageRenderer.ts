@@ -116,7 +116,7 @@ export const renderReceiptToImage = async (
             width: ${widthPx}px !important;
             max-width: ${widthPx}px !important;
             margin: 0 !important;
-            padding: ${widthPx <= 384 ? 7 : 8}px ${widthPx <= 384 ? 5 : 6}px 10px !important;
+            padding: ${widthPx <= 384 ? 7 : 8}px ${widthPx <= 384 ? 7 : 9}px 10px !important;
             box-sizing: border-box !important;
             /* NEVER overflow:hidden here: it clips the logo top + Arabic
                diacritics + pill borders by 1-2px, which is exactly the
@@ -150,6 +150,25 @@ export const renderReceiptToImage = async (
     content.classList.add('receipt-print-root');
     content.style.width = `${widthPx}px`;
     frame.style.height = `${Math.max(content.scrollHeight, 1)}px`;
+
+    // EDGE-CLIP BACKSTOP: in RTL, a line even slightly wider than the paper
+    // spills out the LEFT edge and the capture cuts it. If anything still
+    // overflows (pathological data despite the wrap guards), nudge the whole
+    // block right via padding so the spill re-enters the frame instead of
+    // printing clipped. Reflow from a few px is invisible on paper.
+    try {
+        const spill = content.scrollWidth - widthPx;
+        if (spill > 2) {
+            const cs = frameWindow.getComputedStyle(content);
+            const padSide = (content.dir === 'rtl' || content.style.direction === 'rtl' ||
+                frameDocument.documentElement.dir === 'rtl') ? 'paddingLeft' : 'paddingRight';
+            const cur = parseFloat((cs as any)[padSide] || '0') || 0;
+            (content.style as any)[padSide] = `${cur + spill + 4}px`;
+            frame.style.height = `${Math.max(content.scrollHeight, 1)}px`;
+        }
+    } catch {
+        // Measurement must never break printing.
+    }
 
     try {
         const images = Array.from(content.querySelectorAll('img'));
@@ -224,6 +243,14 @@ export const renderReceiptToImage = async (
 
         // Thermal printers reward contrast, but hard thresholding eats Arabic
         // glyph edges. Boost dark pixels while leaving antialiasing for raster print.
+        // THERMAL 1-BIT: the printer head only prints dot / no-dot, and the
+        // bridge thresholds every payload at luma < 180 anyway. Collapsing to
+        // pure black/white HERE (same cut) prints byte-identical dots while
+        // the PNG deflates to a fraction of the grayscale size — faster POST,
+        // faster SQL INSERT, faster SSE push, faster TCP spool. Sharpness is
+        // unchanged: dimensions and render scale are untouched, only the
+        // unprintable gray levels are dropped.
+        const PRINTER_DOT_CUT = 180;
         const imageData = ctx.getImageData(0, 0, normalizedCanvas.width, normalizedCanvas.height);
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
@@ -237,9 +264,11 @@ export const renderReceiptToImage = async (
                 continue;
             }
             const luminance = (0.299 * r) + (0.587 * g) + (0.114 * b);
-            const value = luminance > 238
+            // Same contrast curve as before, then the printer's own cut.
+            const boosted = luminance > 238
                 ? 255
                 : Math.max(0, Math.round((luminance - 28) * 0.72));
+            const value = boosted < PRINTER_DOT_CUT ? 0 : 255;
             data[i] = data[i + 1] = data[i + 2] = value;
             data[i + 3] = 255;
         }

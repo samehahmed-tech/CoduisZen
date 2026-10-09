@@ -3,7 +3,6 @@ export { useDebounce } from './useDebounce';
 export { useCopyToClipboard } from './useCopyToClipboard';
 export { useFaviconBadge } from './useFaviconBadge';
 export { useLocalStorage } from './useLocalStorage';
-export { useMediaQuery } from './useMediaQuery';
 export { useClickOutside } from './useClickOutside';
 export { useKeyPress } from './useKeyPress';
 export { useOnScreen } from './useOnScreen';

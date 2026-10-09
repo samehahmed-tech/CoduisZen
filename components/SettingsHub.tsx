@@ -10,7 +10,7 @@ import {
     Receipt, BarChart3, Network, BookOpen, FileText, Link2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { AppSettings, Printer as PrinterType, WarehouseType } from '../types';
+import { AppSettings, Printer as PrinterType, WarehouseType, DEFAULT_DAY_CLOSE_RULES, DayCloseRules } from '../types';
 import { useToast } from './Toast';
 import { aiApi } from '../services/api/ai';
 import { branchesApi } from '../services/api/branches';
@@ -182,7 +182,7 @@ const SettingsHub: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState(HOME_TAB);
     const [searchQuery, setSearchQuery] = useState('');
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
     // Modal states
     const [showBranchModal, setShowBranchModal] = useState(false);
@@ -986,6 +986,20 @@ const SettingsHub: React.FC = () => {
                                     </div>
                                     <Toggle enabled={settings.autoCompleteDirectOrders === true} onChange={v => handleChange('autoCompleteDirectOrders', v)} />
                                 </div>
+                                <div className="flex items-center gap-4 p-4 mt-3 bg-elevated/40 border border-border/20 rounded-2xl">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-bold text-main">{tn('Discount approval code', 'كود اعتماد الخصم')}</p>
+                                        <p className="mt-1 text-[10px] font-bold text-muted">{tn('Cashiers enter this code instead of the manager PIN to apply discounts. Manager PINs and permission-holder credentials keep working. Default 10009999.', 'الكاشير يدخل هذا الكود بدل PIN المدير لتطبيق الخصم. أكواد المديرين وأصحاب الصلاحية شغالين عادي. الافتراضي 10009999.')}</p>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={settings.discountApprovalCode || '10009999'}
+                                        onChange={e => handleChange('discountApprovalCode', e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                        className="w-36 rounded-xl border border-border/30 bg-app px-3 py-2.5 text-center font-mono text-sm font-black text-main outline-none focus:border-primary"
+                                        maxLength={12}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1051,7 +1065,7 @@ const SettingsHub: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label className={labelClass}>{tn('Theme', 'السمة')}</label>
-                                <select value={settings.theme || 'aurora-glass'} onChange={e => handleChange('theme', e.target.value)} className={inputClass}>
+                                <select value={settings.theme || 'meridian'} onChange={e => handleChange('theme', e.target.value)} className={inputClass}>
                                     {THEME_LIST.map((theme) => (
                                         <option key={theme.id} value={theme.id}>{theme.name}</option>
                                     ))}
@@ -1083,6 +1097,13 @@ const SettingsHub: React.FC = () => {
                                 <div className="flex items-center gap-4 p-4 bg-elevated/40 border border-border/20 rounded-2xl">
                                     <span className="text-sm font-bold text-main flex-1">{settings.isTouchMode ? tn('Enabled', 'مفعل') : tn('Disabled', 'معطل')}</span>
                                     <Toggle enabled={settings.isTouchMode} onChange={v => handleChange('isTouchMode', v)} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelClass}>{tn('Motion Effects', 'المؤثرات الحركية')}</label>
+                                <div className="flex items-center gap-4 p-4 bg-elevated/40 border border-border/20 rounded-2xl">
+                                    <span className="text-sm font-bold text-main flex-1">{settings.motionEffects === false ? tn('Disabled', 'معطل') : tn('Enabled', 'مفعل')}</span>
+                                    <Toggle enabled={settings.motionEffects !== false} onChange={v => handleChange('motionEffects', v)} />
                                 </div>
                             </div>
                         </div>
@@ -1227,20 +1248,83 @@ const SettingsHub: React.FC = () => {
                             sub={tn('Controls for end-of-day closing, reports, and recipient lists', 'إعدادات إقفال اليوم والتقارير والمستلمين')}
                         />
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            <div className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between gap-5">
-                                <div>
-                                    <p className="text-sm font-black text-main uppercase">{tn('Require Daily Stock Count', 'إلزام الجرد اليومي')}</p>
-                                    <p className="text-[10px] text-muted font-bold mt-1 leading-relaxed">
-                                        {tn('Block day close until a posted stock count exists for the selected business date.', 'يمنع إقفال اليوم لحد ما يتم ترحيل جرد يومي لنفس تاريخ التشغيل.')}
-                                    </p>
-                                </div>
-                                <Toggle
-                                    enabled={settings.dayCloseRequireStockCount !== false}
-                                    onChange={(value) => handleChange('dayCloseRequireStockCount', value)}
-                                />
-                            </div>
+                        {(() => {
+                            const rules: DayCloseRules = { ...DEFAULT_DAY_CLOSE_RULES, ...(settings.dayCloseRules || {}) };
+                            // Legacy compat: old single toggle maps to requireStockCount.
+                            if (settings.dayCloseRules === undefined && settings.dayCloseRequireStockCount !== undefined) {
+                                rules.requireStockCount = settings.dayCloseRequireStockCount !== false;
+                            }
+                            const setRule = (key: keyof DayCloseRules, value: boolean) => {
+                                const next = { ...rules, [key]: value };
+                                handleChange('dayCloseRules', next);
+                                if (key === 'requireStockCount') handleChange('dayCloseRequireStockCount', value);
+                            };
+                            const gates: Array<{ key: keyof DayCloseRules; title: string; titleAr: string; desc: string; descAr: string; icon: any }> = [
+                                { key: 'requireStockCount', title: 'Require Daily Stock Count', titleAr: 'إلزام الجرد اليومي', desc: 'Block day close until a posted stock count exists for the business date.', descAr: 'يمنع إقفال اليوم لحد ما يتم ترحيل جرد يومي لنفس تاريخ التشغيل.', icon: Package },
+                                { key: 'requireKitchenEmpty', title: 'Require Empty Kitchen', titleAr: 'إلزام تفريغ شاشة المطبخ', desc: 'Block close while KDS tickets are pending / preparing / ready.', descAr: 'يمنع القفل لو فيه تيكتات مطبخ معلقة أو قيد التحضير أو جاهزة.', icon: FileText },
+                                { key: 'requireVouchersClear', title: 'Require Vouchers Cleared', titleAr: 'إلزام تصفية السندات', desc: 'Block close while treasury vouchers await approval.', descAr: 'يمنع القفل لو فيه سندات خزينة معلقة بانتظار الاعتماد.', icon: Receipt },
+                                { key: 'requireCustodySettled', title: 'Require Custody Settled', titleAr: 'إلزام تسوية العُهد', desc: 'Block close while custody holdings are unreturned.', descAr: 'يمنع القفل لو فيه عُهد مفتوحة غير مسددة.', icon: ShieldCheck },
+                                { key: 'requireDriverCash', title: 'Require Driver Cash Collected', titleAr: 'إلزام تحصيل نقدية الطيارين', desc: 'Block close while active drivers still hold cash.', descAr: 'يمنع القفل لو فيه طيار بحوزته نقدية محصلة.', icon: Truck },
+                                { key: 'requireVarianceNote', title: 'Require Variance Note', titleAr: 'إلزام ملاحظة الزيادة / العجز', desc: 'Cash over/short must be explained in close notes before closing.', descAr: 'لو فيه فرق نقدية (زيادة أو عجز) لازم المدير يكتب سبب الفرق في ملاحظات الإغلاق.', icon: MessageSquare },
+                            ];
+                            const activeCount = gates.filter((g) => (rules as any)[g.key]).length;
+                            return (
+                                <>
+                                    <div className="p-5 bg-gradient-to-l from-violet-600/10 via-indigo-600/10 to-transparent border border-indigo-500/20 rounded-3xl">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-black text-main">{tn('Mandatory close gates', 'إجراءات القفل الإلزامية')}</p>
+                                                <p className="text-[11px] text-muted font-bold mt-1 leading-relaxed">
+                                                    {tn(
+                                                        `${activeCount} of ${gates.length} gates are mandatory. Disabled gates show as optional and never block closing.`,
+                                                        `${activeCount} من ${gates.length} إجراءات إلزامية. الإجراء المعطّل يظهر كاختياري ولا يمنع القفل أبداً.`
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <span className="text-[11px] font-black px-3 py-1.5 rounded-full bg-indigo-600/10 text-indigo-600 border border-indigo-500/30">
+                                                {tn(`${activeCount}/${gates.length} mandatory`, `${activeCount}/${gates.length} إلزامي`)}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
+                                            {gates.map((gate) => {
+                                                const Icon = gate.icon;
+                                                const enabled = Boolean((rules as any)[gate.key]);
+                                                return (
+                                                    <div key={gate.key} className={`p-4 rounded-2xl border flex items-start gap-3 transition-colors ${enabled ? 'bg-elevated/30 border-emerald-500/30' : 'bg-elevated/10 border-border/20 opacity-80'}`}>
+                                                        <span className={`mt-0.5 rounded-xl p-2 ${enabled ? 'bg-emerald-500/15 text-emerald-600' : 'bg-elevated text-muted'}`}>
+                                                            <Icon size={16} />
+                                                        </span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs font-black text-main uppercase leading-5">{tn(gate.title, gate.titleAr)}</p>
+                                                            <p className="text-[10px] text-muted font-bold mt-1 leading-relaxed">{tn(gate.desc, gate.descAr)}</p>
+                                                            {!enabled && (
+                                                                <p className="text-[10px] font-black text-amber-600 mt-1.5">{tn('Optional — will not block closing', 'اختياري — لن يمنع القفل')}</p>
+                                                            )}
+                                                        </div>
+                                                        <Toggle enabled={enabled} onChange={(value) => setRule(gate.key, value)} />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
 
+                                    <div className="p-5 bg-elevated/20 border border-amber-500/25 rounded-3xl flex items-center justify-between gap-5">
+                                        <div>
+                                            <p className="text-sm font-black text-main uppercase">{tn('Allow Manager Override', 'السماح بتجاوز المدير')}</p>
+                                            <p className="text-[10px] text-muted font-bold mt-1 leading-relaxed">
+                                                {tn(
+                                                    'Privileged roles (owner / branch manager / finance) can force-close remaining blockers with a written reason. Every override is signed in the audit log.',
+                                                    'الأدوار القيادية (المالك / مدير الفرع / المالية) تقدر تقفل اليوم رغم العوائق المتبقية بشرط كتابة سبب واضح. كل تجاوز يتسجل في سجل التدقيق.'
+                                                )}
+                                            </p>
+                                        </div>
+                                        <Toggle enabled={rules.allowManagerOverride !== false} onChange={(value) => setRule('allowManagerOverride', value)} />
+                                    </div>
+                                </>
+                            );
+                        })()}
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                             <div className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between gap-5">
                                 <div>
                                     <p className="text-sm font-black text-main uppercase">{tn('Auto Email Report', 'إرسال التقرير بالإيميل')}</p>

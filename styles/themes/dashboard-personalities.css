@@ -1,0 +1,126 @@
+/* Dashboard theme personalities.
+   These tokens intentionally sit above the generic theme palette: every theme
+   keeps its own identity while dashboard surfaces share one readable system. */
+:root[data-theme="meridian"] { --dash-theme-a: #4f46e5; --dash-theme-b: #d97706; --dash-theme-glow: rgba(79, 70, 229, .24); --dash-theme-grid: rgba(79, 70, 229, .10); --dash-theme-gradient: linear-gradient(135deg, rgba(246, 247, 249, .98), rgba(238, 240, 244, .94)); }
+:root[data-theme="command"] { --dash-theme-a: #0284c7; --dash-theme-b: #d97706; --dash-theme-glow: rgba(2, 132, 199, .24); --dash-theme-grid: rgba(2, 132, 199, .12); --dash-theme-gradient: linear-gradient(135deg, rgba(8, 13, 18, .98), rgba(12, 24, 34, .94)); }
+:root[data-theme="glassline"] { --dash-theme-a: #6366f1; --dash-theme-b: #06b6d4; --dash-theme-glow: rgba(99, 102, 241, .3); --dash-theme-grid: rgba(99, 102, 241, .12); --dash-theme-gradient: linear-gradient(135deg, rgba(238, 241, 248, .96), rgba(228, 233, 245, .9)); }
+:root[data-theme="canvas"] { --dash-theme-a: #1e3a8a; --dash-theme-b: #92400e; --dash-theme-glow: rgba(30, 58, 138, .18); --dash-theme-grid: rgba(30, 58, 138, .08); --dash-theme-gradient: linear-gradient(135deg, rgba(250, 249, 246, .98), rgba(242, 238, 228, .94)); }
+:root[data-theme="fluent-pro"] { --dash-theme-a: #0078d4; --dash-theme-b: #00b7c3; --dash-theme-glow: rgba(0, 120, 212, .2); --dash-theme-grid: rgba(0, 120, 212, .09); --dash-theme-gradient: linear-gradient(135deg, rgba(255, 255, 255, .99), rgba(239, 239, 239, .95)); }
+:root[data-theme="material-x"] { --dash-theme-a: #7c3aed; --dash-theme-b: #db2777; --dash-theme-glow: rgba(124, 58, 237, .28); --dash-theme-grid: rgba(124, 58, 237, .10); --dash-theme-gradient: linear-gradient(135deg, rgba(243, 240, 253, .98), rgba(233, 226, 249, .94)); }
+:root[data-theme="obsidian"] { --dash-theme-a: #5e6ad2; --dash-theme-b: #38bdf8; --dash-theme-glow: rgba(94, 106, 210, .3); --dash-theme-grid: rgba(94, 106, 210, .12); --dash-theme-gradient: linear-gradient(135deg, rgba(8, 9, 10, .98), rgba(14, 16, 20, .94)); }
+:root[data-theme="tiles"] { --dash-theme-a: #2563eb; --dash-theme-b: #0891b2; --dash-theme-glow: rgba(37, 99, 235, .24); --dash-theme-grid: rgba(37, 99, 235, .10); --dash-theme-gradient: linear-gradient(135deg, rgba(247, 248, 250, .98), rgba(239, 241, 245, .94)); }
+:root[data-theme="acrylic"] { --dash-theme-a: #4755ab; --dash-theme-b: #0d9488; --dash-theme-glow: rgba(71, 85, 171, .22); --dash-theme-grid: rgba(71, 85, 171, .09); --dash-theme-gradient: linear-gradient(135deg, rgba(242, 244, 248, .98), rgba(232, 236, 243, .94)); }
+:root[data-theme="touch"] { --dash-theme-a: #ea580c; --dash-theme-b: #d97706; --dash-theme-glow: rgba(234, 88, 12, .26); --dash-theme-grid: rgba(234, 88, 12, .10); --dash-theme-gradient: linear-gradient(135deg, rgba(248, 247, 244, .98), rgba(239, 237, 232, .94)); }
+
+html[data-theme] .dx {
+  --dash-theme-surface: color-mix(in srgb, rgb(var(--bg-card)) 88%, transparent);
+  background-image: radial-gradient(700px 340px at 12% 0%, var(--dash-theme-glow), transparent 68%), radial-gradient(620px 300px at 96% 18%, color-mix(in srgb, var(--dash-theme-glow) 68%, transparent), transparent 70%), var(--theme-page-bg) !important;
+}
+html[data-theme] .dx2-hero {
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--dash-theme-a) 18%, transparent), transparent 40%, color-mix(in srgb, var(--dash-theme-b) 14%, transparent)), var(--dash-theme-gradient) !important;
+  border-color: color-mix(in srgb, var(--dash-theme-a) 48%, rgb(var(--border-color))) !important;
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--dash-theme-glow) 55%, transparent), inset 0 1px rgba(255,255,255,.42) !important;
+}
+html[data-theme] .dx2-status,
+html[data-theme] .dx2-panel,
+html[data-theme] .dx-metric {
+  border-color: color-mix(in srgb, var(--dash-theme-a) 32%, rgb(var(--border-color))) !important;
+}
+html[data-theme] .dx-metric {
+  background-image: linear-gradient(145deg, var(--dash-theme-surface), color-mix(in srgb, var(--dash-theme-b) 8%, rgb(var(--bg-card)))) !important;
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--dash-theme-glow) 35%, transparent), inset 0 1px rgba(255,255,255,.40) !important;
+}
+html[data-theme] .dx-metric:hover {
+  border-color: color-mix(in srgb, var(--dash-theme-a) 78%, rgb(var(--border-color))) !important;
+  box-shadow: 0 24px 54px color-mix(in srgb, var(--dash-theme-glow) 65%, transparent), 0 0 0 1px color-mix(in srgb, var(--dash-theme-a) 24%, transparent) !important;
+}
+html[data-theme] .dx-metric h2,
+html[data-theme] .dx-metric p,
+html[data-theme] .dx-metric .text-main,
+html[data-theme] .dx-metric .text-muted { text-shadow: none !important; }
+
+/* Restore the intended layering: decorative glows must not consume card
+   layout space or push labels/values below the fold. */
+html[data-theme] .dx .dx-metric > :nth-child(1),
+html[data-theme] .dx .dx-metric > :nth-child(2) {
+  position: absolute !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+html[data-theme] .dx .dx-metric > :nth-child(n+3) { position: relative; z-index: 2; }
+html[data-theme] .dx .dx-metric > .flex.items-start { flex: 0 0 auto; }
+html[data-theme] .dx .dx-metric > p { margin-top: 10px !important; margin-bottom: 2px !important; line-height: 1.45 !important; }
+html[data-theme] .dx .dx-metric > h2 { margin-top: 0 !important; line-height: 1.12 !important; }
+html[data-theme] .dx .dx-metric > :last-child { margin-top: auto !important; }
+
+/* Decision cards reuse .dx-metric but do not have the two decorative layer
+   nodes. Restore their real content flow so the copy never stacks on itself. */
+html[data-theme] .dx .dx-metric > .flex.items-start,
+html[data-theme] .dx .dx-metric > p,
+html[data-theme] .dx .dx-metric > h2,
+html[data-theme] .dx .dx-metric > .mt-2,
+html[data-theme] .dx .dx-metric > .mt-4 {
+  position: relative !important;
+  z-index: 2 !important;
+}
+html[data-theme] .dx .dx-metric > [class~="absolute"] {
+  position: absolute !important;
+  z-index: 0 !important;
+}
+html[data-theme] .dx > .relative.z-10 > section[aria-label="قرارات سريعة"] > .dx-metric > :not([class~="absolute"]),
+html[data-theme] .dx > .relative.z-10 > section[aria-label="Decision row"] > .dx-metric > :not([class~="absolute"]) {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+html[data-theme] .dx .dx-metric h2,
+html[data-theme] .dx .dx-metric p,
+html[data-theme] .dx .dx-metric span { max-width: 100%; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  html[data-theme] .dx .dx-metric { padding: 13px !important; }
+  html[data-theme] .dx .dx-metric > p { font-size: 10px !important; }
+  html[data-theme] .dx .dx-metric h2 { font-size: clamp(1.3rem, 7vw, 1.8rem) !important; }
+}
+
+/* Ten visual directions: the same information architecture, ten different
+   material languages. */
+html[data-theme="meridian"] .dx2-hero,
+html[data-theme="meridian"] .dx-metric { border-radius: 12px !important; }
+html[data-theme="meridian"] .dx-metric { border-top-width: 3px !important; border-top-color: rgb(var(--primary)) !important; }
+
+html[data-theme="command"] .dx2-hero,
+html[data-theme="command"] .dx-metric { border-radius: 6px !important; }
+html[data-theme="command"] .dx .dx-metric { background-image: linear-gradient(rgba(2,132,199,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(2,132,199,.06) 1px, transparent 1px), var(--dash-theme-gradient) !important; background-size: 22px 22px, 22px 22px, auto !important; box-shadow: none !important; }
+
+html[data-theme="glassline"] .dx2-hero,
+html[data-theme="glassline"] .dx-metric { border-radius: 18px !important; backdrop-filter: blur(20px) saturate(1.5) !important; }
+html[data-theme="glassline"] .dx-metric { border: 1px solid rgba(255,255,255,0.45) !important; }
+
+html[data-theme="canvas"] .dx2-hero,
+html[data-theme="canvas"] .dx-metric { border-radius: 10px !important; }
+html[data-theme="canvas"] .dx .dx-metric { box-shadow: none !important; border-inline-start: 4px solid rgb(var(--primary)) !important; }
+
+html[data-theme="fluent-pro"] .dx2-hero,
+html[data-theme="fluent-pro"] .dx-metric { border-radius: 6px !important; }
+html[data-theme="fluent-pro"] .dx .dx-metric { box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important; }
+
+html[data-theme="material-x"] .dx2-hero,
+html[data-theme="material-x"] .dx-metric { border-radius: 20px !important; }
+html[data-theme="material-x"] .dx .dx-metric { box-shadow: 0 18px 44px rgba(124,58,237,.18), inset 0 2px 6px rgba(255,255,255,.4) !important; }
+
+html[data-theme="obsidian"] .dx2-hero,
+html[data-theme="obsidian"] .dx-metric { border-radius: 10px !important; }
+html[data-theme="obsidian"] .dx .dx-metric { border-top: 1px solid rgba(94,106,210,.5) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), 0 18px 42px rgba(0,0,0,.4) !important; }
+
+html[data-theme="tiles"] .dx2-hero { border-radius: 16px 26px 16px 26px !important; }
+html[data-theme="tiles"] .dx-metric { border-radius: 16px !important; }
+html[data-theme="tiles"] .dx .dx-metric:nth-child(2n) { border-radius: 22px 16px 22px 16px !important; }
+
+html[data-theme="acrylic"] .dx2-hero,
+html[data-theme="acrylic"] .dx-metric { border-radius: 22px !important; }
+html[data-theme="acrylic"] .dx .dx-metric { box-shadow: 0 16px 38px rgba(15,23,42,.1), inset 0 1px rgba(255,255,255,.5) !important; }
+
+html[data-theme="touch"] .dx2-hero,
+html[data-theme="touch"] .dx-metric { border-radius: 14px !important; border-width: 2px !important; }
+html[data-theme="touch"] .dx .dx-metric { box-shadow: 0 6px 18px rgba(15,23,42,.1) !important; }

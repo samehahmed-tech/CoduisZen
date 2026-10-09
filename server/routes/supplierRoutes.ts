@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import * as supplierController from '../controllers/supplierController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
 
+const procurementAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PROCUREMENT_MANAGER'],
+    ['OP_CREATE_PO'],
+);
+
 router.get('/', supplierController.getSuppliers);
 router.get('/:id', supplierController.getSupplierById);
-router.post('/', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PROCUREMENT_MANAGER'), supplierController.createSupplier);
-router.put('/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'PROCUREMENT_MANAGER'), supplierController.updateSupplier);
-router.delete('/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'), supplierController.deactivateSupplier);
+router.post('/', procurementAuth, supplierController.createSupplier);
+router.put('/:id', procurementAuth, supplierController.updateSupplier);
+router.delete('/:id', procurementAuth, supplierController.deactivateSupplier);
 
 export default router;

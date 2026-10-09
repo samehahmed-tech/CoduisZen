@@ -229,18 +229,21 @@ const Production: React.FC = () => {
         }
     };
 
-    const handleCancelOrder = async (orderId: string) => {
-        try {
-            await cancelProductionOrder(orderId);
-            showToast(tr('Production batch cancelled.', 'تم إلغاء أمر الإنتاج.'), 'success');
-        } catch (error) {
-            showToast(tr('Could not cancel production batch.', 'تعذر إلغاء أمر الإنتاج.'), 'error');
-        }
+    // Card-level cancel routes through the same confirm modal as the detail
+    // view — previously one tap cancelled with no confirmation.
+    const handleCancelOrder = (orderId: string, batch?: string) => {
+        setConfirmAction({ kind: 'cancel', id: orderId, batch: batch || orderId });
     };
 
     const handleCreateOrder = async () => {
         if (!targetItemId || quantityRequested <= 0) {
             showToast(tr('Select item, warehouse, and a valid quantity.', 'اختر المنتج والمخزن وكمية صحيحة.'), 'error');
+            return;
+        }
+        // Explicit warehouse only: silently falling back to another branch's
+        // warehouse posts consumption to the wrong stock.
+        if (!warehouseId) {
+            showToast(tr('Select the production warehouse explicitly.', 'اختر مخزن التشغيل صراحة.'), 'error');
             return;
         }
         try {
@@ -249,7 +252,7 @@ const Production: React.FC = () => {
                 targetItemId,
                 quantityRequested,
                 quantityProduced: 0,
-                warehouseId: effectiveWarehouseId,
+                warehouseId,
                 status: ProductionStatus.PENDING,
                 batchNumber: `B-${Date.now()}`,
                 createdAt: new Date(),
@@ -424,7 +427,7 @@ const Production: React.FC = () => {
                                                     <Eye size={14} />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleCancelOrder(order.id)}
+                                                    onClick={() => handleCancelOrder(order.id, (order as any).batchNumber)}
                                                     className="px-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-black text-[10px] uppercase hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-900/50 transition-colors"
                                                 >
                                                     {tr('Cancel', 'إلغاء')}
@@ -613,10 +616,11 @@ const Production: React.FC = () => {
                                         min="0.001"
                                         step="0.001"
                                         className="flex-1 px-4 py-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-black text-xl text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-0 outline-none transition-colors tabular-nums"
-                                        defaultValue={quantityRequested}
-                                        onBlur={(e) => {
+                                        value={Number.isFinite(quantityRequested) && quantityRequested > 0 ? quantityRequested : ''}
+                                        placeholder="0"
+                                        onChange={(e) => {
                                             const quantity = e.currentTarget.valueAsNumber;
-                                            setQuantityRequested(Number.isFinite(quantity) && quantity >= 0.001 ? quantity : 0);
+                                            setQuantityRequested(Number.isFinite(quantity) && quantity >= 0 ? quantity : 0);
                                         }}
                                     />
                                     <span className="text-sm font-black text-slate-400 uppercase w-16">{selectedCompositeItem?.unit || tr('Unit', 'وحدة')}</span>
@@ -715,10 +719,11 @@ const Production: React.FC = () => {
                                     min="0.001"
                                     step="0.001"
                                     className="w-full px-6 py-4 rounded-xl border-2 border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/5 font-black text-2xl text-emerald-700 dark:text-emerald-400 focus:border-emerald-500 focus:ring-0 outline-none transition-colors tabular-nums text-center"
-                                    defaultValue={actualYield}
-                                    onBlur={(e) => {
+                                    value={Number.isFinite(actualYield) && actualYield > 0 ? actualYield : ''}
+                                    placeholder="0"
+                                    onChange={(e) => {
                                         const quantity = e.currentTarget.valueAsNumber;
-                                        setActualYield(Number.isFinite(quantity) && quantity >= 0.001 ? quantity : 0);
+                                        setActualYield(Number.isFinite(quantity) && quantity >= 0 ? quantity : 0);
                                     }}
                                 />
                             </div>

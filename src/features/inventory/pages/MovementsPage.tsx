@@ -5,22 +5,23 @@ import { InvPageShell, InvPageHeader, InvError, MOVEMENT_TYPE_META } from '../sh
 
 const MovementsPage: React.FC = () => {
   const {
-    lang, settings, inventoryError, clearError,
-    movementLoading, movementDateFrom, setMovementDateFrom,
+    lang, settings, branches, inventoryError, clearError,
+    movementLoading, movementBranchId, setMovementBranchId,
+    movementDateFrom, setMovementDateFrom,
     movementDateTo, setMovementDateTo, movementTypeFilter, setMovementTypeFilter,
     movementSearch, setMovementSearch,
     loadMovements, toggleMovementType, filteredMovementRows, movementSummary,
     exportMovementsCsv, printMovements,
     consumptionRows, consumptionLoading, consumptionDateFrom, setConsumptionDateFrom,
     consumptionDateTo, setConsumptionDateTo, consumptionReportRows, consumptionTotals,
-    exportRecipeConsumptionCsv, printRecipeConsumption, loadRecipeConsumption,
+    exportRecipeConsumptionCsv, printRecipeConsumption, printRecipeConsumptionPdf, loadRecipeConsumption,
   } = useInventoryWorkspace();
 
   const [subTab, setSubTab] = useState<'MOVEMENTS' | 'CONSUMPTION'>('MOVEMENTS');
 
   useEffect(() => {
     void loadMovements();
-  }, [movementDateFrom, movementDateTo, movementTypeFilter]);
+  }, [movementBranchId, movementDateFrom, movementDateTo, movementTypeFilter]);
   useEffect(() => {
     if (subTab === 'CONSUMPTION') void loadRecipeConsumption();
   }, [subTab]);
@@ -79,6 +80,17 @@ const MovementsPage: React.FC = () => {
           aria-label={lang === 'ar' ? 'إلى تاريخ' : 'To date'}
           className="bg-card/60 border border-border/30 rounded-xl px-4 py-2 text-[11px] font-black uppercase text-main outline-none focus:border-sky-500/50"
         />
+        <select
+          value={movementBranchId}
+          onChange={(e) => setMovementBranchId(e.target.value)}
+          aria-label={lang === 'ar' ? 'الفرع' : 'Branch'}
+          className="bg-card/60 border border-border/30 rounded-xl px-4 py-2 text-[11px] font-black uppercase text-main outline-none focus:border-sky-500/50"
+        >
+          <option value="">{lang === 'ar' ? 'كل الفروع' : 'All branches'}</option>
+          {(branches || []).map((b: any) => (
+            <option key={String(b.id)} value={String(b.id)}>{b.name || b.id}</option>
+          ))}
+        </select>
 
         <div className="relative min-w-[200px] flex-1 max-w-xs">
           <Search size={14} className={`absolute top-1/2 -translate-y-1/2 text-muted ${lang === 'ar' ? 'right-3' : 'left-3'}`} />
@@ -243,8 +255,9 @@ const MovementsPage: React.FC = () => {
               <tr className="bg-elevated/60 font-black text-[11px] text-main">
                 <td className="px-4 py-4 uppercase tracking-widest" colSpan={3}>{lang === 'ar' ? 'الإجمالي' : 'TOTALS'}</td>
                 <td className="px-3 py-4 text-center tabular-nums text-emerald-500">+{movementSummary.inQty.toLocaleString()}</td>
-                <td colSpan={2} />
-                <td className="px-3 py-4 text-center tabular-nums">{settings.currencySymbol || 'EGP'} {movementSummary.cost.toFixed(2)}</td>
+                <td className="px-3 py-4 text-center tabular-nums text-rose-500">−{movementSummary.outQty.toLocaleString()}</td>
+                <td className="px-3 py-4 text-center tabular-nums text-emerald-500">+{settings.currencySymbol || 'EGP'} {movementSummary.inCost.toFixed(2)}</td>
+                <td className="px-3 py-4 text-center tabular-nums text-rose-500">−{settings.currencySymbol || 'EGP'} {movementSummary.outCost.toFixed(2)}</td>
                 <td colSpan={4} />
               </tr>
             </tfoot>
@@ -294,8 +307,9 @@ const MovementsPage: React.FC = () => {
           {lang === 'ar' ? 'طباعة' : 'PRINT'}
         </button>
         <button
-          onClick={printRecipeConsumption}
+          onClick={printRecipeConsumptionPdf}
           disabled={consumptionRows.length === 0}
+          title={lang === 'ar' ? 'تقرير أفقي جاهز للحفظ PDF' : 'Landscape report ready to save as PDF'}
           className="flex items-center gap-3 px-5 py-3 bg-card/60 text-muted rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] border border-border/30 hover:bg-main hover:text-app disabled:opacity-40 transition-all active:scale-95"
         >
           <FileText size={14} />
@@ -378,7 +392,10 @@ const MovementsPage: React.FC = () => {
                     <p className="mt-1 flex items-center gap-2 truncate text-[10px] font-bold text-muted">
                       {row.itemId}
                       {row.source === 'THEORETICAL' && (
-                        <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-500">
+                        <span
+                          className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-black text-amber-500"
+                          title={lang === 'ar' ? 'كمية محسوبة من مبيعات الوصفات (ليست حركة مخزنية مسجلة) — قارنها بالجرد الفعلي' : 'Computed from recipe sales (not a recorded stock move) — reconcile against physical count'}
+                        >
                           {lang === 'ar' ? 'نظري' : 'THEORETICAL'}
                         </span>
                       )}

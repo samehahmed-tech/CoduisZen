@@ -116,10 +116,37 @@ const ButcheryManager: React.FC = () => {
         setShowModal(true);
     };
 
+    const sourceOnHand = (() => {
+        if (!form.sourceItemId || !form.warehouseId) return null;
+        const it: any = activeInventory.find((i: any) => i.id === form.sourceItemId);
+        const row = it?.warehouseQuantities?.find((w: any) => w.warehouseId === form.warehouseId);
+        return row ? Number(row.quantity || 0) : 0;
+    })();
+
     const handleSave = async () => {
         const qty = Number(form.sourceQty);
         if (!form.sourceItemId || !form.warehouseId || !Number.isFinite(qty) || qty <= 0) {
             showError(tr('Select source item, warehouse and quantity.', 'اختر صنف المصدر والمخزن والكمية.'));
+            return;
+        }
+        // Empty output rows must never reach the server (phantom lines).
+        const cleanOutputs = outputs.filter((o) => o.outputType === 'WASTE' || String(o.itemId || '').trim());
+        if (cleanOutputs.length === 0) {
+            showError(tr('Add at least one output row with an item.', 'أضف صف مخرجات واحداً على الأقل بصنف.'));
+            return;
+        }
+        for (const o of cleanOutputs) {
+            if (!(Number(o.quantity) > 0)) {
+                showError(tr('Every output row needs a quantity greater than zero.', 'كل صف مخرجات يحتاج كمية أكبر من صفر.'));
+                return;
+            }
+        }
+        // Source availability pre-check (server re-validates on post).
+        if (sourceOnHand !== null && qty > sourceOnHand) {
+            showError(tr(
+                `Insufficient stock in warehouse (on hand ${sourceOnHand}).`,
+                `الرصيد غير كافٍ في المخزن (المتاح ${sourceOnHand}).`,
+            ));
             return;
         }
         if (editingId && editingStatus === 'POSTED') {
@@ -134,7 +161,7 @@ const ButcheryManager: React.FC = () => {
                 saved = await butcheryApi.update(editingId, {
                     ...(editingStatus === 'DRAFT' ? { sourceItemId: form.sourceItemId } : {}),
                     sourceQty: qty,
-                    outputs: outputs.map((o) => ({ ...o, itemId: o.itemId || undefined, quantity: Number(o.quantity) })),
+                    outputs: cleanOutputs.map((o) => ({ ...o, itemId: o.itemId || undefined, quantity: Number(o.quantity) })),
                     notes: form.notes || undefined,
                 });
             } else {
@@ -143,7 +170,7 @@ const ButcheryManager: React.FC = () => {
                     sourceQty: qty,
                     warehouseId: form.warehouseId,
                     notes: form.notes || undefined,
-                    outputs: outputs.map((o) => ({ ...o, quantity: Number(o.quantity) })),
+                    outputs: cleanOutputs.map((o) => ({ ...o, quantity: Number(o.quantity) })),
                 });
             }
             setShowModal(false);
@@ -467,12 +494,12 @@ const ButcheryManager: React.FC = () => {
                                 </select>
                             </label>
                             <label className="block">
-                                <span className="text-[10px] font-black uppercase text-muted">{tr('Quantity', 'الكمية')}</span>
+                                <span className="text-[10px] font-black uppercase text-muted">{tr('Quantity', 'الكمية')}{sourceOnHand !== null ? ` (${tr('on hand', 'المتاح')}: ${sourceOnHand})` : ''}</span>
                                 <input value={form.sourceQty} onChange={(e) => setForm((f) => ({ ...f, sourceQty: e.target.value }))} type="number" min="0" step="0.001" className="w-full bg-app border border-default rounded-xl px-3 py-2 text-sm text-main" />
                             </label>
                             <label className="block">
                                 <span className="text-[10px] font-black uppercase text-muted">{tr('Warehouse', 'المخزن')}</span>
-                                <select value={form.warehouseId} disabled={Boolean(editingId)} onChange={(e) => setForm((f) => ({ ...f, warehouseId: e.target.value }))} className="w-full bg-app border border-default rounded-xl px-3 py-2 text-sm text-main">
+                                <select value={form.warehouseId} disabled={Boolean(editingId && editingStatus !== 'DRAFT')} onChange={(e) => setForm((f) => ({ ...f, warehouseId: e.target.value }))} className="w-full bg-app border border-default rounded-xl px-3 py-2 text-sm text-main">
                                     <option value="">—</option>
                                     {activeWarehouses.map((w: any) => <option key={w.id} value={w.id}>{isAr ? w.nameAr || w.name : w.name}</option>)}
                                 </select>

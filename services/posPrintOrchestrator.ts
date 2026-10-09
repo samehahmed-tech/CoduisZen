@@ -279,7 +279,11 @@ export const printKitchenTicketsByRouting = async ({
             : branchPrinters.find((p) => p.id === printerId) || resolveFallbackKitchenPrinter(branchPrinters, onlineBranchPrinters);
 
         const ticketTitle = buildKitchenTitle(lang, t, targetPrinter, payload.isFallback);
-        const ticketOrder = { ...order, items: payload.items };
+        const ticketOrder = {
+            ...order,
+            items: payload.items,
+            cashierName: (order as any).cashierName || (settings as any)?.currentUser?.name || '',
+        };
 
         try {
             const linkedTemplate = targetPrinter ? findTemplateForPrinter(targetPrinter.id, 'kitchen') : null;
@@ -357,10 +361,13 @@ export const printOrderReceipt = async ({
     const paperWidth = resolvePrinterPaperWidth(primaryCashierPrinter, activeReceiptTemplate);
     if (!primaryCashierPrinter) throw new Error('NO_CASHIER_PRINTER_CONFIGURED');
 
+    const orderWithCashier = (order as any).cashierName
+        ? order
+        : { ...order, cashierName: (settings as any)?.currentUser?.name || '' };
     const htmlReceipt = activeReceiptTemplate
         ? generateHtmlFromTemplate({
             template: activeReceiptTemplate,
-            order,
+            order: orderWithCashier,
             settings: effectiveSettings,
             currencySymbol,
             lang,
@@ -368,7 +375,7 @@ export const printOrderReceipt = async ({
             title: receiptTitle,
         })
         : generateReceiptHTML({
-            order,
+            order: orderWithCashier,
             settings: effectiveSettings,
             currencySymbol,
             lang,

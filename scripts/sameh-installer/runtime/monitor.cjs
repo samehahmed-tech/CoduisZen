@@ -150,6 +150,22 @@ const server = http.createServer(async (request, response) => {
 });
 server.on('error', error => { log(`server error: ${error.stack || error}`); process.exit(1); });
 process.on('uncaughtException', error => { log(`uncaught: ${error.stack || error}`); process.exit(1); });
+// Single-instance guard: blind task restarts used to pile duplicate monitors
+// (the EADDRINUSE spam in the logs). A live monitor with a fresh pidfile
+// means exit quietly; a stale pidfile expires on its own.
+let monitorPrevPid = 0;
+try { monitorPrevPid = Number(fs.readFileSync(path.join(root, 'runtime', 'monitor.pid'), 'utf8')); } catch {}
+if (monitorPrevPid) {
+  let duplicate = false;
+  try {
+    process.kill(monitorPrevPid, 0);
+    let age = Infinity;
+    try { age = Date.now() - fs.statSync(path.join(root, 'runtime', 'monitor.pid')).mtimeMs; } catch {}
+    duplicate = age < 3 * 60 * 1000;
+  } catch { /* dead pid — take over */ }
+  if (duplicate) { log('another monitor active; exiting'); process.exit(0); }
+}
+try { fs.writeFileSync(path.join(root, 'runtime', 'monitor.pid'), String(process.pid)); } catch {}
 server.listen(3099, '127.0.0.1', () => {
   log('monitor ready on http://127.0.0.1:3099');
   launchWatchdog();

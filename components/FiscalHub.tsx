@@ -324,7 +324,7 @@ const FiscalHub: React.FC = () => {
                         <Clock className="text-primary" />
                         {tr('eta_submission_registry', 'ETA Submission Registry')}
                     </h3>
-                    <div className="bg-card border border-border rounded-[2.5rem] overflow-hidden">
+                    <div className="bg-card border border-border rounded-[2.5rem] overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-elevated/50 text-[10px] font-black uppercase text-muted tracking-widest border-b border-border">
                                 <tr>

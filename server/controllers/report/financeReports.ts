@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { eq, and, or, sql, gte, lte, desc, isNull } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, isNull, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { journalEntries, journalLines, chartOfAccounts, costCenters, users, branches } from '../../../src/db/schema';
 import { parseLocalDateRange, resolveScopedBranchId } from './reportUtils';
@@ -134,7 +134,7 @@ export const getTopExpenses = async (req: Request, res: Response) => {
                 eq(journalEntries.status, 'POSTED'),
                 // Operating expenses only: stock COGS journals (referenceType
                 // COGS) are tracked separately, never as opex.
-                eq(journalEntries.referenceType, 'EXPENSE'),
+                inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
                 eq(chartOfAccounts.type, 'EXPENSE'),
                 branchJournalScope(branchId)
             ))
@@ -155,7 +155,7 @@ export const getTopExpenses = async (req: Request, res: Response) => {
                 gte(journalEntries.date, start),
                 lte(journalEntries.date, end),
                 eq(journalEntries.status, 'POSTED'),
-                eq(journalEntries.referenceType, 'EXPENSE'),
+                inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
                 eq(chartOfAccounts.type, 'EXPENSE'),
                 branchJournalScope(branchId)
             ));
@@ -192,7 +192,7 @@ export const getExpenseReport = async (req: Request, res: Response) => {
             gte(journalEntries.date, start),
             lte(journalEntries.date, end),
             statusCondition,
-            eq(journalEntries.referenceType, 'EXPENSE'),
+            inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
             eq(chartOfAccounts.type, 'EXPENSE'),
             branchJournalScope(branchId),
         ];
@@ -232,7 +232,7 @@ export const getExpenseReport = async (req: Request, res: Response) => {
         const countConditions = [
             gte(journalEntries.date, start),
             lte(journalEntries.date, end),
-            eq(journalEntries.referenceType, 'EXPENSE'),
+            inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
             eq(chartOfAccounts.type, 'EXPENSE'),
             branchJournalScope(branchId),
         ];

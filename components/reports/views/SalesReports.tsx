@@ -553,9 +553,10 @@ export const SalesReports = ({ state }: any) => {
                         exportFilename="peak-hours"
                         lang={lang}
                      />
-                     <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-8">
-                        <h3 className="text-xl font-black text-main mb-6">{t.peak_hours_heatmap}</h3>
-                        <div className="grid grid-cols-[auto_repeat(24,1fr)] gap-0.5 text-[8px]">
+                      <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl p-4 md:p-8">
+                         <h3 className="text-xl font-black text-main mb-6">{t.peak_hours_heatmap}</h3>
+                         <div className="overflow-x-auto">
+                         <div className="grid min-w-[560px] grid-cols-[auto_repeat(24,1fr)] gap-0.5 text-[8px]">
                            <div />{HOURS.map((hour) => <div key={hour} className="text-center text-muted font-black">{hour}:00</div>)}
                            {WEEK_DAYS.map((day, dayIndex) => (
                               <React.Fragment key={dayIndex}>
@@ -574,6 +575,7 @@ export const SalesReports = ({ state }: any) => {
                                  })}
                               </React.Fragment>
                            ))}
+                        </div>
                         </div>
                      </div>
                   </div>

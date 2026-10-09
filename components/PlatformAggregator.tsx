@@ -130,12 +130,14 @@ const PlatformAggregator: React.FC = () => {
         }
     };
 
+    // Delete = deactivate (server soft-deletes to preserve order/menu
+    // history). A separate toggle restores it — nothing is ever destroyed.
     const handleDelete = async (id: string) => {
         if (deletingPlatformId) return;
         const ok = await confirm({
-            title: t('Delete Platform', 'حذف المنصة'),
-            message: t('This will permanently remove this platform connection. Continue?', 'سيتم حذف إعدادات المنصة نهائيا. هل تريد المتابعة؟'),
-            confirmText: t('Delete', 'حذف'),
+            title: t('Pause Platform', 'إيقاف المنصة'),
+            message: t('This pauses the platform (history is kept). You can re-activate it anytime. Continue?', 'سيتم إيقاف المنصة مؤقتاً (السجل محفوظ) ويمكن إعادة تفعيلها. متابعة؟'),
+            confirmText: t('Pause', 'إيقاف'),
             variant: 'danger',
         });
         if (!ok) return;
@@ -143,11 +145,23 @@ const PlatformAggregator: React.FC = () => {
         try {
             await platformsApi.delete(id);
             await load();
-            success(t('Platform deleted', 'تم حذف المنصة'));
+            success(t('Platform paused', 'تم إيقاف المنصة'));
         } catch (err: any) {
-            showError(err?.message || t('Failed to delete platform', 'تعذر حذف المنصة'));
+            showError(err?.message || t('Failed to pause platform', 'تعذر إيقاف المنصة'));
         } finally {
             setDeletingPlatformId(null);
+        }
+    };
+
+    const handleToggleActive = async (platform: DeliveryPlatform) => {
+        try {
+            await platformsApi.update(platform.id, { isActive: !(platform.isActive !== false) });
+            await load();
+            success(!(platform.isActive !== false)
+                ? t('Platform activated', 'تم تفعيل المنصة')
+                : t('Platform paused', 'تم إيقاف المنصة'));
+        } catch (err: any) {
+            showError(err?.message || t('Failed to update platform', 'تعذر تحديث المنصة'));
         }
     };
 
@@ -251,9 +265,15 @@ const PlatformAggregator: React.FC = () => {
                             <button onClick={() => openEdit(platform)} className="flex-1 py-2.5 bg-app border border-border rounded-xl text-[10px] font-black text-muted uppercase tracking-widest hover:text-main hover:border-purple-500/40 transition-colors flex items-center justify-center gap-1">
                                 <Edit size={12} /> {isAr ? 'تعديل' : 'Edit'}
                             </button>
-                            <button type="button" aria-label={isAr ? `حذف ${platform.name}` : `Delete ${platform.name}`} onClick={() => handleDelete(platform.id)} disabled={deletingPlatformId === platform.id} className="px-4 py-2.5 bg-app border border-border rounded-xl text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/30 transition-colors disabled:opacity-60">
-                                <Trash2 size={14} className={deletingPlatformId === platform.id ? 'animate-pulse' : ''} />
-                            </button>
+                            {platform.isActive !== false ? (
+                                <button type="button" aria-label={isAr ? `إيقاف ${platform.name}` : `Pause ${platform.name}`} title={isAr ? 'إيقاف مؤقت (يحفظ السجل)' : 'Pause (keeps history)'} onClick={() => handleDelete(platform.id)} disabled={deletingPlatformId === platform.id} className="px-4 py-2.5 bg-app border border-border rounded-xl text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/30 transition-colors disabled:opacity-60">
+                                    <Trash2 size={14} className={deletingPlatformId === platform.id ? 'animate-pulse' : ''} />
+                                </button>
+                            ) : (
+                                <button type="button" aria-label={isAr ? `تفعيل ${platform.name}` : `Activate ${platform.name}`} title={isAr ? 'إعادة تفعيل' : 'Re-activate'} onClick={() => handleToggleActive(platform)} className="px-4 py-2.5 bg-app border border-emerald-500/40 rounded-xl text-emerald-500 hover:bg-emerald-500/10 transition-colors">
+                                    <CheckCircle2 size={14} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -343,8 +363,13 @@ const PlatformAggregator: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'API Key اختياري' : 'API Key optional'}</label>
-                                <input type="password" value={form.apiKey} onChange={(event) => setForm({ ...form, apiKey: event.target.value })} placeholder={t('Enter API key...', 'اكتب مفتاح الربط...')} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-purple-500 text-main" />
+                                <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">
+                                    {isAr ? 'API Key اختياري' : 'API Key optional'}
+                                    {editingPlatform && (editingPlatform as any).apiKeySet && (
+                                        <span className="ms-2 rounded bg-emerald-500/10 px-2 py-0.5 text-emerald-500">{isAr ? 'محفوظ' : 'saved'}</span>
+                                    )}
+                                </label>
+                                <input type="password" value={form.apiKey} onChange={(event) => setForm({ ...form, apiKey: event.target.value })} placeholder={editingPlatform ? t('Blank keeps the saved key', 'فارغ = الاحتفاظ بالمفتاح') : t('Enter API key...', 'اكتب مفتاح الربط...')} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-purple-500 text-main" />
                             </div>
                         </div>
 

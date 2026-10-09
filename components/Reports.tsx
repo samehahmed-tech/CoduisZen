@@ -396,13 +396,19 @@ const Reports: React.FC = () => {
       setPendingOutput({ categoryId, reportName, mode });
    };
 
+   // Local calendar keys — toISOString() is UTC and shifts the day around
+   // midnight for Egypt (UTC+2/3).
+   const toLocalDateKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+   const todayKey = toLocalDateKey(new Date());
+
    const applyQuickDate = (daysAgo: number) => {
       const today = new Date();
       const start = new Date();
       start.setDate(today.getDate() - daysAgo);
       const nextRange = {
-         start: start.toISOString().split('T')[0],
-         end: today.toISOString().split('T')[0],
+         start: toLocalDateKey(start),
+         end: toLocalDateKey(today),
       };
       startFilterTransition(() => {
          setDateRange(nextRange);
@@ -466,7 +472,7 @@ const Reports: React.FC = () => {
             filename: getSafeFileName(activeSubReport, appliedRange.start, appliedRange.end, 'pdf'),
             title: displaySubReportLabel,
             restaurant: pdfBrand.restaurant,
-            logoUrl: settings.receiptLogoUrl || '/logo.png?v=2',
+            logoUrl: settings.receiptLogoUrl || '/logo.png?v=6',
             systemLogoUrl: (pdfBrand as any).systemLogoUrl,
             metaChips: [
                displayCategoryLabel,
@@ -568,7 +574,7 @@ const Reports: React.FC = () => {
          // Dual logos: restaurant (edge) + system mark beside it. Cell-anchored
          // (no fractional cols) so RTL/LTR both stay stable.
          const placeLogo = async (url: string | undefined, colStart: number) => {
-            const logo = await loadLogoBase64(url || '/logo.png?v=2');
+            const logo = await loadLogoBase64(url || '/logo.png?v=6');
             if (!logo) return;
             try {
                const imageId = workbook.addImage({ base64: logo.base64, extension: logo.extension });
@@ -581,7 +587,7 @@ const Reports: React.FC = () => {
                // logo placement is decorative — never fail the export
             }
          };
-         const restaurantLogoUrl = settings.receiptLogoUrl || '/logo.png?v=2';
+         const restaurantLogoUrl = settings.receiptLogoUrl || '/logo.png?v=6';
          const systemLogoUrl = (brand as any).systemLogoUrl;
          // Second mark only when it is a genuinely different image.
          const dualLogos = !!systemLogoUrl && !isSameLogoUrl(systemLogoUrl, restaurantLogoUrl);
@@ -671,8 +677,12 @@ const Reports: React.FC = () => {
             };
          });
 
+         // Totals row sums MONEY columns only (headers naming amounts).
+         // Summing quantities/counts/rates/% produced nonsense "Total" rows.
+         const MONEY_HEADER = /total|amount|value|cost|price|revenue|cash|balance|paid|due|profit|expense|tax|discount|fee|الإجمالي|المبلغ|القيمة|التكلفة|السعر|الإيراد|النقد|الرصيد|المدفوع|المستحق|الربح|المصروف|الضريبة|الخصم|الرسوم/i;
          const columnSums: number[] = new Array(Math.max(headers.length, 1)).fill(0);
          const columnIsNumeric: boolean[] = new Array(Math.max(headers.length, 1)).fill(true);
+         const columnIsMoney: boolean[] = headers.map((h) => MONEY_HEADER.test(String(h || '')));
          bodyRows.forEach((row, rowIndex) => {
             const sheetRow = sheet.addRow(row.map(coerceExcelValue));
             sheetRow.height = 24;
@@ -700,11 +710,11 @@ const Reports: React.FC = () => {
             });
          });
 
-         if (bodyRows.length > 0 && columnIsNumeric.some(Boolean)) {
+         if (bodyRows.length > 0 && columnIsMoney.some(Boolean)) {
             const totalsRow = sheet.addRow(
                headers.map((_, colIndex) => {
                   if (colIndex === 0) return brand.totalLabel;
-                  return columnIsNumeric[colIndex] ? Math.round(columnSums[colIndex] * 100) / 100 : '';
+                  return columnIsMoney[colIndex] && columnIsNumeric[colIndex] ? Math.round(columnSums[colIndex] * 100) / 100 : '';
                })
             );
              totalsRow.height = 28;
@@ -854,11 +864,15 @@ const Reports: React.FC = () => {
                         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] sm:items-center rounded-lg border border-border bg-card p-2">
                            <div className="flex items-center gap-2">
                               <Calendar size={14} className="text-primary" />
-                              <input type="date" value={dateRange.start} onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
+                              <input type="date" value={dateRange.start} max={todayKey} onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
                            </div>
                            <ChevronLeft size={14} className="hidden text-muted sm:block rtl:rotate-180" />
-                           <input type="date" value={dateRange.end} onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
-                            <button onClick={() => startFilterTransition(() => setAppliedRange(dateRange))} className="rounded-md bg-primary px-4 py-2 text-xs font-black text-white transition hover:bg-primary-hover">
+                           <input type="date" value={dateRange.end} max={todayKey} onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
+                            <button onClick={() => startFilterTransition(() => setAppliedRange(
+                              dateRange.start > dateRange.end
+                                 ? { start: dateRange.end, end: dateRange.start }
+                                 : dateRange,
+                            ))} className="rounded-md bg-primary px-4 py-2 text-xs font-black text-white transition hover:bg-primary-hover">
                               {isArabic ? 'تطبيق' : 'Apply'}
                            </button>
                         </div>

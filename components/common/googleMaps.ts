@@ -18,14 +18,14 @@ export const defaultMapCenter: GoogleMapsPoint = {
     lng: Number.isFinite(envLng) ? envLng : 31.2357,
 };
 
-export const mapsProvider = String(import.meta.env.VITE_MAPS_PROVIDER || 'osm').toLowerCase();
+export const mapsProvider = String(import.meta.env.VITE_MAPS_PROVIDER || 'apple').toLowerCase();
 export const googleMapsKey = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '').trim();
 export const osmTileUrl = String(import.meta.env.VITE_OSM_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png').trim();
 export const maptilerKeyEnv = String((import.meta.env as any).VITE_MAPTILER_KEY || '').trim();
 export const nominatimUrl = String(import.meta.env.VITE_NOMINATIM_URL || 'https://nominatim.openstreetmap.org').replace(/\/+$/, '');
 export const osrmUrl = String(import.meta.env.VITE_OSRM_URL || 'https://router.project-osrm.org').replace(/\/+$/, '');
 
-type RuntimeMapsConfig = { provider?: 'osm' | 'google'; googleKey?: string; maptilerKey?: string };
+type RuntimeMapsConfig = { provider?: 'osm' | 'google' | 'apple'; googleKey?: string; maptilerKey?: string };
 let runtimeMapsConfig: RuntimeMapsConfig | null = null;
 
 /** Runtime override from app settings (beats build-time env, no rebuild needed). */
@@ -38,7 +38,8 @@ const activeGoogleKey = () => (runtimeMapsConfig?.googleKey || googleMapsKey).tr
 
 /** Prefer functions over the legacy consts below (they ignore runtime settings). */
 export const shouldUseGoogleMaps = () => activeProvider() === 'google' && !!activeGoogleKey();
-export const shouldUseOsmMaps = () => !shouldUseGoogleMaps();
+export const shouldUseAppleMaps = () => activeProvider() === 'apple';
+export const shouldUseOsmMaps = () => !shouldUseGoogleMaps() && !shouldUseAppleMaps();
 
 /* ── MapTiler (Leaflet → MapTiler → OpenStreetMap data) ── */
 const activeMaptilerKey = () => (runtimeMapsConfig?.maptilerKey || maptilerKeyEnv).trim();

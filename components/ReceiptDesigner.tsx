@@ -9,6 +9,34 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useToast } from './Toast';
 import { useConfirm } from './common/ConfirmProvider';
 import { AppSettings, OrderType } from '../types';
+import { generateHtmlFromTemplate } from '../services/templateReceiptGenerator';
+
+// Sample order for the live print preview — renders the ACTIVE template
+// through the real print generator, so the preview IS the printed output
+// (same HTML the bridge rasterizes), not a mock.
+const buildPreviewOrder = (isAr: boolean): any => ({
+    id: 'preview-1042',
+    orderNumber: 1042,
+    type: OrderType.DINE_IN,
+    branchId: 'preview-branch',
+    tableId: 'table-5',
+    tableName: isAr ? 'طاولة 5' : 'Table 5',
+    customerName: isAr ? 'أحمد محمد' : 'Ahmed M.',
+    customerPhone: '01000000000',
+    cashierName: isAr ? 'كريم' : 'Karim',
+    items: [
+        { cartId: 'c1', id: 'i1', name: 'Beef Shawarma', nameAr: 'شاورما لحمة', quantity: 2, price: 60, selectedModifiers: [{ optionName: isAr ? 'صلصة حارة' : 'Hot sauce', groupName: '', price: 0 }] },
+        { cartId: 'c2', id: 'i2', name: 'Cola', nameAr: 'كنز', quantity: 1, price: 45, selectedModifiers: [] },
+    ],
+    status: 'PREPARING',
+    subtotal: 165,
+    discount: 0,
+    tax: 23.1,
+    total: 188.1,
+    tipAmount: 0,
+    paymentMethod: 'CASH',
+    createdAt: new Date(),
+});
 
 // ?? Receipt Block Types ??
 
@@ -48,7 +76,7 @@ interface ReceiptTemplate {
     linkedDepartments: string[];
     isDefault: boolean;
     createdAt: string;
-    styleVariant?: 'royal' | 'neo' | 'ledger' | 'express';
+    styleVariant?: ReceiptStyleVariant;
 }
 
 // ?? Default block definitions ??
@@ -56,7 +84,7 @@ interface ReceiptTemplate {
 const BLOCK_CATALOG: Record<BlockType, { icon: any; label: string; labelAr: string; defaultConfig: Record<string, any> }> = {
     header: { icon: AlignCenter, label: 'Restaurant Header', labelAr: 'رأس المطعم', defaultConfig: { showBranch: true, showAddress: true, showPhone: true } },
     title: { icon: Type, label: 'Receipt Title', labelAr: 'عنوان الإيصال', defaultConfig: { text: 'Sales Receipt', textAr: 'إيصال بيع' } },
-    orderInfo: { icon: FileText, label: 'Order Info', labelAr: 'بيانات الطلب', defaultConfig: { showOrderNum: true, showType: true, showDate: true, showTime: true } },
+    orderInfo: { icon: FileText, label: 'Order Info', labelAr: 'بيانات الطلب', defaultConfig: { showOrderNum: true, showType: true, showDate: true, showTime: true, showCashier: true } },
     customerInfo: { icon: FileText, label: 'Customer / Table', labelAr: 'العميل / الطاولة', defaultConfig: { showTable: true, showCustomer: true, showPhone: true, showAddress: true } },
     items: { icon: FileText, label: 'Items Table', labelAr: 'جدول الأصناف', defaultConfig: { showModifiers: true, showNotes: true, showPrice: true, showQty: true } },
     totals: { icon: FileText, label: 'Totals Section', labelAr: 'قسم الإجمالي', defaultConfig: { showSubtotal: true, showDiscount: true, showTax: true, showTotal: true, showTip: true } },
@@ -65,7 +93,7 @@ const BLOCK_CATALOG: Record<BlockType, { icon: any; label: string; labelAr: stri
     logo: { icon: Image, label: 'Logo Image', labelAr: 'صورة اللوجو', defaultConfig: { url: '', maxHeight: 120 } },
     footer: { icon: Type, label: 'Footer Message', labelAr: 'رسالة الختام', defaultConfig: { text: 'Thank you for your visit!', textAr: 'شكراً لزيارتكم!', showTaxId: true, showPoweredBy: true } },
     separator: { icon: FileText, label: 'Separator Line', labelAr: 'خط فاصل', defaultConfig: { style: 'dashed' } },
-    customText: { icon: Type, label: 'Custom Text', labelAr: 'نص مخصص', defaultConfig: { text: '', textAr: '', alignment: 'center', bold: false, fontSize: 12 } },
+    customText: { icon: Type, label: 'Custom Text', labelAr: 'نص مخصص', defaultConfig: { text: '', textAr: '', alignment: 'center', bold: true, fontSize: 12 } },
 };
 
 const createBlock = (type: BlockType, overrides?: Partial<ReceiptBlock>): ReceiptBlock => {
@@ -83,7 +111,7 @@ const createBlock = (type: BlockType, overrides?: Partial<ReceiptBlock>): Receip
 
 const DEFAULT_RECEIPT_BLOCKS: BlockType[] = [
     'logo', 'header', 'separator', 'title', 'orderInfo', 'customerInfo',
-    'separator', 'items', 'separator', 'totals', 'payment', 'separator', 'footer', 'qrCode'
+    'separator', 'items', 'separator', 'totals', 'payment', 'separator', 'qrCode', 'footer'
 ];
 
 const DEFAULT_KITCHEN_BLOCKS: BlockType[] = [
@@ -110,7 +138,30 @@ const createDefaultTemplate = (type: 'receipt' | 'kitchen'): ReceiptTemplate => 
     styleVariant: 'royal',
 });
 
-export type ReceiptStyleVariant = 'royal' | 'neo' | 'ledger' | 'express';
+export type ReceiptStyleVariant =
+    | 'royal' | 'neo' | 'ledger' | 'express'
+    | 'zen' | 'modular' | 'card' | 'arabic' | 'split' | 'timeline'
+    | 'ultra' | 'signature' | 'qrhero' | 'negative' | 'geometric' | 'glance';
+
+// Display names for the 16 print schools (designer picker + preset names).
+export const RECEIPT_STYLE_META: { id: ReceiptStyleVariant; name: string; nameAr: string }[] = [
+    { id: 'royal', name: 'Royal Band', nameAr: 'رويال مميز' },
+    { id: 'neo', name: 'Neo Air', nameAr: 'نيو مريح' },
+    { id: 'ledger', name: 'Ledger Pro', nameAr: 'دفتر احترافي' },
+    { id: 'express', name: 'Express Counter', nameAr: 'إكسبريس كاونتر' },
+    { id: 'zen', name: 'Zen Minimal', nameAr: 'زن هادئ' },
+    { id: 'modular', name: 'Modern POS', nameAr: 'مودرن بلوكات' },
+    { id: 'card', name: 'Receipt Card', nameAr: 'كارت فاخر' },
+    { id: 'arabic', name: 'Arabic First', nameAr: 'عربي أصيل' },
+    { id: 'split', name: 'Split Zones', nameAr: 'مناطق مرقمة' },
+    { id: 'timeline', name: 'Timeline', nameAr: 'خط زمني' },
+    { id: 'ultra', name: 'Ultra Compact', nameAr: 'مضغوط' },
+    { id: 'signature', name: 'Coduis Signature', nameAr: 'توقيع زين' },
+    { id: 'qrhero', name: 'QR Hero', nameAr: 'QR بطل' },
+    { id: 'negative', name: 'Negative Space', nameAr: 'فراغ فاخر' },
+    { id: 'geometric', name: 'Geometric Zen', nameAr: 'هندسي' },
+    { id: 'glance', name: 'One Glance', nameAr: 'نظرة واحدة' },
+];
 
 // Retired factory designs → their modern successor. Stored templates keep
 // their blocks and printer links; only the look is upgraded.
@@ -176,6 +227,20 @@ const createReceiptPresets = (): ReceiptTemplate[] => {
         createPreset({ id: 'preset_receipt_express_58', name: 'Express 58mm', nameAr: 'إكسبريس 58مم', styleVariant: 'express', fontSize: 'normal', paperWidth: '58mm', blockTypes: [
             'logo', 'header', 'orderInfo', 'items', 'totals', 'payment', 'qrCode', 'footer',
         ] }),
+        createPreset({ id: 'preset_receipt_zen_80', name: 'Zen Minimal 80mm', nameAr: 'زن هادئ 80مم', styleVariant: 'zen', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_modular_80', name: 'Modern POS 80mm', nameAr: 'مودرن بلوكات 80مم', styleVariant: 'modular', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_card_80', name: 'Receipt Card 80mm', nameAr: 'كارت فاخر 80مم', styleVariant: 'card', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_arabic_80', name: 'Arabic First 80mm', nameAr: 'عربي أصيل 80مم', styleVariant: 'arabic', fontSize: 'large', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_split_80', name: 'Split Zones 80mm', nameAr: 'مناطق مرقمة 80مم', styleVariant: 'split', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_timeline_80', name: 'Timeline 80mm', nameAr: 'خط زمني 80مم', styleVariant: 'timeline', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_ultra_80', name: 'Ultra Compact 80mm', nameAr: 'مضغوط 80مم', styleVariant: 'ultra', fontSize: 'normal', paperWidth: '80mm', blockTypes: [
+            'logo', 'header', 'orderInfo', 'items', 'totals', 'payment', 'qrCode', 'footer',
+        ] }),
+        createPreset({ id: 'preset_receipt_signature_80', name: 'Coduis Signature 80mm', nameAr: 'توقيع زين 80مم', styleVariant: 'signature', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_qrhero_80', name: 'QR Hero 80mm', nameAr: 'QR بطل 80مم', styleVariant: 'qrhero', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_negative_80', name: 'Negative Space 80mm', nameAr: 'فراغ فاخر 80مم', styleVariant: 'negative', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_geometric_80', name: 'Geometric Zen 80mm', nameAr: 'هندسي 80مم', styleVariant: 'geometric', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
+        createPreset({ id: 'preset_receipt_glance_80', name: 'One Glance 80mm', nameAr: 'نظرة واحدة 80مم', styleVariant: 'glance', fontSize: 'normal', paperWidth: '80mm', blockTypes: DEFAULT_RECEIPT_BLOCKS }),
     ];
 };
 
@@ -183,7 +248,7 @@ const createReceiptPresets = (): ReceiptTemplate[] => {
 
 const STORAGE_KEY = 'coduiszen_receipt_templates';
 const PRESET_VERSION_KEY = 'coduiszen_receipt_presets_version';
-const PRESET_VERSION = '6';
+const PRESET_VERSION = '8';
 
 const MOJIBAKE_RE = /(?:[ØÙ][^\s]|Ã|Â|ط[§±¨µ¦©®¯¹ھ]|ظ[„…‚])/u;
 
@@ -284,8 +349,52 @@ const healTemplateArabic = (template: ReceiptTemplate, factoryById: Map<string, 
     return { template: healed ? { ...template, nameAr, blocks } : template, healed };
 };
 
+// Stored receipt templates keep the user's block order — except one safe,
+// idempotent normalization: the QR block must come BEFORE the footer (the
+// thank-you line closes the receipt). Runs on every load, touches nothing else.
+const normalizeReceiptBlockOrder = (template: ReceiptTemplate): ReceiptTemplate => {
+    if (template.type !== 'receipt' || !Array.isArray(template.blocks)) return template;
+    const qrIdx = template.blocks.findIndex(b => b.type === 'qrCode' && b.enabled);
+    const footerIdx = template.blocks.findIndex(b => b.type === 'footer' && b.enabled);
+    if (qrIdx < 0 || footerIdx < 0 || qrIdx < footerIdx) return template;
+    const blocks = [...template.blocks];
+    const [qr] = blocks.splice(qrIdx, 1);
+    const targetIdx = blocks.findIndex(b => b.type === 'footer' && (b as any).enabled !== false);
+    blocks.splice(targetIdx < 0 ? blocks.length : targetIdx, 0, qr);
+    return { ...template, blocks };
+};
+
+const createKitchenPreset = (config: {
+    id: string;
+    name: string;
+    nameAr: string;
+    styleVariant: ReceiptStyleVariant;
+    fontSize: 'small' | 'normal' | 'large';
+    paperWidth: '58mm' | '80mm';
+}): ReceiptTemplate => ({
+    ...createDefaultTemplate('kitchen'),
+    id: config.id,
+    name: config.name,
+    nameAr: config.nameAr,
+    styleVariant: config.styleVariant,
+    fontSize: config.fontSize,
+    paperWidth: config.paperWidth,
+    isDefault: false,
+    blocks: DEFAULT_KITCHEN_BLOCKS.map(type => createBlock(type, type === 'title'
+        ? { config: { ...BLOCK_CATALOG.title.defaultConfig, text: 'KITCHEN TICKET', textAr: 'تذكرة المطبخ' } }
+        : undefined)),
+});
+
+const createKitchenPresets = (): ReceiptTemplate[] => [
+    createKitchenPreset({ id: 'preset_kitchen_station_80', name: 'Station Bold 80mm', nameAr: 'محطة واضحة 80مم', styleVariant: 'royal', fontSize: 'large', paperWidth: '80mm' }),
+    createKitchenPreset({ id: 'preset_kitchen_zen_80', name: 'Zen Kitchen 80mm', nameAr: 'مطبخ هادئ 80مم', styleVariant: 'zen', fontSize: 'large', paperWidth: '80mm' }),
+    createKitchenPreset({ id: 'preset_kitchen_timeline_80', name: 'Timeline Kitchen 80mm', nameAr: 'مطبخ زمني 80مم', styleVariant: 'timeline', fontSize: 'normal', paperWidth: '80mm' }),
+    createKitchenPreset({ id: 'preset_kitchen_compact_80', name: 'Compact Kitchen 80mm', nameAr: 'مطبخ مضغوط 80مم', styleVariant: 'ultra', fontSize: 'normal', paperWidth: '80mm' }),
+    createKitchenPreset({ id: 'preset_kitchen_glance_80', name: 'One-Glance Kitchen 80mm', nameAr: 'مطبخ نظرة واحدة 80مم', styleVariant: 'glance', fontSize: 'large', paperWidth: '80mm' }),
+];
+
 const buildFactoryIndex = (): { presets: ReceiptTemplate[]; byId: Map<string, ReceiptTemplate> } => {
-    const presets = [...createReceiptPresets(), createDefaultTemplate('kitchen')];
+    const presets = [...createReceiptPresets(), ...createKitchenPresets(), createDefaultTemplate('kitchen')];
     return { presets, byId: new Map(presets.map(template => [template.id, template])) };
 };
 
@@ -314,20 +423,20 @@ const loadTemplates = (remoteTemplates?: ReceiptTemplate[]): ReceiptTemplate[] =
                 // never shows again on this device.
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(savedHealed));
             }
-            return savedHealed;
+            return savedHealed.map(normalizeReceiptBlockOrder);
         }
 
-        const presetTemplates = createReceiptPresets();
+        const presetTemplates = [...createReceiptPresets(), ...createKitchenPresets()];
         const existingIds = new Set(savedHealed.map(template => template.id));
         const templates = savedHealed.length
             ? [...savedHealed, ...presetTemplates.filter(template => !existingIds.has(template.id)).map(template => ({ ...template, isDefault: false }))]
             : [...presetTemplates, createDefaultTemplate('kitchen')];
         const { healed: finalTemplates } = healAll(templates);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(finalTemplates));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(finalTemplates.map(normalizeReceiptBlockOrder)));
         localStorage.setItem(PRESET_VERSION_KEY, PRESET_VERSION);
-        return finalTemplates;
+        return finalTemplates.map(normalizeReceiptBlockOrder);
     } catch { /* ignore */ }
-    return [...createReceiptPresets(), createDefaultTemplate('kitchen')];
+    return [...createReceiptPresets(), ...createKitchenPresets(), createDefaultTemplate('kitchen')].map(normalizeReceiptBlockOrder);
 };
 
 const saveTemplates = (templates: ReceiptTemplate[]) => {
@@ -351,6 +460,8 @@ const ReceiptDesigner: React.FC = () => {
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [previewMode, setPreviewMode] = useState<'rich' | 'raw'>('rich');
+    const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
+    const [previewFrameHeight, setPreviewFrameHeight] = useState(900);
 
     // Drag state
     const dragItem = useRef<number | null>(null);
@@ -366,6 +477,28 @@ const ReceiptDesigner: React.FC = () => {
         { value: OrderType.PICKUP, en: 'Pickup', ar: 'استلام عميل' },
         { value: OrderType.KIOSK, en: 'Kiosk', ar: 'كشك الطلب الذاتي' },
     ];
+
+    // Live print preview: the active template rendered by the real generator.
+    // NOTE: must stay AFTER activeTemplate — reading it earlier throws a
+    // TDZ "Cannot access before initialization" that kills the whole page.
+    const previewPaperWidth = activeTemplate?.paperWidth || '80mm';
+    const previewPaperPx = previewPaperWidth === '58mm' ? 384 : 576;
+    const previewPanePx = previewPaperWidth === '58mm' ? 220 : 300;
+    const previewScale = previewPanePx / previewPaperPx;
+    const previewHtml = React.useMemo(() => {
+        try {
+            if (!activeTemplate) return '';
+            return generateHtmlFromTemplate({
+                template: activeTemplate as any,
+                order: buildPreviewOrder(isAr),
+                settings: settings as any,
+                currencySymbol: settings.currencySymbol || (isAr ? 'ج.م' : 'EGP'),
+                lang: (isAr ? 'ar' : 'en') as 'ar' | 'en',
+            });
+        } catch {
+            return '';
+        }
+    }, [activeTemplate, settings, isAr]);
 
     const setDefaultReceiptTemplate = (templateId: string) => {
         const next = templates.map(template => ({
@@ -402,7 +535,7 @@ const ReceiptDesigner: React.FC = () => {
         const healedRemote = remote.map(repairTemplateArabic).map(migrateLegacyPresetLook).map(template => {
             const result = healTemplateArabic(template, byId);
             if (result.healed) pushedHealing = true;
-            return result.template;
+            return normalizeReceiptBlockOrder(result.template);
         });
         saveTemplates(healedRemote);
         setTemplates(healedRemote);
@@ -629,6 +762,7 @@ const ReceiptDesigner: React.FC = () => {
             textAr: isAr ? 'النص العربي' : 'Arabic text',
             showOrderNum: isAr ? 'إظهار رقم الطلب' : 'Show order number',
             showType: isAr ? 'إظهار نوع الطلب' : 'Show order type',
+            showCashier: isAr ? 'إظهار الكاشير' : 'Show cashier',
             showDate: isAr ? 'إظهار التاريخ' : 'Show date',
             showTime: isAr ? 'إظهار الوقت' : 'Show time',
             showTable: isAr ? 'إظهار الطاولة' : 'Show table',
@@ -682,30 +816,30 @@ const ReceiptDesigner: React.FC = () => {
                 );
             case 'header':
                 return (
-                    <div style={{ textAlign: 'center', paddingBottom: 6, borderBottom: '2px solid #111' }}>
+                    <div style={{ textAlign: 'center', paddingBottom: 6, borderBottom: '3px solid #000' }}>
                         <div style={{ fontSize: 18, fontWeight: 900 }}>{sampleName}</div>
-                        {block.config.showBranch && <div style={{ fontSize: 10, fontWeight: 700, color: '#555' }}>{isAr ? 'الفرع الرئيسي' : 'Main Branch'}</div>}
-                        {block.config.showAddress && settings.branchAddress && <div style={{ fontSize: 9, color: '#888' }}>{settings.branchAddress}</div>}
-                        {block.config.showPhone && settings.phone && <div style={{ fontSize: 9, color: '#888' }}>{isAr ? 'هاتف' : 'Tel'}: {settings.phone}</div>}
+                        {block.config.showBranch && <div style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>{isAr ? 'الفرع الرئيسي' : 'Main Branch'}</div>}
+                        {block.config.showAddress && settings.branchAddress && <div style={{ fontSize: 9, fontWeight: 800, color: '#000' }}>{settings.branchAddress}</div>}
+                        {block.config.showPhone && settings.phone && <div style={{ fontSize: 9, fontWeight: 800, color: '#000' }}>{isAr ? 'هاتف' : 'Tel'}: {settings.phone}</div>}
                     </div>
                 );
             case 'title':
                 return (
-                    <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, padding: '5px 0', border: '1px dashed #999', borderRadius: 3, background: '#f5f5f5', margin: '4px 0' }}>
+                    <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5, padding: '5px 0', border: '3px double #000', background: '#fff', color: '#000', margin: '4px 0' }}>
                         {isAr ? (block.config.textAr || block.config.text || 'إيصال بيع') : (block.config.text || block.config.textAr || 'Sales Receipt')}
                     </div>
                 );
             case 'orderInfo':
                 return (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 10, borderBottom: '1px dashed #ccc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 10, fontWeight: 800, borderBottom: '2px dashed #000' }}>
                         {block.config.showOrderNum && <span><strong>{isAr ? 'طلب' : 'Order'} #1042</strong></span>}
-                        {block.config.showType && <span style={{ background: '#111', color: '#fff', padding: '1px 6px', borderRadius: 8, fontSize: 8, fontWeight: 700 }}>{isAr ? 'صالة' : 'Dine-In'}</span>}
-                        {block.config.showDate && <span style={{ fontSize: 9, color: '#666' }}>18 Mar · 21:00</span>}
+                        {block.config.showType && <span style={{ background: '#fff', color: '#000', padding: '1px 6px', border: '2px solid #000', fontSize: 8, fontWeight: 900 }}>{isAr ? 'صالة' : 'Dine-In'}</span>}
+                        {block.config.showDate && <span style={{ fontSize: 9, fontWeight: 800, color: '#000' }}>18 Mar · 21:00</span>}
                     </div>
                 );
             case 'customerInfo':
                 return (
-                    <div style={{ padding: '3px 0', fontSize: 10, fontWeight: 600 }}>
+                    <div style={{ padding: '3px 0', fontSize: 10, fontWeight: 800, color: '#000' }}>
                         {block.config.showTable && <div>{isAr ? 'طاولة' : 'Table'}: <strong>5</strong></div>}
                         {block.config.showCustomer && <div>{isAr ? 'العميل: أحمد محمد' : 'Customer: Ahmed M.'}</div>}
                     </div>
@@ -713,7 +847,7 @@ const ReceiptDesigner: React.FC = () => {
             case 'items':
                 return (
                     <div style={{ fontSize: 10, padding: '4px 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1.5px solid #222', paddingBottom: 2, fontSize: 8, fontWeight: 800, color: '#888', textTransform: 'uppercase' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #000', paddingBottom: 2, fontSize: 8, fontWeight: 900, color: '#000', textTransform: 'uppercase' }}>
                             <span>{isAr ? 'الصنف' : 'Item'}</span>
                             <span>{isAr ? 'الكمية' : 'Qty'}</span>
                             {block.config.showPrice && <span>{isAr ? 'المبلغ' : 'Total'}</span>}
@@ -722,22 +856,22 @@ const ReceiptDesigner: React.FC = () => {
                             { name: isAr ? 'شاورما لحمة' : 'Beef Shawarma', qty: 2, total: '120.00' },
                             { name: isAr ? 'فتوش' : 'Fattoush', qty: 1, total: '45.00' },
                         ].map((item, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dashed #eee', fontWeight: 600 }}>
-                                <span style={{ fontWeight: 700 }}>{item.name}</span>
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '2px dashed #000', fontWeight: 800 }}>
+                                <span style={{ fontWeight: 900 }}>{item.name}</span>
                                 <span>{item.qty}</span>
-                                {block.config.showPrice && <span style={{ fontWeight: 700 }}>{item.total}</span>}
+                                {block.config.showPrice && <span style={{ fontWeight: 900 }}>{item.total}</span>}
                             </div>
                         ))}
-                        {block.config.showModifiers && <div style={{ fontSize: 8, color: '#666', paddingRight: 8 }}>+ {isAr ? 'صلصة حارة' : 'Hot sauce'}</div>}
-                        {block.config.showNotes && <div style={{ fontSize: 8, color: '#999', fontStyle: 'italic' }}>{isAr ? 'ملاحظة: بدون بصل' : 'Note: No onions'}</div>}
+                        {block.config.showModifiers && <div style={{ fontSize: 8, fontWeight: 800, color: '#000', paddingRight: 8 }}>+ {isAr ? 'صلصة حارة' : 'Hot sauce'}</div>}
+                        {block.config.showNotes && <div style={{ fontSize: 8, fontWeight: 800, color: '#000' }}>{isAr ? 'ملاحظة: بدون بصل' : 'Note: No onions'}</div>}
                     </div>
                 );
             case 'totals':
                 return (
                     <div style={{ fontSize: 10, padding: '4px 0' }}>
-                        {block.config.showSubtotal && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontWeight: 600, color: '#444' }}><span>{isAr ? 'المجموع الفرعي' : 'Subtotal'}</span><span>165.00</span></div>}
-                        {block.config.showTax && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontWeight: 600, color: '#444' }}><span>{isAr ? 'الضريبة' : 'Tax'}</span><span>23.10</span></div>}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 4px', background: '#111', color: '#fff', borderRadius: 4, fontWeight: 900, fontSize: 14, marginTop: 4 }}>
+                        {block.config.showSubtotal && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontWeight: 800, color: '#000' }}><span>{isAr ? 'المجموع الفرعي' : 'Subtotal'}</span><span>165.00</span></div>}
+                        {block.config.showTax && <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontWeight: 800, color: '#000' }}><span>{isAr ? 'الضريبة' : 'Tax'}</span><span>23.10</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 4px', background: '#fff', color: '#000', border: '4px solid #000', fontWeight: 900, fontSize: 14, marginTop: 4 }}>
                             <span>{isAr ? 'الإجمالي' : 'TOTAL'}</span>
                             <span>EGP 188.10</span>
                         </div>
@@ -746,7 +880,7 @@ const ReceiptDesigner: React.FC = () => {
             case 'payment':
                 return (
                     <div style={{ textAlign: 'center', padding: '4px 0' }}>
-                        <span style={{ display: 'inline-block', padding: '2px 12px', border: '1.5px solid #333', borderRadius: 14, fontSize: 9, fontWeight: 700, textTransform: 'uppercase' }}>
+                        <span style={{ display: 'inline-block', padding: '2px 12px', border: '2.5px solid #000', color: '#000', background: '#fff', fontSize: 9, fontWeight: 900, textTransform: 'uppercase' }}>
                             {isAr ? 'الدفع: كاش' : 'Paid: Cash'}
                         </span>
                     </div>
@@ -763,14 +897,14 @@ const ReceiptDesigner: React.FC = () => {
                                 QR
                             </div>
                         )}
-                        <div style={{ fontSize: 7, color: '#aaa', marginTop: 2 }}>{isAr ? 'امسح للتقييم' : 'Scan to rate'}</div>
+                        <div style={{ fontSize: 7, fontWeight: 800, color: '#000', marginTop: 2 }}>{isAr ? 'امسح للتقييم' : 'Scan to rate'}</div>
                     </div>
                 );
             case 'footer':
                 return (
-                    <div style={{ textAlign: 'center', paddingTop: 6, borderTop: '2px solid #111' }}>
-                        <div style={{ fontSize: 11, fontWeight: 800 }}>{isAr ? (block.config.textAr || 'شكراً لزيارتكم!') : (block.config.text || 'Thank you!')}</div>
-                        {block.config.showPoweredBy && <div style={{ fontSize: 7, color: '#ccc', marginTop: 4 }}>Powered by Coduis Zen</div>}
+                    <div style={{ textAlign: 'center', paddingTop: 6, borderTop: '3px solid #000' }}>
+                        <div style={{ fontSize: 11, fontWeight: 900, color: '#000' }}>{isAr ? (block.config.textAr || 'شكراً لزيارتكم!') : (block.config.text || 'Thank you!')}</div>
+                        {block.config.showPoweredBy && <div style={{ fontSize: 7, fontWeight: 800, color: '#000', marginTop: 4 }}>Powered by Coduis Zen</div>}
                     </div>
                 );
             case 'separator':
@@ -1095,6 +1229,20 @@ const ReceiptDesigner: React.FC = () => {
                                     ))}
                                 </div>
                             </div>
+                            {(
+                                <div>
+                                    <label className="text-[9px] font-bold text-muted uppercase tracking-widest">{isAr ? 'مدرسة التصميم' : 'Design School'}</label>
+                                    <div className="grid grid-cols-2 gap-1.5 mt-1 max-h-56 overflow-y-auto pos-scroll pe-0.5">
+                                        {RECEIPT_STYLE_META.map(style => (
+                                            <button key={style.id} onClick={() => updateTemplate(t => ({ ...t, styleVariant: style.id }))}
+                                                title={isAr ? style.nameAr : style.name}
+                                                className={`px-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight border transition-all truncate ${String(activeTemplate.styleVariant || 'royal') === style.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted hover:border-primary/40'}`}>
+                                                {isAr ? style.nameAr : style.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1214,7 +1362,7 @@ const ReceiptDesigner: React.FC = () => {
                                     onClick={() => setPreviewMode('rich')}
                                     className={`px-2 py-1 text-[9px] font-black tracking-widest uppercase rounded-lg transition-all ${previewMode === 'rich' ? 'bg-primary text-white shadow-md' : 'text-muted hover:text-main'}`}
                                 >
-                                    {isAr ? 'بصري' : 'Graphical'}
+                                    {isAr ? 'الطباعة' : 'Print'}
                                 </button>
                                 <button 
                                     onClick={() => setPreviewMode('raw')}
@@ -1228,20 +1376,64 @@ const ReceiptDesigner: React.FC = () => {
                             style={{ maxWidth: activeTemplate.paperWidth === '58mm' ? 220 : 300, margin: '0 auto' }}>
                             {/* Paper Header Effect */}
                             <div className="h-3 bg-gradient-to-b from-slate-100 to-white" />
+                            {previewMode === 'raw' ? (
                             <div
                                 dir={isAr ? 'rtl' : 'ltr'}
                                 style={{
-                                    fontFamily: previewMode === 'raw' ? "'Courier New', Tahoma, Arial, monospace" : "'Cairo', system-ui, sans-serif",
+                                    fontFamily: "'Courier New', Tahoma, Arial, monospace",
                                     padding: '8px 12px',
-                                    fontSize: previewMode === 'raw' ? (activeTemplate.paperWidth === '58mm' ? 9.5 : 10.5) : (activeTemplate.fontSize === 'small' ? 10 : activeTemplate.fontSize === 'large' ? 14 : 12),
+                                    fontSize: activeTemplate.paperWidth === '58mm' ? 9.5 : 10.5,
                                     color: '#1a1a1a',
-                                    lineHeight: previewMode === 'raw' ? 1.2 : 1.4,
+                                    lineHeight: 1.2,
                                 }}
                             >
                                 {activeTemplate.blocks.filter(b => b.enabled).map(block => (
-                                    <div key={block.id}>{previewMode === 'raw' ? renderRawBlockPreview(block) : renderBlockPreview(block)}</div>
+                                    <div key={block.id}>{renderRawBlockPreview(block)}</div>
                                 ))}
                             </div>
+                            ) : previewHtml ? (
+                            <div style={{ maxHeight: 640, overflowY: 'auto' }} className="pos-scroll">
+                                <iframe
+                                    ref={previewFrameRef}
+                                    title="print-preview"
+                                    srcDoc={previewHtml}
+                                    scrolling="no"
+                                    style={{
+                                        width: previewPaperPx,
+                                        height: previewFrameHeight,
+                                        border: 0,
+                                        display: 'block',
+                                        margin: '0 auto',
+                                        // zoom (not transform): scales LAYOUT too, so the
+                                        // paper stays centered with no shift and no dead gap.
+                                        zoom: previewScale,
+                                        pointerEvents: 'none',
+                                    }}
+                                    onLoad={() => {
+                                        try {
+                                            const doc = previewFrameRef.current?.contentDocument;
+                                            const h = doc?.documentElement?.scrollHeight || doc?.body?.scrollHeight || 0;
+                                            if (h > 0) setPreviewFrameHeight(Math.min(2400, h + 20));
+                                        } catch { /* cross-origin guard */ }
+                                    }}
+                                />
+                            </div>
+                            ) : (
+                            <div
+                                dir={isAr ? 'rtl' : 'ltr'}
+                                style={{
+                                    fontFamily: "'Cairo', system-ui, sans-serif",
+                                    padding: '8px 12px',
+                                    fontSize: activeTemplate.fontSize === 'small' ? 10 : activeTemplate.fontSize === 'large' ? 14 : 12,
+                                    color: '#1a1a1a',
+                                    lineHeight: 1.4,
+                                }}
+                            >
+                                {activeTemplate.blocks.filter(b => b.enabled).map(block => (
+                                    <div key={block.id}>{renderBlockPreview(block)}</div>
+                                ))}
+                            </div>
+                            )}
                             {/* Paper Tear Effect */}
                             <div className="h-6" style={{
                                 background: 'repeating-linear-gradient(90deg, transparent, transparent 4px, #e5e7eb 4px, #e5e7eb 8px)',

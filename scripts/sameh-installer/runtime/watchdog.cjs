@@ -32,6 +32,26 @@ function processExists(pidFile) {
   try { process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 0); return true; } catch { return false; }
 }
 
+// Single-instance guard: the monitor task AND the monitor's own interval
+// each launch watchdogs, so pile-ups used to race on restart.request and
+// fire duplicate restarts. A live watchdog (fresh pidfile) means exit.
+function claimSingleInstance() {
+  const pidFile = path.join(root, 'runtime', 'watchdog.pid');
+  let previousPid = 0;
+  try { previousPid = Number(fs.readFileSync(pidFile, 'utf8')); } catch {}
+  if (previousPid) {
+    try {
+      process.kill(previousPid, 0);
+      let age = Infinity;
+      try { age = Date.now() - fs.statSync(pidFile).mtimeMs; } catch {}
+      if (age < 3 * 60 * 1000) return false; // another watchdog is active
+      log(`stale watchdog pid ${previousPid}; taking over`);
+    } catch { /* dead pid — take over */ }
+  }
+  try { fs.writeFileSync(pidFile, String(process.pid)); } catch {}
+  return true;
+}
+
 function launch(script) {
   const child = spawn(node, [path.join(root, 'runtime', script)], { cwd: root, detached: true, windowsHide: true, stdio: 'ignore' });
   child.on('error', error => log(`failed to start ${script}: ${error.message}`));
@@ -144,6 +164,7 @@ function ensureTask(name, script, schedule) {
 }
 
 (async () => {
+  if (!claimSingleInstance()) { log('another watchdog active; exiting'); return; }
   if (!fs.existsSync(path.join(root, 'install-state.json'))) { log('install-state.json missing'); return; }
   const repairs = [];
   if (repairDatabaseUrl()) repairs.push('تم إصلاح رابط SQL Server تلقائياً.');

@@ -1,11 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOTION PERSONALITIES — per-theme entrance/exit/hover/press language.
-   Keyed by [data-theme] so the same component moves differently per world.
-   All GPU-friendly (transform/opacity). Global reduced-motion kill-switch
-   lives in interaction-system.css and always wins.
+   MOTION PERSONALITIES 2.0 — per-theme entrance/press language.
+   Keyed by the 10 live [data-theme] ids. GPU-only. Reduced-motion
+   kill-switch in interaction-system.css always wins.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Shared stage: modal / drawer / popover / toast use theme duration+ease */
 .theme-modal-panel {
     animation: theme-modal-in var(--theme-duration, 200ms) var(--theme-ease, ease) both;
 }
@@ -20,80 +18,78 @@
 @keyframes theme-pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 @keyframes theme-toast-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
 
-/* ── Per-theme entrance accents ───────────────────────────────────────── */
-[data-theme='aurora-glass'] .theme-modal-panel { animation-name: aurora-modal-in; animation-duration: var(--theme-duration-slow, 480ms); }
-@keyframes aurora-modal-in { from { opacity: 0; transform: translateY(18px) scale(0.96); filter: blur(6px); } }
+/* ── Per-theme entrances ── */
+[data-theme='glassline'] .theme-modal-panel { animation-name: glassline-modal-in; animation-duration: var(--theme-duration-slow, 480ms); }
+@keyframes glassline-modal-in { from { opacity: 0; transform: translateY(18px) scale(0.96); filter: blur(8px); } }
 
-[data-theme='midnight-command'] .theme-modal-panel,
-[data-theme='midnight-command'] .theme-popover,
-[data-theme='midnight-command'] .theme-toast { animation-duration: 120ms; }
-[data-theme='midnight-command'] .theme-modal-panel { animation-name: midnight-modal-in; }
-@keyframes midnight-modal-in { from { opacity: 0; transform: translateY(4px); } }
+[data-theme='meridian'] .theme-modal-panel { animation-name: meridian-modal-in; animation-duration: 200ms; }
+@keyframes meridian-modal-in { from { opacity: 0; transform: translateY(8px); } }
 
-[data-theme='neo-brutal'] .theme-modal-panel { animation-name: brutal-modal-in; animation-duration: 140ms; }
-@keyframes brutal-modal-in { from { opacity: 0; transform: translate(-6px, 6px); } }
-[data-theme='neo-brutal'] .theme-toast { animation-name: brutal-modal-in; animation-duration: 120ms; }
-[data-theme='neo-brutal'] .theme-btn-primary { transition-duration: 80ms; }
+[data-theme='command'] .theme-modal-panel,
+[data-theme='command'] .theme-popover,
+[data-theme='command'] .theme-toast,
+[data-theme='command'] .theme-drawer-panel { animation-duration: 100ms; animation-name: meridian-modal-in; }
+[data-theme='command'] .theme-btn-primary { transition-duration: 90ms; }
 
-[data-theme='soft-organic'] .theme-modal-panel { animation-name: organic-modal-in; animation-duration: var(--theme-duration-slow, 560ms); }
-@keyframes organic-modal-in { 0% { opacity: 0; transform: translateY(22px) scale(0.94); } 60% { opacity: 1; transform: translateY(-4px) scale(1.008); } 100% { opacity: 1; transform: none; } }
+[data-theme='canvas'] .theme-modal-panel { animation-name: canvas-modal-in; animation-duration: 420ms; }
+@keyframes canvas-modal-in { from { opacity: 0; transform: translateY(12px); } }
 
-[data-theme='editorial-luxury'] .theme-modal-panel { animation-name: editorial-modal-in; animation-duration: 450ms; }
-@keyframes editorial-modal-in { from { opacity: 0; transform: translateY(12px); } }
+[data-theme='fluent-pro'] .theme-modal-panel { animation-name: fluent-modal-in; animation-duration: 150ms; }
+@keyframes fluent-modal-in { from { opacity: 0; transform: scale(0.97); } }
+[data-theme='fluent-pro'] .theme-toast { animation-name: fluent-modal-in; animation-duration: 120ms; }
 
-[data-theme='terminal-ops'] .theme-modal-panel,
-[data-theme='terminal-ops'] .theme-popover,
-[data-theme='terminal-ops'] .theme-toast,
-[data-theme='terminal-ops'] .theme-drawer-panel { animation-duration: 90ms; animation-name: midnight-modal-in; }
+[data-theme='material-x'] .theme-modal-panel { animation-name: materialx-modal-in; animation-duration: var(--theme-duration-slow, 440ms); }
+@keyframes materialx-modal-in { 0% { opacity: 0; transform: translateY(20px) scale(0.94); } 60% { opacity: 1; transform: translateY(-4px) scale(1.008); } 100% { opacity: 1; transform: none; } }
 
-[data-theme='future-hud'] .theme-modal-panel { animation-name: hud-modal-in; }
-@keyframes hud-modal-in { from { opacity: 0; transform: translateX(-18px); } }
-[data-theme='future-hud'] .theme-toast { animation-name: hud-modal-in; }
-[data-theme='future-hud'] .theme-drawer-panel { animation-name: hud-modal-in; }
+[data-theme='obsidian'] .theme-modal-panel { animation-name: obsidian-modal-in; animation-duration: var(--theme-duration-slow, 520ms); }
+@keyframes obsidian-modal-in { from { opacity: 0; transform: translateY(16px); filter: brightness(0.6); } }
+[data-theme='obsidian'] .theme-toast { animation-name: obsidian-modal-in; animation-duration: 380ms; }
 
-[data-theme='bento-saas'] .theme-modal-panel { animation-name: bento-modal-in; }
-@keyframes bento-modal-in { 0% { opacity: 0; transform: translateY(14px) scale(0.97); } 60% { opacity: 1; transform: translateY(-2px) scale(1.004); } 100% { opacity: 1; transform: none; } }
+[data-theme='tiles'] .theme-modal-panel { animation-name: materialx-modal-in; animation-duration: 400ms; }
 
-[data-theme='industrial-ops'] .theme-modal-panel { animation-name: brutal-modal-in; animation-duration: 160ms; }
+[data-theme='acrylic'] .theme-modal-panel { animation-name: canvas-modal-in; animation-duration: 480ms; }
 
-[data-theme='premium-hospitality'] .theme-modal-panel { animation-name: editorial-modal-in; animation-duration: 500ms; }
+[data-theme='touch'] .theme-modal-panel { animation-name: fluent-modal-in; animation-duration: 140ms; }
+[data-theme='touch'] .theme-toast { animation-name: fluent-modal-in; animation-duration: 120ms; }
 
-/* ── Per-theme press / hover intensity ────────────────────────────────── */
-[data-theme='neo-brutal'] .theme-card:active { transform: translate(2px, 2px); }
-[data-theme='soft-organic'] .theme-icon-button:active { transform: scale(0.9); }
-[data-theme='terminal-ops'] .theme-btn-primary:active { transform: scale(0.98); box-shadow: 0 0 14px rgba(var(--primary), 0.5); }
-[data-theme='future-hud'] .theme-btn-primary:hover { box-shadow: 0 0 28px -2px rgba(var(--primary), 0.7); }
-[data-theme='industrial-ops'] .theme-card:active { transform: translateY(2px); }
+/* ── Press intensity ── */
+[data-theme='material-x'] .theme-card:active { transform: scale(0.97); }
+[data-theme='command'] .theme-btn-primary:active { transform: scale(0.97); }
+[data-theme='touch'] .theme-btn-primary:active { transform: scale(0.96); }
+[data-theme='canvas'] .theme-card:active { transform: translateY(1px); }
+[data-theme='obsidian'] .theme-btn-primary:hover { box-shadow: 0 0 28px rgba(var(--primary), 0.5); }
 
-/* ── Status pulse language per theme (KDS / orders / dispatch) ────────── */
-[data-theme='terminal-ops'] [data-status="preparing"] [data-status-indicator],
-[data-theme='future-hud'] [data-status="preparing"] [data-status-indicator] {
-    animation-duration: 0.9s;
+/* ── Status pulse language (brief emphasis, never continuous flashing) ── */
+[data-theme='command'] [data-status="preparing"] [data-status-indicator],
+[data-theme='fluent-pro'] [data-status="preparing"] [data-status-indicator] {
+    animation-duration: 0.8s;
+    animation-iteration-count: 6;
 }
-[data-theme='editorial-luxury'] [data-status="preparing"] [data-status-indicator],
-[data-theme='premium-hospitality'] [data-status="preparing"] [data-status-indicator] {
-    animation-duration: 2.2s;
+[data-theme='canvas'] [data-status="preparing"] [data-status-indicator],
+[data-theme='obsidian'] [data-status="preparing"] [data-status-indicator] {
+    animation-duration: 2.4s;
 }
-[data-theme='neo-brutal'] [data-status="preparing"] [data-status-indicator],
-[data-theme='industrial-ops'] [data-status="preparing"] [data-status-indicator] {
-    animation: none;
-    box-shadow: 0 0 0 3px rgb(var(--accent));
+[data-theme='glassline'] [data-status="preparing"] [data-status-indicator],
+[data-theme='material-x'] [data-status="preparing"] [data-status-indicator] {
+    animation: status-glow-pulse 1.6s ease-in-out 3;
+    box-shadow: 0 0 0 3px rgba(var(--primary), 0.35);
 }
-
-/* ── Skeleton voice per theme ─────────────────────────────────────────── */
-[data-theme='neo-brutal'] .theme-skeleton { animation: none; background: rgba(var(--text-main), 0.08); border: 2px dashed rgba(var(--text-main), 0.3); }
-[data-theme='terminal-ops'] .theme-skeleton { animation-duration: 0.9s; }
-[data-theme='editorial-luxury'] .theme-skeleton,
-[data-theme='premium-hospitality'] .theme-skeleton { animation-duration: 2.2s; }
-[data-theme='future-hud'] .theme-skeleton {
-    background: linear-gradient(100deg, transparent 20%, rgba(var(--primary), 0.25) 50%, transparent 80%);
-    background-size: 220% 100%;
+@keyframes status-glow-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(var(--primary), 0.35), 0 0 12px rgba(var(--primary), 0.4); }
+    50% { box-shadow: 0 0 0 5px rgba(var(--primary), 0.15), 0 0 22px rgba(var(--primary), 0.7); }
 }
 
-/* ── Page transition polish (route views fade/slide per theme cadence) ─── */
-@keyframes theme-page-in { from { opacity: 0; transform: translateY(6px); } }
-.page-enter, [data-page-enter] { animation: theme-page-in var(--theme-duration, 200ms) var(--theme-ease, ease) both; }
-[data-theme='future-hud'] .page-enter, [data-theme='future-hud'] [data-page-enter] { animation-name: hud-modal-in; }
-[data-theme='neo-brutal'] .page-enter, [data-theme='neo-brutal'] [data-page-enter],
-[data-theme='terminal-ops'] .page-enter, [data-theme='terminal-ops'] [data-page-enter],
-[data-theme='midnight-command'] .page-enter, [data-theme='midnight-command'] [data-page-enter] { animation: none; }
+/* ── Skeletons ── */
+[data-theme='command'] .theme-skeleton,
+[data-theme='fluent-pro'] .theme-skeleton,
+[data-theme='touch'] .theme-skeleton { animation: none; background: rgba(var(--text-main), 0.08); }
+[data-theme='canvas'] .theme-skeleton,
+[data-theme='obsidian'] .theme-skeleton { animation-duration: 2.4s; }
+
+/* ── Page enter ── */
+[data-theme='obsidian'] .page-enter, [data-theme='obsidian'] [data-page-enter] { animation-name: obsidian-modal-in; }
+[data-theme='glassline'] .page-enter, [data-theme='glassline'] [data-page-enter],
+[data-theme='material-x'] .page-enter, [data-theme='material-x'] [data-page-enter] { animation-name: materialx-modal-in; }
+[data-theme='command'] .page-enter, [data-theme='command'] [data-page-enter],
+[data-theme='fluent-pro'] .page-enter, [data-theme='fluent-pro'] [data-page-enter],
+[data-theme='touch'] .page-enter, [data-theme='touch'] [data-page-enter] { animation: none; }

@@ -541,7 +541,7 @@ const CampaignHub: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-card/60 backdrop-blur-3xl border border-border/40 rounded-[2.5rem] overflow-hidden shadow-2xl">
+                    <div className="bg-card/60 backdrop-blur-3xl border border-border/40 rounded-[2.5rem] overflow-x-auto shadow-2xl">
                         <table className="w-full text-left">
                             <thead className="bg-elevated/40 border-b border-border/30">
                                 <tr>

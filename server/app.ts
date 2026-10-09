@@ -157,6 +157,7 @@ import reservationRoutes from './routes/reservationRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
 import ttsRoutes from './routes/ttsRoutes';
 import mailRoutes from './routes/mailRoutes';
+import mapsRoutes from './routes/mapsRoutes';
 
 app.use('/api/settings', settingsRoutes);
 app.use('/api/branches', branchRoutes);
@@ -204,7 +205,7 @@ import attendanceOpsRoutes from './routes/attendanceOpsRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import rolesRoutes from './routes/rolesRoutes';
 
-app.use('/api/approvals', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER', 'WAITER', 'CALL_CENTER', 'CALL_CENTER_MANAGER', 'CALL_CENTER_AGENT'), approvalRoutes);
+app.use('/api/approvals', approvalRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/menu', menuRoutes);
@@ -213,6 +214,7 @@ app.use('/api/webhooks', requireRoles('SUPER_ADMIN', 'OWNER'), webhookRoutes);
 app.use('/api/migration', requireRoles('SUPER_ADMIN', 'OWNER'), migrationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/attendance-ops', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGER'), attendanceOpsRoutes);
+app.use('/api/maps', mapsRoutes);
 
 
 // Error tracking API (ops)

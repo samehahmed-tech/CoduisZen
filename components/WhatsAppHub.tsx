@@ -226,25 +226,47 @@ export const WhatsAppHub = () => {
     }, [chats, chatSearch]);
 
     const selectedMessages = selectedChat ? chats[selectedChat] || [] : [];
-    const vipCount = customers.filter((c: any) => c.loyaltyTier === 'GOLD' || c.loyaltyTier === 'PLATINUM').length;
+    // Tiers are stored capitalized ('Gold'/'Platinum') — compare case-insensitively.
+    const isVipTier = (tier: unknown) => ['gold', 'platinum'].includes(String(tier || '').toLowerCase());
+    const vipCount = customers.filter((c: any) => isVipTier(c.loyaltyTier)).length;
+
+    // Canonical Egyptian mobile (01xxxxxxxxx); anything else is dropped with
+    // a count so invalid numbers fail visibly instead of invisibly.
+    const normalizeTargetPhone = (raw: unknown): string | null => {
+        const digits = String(raw || '').replace(/\D/g, '');
+        const local = digits.startsWith('0020') ? '0' + digits.slice(4)
+            : digits.startsWith('20') && digits.length === 13 ? '0' + digits.slice(2)
+            : digits;
+        return /^01[0-9]{9}$/.test(local) ? local : null;
+    };
 
     const targetPhones = useMemo(() => {
-        const phones = targetType === 'ALL' ? customers.map((c: any) => c.phone).filter(Boolean)
+        const raw = targetType === 'ALL' ? customers.map((c: any) => c.phone).filter(Boolean)
             : targetType === 'VIP' ? customers
-            .filter((c: any) => c.loyaltyTier === 'GOLD' || c.loyaltyTier === 'PLATINUM')
+            .filter((c: any) => isVipTier(c.loyaltyTier))
             .map((c: any) => c.phone)
             .filter(Boolean)
             : manualPhones.split(/[,،\n]/).map((p) => p.trim()).filter(Boolean);
-        return Array.from(new Set(phones.map((p: string) => p.trim()).filter(Boolean)));
+        const valid = new Set<string>();
+        let dropped = 0;
+        for (const p of raw) {
+            const n = normalizeTargetPhone(p);
+            if (n) valid.add(n);
+            else dropped += 1;
+        }
+        return { phones: Array.from(valid), dropped };
     }, [customers, manualPhones, targetType]);
 
     const handleCampaign = async () => {
         if (!campaignText.trim()) return toast.error('اكتب نص الحملة الأول');
-        if (targetPhones.length === 0) return toast.error('مفيش أرقام مستهدفة');
-        const ok = await sendCampaign(targetPhones, campaignText.trim(), true);
+        if (targetPhones.phones.length === 0) return toast.error('مفيش أرقام مستهدفة');
+        if (targetPhones.dropped > 0) toast.error(`تم استبعاد ${targetPhones.dropped} أرقام غير صحيحة`);
+        const ok = await sendCampaign(targetPhones.phones, campaignText.trim(), true);
         if (ok) {
-            toast.success(`تمت جدولة ${targetPhones.length} رسالة`);
+            toast.success(`تمت جدولة ${targetPhones.phones.length} رسالة`);
             setCampaignText('');
+        } else {
+            toast.error('تعذر جدولة الحملة — تأكد من اتصال واتساب');
         }
     };
 
@@ -255,6 +277,8 @@ export const WhatsAppHub = () => {
             toast.success('تم إرسال الرد');
             setReplyText('');
             fetchInbox();
+        } else {
+            toast.error('تعذر إرسال الرد — تأكد من اتصال واتساب');
         }
     };
 
@@ -262,6 +286,7 @@ export const WhatsAppHub = () => {
         if (!testPhone.trim() || !testMessage.trim()) return toast.error('اكتب الرقم والرسالة');
         const ok = await sendDirectMessage(testPhone.trim(), testMessage.trim());
         if (ok) toast.success('تم إرسال رسالة الاختبار');
+        else toast.error('تعذر إرسال رسالة الاختبار — تأكد من اتصال واتساب');
     };
 
     const handleSaveConfig = async () => {
@@ -582,9 +607,9 @@ export const WhatsAppHub = () => {
                                 <textarea value={manualPhones} onChange={(e) => setManualPhones(e.target.value)} placeholder="رقم في كل سطر أو مفصول بفاصلة" className="mt-4 min-h-[95px] w-full rounded-xl border border-border bg-elevated p-4 text-sm font-bold outline-none focus:border-emerald-400" />
                             )}
                             <textarea value={campaignText} onChange={(e) => setCampaignText(e.target.value)} placeholder="اكتب رسالة الحملة. مثال: أهلاً {name} عندنا عرض النهاردة..." className="mt-4 min-h-[220px] w-full rounded-xl border border-border bg-elevated p-4 text-sm font-bold leading-7 outline-none focus:border-emerald-400" />
-                            <button onClick={handleCampaign} disabled={!isReady || isLoading || targetPhones.length === 0} className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-50">
+                            <button onClick={handleCampaign} disabled={!isReady || isLoading || targetPhones.phones.length === 0} className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-50">
                                 <Send className="h-4 w-4" />
-                                جدولة الحملة لـ {targetPhones.length} رقم
+                                جدولة الحملة لـ {targetPhones.phones.length} رقم
                             </button>
                         </section>
 

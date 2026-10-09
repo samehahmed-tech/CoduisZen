@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, LocateFixed, MapPin, Navigation, Search } from 'lucide-react';
-import { defaultMapCenter, hasMapTilerKey, loadGoogleMaps, maptilerKey, nominatimUrl, shouldUseGoogleMaps, shouldUseOsmMaps } from './googleMaps';
+import { defaultMapCenter, hasMapTilerKey, loadGoogleMaps, maptilerKey, nominatimUrl, shouldUseAppleMaps, shouldUseGoogleMaps, shouldUseOsmMaps } from './googleMaps';
+import { appleForwardGeocode, appleLanguage, appleReverseGeocode, fetchAppleToken, loadAppleMaps } from './appleMaps';
 import { addOsmTileLayer, createLeafletIcon, loadLeaflet } from './leafletMaps';
 
 export type AddressPin = {
@@ -243,6 +244,11 @@ const searchPlaces = async (text: string, isAr: boolean, signal: AbortSignal): P
 
 const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, lang = 'ar', compact = false, title, mapHeightClass = '' }) => {
     const isAr = lang === 'ar';
+    const useApple = shouldUseAppleMaps();
+    // Apple failure (no token/CDN) falls through to the free OSM stack.
+    const [appleFailed, setAppleFailed] = useState(false);
+    const useAppleEff = useApple && !appleFailed;
+    const useOsmEff = shouldUseOsmMaps() || (useApple && appleFailed);
     const [query, setQuery] = useState(value.address || '');
     const [isLocating, setIsLocating] = useState(false);
     const [mapsReady, setMapsReady] = useState(false);
@@ -260,6 +266,10 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
     const autocompleteRef = useRef<any>(null);
     const leafletMapRef = useRef<any>(null);
     const leafletMarkerRef = useRef<any>(null);
+    const appleMapRef = useRef<any>(null);
+    const applePinRef = useRef<any>(null);
+    const appleDownRef = useRef({ x: 0, y: 0 });
+    const [appleReady, setAppleReady] = useState(false);
     const position = pinToPosition(value);
 
     const localSuggestions = useMemo(() => {
@@ -272,7 +282,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
     }, [isAr, query, value.address]);
 
     useEffect(() => {
-        if (!shouldUseOsmMaps()) return;
+        if (!useOsmEff) return;
         const text = query.trim();
         if (text.length < 3) {
             setSearchResults([]);
@@ -322,13 +332,23 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [isAr, query]);
+    }, [isAr, query, useOsmEff]);
+
+    const moveApplePin = (lat: number, lng: number) => {
+        try {
+            const mk = window.mapkit;
+            if (!mk || !appleMapRef.current || !applePinRef.current) return;
+            applePinRef.current.coordinate = new mk.Coordinate(lat, lng);
+            appleMapRef.current.setCenterAnimated(new mk.Coordinate(lat, lng));
+        } catch { /* map not ready */ }
+    };
 
     const choosePin = (pin: AddressPin) => {
         onChange(pin);
         setQuery(pin.address);
         setSearchResults([]);
         setSearchNotice(null);
+        if (Number.isFinite(pin.lat) && Number.isFinite(pin.lng)) moveApplePin(pin.lat!, pin.lng!);
         if (leafletMapRef.current && pin.lat && pin.lng) {
             leafletMapRef.current.setView([pin.lat, pin.lng], 16);
             leafletMarkerRef.current?.setLatLng([pin.lat, pin.lng]);
@@ -340,9 +360,10 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
         }
     };
 
-    // Reverse-lookup a human address for exact coordinates: Google geocoder
-    // when maps are loaded, otherwise Nominatim reverse (Egypt-unbiased —
-    // coordinates need no country bias).
+    // Reverse-lookup a human address for exact coordinates: Apple geocoder
+    // when the Apple map is up, Google geocoder when maps are loaded,
+    // otherwise Nominatim reverse (Egypt-unbiased — coordinates need no
+    // country bias).
     const reverseToPin = async (lat: number, lng: number, signal?: AbortSignal): Promise<AddressPin> => {
         const fallback: AddressPin = { address: `${lat}, ${lng}`, lat, lng, label: isAr ? 'إحداثيات ملصقة' : 'Pasted coordinates' };
         if (geocoderRef.current) {
@@ -365,6 +386,13 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
                 if (error?.name === 'AbortError') throw error;
             }
             return fallback;
+        }
+        if (appleMapRef.current) {
+            try {
+                const mk = await loadAppleMaps();
+                const address = await appleReverseGeocode(mk, lat, lng, lang);
+                return { address, lat, lng, label: address };
+            } catch { /* fall through to Nominatim */ }
         }
         const res = await fetch(`${nominatimUrl}/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=${isAr ? 'ar,en' : 'en,ar'}`, {
             headers: { Accept: 'application/json' },
@@ -399,12 +427,21 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
         return true;
     };
 
-    const applyAddress = (address: string) => {
+    const applyAddress = async (address: string) => {
         // Pasted coordinates / Maps URL / Plus Code: pin exactly, even in
         // Google mode (autocomplete can't parse those).
         if (parsePastedLocation(address)) {
             void pinPastedLocation(address);
             return;
+        }
+        // Apple forward geocode first in Apple mode (Nominatim cascade below on miss).
+        if (useAppleEff && address.trim()) {
+            try {
+                const mk = await loadAppleMaps();
+                const hit = await appleForwardGeocode(mk, address.trim(), lang);
+                choosePin({ address: hit.address, lat: hit.lat, lng: hit.lng, label: hit.address });
+                return;
+            } catch { /* cascade below */ }
         }
         if (geocoderRef.current && address.trim()) {
             geocoderRef.current.geocode({ address }, (results: any[], status: string) => {
@@ -428,7 +465,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
             });
             return;
         }
-        if (shouldUseOsmMaps() && address.trim()) {
+        if (useOsmEff && address.trim()) {
             setIsSearching(true);
             searchPlaces(address.trim(), isAr, new AbortController().signal)
                 .then((outcome) => {
@@ -471,6 +508,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
                 };
                 onChange(next);
                 setQuery(next.address);
+                moveApplePin(next.lat, next.lng);
                 googleMapRef.current?.panTo({ lat: next.lat, lng: next.lng });
                 googleMapRef.current?.setZoom(17);
                 leafletMapRef.current?.setView([next.lat, next.lng], 17);
@@ -572,7 +610,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
     }, []);
 
     useEffect(() => {
-        if (!shouldUseOsmMaps() || !mapRef.current) return;
+        if (!useOsmEff || !mapRef.current) return;
         let disposed = false;
 
         loadLeaflet()
@@ -622,7 +660,94 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
         return () => {
             disposed = true;
         };
-    }, []);
+    }, [useOsmEff]);
+
+    // Apple map: single pin, tap-to-place (MapKit annotations are not
+    // draggable — a tap sets the pin instead).
+    useEffect(() => {
+        if (!useAppleEff || !mapRef.current) return;
+        let disposed = false;
+        loadAppleMaps()
+            .then(async (mk) => {
+                if (disposed || !mapRef.current || appleMapRef.current) return;
+                try {
+                    await fetchAppleToken();
+                } catch {
+                    if (!disposed) setAppleFailed(true);
+                    return;
+                }
+                const start = { lat: value.lat ?? branchFallback.lat, lng: value.lng ?? branchFallback.lng };
+                const map = new mk.Map(mapRef.current, {
+                    center: new mk.Coordinate(start.lat, start.lng),
+                    region: new mk.CoordinateRegion(
+                        new mk.Coordinate(start.lat, start.lng),
+                        new mk.CoordinateSpan(0.03, 0.03),
+                    ),
+                    mapType: mk.Map.MapTypes.Standard,
+                    showsPointsOfInterest: false,
+                    showsMapTypeControl: false,
+                    isRotationEnabled: false,
+                    language: appleLanguage(lang),
+                });
+                const pin = new mk.MarkerAnnotation(new mk.Coordinate(start.lat, start.lng), {
+                    color: '#ef4444',
+                    title: isAr ? 'عنوان العميل' : 'Customer address',
+                    glyphText: 'A',
+                });
+                map.addAnnotation(pin);
+                appleMapRef.current = map;
+                applePinRef.current = pin;
+                const node = mapRef.current as HTMLDivElement;
+                const onDown = (e: PointerEvent) => {
+                    appleDownRef.current = { x: e.clientX, y: e.clientY };
+                };
+                const onClick = (e: MouseEvent) => {
+                    const target = e.target as HTMLElement | null;
+                    if (target?.closest('button, input, a')) return;
+                    const moved = Math.hypot(e.clientX - appleDownRef.current.x, e.clientY - appleDownRef.current.y);
+                    if (moved > 6 || !appleMapRef.current) return;
+                    try {
+                        const coord = appleMapRef.current.convertPointOnPageToCoordinate(new DOMPoint(e.clientX, e.clientY));
+                        if (!coord) return;
+                        const lat = Number(coord.latitude.toFixed(6));
+                        const lng = Number(coord.longitude.toFixed(6));
+                        moveApplePin(lat, lng);
+                        reverseToPin(lat, lng)
+                            .then((next) => choosePin(next))
+                            .catch(() => choosePin({
+                                address: `${lat}, ${lng}`,
+                                lat,
+                                lng,
+                                label: isAr ? 'إحداثيات ملصقة' : 'Pasted coordinates',
+                            }));
+                    } catch { /* ignore bad taps */ }
+                };
+                node.addEventListener('pointerdown', onDown);
+                node.addEventListener('click', onClick);
+                (appleMapRef as any).cleanup = () => {
+                    node.removeEventListener('pointerdown', onDown);
+                    node.removeEventListener('click', onClick);
+                };
+                setAppleReady(true);
+            })
+            .catch(() => {
+                if (!disposed) setAppleFailed(true);
+            });
+        return () => {
+            disposed = true;
+            try {
+                (appleMapRef as any).cleanup?.();
+                appleMapRef.current?.destroy();
+            } catch { /* already gone */ }
+            appleMapRef.current = null;
+            applePinRef.current = null;
+        };
+    }, [useAppleEff]);
+
+    useEffect(() => {
+        if (!appleMapRef.current || !applePinRef.current || !value.lat || !value.lng) return;
+        moveApplePin(value.lat, value.lng);
+    }, [value.lat, value.lng]);
 
     useEffect(() => {
         if (!googleMapRef.current || !markerRef.current || !value.lat || !value.lng) return;
@@ -671,7 +796,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
                             onKeyDown={(event) => {
                                 if (event.key === 'Enter') {
                                     event.preventDefault();
-                                    applyAddress(query);
+                                    void applyAddress(query);
                                 }
                             }}
                             className={`h-11 w-full rounded-xl border border-border bg-elevated text-sm font-bold text-main outline-none transition-colors focus:border-primary ${isAr ? 'pr-10 pl-3' : 'pl-10 pr-3'}`}
@@ -733,7 +858,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
                                     if (suggestion.lat && suggestion.lng) {
                                         choosePin(suggestion);
                                     } else if (geocoderRef.current) {
-                                        applyAddress(suggestion.address);
+                                        void applyAddress(suggestion.address);
                                     } else {
                                         onChange(suggestion);
                                         setQuery(suggestion.address);
@@ -748,7 +873,7 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
                 </div>
 
                 <div className={`relative min-h-[210px] overflow-hidden rounded-2xl border border-border bg-app ${mapHeightClass}`}>
-                    {(shouldUseGoogleMaps() || shouldUseOsmMaps()) && (
+                    {(shouldUseGoogleMaps() || useOsmEff || useAppleEff) && (
                         <div ref={mapRef} className="absolute inset-0 z-0" />
                     )}
                     {shouldUseGoogleMaps() && !mapsReady && !mapsError && (
@@ -761,17 +886,22 @@ const AddressMapPicker: React.FC<AddressMapPickerProps> = ({ value, onChange, la
                             {isAr ? 'تعذر تحميل Google Maps، يتم استخدام الخريطة التشغيلية مؤقتًا.' : 'Google Maps failed, using operational fallback.'}
                         </div>
                     )}
-                    {shouldUseOsmMaps() && !osmReady && !osmError && (
+                    {useOsmEff && !osmReady && !osmError && (
                         <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/80 text-xs font-black text-muted backdrop-blur-sm">
                             {isAr ? 'جاري تحميل خريطة OpenStreetMap...' : 'Loading OpenStreetMap...'}
                         </div>
                     )}
-                    {shouldUseOsmMaps() && osmError && (
+                    {useOsmEff && osmError && (
                         <div className="absolute inset-x-3 top-3 z-20 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[10px] font-black text-amber-700">
                             {isAr ? 'تعذر تحميل خريطة OSM، يتم استخدام الخريطة التشغيلية مؤقتًا.' : 'OSM map failed, using operational fallback.'}
                         </div>
                     )}
-                    {((!shouldUseGoogleMaps() && !shouldUseOsmMaps()) || mapsError || osmError) && (
+                    {useAppleEff && !appleReady && !appleFailed && (
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/80 text-xs font-black text-muted backdrop-blur-sm">
+                            {isAr ? 'جاري تحميل خريطة Apple...' : 'Loading Apple Maps...'}
+                        </div>
+                    )}
+                    {((!shouldUseGoogleMaps() && !useOsmEff && !useAppleEff) || mapsError || osmError) && (
                         <>
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.18)_1px,transparent_1px)] bg-[size:28px_28px]" />
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.12),transparent_32%)]" />

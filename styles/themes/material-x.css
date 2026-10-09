@@ -1,0 +1,39 @@
+/* THEME · MATERIAL X — expressive tonal surfaces, springy motion */
+[data-theme="material-x"] {
+    --primary: 124, 58, 237; --primary-hover: 109, 40, 217;
+    --secondary: 100, 116, 139; --accent: 219, 39, 119;
+    --bg-app: 243, 240, 253; --bg-card: 255, 255, 255; --bg-sidebar: 238, 233, 250;
+    --bg-elevated: 255, 255, 255; --bg-global: 243, 240, 253;
+    --text-main: 40, 25, 80; --text-muted: 125, 115, 160;
+    --border-color: 222, 212, 246; --border-subtle: 124 58 237 / 0.18;
+    --glass-bg: 255 255 255 / 0.75;
+    --success: 5, 150, 105; --warning: 217, 119, 6; --danger: 225, 29, 72; --info: 8, 145, 178;
+    --theme-page-bg: radial-gradient(700px 320px at 90% 0%, rgba(219,39,119,0.14), transparent 60%), linear-gradient(180deg, #f3f0fd 0%, #e9e2f9 100%);
+    --theme-card-bg: rgba(255,255,255,0.88); --theme-card-hover-bg: #ffffff;
+    --theme-rail-bg: rgba(238,233,250,0.88); --theme-topbar-bg: rgba(255,255,255,0.8);
+    --theme-table-head-bg: rgba(238,233,250,0.9); --theme-row-hover-bg: rgba(124,58,237,0.06);
+    --theme-input-bg: #f1ebfb; --theme-button-bg: linear-gradient(135deg, #7c3aed, #db2777);
+    --theme-active-bg: rgba(124,58,237,0.1); --theme-focus-ring: rgba(124,58,237,0.35);
+    --theme-popup-bg: #ffffff;
+    --chart-1: 124, 58, 237; --chart-2: 219, 39, 119; --chart-3: 8, 145, 178; --chart-4: 245, 158, 11; --chart-5: 16, 185, 129;
+    --chart-grid: 124 58 237 / 0.1; --chart-tooltip-bg: rgba(255,255,255,0.96);
+}
+.dark [data-theme="material-x"], [data-theme="material-x"].dark {
+    --primary: 196, 181, 253; --primary-hover: 221, 214, 254;
+    --secondary: 148, 163, 184; --accent: 249, 168, 212;
+    --bg-app: 19, 12, 34; --bg-card: 30, 20, 54; --bg-sidebar: 23, 15, 42;
+    --bg-elevated: 44, 30, 76; --bg-global: 19, 12, 34;
+    --text-main: 243, 238, 255; --text-muted: 175, 162, 205;
+    --border-color: 70, 50, 115; --border-subtle: 196 181 253 / 0.18;
+    --glass-bg: 30 20 54 / 0.8;
+    --success: 52, 211, 153; --warning: 251, 191, 36; --danger: 251, 113, 133; --info: 56, 189, 248;
+    --theme-page-bg: radial-gradient(700px 320px at 90% 0%, rgba(219,39,119,0.16), transparent 60%), linear-gradient(180deg, #130c22 0%, #0d0718 100%);
+    --theme-card-bg: rgba(30,20,54,0.9); --theme-card-hover-bg: rgba(44,30,76,0.94);
+    --theme-rail-bg: rgba(23,15,42,0.9); --theme-topbar-bg: rgba(30,20,54,0.82);
+    --theme-table-head-bg: rgba(19,12,34,0.85); --theme-row-hover-bg: rgba(196,181,253,0.07);
+    --theme-input-bg: #2c1e4e; --theme-button-bg: linear-gradient(135deg, #8b5cf6, #ec4899);
+    --theme-active-bg: rgba(196,181,253,0.12); --theme-focus-ring: rgba(196,181,253,0.4);
+    --theme-popup-bg: #2c1e4e;
+    --chart-1: 196, 181, 253; --chart-2: 249, 168, 212; --chart-3: 34, 211, 238; --chart-4: 253, 224, 71; --chart-5: 110, 231, 183;
+    --chart-grid: 196 181 253 / 0.12; --chart-tooltip-bg: rgba(30,20,54,0.96);
+}

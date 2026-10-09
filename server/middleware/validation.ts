@@ -184,6 +184,11 @@ export const createOrderSchema = z.object({
     discount_type: z.string().max(20).optional().nullable(),
     scheduledFor: z.union([z.string(), z.date()]).optional().nullable(),
     scheduled_for: z.union([z.string(), z.date()]).optional().nullable(),
+    // Kitchen print ownership: the POS renders the designed ticket itself and
+    // asks the server to skip its plain-text fallback (screen tickets are
+    // still created). Must be declared or zod strips them before createOrder.
+    skipKitchenDispatch: z.boolean().optional(),
+    clientHandlesPrinting: z.boolean().optional(),
 }).refine(data => data.branchId || data.branch_id, {
     message: 'Branch ID is required (branchId or branch_id)',
 });
@@ -427,7 +432,7 @@ export const createRefundSchema = z.object({
     orderId: z.string().min(1, 'Order ID is required'),
     type: z.enum(['FULL', 'PARTIAL', 'ITEM']),
     reason: z.string().trim().min(1, 'Reason is required').max(1000),
-    reasonCategory: z.enum(['QUALITY', 'WRONG_ORDER', 'CUSTOMER_REQUEST', 'OVERCHARGE', 'OTHER']).default('OTHER'),
+    reasonCategory: z.enum(['QUALITY', 'WRONG_ORDER', 'CUSTOMER_REQUEST', 'CUSTOMER_COMPLAINT', 'LATE_DELIVERY', 'OVERCHARGE', 'OTHER']).default('OTHER'),
     refundMethod: z.enum(['CASH', 'ORIGINAL_PAYMENT', 'STORE_CREDIT']).default('ORIGINAL_PAYMENT'),
     customAmount: z.number().positive().optional(),
     items: z.array(z.object({

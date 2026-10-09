@@ -170,6 +170,10 @@ export interface ThemeConfig {
     name: string;
     description: string;
     tags: string[];
+    /** Engine 2.0: gallery grouping + defaults. All optional (backward compatible). */
+    category?: string;
+    defaultMode?: 'light' | 'dark';
+    background?: import('./engine/background').BackgroundConfig;
     shape: ShapeTokens;
     surfaces: SurfaceTokens;
     shadows: ShadowTokens;
@@ -184,28 +188,28 @@ export interface ThemeConfig {
     effects?: EffectsTokens;
 }
 
-import { auroraGlassTheme } from './themes/aurora-glass';
-import { midnightCommandTheme } from './themes/midnight-command';
-import { neoBrutalTheme } from './themes/neo-brutal';
-import { softOrganicTheme } from './themes/soft-organic';
-import { editorialLuxuryTheme } from './themes/editorial-luxury';
-import { terminalOpsTheme } from './themes/terminal-ops';
-import { futureHudTheme } from './themes/future-hud';
-import { bentoSaasTheme } from './themes/bento-saas';
-import { industrialOpsTheme } from './themes/industrial-ops';
-import { premiumHospitalityTheme } from './themes/premium-hospitality';
+import { meridianTheme } from './themes/meridian';
+import { commandTheme } from './themes/command';
+import { glasslineTheme } from './themes/glassline';
+import { canvasTheme } from './themes/canvas';
+import { fluentProTheme } from './themes/fluent-pro';
+import { materialXTheme } from './themes/material-x';
+import { obsidianTheme } from './themes/obsidian';
+import { tilesTheme } from './themes/tiles';
+import { acrylicTheme } from './themes/acrylic';
+import { touchTheme } from './themes/touch';
 
 export const THEME_REGISTRY: Record<AppTheme, ThemeConfig> = {
-    'aurora-glass': auroraGlassTheme,
-    'midnight-command': midnightCommandTheme,
-    'neo-brutal': neoBrutalTheme,
-    'soft-organic': softOrganicTheme,
-    'editorial-luxury': editorialLuxuryTheme,
-    'terminal-ops': terminalOpsTheme,
-    'future-hud': futureHudTheme,
-    'bento-saas': bentoSaasTheme,
-    'industrial-ops': industrialOpsTheme,
-    'premium-hospitality': premiumHospitalityTheme
+    'meridian': meridianTheme,
+    'command': commandTheme,
+    'glassline': glasslineTheme,
+    'canvas': canvasTheme,
+    'fluent-pro': fluentProTheme,
+    'material-x': materialXTheme,
+    'obsidian': obsidianTheme,
+    'tiles': tilesTheme,
+    'acrylic': acrylicTheme,
+    'touch': touchTheme
 };
 
 export const THEME_LIST: ThemeConfig[] = Object.values(THEME_REGISTRY);

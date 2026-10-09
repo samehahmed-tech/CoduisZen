@@ -153,6 +153,17 @@ export default function TreasuryHub() {
         }
     };
 
+    const approveTransfer = async (id: string) => {
+        if (!(await confirm({ title: isAr ? 'اعتماد التحويل؟' : 'Approve transfer?', message: isAr ? 'سيتم نقل المبلغ بين الحسابين نهائياً' : 'Amount will move between accounts permanently', confirmText: isAr ? 'اعتماد' : 'Approve', variant: 'warning' }))) return;
+        try {
+            await treasuryApi.approveTransfer(id);
+            toast.success(isAr ? 'تم اعتماد التحويل' : 'Transfer approved');
+            refreshAll();
+        } catch (e: any) {
+            toast.error(e.message);
+        }
+    };
+
     // ── forms ──
     const [acctForm, setAcctForm] = useState({ name: '', accountType: 'CASH_ON_HAND', institution: '', accountNumber: '', openingBalance: '' });
     const [trfForm, setTrfForm] = useState({ fromAccountId: '', toAccountId: '', amount: '', reason: '' });
@@ -262,7 +273,7 @@ export default function TreasuryHub() {
                                             <p className="text-xs text-muted">{t.reason || ''}</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => treasuryApi.approveTransfer(t.id).then(() => { toast.success(isAr ? 'تم اعتماد التحويل' : 'Transfer approved'); refreshAll(); }).catch((e: any) => toast.error(e.message))} className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500"><CheckCircle2 size={15} /></button>
+                                            <button onClick={() => approveTransfer(t.id)} className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500"><CheckCircle2 size={15} /></button>
                                             <button onClick={() => treasuryApi.rejectTransfer(t.id).then(() => { toast.success(isAr ? 'تم رفض التحويل' : 'Transfer rejected'); refreshAll(); }).catch((e: any) => toast.error(e.message))} className="p-2 rounded-xl bg-rose-500/10 text-rose-500"><XCircle size={15} /></button>
                                         </div>
                                     </div>
@@ -306,7 +317,7 @@ export default function TreasuryHub() {
                             <button onClick={async () => {
                                 if (!acctForm.name.trim()) { toast.error(isAr ? 'أدخل اسم الحساب' : 'Enter account name'); return; }
                                 try {
-                                    await treasuryApi.createBankAccount({ ...acctForm, openingBalance: Number(acctForm.openingBalance || 0), accountType: acctForm.accountType as any });
+                                    await treasuryApi.createBankAccount({ ...acctForm, openingBalance: Number(acctForm.openingBalance || 0), accountType: acctForm.accountType as any, branchId: branchId || undefined });
                                     toast.success(isAr ? 'تم إنشاء الحساب' : 'Account created');
                                     setAcctForm({ name: '', accountType: 'CASH_ON_HAND', institution: '', accountNumber: '', openingBalance: '' });
                                     refreshAll();
@@ -358,9 +369,16 @@ export default function TreasuryHub() {
                             <input type="number" placeholder={isAr ? 'المبلغ *' : 'Amount *'} value={trfForm.amount} onChange={(e) => setTrfForm({ ...trfForm, amount: e.target.value })} className={inputCls} />
                             <input placeholder={isAr ? 'البيان' : 'Reason'} value={trfForm.reason} onChange={(e) => setTrfForm({ ...trfForm, reason: e.target.value })} className={inputCls} />
                             <button onClick={async () => {
-                                if (!trfForm.fromAccountId || !trfForm.toAccountId || !Number(trfForm.amount)) { toast.error(isAr ? 'أكمل بيانات التحويل' : 'Complete transfer data'); return; }
+                                if (!trfForm.fromAccountId || !trfForm.toAccountId) { toast.error(isAr ? 'اختر حسابي المصدر والوجهة' : 'Select source and destination accounts'); return; }
+                                // Fail fast with clear messages (the server re-validates
+                                // authoritatively: same account, amount > 0, balance).
+                                if (trfForm.fromAccountId === trfForm.toAccountId) { toast.error(isAr ? 'حساب المصدر هو نفس حساب الوجهة' : 'Source and destination accounts are the same'); return; }
+                                const amountNum = Number(trfForm.amount);
+                                if (!Number.isFinite(amountNum) || amountNum <= 0) { toast.error(isAr ? 'المبلغ يجب أن يكون أكبر من صفر' : 'Amount must be greater than zero'); return; }
+                                const fromBalance = Number(accounts.find((a: any) => String(a.id) === String(trfForm.fromAccountId))?.balance || 0);
+                                if (amountNum > fromBalance) { toast.error(isAr ? `الرصيد غير كاف (المتاح ${fmt(fromBalance)})` : `Insufficient balance (available ${fmt(fromBalance)})`); return; }
                                 try {
-                                    await treasuryApi.requestTransfer({ ...trfForm, amount: Number(trfForm.amount) });
+                                    await treasuryApi.requestTransfer({ ...trfForm, amount: amountNum });
                                     toast.success(isAr ? 'تم إرسال التحويل للاعتماد' : 'Transfer sent for approval');
                                     setTrfForm({ fromAccountId: '', toAccountId: '', amount: '', reason: '' });
                                     refreshAll();
@@ -380,7 +398,7 @@ export default function TreasuryHub() {
                                     <p className="text-xs text-muted mt-1">{t.reason || ''}</p>
                                     {t.status === 'PENDING' && (
                                         <div className="flex gap-2 mt-2">
-                                            <button onClick={() => treasuryApi.approveTransfer(t.id).then(() => { toast.success(isAr ? 'تم الاعتماد' : 'Approved'); refreshAll(); }).catch((e: any) => toast.error(e.message))} className="text-[11px] font-black px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-500">{isAr ? 'اعتماد' : 'Approve'}</button>
+                                            <button onClick={() => approveTransfer(t.id)} className="text-[11px] font-black px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-500">{isAr ? 'اعتماد' : 'Approve'}</button>
                                             <button onClick={() => treasuryApi.rejectTransfer(t.id).then(() => { toast.success(isAr ? 'تم الرفض' : 'Rejected'); refreshAll(); }).catch((e: any) => toast.error(e.message))} className="text-[11px] font-black px-4 py-1.5 rounded-full bg-rose-500/10 text-rose-500">{isAr ? 'رفض' : 'Reject'}</button>
                                         </div>
                                     )}
@@ -618,6 +636,19 @@ export default function TreasuryHub() {
                                 </div>
                                 <button onClick={async () => {
                                     const holder = users.find((x: any) => String(x.id) === settleForm.holderUserId);
+                                    const holderKey = settleForm.holderUserId || (holder ? String(holder.name) : '');
+                                    const outstandingRow = (overview?.custodyOutstanding || []).find((c: any) =>
+                                        (c.holderUserId && String(c.holderUserId) === String(settleForm.holderUserId)) ||
+                                        (!c.holderUserId && holderKey && String(c.holderName || '') === String(holder ? holder.name : holderKey)),
+                                    );
+                                    const outstanding = outstandingRow ? Number(outstandingRow.outstanding || 0) : null;
+                                    const amountNum = Number(settleForm.amount);
+                                    if (!Number.isFinite(amountNum) || amountNum <= 0) { toast.error(isAr ? 'أدخل مبلغ تسوية صحيح' : 'Enter a valid settlement amount'); return; }
+                                    // Over-settling silently creates dangling custody — block it.
+                                    if (outstanding !== null && amountNum > outstanding + 0.01) {
+                                        toast.error(isAr ? `المبلغ يتجاوز العهدة القائمة (${fmt(outstanding)})` : `Amount exceeds outstanding custody (${fmt(outstanding)})`);
+                                        return;
+                                    }
                                     const ok = await submitVoucher({
                                         kind: 'RECEIPT', category: 'CUSTODY_SETTLEMENT', paymentMethod: 'CASH',
                                         holderUserId: settleForm.holderUserId || undefined,

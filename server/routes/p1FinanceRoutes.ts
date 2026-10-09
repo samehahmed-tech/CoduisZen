@@ -1,12 +1,17 @@
 import { Router } from 'express';
-import { authenticateToken, requireRoles } from '../middleware/auth';
+import { authenticateToken, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import * as p1 from '../controllers/p1FinanceController';
 
-// Same role allow-list used by the core finance routes (kept in sync with financeRoutes.ts)
+// Same role allow-list used by the core finance routes (kept in sync with financeRoutes.ts).
+// Permission fallback: cashiers/TREASURY staff carry OP_MANAGE_CASH_DRAWER by
+// design and must reach drawer endpoints without a finance title.
 const financeAuth = [
     authenticateToken,
-    requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR', 'COST_ACCOUNTANT', 'TREASURY_OFFICER'),
+    requireRoleOrPermission(
+        ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'ACCOUNTANT', 'FINANCE_DIRECTOR', 'COST_ACCOUNTANT', 'TREASURY_OFFICER'],
+        ['OP_MANAGE_CASH_DRAWER', 'OP_PROCESS_REFUND', 'OP_VOID_ORDER'],
+    ),
 ];
 
 const router = Router();

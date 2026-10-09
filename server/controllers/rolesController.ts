@@ -93,6 +93,19 @@ const PERMISSION_METADATA: { key: AppPermission; name: string; nameAr: string; c
     { key: AppPermission.CFG_EDIT_FLOOR_PLAN, name: 'Edit Floor Plan', nameAr: 'تعديل مخطط القاعة', category: 'configuration', categoryAr: 'الإعدادات' },
     { key: AppPermission.CFG_MANAGE_BRANCHES, name: 'Manage Branches', nameAr: 'إدارة الفروع', category: 'configuration', categoryAr: 'الإعدادات' },
     { key: AppPermission.CFG_OFFLINE_MODE, name: 'Offline Mode', nameAr: 'الوضع غير المتصل', category: 'configuration', categoryAr: 'الإعدادات' },
+    { key: AppPermission.OP_MANAGE_SHIFTS, name: 'Manage Shifts', nameAr: 'إدارة الشيفتات', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_DELIVERY, name: 'Manage Delivery', nameAr: 'إدارة التوصيل', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_MARKETING, name: 'Manage Marketing', nameAr: 'إدارة التسويق', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_WASTAGE, name: 'Record Wastage', nameAr: 'تسجيل الهدر', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_PRODUCTION, name: 'Manage Production', nameAr: 'إدارة الإنتاج', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_BUDGETS, name: 'Manage Budgets', nameAr: 'إدارة الميزانيات', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_CUSTOMERS, name: 'Manage Customers', nameAr: 'إدارة العملاء', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_MANAGE_FINANCE, name: 'Manage Finance', nameAr: 'إدارة المالية', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.OP_KDS_OPERATE, name: 'Operate KDS', nameAr: 'تشغيل شاشة المطبخ', category: 'operations', categoryAr: 'العمليات' },
+    { key: AppPermission.CFG_MANAGE_SETTINGS, name: 'Manage Settings', nameAr: 'إدارة الإعدادات', category: 'configuration', categoryAr: 'الإعدادات' },
+    { key: AppPermission.CFG_MANAGE_PRINTERS, name: 'Manage Printers', nameAr: 'إدارة الطابعات', category: 'configuration', categoryAr: 'الإعدادات' },
+    { key: AppPermission.CFG_MANAGE_PLATFORMS, name: 'Manage Platforms', nameAr: 'إدارة المنصات', category: 'configuration', categoryAr: 'الإعدادات' },
+    { key: AppPermission.CFG_MANAGE_WAREHOUSES, name: 'Manage Warehouses', nameAr: 'إدارة المخازن', category: 'configuration', categoryAr: 'الإعدادات' },
 ];
 
 async function migrateBuiltInRolePermissions() {

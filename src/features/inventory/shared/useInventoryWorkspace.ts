@@ -24,9 +24,9 @@ export function useInventoryWorkspace() {
     isLoading: inventoryLoading, error: inventoryError,
     fetchInventory, fetchWarehouses, fetchSuppliers, fetchPurchaseOrders, fetchTransferMovements,
     addInventoryItem, updateInventoryItem, deleteInventoryItem,
-    addWarehouse, updateStock,
+    addWarehouse, updateWarehouse, updateStock,
     patchStockFromSocket,
-    createSupplierInDB, updateSupplierInDB, deactivateSupplierInDB,
+    createSupplierInDB, updateSupplierInDB, deactivateSupplierInDB, reactivateSupplierInDB,
     createBranchTransferInDB,
     clearError,
   } = useInventoryStore(
@@ -47,11 +47,13 @@ export function useInventoryWorkspace() {
       updateInventoryItem: state.updateInventoryItem,
       deleteInventoryItem: state.deleteInventoryItem,
       addWarehouse: state.addWarehouse,
+      updateWarehouse: state.updateWarehouse,
       updateStock: state.updateStock,
       patchStockFromSocket: state.patchStockFromSocket,
       createSupplierInDB: state.createSupplierInDB,
       updateSupplierInDB: state.updateSupplierInDB,
       deactivateSupplierInDB: state.deactivateSupplierInDB,
+      reactivateSupplierInDB: state.reactivateSupplierInDB,
       createBranchTransferInDB: state.createBranchTransferInDB,
       clearError: state.clearError,
     }))
@@ -181,16 +183,26 @@ export function useInventoryWorkspace() {
     [suppliers]
   );
 
+  // Totals count only rows on live warehouses — orphaned rows (missing or
+  // deactivated warehouse) are surfaced separately via
+  // orphanedWarehouseAssignments and must not inflate valuation.
+  const isLiveWarehouseRow = (warehouseId: string) => {
+    const warehouse = warehouseById.get(warehouseId);
+    return Boolean(warehouse) && warehouse.isActive !== false;
+  };
+
   const inventoryTotalsById = useMemo(() => {
     const totals = new Map<string, number>();
     inventory.forEach((item) => {
       totals.set(
         item.id,
-        item.warehouseQuantities.reduce((sum, quantity) => sum + quantity.quantity, 0)
+        item.warehouseQuantities
+          .filter((quantity) => isLiveWarehouseRow(quantity.warehouseId))
+          .reduce((sum, quantity) => sum + quantity.quantity, 0)
       );
     });
     return totals;
-  }, [inventory]);
+  }, [inventory, warehouses]);
 
   const inventoryById = useMemo(
     () => new Map(inventory.map((item) => [item.id, item])),
@@ -201,11 +213,14 @@ export function useInventoryWorkspace() {
     const counts = new Map<string, number>();
     inventory.forEach((item) => {
       item.warehouseQuantities.forEach((quantity) => {
+        // Skip orphaned and zero rows so SKU cards report stocked lines.
+        if (Number(quantity.quantity || 0) <= 0) return;
+        if (!isLiveWarehouseRow(quantity.warehouseId)) return;
         counts.set(quantity.warehouseId, (counts.get(quantity.warehouseId) || 0) + 1);
       });
     });
     return counts;
-  }, [inventory]);
+  }, [inventory, warehouses]);
 
   const selectedWarehouseRows = useMemo(() => {
     if (!selectedWarehouse) return [];
@@ -548,7 +563,27 @@ export function useInventoryWorkspace() {
   };
 
   const handleUpsertSupplier = async () => {
-    if (!supplierForm.name.trim()) return;
+    const name = supplierForm.name.trim();
+    const phoneDigits = String(supplierForm.phone || '').replace(/\D/g, '');
+    if (!name) {
+      showToast(lang === 'ar' ? 'اسم المورد مطلوب' : 'Supplier name is required', 'error');
+      return;
+    }
+    if (!supplierForm.phone.trim() && !supplierForm.email.trim()) {
+      showToast(lang === 'ar' ? 'الهاتف أو البريد مطلوب' : 'Phone or email is required', 'error');
+      return;
+    }
+    // Duplicate guard: same phone digits or same name (excluding self on edit).
+    const duplicate = suppliers.some((s: any) =>
+      String(s.id) !== String(supplierForm.id || '') && (
+        (phoneDigits && String(s.phone || '').replace(/\D/g, '') === phoneDigits) ||
+        String(s.name || '').trim().toLowerCase() === name.toLowerCase()
+      ),
+    );
+    if (duplicate) {
+      showToast(lang === 'ar' ? 'مورد بنفس الهاتف أو الاسم مسجل بالفعل' : 'A supplier with the same phone or name already exists', 'error');
+      return;
+    }
     if (supplierForm.id) {
       await updateSupplierInDB(supplierForm);
     } else {
@@ -557,8 +592,35 @@ export function useInventoryWorkspace() {
     setSupplierForm({ id: '', name: '', nameAr: '', contactPerson: '', phone: '', email: '', category: '' });
   };
 
+  const handleReactivateSupplier = async (id: string) => {
+    await reactivateSupplierInDB(id);
+    showToast(lang === 'ar' ? 'تمت إعادة تفعيل المورد' : 'Supplier re-enabled', 'success');
+  };
+
+  const branchTransferOnHand = useMemo(() => {
+    if (!branchTransferItemId || !branchTransferFromWh) return 0;
+    const item = inventory.find((i: any) => i.id === branchTransferItemId);
+    return Number(item?.warehouseQuantities?.find((w: any) => w.warehouseId === branchTransferFromWh)?.quantity || 0);
+  }, [inventory, branchTransferItemId, branchTransferFromWh]);
+
   const handleCreateBranchTransfer = async () => {
-    if (!branchTransferItemId || !branchTransferFromWh || !branchTransferToWh || branchTransferQty <= 0) return;
+    if (!branchTransferItemId || !branchTransferFromWh || !branchTransferToWh) {
+      showToast(lang === 'ar' ? 'اختر الصنف ومخزني المصدر والوجهة' : 'Select item, source and destination', 'error');
+      return;
+    }
+    // Fail fast client-side (the server re-validates authoritatively).
+    if (branchTransferFromWh === branchTransferToWh) {
+      showToast(lang === 'ar' ? 'مخزن المصدر هو نفسه الوجهة' : 'Source and destination are the same', 'error');
+      return;
+    }
+    if (!(branchTransferQty > 0)) {
+      showToast(lang === 'ar' ? 'الكمية يجب أن تكون أكبر من صفر' : 'Quantity must be greater than zero', 'error');
+      return;
+    }
+    if (branchTransferQty > branchTransferOnHand) {
+      showToast(lang === 'ar' ? `الرصيد غير كافٍ (المتاح ${branchTransferOnHand})` : `Insufficient stock (on hand ${branchTransferOnHand})`, 'error');
+      return;
+    }
     await createBranchTransferInDB({
       itemId: branchTransferItemId,
       fromWarehouseId: branchTransferFromWh,
@@ -567,7 +629,24 @@ export function useInventoryWorkspace() {
       reason: branchTransferReason,
       actorId: settings.currentUser?.id,
     });
+    showToast(lang === 'ar' ? 'تم التحويل فوراً' : 'Transferred immediately', 'success');
     setBranchTransferQty(1);
+  };
+
+  const handleToggleWarehouseActive = async (warehouse: any) => {
+    const next = warehouse.isActive === false;
+    const ok = await confirm({
+      title: lang === 'ar' ? (next ? 'تفعيل المخزن؟' : 'إيقاف المخزن؟') : (next ? 'Activate warehouse?' : 'Deactivate warehouse?'),
+      message: next
+        ? (lang === 'ar' ? `إعادة ${warehouse.name} للخدمة.` : `Bring ${warehouse.name} back into service.`)
+        : (lang === 'ar' ? `إيقاف ${warehouse.name}؟ لن يظهر في الاختيارات لكن أرصدته محفوظة.` : `Deactivate ${warehouse.name}? It hides from pickers but balances are kept.`),
+      confirmText: lang === 'ar' ? 'تأكيد' : 'Confirm',
+      cancelText: lang === 'ar' ? 'تراجع' : 'Back',
+      variant: next ? 'info' : 'danger',
+    });
+    if (!ok) return;
+    await updateWarehouse(warehouse.id, { isActive: next } as any);
+    await fetchWarehouses();
   };
 
   // --- AI Forecasting State ---
@@ -619,6 +698,20 @@ export function useInventoryWorkspace() {
 
   const handleStartCount = async () => {
     if (!selectedCountWarehouse) return;
+    // No duplicate audits: an open session for the same warehouse+date must
+    // be finished (or opened) first — otherwise two sessions post over_launch each other.
+    const sameDay = String(selectedCountDate || '').split('T')[0];
+    const openDuplicate = (countHistory || []).find((h: any) =>
+      String(h.warehouseId || '') === String(selectedCountWarehouse)
+      && String(h.countDate || '').split('T')[0] === sameDay
+      && !['POSTED', 'FINALIZED', 'CANCELLED', 'CLOSED'].includes(String(h.status || '').toUpperCase()),
+    );
+    if (openDuplicate) {
+      setCountError(lang === 'ar'
+        ? `توجد جلسة جرد مفتوحة لنفس المخزن والتاريخ (${openDuplicate.id}) — افتحها بدل بدء جديدة.`
+        : `An open count session already exists for this warehouse and date (${openDuplicate.id}) — open it instead.`);
+      return;
+    }
     setCountLoading(true);
     try {
       setCountError(null);
@@ -751,20 +844,30 @@ export function useInventoryWorkspace() {
           await loadCountHistory();
           showToast(lang === 'ar' ? 'تم حفظ مسودة الجرد.' : 'Stock count draft saved.', 'success');
       } else {
-        const incompleteCount = countSession.items.some(
-          (it: any) => it.countedQty === null || it.countedQty === undefined
-        );
-        if (incompleteCount) {
+        const counted = counts.filter((it: any) => it.countedQty !== null && it.countedQty !== undefined);
+        if (counted.length === 0) {
           throw new Error(
             lang === 'ar'
-              ? 'لا يمكن اعتماد الجرد قبل إدخال الكمية الفعلية لكل الأصناف.'
-              : 'Enter the physical quantity for every item before posting the count.'
+              ? 'لا يوجد أي صنف معدود — أدخل كمية فعلية واحدة على الأقل قبل الاعتماد.'
+              : 'Nothing counted yet — enter at least one physical quantity before posting.'
           );
         }
-        await inventoryApi.submitCount(
-          countSession.id,
-          counts.filter((it: any) => it.countedQty !== null),
-        );
+        // Partial posting: only counted lines move stock. Uncounted lines
+        // keep system values (no forced full-count, no zero-fill surprises).
+        const uncounted = countSession.items.length - counted.length;
+        if (uncounted > 0) {
+          const ok = await confirm({
+            title: lang === 'ar' ? 'اعتماد جزئي؟' : 'Post partial count?',
+            message: lang === 'ar'
+              ? `سيتم اعتماد ${counted.length} أصناف فقط، وتبقى ${uncounted} بدون تغيير.`
+              : `Only ${counted.length} lines will post; ${uncounted} stay untouched.`,
+            confirmText: lang === 'ar' ? 'اعتماد الجزئي' : 'Post partial',
+            cancelText: lang === 'ar' ? 'تراجع' : 'Back',
+            variant: 'warning',
+          });
+          if (!ok) return;
+        }
+        await inventoryApi.submitCount(countSession.id, counted);
         await inventoryApi.postStockCount(countSession.id);
         setCountSession(null);
         await Promise.all([fetchInventory(), loadCountHistory()]);
@@ -795,6 +898,7 @@ export function useInventoryWorkspace() {
   // --- MOVEMENT LOG STATE ---
   const [movementLog, setMovementLog] = useState<any[]>([]);
   const [movementLoading, setMovementLoading] = useState(false);
+  const [movementBranchId, setMovementBranchId] = useState('');
   const [movementDateFrom, setMovementDateFrom] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
     return formatLocalDate(d);
@@ -809,7 +913,7 @@ export function useInventoryWorkspace() {
       const data = await reportsApi.getStockMovements({
         startDate: movementDateFrom,
         endDate: movementDateTo,
-        branchId: settings.activeBranchId || undefined,
+        branchId: movementBranchId || settings.activeBranchId || undefined,
         types: movementTypeFilter.size > 0 ? Array.from(movementTypeFilter) : undefined,
       });
       setMovementLog(data || []);
@@ -838,17 +942,20 @@ export function useInventoryWorkspace() {
     ));
   }, [movementLog, movementSearch]);
 
+  // In/out money tracked separately: summing abs() of both sides double-
+  // counts every transfer's value (once leaving, once arriving).
   const movementSummary = useMemo(() => {
     let inQty = 0;
     let outQty = 0;
-    let cost = 0;
+    let inCost = 0;
+    let outCost = 0;
     for (const mv of filteredMovementRows) {
       const qty = Number(mv.quantity || 0);
-      if (qty >= 0) inQty += qty;
-      else outQty += Math.abs(qty);
-      cost += Math.abs(Number(mv.totalCost || 0));
+      const value = Math.abs(Number(mv.totalCost || 0));
+      if (qty >= 0) { inQty += qty; inCost += value; }
+      else { outQty += Math.abs(qty); outCost += value; }
     }
-    return { count: filteredMovementRows.length, inQty, outQty, cost };
+    return { count: filteredMovementRows.length, inQty, outQty, inCost, outCost, cost: inCost - outCost };
   }, [filteredMovementRows]);
 
   const getMovementExportRows = () => filteredMovementRows.map((mv) => ({
@@ -1024,6 +1131,48 @@ export function useInventoryWorkspace() {
     win.document.close();
   };
 
+  // Landscape PDF-ready report window (distinct from screen print): dated
+  // title + totals footer so "Save as PDF" produces a complete document.
+  const printRecipeConsumptionPdf = () => {
+    const headers = lang === 'ar'
+      ? ['الصنف', 'المخزن', 'المسحوب', 'الرصيد الحالي', 'العجز', 'الأوفر', 'الوحدة', 'التكلفة']
+      : ['Item', 'Warehouse', 'Consumed', 'Current Stock', 'Shortage', 'Over', 'Unit', 'Cost'];
+    const escapeHtml = (value: any) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+    const rows = getConsumptionExportRows().map((row) => [row.item, row.warehouse, row.consumed, row.currentStock, row.shortage, row.over, row.unit, row.cost.toFixed(2)]);
+    const win = window.open('', '_blank', 'width=1100,height=800');
+    if (!win) return;
+    win.document.write(`
+      <html dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
+        <head>
+          <title>${lang === 'ar' ? 'تقرير مسحوبات الوصفات' : 'Recipe Consumption Report'} ${consumptionDateFrom} - ${consumptionDateTo}</title>
+          <style>
+            @page{size:A4 landscape;margin:10mm}
+            body{font-family:Arial,sans-serif;padding:24px;color:#111}
+            h1{font-size:20px;margin:0 0 4px}
+            p.sub{margin:0 0 18px;color:#555}
+            table{width:100%;border-collapse:collapse;font-size:11px}
+            th,td{border:1px solid #ddd;padding:7px;text-align:center}
+            th{background:#f4f4f5}
+            tfoot td{font-weight:900;background:#fafafa}
+            @media print{.noprint{display:none}}
+          </style>
+        </head>
+        <body>
+          <h1>${lang === 'ar' ? 'تقرير مسحوبات الوصفات' : 'Recipe Consumption Report'}</h1>
+          <p class="sub">${consumptionDateFrom} - ${consumptionDateTo}</p>
+          <table>
+            <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+            <tfoot><tr><td colspan="2">${lang === 'ar' ? 'الإجمالي' : 'Total'}</td><td>${consumptionTotals.quantity.toLocaleString()}</td><td></td><td>${consumptionTotals.shortage.toLocaleString()}</td><td>${consumptionTotals.over.toLocaleString()}</td><td></td><td>${consumptionTotals.cost.toFixed(2)}</td></tr></tfoot>
+          </table>
+          <p class="noprint" style="margin-top:16px;color:#555">${lang === 'ar' ? 'اختر "حفظ كـ PDF" من نافذة الطباعة.' : 'Choose "Save as PDF" in the print dialog.'}</p>
+          <script>window.onload=()=>window.print()</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
   const loadRecipeConsumption = async () => {
     setConsumptionLoading(true);
     try {
@@ -1060,10 +1209,11 @@ export function useInventoryWorkspace() {
     branchTransferToWh, setBranchTransferToWh, branchTransferQty, setBranchTransferQty,
     branchTransferReason, setBranchTransferReason,
     isImportingInventory,
-    handleSaveItem, handleDeleteItem, handleDeactivateSupplier, handleUpsertSupplier,
+    handleSaveItem, handleDeleteItem, handleDeactivateSupplier, handleReactivateSupplier, handleUpsertSupplier,
     exportInventoryTemplate, handleInventoryFileImport,
     handleSaveWarehouse, handleAdjustment, handleTransfer,
     handleDirectReceipt, handleSupplierReturn, handleZeroInventory, handleCreateBranchTransfer,
+    branchTransferOnHand, handleToggleWarehouseActive,
     aiForecasts, handleRequestForecast,
     countSession, setCountSession, blindCount, setBlindCount,
     countScan, setCountScan, countScanFilter, setCountScanFilter,
@@ -1072,14 +1222,15 @@ export function useInventoryWorkspace() {
     countHistory, countError, activeCountWarehouseName,
     loadCountHistory, handleStartCount, handleOpenCount, handlePrintCount,
     exportStockCount, handleUpdateCountItem, handleCompleteCount, handleZeroCountInputs,
-    movementLog, movementLoading, movementDateFrom, setMovementDateFrom,
+    movementLog, movementLoading, movementBranchId, setMovementBranchId,
+    movementDateFrom, setMovementDateFrom,
     movementDateTo, setMovementDateTo, movementTypeFilter, setMovementTypeFilter,
     movementSearch, setMovementSearch,
     loadMovements, toggleMovementType, filteredMovementRows, movementSummary,
     exportMovementsCsv, printMovements,
     consumptionRows, consumptionLoading, consumptionDateFrom, setConsumptionDateFrom,
     consumptionDateTo, setConsumptionDateTo, consumptionReportRows, consumptionTotals,
-    exportRecipeConsumptionCsv, printRecipeConsumption, loadRecipeConsumption,
+    exportRecipeConsumptionCsv, printRecipeConsumption, printRecipeConsumptionPdf, loadRecipeConsumption,
   };
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Activity, Ban, Building2, Camera, Check, ChevronRight, Crown, Download, Eye, EyeOff, FileText,
+    Activity, Ban, Building2, Camera, Check, ChevronRight, Copy, Crown, Download, Eye, EyeOff, FileText,
     KeyRound, Layers, LockKeyhole, MapPin, Monitor, Plus, RefreshCw, Save, Search,
     ShieldCheck, Trash2, Users, X, UserCog, Settings, Globe, FileBarChart,
 } from 'lucide-react';
@@ -123,7 +123,7 @@ const permLabel = (p: string, isAr: boolean) => {
 };
 
 const UserManagement: React.FC = () => {
-    const { users, branches, roles, settings, fetchUsers, fetchBranches, loadRoles, createUser, updateUserInDB, deleteUserFromDB, saveRolePermissions } = useAuthStore();
+    const { users, branches, roles, settings, fetchUsers, fetchBranches, loadRoles, createUser, updateUserInDB, deleteUserFromDB, saveRolePermissions, setUserAvatar } = useAuthStore();
     const lang = (settings.language || 'ar') as 'ar' | 'en';
     const isAr = lang === 'ar';
     const { success, error: showError, info } = useToast();
@@ -148,6 +148,7 @@ const UserManagement: React.FC = () => {
     const [newRoleNameAr, setNewRoleNameAr] = useState('');
     const [showCreateRole, setShowCreateRole] = useState(false);
     const [avatarBusy, setAvatarBusy] = useState(false);
+    const [copySourceId, setCopySourceId] = useState('');
     const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
     const handleAvatarFile = async (file: File | undefined) => {
@@ -276,27 +277,58 @@ const UserManagement: React.FC = () => {
             };
             if (isEdit) await updateUserInDB(payload); else await createUser(payload);
             await fetchUsers();
+            // Local-first commit: photo (or its removal) lands in localStorage,
+            // the users list, the header's currentUser and the offline cache —
+            // even if the server round-trip drops the avatar column.
+            setUserAvatar(payload.id, form.avatar || null);
             setFormOpen(false); setSelectedId(payload.id);
             success(isAr ? 'تم حفظ المستخدم' : 'User saved');
         } catch (err: any) { showError(err?.message || err?.code || (isAr ? 'فشل الحفظ' : 'Save failed')); } finally { setBusy(false); }
     };
 
     const deleteUser = async (user: User) => {
-        const ok = await confirm({ title: isAr ? 'حذف مستخدم' : 'Delete user', message: isAr ? `حذف ${user.name}؟ سيتم تعطيل الحساب.` : `Deactivate ${user.name}?`, confirmText: isAr ? 'تعطيل' : 'Deactivate', variant: 'danger' });
-        if (!ok) return;
-        try { await deleteUserFromDB(user.id); await fetchUsers(); success(isAr ? 'تم تعطيل المستخدم' : 'User deactivated'); } catch (err: any) { showError(err.message); }
+        await hardDeleteUser(user);
     };
 
-    const applyBulk = async (action: 'activate' | 'deactivate' | 'role' | 'branch') => {
+    const applyBulk = async (action: 'activate' | 'deactivate' | 'role' | 'branch' | 'delete-hard') => {
         if (!checked.length) return info(isAr ? 'اختار مستخدمين أولا' : 'Select users first');
+        if (action === 'delete-hard') {
+            const ok = await confirm({ title: isAr ? 'حذف نهائي' : 'Permanent delete', message: isAr ? `حذف ${checked.length} مستخدم نهائياً؟ لا يمكن التراجع. من لديه حركات مسجلة سيتم تخطيه.` : `Permanently delete ${checked.length} users? Cannot be undone. Users with recorded activity are skipped.`, confirmText: isAr ? 'حذف نهائي' : 'Delete forever', variant: 'danger' });
+            if (!ok) return;
+        }
         setBusy(true);
         try {
             if (action === 'activate') await usersApi.bulkUpdateStatus(checked, true);
             if (action === 'deactivate') await usersApi.bulkUpdateStatus(checked, false);
             if (action === 'role') await usersApi.bulkAssignRole(checked, roleFilter === 'ALL' ? UserRole.CASHIER : roleFilter);
             if (action === 'branch' && branches[0]) await usersApi.bulkAssignBranch(checked, branches[0].id);
+            if (action === 'delete-hard') {
+                const res = await usersApi.bulkDelete(checked, true);
+                await fetchUsers(); setChecked([]);
+                success(isAr ? `تم حذف ${res.deleted ?? 0} نهائياً${res.failed?.length ? ` — تعذر ${res.failed.length}` : ''}${res.skipped ? ` — تم تخطي ${res.skipped}` : ''}` : `Hard-deleted ${res.deleted ?? 0}${res.failed?.length ? ` — ${res.failed.length} failed` : ''}${res.skipped ? ` — ${res.skipped} skipped` : ''}`);
+                return;
+            }
             await fetchUsers(); setChecked([]); success(isAr ? 'تم تطبيق الإجراء' : 'Bulk action applied');
         } catch (err: any) { showError(err.message); } finally { setBusy(false); }
+    };
+
+    const hardDeleteUser = async (user: User) => {
+        const ok = await confirm({ title: isAr ? 'حذف نهائي' : 'Permanent delete', message: isAr ? `حذف ${user.name} نهائياً من قاعدة البيانات؟ لا يمكن التراجع. لو عليه حركات مسجلة (شيفتات/طلبات) سيتم الرفض — عطّله بدلاً من ذلك.` : `Permanently delete ${user.name} from the database? Cannot be undone. If they have recorded activity the delete is refused — disable instead.`, confirmText: isAr ? 'حذف نهائي' : 'Delete forever', variant: 'danger' });
+        if (!ok) return;
+        setBusy(true);
+        try { await usersApi.delete(user.id, true); await fetchUsers(); if (selectedId === user.id) setSelectedId(''); success(isAr ? 'تم الحذف النهائي' : 'Permanently deleted'); }
+        catch (err: any) { showError(err?.message === 'USER_HAS_DEPENDENCIES' ? (isAr ? 'عليه حركات مسجلة — عطّل الحساب بدلاً من الحذف' : 'Has recorded activity — disable instead of deleting') : err.message); }
+        finally { setBusy(false); }
+    };
+
+    const copyAccess = async () => {
+        if (!selectedUser || !copySourceId) return info(isAr ? 'اختار المستخدم المصدر أولا' : 'Pick a source user first');
+        const source = users.find((u) => u.id === copySourceId);
+        const ok = await confirm({ title: isAr ? 'نسخ الصلاحيات' : 'Copy permissions', message: isAr ? `نسخ الدور والصلاحيات من ${source?.name} إلى ${selectedUser.name}؟ سيتم تسجيل خروج ${selectedUser.name} من كل الجلسات.` : `Copy role and permissions from ${source?.name} to ${selectedUser.name}? They will be signed out everywhere.`, confirmText: isAr ? 'نسخ' : 'Copy', variant: 'danger' });
+        if (!ok) return;
+        setBusy(true);
+        try { await usersApi.copyPermissions(selectedUser.id, copySourceId); await fetchUsers(); setCopySourceId(''); success(isAr ? 'تم نسخ الصلاحيات' : 'Permissions copied'); }
+        catch (err: any) { showError(err.message); } finally { setBusy(false); }
     };
 
     const toggleUserPermission = async (perm: AppPermission) => {
@@ -410,11 +442,12 @@ const UserManagement: React.FC = () => {
                                     <button onClick={() => applyBulk('deactivate')} title={isAr ? 'تعطيل' : 'Deactivate'} className="rounded-md border border-border px-2.5 py-2 text-rose-500 hover:bg-rose-500/10"><Ban size={14} /></button>
                                     <button onClick={() => applyBulk('role')} title={isAr ? 'تغيير الدور' : 'Change role'} className="rounded-md border border-border px-2.5 py-2 text-main hover:bg-elevated"><UserCog size={14} /></button>
                                     <button onClick={() => applyBulk('branch')} title={isAr ? 'تغيير الفرع' : 'Change branch'} className="rounded-md border border-border px-2.5 py-2 text-main hover:bg-elevated"><Building2 size={14} /></button>
+                                    <button onClick={() => applyBulk('delete-hard')} title={isAr ? 'حذف نهائي للمحدد' : 'Hard-delete selected'} className="rounded-md border border-rose-500/40 px-2.5 py-2 text-rose-500 hover:bg-rose-500/10"><Trash2 size={14} /></button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[880px] text-sm">
-                                    <thead className="bg-elevated/50 text-[11px] font-black uppercase text-muted"><tr><th className="w-10 p-3"></th><th className="p-3 text-start">{isAr ? 'المستخدم' : 'User'}</th><th className="p-3 text-start">{isAr ? 'الدور' : 'Role'}</th><th className="p-3 text-start">{isAr ? 'الفرع' : 'Branch'}</th><th className="p-3 text-start">{isAr ? 'الصلاحيات' : 'Perms'}</th><th className="p-3 text-start">{isAr ? 'الحالة' : 'Status'}</th><th className="p-3 text-end">{isAr ? 'إجراءات' : 'Actions'}</th></tr></thead>
+                                    <thead className="bg-elevated/50 text-[11px] font-black uppercase text-muted"><tr><th className="w-10 p-3"><input type="checkbox" title={isAr ? 'تحديد الكل' : 'Select all'} checked={filteredUsers.length > 0 && filteredUsers.every((u) => checked.includes(u.id))} onChange={() => setChecked((prev) => filteredUsers.every((u) => prev.includes(u.id)) ? prev.filter((id) => !filteredUsers.some((u) => u.id === id)) : [...new Set([...prev, ...filteredUsers.map((u) => u.id)])])} /></th><th className="p-3 text-start">{isAr ? 'المستخدم' : 'User'}</th><th className="p-3 text-start">{isAr ? 'الدور' : 'Role'}</th><th className="p-3 text-start">{isAr ? 'الفرع' : 'Branch'}</th><th className="p-3 text-start">{isAr ? 'الصلاحيات' : 'Perms'}</th><th className="p-3 text-start">{isAr ? 'الحالة' : 'Status'}</th><th className="p-3 text-end">{isAr ? 'إجراءات' : 'Actions'}</th></tr></thead>
                                     <tbody>
                                         {filteredUsers.map((user) => {
                                             const active = selectedUser?.id === user.id; const selected = checked.includes(user.id);
@@ -455,6 +488,17 @@ const UserManagement: React.FC = () => {
                                     <div className="flex gap-2">
                                         <button onClick={() => setTab('access')} className="flex-1 rounded-lg border border-border px-3 py-2.5 text-xs font-black text-main hover:bg-elevated"><ShieldCheck size={14} className="inline me-1" /> {isAr ? 'إدارة الصلاحيات' : 'Permissions'}</button>
                                         <button onClick={() => setTab('security')} className="flex-1 rounded-lg border border-border px-3 py-2.5 text-xs font-black text-main hover:bg-elevated"><LockKeyhole size={14} className="inline me-1" /> {isAr ? 'الأمان' : 'Security'}</button>
+                                    </div>
+                                    <div className="rounded-lg border border-border/60 bg-app/50 p-3">
+                                        <div className="mb-2 flex items-center gap-2 text-xs font-black text-main"><Copy size={14} /> {isAr ? 'نسخ صلاحيات من مستخدم' : 'Copy access from user'}</div>
+                                        <div className="flex gap-2">
+                                            <select value={copySourceId} onChange={(e) => setCopySourceId(e.target.value)} className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-card px-2 text-xs font-bold text-main outline-none">
+                                                <option value="">{isAr ? 'اختار المصدر' : 'Pick source'}</option>
+                                                {users.filter((u) => u.id !== selectedUser.id).map((u) => <option key={u.id} value={u.id}>{u.name} — {roleLabel(String(u.role))}</option>)}
+                                            </select>
+                                            <button disabled={busy || !copySourceId} onClick={copyAccess} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-white disabled:opacity-50">{isAr ? 'نسخ' : 'Copy'}</button>
+                                        </div>
+                                        <div className="mt-1.5 text-[11px] font-bold text-muted">{isAr ? 'ينسخ الدور والصلاحيات والتخصيصات، ويسجّل خروج المستخدم من كل الجلسات.' : 'Copies role, permissions and overrides; signs the user out everywhere.'}</div>
                                     </div>
                                     <div>
                                         <div className="mb-2 flex items-center gap-2 text-xs font-black text-main"><Layers size={14} /> {isAr ? 'صلاحيات سريعة' : 'Quick permissions'}</div>
@@ -570,6 +614,7 @@ const UserManagement: React.FC = () => {
                                             <Action title={isAr ? 'تغيير PIN' : 'Reset PIN'} icon={KeyRound} onClick={() => securityAction('pin')} />
                                             <Action title={isAr ? 'تغيير كلمة المرور' : 'Reset password'} icon={LockKeyhole} onClick={() => securityAction('password')} />
                                             <Action title={selectedUser?.isActive === false ? (isAr ? 'تفعيل الحساب' : 'Activate account') : (isAr ? 'تعطيل الحساب' : 'Disable account')} icon={Ban} onClick={() => securityAction('toggle')} danger={selectedUser?.isActive !== false} />
+                                            <Action title={isAr ? 'حذف نهائي من قاعدة البيانات' : 'Permanent database delete'} icon={Trash2} onClick={() => selectedUser && hardDeleteUser(selectedUser)} danger />
                                         </div>
                                     </div>
                                 ) : <Empty title={isAr ? 'اختار مستخدم' : 'Select user'} />}

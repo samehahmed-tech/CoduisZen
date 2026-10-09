@@ -33,6 +33,7 @@ const toUiStatus = (s?: string): Driver['status'] => {
 
 const DriversHub: React.FC = () => {
     const { settings } = useAuthStore();
+    const branches = useAuthStore((s: any) => s.branches || []);
     const { orders, fetchOrders } = useOrderStore();
     const { confirm } = useConfirm();
     const lang = settings.language || 'en';
@@ -51,7 +52,8 @@ const DriversHub: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
-    const [form, setForm] = useState({ name: '', phone: '', email: '', password: '', pin: '', vehicleType: 'BIKE', createLogin: true });
+    const [form, setForm] = useState({ name: '', phone: '', email: '', password: '', pin: '', vehicleType: 'BIKE', createLogin: true, branchId: '' });
+    const [showInactive, setShowInactive] = useState(false);
     const [checkins, setCheckins] = useState<any[]>([]);
     const [settleTarget, setSettleTarget] = useState<Driver | null>(null);
     const [settleAmount, setSettleAmount] = useState('');
@@ -64,7 +66,7 @@ const DriversHub: React.FC = () => {
         setError(null);
         try {
             const [list, fixes] = await Promise.all([
-                deliveryApi.getDrivers(branchId ? { branchId } : undefined),
+                deliveryApi.getDrivers({ ...(branchId ? { branchId } : {}), ...(showInactive ? { includeInactive: true } : {}) }),
                 deliveryApi.getTelemetry(branchId || undefined).catch(() => []),
             ]);
             setDrivers((list || []).map((d: any) => ({
@@ -92,7 +94,7 @@ const DriversHub: React.FC = () => {
         } catch { /* inbox degrades gracefully */ }
     };
 
-    useEffect(() => { load(); loadCheckins(); }, [branchId]);
+    useEffect(() => { load(); loadCheckins(); }, [branchId, showInactive]);
     useEffect(() => {
         const refresh = () => { load(true); loadCheckins(); };
         const onStatus = (p: { id: string; status: string }) =>
@@ -164,16 +166,24 @@ const DriversHub: React.FC = () => {
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         return drivers
-            .filter((d) => d.isActive !== false)
+            .filter((d) => showInactive || d.isActive !== false)
             .filter((d) => statusFilter === 'ALL' || d.status === statusFilter)
             .filter((d) => !q || d.name.toLowerCase().includes(q) || d.phone.includes(q))
             .sort((a, b) => {
                 const rank = (s?: string) => (s === 'AVAILABLE' ? 0 : s === 'ON_DELIVERY' ? 1 : 2);
                 return rank(a.status) - rank(b.status) || a.name.localeCompare(b.name);
             });
-    }, [drivers, query, statusFilter]);
+    }, [drivers, query, statusFilter, showInactive]);
 
     const cycleStatus = async (driver: Driver) => {
+        // Road states (BUSY/ON_DELIVERY/RETURNING) are server-driven by the
+        // pickup/deliver flow — flipping them manually here would desync the
+        // queue, so the cycle only covers the manual states and refuses while
+        // the pilot carries live orders.
+        if (Number(loadByDriver[driver.id]?.count || 0) > 0) {
+            setError(isAr ? 'الطيار في الطريق — الحالة تتغير تلقائياً' : 'Pilot is on the road — status changes automatically');
+            return;
+        }
         const next = STATUS_ORDER[(STATUS_ORDER.indexOf(driver.status as any) + 1 + STATUS_ORDER.length) % STATUS_ORDER.length] || 'AVAILABLE';
         try {
             await deliveryApi.updateDriverStatus(driver.id, next === 'ON_DELIVERY' ? 'BUSY' : next);
@@ -185,18 +195,19 @@ const DriversHub: React.FC = () => {
 
     const openAdd = () => {
         setEditing(null);
-        setForm({ name: '', phone: '', email: '', password: '', pin: '', vehicleType: 'BIKE', createLogin: true });
+        setForm({ name: '', phone: '', email: '', password: '', pin: '', vehicleType: 'BIKE', createLogin: true, branchId: branchId || '' });
         setShowForm(true);
     };
 
     const openEdit = (driver: Driver) => {
         setEditing(driver);
-        setForm({ name: driver.name, phone: driver.phone, email: '', password: '', pin: '', vehicleType: driver.vehicleType || 'BIKE', createLogin: false });
+        setForm({ name: driver.name, phone: driver.phone, email: '', password: '', pin: '', vehicleType: driver.vehicleType || 'BIKE', createLogin: false, branchId: (driver as any).branchId || branchId || '' });
         setShowForm(true);
     };
 
     const saveForm = async () => {
-        if (!form.name.trim() || !form.phone.trim() || !branchId) {
+        const formBranchId = form.branchId || branchId;
+        if (!form.name.trim() || !form.phone.trim() || !formBranchId) {
             setError(isAr ? 'الاسم والهاتف والفرع مطلوبة' : 'Name, phone and branch are required');
             return;
         }
@@ -208,7 +219,7 @@ const DriversHub: React.FC = () => {
                 setMessage(isAr ? 'تم حفظ الطيار' : 'Driver saved');
             } else {
                 await deliveryApi.createDriver({
-                    name: form.name.trim(), phone: form.phone.trim(), branchId,
+                    name: form.name.trim(), phone: form.phone.trim(), branchId: formBranchId,
                     email: form.email.trim() || undefined, password: form.password.trim() || undefined,
                     pin: form.pin.trim() || undefined, createLogin: form.createLogin, status: 'AVAILABLE',
                 });
@@ -220,6 +231,16 @@ const DriversHub: React.FC = () => {
             setError(e?.message || (isAr ? 'تعذر الحفظ' : 'Save failed'));
         } finally {
             setSaving(false);
+        }
+    };
+
+    const enableDriver = async (driver: Driver) => {
+        try {
+            await deliveryApi.updateDriver(driver.id, { isActive: true, status: 'AVAILABLE' } as any);
+            setMessage(isAr ? 'تمت إعادة تفعيل الطيار' : 'Pilot re-enabled');
+            await load(true);
+        } catch (e: any) {
+            setError(e?.message || (isAr ? 'تعذر التفعيل' : 'Re-enable failed'));
         }
     };
 
@@ -325,6 +346,9 @@ const DriversHub: React.FC = () => {
                     </button>
                     <button onClick={() => load()} disabled={loading || refreshing} className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-black text-main disabled:opacity-60">
                         <RefreshCw size={15} className={loading || refreshing ? 'animate-spin' : ''} />{isAr ? 'تحديث' : 'Refresh'}
+                    </button>
+                    <button onClick={() => setShowInactive((v) => !v)} className={`inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-xs font-black ${showInactive ? 'border-amber-500/50 bg-amber-500/10 text-amber-600' : 'border-border bg-card text-muted'}`}>
+                        {isAr ? 'المعطلون' : 'Disabled'}
                     </button>
                     <button onClick={openAdd} className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-white">
                         <Plus size={15} />{isAr ? 'طيار جديد' : 'New pilot'}
@@ -464,9 +488,15 @@ const DriversHub: React.FC = () => {
                                     <button onClick={() => openEdit(driver)} className="h-10 rounded-xl border border-border px-4 text-[11px] font-black text-muted">
                                         {isAr ? 'تعديل' : 'Edit'}
                                     </button>
-                                    <button onClick={() => disableDriver(driver)} className="h-10 rounded-xl bg-rose-500/10 px-4 text-[11px] font-black text-rose-600">
-                                        <X size={14} />
-                                    </button>
+                                    {driver.isActive === false ? (
+                                        <button onClick={() => enableDriver(driver)} className="h-10 rounded-xl bg-emerald-500/10 px-4 text-[11px] font-black text-emerald-600">
+                                            {isAr ? 'تفعيل' : 'Enable'}
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => disableDriver(driver)} className="h-10 rounded-xl bg-rose-500/10 px-4 text-[11px] font-black text-rose-600">
+                                            <X size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             </article>
                         );
@@ -481,14 +511,28 @@ const DriversHub: React.FC = () => {
                         <div className="mt-4 space-y-3">
                             <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={isAr ? 'الاسم' : 'Name'} className="h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
                             <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder={isAr ? 'الهاتف' : 'Phone'} dir="ltr" className="h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                            <div className="grid grid-cols-2 gap-3">
-                                <select value={form.vehicleType} onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value }))} className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none">
-                                    <option value="BIKE">{isAr ? 'موتوسيكل' : 'Bike'}</option>
-                                    <option value="SCOOTER">Scooter</option>
-                                    <option value="CAR">{isAr ? 'سيارة' : 'Car'}</option>
+                            {!editing && (
+                                <select value={form.branchId} onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))} className="h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary">
+                                    <option value="">{isAr ? 'الفرع *' : 'Branch *'}</option>
+                                    {branches.map((b: any) => (
+                                        <option key={String(b.id)} value={String(b.id)}>{b.name || b.id}</option>
+                                    ))}
                                 </select>
-                                <input value={form.pin} onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value }))} placeholder="PIN (6 digits)" dir="ltr" className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
-                            </div>
+                            )}
+                            {!editing ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <select value={form.vehicleType} onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value }))} className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none">
+                                        <option value="BIKE">{isAr ? 'موتوسيكل' : 'Bike'}</option>
+                                        <option value="SCOOTER">Scooter</option>
+                                        <option value="CAR">{isAr ? 'سيارة' : 'Car'}</option>
+                                    </select>
+                                    <input value={form.pin} onChange={(e) => setForm((f) => ({ ...f, pin: e.target.value }))} placeholder="PIN (6 digits)" dir="ltr" className="h-11 rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />
+                                </div>
+                            ) : (
+                                <p className="rounded-xl bg-elevated/60 px-3 py-2.5 text-[11px] font-bold text-muted">
+                                    {isAr ? 'المركبة ورقم الدخول تُضبط عند الإنشاء فقط — هنا الاسم والهاتف فقط.' : 'Vehicle and login PIN are set at creation — name and phone only here.'}
+                                </p>
+                            )}
                             {!editing && (
                                 <>
                                     <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder={isAr ? 'إيميل الدخول' : 'Login email'} dir="ltr" className="h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold outline-none focus:border-primary" />

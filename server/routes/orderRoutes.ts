@@ -2,14 +2,19 @@ import { Router } from 'express';
 import * as orderController from '../controllers/orderController';
 import { validate } from '../middleware/validate';
 import { createOrderSchema, updateOrderStatusSchema } from '../middleware/validation';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
 // Call-center roles take/distribute delivery orders and monitor all branches,
 // so they need the same order access as cashiers (create + read + status).
-const posAuth = requireRoles(...POS_FLOOR_ROLES, 'CALL_CENTER', 'CALL_CENTER_MANAGER');
+// Permission fallback keeps the Roles screen effective: anyone explicitly
+// granted OP_PLACE_ORDER / OP_APPLY_DISCOUNT passes regardless of role.
+const posAuth = requireRoleOrPermission(
+    [...POS_FLOOR_ROLES, 'CALL_CENTER', 'CALL_CENTER_MANAGER'],
+    ['OP_PLACE_ORDER', 'OP_APPLY_DISCOUNT'],
+);
 const orderReadAuth = requireRoles(...POS_FLOOR_ROLES, 'KITCHEN_STAFF', 'PICKUP_STAFF', 'CALL_CENTER', 'CALL_CENTER_MANAGER');
 
 router.get('/', orderReadAuth, enforceBranch, orderController.getAllOrders);

@@ -5,6 +5,10 @@ import ExcelJS from 'exceljs';
 
 type Lang = 'ar' | 'en';
 
+/** Latin digits with Arabic locale + Cairo everywhere in HR workbooks. */
+const AR_LATIN = 'ar-EG-u-nu-latn';
+const cairo = (font: any = {}) => ({ name: 'Cairo', ...font });
+
 const logoPath = path.resolve(process.cwd(), 'public', 'logo.png');
 
 const labels = {
@@ -90,7 +94,7 @@ const toDate = (value: unknown) => {
 const formatDate = (value: unknown, lang: Lang) => {
     const date = toDate(value);
     if (!date) return labels[lang].noData;
-    return date.toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+    return date.toLocaleDateString(lang === 'ar' ? AR_LATIN : 'en-US', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -100,7 +104,7 @@ const formatDate = (value: unknown, lang: Lang) => {
 const formatTime = (value: unknown, lang: Lang) => {
     const date = toDate(value);
     if (!date) return labels[lang].noData;
-    return date.toLocaleTimeString(lang === 'ar' ? 'ar-EG' : 'en-US', {
+    return date.toLocaleTimeString(lang === 'ar' ? AR_LATIN : 'en-US', {
         hour: '2-digit',
         minute: '2-digit',
     });
@@ -114,7 +118,7 @@ const num = (value: unknown) => {
 export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') => {
     const rows = Array.isArray(report.rows) ? report.rows : [];
     const t = labels[lang];
-    const locale = lang === 'ar' ? 'ar-EG' : 'en-US';
+    const locale = lang === 'ar' ? AR_LATIN : 'en-US';
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Coduis Zen';
     workbook.created = new Date();
@@ -128,11 +132,11 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
     sheet.mergeCells('A1:L3');
     sheet.mergeCells('A4:L4');
     sheet.getCell('A1').value = t.title;
-    sheet.getCell('A1').font = { bold: true, size: 24, color: { argb: 'FFFFFFFF' } };
+    sheet.getCell('A1').font = cairo({ bold: true, size: 24, color: { argb: 'FFFFFFFF' } });
     sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: lang === 'ar' ? 'right' : 'left' };
     sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10243E' } };
     sheet.getCell('A4').value = `${t.period}: ${report.period?.startDate || 'all'} ${lang === 'ar' ? 'إلى' : 'to'} ${report.period?.endDate || 'all'}    |    ${t.generatedAt}: ${new Date().toLocaleString(locale)}`;
-    sheet.getCell('A4').font = { bold: true, size: 11, color: { argb: 'FF64748B' } };
+    sheet.getCell('A4').font = cairo({ bold: true, size: 11, color: { argb: 'FF64748B' } });
     sheet.getCell('A4').alignment = { horizontal: lang === 'ar' ? 'right' : 'left' };
 
     if (fs.existsSync(logoPath)) {
@@ -168,11 +172,11 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
         const col = index + 1;
         const cell = sheet.getCell(6, col);
         cell.value = label as string;
-        cell.font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+        cell.font = cairo({ bold: true, size: 10, color: { argb: 'FF64748B' } });
         cell.alignment = { horizontal: 'center' };
         const val = sheet.getCell(7, col);
         val.value = value as any;
-        val.font = { bold: true, size: 16, color: { argb: 'FF10243E' } };
+        val.font = cairo({ bold: true, size: 16, color: { argb: 'FF10243E' } });
         val.alignment = { horizontal: 'center' };
         val.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
         val.border = { bottom: { style: 'thin', color: { argb: 'FFD8E4F2' } } };
@@ -182,7 +186,7 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
     headerRow.values = ['#', t.employee, t.code, t.branch, t.day, t.clockIn, t.clockOut, t.hours, t.late, t.early, t.overtime, t.status];
     headerRow.height = 28;
     headerRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        cell.font = cairo({ bold: true, color: { argb: 'FFFFFFFF' }, size: 11 });
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF19324F' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = {
@@ -214,7 +218,7 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
         ];
         summaryRow.height = 28;
         summaryRow.eachCell((cell, colNumber) => {
-            cell.font = { bold: true, size: 11, color: { argb: 'FF10243E' } };
+            cell.font = cairo({ bold: true, size: 11, color: { argb: 'FF10243E' } });
             cell.alignment = {
                 horizontal: colNumber >= 5 ? 'center' : lang === 'ar' ? 'right' : 'left',
                 vertical: 'middle',
@@ -226,7 +230,7 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
                 bottom: { style: 'thin', color: { argb: 'FFD5E4F6' } },
             };
         });
-        summaryRow.getCell(12).font = { bold: true, size: 10, color: { argb: 'FF2563EB' } };
+        summaryRow.getCell(12).font = cairo({ bold: true, size: 10, color: { argb: 'FF2563EB' } });
         rowPointer += 1;
 
         employeeRows
@@ -251,7 +255,7 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
                 ];
                 detailRow.height = 24;
                 detailRow.eachCell((cell, colNumber) => {
-                    cell.font = { size: 10, bold: colNumber === 12 };
+                    cell.font = cairo({ size: 10, bold: colNumber === 12 });
                     cell.alignment = {
                         horizontal: colNumber >= 5 ? 'center' : lang === 'ar' ? 'right' : 'left',
                         vertical: 'middle',
@@ -260,7 +264,7 @@ export const generateHrAttendanceXlsx = async (report: any, lang: Lang = 'ar') =
                     cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
                 });
                 detailRow.getCell(12).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${statusFill(label, lang)}` } };
-                detailRow.getCell(12).font = { bold: true, size: 10, color: { argb: 'FF10243E' } };
+                detailRow.getCell(12).font = cairo({ bold: true, size: 10, color: { argb: 'FF10243E' } });
                 rowPointer += 1;
             });
 
@@ -293,7 +297,7 @@ export const streamHrAttendanceXlsx = async (
 ) => {
     const rows = Array.isArray(report.rows) ? report.rows : [];
     const t = labels[lang];
-    const locale = lang === 'ar' ? 'ar-EG' : 'en-US';
+    const locale = lang === 'ar' ? AR_LATIN : 'en-US';
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
         stream: output,
         useStyles: true,
@@ -326,11 +330,11 @@ export const streamHrAttendanceXlsx = async (
     sheet.mergeCells('A1:L3');
     sheet.mergeCells('A4:L4');
     sheet.getCell('A1').value = t.title;
-    sheet.getCell('A1').font = { bold: true, size: 24, color: { argb: 'FFFFFFFF' } };
+    sheet.getCell('A1').font = cairo({ bold: true, size: 24, color: { argb: 'FFFFFFFF' } });
     sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: lang === 'ar' ? 'right' : 'left' };
     sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10243E' } };
     sheet.getCell('A4').value = `${t.period}: ${report.period?.startDate || 'all'} ${lang === 'ar' ? 'إلى' : 'to'} ${report.period?.endDate || 'all'}    |    ${t.generatedAt}: ${new Date().toLocaleString(locale)}`;
-    sheet.getCell('A4').font = { bold: true, size: 11, color: { argb: 'FF64748B' } };
+    sheet.getCell('A4').font = cairo({ bold: true, size: 11, color: { argb: 'FF64748B' } });
     sheet.getCell('A4').alignment = { horizontal: lang === 'ar' ? 'right' : 'left' };
 
     const totalHours = rows.reduce((sum: number, row: any) => sum + num(row.totalHours), 0);
@@ -361,11 +365,11 @@ export const streamHrAttendanceXlsx = async (
         const col = index + 1;
         const cell = sheet.getCell(6, col);
         cell.value = label as string;
-        cell.font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+        cell.font = cairo({ bold: true, size: 10, color: { argb: 'FF64748B' } });
         cell.alignment = { horizontal: 'center' };
         const val = sheet.getCell(7, col);
         val.value = value as any;
-        val.font = { bold: true, size: 16, color: { argb: 'FF10243E' } };
+        val.font = cairo({ bold: true, size: 16, color: { argb: 'FF10243E' } });
         val.alignment = { horizontal: 'center' };
         val.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
         val.border = { bottom: { style: 'thin', color: { argb: 'FFD8E4F2' } } };
@@ -375,7 +379,7 @@ export const streamHrAttendanceXlsx = async (
     headerRow.values = ['#', t.employee, t.code, t.branch, t.day, t.clockIn, t.clockOut, t.hours, t.late, t.early, t.overtime, t.status];
     headerRow.height = 28;
     headerRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        cell.font = cairo({ bold: true, color: { argb: 'FFFFFFFF' }, size: 11 });
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF19324F' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = {
@@ -407,7 +411,7 @@ export const streamHrAttendanceXlsx = async (
         ]);
         summaryRow.height = 28;
         summaryRow.eachCell((cell, colNumber) => {
-            cell.font = { bold: true, size: 11, color: { argb: 'FF10243E' } };
+            cell.font = cairo({ bold: true, size: 11, color: { argb: 'FF10243E' } });
             cell.alignment = {
                 horizontal: colNumber >= 5 ? 'center' : lang === 'ar' ? 'right' : 'left',
                 vertical: 'middle',
@@ -419,7 +423,7 @@ export const streamHrAttendanceXlsx = async (
                 bottom: { style: 'thin', color: { argb: 'FFD5E4F6' } },
             };
         });
-        summaryRow.getCell(12).font = { bold: true, size: 10, color: { argb: 'FF2563EB' } };
+        summaryRow.getCell(12).font = cairo({ bold: true, size: 10, color: { argb: 'FF2563EB' } });
         summaryRow.commit();
         rowPointer += 1;
 
@@ -444,7 +448,7 @@ export const streamHrAttendanceXlsx = async (
                 ]);
                 detailRow.height = 24;
                 detailRow.eachCell((cell, colNumber) => {
-                    cell.font = { size: 10, bold: colNumber === 12 };
+                    cell.font = cairo({ size: 10, bold: colNumber === 12 });
                     cell.alignment = {
                         horizontal: colNumber >= 5 ? 'center' : lang === 'ar' ? 'right' : 'left',
                         vertical: 'middle',
@@ -453,7 +457,7 @@ export const streamHrAttendanceXlsx = async (
                     cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
                 });
                 detailRow.getCell(12).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${statusFill(label, lang)}` } };
-                detailRow.getCell(12).font = { bold: true, size: 10, color: { argb: 'FF10243E' } };
+                detailRow.getCell(12).font = cairo({ bold: true, size: 10, color: { argb: 'FF10243E' } });
                 detailRow.commit();
                 rowPointer += 1;
             });
@@ -492,11 +496,11 @@ export const generateHrTabularXlsx = async (input: {
     sheet.mergeCells(1, 1, 3, lastCol);
     sheet.mergeCells(4, 1, 4, lastCol);
     sheet.getCell(1, 1).value = input.title;
-    sheet.getCell(1, 1).font = { bold: true, size: 23, color: { argb: 'FFFFFFFF' } };
+    sheet.getCell(1, 1).font = cairo({ bold: true, size: 23, color: { argb: 'FFFFFFFF' } });
     sheet.getCell(1, 1).alignment = { vertical: 'middle', horizontal: rtl ? 'right' : 'left' };
     sheet.getCell(1, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10243E' } };
-    sheet.getCell(4, 1).value = input.subtitle || new Date().toLocaleString(rtl ? 'ar-EG' : 'en-US');
-    sheet.getCell(4, 1).font = { bold: true, size: 11, color: { argb: 'FF64748B' } };
+    sheet.getCell(4, 1).value = input.subtitle || new Date().toLocaleString(rtl ? AR_LATIN : 'en-US');
+    sheet.getCell(4, 1).font = cairo({ bold: true, size: 11, color: { argb: 'FF64748B' } });
     sheet.getCell(4, 1).alignment = { horizontal: rtl ? 'right' : 'left' };
 
     if (fs.existsSync(logoPath)) {
@@ -508,10 +512,10 @@ export const generateHrTabularXlsx = async (input: {
     totals.forEach(([label, value], index) => {
         const col = index + 1;
         sheet.getCell(6, col).value = label;
-        sheet.getCell(6, col).font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
+        sheet.getCell(6, col).font = cairo({ bold: true, size: 10, color: { argb: 'FF64748B' } });
         sheet.getCell(6, col).alignment = { horizontal: 'center' };
         sheet.getCell(7, col).value = value as any;
-        sheet.getCell(7, col).font = { bold: true, size: 15, color: { argb: 'FF10243E' } };
+        sheet.getCell(7, col).font = cairo({ bold: true, size: 15, color: { argb: 'FF10243E' } });
         sheet.getCell(7, col).alignment = { horizontal: 'center' };
         sheet.getCell(7, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
     });
@@ -520,7 +524,7 @@ export const generateHrTabularXlsx = async (input: {
     headerRow.values = headers;
     headerRow.height = 28;
     headerRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+        cell.font = cairo({ bold: true, color: { argb: 'FFFFFFFF' }, size: 10 });
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF19324F' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cell.border = {
@@ -534,11 +538,11 @@ export const generateHrTabularXlsx = async (input: {
         sheetRow.eachCell((cell, colNumber) => {
             const value = cell.value;
             const isNegative = typeof value === 'number' && value < 0;
-            cell.font = {
+            cell.font = cairo({
                 size: 10,
                 bold: colNumber <= 2,
                 color: { argb: isNegative ? 'FFBE123C' : 'FF142033' },
-            };
+            });
             cell.alignment = {
                 horizontal: typeof value === 'number' ? 'center' : rtl ? 'right' : 'left',
                 vertical: 'middle',

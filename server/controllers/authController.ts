@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { users, userSessions, auditLogs } from '../../src/db/schema';
-import { and, eq, ne, desc, gte, lte, sql, inArray } from 'drizzle-orm';
+import { users, userSessions, auditLogs, roles } from '../../src/db/schema';
+import { and, eq, ne, desc, gte, lte, sql, inArray, or } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { INITIAL_ROLE_PERMISSIONS } from '../../types';
 import { requireEnv } from '../config/env';
 import { getLoginThrottleState, registerLoginFailure, registerLoginSuccess } from '../services/loginProtectionService';
 import { createSignedAuditLog } from '../services/auditLogService';
@@ -77,6 +78,41 @@ const normalizeAllowedBranches = (user: any): string[] => {
     return Array.from(branches);
 };
 
+/**
+ * Effective permissions for tokens = code role defaults ∪ DB role-matrix row
+ * ∪ stored user snapshot ± custom overrides. This is what makes the
+ * Roles/Permissions screen actually effective server-side: a grant made
+ * anywhere (role matrix, per-user edit, override) lands in the next token.
+ * Enforcement itself must never break login, so every step degrades
+ * gracefully to the stored snapshot.
+ */
+const resolveEffectivePermissions = async (user: any): Promise<string[]> => {
+    const stored = parseJsonField<string[]>(user?.permissions, []);
+    try {
+        const role = String(user?.role || '');
+        const defaults: string[] = ((INITIAL_ROLE_PERMISSIONS as any)[role] || []) as string[];
+        let dbRow: string[] = [];
+        if (role) {
+            const [row] = await db.select({ permissions: roles.permissions }).top(1).from(roles)
+                .where(or(eq(roles.id, role), eq(roles.name, role)));
+            dbRow = parseJsonField<string[]>((row as any)?.permissions, []);
+        }
+        const effective = new Set<string>([...defaults, ...dbRow, ...stored]);
+        const custom: any = parseJsonField<Record<string, any>>(user?.customPermissions, {});
+        if (custom && typeof custom === 'object') {
+            if (Array.isArray(custom.added)) for (const p of custom.added) effective.add(String(p));
+            if (Array.isArray(custom.removed)) for (const p of custom.removed) effective.delete(String(p));
+            for (const [perm, enabled] of Object.entries(custom)) {
+                if (perm === 'added' || perm === 'removed' || perm === 'defaultPage') continue;
+                if (enabled) effective.add(perm); else effective.delete(perm);
+            }
+        }
+        return Array.from(effective);
+    } catch {
+        return stored;
+    }
+};
+
 const getSessionExpiry = (): Date => {
     const refreshMs = parseJwtExpiryMs(REFRESH_TOKEN_EXPIRES_IN);
     const sessionMs = AUTH_SESSION_TTL_HOURS > 0 ? AUTH_SESSION_TTL_HOURS * 60 * 60 * 1000 : refreshMs;
@@ -115,7 +151,7 @@ const issueAccessToken = async (user: any, req: Request, deviceName?: string) =>
     const token = jwt.sign({
         id: user.id,
         role: user.role,
-        permissions: parseJsonField<string[]>(user.permissions, []),
+        permissions: await resolveEffectivePermissions(user),
         branchId: user.assignedBranchId,
         allowedBranches: normalizeAllowedBranches(user),
         sid: sessionId,
@@ -764,7 +800,7 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
         const newToken = jwt.sign({
             id: user.id,
             role: user.role,
-            permissions: user.permissions || [],
+            permissions: await resolveEffectivePermissions(user),
             branchId: user.assignedBranchId,
             allowedBranches: normalizeAllowedBranches(user),
             sid: sessionId,

@@ -2,9 +2,9 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { orders, payments, orderItems, menuItems, menuCategories, recipes, recipeIngredients, inventoryItems, branches, stockMovements, inventoryStock, inventoryBatches, warehouses, journalEntries, journalLines, chartOfAccounts, costCenters, employees, attendance, payrollCycles, payrollPayouts, customers, campaigns, shifts, managerApprovals, purchaseOrders, purchaseOrderItems, suppliers, drivers, fiscalLogs, etaDeadLetters, auditLogs } from '../../src/db/schema';
 import { eq, and, or, sql, gte, lte, inArray, desc, asc, isNull } from 'drizzle-orm';
-import PDFDocument from 'pdfkit';
 import { DELIVERED_STATUSES, DashboardScope, parseLocalDateRange, parseReportFilters, ReportGranularity, resolveScopedBranchId } from './report/reportUtils';
 import { generateHrTabularXlsx } from '../services/hrReportExportService';
+import { fmtInt, fmtMoney, renderReportPdf, reportLocale, ReportKpi, ReportSection } from '../services/reportStyle';
 import { revenueEligibleOrder, revenueRecognizedOrder } from '../utils/orderRevenue';
 import { writeDbError } from '../utils/dbErrors';
 
@@ -234,7 +234,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     gte(journalEntries.date, start),
                     lte(journalEntries.date, end),
                     eq(journalEntries.status, 'POSTED'),
-                    eq(journalEntries.referenceType, 'EXPENSE'),
+                    inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
                     eq(chartOfAccounts.type, 'EXPENSE'),
                     journalBranchScope
                 )),
@@ -248,7 +248,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     gte(journalEntries.date, start),
                     lte(journalEntries.date, end),
                     eq(journalEntries.status, 'PENDING_APPROVAL'),
-                    eq(journalEntries.referenceType, 'EXPENSE'),
+                    inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
                     eq(chartOfAccounts.type, 'EXPENSE'),
                     journalBranchScope
                 )),
@@ -676,7 +676,7 @@ export const exportReportCsv = async (req: Request, res: Response) => {
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                     .leftJoin(costCenters, eq(journalLines.costCenterId, costCenters.id))
                     .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE'),
-                        eq(journalEntries.referenceType, 'EXPENSE'),
+                        inArray(journalEntries.referenceType, ['EXPENSE', 'TREASURY_VOUCHER']),
                         branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined))
                     .groupBy(chartOfAccounts.name)
                     .orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).offset(0).fetch(20);
@@ -906,31 +906,28 @@ export const exportReportCsv = async (req: Request, res: Response) => {
 export const exportReportPdf = async (req: Request, res: Response) => {
     try {
         const { branchId, start, end, reportType, granularity } = parseReportFilters(req);
+        const lang = String(req.query.lang || 'ar').toLowerCase() === 'en' ? 'en' : 'ar';
+        const rtl = lang === 'ar';
+        const locale = reportLocale(lang);
         const filename = `report_${reportType.toLowerCase()}_${Date.now()}.pdf`;
+        const rangeLabel = `${start.toISOString().split('T')[0]} – ${end.toISOString().split('T')[0]}`;
+        const money = (v: unknown) => fmtMoney(v, locale, 'EGP');
+        const int = (v: unknown) => fmtInt(v, locale);
+        const T = (ar: string, en: string) => (rtl ? ar : en);
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        let branchName: string | undefined;
+        if (branchId) {
+            const [b] = await db.select({ name: branches.name }).from(branches).where(eq(branches.id, branchId)).top(1);
+            branchName = b?.name;
+        }
 
-        const doc = new PDFDocument({ margin: 36, size: 'A4' });
-        doc.pipe(res);
-
-        doc.fontSize(18).text('Coduis Zen Report Export', { align: 'left' });
-        doc.moveDown(0.5);
-        doc.fontSize(10).text(`Type: ${reportType}`);
-        doc.text(`Branch: ${branchId || 'ALL'}`);
-        doc.text(`Range: ${start.toISOString().split('T')[0]} → ${end.toISOString().split('T')[0]}`);
-        doc.moveDown();
-
-        const addTableHeader = (headers: string[]) => {
-            doc.fontSize(8).font('Helvetica-Bold');
-            const colWidth = (doc.page.width - 72) / headers.length;
-            headers.forEach((h, i) => doc.text(h, 36 + i * colWidth, doc.y, { width: colWidth, continued: i < headers.length - 1 }));
-            doc.moveDown(0.3);
-            doc.font('Helvetica').fontSize(8);
-        };
+        let title = reportType;
+        let kpis: ReportKpi[] = [];
+        let sections: ReportSection[] = [];
 
         switch (reportType) {
             case 'TRIAL_BALANCE': {
+                title = T('ميزان المراجعة', 'Trial Balance');
                 const rows = await db.select({
                     code: chartOfAccounts.code, name: chartOfAccounts.name, type: chartOfAccounts.type,
                     debit: sql<number>`coalesce(sum(${journalLines.debit}), 0)`,
@@ -940,11 +937,24 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                     .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED')))
                     .groupBy(chartOfAccounts.code, chartOfAccounts.name, chartOfAccounts.type).orderBy(chartOfAccounts.code);
-                doc.fontSize(12).text('Trial Balance', { underline: true }); doc.moveDown(0.5);
-                rows.forEach(r => { doc.text(`${r.code} | ${r.name} | Dr ${Number(r.debit).toFixed(2)} | Cr ${Number(r.credit).toFixed(2)} | Bal ${(Number(r.debit) - Number(r.credit)).toFixed(2)}`); });
+                const tDr = rows.reduce((s, r) => s + Number(r.debit || 0), 0);
+                const tCr = rows.reduce((s, r) => s + Number(r.credit || 0), 0);
+                kpis = [
+                    { label: T('إجمالي مدين', 'Total Debit'), value: money(tDr), color: '#1d4ed8' },
+                    { label: T('إجمالي دائن', 'Total Credit'), value: money(tCr), color: '#7c3aed' },
+                    { label: T('الرصيد', 'Balance'), value: money(tDr - tCr), color: '#059669' },
+                    { label: T('الحسابات', 'Accounts'), value: int(rows.length), color: '#0f766e' },
+                ];
+                sections = [{
+                    title: T('ميزان المراجعة', 'Trial Balance'),
+                    headers: [T('الكود', 'Code'), T('الحساب', 'Account'), T('النوع', 'Type'), T('مدين', 'Debit'), T('دائن', 'Credit'), T('الرصيد', 'Balance')],
+                    rows: rows.map(r => [String(r.code || ''), String(r.name || ''), String(r.type || ''), money(r.debit), money(r.credit), money(Number(r.debit || 0) - Number(r.credit || 0))]),
+                    footer: [T('الإجمالي', 'Total'), '', '', money(tDr), money(tCr), money(tDr - tCr)],
+                }];
                 break;
             }
             case 'TOP_EXPENSES': {
+                title = T('أعلى المصروفات', 'Top Expenses');
                 const rows = await db.select({
                     name: chartOfAccounts.name,
                     total: sql<number>`coalesce(sum(${journalLines.debit}) - sum(${journalLines.credit}), 0)`,
@@ -953,11 +963,18 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                     .innerJoin(chartOfAccounts, eq(journalLines.accountId, chartOfAccounts.id))
                     .where(and(gte(journalEntries.date, start), lte(journalEntries.date, end), eq(journalEntries.status, 'POSTED'), eq(chartOfAccounts.type, 'EXPENSE')))
                     .groupBy(chartOfAccounts.name).orderBy(sql`sum(${journalLines.debit}) - sum(${journalLines.credit}) desc`).offset(0).fetch(20);
-                doc.fontSize(12).text('Top Expenses', { underline: true }); doc.moveDown(0.5);
-                rows.forEach((r, i) => { doc.text(`${i + 1}. ${r.name}: ${Number(r.total).toFixed(2)} LE`); });
+                const total = rows.reduce((s, r) => s + Number(r.total || 0), 0);
+                kpis = [{ label: T('إجمالي المصروفات', 'Total Expenses'), value: money(total), color: '#dc2626' }];
+                sections = [{
+                    title: T('أعلى المصروفات', 'Top Expenses'),
+                    headers: ['#', T('الحساب', 'Account'), T('الإجمالي', 'Total')],
+                    rows: rows.map((r, i) => [int(i + 1), String(r.name || ''), money(r.total)]),
+                    footer: ['', T('الإجمالي', 'Total'), money(total)],
+                }];
                 break;
             }
             case 'EXPENSE_REPORT': {
+                title = T('تقرير المصروفات', 'Expense Report');
                 const rows = await db.select({
                     date: journalEntries.date,
                     reference: journalEntries.reference,
@@ -976,17 +993,26 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                         eq(chartOfAccounts.type, 'EXPENSE'),
                         branchId ? or(eq(costCenters.branchId, branchId), sql`${journalLines.costCenterId} is null`) : undefined
                     ))
-.orderBy(desc(journalEntries.date), desc(journalLines.id))
+                    .orderBy(desc(journalEntries.date), desc(journalLines.id))
                     .offset(0).fetch(120);
                 const total = rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
-                doc.fontSize(12).text(`Expense Report - Total ${total.toFixed(2)} LE`, { underline: true }); doc.moveDown(0.5);
-                rows.forEach((r) => {
-                    const day = r.date ? new Date(r.date).toISOString().split('T')[0] : '-';
-                    doc.text(`${day} | ${r.code} ${r.name} | ${Number(r.total).toFixed(2)} LE | ${r.reference || '-'} | ${r.description || ''}`);
-                });
+                kpis = [{ label: T('إجمالي المصروفات', 'Total Expenses'), value: money(total), color: '#dc2626' }];
+                sections = [{
+                    title: T('تفاصيل المصروفات', 'Expense Details'),
+                    headers: [T('التاريخ', 'Date'), T('الحساب', 'Account'), T('الوصف', 'Description'), T('المرجع', 'Reference'), T('القيمة', 'Amount')],
+                    rows: rows.map(r => [
+                        r.date ? fmtDate(r.date, locale) : '-',
+                        `${r.code || ''} ${r.name || ''}`.trim(),
+                        String(r.description || '-'),
+                        String(r.reference || '-'),
+                        money(r.total),
+                    ]),
+                    footer: ['', '', '', T('الإجمالي', 'Total'), money(total)],
+                }];
                 break;
             }
             case 'REORDER_ALERTS': {
+                title = T('تنبيهات إعادة الطلب', 'Reorder Alerts');
                 const rows = await db.select({
                     itemName: inventoryItems.name, unit: inventoryItems.unit, threshold: inventoryItems.threshold,
                     currentStock: sql<number>`coalesce(sum(${inventoryStock.quantity}), 0)`,
@@ -995,44 +1021,65 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                     .where(eq(inventoryItems.isActive, true))
                     .groupBy(inventoryItems.id, inventoryItems.name, inventoryItems.unit, inventoryItems.threshold)
                     .having(sql`coalesce(sum(${inventoryStock.quantity}), 0) <= ${inventoryItems.threshold}`);
-                doc.fontSize(12).text(`Reorder Alerts (${rows.length} items)`, { underline: true }); doc.moveDown(0.5);
-                rows.forEach(r => { doc.text(`${r.itemName} (${r.unit}): Stock ${Number(r.currentStock)} / Threshold ${r.threshold}`); });
+                kpis = [{ label: T('أصناف تحت الحد', 'Items Below Threshold'), value: int(rows.length), color: '#dc2626' }];
+                sections = [{
+                    title: T('تنبيهات إعادة الطلب', 'Reorder Alerts'),
+                    headers: [T('الصنف', 'Item'), T('الوحدة', 'Unit'), T('الرصيد', 'Stock'), T('الحد', 'Threshold')],
+                    rows: rows.map(r => [String(r.itemName || ''), String(r.unit || ''), int(r.currentStock), int(r.threshold)]),
+                }];
                 break;
             }
             case 'PAYROLL': {
+                title = T('ملخص الرواتب', 'Payroll Summary');
                 const conditions: any[] = [gte(payrollCycles.periodStart, start), lte(payrollCycles.periodEnd, end)];
                 if (branchId) conditions.push(eq(payrollCycles.branchId, branchId));
                 const cycles = await db.select().from(payrollCycles).where(and(...conditions));
-                doc.fontSize(12).text('Payroll Summary', { underline: true }); doc.moveDown(0.5);
-                if (cycles.length > 0) {
-                    const payouts = await db.select({
+                const payouts = cycles.length > 0
+                    ? await db.select({
                         employeeName: employees.name, role: employees.role, netPay: payrollPayouts.netPay,
                     }).from(payrollPayouts).innerJoin(employees, eq(payrollPayouts.employeeId, employees.id))
-                        .where(inArray(payrollPayouts.cycleId, cycles.map(c => c.id)));
-                    const total = payouts.reduce((s, p) => s + Number(p.netPay), 0);
-                    doc.text(`Total Payroll: ${total.toFixed(2)} LE`); doc.moveDown(0.3);
-                    payouts.forEach(p => { doc.text(`${p.employeeName} (${p.role}): ${Number(p.netPay).toFixed(2)} LE`); });
-                } else {
-                    doc.text('No payroll cycles found for this period.');
-                }
+                        .where(inArray(payrollPayouts.cycleId, cycles.map(c => c.id)))
+                    : [];
+                const total = payouts.reduce((s, p) => s + Number(p.netPay || 0), 0);
+                kpis = [
+                    { label: T('إجمالي الرواتب', 'Total Payroll'), value: money(total), color: '#059669' },
+                    { label: T('الموظفون', 'Employees'), value: int(payouts.length), color: '#0f766e' },
+                ];
+                sections = [{
+                    title: T('ملخص الرواتب', 'Payroll Summary'),
+                    headers: [T('الموظف', 'Employee'), T('الوظيفة', 'Role'), T('صافي المستحق', 'Net Pay')],
+                    rows: payouts.map(p => [String(p.employeeName || ''), String(p.role || ''), money(p.netPay)]),
+                    footer: payouts.length ? ['', T('الإجمالي', 'Total'), money(total)] : undefined,
+                    emptyText: T('لا توجد دورات رواتب في هذه الفترة.', 'No payroll cycles found for this period.'),
+                }];
                 break;
             }
             case 'ATTENDANCE': {
+                title = T('تقرير الحضور', 'Attendance Report');
                 const conditions: any[] = [gte(attendance.clockIn, start), lte(attendance.clockIn, end)];
                 if (branchId) conditions.push(eq(attendance.branchId, branchId));
                 const rows = await db.select({
                     employeeName: employees.name, role: employees.role,
-            presentDays: sql<number>`sum(case when ${attendance.status} = 'PRESENT' then 1 else 0 end)`,
-            lateDays: sql<number>`sum(case when ${attendance.status} = 'LATE' then 1 else 0 end)`,
-            absentDays: sql<number>`sum(case when ${attendance.status} = 'ABSENT' then 1 else 0 end)`,
+                    presentDays: sql<number>`sum(case when ${attendance.status} = 'PRESENT' then 1 else 0 end)`,
+                    lateDays: sql<number>`sum(case when ${attendance.status} = 'LATE' then 1 else 0 end)`,
+                    absentDays: sql<number>`sum(case when ${attendance.status} = 'ABSENT' then 1 else 0 end)`,
                     totalHours: sql<number>`coalesce(sum(${attendance.totalHours}), 0)`,
                 }).from(attendance).innerJoin(employees, eq(attendance.employeeId, employees.id))
                     .where(and(...conditions)).groupBy(employees.name, employees.role);
-                doc.fontSize(12).text('Attendance Report', { underline: true }); doc.moveDown(0.5);
-                rows.forEach(r => { doc.text(`${r.employeeName} (${r.role}): P:${r.presentDays} L:${r.lateDays} A:${r.absentDays} | ${Number(r.totalHours).toFixed(1)}h`); });
+                const tH = rows.reduce((s, r) => s + Number(r.totalHours || 0), 0);
+                kpis = [
+                    { label: T('الموظفون', 'Employees'), value: int(rows.length), color: '#0f766e' },
+                    { label: T('إجمالي الساعات', 'Total Hours'), value: int(tH), color: '#1d4ed8' },
+                ];
+                sections = [{
+                    title: T('تقرير الحضور', 'Attendance Report'),
+                    headers: [T('الموظف', 'Employee'), T('الوظيفة', 'Role'), T('حضور', 'Present'), T('تأخير', 'Late'), T('غياب', 'Absent'), T('الساعات', 'Hours')],
+                    rows: rows.map(r => [String(r.employeeName || ''), String(r.role || ''), int(r.presentDays), int(r.lateDays), int(r.absentDays), int(r.totalHours)]),
+                }];
                 break;
             }
             case 'CUSTOMER_LTV': {
+                title = T('القيمة العمرية للعملاء', 'Customer LTV');
                 const conditions: any[] = [gte(orders.createdAt, start), lte(orders.createdAt, end), inArray(orders.status, ['DELIVERED', 'COMPLETED']), sql`${orders.customerId} is not null`];
                 if (branchId) conditions.push(eq(orders.branchId, branchId));
                 const rows = await db.select({
@@ -1040,11 +1087,18 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                     orderCount: sql<number>`count(*)`,
                 }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id))
                     .where(and(...conditions)).groupBy(customers.name).orderBy(sql`sum(${orders.total}) desc`).offset(0).fetch(50);
-                doc.fontSize(12).text('Customer LTV', { underline: true }); doc.moveDown(0.5);
-                rows.forEach((r, i) => { doc.text(`${i + 1}. ${r.customerName}: ${Number(r.totalSpent).toFixed(2)} LE (${r.orderCount} orders)`); });
+                const total = rows.reduce((s, r) => s + Number(r.totalSpent || 0), 0);
+                kpis = [{ label: T('إجمالي إنفاق العملاء', 'Total Customer Spend'), value: money(total), color: '#059669' }];
+                sections = [{
+                    title: T('القيمة العمرية للعملاء', 'Customer LTV'),
+                    headers: ['#', T('العميل', 'Customer'), T('الطلبات', 'Orders'), T('إجمالي الإنفاق', 'Total Spent')],
+                    rows: rows.map((r, i) => [int(i + 1), String(r.customerName || ''), int(r.orderCount), money(r.totalSpent)]),
+                    footer: ['', '', T('الإجمالي', 'Total'), money(total)],
+                }];
                 break;
             }
             case 'BRANCH_PERFORMANCE': {
+                title = T('أداء الفروع', 'Branch Performance');
                 const revenueEligible = revenueEligibleOrder();
                 const rows = await db.select({
                     branchName: branches.name, orderCount: sql<number>`count(*)`,
@@ -1053,33 +1107,63 @@ export const exportReportPdf = async (req: Request, res: Response) => {
                 }).from(orders).innerJoin(branches, eq(orders.branchId, branches.id))
                     .where(and(gte(orders.createdAt, start), lte(orders.createdAt, end)))
                     .groupBy(branches.name).orderBy(sql`sum(case when ${revenueEligible} then ${orders.total} else 0 end) desc`);
-                doc.fontSize(12).text('Branch Performance', { underline: true }); doc.moveDown(0.5);
-                rows.forEach(r => { doc.text(`${r.branchName}: ${Number(r.revenue).toFixed(2)} LE | ${r.orderCount} orders | Avg ${Number(r.avgTicket).toFixed(2)} LE`); });
+                const total = rows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+                kpis = [{ label: T('إجمالي الإيراد', 'Total Revenue'), value: money(total), color: '#059669' }];
+                sections = [{
+                    title: T('أداء الفروع', 'Branch Performance'),
+                    headers: [T('الفرع', 'Branch'), T('الطلبات', 'Orders'), T('الإيراد', 'Revenue'), T('متوسط الفاتورة', 'Avg Ticket')],
+                    rows: rows.map(r => [String(r.branchName || ''), int(r.orderCount), money(r.revenue), money(r.avgTicket)]),
+                    footer: ['', T('الإجمالي', 'Total'), money(total), ''],
+                }];
                 break;
             }
             default: {
+                title = T('ملخص التقرير', 'Report Summary');
                 const snapshot = await getExportSnapshot(branchId, start, end);
                 const dailyRows = aggregateDailyRows(snapshot.daily, granularity);
-                doc.fontSize(12).text('Summary', { underline: true }); doc.fontSize(10);
-                doc.text(`Orders: ${Number(snapshot.overview.orderCount || 0)}`);
-                doc.text(`Gross Sales: ${Number(snapshot.overview.grossSales || 0).toFixed(2)}`);
-                doc.text(`Net Sales: ${Number(snapshot.overview.netSales || 0).toFixed(2)}`);
-                doc.text(`Tax Total: ${Number(snapshot.overview.taxTotal || 0).toFixed(2)}`);
-                doc.text(`Discount Total: ${Number(snapshot.overview.discountTotal || 0).toFixed(2)}`);
-                doc.text(`COGS: ${Number(snapshot.profit.cogs || 0).toFixed(2)}`);
-                doc.moveDown();
-                doc.fontSize(12).text('Time Series', { underline: true }); doc.fontSize(9);
-                dailyRows.slice(0, 20).forEach((row: any) => {
-                    doc.text(`${row.day} | Rev ${Number(row.revenue || 0).toFixed(2)} | Net ${Number(row.net || 0).toFixed(2)} | Orders ${Number(row.orderCount || 0)}`);
-                });
-                doc.moveDown();
-                doc.fontSize(12).text('Payment Mix', { underline: true }); doc.fontSize(9);
-                snapshot.payments.forEach((p: any) => { doc.text(`${p.method} | ${Number(p.total || 0).toFixed(2)} | count ${Number(p.count || 0)}`); });
+                kpis = [
+                    { label: T('الطلبات', 'Orders'), value: int(snapshot.overview.orderCount || 0), color: '#0f766e' },
+                    { label: T('إجمالي المبيعات', 'Gross Sales'), value: money(snapshot.overview.grossSales || 0), color: '#1d4ed8' },
+                    { label: T('صافي المبيعات', 'Net Sales'), value: money(snapshot.overview.netSales || 0), color: '#059669' },
+                    { label: T('تكلفة البضاعة', 'COGS'), value: money(snapshot.profit.cogs || 0), color: '#dc2626' },
+                ];
+                sections = [
+                    {
+                        title: T('السلاسل الزمنية', 'Time Series'),
+                        headers: [T('اليوم', 'Day'), T('الإيراد', 'Revenue'), T('الصافي', 'Net'), T('الطلبات', 'Orders')],
+                        rows: dailyRows.slice(0, 60).map((row: any) => [String(row.day || ''), money(row.revenue || 0), money(row.net || 0), int(row.orderCount || 0)]),
+                    },
+                    {
+                        title: T('توزيع طرق الدفع', 'Payment Mix'),
+                        headers: [T('الطريقة', 'Method'), T('الإجمالي', 'Total'), T('العدد', 'Count')],
+                        rows: (snapshot.payments || []).map((p: any) => [String(p.method || ''), money(p.total || 0), int(p.count || 0)]),
+                    },
+                ];
                 break;
             }
         }
 
-        doc.end();
+        const wide = sections.some(s => s.headers.length > 5);
+        const pdf = await renderReportPdf({
+            lang,
+            title,
+            subtitle: T('تقرير تفصيلي من منظومة التقارير', 'Detailed system report'),
+            meta: [
+                [T('النوع', 'Type'), reportType],
+                [T('الفرع', 'Branch'), branchName || branchId || T('كل الفروع', 'All branches')],
+                [T('الفترة', 'Range'), rangeLabel],
+            ],
+            kpis,
+            sections,
+            signatures: [T('أعدّه', 'Prepared by'), T('المدير المسؤول', 'Responsible Manager')],
+            footerTag: reportType,
+            footerMeta: rangeLabel,
+            orientation: wide ? 'landscape' : 'portrait',
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(pdf);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }

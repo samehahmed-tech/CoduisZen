@@ -84,6 +84,51 @@ export function withLocalAvatars<T extends { id: string; avatar?: string }>(user
     return changed ? merged : users;
 }
 
+const SERVER_KEY = 'user_avatars_v1';
+
+const parseAvatarMap = (value: unknown): AvatarMap => {
+    try {
+        if (!value) return {};
+        if (typeof value === 'object') return value as AvatarMap;
+        const parsed = JSON.parse(String(value));
+        return parsed && typeof parsed === 'object' ? (parsed as AvatarMap) : {};
+    } catch {
+        return {};
+    }
+};
+
+/**
+ * Server avatar map (cross-terminal). Lazy-imports the API layer so this
+ * util never creates an import cycle with the store.
+ */
+export async function fetchServerAvatarMap(): Promise<AvatarMap> {
+    try {
+        const { apiRequest } = await import('../../services/api/core');
+        const all = await apiRequest<any>('/settings');
+        return parseAvatarMap(all?.[SERVER_KEY]);
+    } catch {
+        return {};
+    }
+}
+
+/** Best-effort read-modify-write of one entry (admin-gated endpoint). */
+export async function saveServerAvatar(userId: string, dataUrl: string | null): Promise<void> {
+    if (!userId) return;
+    try {
+        const { apiRequest } = await import('../../services/api/core');
+        const all = await apiRequest<any>('/settings').catch(() => ({}));
+        const map = parseAvatarMap(all?.[SERVER_KEY]);
+        if (dataUrl) map[String(userId)] = dataUrl;
+        else delete map[String(userId)];
+        await apiRequest('/settings/' + SERVER_KEY, {
+            method: 'PUT',
+            body: JSON.stringify({ value: map, category: 'general' }),
+        });
+    } catch {
+        // Local copy already saved — server sync is a bonus, never blocks.
+    }
+}
+
 /**
  * Convert an uploaded image file to a small compressed data-URL
  * suitable for localStorage. Rejects oversized/invalid files.

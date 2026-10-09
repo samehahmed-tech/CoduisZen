@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
     sendMail, getInbox, getSent, getMessage, getMailThread,
     markMailRead, toggleMailStar, archiveMail,
-    getMailUnreadCount, getMailDirectory, deleteSentMail,
+    getMailUnreadCount, getMailDirectory, deleteSentMail, deleteInboxMail,
 } from '../controllers/mailController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -21,5 +21,6 @@ router.post('/:id/archive', archiveMail);
 router.get('/unread-count', getMailUnreadCount);
 router.get('/directory', getMailDirectory);
 router.delete('/sent/:id', deleteSentMail);
+router.delete('/inbox/:id', deleteInboxMail);
 
 export default router;

@@ -1,17 +1,21 @@
 import React, { createContext, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { THEME_REGISTRY, type ThemeConfig } from './tokens';
+import { migrateThemeId } from './engine/migrate';
+import { sanitizeColorOverrides } from './engine/validation';
+import { sanitizeBackgroundConfig, buildBackgroundCSS } from './engine/background';
+import { resolveUserOverrides } from './engine/resolve';
 import type { AppTheme } from '../types';
-import auroraGlassThemeUrl from '../styles/themes/aurora-glass.css?url';
-import midnightCommandThemeUrl from '../styles/themes/midnight-command.css?url';
-import neoBrutalThemeUrl from '../styles/themes/neo-brutal.css?url';
-import softOrganicThemeUrl from '../styles/themes/soft-organic.css?url';
-import editorialLuxuryThemeUrl from '../styles/themes/editorial-luxury.css?url';
-import terminalOpsThemeUrl from '../styles/themes/terminal-ops.css?url';
-import futureHudThemeUrl from '../styles/themes/future-hud.css?url';
-import bentoSaasThemeUrl from '../styles/themes/bento-saas.css?url';
-import industrialOpsThemeUrl from '../styles/themes/industrial-ops.css?url';
-import premiumHospitalityThemeUrl from '../styles/themes/premium-hospitality.css?url';
+import meridianThemeUrl from '../styles/themes/meridian.css?url';
+import commandThemeUrl from '../styles/themes/command.css?url';
+import glasslineThemeUrl from '../styles/themes/glassline.css?url';
+import canvasThemeUrl from '../styles/themes/canvas.css?url';
+import fluentProThemeUrl from '../styles/themes/fluent-pro.css?url';
+import materialXThemeUrl from '../styles/themes/material-x.css?url';
+import obsidianThemeUrl from '../styles/themes/obsidian.css?url';
+import tilesThemeUrl from '../styles/themes/tiles.css?url';
+import acrylicThemeUrl from '../styles/themes/acrylic.css?url';
+import touchThemeUrl from '../styles/themes/touch.css?url';
 
 export interface ThemeContextValue {
     theme: AppTheme;
@@ -26,16 +30,16 @@ export const ThemeContext = createContext<ThemeContextValue | null>(null);
 const THEME_STYLESHEET_ID = 'restoflow-theme-stylesheet';
 
 const THEME_STYLESHEET_URLS: Record<AppTheme, string> = {
-    'aurora-glass': auroraGlassThemeUrl,
-    'midnight-command': midnightCommandThemeUrl,
-    'neo-brutal': neoBrutalThemeUrl,
-    'soft-organic': softOrganicThemeUrl,
-    'editorial-luxury': editorialLuxuryThemeUrl,
-    'terminal-ops': terminalOpsThemeUrl,
-    'future-hud': futureHudThemeUrl,
-    'bento-saas': bentoSaasThemeUrl,
-    'industrial-ops': industrialOpsThemeUrl,
-    'premium-hospitality': premiumHospitalityThemeUrl,
+    'meridian': meridianThemeUrl,
+    'command': commandThemeUrl,
+    'glassline': glasslineThemeUrl,
+    'canvas': canvasThemeUrl,
+    'fluent-pro': fluentProThemeUrl,
+    'material-x': materialXThemeUrl,
+    'obsidian': obsidianThemeUrl,
+    'tiles': tilesThemeUrl,
+    'acrylic': acrylicThemeUrl,
+    'touch': touchThemeUrl,
 };
 
 function applySemanticTokenLayers(config: ThemeConfig) {
@@ -116,115 +120,115 @@ function applySemanticTokenLayers(config: ThemeConfig) {
 }
 
 const POS_CARD_THEME_TOKENS: Record<AppTheme, Record<string, string>> = {
-    'aurora-glass': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34, 211, 238, 0.35), transparent 26%), linear-gradient(135deg, #4f46e5, rgb(var(--primary))), rgb(var(--primary))',
+    'meridian': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(129,140,248,0.35), transparent 26%), linear-gradient(135deg, #4f46e5, #6d28d9)',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '224 231 255',
-        '--pos-theme-card-action-bg': 'rgba(255, 255, 255, 0.94)',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(255, 255, 255, 0.20)',
-        '--pos-theme-card-badge-bg': 'rgba(34, 211, 238, 0.9)',
-        '--pos-theme-card-pattern-opacity': '0.26',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.5)',
-    },
-    'midnight-command': {
-        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, rgb(var(--primary)), #1e293b), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '220 224 235',
+        '--pos-theme-card-hero-muted': '225 230 250',
         '--pos-theme-card-action-bg': '#ffffff',
         '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(10, 14, 25, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-pattern-opacity': '0.08',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
-    },
-    'neo-brutal': {
-        '--pos-theme-card-hero-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-hero-text': 'var(--bg-card)',
-        '--pos-theme-card-hero-muted': 'var(--text-muted)',
-        '--pos-theme-card-action-bg': 'rgb(var(--accent))',
-        '--pos-theme-card-action-text': '15 15 15',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.9)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
-        '--pos-theme-card-pattern-opacity': '0',
-        '--pos-theme-card-art-ring': 'rgba(var(--border-color), 0.9)',
-    },
-    'soft-organic': {
-        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, rgb(var(--primary)), #e8a87c), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '255 240 225',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(90, 60, 40, 0.25)',
-        '--pos-theme-card-badge-bg': 'rgba(232, 168, 124, 0.95)',
-        '--pos-theme-card-pattern-opacity': '0.14',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.5)',
-    },
-    'editorial-luxury': {
-        '--pos-theme-card-hero-bg': 'rgb(var(--bg-card))',
-        '--pos-theme-card-hero-text': 'var(--text-main)',
-        '--pos-theme-card-hero-muted': 'var(--text-muted)',
-        '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': 'var(--bg-card)',
-        '--pos-theme-card-control-bg': 'rgba(var(--bg-elevated), 0.9)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
-        '--pos-theme-card-pattern-opacity': '0',
-        '--pos-theme-card-art-ring': 'rgba(var(--border-color), 0.8)',
-    },
-    'terminal-ops': {
-        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #0c2b1a, rgb(var(--primary))), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '220 240 225',
-        '--pos-theme-card-hero-muted': '150 190 160',
-        '--pos-theme-card-action-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-action-text': '4 12 8',
-        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.35)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-pattern-opacity': '0.18',
-        '--pos-theme-card-art-ring': 'rgba(60, 220, 130, 0.5)',
-    },
-    'future-hud': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34, 211, 238, 0.4), transparent 26%), linear-gradient(135deg, #0c2340, rgb(var(--primary))), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '210 230 250',
-        '--pos-theme-card-action-bg': 'rgba(255, 255, 255, 0.95)',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.3)',
-        '--pos-theme-card-badge-bg': 'rgba(34, 211, 238, 0.9)',
-        '--pos-theme-card-pattern-opacity': '0.24',
-        '--pos-theme-card-art-ring': 'rgba(34, 211, 238, 0.55)',
-    },
-    'bento-saas': {
-        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, rgb(var(--primary)), #ec4899), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '240 230 250',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(40, 30, 90, 0.25)',
-        '--pos-theme-card-badge-bg': 'rgba(236, 72, 153, 0.9)',
+        '--pos-theme-card-control-bg': 'rgba(30, 27, 75, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgba(245, 158, 11, 0.92)',
         '--pos-theme-card-pattern-opacity': '0.16',
         '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
     },
-    'industrial-ops': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 80% 10%, rgba(76,194,255,0.35), transparent 45%), linear-gradient(135deg, #0078d4, #106ebe), rgb(var(--primary))',
+    'command': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(56,189,248,0.3), transparent 26%), linear-gradient(135deg, #0c4a6e, #0284c7)',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '220 235 248',
+        '--pos-theme-card-hero-muted': '220 235 245',
         '--pos-theme-card-action-bg': '#ffffff',
         '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.22)',
-        '--pos-theme-card-badge-bg': '#4cc2ff',
-        '--pos-theme-card-pattern-opacity': '0.12',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.5)',
+        '--pos-theme-card-control-bg': 'rgba(5, 15, 25, 0.32)',
+        '--pos-theme-card-badge-bg': 'rgba(250, 204, 21, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.1',
+        '--pos-theme-card-art-ring': 'rgba(56, 189, 248, 0.5)',
     },
-    'premium-hospitality': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 15%, rgba(212, 175, 105, 0.4), transparent 28%), linear-gradient(135deg, #6e1822, rgb(var(--primary))), rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 250 240',
-        '--pos-theme-card-hero-muted': '235 215 190',
-        '--pos-theme-card-action-bg': 'rgba(255, 255, 255, 0.95)',
+    'glassline': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34,211,238,0.4), transparent 26%), linear-gradient(135deg, #6366f1, #06b6d4)',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '230 232 255',
+        '--pos-theme-card-action-bg': '#ffffff',
         '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(40, 20, 15, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgba(212, 175, 105, 0.92)',
+        '--pos-theme-card-control-bg': 'rgba(30, 27, 75, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgba(34, 211, 238, 0.9)',
         '--pos-theme-card-pattern-opacity': '0.2',
-        '--pos-theme-card-art-ring': 'rgba(212, 175, 105, 0.55)',
+        '--pos-theme-card-art-ring': 'rgba(165, 180, 252, 0.55)',
+    },
+    'canvas': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #1e3a8a, #1e40af)',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '220 228 240',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(15, 23, 42, 0.28)',
+        '--pos-theme-card-badge-bg': 'rgba(146, 64, 14, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.08',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
+    },
+    'fluent-pro': {
+        '--pos-theme-card-hero-bg': 'rgb(var(--primary))',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '220 228 240',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(15, 23, 42, 0.25)',
+        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
+        '--pos-theme-card-pattern-opacity': '0',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
+    },
+    'material-x': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(249,168,212,0.4), transparent 26%), linear-gradient(135deg, #7c3aed, #db2777)',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '240 225 245',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(50, 15, 50, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgba(219, 39, 119, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.2',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+    },
+    'obsidian': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(94,106,210,0.3), transparent 26%), linear-gradient(135deg, #1a1a1e, #0c0c0e)',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '220 220 228',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.40)',
+        '--pos-theme-card-badge-bg': 'rgba(94, 106, 210, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.1',
+        '--pos-theme-card-art-ring': 'rgba(94, 106, 210, 0.55)',
+    },
+    'tiles': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(96,165,250,0.3), transparent 26%), linear-gradient(135deg, #2563eb, #4f46e5)',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '225 232 250',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(15, 25, 50, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgba(37, 99, 235, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.14',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+    },
+    'acrylic': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(45,212,191,0.3), transparent 26%), linear-gradient(135deg, #4755ab, #0d9488)',
+        '--pos-theme-card-hero-text': '255 255 255',
+        '--pos-theme-card-hero-muted': '230 235 245',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(25, 30, 50, 0.30)',
+        '--pos-theme-card-badge-bg': 'rgba(13, 148, 136, 0.9)',
+        '--pos-theme-card-pattern-opacity': '0.16',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+    },
+    'touch': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(245,158,11,0.4), transparent 26%), linear-gradient(135deg, #c2410c, #ea580c)',
+        '--pos-theme-card-hero-text': '255 250 242',
+        '--pos-theme-card-hero-muted': '244 224 200',
+        '--pos-theme-card-action-bg': '#ffffff',
+        '--pos-theme-card-action-text': 'var(--primary)',
+        '--pos-theme-card-control-bg': 'rgba(40, 20, 10, 0.28)',
+        '--pos-theme-card-badge-bg': 'rgba(245, 158, 11, 0.92)',
+        '--pos-theme-card-pattern-opacity': '0.2',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
     },
 };
 
@@ -272,7 +276,7 @@ function applyThemeCSSVariables(config: ThemeConfig) {
 
 function applyPOSCardThemeVariables(theme: AppTheme) {
     const root = document.documentElement;
-    const tokens = POS_CARD_THEME_TOKENS[theme] ?? POS_CARD_THEME_TOKENS['aurora-glass'];
+    const tokens = POS_CARD_THEME_TOKENS[theme] ?? POS_CARD_THEME_TOKENS['meridian'];
     Object.entries(tokens).forEach(([key, value]) => {
         root.style.setProperty(key, value);
     });
@@ -282,27 +286,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const settings = useAuthStore((s) => s.settings);
     const updateSettings = useAuthStore((s) => s.updateSettings);
 
-    // Migrate stored choices from retired (pre-10-personality) theme ids.
-    const LEGACY_THEME_MAP: Record<string, AppTheme> = {
-        'fluent-frost': 'aurora-glass',
-        'aero-glass': 'aurora-glass',
-        'aurora-mesh': 'aurora-glass',
-        'mica-noir': 'midnight-command',
-        'cupertino-noir': 'midnight-command',
-        'cupertino-mist': 'soft-organic',
-        'material-bloom': 'bento-saas',
-        'pixel-dusk': 'future-hud',
-        'linear-drift': 'terminal-ops',
-        'notion-bone': 'editorial-luxury',
-    };
+    // Engine 2.0 migration: any stored id from any generation resolves to a
+    // living V2 theme. Unknown/malformed values fall back to meridian safely.
     const storedTheme = settings.theme as string | undefined;
-    const themeId = (
-        storedTheme && THEME_REGISTRY[storedTheme as AppTheme]
-            ? storedTheme
-            : (storedTheme && LEGACY_THEME_MAP[storedTheme]) || 'aurora-glass'
-    ) as AppTheme;
-    const isDark = settings.isDarkMode;
-    const config = THEME_REGISTRY[themeId] ?? THEME_REGISTRY['aurora-glass'];
+    const themeId = migrateThemeId(storedTheme);
+    const isDark = settings.isDarkMode ?? true;
+    const config = THEME_REGISTRY[themeId as AppTheme] ?? THEME_REGISTRY['meridian' as AppTheme];
 
     useEffect(() => {
         const root = document.documentElement;
@@ -311,7 +300,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         root.setAttribute('data-theme', themeId);
         body.setAttribute('data-theme', themeId);
         root.setAttribute('data-motion-style', config.motion.style);
+        // Motion Engine 2.0: three levels. Legacy boolean preserved (false = off).
+        const motionLevel = settings.motionLevel || (settings.motionEffects === false ? 'off' : 'full');
+        root.setAttribute('data-motion-level', motionLevel);
+        // Motion effects master switch (settings, default ON for beauty).
+        root.setAttribute('data-motion', motionLevel === 'off' ? 'off' : 'on');
+        root.setAttribute('data-motion-reduced', motionLevel === 'reduced' ? 'true' : 'false');
         root.setAttribute('data-interaction-intensity', config.interaction?.intensity ?? 'standard');
+        // Density drives density.css scale vars via shell class (applied below).
 
         if (isDark) {
             root.classList.add('dark');
@@ -320,6 +316,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             root.classList.remove('dark');
             body.classList.remove('dark');
         }
+        // Native controls (date inputs, scrollbars, form widgets) follow the
+        // active mode on every theme instead of staying light.
+        root.style.setProperty('color-scheme', isDark ? 'dark' : 'light');
 
         if (settings.language === 'ar') {
             root.setAttribute('dir', 'rtl');
@@ -330,10 +329,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
 
         applyThemeCSSVariables(config);
-        applyPOSCardThemeVariables(themeId);
+        applyPOSCardThemeVariables(themeId as AppTheme);
+        // Color Engine 2.0: validated brand-only overrides win over the theme
+        // personality (status/focus tokens are never overridable). Stale inline
+        // vars are removed so Reset truly restores theme defaults — atomic.
+        const { vars: overrideVars } = resolveUserOverrides(sanitizeColorOverrides(settings.colorOverrides), isDark);
+        for (const key of ['--primary', '--primary-hover', '--secondary', '--accent']) {
+            if (key in overrideVars) root.style.setProperty(key, overrideVars[key]);
+            else root.style.removeProperty(key);
+        }
 
         const shell = document.querySelector('.workspace-shell') as HTMLElement | null;
         if (shell) {
+            // Density 2.0: explicit class drives density.css scale vars.
+            shell.classList.remove('density-compact', 'density-comfortable', 'density-spacious');
+            shell.classList.add(`density-${settings.density || 'comfortable'}`);
+            shell.setAttribute('data-density', settings.density || 'comfortable');
             const wp = settings.wallpaper || 'none';
             const wpOpacity = settings.wallpaperOpacity ?? 0.15;
             if (wp && wp !== 'none') {
@@ -344,16 +355,35 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 } else {
                     shell.style.removeProperty('--wp-img');
                 }
+                // A chosen wallpaper image always wins over the background engine.
+                shell.removeAttribute('data-bg-engine');
+                shell.style.removeProperty('--te2-bg-image');
+                shell.style.removeProperty('--te2-bg-size');
             } else {
                 shell.removeAttribute('data-wallpaper');
                 shell.style.setProperty('--wallpaper-opacity', '0');
                 shell.style.removeProperty('--wp-img');
+                // Background Engine 2.0: validated config paints the shell layer.
+                const bgCfg = sanitizeBackgroundConfig(settings.backgroundConfig);
+                if (bgCfg.type !== 'theme-native') {
+                    const built = buildBackgroundCSS(bgCfg);
+                    shell.style.setProperty('--te2-bg-image', built.backgroundImage);
+                    if (built.backgroundSize) shell.style.setProperty('--te2-bg-size', built.backgroundSize);
+                    else shell.style.removeProperty('--te2-bg-size');
+                    shell.setAttribute('data-bg-engine', bgCfg.type);
+                    shell.setAttribute('data-bg-speed', bgCfg.speed || 'off');
+                } else {
+                    shell.removeAttribute('data-bg-engine');
+                    shell.removeAttribute('data-bg-speed');
+                    shell.style.removeProperty('--te2-bg-image');
+                    shell.style.removeProperty('--te2-bg-size');
+                }
             }
         }
-    }, [themeId, isDark, config, settings.language, settings.wallpaper, settings.wallpaperOpacity, settings.customWallpaperUrl]);
+    }, [themeId, isDark, config, settings.language, settings.wallpaper, settings.wallpaperOpacity, settings.customWallpaperUrl, settings.density, settings.backgroundConfig]);
 
     useEffect(() => {
-        const href = THEME_STYLESHEET_URLS[themeId] || THEME_STYLESHEET_URLS['aurora-glass'];
+        const href = THEME_STYLESHEET_URLS[themeId as AppTheme] || THEME_STYLESHEET_URLS['meridian' as AppTheme];
         let link = document.getElementById(THEME_STYLESHEET_ID) as HTMLLinkElement | null;
 
         if (!link) {

@@ -962,7 +962,11 @@ export const createOrder = async (req: Request, res: Response) => {
             activeShift = found;
         }
 
-        if (!activeShift) {
+        // Call-center orders are scheduled/remote: they must NOT block on a
+        // branch cash shift. Dine-in/POS orders still require one.
+        const isCallCenterOrder = orderData.isCallCenterOrder === true
+            || String(orderData.source || '').toLowerCase() === 'call_center';
+        if (!activeShift && !isCallCenterOrder) {
             await clearIdempotencyClaim();
             return res.status(400).json({
                 error: 'SHIFT_REQUIRED',
@@ -1418,7 +1422,7 @@ const [createdOrExistingCustomer] = await tx
                 tipAmount: orderData.tipAmount || 0,
                 serviceCharge: serviceCharge,
                 total,
-                shiftId: activeShift.id,
+                shiftId: activeShift?.id ?? orderData.shiftId ?? null,
                 businessDate: activeBusinessDate,
                 createdAt: sql`CAST(${orderTimestamp.toISOString()} AS datetime2(3))` as any,
                 updatedAt: new Date(),
@@ -1628,13 +1632,22 @@ const [createdOrExistingCustomer] = await tx
         const isPosOrder = String(orderData.source || '').toLowerCase() === 'pos';
         const skipAutoKitchenDispatch = isPosOrder && orderData.skipKitchenDispatch === true;
         const isScheduledSaved = String(savedOrder.status || '').toUpperCase() === 'SCHEDULED';
+        // Physical kitchen printing has one owner per order source: the POS
+        // renders the designed (ReceiptDesigner) ticket itself and enqueues it
+        // as image bytes, so the server must NOT also enqueue its plain-text
+        // fallback for the same order (slow PowerShell raster + duplicates).
+        // KDS screen tickets are always created; only the PRINT enqueue is
+        // gated. Non-POS sources (call center, kiosk without client print)
+        // keep the server text fallback so they never go kitchen-blind.
+        const posHandlesPrinting = isPosOrder && orderData.clientHandlesPrinting === true;
+        const dispatchPrintJobs = !posHandlesPrinting;
         if (!skipAutoKitchenDispatch && ['DINE_IN', 'KIOSK'].includes(String(savedOrder.type))) {
-            await kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch((error) => {
+            await kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id, { enqueuePrintJobs: dispatchPrintJobs }).catch((error) => {
                 console.error('[Orders] KDS auto-dispatch failed', savedOrder.id, error);
                 inventoryWarnings.push({ code: 'KDS_DISPATCH_FAILED', orderId: savedOrder.id });
             });
         } else if (!skipAutoKitchenDispatch && !isScheduledSaved && ['DELIVERY', 'TAKEAWAY', 'PICKUP'].includes(String(savedOrder.type))) {
-            kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
+            kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id, { enqueuePrintJobs: dispatchPrintJobs }).catch(() => {});
         } else if (!skipAutoKitchenDispatch && paidNow && !isPosOrder && !isScheduledSaved) {
             kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id).catch(() => {});
         }
@@ -1836,6 +1849,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             approvalId: approval_id,
             paymentMethod,
             payments: paymentRows,
+            forceVoid: (req.body as any)?.forceVoid === true,
             user: {
                 role: req.user?.role,
                 branchId: req.user?.branchId,
@@ -2079,15 +2093,18 @@ export const updateOrderItems = async (req: Request, res: Response) => {
         if (!currentOrder) return res.status(404).json({ error: 'ORDER_NOT_FOUND', code: 'ORDER_NOT_FOUND' });
         const editableStatuses = ['PENDING', 'SCHEDULED'];
         const statusUpper = String(currentOrder.status || '').toUpperCase();
-        // Café reality: dine-in tickets stay open while the kitchen works, and
-        // the cashier edits them repeatedly. Allow rewriting a FIRED dine-in
-        // ticket only while it is unpaid — totals recompute from scratch, open
-        // KDS tickets rebuild, inventory moves by delta. Paid/fired tickets
-        // keep the cancel + refund flow (money already moved).
+        // Café reality: dine-in tickets stay open while the kitchen works
+        // (PREPARING → READY → SERVED), and the cashier edits them
+        // repeatedly. Allow rewriting a FIRED dine-in ticket in ANY
+        // non-terminal status while it is unpaid — totals recompute from
+        // scratch, open KDS tickets rebuild, inventory moves by delta.
+        // Paid/fired tickets keep the cancel + refund flow (money moved).
         let unpaidDineInEdit = false;
         if (!editableStatuses.includes(statusUpper)) {
-            const isFiredDineIn = String(currentOrder.type || '').toUpperCase() === 'DINE_IN' && statusUpper === 'PREPARING';
-            if (isFiredDineIn && !currentOrder.isPaid && Number(currentOrder.paidAmount || 0) === 0) {
+            const terminalStatuses = ['DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED'];
+            const isOpenDineIn = String(currentOrder.type || '').toUpperCase() === 'DINE_IN'
+                && !terminalStatuses.includes(statusUpper);
+            if (isOpenDineIn && !currentOrder.isPaid && Number(currentOrder.paidAmount || 0) === 0) {
                 const [paidRow] = await db.select({ id: payments.id }).top(1).from(payments)
                     .where(and(eq(payments.orderId, orderId), eq(payments.status, 'COMPLETED')));
                 unpaidDineInEdit = !paidRow;
@@ -2430,7 +2447,11 @@ export const updateOrderItems = async (req: Request, res: Response) => {
         });
 
         if (!isScheduledEditOrder) {
-            await kdsController.dispatchToKitchen(currentOrder.branchId, orderId).catch(() => undefined);
+            // Screen tickets rebuild so the kitchen sees the edit; physical
+            // reprint is owned by the POS (designed ticket, background print).
+            // Enqueuing the plain-text fallback here too would double-print
+            // every table edit on network printers.
+            await kdsController.dispatchToKitchen(currentOrder.branchId, orderId, { enqueuePrintJobs: false }).catch(() => undefined);
         }
         emitBranchEvent(currentOrder.branchId, 'order:status', { id: orderId, status: String(currentOrder.status || 'PENDING'), updatedAt: now });
         emitBranchEvent(currentOrder.branchId, 'order:updated', { id: orderId, total, updatedAt: now });

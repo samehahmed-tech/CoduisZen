@@ -54,7 +54,6 @@ import {
     Building2,
     LayoutGrid,
     Rows3,
-    Sparkles,
     List,
     Activity,
     Printer,
@@ -452,9 +451,23 @@ const CallCenter: React.FC = () => {
     const currencySymbol = lang === 'ar' ? 'ج.م' : 'EGP';
     const tr = (ar: string, en: string) => lang === 'ar' ? ar : en;
 
-    // --- View State ---
+    // --- View State (same view system as POS: density + card size + grid/retail) ---
+    const CC_UI_PREFS_KEY = 'coduiszen_cc_ui_prefs_v1';
+    const CC_DENSITIES = ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'] as const;
+    const updateSettings = useAuthStore((s: any) => s.updateSettings);
     const [activeView, setActiveView] = useState<'order' | 'tracking'>('order');
-    const [menuDensity, setMenuDensity] = useState<'comfortable' | 'compact' | 'ultra' | 'buttons'>('comfortable');
+    const [menuDensity, setMenuDensity] = useState<string>(() => {
+        const s = (settings as any)?.ccItemDensity || (settings as any)?.posItemDensity;
+        return typeof s === 'string' && (CC_DENSITIES as readonly string[]).includes(s) ? s : 'typo';
+    });
+    const [ccCardSize, setCcCardSize] = useState<'small' | 'medium' | 'large'>(() => {
+        const s = (settings as any)?.ccCardSize || (settings as any)?.posCardSize;
+        return s === 'small' || s === 'large' ? s : 'medium';
+    });
+    const [ccPosMode, setCcPosMode] = useState<'grid' | 'retail'>(() => {
+        const s = (settings as any)?.ccPosMode || (settings as any)?.posMode;
+        return s === 'retail' ? 'retail' : 'grid';
+    });
 
     // --- Order Creation State ---
     const [phoneSearch, setPhoneSearch] = useState('');
@@ -645,6 +658,38 @@ const CallCenter: React.FC = () => {
         try { localStorage.setItem('cc_held_orders', JSON.stringify(heldOrders)); } catch { /* storage full */ }
     }, [heldOrders]);
 
+    // CC view prefs: DB-backed (per-user) wins, localStorage fallback.
+    useEffect(() => {
+        const sD = (settings as any)?.ccItemDensity || (settings as any)?.posItemDensity;
+        const sS = (settings as any)?.ccCardSize || (settings as any)?.posCardSize;
+        const sM = (settings as any)?.ccPosMode || (settings as any)?.posMode;
+        let applied = false;
+        if (typeof sD === 'string' && (CC_DENSITIES as readonly string[]).includes(sD)) { setMenuDensity(sD); applied = true; }
+        if (sS === 'small' || sS === 'medium' || sS === 'large') { setCcCardSize(sS); applied = true; }
+        if (sM === 'grid' || sM === 'retail') { setCcPosMode(sM); applied = true; }
+        if (!applied) {
+            try {
+                const raw = localStorage.getItem(CC_UI_PREFS_KEY);
+                if (raw) {
+                    const p = JSON.parse(raw);
+                    if (typeof p?.menuDensity === 'string' && (CC_DENSITIES as readonly string[]).includes(p.menuDensity)) setMenuDensity(p.menuDensity);
+                    if (p?.ccCardSize === 'small' || p?.ccCardSize === 'medium' || p?.ccCardSize === 'large') setCcCardSize(p.ccCardSize);
+                    if (p?.ccPosMode === 'grid' || p?.ccPosMode === 'retail') setCcPosMode(p.ccPosMode);
+                }
+            } catch { /* ignore */ }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        try { localStorage.setItem(CC_UI_PREFS_KEY, JSON.stringify({ menuDensity, ccCardSize, ccPosMode })); } catch { /* ignore */ }
+    }, [menuDensity, ccCardSize, ccPosMode]);
+
+    useEffect(() => {
+        updateSettings({ ccItemDensity: menuDensity, ccCardSize, ccPosMode } as any);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [menuDensity, ccCardSize, ccPosMode]);
+
     // Load delivery zones (branch zones + global zones)
     // Platforms come from the menu store — same source of truth as POS.
     useEffect(() => {
@@ -673,10 +718,14 @@ const CallCenter: React.FC = () => {
 
     const handleZonePicked = useCallback((zoneId: string, zone?: any) => {
         setSelectedZoneId(zoneId);
-        // Auto-link branch when the zone is tied to a specific branch.
+        // Auto-link branch when the zone is tied to a specific branch. A
+        // GLOBAL zone (no branch) must NOT keep a stale auto-branch: flag it
+        // manual so the agent consciously confirms the fulfilling branch.
         if (zone?.branchId) {
             setSelectedBranchId(String(zone.branchId));
             setBranchManualOverride(false);
+        } else if (zoneId) {
+            setBranchManualOverride(true);
         }
     }, []);
 
@@ -712,13 +761,24 @@ const CallCenter: React.FC = () => {
     // --- PBX Integration ---
     const [incomingPBXCall, setIncomingPBXCall] = useState<{ phone: string, name?: string, timer: number } | null>(null);
 
+    const matchCustomerByPhone = (phone: string) => {
+        const digits = String(phone || '').replace(/\D/g, '');
+        const local = customers.find(c => String(c.phone || '').replace(/\D/g, '') === digits);
+        if (local) return local;
+        // Server-side matches the local cache may not have yet — using them
+        // avoids registering a duplicate customer for a known caller.
+        return (remoteCustomerSuggestions || []).find((c: any) =>
+            String(c.phone || c.phoneNumber || '').replace(/\D/g, '') === digits,
+        );
+    };
+
     const openIncomingCallFromSearch = () => {
         const phone = selectedCustomer?.phone || phoneSearch.trim();
         if (!phone) {
             showToast(lang === 'ar' ? 'اكتب رقم العميل الأول' : 'Enter the customer phone first', 'warning');
             return;
         }
-        const matchedCustomer = customers.find(c => c.phone === phone);
+        const matchedCustomer = matchCustomerByPhone(phone);
         setIncomingPBXCall({
             phone,
             name: matchedCustomer?.name || selectedCustomer?.name || (lang === 'ar' ? 'عميل جديد' : 'New caller'),
@@ -728,7 +788,7 @@ const CallCenter: React.FC = () => {
 
     const answerPBXCall = () => {
         if (!incomingPBXCall) return;
-        const found = customers.find(c => c.phone === incomingPBXCall.phone);
+        const found = matchCustomerByPhone(incomingPBXCall.phone);
         
         setPhoneSearch(incomingPBXCall.phone);
         
@@ -977,7 +1037,14 @@ const CallCenter: React.FC = () => {
         showToast(lang === 'ar' ? 'تم إضافة الطلب السابق للسلة' : 'Previous order added to cart', 'success');
     };
 
-    const normalizePhone = (value: string) => value.replace(/\D/g, '');
+    // Canonical Egyptian mobile shape (01xxxxxxxxx) — +20/0020 variants
+    // collapse to it so the same caller always exact-matches (CRM parity).
+    const normalizePhone = (value: string) => {
+        const digits = String(value || '').replace(/\D/g, '');
+        if (digits.startsWith('0020')) return '0' + digits.slice(4);
+        if (digits.startsWith('20') && digits.length === 13) return '0' + digits.slice(2);
+        return digits;
+    };
 
     const mergeCustomerSuggestions = (localResults: any[], remoteResults: any[]) => {
         const seen = new Set<string>();
@@ -1076,6 +1143,19 @@ const CallCenter: React.FC = () => {
             }
         }
     };
+
+    // Handoff from CRM "Start New Order": the exact-match path above picks
+    // the customer automatically once the phone lands in the search box.
+    useEffect(() => {
+        try {
+            const pending = sessionStorage.getItem('crm_call_phone');
+            if (pending) {
+                sessionStorage.removeItem('crm_call_phone');
+                handlePhoneInputChange(pending);
+            }
+        } catch { /* session storage unavailable */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handlePrintCustomerReport = () => {
         if (!selectedCustomer) return;
@@ -1234,8 +1314,11 @@ const CallCenter: React.FC = () => {
     const subtotal = money(cart.reduce((sum, item) => sum + (((item.price || 0) + lineModsPrice(item)) * (item.quantity || 0)), 0));
     const discountAmount = money(subtotal * (discount / 100));
     const selectedZone = deliveryZones.find(z => String(z.id) === String(selectedZoneId));
-    // Takeaway/pickup has no zone and no delivery fee by definition.
-    const deliveryFee = orderChannel === 'TAKEAWAY' ? 0 : (freeDelivery ? 0 : Number(selectedZone?.deliveryFee ?? 15));
+    // Takeaway/pickup has no zone and no delivery fee by definition. A
+    // delivery with no zone has an UNKNOWN fee — never invent one (the old
+    // hardcoded 15 silently charged made-up money); the submit guard below
+    // requires a zone first, and the server prices authoritatively anyway.
+    const deliveryFee = orderChannel === 'TAKEAWAY' ? 0 : (freeDelivery ? 0 : Number(selectedZone?.deliveryFee ?? 0));
     const targetBranchTaxRate = Number(branches.find((b: any) => b.id === selectedBranchId)?.taxRate ?? settings.taxRate ?? 14);
     const effectiveTaxRate = Number.isFinite(targetBranchTaxRate) && targetBranchTaxRate >= 0 && targetBranchTaxRate <= 100 ? targetBranchTaxRate : 14;
     const tax = money((subtotal - discountAmount) * (effectiveTaxRate / 100));
@@ -1261,6 +1344,14 @@ const CallCenter: React.FC = () => {
             scheduledFor,
             externalRef,
             branchId: selectedBranchId,
+            // Full delivery context — recalling without these delivered to a
+            // wrong/stale address with a wrong fee.
+            deliveryAddress,
+            deliveryPin: { ...deliveryPin },
+            selectedZoneId,
+            freeDelivery,
+            discount,
+            urgentFlag,
             total,
             timestamp: new Date(),
             notes: orderNotes
@@ -1281,6 +1372,12 @@ const CallCenter: React.FC = () => {
             if (order.scheduledFor !== undefined) setScheduledFor(order.scheduledFor);
             if (order.externalRef !== undefined) setExternalRef(order.externalRef);
             if (order.branchId) setSelectedBranchId(order.branchId);
+            if (order.deliveryAddress !== undefined) setDeliveryAddress(order.deliveryAddress);
+            if (order.deliveryPin !== undefined) setDeliveryPin({ ...(order.deliveryPin || {}) });
+            if (order.selectedZoneId !== undefined) setSelectedZoneId(order.selectedZoneId);
+            if (order.freeDelivery !== undefined) setFreeDelivery(Boolean(order.freeDelivery));
+            if (order.discount !== undefined) setDiscount(Number(order.discount) || 0);
+            if (order.urgentFlag !== undefined) setUrgentFlag(Boolean(order.urgentFlag));
             setHeldOrders(heldOrders.filter(o => o.id !== holdId));
         }
     };
@@ -1291,6 +1388,7 @@ const CallCenter: React.FC = () => {
         setPhoneSearch('');
         setDeliveryAddress('');
         setDeliveryPin({});
+        setSelectedZoneId('');
         setOrderNotes('');
         setDiscount(0);
         setFreeDelivery(false);
@@ -1485,6 +1583,12 @@ const CallCenter: React.FC = () => {
                 showToast(tr('وقت الجدولة لازم يكون في المستقبل', 'Scheduled time must be in the future'), 'error');
                 return;
             }
+        }
+        // Delivery without a zone has no fee and no fulfilling branch — block
+        // instead of sending a fee-less order the branch cannot price.
+        if (orderChannel === 'DELIVERY' && !selectedZoneId) {
+            showToast(tr('اختر منطقة التوصيل أولاً (تحدد الرسوم والفرع)', 'Select the delivery zone first (it sets the fee and branch)'), 'error');
+            return;
         }
 
         setIsSubmittingOrder(true);
@@ -2212,11 +2316,34 @@ const CallCenter: React.FC = () => {
                                             <span className="opacity-60">•</span>
                                             <span className="max-w-[140px] truncate">{branches.find((b: any) => b.id === selectedBranchId)?.name || ''}</span>
                                         </div>
-                                        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl p-1 shrink-0 border border-border/50 shadow-sm">
-                                            <button onClick={() => setMenuDensity('comfortable')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'comfortable' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'ملصق' : 'Poster'}><LayoutGrid size={15} /></button>
-                                            <button onClick={() => setMenuDensity('compact')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'compact' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'دفتر' : 'Ledger'}><Rows3 size={15} /></button>
-                                            <button onClick={() => setMenuDensity('ultra')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'ultra' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'زجاجي' : 'Glass'}><Sparkles size={15} /></button>
-                                            <button onClick={() => setMenuDensity('buttons')} className={`p-1.5 rounded-lg transition-all ${menuDensity === 'buttons' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-500 shadow-sm border border-indigo-500/20' : 'text-muted hover:text-main hover:bg-elevated'}`} title={lang === 'ar' ? 'سبليت' : 'Split'}><Ticket size={15} /></button>
+                                        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-xl p-1 shrink-0 border border-border/50 shadow-sm">
+                                            <select
+                                                value={menuDensity}
+                                                onChange={(e) => setMenuDensity(e.target.value)}
+                                                aria-label={lang === 'ar' ? 'طريقة العرض' : 'View density'}
+                                                title={lang === 'ar' ? 'طريقة العرض (نفس شاشة البيع)' : 'View density (same as POS)'}
+                                                className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer px-1 max-w-[110px]"
+                                            >
+                                                <option value="sahara">{lang === 'ar' ? 'سهارا' : 'Sahara'}</option>
+                                                <option value="typo">{lang === 'ar' ? 'مطبعة' : 'Typo'}</option>
+                                                <option value="noir">{lang === 'ar' ? 'ليلي' : 'Noir'}</option>
+                                                <option value="vitrine">{lang === 'ar' ? 'فيترين' : 'Vitrine'}</option>
+                                                <option value="circle">{lang === 'ar' ? 'دائري' : 'Circle'}</option>
+                                                <option value="kiosk">{lang === 'ar' ? 'كيوسك' : 'Kiosk'}</option>
+                                                <option value="pop">{lang === 'ar' ? 'بوب' : 'Pop'}</option>
+                                                <option value="gold">{lang === 'ar' ? 'ذهبي' : 'Gold'}</option>
+                                            </select>
+                                            <span className="w-px h-4 bg-border/50" />
+                                            <select
+                                                value={ccCardSize}
+                                                onChange={(e) => setCcCardSize(e.target.value as 'small' | 'medium' | 'large')}
+                                                aria-label={lang === 'ar' ? 'حجم الكارت' : 'Card size'}
+                                                className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer px-1"
+                                            >
+                                                <option value="small">{lang === 'ar' ? 'صغير' : 'S'}</option>
+                                                <option value="medium">{lang === 'ar' ? 'وسط' : 'M'}</option>
+                                                <option value="large">{lang === 'ar' ? 'كبير' : 'L'}</option>
+                                            </select>
                                         </div>
                                     </div>
                                     {/* Category Scrolling Row */}
@@ -2275,7 +2402,7 @@ const CallCenter: React.FC = () => {
                                         </div>
                                     ) : (
                                         <div className="flex-1 min-h-0 overflow-hidden">
-                                            <ItemGrid items={pricedItems} onAddItem={handleGridAdd} onRemoveItem={handleGridRemoveOne} cartItems={cart} currencySymbol={currencySymbol} isTouchMode={Boolean((settings as any)?.isTouchMode)} density={menuDensity === 'buttons' ? 'buttons' : menuDensity === 'ultra' ? 'ultra' : menuDensity === 'compact' ? 'compact' : 'comfortable'} lang={lang} />
+                                            <ItemGrid items={pricedItems} onAddItem={handleGridAdd} onRemoveItem={handleGridRemoveOne} cartItems={cart} currencySymbol={currencySymbol} isTouchMode={Boolean((settings as any)?.isTouchMode)} density={menuDensity as any} cardSize={ccCardSize} lang={lang} />
                                         </div>
                                     )}
                                 </div>
@@ -2332,7 +2459,14 @@ const CallCenter: React.FC = () => {
                                             ))}
                                         </div>
                                         {orderChannel === 'DELIVERY' && (
-                                            <button onClick={() => setFreeDelivery(!freeDelivery)} title={lang === 'ar' ? 'توصيل مجاني' : 'Free delivery'} className={`p-2 rounded-lg border transition-all ${freeDelivery ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-elevated text-muted border-border/50 hover:text-emerald-500'}`}>
+                                            <button onClick={() => {
+                                                // Zeroing the fee is a discount-equivalent: same gate as discounts.
+                                                if (!freeDelivery && !hasPermission(AppPermission.OP_APPLY_DISCOUNT)) {
+                                                    requestManagerApproval('APPLY_DISCOUNT', () => setFreeDelivery(true));
+                                                    return;
+                                                }
+                                                setFreeDelivery(!freeDelivery);
+                                            }} title={lang === 'ar' ? 'توصيل مجاني' : 'Free delivery'} className={`p-2 rounded-lg border transition-all ${freeDelivery ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-elevated text-muted border-border/50 hover:text-emerald-500'}`}>
                                                 <Bike size={14} />
                                             </button>
                                         )}

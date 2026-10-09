@@ -152,8 +152,8 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
 
     const alignClass = (a?: string) => (a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left');
 
-    const restaurantLogo = (settings as any)?.receiptLogoUrl || '/logo.png?v=2';
-    const systemLogoRaw = (settings as any)?.systemLogoUrl || '/logo.png?v=2';
+    const restaurantLogo = (settings as any)?.receiptLogoUrl || '/logo.png?v=6';
+    const systemLogoRaw = (settings as any)?.systemLogoUrl || '/logo.png?v=6';
     // Second mark only when it is a genuinely different image — never the
     // same logo twice.
     const normLogo = (u?: string) => {
@@ -165,12 +165,12 @@ const ReportDataTable: React.FC<ReportDataTableProps> = ({
 
     return (
         <div className="card-primary rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
-            <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+            <div className="p-4 md:p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-1.5" data-pdf-hide="false">
-                        <img src={restaurantLogo} alt="" className="h-10 w-auto max-w-[170px] rounded-xl border border-slate-800 object-contain bg-[#0b1b30] px-2 py-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <img src={restaurantLogo} alt="" className="h-8 w-auto max-w-[130px] rounded-xl border border-slate-800 object-contain bg-[#0b1b30] px-2 py-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         {showDualLogos && (
-                            <img src={systemLogoRaw} alt="" className="h-8 w-auto max-w-[130px] rounded-xl border border-[#c9a227]/60 object-contain bg-[#0b1b30] px-2 py-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            <img src={systemLogoRaw} alt="" className="h-7 w-auto max-w-[110px] rounded-xl border border-[#c9a227]/60 object-contain bg-[#0b1b30] px-2 py-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         )}
                     </div>
                     <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary hidden items-center justify-center">

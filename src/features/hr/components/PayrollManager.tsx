@@ -371,7 +371,17 @@ export default function PayrollManager() {
     );
 
     const totals = useMemo(() => {
-        const gross = selectedPayouts.reduce((sum, p) => sum + Number(p.basicSalary || 0) + Number(p.overtime || 0), 0);
+        // Prefer the server-computed grossPay when present — basic+overtime
+        // alone understates payroll by dropping allowances/bonuses/earnings.
+        const rowGross = (p: any) => {
+            if (p.grossPay !== undefined && p.grossPay !== null) return Number(p.grossPay || 0);
+            return Number(p.basicSalary || 0)
+                + Number(p.overtime || 0)
+                + Number(p.fixedAllowances || 0)
+                + Number(p.bonuses || 0)
+                + Number(p.earnings || 0);
+        };
+        const gross = selectedPayouts.reduce((sum, p) => sum + rowGross(p), 0);
         const deductions = selectedPayouts.reduce((sum, p) => sum + Number(p.deductions || 0), 0);
         const net = selectedPayouts.reduce((sum, p) => sum + Number(p.netPay || 0), 0);
         return { gross, deductions, net };

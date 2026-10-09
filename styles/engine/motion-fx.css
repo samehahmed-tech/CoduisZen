@@ -1,0 +1,63 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTION FX 2.0 — direction-aware reveals, tilt stage, conic beam.
+   Techniques reimplemented originally (no copied code, no libraries).
+   All GPU-only; disabled on touch / reduced-motion / motion-off.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Direction-aware veil (Delgado-style in/out per entry edge) ── */
+.dirfx { position: relative; }
+.dirfx-veil {
+    position: absolute; inset: 0;
+    display: flex; align-items: flex-end;
+    padding: 1rem;
+    background: linear-gradient(0deg, rgba(var(--primary), 0.92), rgba(var(--primary), 0.55));
+    color: #fff;
+    opacity: 0;
+    pointer-events: none;
+    backface-visibility: hidden;
+}
+.dirfx-parent { perspective: 500px; }
+.in-top .dirfx-veil, .in-right .dirfx-veil, .in-bottom .dirfx-veil, .in-left .dirfx-veil { opacity: 1; }
+.in-top .dirfx-veil { transform-origin: 50% 0%; animation: dirfx-in-top 300ms ease 0ms 1 forwards; }
+.in-right .dirfx-veil { transform-origin: 100% 50%; animation: dirfx-in-right 300ms ease 0ms 1 forwards; }
+.in-bottom .dirfx-veil { transform-origin: 50% 100%; animation: dirfx-in-bottom 300ms ease 0ms 1 forwards; }
+.in-left .dirfx-veil { transform-origin: 0% 50%; animation: dirfx-in-left 300ms ease 0ms 1 forwards; }
+.out-top .dirfx-veil { transform-origin: 50% 0%; animation: dirfx-out-top 300ms ease 0ms 1 forwards; }
+.out-right .dirfx-veil { transform-origin: 100% 50%; animation: dirfx-out-right 300ms ease 0ms 1 forwards; }
+.out-bottom .dirfx-veil { transform-origin: 50% 100%; animation: dirfx-out-bottom 300ms ease 0ms 1 forwards; }
+.out-left .dirfx-veil { transform-origin: 0% 50%; animation: dirfx-out-left 300ms ease 0ms 1 forwards; }
+@keyframes dirfx-in-top { from { transform: rotate3d(-1, 0, 0, 90deg); } to { transform: rotate3d(0, 0, 0, 0deg); } }
+@keyframes dirfx-in-right { from { transform: rotate3d(0, -1, 0, 90deg); } to { transform: rotate3d(0, 0, 0, 0deg); } }
+@keyframes dirfx-in-bottom { from { transform: rotate3d(1, 0, 0, 90deg); } to { transform: rotate3d(0, 0, 0, 0deg); } }
+@keyframes dirfx-in-left { from { transform: rotate3d(0, 1, 0, 90deg); } to { transform: rotate3d(0, 0, 0, 0deg); } }
+@keyframes dirfx-out-top { from { transform: rotate3d(0, 0, 0, 0deg); } to { transform: rotate3d(-1, 0, 0, 104deg); } }
+@keyframes dirfx-out-right { from { transform: rotate3d(0, 0, 0, 0deg); } to { transform: rotate3d(0, -1, 0, 104deg); } }
+@keyframes dirfx-out-bottom { from { transform: rotate3d(0, 0, 0, 0deg); } to { transform: rotate3d(1, 0, 0, 104deg); } }
+@keyframes dirfx-out-left { from { transform: rotate3d(0, 0, 0, 0deg); } to { transform: rotate3d(0, 1, 0, 104deg); } }
+
+/* ── Tilt stage (JS drives transform; CSS owns the stage) ── */
+[data-tilt] { transform-style: preserve-3d; will-change: transform; }
+
+/* ── Conic beam: living light border on hover ── */
+@property --beam-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.beam-hover { position: relative; }
+.beam-hover::after {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit;
+    background: conic-gradient(from var(--beam-angle, 0deg), rgb(var(--primary)), rgb(var(--accent)), rgb(var(--primary)));
+    z-index: -1; opacity: 0; transition: opacity 0.35s ease;
+    animation: beam-spin 5s linear infinite;
+}
+.beam-hover:hover::after { opacity: 1; }
+@keyframes beam-spin { to { --beam-angle: 360deg; } }
+
+/* ── Guards ── */
+html[data-motion="off"] .dirfx-veil, html[data-motion="off"] .beam-hover::after { display: none; }
+html[data-motion-level="reduced"] .beam-hover::after { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+    .dirfx-veil, .beam-hover::after { display: none; }
+    [data-tilt] { transform: none !important; }
+}
+@media (pointer: coarse) {
+    .dirfx-veil { display: none; }
+    [data-tilt] { transform: none !important; }
+}

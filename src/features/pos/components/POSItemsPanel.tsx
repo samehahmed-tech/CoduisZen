@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Search, X, SlidersHorizontal, LayoutGrid, Rows3, Type, MoonStar,
-    CircleDot, LayoutDashboard, Coffee, Crown,
+    Search, X, SlidersHorizontal, LayoutGrid, Type, MoonStar,
+    CircleDot, LayoutDashboard, Coffee, Crown, GalleryHorizontal,
     ShoppingBag, Star, CheckCircle, RotateCcw, ArrowUpDown,
 } from 'lucide-react';
 import type { CardDensity, CardSize } from './MenuItemCard';
@@ -85,7 +85,7 @@ const ToolsDropdown: React.FC<{
         { id: 'sahara', icon: LayoutGrid, label: isAr ? 'سهارا' : 'Sahara' },
         { id: 'typo', icon: Type, label: isAr ? 'مطبعة' : 'Typo' },
         { id: 'noir', icon: MoonStar, label: isAr ? 'ليلي' : 'Noir' },
-        { id: 'ticket', icon: Rows3, label: isAr ? 'تذكرة' : 'Ticket' },
+        { id: 'vitrine', icon: GalleryHorizontal, label: isAr ? 'فيترين' : 'Vitrine' },
         { id: 'circle', icon: CircleDot, label: isAr ? 'دائري' : 'Circle' },
         { id: 'kiosk', icon: LayoutDashboard, label: isAr ? 'كيوسك' : 'Kiosk' },
         { id: 'pop', icon: Coffee, label: isAr ? 'بوب' : 'Pop' },

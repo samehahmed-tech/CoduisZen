@@ -393,6 +393,7 @@ export interface Order {
   notes?: string;
   tipAmount?: number;
   kitchenNotes?: string; // Notes for kitchen staff
+  cashierName?: string; // Cashier who placed the order (printed on receipts)
   deliveryNotes?: string;
   driverId?: string; // Link to the assigned driver
   deliveryFee?: number;
@@ -693,6 +694,22 @@ export enum AppPermission {
   NAV_REFUNDS = 'NAV_REFUNDS',
   NAV_FISCAL = 'NAV_FISCAL',
   NAV_MAIL = 'NAV_MAIL',
+
+  // --- Extended Permissions (Phase 3 — full system coverage: every
+  // capability is grantable/revocable from the Roles screen) ---
+  OP_MANAGE_SHIFTS = 'OP_MANAGE_SHIFTS',
+  OP_MANAGE_DELIVERY = 'OP_MANAGE_DELIVERY',
+  OP_MANAGE_MARKETING = 'OP_MANAGE_MARKETING',
+  OP_MANAGE_WASTAGE = 'OP_MANAGE_WASTAGE',
+  OP_MANAGE_PRODUCTION = 'OP_MANAGE_PRODUCTION',
+  OP_MANAGE_BUDGETS = 'OP_MANAGE_BUDGETS',
+  OP_MANAGE_CUSTOMERS = 'OP_MANAGE_CUSTOMERS',
+  OP_MANAGE_FINANCE = 'OP_MANAGE_FINANCE',
+  OP_KDS_OPERATE = 'OP_KDS_OPERATE',
+  CFG_MANAGE_SETTINGS = 'CFG_MANAGE_SETTINGS',
+  CFG_MANAGE_PRINTERS = 'CFG_MANAGE_PRINTERS',
+  CFG_MANAGE_PLATFORMS = 'CFG_MANAGE_PLATFORMS',
+  CFG_MANAGE_WAREHOUSES = 'CFG_MANAGE_WAREHOUSES',
 }
 
 export enum UserRole {
@@ -851,6 +868,13 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_CLOSE_DAY, AppPermission.OP_CREATE_PO,
     AppPermission.OP_RECEIVE_GRN, AppPermission.OP_APPROVE_PO,
     AppPermission.OP_CREATE_SUPPLIER_INVOICE, AppPermission.OP_APPROVE_SUPPLIER_INVOICE,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_DELIVERY,
+    AppPermission.OP_MANAGE_MARKETING, AppPermission.OP_MANAGE_WASTAGE,
+    AppPermission.OP_MANAGE_PRODUCTION, AppPermission.OP_MANAGE_BUDGETS,
+    AppPermission.OP_MANAGE_CUSTOMERS, AppPermission.OP_MANAGE_FINANCE,
+    AppPermission.OP_KDS_OPERATE,
+    AppPermission.CFG_MANAGE_SETTINGS, AppPermission.CFG_MANAGE_PRINTERS,
+    AppPermission.CFG_MANAGE_PLATFORMS, AppPermission.CFG_MANAGE_WAREHOUSES,
   ],
 
   [UserRole.PARTNER]: [
@@ -917,7 +941,9 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_APPLY_DISCOUNT,
     AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
     AppPermission.OP_CREATE_PO, AppPermission.OP_RECEIVE_GRN,
-    AppPermission.OP_VOID_ORDER, AppPermission.OP_CLOSE_DAY, AppPermission.NAV_MAIL,
+    AppPermission.OP_VOID_ORDER, AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_CUSTOMERS,
+    AppPermission.OP_KDS_OPERATE, AppPermission.NAV_MAIL,
   ],
 
   [UserRole.BRANCH_MANAGER]: [
@@ -936,25 +962,36 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_APPLY_DISCOUNT,
     AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
     AppPermission.OP_VOID_ORDER, AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_DELIVERY,
+    AppPermission.OP_MANAGE_MARKETING, AppPermission.OP_MANAGE_WASTAGE,
+    AppPermission.OP_MANAGE_PRODUCTION, AppPermission.OP_MANAGE_BUDGETS,
+    AppPermission.OP_MANAGE_CUSTOMERS, AppPermission.OP_MANAGE_FINANCE,
+    AppPermission.OP_KDS_OPERATE,
     AppPermission.CFG_MANAGE_USERS, AppPermission.CFG_MANAGE_ROLES, AppPermission.NAV_MAIL,
+    AppPermission.CFG_MANAGE_SETTINGS, AppPermission.CFG_MANAGE_PRINTERS,
+    AppPermission.CFG_MANAGE_PLATFORMS, AppPermission.CFG_MANAGE_WAREHOUSES,
   ],
 
   [UserRole.CASHIER]: [
     AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_DASHBOARD,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_MANAGE_CASH_DRAWER,
     AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_CUSTOMERS,
   ],
 
   [UserRole.WAITER]: [
     AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_KDS,
     AppPermission.NAV_FLOOR_PLAN,
     AppPermission.OP_PLACE_ORDER,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_CUSTOMERS,
   ],
 
   [UserRole.CAPTAIN]: [
     AppPermission.NAV_MAIL, AppPermission.NAV_POS, AppPermission.NAV_KDS,
     AppPermission.NAV_FLOOR_PLAN,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_VOID_ORDER,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_CUSTOMERS,
+    AppPermission.OP_KDS_OPERATE,
   ],
 
   [UserRole.DRIVER]: [
@@ -963,12 +1000,14 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
 
   [UserRole.KITCHEN_STAFF]: [
     AppPermission.NAV_MAIL, AppPermission.NAV_KDS,
+    AppPermission.OP_KDS_OPERATE, AppPermission.OP_MANAGE_WASTAGE,
   ],
 
   [UserRole.CALL_CENTER]: [
     AppPermission.NAV_MAIL, AppPermission.NAV_CALL_CENTER, AppPermission.NAV_CRM,
     AppPermission.NAV_DISPATCH,
     AppPermission.OP_PLACE_ORDER,
+    AppPermission.OP_MANAGE_CUSTOMERS,
     AppPermission.DATA_VIEW_CUSTOMER_SENSITIVE,
     AppPermission.NAV_AI_ASSISTANT,
   ],
@@ -978,6 +1017,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_DISPATCH, AppPermission.NAV_REPORTS,
     AppPermission.NAV_WHATSAPP, AppPermission.NAV_PLATFORMS,
     AppPermission.OP_PLACE_ORDER, AppPermission.OP_VOID_ORDER,
+    AppPermission.OP_MANAGE_DELIVERY, AppPermission.OP_MANAGE_CUSTOMERS,
     AppPermission.DATA_VIEW_CUSTOMER_SENSITIVE,
     AppPermission.NAV_AI_ASSISTANT, AppPermission.DATA_VIEW_REVENUE,
   ],
@@ -989,6 +1029,8 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_VOID_ORDER, AppPermission.NAV_REPORTS,
     AppPermission.NAV_REFUNDS, AppPermission.NAV_PICKUP, AppPermission.NAV_ORDERS,
     AppPermission.DATA_VIEW_REVENUE,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_CUSTOMERS,
+    AppPermission.OP_KDS_OPERATE,
   ],
 
   [UserRole.WAREHOUSE_STAFF]: [
@@ -996,6 +1038,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.DATA_VIEW_STOCK_LEVELS,
     AppPermission.OP_TRANSFER_STOCK, AppPermission.OP_ADJUST_STOCK,
     AppPermission.OP_RECEIVE_GRN,
+    AppPermission.OP_MANAGE_WASTAGE,
   ],
 
   [UserRole.WAREHOUSE_DIRECTOR]: [
@@ -1010,6 +1053,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
   [UserRole.PRODUCTION_STAFF]: [
     AppPermission.NAV_MAIL, AppPermission.NAV_PRODUCTION, AppPermission.NAV_RECIPES,
     AppPermission.DATA_VIEW_STOCK_LEVELS,
+    AppPermission.OP_MANAGE_PRODUCTION,
   ],
 
   [UserRole.PROCUREMENT_MANAGER]: [
@@ -1024,6 +1068,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_MAIL, AppPermission.NAV_FINANCE, AppPermission.NAV_REPORTS,
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS,
+    AppPermission.OP_MANAGE_BUDGETS, AppPermission.OP_MANAGE_FINANCE,
   ],
 
   [UserRole.COST_ACCOUNTANT]: [
@@ -1031,6 +1076,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_INVENTORY, AppPermission.NAV_REPORTS,
     AppPermission.NAV_WASTAGE,
     AppPermission.DATA_VIEW_COSTS, AppPermission.DATA_VIEW_STOCK_LEVELS,
+    AppPermission.OP_MANAGE_BUDGETS, AppPermission.OP_MANAGE_FINANCE,
   ],
 
   [UserRole.FINANCE_DIRECTOR]: [
@@ -1040,6 +1086,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.DATA_VIEW_REVENUE, AppPermission.DATA_VIEW_COSTS,
     AppPermission.DATA_VIEW_PROFITS, AppPermission.DATA_VIEW_AUDIT_LOGS,
     AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_MANAGE_BUDGETS, AppPermission.OP_MANAGE_FINANCE,
   ],
 
   [UserRole.HR_MANAGER]: [
@@ -1058,6 +1105,7 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.NAV_MAIL, AppPermission.NAV_TREASURY, AppPermission.NAV_FINANCE,
     AppPermission.NAV_DASHBOARD,
     AppPermission.OP_MANAGE_CASH_DRAWER, AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_MANAGE_FINANCE,
     AppPermission.DATA_VIEW_REVENUE,
   ],
 
@@ -1091,6 +1139,8 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
     AppPermission.OP_CREATE_PO, AppPermission.OP_RECEIVE_GRN,
     AppPermission.OP_APPROVE_PO,
     AppPermission.OP_MANAGE_CASH_DRAWER, AppPermission.OP_CLOSE_DAY,
+    AppPermission.OP_MANAGE_SHIFTS, AppPermission.OP_MANAGE_CUSTOMERS,
+    AppPermission.OP_KDS_OPERATE,
     AppPermission.CFG_EDIT_MENU_PRICING, AppPermission.CFG_EDIT_FLOOR_PLAN,
   ],
 
@@ -1102,16 +1152,44 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
 };
 
 export type AppTheme =
-  | 'aurora-glass'
-  | 'midnight-command'
-  | 'neo-brutal'
-  | 'soft-organic'
-  | 'editorial-luxury'
-  | 'terminal-ops'
-  | 'future-hud'
-  | 'bento-saas'
-  | 'industrial-ops'
-  | 'premium-hospitality';
+  | 'meridian'
+  | 'command'
+  | 'glassline'
+  | 'canvas'
+  | 'fluent-pro'
+  | 'material-x'
+  | 'obsidian'
+  | 'tiles'
+  | 'acrylic'
+  | 'touch';
+
+/** Which day-close readiness checks are mandatory (Settings → Day Close). */
+export interface DayCloseRules {
+  /** Block close until a POSTED stock count exists (default true). */
+  requireStockCount: boolean;
+  /** Block close while kitchen tickets are PENDING/PREPARING/READY (default true). */
+  requireKitchenEmpty: boolean;
+  /** Block close while treasury vouchers are PENDING (default true). */
+  requireVouchersClear: boolean;
+  /** Block close while custody holdings are open (default true). */
+  requireCustodySettled: boolean;
+  /** Block close while drivers hold cash (default true). */
+  requireDriverCash: boolean;
+  /** Require a written note when shift cash variance ≠ 0 (default true). */
+  requireVarianceNote: boolean;
+  /** Allow privileged roles to force-close with a written override reason (default true). */
+  allowManagerOverride: boolean;
+}
+
+export const DEFAULT_DAY_CLOSE_RULES: DayCloseRules = {
+  requireStockCount: true,
+  requireKitchenEmpty: true,
+  requireVouchersClear: true,
+  requireCustodySettled: true,
+  requireDriverCash: true,
+  requireVarianceNote: true,
+  allowManagerOverride: true,
+};
 
 export interface AppSettings {
   restaurantName: string;
@@ -1124,9 +1202,19 @@ export interface AppSettings {
   timezone?: string;
   isDarkMode: boolean;
   isTouchMode: boolean;
+  /** Dashboard / UI motion effects. Default true (beauty on); user can disable. */
+  motionEffects?: boolean;
   layoutMode: 'classic' | 'tiles'; // Shell view: sidebar workspace vs 3D tiles launcher
   theme: AppTheme;
   accentColor?: string;
+  /** Validated brand color overrides (primary/secondary/accent only). Local-only. */
+  colorOverrides?: { primary?: string; secondary?: string; accent?: string };
+  /** UI density. Local-only until server whitelists it. */
+  density?: 'compact' | 'comfortable' | 'spacious';
+  /** Motion intensity. Local-only. Legacy motionEffects boolean still respected. */
+  motionLevel?: 'full' | 'reduced' | 'off';
+  /** Background engine configuration. Local-only. */
+  backgroundConfig?: import('./theme/engine/background').BackgroundConfig;
   branchAddress: string;
   phone: string;
   receiptLogoUrl?: string;
@@ -1147,6 +1235,15 @@ export interface AppSettings {
   endOfDayEmailRecipients?: string[];
   dayCloseRequireStockCount?: boolean;
   dayCloseWhatsappRecipients?: string[];
+  /**
+   * Granular day-close gates, editable from Settings → Day Close.
+   * Each flag decides whether the matching readiness check BLOCKS closing.
+   * Disabled checks are shown as optional/skipped and never block —
+   * the admin can therefore waive non-essential procedures.
+   * `allowManagerOverride` lets privileged roles force-close remaining
+   * blockers with a written reason (audited as DAY_CLOSE_OVERRIDE).
+   */
+  dayCloseRules?: DayCloseRules;
   blindShiftReconciliation?: boolean;
   maxKitchenPrinters?: number;
   activeBranchId?: string; // Current operating branch context
@@ -1168,6 +1265,16 @@ export interface AppSettings {
   rolePermissionOverrides?: Record<string, AppPermission[]>;
   customRoles?: CustomRole[];
   customPaymentMethods?: CustomPaymentMethod[];
+  // Shared discount-approval code cashiers enter instead of a manager PIN.
+  // Server default '10009999' applies when unset.
+  discountApprovalCode?: string;
+  // Per-user POS / CallCenter view prefs (persisted to DB via settings).
+  posItemDensity?: string;
+  posCardSize?: 'small' | 'medium' | 'large';
+  posMode?: 'grid' | 'retail';
+  ccItemDensity?: string;
+  ccCardSize?: 'small' | 'medium' | 'large';
+  ccPosMode?: 'grid' | 'retail';
 }
 
 export enum ProductionStatus {

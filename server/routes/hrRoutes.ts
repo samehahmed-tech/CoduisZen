@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import * as hrController from '../controllers/hrController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
-const hrAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGER', 'PAYROLL_OFFICER', 'MANAGER');
+// Payroll execution additionally honors an explicit OP_PROCESS_PAYROLL grant.
+const hrAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGER', 'PAYROLL_OFFICER', 'MANAGER'],
+    ['OP_PROCESS_PAYROLL'],
+);
 
 router.get('/employees', hrAuth, enforceBranch, hrController.getEmployees);
 router.post('/employees', hrAuth, enforceBranch, hrController.upsertEmployee);

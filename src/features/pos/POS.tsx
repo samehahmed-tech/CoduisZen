@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useRef, useMemo, useCallback, useOptimistic, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ShoppingBag, X, LogOut, SlidersHorizontal, ArrowUpDown, LayoutGrid, Grid2x2, Plus, UtensilsCrossed, Truck, MapPin, Keyboard, UserPlus, Phone, Smartphone } from 'lucide-react';
+import { Search, ShoppingBag, X, LogOut, SlidersHorizontal, ArrowUpDown, LayoutGrid, Grid2x2, Plus, UtensilsCrossed, Truck, MapPin, Keyboard, UserPlus, Phone, Smartphone, Printer } from 'lucide-react';
 import {
    Order, OrderItem, OrderStatus, Table, PaymentMethod,
    OrderType, Customer, PaymentRecord, RestaurantMenu, UserRole,
@@ -253,9 +253,18 @@ const POS: React.FC = () => {
    const [categorySidebarCollapsed, setCategorySidebarCollapsed] = useState(() => false);
    const [itemFilter, setItemFilter] = useState<'all' | 'available' | 'popular'>('all');
    const [itemSort, setItemSort] = useState<'smart' | 'name' | 'price_asc' | 'price_desc'>('smart');
-    const [itemDensity, setItemDensity] = useState<CardDensity>('ticket');
-    const [cardSize, setCardSize] = useState<CardSize>('medium');
-   const [posMode, setPosMode] = useState<'grid' | 'retail'>('grid');
+    const [itemDensity, setItemDensity] = useState<CardDensity>(() => {
+       const s = (settings as any)?.posItemDensity;
+       return (typeof s === 'string' && ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'].includes(s) ? s : 'typo') as CardDensity;
+    });
+    const [cardSize, setCardSize] = useState<CardSize>(() => {
+       const s = (settings as any)?.posCardSize;
+       return (s === 'small' || s === 'large' ? s : 'medium') as CardSize;
+    });
+   const [posMode, setPosMode] = useState<'grid' | 'retail'>(() => {
+      const s = (settings as any)?.posMode;
+      return s === 'retail' ? 'retail' : 'grid';
+   });
    const [editingItemId, setEditingItemId] = useState<string | null>(null);
    const [noteInput, setNoteInput] = useState('');
    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | string>(PaymentMethod.CASH);
@@ -445,28 +454,40 @@ const POS: React.FC = () => {
    }, []);
 
    useEffect(() => {
+      // DB-backed prefs win; localStorage is only a pre-login fallback.
+      const sDensity = (settings as any)?.posItemDensity;
+      const sSize = (settings as any)?.posCardSize;
+      const sMode = (settings as any)?.posMode;
+      if (typeof sDensity === 'string' && ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'].includes(sDensity)) {
+         setItemDensity(sDensity as CardDensity);
+      } else {
+         try {
+            const raw = localStorage.getItem(POS_UI_PREFS_KEY);
+            if (raw) {
+               const parsed = JSON.parse(raw);
+               if (parsed?.itemDensity && ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'].includes(parsed.itemDensity)) {
+                  setItemDensity(parsed.itemDensity);
+               }
+            }
+         } catch { /* ignore */ }
+      }
+      if (sSize === 'small' || sSize === 'medium' || sSize === 'large') setCardSize(sSize);
+      if (sMode === 'grid' || sMode === 'retail') setPosMode(sMode);
       try {
          const raw = localStorage.getItem(POS_UI_PREFS_KEY);
-         if (!raw) return;
-         const parsed = JSON.parse(raw);
-         if (parsed?.itemFilter && ['all', 'available', 'popular'].includes(parsed.itemFilter)) {
-            setItemFilter(parsed.itemFilter);
-         }
-         if (parsed?.itemSort && ['smart', 'name', 'price_asc', 'price_desc'].includes(parsed.itemSort)) {
-            setItemSort(parsed.itemSort);
-         }
-          if (parsed?.itemDensity && ['sahara', 'typo', 'noir', 'ticket', 'circle', 'kiosk', 'pop', 'gold', 'comfortable', 'compact', 'ultra', 'buttons'].includes(parsed.itemDensity)) {
-             setItemDensity(parsed.itemDensity);
-          }
-          if (parsed?.cardSize && ['small', 'medium', 'large'].includes(parsed.cardSize)) {
-             setCardSize(parsed.cardSize);
-          }
-         if (parsed?.posMode && ['grid', 'retail'].includes(parsed.posMode)) {
-            setPosMode(parsed.posMode);
+         if (raw) {
+            const parsed = JSON.parse(raw);
+            if (!sDensity && !sSize && !sMode) {
+               if (parsed?.itemFilter && ['all', 'available', 'popular'].includes(parsed.itemFilter)) setItemFilter(parsed.itemFilter);
+               if (parsed?.itemSort && ['smart', 'name', 'price_asc', 'price_desc'].includes(parsed.itemSort)) setItemSort(parsed.itemSort);
+               if (parsed?.cardSize && ['small', 'medium', 'large'].includes(parsed.cardSize)) setCardSize(parsed.cardSize);
+               if (parsed?.posMode && ['grid', 'retail'].includes(parsed.posMode)) setPosMode(parsed.posMode);
+            }
          }
       } catch {
          // ignore malformed local prefs
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    useEffect(() => {
@@ -482,6 +503,12 @@ const POS: React.FC = () => {
          // ignore storage errors
       }
     }, [itemFilter, itemSort, itemDensity, cardSize, posMode]);
+
+   // Persist view prefs per-user to DB (view mode + مطبعة default).
+   useEffect(() => {
+      updateSettings({ posItemDensity: itemDensity, posCardSize: cardSize, posMode } as any);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [itemDensity, cardSize, posMode]);
 
    useEffect(() => {
       try {
@@ -1212,15 +1239,22 @@ const POS: React.FC = () => {
    }, [safeActiveCart, handleUpdateQuantity]);
 
    // Client-side quote for cart lines that are on no saved round yet (same
-   // math as supplementary kitchen rounds: subtotal + tax at the branch rate,
-   // no discounts — discounts live on the fired tickets).
+   // math as supplementary kitchen rounds: NET subtotal (after per-line item
+   // discounts, mirroring calculateOrderTotals) + tax at the branch rate.
+   // Order-level discounts/coupons live on the fired tickets by design.
+   const netFreshLineTotal = (item: any) => {
+      const mods = ((item as any).selectedModifiers || (item as any).modifiers || [])
+         .reduce((s: number, m: any) => s + Number(m?.price || 0), 0);
+      const lineGross = (Number((item as any).price || 0) + mods) * Number((item as any).quantity || 0);
+      const rawDiscount = Number((item as any).itemDiscount || 0);
+      const lineDiscount = rawDiscount > 0
+         ? ((item as any).itemDiscountType === 'percent' ? lineGross * (rawDiscount / 100) : rawDiscount)
+         : 0;
+      return Math.max(0, lineGross - lineDiscount);
+   };
    const priceFreshTableLines = (lines: any[]) => {
       const money = (v: number) => parseFloat(Number(v || 0).toFixed(2));
-      const freshSubtotal = money(lines.reduce((acc, item) => {
-         const mods = ((item as any).selectedModifiers || (item as any).modifiers || [])
-            .reduce((s: number, m: any) => s + Number(m?.price || 0), 0);
-         return acc + ((Number((item as any).price || 0) + mods) * Number((item as any).quantity || 0));
-      }, 0));
+      const freshSubtotal = money(lines.reduce((acc, item) => acc + netFreshLineTotal(item), 0));
       const freshTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
       const freshTax = money(freshSubtotal * freshTaxRate);
       return { freshSubtotal, freshTax, freshTotal: money(freshSubtotal + freshTax) };
@@ -1245,7 +1279,23 @@ const POS: React.FC = () => {
                   showToast(lang === 'ar' ? 'أرسل الأصناف الجديدة للمطبخ أولاً قبل الإغلاق' : 'Send the new items to the kitchen before closing', 'error');
                   return;
                }
-               // Greedy split distribution across rounds (exact, no remainder leaks).
+               // SPLIT must cover the combined table total EXACTLY before any
+               // round is completed — never invent or drop money. Validation
+               // happens up front so a mismatch aborts with NOTHING closed.
+               const tableTotal = tableOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+               if (selectedPaymentMethod === PaymentMethod.SPLIT) {
+                  const splitSum = splitPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
+                  if (Math.abs(splitSum - tableTotal) > 0.01) {
+                     showToast(
+                        lang === 'ar'
+                           ? `مجموع التقسيم (${splitSum.toFixed(2)}) لا يساوي إجمالي الترابيزة (${tableTotal.toFixed(2)}) — راجع المدفوعات قبل الإغلاق`
+                           : `Split total (${splitSum.toFixed(2)}) does not match the table total (${tableTotal.toFixed(2)}) — review payments before closing`,
+                        'error',
+                     );
+                     return;
+                  }
+               }
+               // Greedy split distribution across rounds (exact by construction).
                let splitPool = selectedPaymentMethod === PaymentMethod.SPLIT
                   ? splitPayments.map(p => ({ method: String(p.method), amount: Number(p.amount || 0) }))
                   : [];
@@ -1263,7 +1313,12 @@ const POS: React.FC = () => {
                         rest = Number((rest - take).toFixed(2));
                         if (head.amount <= 0.005) splitPool.shift();
                      }
-                     if (rest > 0.005) payments.push({ method: splitPool[0]?.method || PaymentMethod.CASH, amount: Number(rest.toFixed(2)) });
+                     if (rest > 0.005) {
+                        // Unreachable after the up-front validation above;
+                        // kept as a labeled guard instead of silent cash-fill.
+                        showToast(lang === 'ar' ? 'خطأ توزيع التقسيم — تم إيقاف الإغلاق' : 'Split distribution error — close aborted', 'error');
+                        return;
+                     }
                   } else {
                      payments = [{ method: selectedPaymentMethod, amount: roundTotal }];
                   }
@@ -1323,13 +1378,15 @@ const POS: React.FC = () => {
    const handleMergeTables = async (sourceTableId: string, targetTableId: string, itemCartIds: string[]) => {
       if (!sourceTableId || !targetTableId || sourceTableId === targetTableId) return;
 
-      const sourceOrder = findActiveTableOrder(orders, tables, sourceTableId);
-      if (!sourceOrder) {
+      // A table can hold several open rounds — "merge all" must cover every
+      // round, not just the linked (latest) one, or lines stay behind.
+      const sourceRounds = getActiveTableOrders(orders, tables, sourceTableId);
+      if (sourceRounds.length === 0) {
          showToast(lang === 'ar' ? 'لا يوجد طلب على الطاولة المصدر' : 'No active order on source table', 'error');
          return;
       }
 
-      const sourceItemIds = (sourceOrder.items || []).map(i => i.cartId);
+      const sourceItemIds = sourceRounds.flatMap(round => (round.items || []).map(i => i.cartId));
       const idsToMove = (itemCartIds && itemCartIds.length > 0) ? itemCartIds : sourceItemIds;
       if (idsToMove.length === 0) {
          showToast(lang === 'ar' ? 'اختر أصناف للدمج' : 'Select items to merge', 'error');
@@ -1446,7 +1503,7 @@ const POS: React.FC = () => {
       payments: withPayment
          ? buildOrderPayment(selectedPaymentMethod, cartTotal, splitPayments).payments
          : [],
-      ...(settings.orderManualKitchenFlow === true ? { skipKitchenDispatch: true } : {}),
+      ...(settings.orderManualKitchenFlow === true ? { skipKitchenDispatch: true } : { clientHandlesPrinting: true }),
       syncStatus: 'PENDING'
    });
 
@@ -1466,14 +1523,61 @@ const POS: React.FC = () => {
    };
 
    const fireOrderToKitchen = async (order: Order) => {
-      // Kitchen printing has one owner: the server print queue/bridge.
-      // The old flow dispatched with clientHandlesPrinting=true and then
-      // printed locally as well. For takeaway orders the server also
-      // auto-dispatches during createOrder, so the same ticket could be
-      // printed twice (especially after a bridge reconnect).
+      // Kitchen SCREEN tickets live on the server (KDS). Physical printing is
+      // owned by the POS: it renders the designed (ReceiptDesigner) ticket as
+      // image bytes and enqueues it in the background — never blocking the
+      // cashier, with failures surfaced via the failed-print banner + reprint.
       await kdsApi.dispatchOrder(order.id, branchId, false);
       await updateOrderStatus(order.id, OrderStatus.PREPARING, undefined, undefined, { skipVersionCheck: true });
    };
+
+   // ── Background printing + failed-print recovery ──────────────────────
+   // Printing never blocks order flow: render + enqueue run detached, and any
+   // enqueue failure lands here with a one-tap reprint (no lost tickets).
+   interface FailedPrintJob { key: string; kind: 'kitchen' | 'receipt'; orderId: string; orderNumber?: string; order: Order; }
+   const [failedPrints, setFailedPrints] = useState<FailedPrintJob[]>([]);
+   const markPrintFailed = useCallback((kind: 'kitchen' | 'receipt', order: Order) => {
+      const label = kind === 'kitchen'
+         ? (lang === 'ar' ? 'تذكرة المطبخ' : 'kitchen ticket')
+         : (lang === 'ar' ? 'الإيصال' : 'receipt');
+      setFailedPrints(prev => prev.some(p => p.orderId === order.id && p.kind === kind)
+         ? prev
+         : [...prev, { key: `${kind}:${order.id}:${Date.now()}`, kind, orderId: order.id, orderNumber: (order as any).orderNumber, order }]);
+      showToast(
+         lang === 'ar'
+            ? `تم حفظ الطلب — تعذرت طباعة ${label} (طلب #${(order as any).orderNumber || ''}). أعد المحاولة من الشريط أسفل الشاشة.`
+            : `Order saved — ${label} print failed. Retry from the banner below.`,
+         'warning');
+   }, [lang, showToast]);
+   const resolvePrintBranch = useCallback((order: Order) =>
+      branches.find(b => (b as any).id === (order.branchId || branchId)), [branches, branchId]);
+   const printKitchenTicketInBackground = useCallback((order: Order) => {
+      void printKitchenTicketsByRouting({
+         order, categories, printers, branchId: order.branchId || branchId,
+         maxKitchenPrinters: settings.maxKitchenPrinters, settings,
+         currencySymbol, lang, t, branch: resolvePrintBranch(order),
+      }).catch(() => markPrintFailed('kitchen', order));
+   }, [branches, branchId, categories, printers, settings, currencySymbol, lang, t, markPrintFailed, resolvePrintBranch]);
+   const retryFailedPrint = useCallback(async (entry: FailedPrintJob) => {
+      try {
+         if (entry.kind === 'kitchen') {
+            await printKitchenTicketsByRouting({
+               order: entry.order, categories, printers, branchId: entry.order.branchId || branchId,
+               maxKitchenPrinters: settings.maxKitchenPrinters, settings,
+               currencySymbol, lang, t, branch: resolvePrintBranch(entry.order),
+            });
+         } else {
+            await printOrderReceipt({
+               order: entry.order, printers, settings, currencySymbol, lang, t,
+               branch: resolvePrintBranch(entry.order),
+            });
+         }
+         setFailedPrints(prev => prev.filter(p => p.key !== entry.key));
+         showToast(lang === 'ar' ? 'تمت إعادة الطباعة بنجاح' : 'Reprinted successfully', 'success');
+      } catch {
+         showToast(lang === 'ar' ? 'تعذرت إعادة الطباعة — تحقق من الطابعة والشبكة' : 'Reprint failed — check printer and network', 'error');
+      }
+   }, [branches, branchId, categories, printers, settings, currencySymbol, lang, t, showToast, resolvePrintBranch]);
 
    const [submittingOrderKey, setSubmittingOrderKey] = useState<string | null>(null);
    const submittingOrderKeyRef = useRef<string | null>(null);
@@ -1524,6 +1628,13 @@ const POS: React.FC = () => {
          try {
             await fireOrderToKitchen({ id: pending.orderId } as Order);
             pendingDispatchRef.current = null;
+            // Print the designed ticket in the background from the intact
+            // cart (captured before the reset below clears it).
+            printKitchenTicketInBackground({
+               id: pending.orderId, type: activeOrderType, branchId,
+               tableId: selectedTableId || undefined, items: [...safeActiveCart],
+               createdAt: new Date(),
+            } as Order);
             resetAfterOrderCommit();
             showToast(lang === 'ar' ? 'تم إرسال الطلب للمطبخ بنجاح' : 'Kitchen ticket sent successfully', 'success');
          } catch {
@@ -1560,13 +1671,17 @@ const POS: React.FC = () => {
          const intendedItems = safeActiveCart as any[];
          const intendedDiscount = orderDiscountAmount;
          // Never throws: every outcome toasts, and no path duplicates.
-         const saveInPlace = async (orderId: string, attempt = 1): Promise<void> => {
-            try {
-               await updateOrderItems(orderId, { items: intendedItems, discount: intendedDiscount });
-               loadTableOrder(selectedTableId);
-               clearTableDraft(selectedTableId);
-               showToast(lang === 'ar' ? 'تم تحديث أصناف الترابيزة ✓' : 'Table order updated ✓', 'success');
-            } catch (error: any) {
+          const saveInPlace = async (orderId: string, attempt = 1): Promise<void> => {
+             try {
+                await updateOrderItems(orderId, { items: intendedItems, discount: intendedDiscount });
+                loadTableOrder(selectedTableId);
+                clearTableDraft(selectedTableId);
+                showToast(lang === 'ar' ? 'تم تحديث أصناف الترابيزة ✓' : 'Table order updated ✓', 'success');
+                // Reprint the rewritten ticket (designed image, background) so
+                // the kitchen cooks the edited lines, not the old ones.
+                const editedOrder = orders.find(o => o.id === orderId);
+                if (editedOrder) printKitchenTicketInBackground({ ...editedOrder, items: intendedItems } as Order);
+             } catch (error: any) {
                const code = String(error?.code || error?.message || '');
                if (code.includes('ORDER_VERSION_CONFLICT') && attempt === 1) {
                   // Someone touched the ticket after we loaded it — pull
@@ -1591,27 +1706,26 @@ const POS: React.FC = () => {
             await saveInPlace(linkedOrder.id);
             return { handled: true };
          }
-         // Case 2: fired ticket → partition cart into carried vs fresh lines.
-         const linkedById = new Map((linkedOrder.items || []).map((l: any) => [rowKeyOf(l), l]));
-         const sigOf = (l: any) => `${l.menuItemId || l.menu_item_id || ''}::${l.sizeId || l.size_id || ''}::${l.quantity}::${JSON.stringify(((l.selectedModifiers || l.modifiers || []) as any[]).map(m => String(m.id || m.optionId)).sort())}`;
-         const carried = safeActiveCart.filter(l => linkedById.has(rowKeyOf(l)));
-         const fresh = safeActiveCart.filter(l => !linkedById.has(rowKeyOf(l)));
-         const touched = carried.some(l => {
+          // Case 2: fired ticket → always update SAME order in place so KDS
+          // keeps same orderNumber. Separate supplementary rounds created
+          // new orderNumbers which confused kitchen (same table, new number).
+          const linkedById = new Map((linkedOrder.items || []).map((l: any) => [rowKeyOf(l), l]));
+          const fresh = safeActiveCart.filter(l => !linkedById.has(rowKeyOf(l)));
+          const sigOf = (l: any) => `${l.menuItemId || l.menu_item_id || ''}::${l.sizeId || l.size_id || ''}::${l.quantity}::${JSON.stringify(((l.selectedModifiers || l.modifiers || []) as any[]).map(m => String(m.id || m.optionId)).sort())}`;
+          const carried = safeActiveCart.filter(l => linkedById.has(rowKeyOf(l)));
+          const touched = carried.some(l => {
             const orig: any = linkedById.get(rowKeyOf(l));
             return !orig || sigOf(orig) !== sigOf(l);
-         });
-         const removed = (linkedOrder.items || []).some(o => !safeActiveCart.some(l => rowKeyOf(l) === rowKeyOf(o)));
-         // Case 2a: pure addition → caller creates a fresh-only round.
-         if (!touched && !removed) {
-            if (fresh.length === 0) {
-               showToast(lang === 'ar' ? 'لا توجد أصناف جديدة للإرسال' : 'No new items to send', 'info');
-               return { handled: true };
-            }
-            return { handled: false, freshOnly: fresh };
-         }
-         // Case 2b: fired lines added/removed/changed → rewrite the ticket.
-         await saveInPlace(linkedOrder.id);
-         return { handled: true };
+          });
+          const removed = (linkedOrder.items || []).some(o => !safeActiveCart.some(l => rowKeyOf(l) === rowKeyOf(o)));
+          if (!touched && !removed && fresh.length === 0) {
+             showToast(lang === 'ar' ? 'لا توجد أصناف جديدة للإرسال' : 'No new items to send', 'info');
+             return { handled: true };
+          }
+          // Pure addition or edit → rewrite same ticket (server rebuilds KDS
+          // tickets for same orderId, same orderNumber).
+          await saveInPlace(linkedOrder.id);
+          return { handled: true };
       };
 
       const tableEdit = await sendTableEdit();
@@ -1629,11 +1743,7 @@ const POS: React.FC = () => {
             // nothing is claimed or applied twice.
             const freshLines = tableEdit.freshOnly as any[];
             const money = (v: number) => parseFloat(v.toFixed(2));
-            const freshSubtotal = money(freshLines.reduce((acc, item) => {
-               const mods = ((item as any).selectedModifiers || (item as any).modifiers || [])
-                  .reduce((s: number, m: any) => s + Number(m?.price || 0), 0);
-               return acc + ((Number((item as any).price || 0) + mods) * Number((item as any).quantity || 0));
-            }, 0));
+            const freshSubtotal = money(freshLines.reduce((acc, item) => acc + netFreshLineTotal(item), 0));
             const freshTaxRate = Math.max(0, Number(settings.taxRate ?? activeBranch?.taxRate ?? 14)) / 100;
             const freshTax = money(freshSubtotal * freshTaxRate);
             draftOrder.items = freshLines as any;
@@ -1663,6 +1773,9 @@ const POS: React.FC = () => {
           try {
              await fireOrderToKitchen(savedOrder);
              pendingDispatchRef.current = null;
+             // Designed kitchen ticket prints in the background (does not
+             // block the success toast); failures land on the reprint banner.
+             printKitchenTicketInBackground(savedOrder);
              resetAfterOrderCommit();
           } catch {
              // Order IS saved: keep the cart so a retry re-dispatches the same
@@ -1730,6 +1843,9 @@ const POS: React.FC = () => {
          } else if (settings.orderManualKitchenFlow !== true) {
             fireOrderToKitchen(savedOrder)
                .catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذر إرساله للمطبخ' : 'Order saved, but kitchen dispatch failed', 'error'));
+            // Designed kitchen ticket in the background; enqueue failures
+            // land on the reprint banner instead of blocking the sale.
+            printKitchenTicketInBackground(savedOrder);
          }
 
          // 4. Trigger customer receipts in background to avoid blocking UI animations
@@ -1744,8 +1860,8 @@ const POS: React.FC = () => {
                lang,
                t,
                branch: activeBranch
-            }).catch(() => showToast(lang === 'ar' ? 'تم حفظ الطلب، لكن تعذرت طباعة الإيصال' : 'Order saved, but receipt print failed', 'warning'));
-          }
+            }).catch(() => markPrintFailed('receipt', savedOrder));
+           }
                       if (selectedPaymentMethod === PaymentMethod.CASH) {
              try {
                await printService.triggerCashDrawer(branchId);
@@ -2512,9 +2628,45 @@ const POS: React.FC = () => {
                   if (remaining > 0) setSplitPayments(prev => [...prev, { method, amount: remaining }]);
                }}
                onRemovePayment={(idx) => setSplitPayments(prev => prev.filter((_, i) => i !== idx))}
-               onUpdateAmount={(idx, val) => setSplitPayments(prev => prev.map((p, i) => i === idx ? { ...p, amount: val } : p))}
+                            onUpdateAmount={(idx, val) => setSplitPayments(prev => prev.map((p, i) => i === idx ? { ...p, amount: Math.max(0, Number(val) || 0) } : p))}
             />
             </React.Suspense>
+
+             {/* Failed-print recovery banner: background printing never blocks
+                 the sale, so enqueue failures surface here with one-tap reprint. */}
+             {failedPrints.length > 0 && (
+                <div className="fixed bottom-4 inset-x-0 z-[600] flex justify-center px-4 pointer-events-none">
+                   <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-rose-500/40 bg-card/95 backdrop-blur-xl shadow-2xl shadow-rose-500/20 p-3 space-y-2">
+                      {failedPrints.map(entry => (
+                         <div key={entry.key} className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/30">
+                               <Printer size={16} />
+                            </span>
+                            <span className="min-w-0 flex-1 text-xs font-black text-main">
+                               {lang === 'ar'
+                                  ? `تعذرت طباعة ${entry.kind === 'kitchen' ? 'تذكرة المطبخ' : 'الإيصال'} — طلب #${entry.orderNumber || entry.orderId}`
+                                  : `${entry.kind === 'kitchen' ? 'Kitchen ticket' : 'Receipt'} print failed — order #${entry.orderNumber || entry.orderId}`}
+                            </span>
+                            <button
+                               type="button"
+                               onClick={() => void retryFailedPrint(entry)}
+                               className="shrink-0 rounded-xl bg-primary px-4 py-2 text-[11px] font-black text-white shadow-md active:scale-95"
+                            >
+                               {lang === 'ar' ? 'إعادة طباعة' : 'Reprint'}
+                            </button>
+                            <button
+                               type="button"
+                               onClick={() => setFailedPrints(prev => prev.filter(p => p.key !== entry.key))}
+                               className="shrink-0 rounded-xl border border-border/40 px-2.5 py-2 text-muted hover:text-main active:scale-95"
+                               aria-label={lang === 'ar' ? 'تجاهل' : 'Dismiss'}
+                            >
+                               <X size={14} />
+                            </button>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+             )}
 
             {managedTableId && (
                <React.Suspense fallback={null}>

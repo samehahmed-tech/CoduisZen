@@ -1,9 +1,28 @@
 import { Request, Response } from 'express';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { waitlists, tables } from '../../src/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { getNumberParam, getStringParam } from '../utils/request';
 import { getIO } from '../socket';
+
+let waitlistSchemaInflight: Promise<void> | null = null;
+
+/**
+ * Self-heal for DBs created before `seated_at` existed (schema-doctor may
+ * never have run on them). Idempotent; concurrent callers share one run.
+ */
+const ensureWaitlistSchema = async () => {
+    if (!waitlistSchemaInflight) {
+        waitlistSchemaInflight = pool.query(`
+            IF COL_LENGTH('dbo.waitlists', 'seated_at') IS NULL
+                ALTER TABLE dbo.waitlists ADD seated_at datetime2 NULL;
+        `).then(() => undefined).catch((err: any) => {
+            waitlistSchemaInflight = null;
+            throw err;
+        });
+    }
+    await waitlistSchemaInflight;
+};
 
 export const waitlistController = {
     // Get active waitlist for a branch
@@ -12,6 +31,7 @@ export const waitlistController = {
             const branchId = getStringParam(req.query.branchId);
             if (!branchId) return res.status(400).json({ error: 'Branch ID required' });
 
+            await ensureWaitlistSchema();
             const list = await db.select().from(waitlists)
                 .where(and(
                     eq(waitlists.branchId, branchId),
@@ -61,6 +81,7 @@ export const waitlistController = {
             
             if (id === undefined || !status) return res.status(400).json({ error: 'Valid ID and Status required' });
 
+            await ensureWaitlistSchema();
             const [updated] = await db.update(waitlists)
                 .set({
                     status,

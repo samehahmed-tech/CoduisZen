@@ -30,10 +30,15 @@ const gradientKeyframes = `
 .animate-stagger-2 { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
 .animate-stagger-3 { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
 .animate-stagger-4 { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both; }
-/* Login is a forced-dark glass page: shield its fields from the global
+@keyframes capIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+/* Login glass fields: in dark mode shield them from the global
    light-theme input backgrounds (theme-overrides repaints ALL inputs with
-   light vars in light mode while this page forces white text). */
-#login-form .login-field {
+   light vars in light mode). Scoped under .dark so light mode uses the
+   component lt classes. */
+.dark #login-form .login-field {
   background: rgba(255, 255, 255, 0.06) !important;
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.10) !important;
@@ -43,15 +48,15 @@ const gradientKeyframes = `
   color: #64748b !important;
   opacity: 1;
 }
-#login-form .login-field:focus {
+.dark #login-form .login-field:focus {
   background: rgba(255, 255, 255, 0.08) !important;
   border-color: rgba(251, 191, 36, 0.35) !important;
 }
-/* Fix: browser autofill paints inputs white while text stays white -> unreadable */
-#login-form input:-webkit-autofill,
-#login-form input:-webkit-autofill:hover,
-#login-form input:-webkit-autofill:focus,
-#login-form input:-webkit-autofill:active {
+/* Fix: browser autofill paints inputs white while text stays white -> unreadable (dark mode) */
+.dark #login-form input:-webkit-autofill,
+.dark #login-form input:-webkit-autofill:hover,
+.dark #login-form input:-webkit-autofill:focus,
+.dark #login-form input:-webkit-autofill:active {
   -webkit-text-fill-color: #ffffff !important;
   -webkit-box-shadow: 0 0 0 1000px #151d2b inset !important;
   box-shadow: 0 0 0 1000px #151d2b inset !important;
@@ -76,6 +81,50 @@ const LOGIN_BACKGROUNDS = [
     'https://images.unsplash.com/photo-1551218808-94e220e084d2?q=80&w=2500&auto=format&fit=crop', // chef plating in kitchen
 ];
 
+/* Slideshow media pool — halal-safe only (no alcohol): restaurant/cafe
+   interiors, coffee, bakery and desserts. Videos are short muted loops. */
+const LOGIN_MEDIA: { type: 'image' | 'video'; src: string }[] = [
+    // Bundled local media first — guaranteed to work offline / behind strict firewalls.
+    { type: 'video', src: '/login-bg/bg-latte-1.mp4' }, // latte art pour
+    { type: 'video', src: '/login-bg/bg-pour-1.mp4' }, // barista pour
+    { type: 'image', src: '/login-bg/bg-cafe-1.jpg' }, // restaurant interior
+    { type: 'image', src: '/login-bg/bg-coffee-1.jpg' }, // coffee art
+    { type: 'image', src: '/login-bg/bg-baklava-1.jpg' }, // baklava
+    // Remote pool for extra variety (same subjects, halal-safe).
+    { type: 'video', src: 'https://videos.pexels.com/video-files/13736555/13736555-hd_720_1280_24fps.mp4' },
+    { type: 'video', src: 'https://videos.pexels.com/video-files/34505177/14619761_720_1280_30fps.mp4' }, // barista pour
+    { type: 'image', src: 'https://images.pexels.com/photos/776538/pexels-photo-776538.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // restaurant interior
+    { type: 'image', src: 'https://images.pexels.com/photos/34077030/pexels-photo-34077030.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // cozy cafe
+    { type: 'image', src: 'https://images.pexels.com/photos/35646560/pexels-photo-35646560.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // cafe wooden tables
+    { type: 'image', src: 'https://images.pexels.com/photos/29517889/pexels-photo-29517889.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // modern cafe warm light
+    { type: 'image', src: 'https://images.pexels.com/photos/29525876/pexels-photo-29525876.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // cafe pendant lights
+    { type: 'image', src: 'https://images.pexels.com/photos/312420/pexels-photo-312420.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // coffee cup at cafe
+    { type: 'image', src: 'https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // coffee art
+    { type: 'image', src: 'https://images.pexels.com/photos/8696281/pexels-photo-8696281.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // baklava
+    { type: 'image', src: 'https://images.pexels.com/photos/18543486/pexels-photo-18543486.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // turkish baklava
+    ...LOGIN_BACKGROUNDS.map(src => ({ type: 'image' as const, src })),
+];
+
+/* Rotating capability lines shown above the card — short system pitch. */
+const CAPABILITIES = {
+    ar: [
+        'نقطة بيع سريعة للكاشير',
+        'شاشات مطبخ KDS مباشرة',
+        'مخزون وموردون بلا عجز',
+        'فروع متعددة بصلاحيات دقيقة',
+        'مالية وتقارير لحظية',
+        'ولاء عملاء يعيدهم إليك',
+    ],
+    en: [
+        'Lightning-fast cashier POS',
+        'Live kitchen KDS screens',
+        'Zero-shortage inventory',
+        'Multi-branch fine-grained roles',
+        'Instant finance reports',
+        'Loyalty that brings them back',
+    ],
+};
+
 const Login: React.FC = () => {
     const { loginWithPassword, settings, updateSettings } = useAuthStore();
     const navigate = useNavigate();
@@ -94,10 +143,41 @@ const Login: React.FC = () => {
     const [kickNotice, setKickNotice] = useState<string | undefined>();
     const [pressedKey, setPressedKey] = useState<string | null>(null);
     const [timeStr, setTimeStr] = useState('');
-    const [bgImage] = useState(() => LOGIN_BACKGROUNDS[Math.floor(Math.random() * LOGIN_BACKGROUNDS.length)]);
-
     const pinInputRef = useRef<HTMLInputElement>(null);
     const isArabic = settings.language === 'ar';
+    const capList = isArabic ? CAPABILITIES.ar : CAPABILITIES.en;
+    // Shuffled slideshow order over the full media pool, random start, no immediate repeats.
+    const [slideOrder] = useState<number[]>(() => {
+        const arr = LOGIN_MEDIA.map((_, i) => i);
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    });
+    const [slidePos, setSlidePos] = useState(0);
+    const activeSlide = slideOrder[slidePos] ?? 0;
+    // Gentle mouse parallax over the backdrop (throttled).
+    const parRef = useRef({ x: 0, y: 0, t: 0 });
+    const [par, setPar] = useState({ x: 0, y: 0 });
+    const handlePar = (e: React.MouseEvent<HTMLDivElement>) => {
+        const now = Date.now();
+        if (now - parRef.current.t < 90) return;
+        parRef.current.t = now;
+        const r = e.currentTarget.getBoundingClientRect();
+        setPar({ x: (e.clientX - r.left) / r.width - 0.5, y: (e.clientY - r.top) / r.height - 0.5 });
+    };
+    const [capIndex, setCapIndex] = useState(0);
+    const [capChar, setCapChar] = useState(0);
+    useEffect(() => {
+        const full = capList[capIndex % capList.length];
+        if (capChar < full.length) {
+            const id = setTimeout(() => setCapChar(c => c + 1), 45);
+            return () => clearTimeout(id);
+        }
+        const id = setTimeout(() => { setCapIndex(i => i + 1); setCapChar(0); }, 2300);
+        return () => clearTimeout(id);
+    }, [capChar, capIndex, capList]);
 
     // One-time kick-out notice: if the app logged out on its own (expired /
     // revoked session), explain it instead of a silent login form.
@@ -133,6 +213,12 @@ const Login: React.FC = () => {
         const id = setInterval(tick, 30000);
         return () => clearInterval(id);
     }, [isArabic]);
+
+    // Rotating background (slideshow) — random non-repeating jump every 9s.
+    useEffect(() => {
+        const id = setInterval(() => setSlidePos(p => (p + 1 + Math.floor(Math.random() * (LOGIN_MEDIA.length - 1))) % LOGIN_MEDIA.length), 9000);
+        return () => clearInterval(id);
+    }, []);
 
 
     const t = {
@@ -300,7 +386,7 @@ const Login: React.FC = () => {
     // ???????????????????????????????????????????????????????????
     // THEME HELPERS
     // ???????????????????????????????????????????????????????????
-  const lt = false; // Forced dark mode for the premium glossy aesthetic
+  const lt = !(settings.isDarkMode ?? true); // theme-aware: dark by default
 
     // Accent color pair
     const accentRing = 'ring-amber-400/25';
@@ -311,114 +397,48 @@ const Login: React.FC = () => {
     return (
         <>
             <style>{gradientKeyframes}</style>
-            <div className={`flex h-[100dvh] w-full overflow-hidden ${isArabic ? 'rtl' : 'ltr'} relative bg-black`}>
+            <div onMouseMove={handlePar} className={`flex min-h-[100dvh] w-full flex-col overflow-hidden ${isArabic ? 'rtl' : 'ltr'} relative ${lt ? 'bg-[#e9e5db]' : 'bg-black'}`}>
 
-                {/* ??? FULLSCREEN BACKGROUND IMAGES FOR TRUE GLASSMORPHISM ??? */}
-                <div
-                    className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-[40s] hover:scale-105"
-                    style={{
-                        backgroundImage: `url('${bgImage}')`,
-                    }}
-                />
-                {/* Global subtle texture */}
-                <div className="absolute inset-0 z-0 bg-black/20 mix-blend-multiply" />
-
-                {/* ???????????????????? LEFT PANEL — VISUAL SHOWCASE (TRANSPARENT) ???????????????????? */}
-                <div className="relative hidden lg:flex lg:w-[50%] flex-col justify-between p-10 xl:p-14 overflow-hidden z-10">
-                   {/* We let the beautiful background image shine here cleanly */}
-                    <div className="absolute inset-0 z-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-
-                    {/* Floating glass orbs */}
-                    <div className={`absolute top-[10%] left-[15%] w-72 h-72 rounded-full blur-3xl pointer-events-none ${lt ? 'bg-blue-300/25' : 'bg-violet-600/15'}`} style={{ animation: 'float 8s ease-in-out infinite' }} />
-                    <div className={`absolute bottom-[5%] right-[10%] w-96 h-96 rounded-full blur-3xl pointer-events-none ${lt ? 'bg-indigo-200/30' : 'bg-cyan-500/10'}`} style={{ animation: 'float 12s ease-in-out infinite 2s' }} />
-                    <div className={`absolute top-[50%] right-[30%] w-48 h-48 rounded-full blur-2xl pointer-events-none ${lt ? 'bg-violet-200/20' : 'bg-fuchsia-500/10'}`} style={{ animation: 'float 10s ease-in-out infinite 4s' }} />
-
-                    {/* Decorative grid */}
-                    <div className="absolute inset-0 z-[1] pointer-events-none" style={{
-                        backgroundImage: lt
-                            ? 'radial-gradient(circle, rgba(99,102,241,0.06) 1px, transparent 1px)'
-                            : 'radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)',
-                        backgroundSize: '32px 32px',
-                    }} />
-
-                    {/* ?? Top: Brand identity — wide banner shown in its natural shape ?? */}
-                    <div className="relative z-10 flex items-center gap-4">
-                        <div className="h-16 rounded-[1.25rem] flex items-center justify-center px-4 ring-2 ring-amber-300/60" style={{ background: 'linear-gradient(135deg,#0b1b30 0%,#020617 100%)', boxShadow: '0 10px 34px rgba(0,0,0,0.35), 0 0 28px rgba(201,162,39,0.35)' }}>
-                            <img src="/logo.png?v=2" alt="Logo" className="h-11 w-auto max-w-[230px] object-contain" draggable={false} />
-                        </div>
-                        <div>
-                            <h2 className={`text-xl font-extrabold tracking-[0.15em] uppercase ${lt ? 'text-slate-800' : 'text-white'}`}>Coduis Zen</h2>
-                            <p className={`text-[9px] font-bold tracking-[0.25em] uppercase ${lt ? 'text-slate-500' : 'text-white/40'}`}>
-                                {isArabic ? 'نظام تحكم المطاعم' : 'Restaurant Control OS'}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* ?? Center: Hero copy ?? */}
-                    <div className="relative z-10 max-w-lg -mt-8">
-                        {/* Badge */}
-                        <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border  mb-8 ${lt ? 'bg-blue-50/60 border-blue-100/80' : 'bg-white/5 border-white/10'}`}>
-                            <Sparkles size={13} className={lt ? 'text-teal-600' : 'text-amber-300'} style={{ animation: 'shimmer 3s infinite' }} />
-                            <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${lt ? 'text-teal-700' : 'text-white/60'}`}>
-                                {isArabic ? 'مركز قيادة المطعم' : 'Restaurant Command Center'}
-                            </span>
-                        </div>
-
-                        <h1 className={`text-[2.75rem] xl:text-[3.25rem] font-black leading-[1.1] tracking-tight mb-5 ${lt ? 'text-slate-900' : 'text-white'}`}>
-                            {isArabic ? 'ارتقِ بعملك' : 'Elevate Your'} <br />
-                            <span className={`text-transparent bg-clip-text bg-gradient-to-r ${lt ? 'from-teal-700 via-emerald-600 to-amber-600' : 'from-teal-300 via-emerald-200 to-amber-300'}`}>
-                                {isArabic ? 'مساحة العمل' : 'Workspace'}
-                            </span>
-                        </h1>
-                        <p className={`text-sm leading-relaxed max-w-md ${lt ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {isArabic
-                                ? 'ادخل إلى لوحة التحكم الذكية، وأدِر العمليات بسلاسة مع تحليلات فورية.'
-                                : 'Coordinate live orders, kitchen flow, inventory, and branch operations from one calm operational surface.'}
-                        </p>
-
-                        {/* Stats row */}
-                        <div className="flex gap-8 mt-10">
-                            {[
-                                { value: isArabic ? 'حي' : 'Live', label: isArabic ? 'وقت التشغيل' : 'Sync' },
-                                { value: isArabic ? 'فروع' : 'Multi-Branch', label: isArabic ? 'متعدد الفروع' : 'Branch Aware' },
-                                { value: isArabic ? 'تدقيق' : 'Audit', label: isArabic ? 'جاهز للمراجعة' : 'Ready' },
-                            ].map((s, i) => (
-                                <div key={i} className="flex flex-col">
-                                    <span className={`text-xl font-black ${lt ? 'text-slate-800' : 'text-white'}`}>{s.value}</span>
-                                    <span className={`text-[10px] font-semibold uppercase tracking-wider mt-0.5 ${lt ? 'text-slate-400' : 'text-white/30'}`}>{s.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* ?? Bottom: Footer ?? */}
-                    <div className={`relative z-10 flex items-center justify-between text-[11px] font-medium border-t pt-5 ${lt ? 'text-slate-400 border-slate-200/50' : 'text-white/20 border-white/5'}`}>
-                        <span className="tracking-wider">
-                            {isArabic ? `© ${new Date().getFullYear()} Coduis Zen. جميع الحقوق محفوظة` : `© ${new Date().getFullYear()} Coduis Zen. All rights reserved.`}
-                        </span>
-                        <span className="font-mono tracking-wider">{timeStr}</span>
-                    </div>
+                {/* ??? MEDIA SLIDESHOW — halal-safe photos + muted video loops ??? */}
+                <div className="absolute inset-0 z-0" style={{ transform: `scale(1.12) translate(${par.x * -18}px, ${par.y * -14}px)`, transition: 'transform .6s ease-out' }}>
+                    {LOGIN_MEDIA.map((m, i) => {
+                        const active = i === activeSlide;
+                        const anim: React.CSSProperties = {
+                            opacity: active ? 1 : 0,
+                            transform: active ? 'scale(1.1) translate(-1%, 1%)' : 'scale(1)',
+                            transition: 'opacity 1.6s ease, transform 9s ease',
+                        };
+                        return m.type === 'video' ? (
+                            <video
+                                key={i}
+                                className="absolute inset-0 h-full w-full object-cover"
+                                style={anim}
+                                autoPlay muted loop playsInline preload="auto"
+                                src={m.src}
+                            />
+                        ) : (
+                            <div
+                                key={i}
+                                className="absolute inset-0 bg-cover bg-center"
+                                style={{ ...anim, backgroundImage: `url('${m.src}')` }}
+                            />
+                        );
+                    })}
                 </div>
+                {/* Readability shade — theme aware */}
+                <div className={`absolute inset-0 z-[1] ${lt
+                    ? 'bg-gradient-to-b from-white/75 via-white/60 to-white/85'
+                    : 'bg-gradient-to-b from-black/60 via-black/55 to-black/80'}`} />
 
-                {/* ???????????????????? RIGHT PANEL — MAGIC GLASS ???????????????????? */}
-                <div className="relative flex-1 lg:w-[50%] flex flex-col justify-center items-center px-5 sm:px-8 lg:px-14 overflow-hidden h-[100dvh] z-20 bg-black/50 -[40px] shadow-[0_0_80px_rgba(0,0,0,0.8)] border-l border-white/5">
+                {/* Centered layout — brand showcase panel removed per approved concept (v2) */}
 
-                    {/* Deep inner glow/ambient blobs for Right Panel */}
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden mix-blend-color-dodge">
-                        <div className="absolute -top-40 -right-40 w-[80vw] lg:w-[40vw] h-[80vw] lg:h-[40vw] rounded-full blur-[140px] bg-teal-500/15" style={{ animation: 'float 10s ease-in-out infinite' }} />
-                        <div className="absolute -bottom-40 -left-40 w-[70vw] lg:w-[35vw] h-[70vw] lg:h-[35vw] rounded-full blur-[140px] bg-amber-500/15" style={{ animation: 'float 14s ease-in-out infinite 3s' }} />
+                {/* ??? Top bar: Logo + Controls ??? */}
+                <div className="relative z-20 flex items-center justify-between px-5 sm:px-8 py-4">
+                    {/* Logo — transparent asset floating with light halo, responsive */}
+                    <div className="relative flex items-center">
+                        <div aria-hidden className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" style={{ width: '130%', height: '160%', background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.30), rgba(251,191,36,0.14) 55%, transparent 72%)' }} />
+                        <img src="/logo.png?v=6" alt="Coduis Xen ERP Systems" className="relative w-auto object-contain" style={{ height: 'clamp(72px, 10vw, 120px)', filter: 'drop-shadow(0 0 14px rgba(255,255,255,0.55)) drop-shadow(0 8px 24px rgba(0,0,0,0.5))' }} draggable={false} />
                     </div>
-
-                    {/* ??? Top bar: Logo + Controls ??? */}
-                    <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 sm:px-8 lg:px-14 py-5 z-20">
-                        {/* Mobile logo — natural wide shape */}
-                        <div className="flex lg:hidden items-center gap-2.5">
-                            <span className="flex h-11 items-center justify-center rounded-xl px-2.5 shadow-lg shadow-black/20 ring-1 ring-amber-300/50" style={{ background: 'linear-gradient(135deg,#0b1b30 0%,#020617 100%)' }}>
-                                <img src="/logo.png?v=2" alt="Logo" className="h-8 w-auto max-w-[150px] object-contain" draggable={false} />
-                            </span>
-                            <span className={`text-sm font-extrabold tracking-widest uppercase ${lt ? 'text-slate-700' : 'text-white/80'}`}>Coduis Zen</span>
-                        </div>
-                        <div className="hidden lg:block" /> {/* spacer on desktop */}
 
                         {/* Controls */}
                         <div className="flex items-center gap-2">
@@ -445,11 +465,20 @@ const Login: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* ??? FORM CONTAINER ??? */}
-                    <div className="w-full max-w-[420px] relative z-10 flex flex-col justify-center p-6 sm:p-10 bg-black/60 backdrop-blur-lg rounded-2xl border border-white/20">
+                    {/* ??? CENTERED LOGIN CARD ??? */}
+                    <div className="relative z-20 flex flex-1 flex-col items-center justify-center px-4 sm:px-6 pb-6">
+                    {/* Ambient orbs behind the card */}
+                    <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/15 blur-[110px]" />
+                    <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-teal-500/15 blur-[100px]" />
+                    {/* Animated capability pitch */}
+                    <p key={settings.language} className={`mb-4 flex min-h-[22px] items-center gap-2 text-[12px] sm:text-sm font-bold tracking-wide ${lt ? 'text-slate-600' : 'text-white/80'}`} style={{ textShadow: lt ? 'none' : '0 2px 12px rgba(0,0,0,.6)' }}>
+                        <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" style={{ boxShadow: '0 0 10px rgba(251,191,36,.9)' }} />
+                        <span>{capList[capIndex % capList.length].slice(0, capChar)}<span className="animate-pulse text-amber-400">▍</span></span>
+                    </p>
+                    <div className={`w-full max-w-[400px] flex flex-col justify-center p-6 sm:p-8 rounded-[1.75rem] border backdrop-blur-xl shadow-2xl ${lt ? 'bg-white/85 border-white/60 shadow-black/10' : 'bg-black/60 border-white/15 shadow-black/60'}`}>
 
                         {/* Header */}
-                        <div className="text-center sm:text-start mb-6 animate-stagger-1">
+                        <div className="text-center mb-6 animate-stagger-1">
                             <div className={`inline-flex lg:hidden items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br border mb-3  ${lt ? 'from-teal-100/80 to-amber-50 border-stone-200/60' : 'from-teal-500/20 to-amber-500/10 border-white/10'}`}>
                                 <Fingerprint size={22} className={lt ? 'text-teal-600' : 'text-amber-300'} />
                             </div>
@@ -539,7 +568,9 @@ const Login: React.FC = () => {
                                                 className={`h-14 sm:h-[3.75rem] rounded-2xl font-semibold text-xl transition-all duration-150
                                                 ${pressedKey === digit
                                                         ? 'bg-amber-400/90 text-slate-950 scale-[0.90] shadow-[0_0_25px_rgba(251,191,36,0.5)] border border-amber-300'
-                                                        : 'bg-white/[0.03]  border border-white/[0.06] text-slate-200 hover:bg-white/[0.08] hover:border-amber-400/30 hover:shadow-[0_4px_15px_rgba(251,191,36,0.15)] active:scale-[0.93]'
+                                                        : lt
+                                                            ? 'bg-white border border-stone-200 text-slate-800 shadow-sm hover:border-amber-500/50 hover:shadow-md active:scale-[0.93]'
+                                                            : 'bg-white/[0.03]  border border-white/[0.06] text-slate-200 hover:bg-white/[0.08] hover:border-amber-400/30 hover:shadow-[0_4px_15px_rgba(251,191,36,0.15)] active:scale-[0.93]'
                                                     }`}
                                             >
                                                 {digit}
@@ -562,9 +593,11 @@ const Login: React.FC = () => {
                                             onClick={() => handlePinDigit('0')}
                                             className={`h-14 sm:h-[3.75rem] rounded-2xl font-semibold text-xl transition-all duration-150
                                             ${pressedKey === '0'
-                                                    ? 'bg-amber-400/90 text-slate-950 scale-[0.90] shadow-[0_0_25px_rgba(251,191,36,0.5)] border border-amber-300'
-                                                    : 'bg-white/[0.03]  border border-white/[0.06] text-slate-200 hover:bg-white/[0.08] hover:border-amber-400/30 hover:shadow-[0_4px_15px_rgba(251,191,36,0.15)] active:scale-[0.93]'
-                                                }`}
+                                                     ? 'bg-amber-400/90 text-slate-950 scale-[0.90] shadow-[0_0_25px_rgba(251,191,36,0.5)] border border-amber-300'
+                                                     : lt
+                                                         ? 'bg-white border border-stone-200 text-slate-800 shadow-sm hover:border-amber-500/50 hover:shadow-md active:scale-[0.93]'
+                                                         : 'bg-white/[0.03]  border border-white/[0.06] text-slate-200 hover:bg-white/[0.08] hover:border-amber-400/30 hover:shadow-[0_4px_15px_rgba(251,191,36,0.15)] active:scale-[0.93]'
+                                                 }`}
                                         >
                                             0
                                         </button>
@@ -603,7 +636,7 @@ const Login: React.FC = () => {
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
                                                 placeholder="admin@zen.com"
-                                                style={{ colorScheme: 'dark' }}
+                                                style={{ colorScheme: lt ? 'light' : 'dark' }}
                                                 className={`login-field relative w-full rounded-2xl py-3.5 pl-11 pr-5 outline-none transition-all text-sm font-medium text-left caret-amber-300 focus:ring-2 ${lt
                                                     ? `bg-white border border-stone-200 text-slate-900 placeholder:text-slate-300 focus:${accentRing} focus:border-teal-500/40 shadow-sm`
                                                     : `bg-white/[0.03] border border-white/[0.06] text-white placeholder:text-slate-600 focus:ring-amber-400/25 focus:border-amber-400/30`
@@ -623,7 +656,7 @@ const Login: React.FC = () => {
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 placeholder="••••••••"
-                                                style={{ colorScheme: 'dark' }}
+                                                style={{ colorScheme: lt ? 'light' : 'dark' }}
                                                 className={`login-field relative w-full rounded-2xl py-3.5 pl-11 pr-12 outline-none transition-all text-sm font-medium tracking-wider caret-amber-300 focus:ring-2 ${lt
                                                     ? `bg-white border border-stone-200 text-slate-900 placeholder:text-slate-300 focus:${accentRing} focus:border-teal-500/40 shadow-sm`
                                                     : `bg-white/[0.03] border border-white/[0.06] text-white placeholder:text-slate-600 focus:ring-amber-400/25 focus:border-amber-400/30`
@@ -722,12 +755,11 @@ const Login: React.FC = () => {
                             </button>
                         </form>
 
-                        {/* Footer on mobile */}
-                        <p className={`lg:hidden text-center text-[10px] font-medium mt-6 animate-stagger-4 ${lt ? 'text-slate-400' : 'text-white/30'}`}>
-                            {t.footer}
-                        </p>
                     </div>
-                </div>
+                    </div>
+                    <p className={`relative z-20 text-center text-[11px] font-medium pb-5 ${lt ? 'text-slate-500' : 'text-white/35'}`}>
+                        {t.footer} · <span className="font-mono">{timeStr}</span>
+                    </p>
 
             </div>
         </>

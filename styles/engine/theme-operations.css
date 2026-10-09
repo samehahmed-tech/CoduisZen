@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   THEME OPERATIONS (V6.1) — deep coverage layer.
-   POS tilt-cards · cart · KDS tickets · dashboard KPI · chart shapes ·
-   login accents · command palette · date-range · arbitrary-radius remap.
+   THEME OPERATIONS (V6.1) — RETIRED as personality layer.
+   Per-theme blocks below target retired ids and no longer match any live
+   theme (dead CSS). Live per-theme geometry now lives in
+   styles/engine/theme-worlds.css. Kept for safe rollback.
    Imported LAST so personality wins over layout defaults.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -296,35 +297,35 @@
 
 [data-theme='future-hud'] .pos-3d-card { clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); }
 [data-theme='future-hud'] .pos-flip-card,
-[data-theme='future-hud'] .pos-ticket-card { --card-radius: 8px; border-color: rgba(var(--primary), 0.4) !important; }
-[data-theme='future-hud'] .pos-flip-back { border-color: rgba(var(--primary), 0.5) !important; box-shadow: 0 0 20px -4px rgba(var(--primary), 0.5); }
-[data-theme='future-hud'] .pos-ticket-add { border-radius: 6px !important; }
+[data-theme='obsidian'] .pos-ticket-card { --card-radius: 8px; border-color: rgba(var(--primary), 0.4) !important; }
+[data-theme='obsidian'] .pos-flip-back { border-color: rgba(var(--primary), 0.5) !important; box-shadow: 0 0 20px -4px rgba(var(--primary), 0.5); }
+[data-theme='obsidian'] .pos-ticket-add { border-radius: 6px !important; }
 
-[data-theme='industrial-ops'] .pos-3d-card,
-[data-theme='industrial-ops'] .pos-flip-card,
-[data-theme='industrial-ops'] .pos-ticket-card { --card-radius: 6px; border-top: 3px solid rgb(var(--primary)); }
-[data-theme='industrial-ops'] .pos-ticket-perf { border-inline-start-width: 3px !important; }
+[data-theme='meridian'] .pos-3d-card,
+[data-theme='meridian'] .pos-flip-card,
+[data-theme='meridian'] .pos-ticket-card { --card-radius: 6px; border-top: 3px solid rgb(var(--primary)); }
+[data-theme='meridian'] .pos-ticket-perf { border-inline-start-width: 3px !important; }
 
-[data-theme='premium-hospitality'] .pos-3d-card,
-[data-theme='premium-hospitality'] .pos-flip-card,
-[data-theme='premium-hospitality'] .pos-ticket-card { border-color: rgba(var(--accent), 0.4) !important; }
-[data-theme='premium-hospitality'] .pos-flip-back { border-color: rgba(var(--accent), 0.5) !important; }
+[data-theme='acrylic'] .pos-3d-card,
+[data-theme='acrylic'] .pos-flip-card,
+[data-theme='acrylic'] .pos-ticket-card { border-color: rgba(var(--accent), 0.4) !important; }
+[data-theme='acrylic'] .pos-flip-back { border-color: rgba(var(--accent), 0.5) !important; }
 
-[data-theme='aurora-glass'] .pos-flip-back { background: linear-gradient(160deg, rgba(var(--primary), 0.5), rgba(5, 7, 14, 0.85)); }
-[data-theme='bento-saas'] .pos-3d-card { --card-radius: 22px; }
-[data-theme='bento-saas'] .pos-flip-card { --card-radius: 20px; }
+[data-theme='glassline'] .pos-flip-back { background: linear-gradient(160deg, rgba(var(--primary), 0.5), rgba(5, 7, 14, 0.85)); }
+[data-theme='tiles'] .pos-3d-card { --card-radius: 22px; }
+[data-theme='tiles'] .pos-flip-card { --card-radius: 20px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DASHBOARD KPI voice: icon-tile geometry + progress track per theme
    (card shells already follow theme-card + radius remap)
    ═══════════════════════════════════════════════════════════════════════════ */
-[data-theme='neo-brutal'] .kpi-tile,
-[data-theme='neo-brutal'] [class*='kpi-'] [class*='rounded-2xl'] { border-radius: 2px !important; }
-[data-theme='terminal-ops'] .recharts-wrapper { font-family: ui-monospace, Menlo, monospace; }
-[data-theme='industrial-ops'] .dashboard-progress,
-[data-theme='terminal-ops'] .dashboard-progress { border-radius: 2px !important; }
-[data-theme='soft-organic'] .dashboard-progress { border-radius: 999px !important; }
-[data-theme='editorial-luxury'] .dashboard-section-title,
-[data-theme='industrial-ops'] .dashboard-section-title,
-[data-theme='terminal-ops'] .dashboard-section-title,
-[data-theme='future-hud'] .dashboard-section-title { text-transform: uppercase; letter-spacing: 0.12em; }
+[data-theme='touch'] .kpi-tile,
+[data-theme='touch'] [class*='kpi-'] [class*='rounded-2xl'] { border-radius: 6px !important; }
+[data-theme='command'] .recharts-wrapper { font-family: ui-monospace, Menlo, monospace; }
+[data-theme='meridian'] .dashboard-progress,
+[data-theme='command'] .dashboard-progress { border-radius: 2px !important; }
+[data-theme='material-x'] .dashboard-progress { border-radius: 999px !important; }
+[data-theme='canvas'] .dashboard-section-title,
+[data-theme='meridian'] .dashboard-section-title,
+[data-theme='command'] .dashboard-section-title,
+[data-theme='obsidian'] .dashboard-section-title { text-transform: uppercase; letter-spacing: 0.12em; }

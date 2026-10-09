@@ -486,6 +486,22 @@ export const getMailThread = async (req: Request, res: Response) => {
 };
 
 /** DELETE /mail/sent/:id — sender deletes own message (removes for everyone) */
+/** DELETE /mail/inbox/:id — remove MY received copy only (the message and other recipients are untouched). */
+export const deleteInboxMail = async (req: Request, res: Response) => {
+    try {
+        await ensureMailSchema();
+        const userId = req.user?.id;
+        const id = getStringParam(req.params.id);
+        if (!userId) return res.status(401).json({ error: 'AUTH_REQUIRED' });
+        const row = await myRecipientRow(id, userId);
+        if (!row) return res.status(404).json({ error: 'MESSAGE_NOT_FOUND' });
+        await db.delete(mailMessageRecipients).where(eq(mailMessageRecipients.id, row.id));
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 export const deleteSentMail = async (req: Request, res: Response) => {
     try {
         await ensureMailSchema();

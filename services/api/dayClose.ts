@@ -20,6 +20,12 @@ export const dayCloseApi = {
             method: 'POST',
             body: JSON.stringify(payload || {}),
         }),
+    /** Reopen a wrongly-closed day (undo close; manager-only, reason required). */
+    reopen: (branchId: string, date: string, reason: string) =>
+        apiRequest<{ success: boolean; message: string; businessDate: string; previousBusinessDate: string; reopenedOrders: number; dateReverted: boolean }>(
+            `/day-close/${branchId}/${date}/reopen`,
+            { method: 'POST', body: JSON.stringify({ reason }) },
+        ),
     sendEmail: (branchId: string, date: string, emailConfig: { to: string[]; cc?: string[]; subject: string; includeReports: Array<'sales' | 'payments' | 'audit'> }) =>
         apiRequest<{ success: boolean; message: string }>(`/day-close/${branchId}/${date}/send-email`, {
             method: 'POST',

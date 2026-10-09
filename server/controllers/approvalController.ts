@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { managerApprovals, auditLogs, users, journalEntries, financeExceptions } from '../../src/db/schema';
+import { managerApprovals, auditLogs, users, journalEntries, financeExceptions, settings } from '../../src/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { GLService } from '../services/glService';
 import { findApproverByPassword, findApproverByPin } from '../services/managerApprovalAuth';
@@ -134,6 +134,29 @@ export const getApprovals = async (req: Request, res: Response) => {
 };
 
 /**
+ * Shared discount-approval code (the "10009999" style code cashiers enter
+ * instead of a manager PIN). Configurable via the discountApprovalCode
+ * setting; manager PINs and permission-holder credentials keep working.
+ * Only ever honored for discount actions — never voids/refunds.
+ */
+const DEFAULT_DISCOUNT_CODE = '10009999';
+const resolveDiscountCode = async (): Promise<string> => {
+    try {
+        const [row] = await db.select({ value: settings.value }).top(1)
+            .from(settings).where(eq(settings.key, 'discountApprovalCode'));
+        const raw = String((row as any)?.value ?? '').trim();
+        if (!raw) return DEFAULT_DISCOUNT_CODE;
+        try {
+            const parsed = JSON.parse(raw);
+            if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
+        } catch { /* plain string value */ }
+        return raw;
+    } catch {
+        return DEFAULT_DISCOUNT_CODE;
+    }
+};
+
+/**
  * Verify Manager PIN for secure actions (Void, Refund, High Discount)
  */
 export const verifyManagerPin = async (req: Request, res: Response) => {
@@ -141,7 +164,7 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
         const { branchId, pin, password, action, approvalId, relatedId } = req.body;
         const usePassword = typeof password === 'string';
         const credential = usePassword ? password : pin;
-        const verificationReason = usePassword ? 'Password Verified' : 'PIN Verified';
+        let verificationReason = usePassword ? 'Password Verified' : 'PIN Verified';
 
         if (!credential || (!branchId && !approvalId)) {
             return res.status(400).json({ error: `${usePassword ? 'password' : 'pin'} and branchId or approvalId are required` });
@@ -157,6 +180,11 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         }
 
+        // Discounts additionally accept credentials from anyone explicitly
+        // granted OP_APPLY_DISCOUNT (their own PIN/password becomes an
+        // approval credential) — no manager PIN sharing required.
+        const discountPermission = effectiveAction === 'APPLY_DISCOUNT' ? 'OP_APPLY_DISCOUNT' : undefined;
+
         const approvers = await db.select({
             id: users.id,
             name: users.name,
@@ -167,10 +195,23 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
             pinCodeHash: users.pinCodeHash,
             pinLoginEnabled: users.pinLoginEnabled,
             passwordHash: users.passwordHash,
+            permissions: users.permissions,
+            customPermissions: users.customPermissions,
         }).from(users).where(eq(users.isActive, true));
-        const validManager = usePassword
-            ? await findApproverByPassword(approvers, String(password), effectiveBranchId)
-            : await findApproverByPin(approvers, String(pin), effectiveBranchId);
+        let validManager = usePassword
+            ? await findApproverByPassword(approvers, String(password), effectiveBranchId, discountPermission)
+            : await findApproverByPin(approvers, String(pin), effectiveBranchId, discountPermission);
+
+        // Shared discount code: an explicit alternative to the manager PIN so
+        // cashiers can apply discounts without ever seeing it. Audited as its
+        // own reason with the requesting user as resolver.
+        if (!usePassword && !validManager && effectiveAction === 'APPLY_DISCOUNT' && req.user) {
+            const code = await resolveDiscountCode();
+            if (code && String(pin) === code) {
+                validManager = { id: req.user.id, name: req.user.name || req.user.id, role: req.user.role } as any;
+                verificationReason = 'Discount Code Verified';
+            }
+        }
 
         if (validManager) {
             if (approval) {

@@ -2,15 +2,16 @@
    wallpaperOpacity means visibility: lower = quieter image, higher = clearer image.
    Surfaces become more glass-like as wallpaper visibility increases. */
 
-.workspace-shell[data-wallpaper='aurora'] { --wp-img: url('/wallpapers/aurora.png'); }
-.workspace-shell[data-wallpaper='nebula'] { --wp-img: url('/wallpapers/nebula.png'); }
-.workspace-shell[data-wallpaper='mesh'] { --wp-img: url('/wallpapers/mesh.png'); }
-.workspace-shell[data-wallpaper='mountain'] { --wp-img: url('/wallpapers/mountain.png'); }
-.workspace-shell[data-wallpaper='ocean'] { --wp-img: url('/wallpapers/ocean.png'); }
-.workspace-shell[data-wallpaper='abstract'] { --wp-img: url('/wallpapers/abstract.png'); }
-.workspace-shell[data-wallpaper='glass'] { --wp-img: url('/wallpapers/glass.png'); }
-.workspace-shell[data-wallpaper='forest'] { --wp-img: url('/wallpapers/forest.png'); }
-.workspace-shell[data-wallpaper='marble'] { --wp-img: url('/wallpapers/marble.png'); }
+.workspace-shell[data-wallpaper='ember'] { --wp-img: url('/wallpapers/ember.png'); }
+.workspace-shell[data-wallpaper='saffron'] { --wp-img: url('/wallpapers/saffron.png'); }
+.workspace-shell[data-wallpaper='dune'] { --wp-img: url('/wallpapers/dune.png'); }
+.workspace-shell[data-wallpaper='matcha'] { --wp-img: url('/wallpapers/matcha.png'); }
+.workspace-shell[data-wallpaper='rose'] { --wp-img: url('/wallpapers/rose.png'); }
+.workspace-shell[data-wallpaper='abyss'] { --wp-img: url('/wallpapers/abyss.png'); }
+.workspace-shell[data-wallpaper='porcelain'] { --wp-img: url('/wallpapers/porcelain.png'); }
+.workspace-shell[data-wallpaper='cocoa'] { --wp-img: url('/wallpapers/cocoa.png'); }
+.workspace-shell[data-wallpaper='neon'] { --wp-img: url('/wallpapers/neon.png'); }
+.workspace-shell[data-wallpaper='olive'] { --wp-img: url('/wallpapers/olive.png'); }
 
 .workspace-shell[data-wallpaper]:not([data-wallpaper='none']) {
     --wallpaper-strength: var(--wallpaper-opacity, 0.15);

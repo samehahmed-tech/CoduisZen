@@ -6,8 +6,8 @@ export const deliveryApi = {
     updateZone: (id: number | string, data: any) => apiRequest<any>(`/delivery/zones/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteZone: (id: number | string) => apiRequest<any>(`/delivery/zones/${id}`, { method: 'DELETE' }),
     getAvailableDrivers: (branchId?: string) => apiRequest<any[]>(`/delivery/drivers${branchId ? `?branchId=${branchId}` : ''}`),
-    getDrivers: (params?: { branchId?: string; status?: string }) => {
-        const query = new URLSearchParams(params as any).toString();
+    getDrivers: (params?: { branchId?: string; status?: string; includeInactive?: boolean }) => {
+        const query = new URLSearchParams({ ...(params as any), ...(params?.includeInactive ? { includeInactive: '1' } : {}) }).toString();
         return apiRequest<any[]>(`/delivery/drivers/all${query ? `?${query}` : ''}`);
     },
     createDriver: (data: {
@@ -67,9 +67,9 @@ export const deliveryApi = {
     /** Confirm delivery with proof-of-collection when cash is due. */
     deliverOrder: (id: string, data?: { cashCollected?: number; notes?: string; deliveryOtp?: string; managerPin?: string }) =>
         apiRequest<any>(`/delivery/orders/${id}/deliver`, { method: 'PUT', body: JSON.stringify(data || {}) }),
-    /** Report a failed delivery — order returns to the dispatch queue. */
-    failDelivery: (id: string, reason: string) =>
-        apiRequest<any>(`/delivery/orders/${id}/fail`, { method: 'PUT', body: JSON.stringify({ reason }) }),
+    /** Report a failed delivery — order returns to the dispatch queue. Managers pass managerPin (no driver profile needed). */
+    failDelivery: (id: string, reason: string, managerPin?: string) =>
+        apiRequest<any>(`/delivery/orders/${id}/fail`, { method: 'PUT', body: JSON.stringify({ reason, ...(managerPin ? { managerPin } : {}) }) }),
 };
 
 export const callCenterSupervisorApi = {

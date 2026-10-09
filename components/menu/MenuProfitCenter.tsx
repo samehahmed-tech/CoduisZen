@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { MenuItem, MenuCategory } from '../../types';
+import { MenuItem, MenuCategory, AppPermission } from '../../types';
 import { useMenuStore } from '../../stores/useMenuStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useInventoryStore } from '../../stores/useInventoryStore';
@@ -60,7 +60,17 @@ const MenuProfitCenter: React.FC = () => {
         duplicateItem: state.duplicateItem,
     })));
     const { inventory, fetchInventory } = useInventoryStore();
-    const { branches, printers, settings } = useAuthStore(useShallow((state) => ({ branches: state.branches, printers: state.printers, settings: state.settings })));
+    const { branches, printers, settings, hasPermission } = useAuthStore(useShallow((state) => ({ branches: state.branches, printers: state.printers, settings: state.settings, hasPermission: state.hasPermission })));
+    // Menu mutations are manager-gated server-side (roles + CFG_EDIT_MENU_PRICING);
+    // mirror it exactly so the UI never denies someone the API would allow
+    // (a stale wrong role path here locked out every admin).
+    const userRole = String((settings as any)?.currentUser?.role || '').toUpperCase();
+    const canManageMenu = ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER'].includes(userRole)
+        || hasPermission(AppPermission.CFG_EDIT_MENU_PRICING);
+    const denyMenuManage = () => {
+        showError(lang === 'ar' ? 'إدارة المنيو للمشرفين فقط' : 'Menu management is restricted to managers');
+        return false;
+    };
     const lang = settings.language;
     const { error: showError, info } = useToast();
     const { confirm } = useConfirm();
@@ -72,6 +82,11 @@ const MenuProfitCenter: React.FC = () => {
 
     // --- State ---
     const [selectedMenuId, setSelectedMenuId] = useState<string>(menus[0]?.id || '');
+    // menus load async — an empty initial id stuck around and rendered the
+    // empty-state wizard forever. Adopt the first menu once it arrives.
+    useEffect(() => {
+        if (!selectedMenuId && menus.length > 0) setSelectedMenuId(menus[0].id);
+    }, [menus, selectedMenuId]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | 'all'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     // Debounced query: typing filters without re-rendering the grid per keystroke
@@ -309,6 +324,7 @@ const MenuProfitCenter: React.FC = () => {
 
     const handleSaveItem = async (item: MenuItem, categoryId: string, keepOpen?: boolean) => {
         if (!drawerItem) return;
+        if (!canManageMenu) { denyMenuManage(); return; }
         try {
             if (drawerItem.mode === 'ADD') {
                 await addMenuItem(drawerItem.menuId, categoryId, { ...item, id: `item-${Date.now()}` });
@@ -326,8 +342,21 @@ const MenuProfitCenter: React.FC = () => {
     };
 
     const handleToggleAvailability = useCallback((item: MenuItem & { _categoryId: string }) => {
-        updateMenuItem(selectedMenuId, item._categoryId, { ...item, isAvailable: !item.isAvailable });
-    }, [updateMenuItem, selectedMenuId]);
+        if (!canManageMenu) { denyMenuManage(); return; }
+        updateMenuItem(selectedMenuId, item._categoryId, { ...item, isAvailable: !item.isAvailable }).catch((err: any) => {
+            showError(err?.message || (lang === 'ar' ? 'تعذر تحديث الحالة' : 'Could not update status'));
+        });
+    }, [updateMenuItem, selectedMenuId, canManageMenu, lang, showError]);
+
+    // Inline quick price edit (optimistic — store rolls back visually on failure via refetch).
+    const handleQuickPrice = useCallback(async (item: MenuItem & { _categoryId: string }, price: number) => {
+        if (!canManageMenu) { denyMenuManage(); return; }
+        try {
+            await updateMenuItem(selectedMenuId, item._categoryId, { ...item, price });
+        } catch (err: any) {
+            showError(err?.message || (lang === 'ar' ? 'تعذر حفظ السعر' : 'Could not save price'));
+        }
+    }, [updateMenuItem, selectedMenuId, canManageMenu, lang, showError]);
 
     const handleDuplicate = useCallback(async (item: MenuItem & { _categoryId: string }) => {
         try {
@@ -338,6 +367,7 @@ const MenuProfitCenter: React.FC = () => {
     }, [duplicateItem, selectedMenuId, lang, showError]);
 
     const handleArchive = useCallback(async (item: MenuItem & { _categoryId: string }) => {
+        if (!canManageMenu) { denyMenuManage(); return; }
         try {
             if (item.archivedAt) {
                 await restoreItem(selectedMenuId, item._categoryId, item.id);
@@ -347,9 +377,10 @@ const MenuProfitCenter: React.FC = () => {
         } catch (err: any) {
             showError(err?.message || (lang === 'ar' ? 'تعذر تحديث حالة الصنف' : 'Could not update item status'));
         }
-    }, [archiveItem, restoreItem, selectedMenuId, lang, showError]);
+    }, [archiveItem, restoreItem, selectedMenuId, lang, showError, canManageMenu]);
 
     const handleDelete = useCallback(async (item: MenuItem & { _categoryId: string }) => {
+        if (!canManageMenu) { denyMenuManage(); return false; }
         const ok = await confirm({
             title: lang === 'ar' ? 'حذف الصنف؟' : 'Delete item?',
             message: lang === 'ar'
@@ -367,7 +398,7 @@ const MenuProfitCenter: React.FC = () => {
             showError(err?.message || (lang === 'ar' ? 'تعذر حذف الصنف' : 'Could not delete item'));
             return false;
         }
-    }, [confirm, deleteMenuItem, selectedMenuId, lang, showError]);
+    }, [confirm, deleteMenuItem, selectedMenuId, lang, showError, canManageMenu]);
 
     const handleDeleteDrawerItem = async () => {
         if (!drawerItem || drawerItem.mode !== 'EDIT') return;
@@ -380,6 +411,7 @@ const MenuProfitCenter: React.FC = () => {
 
     const handleDeleteDrawerCategory = async () => {
         if (!drawerCategory || drawerCategory.mode !== 'EDIT') return;
+        if (!canManageMenu) { denyMenuManage(); return; }
         const ok = await confirm({
             title: lang === 'ar' ? 'حذف المجموعة؟' : 'Delete section?',
             message: lang === 'ar'
@@ -399,14 +431,42 @@ const MenuProfitCenter: React.FC = () => {
     };
 
     const handleBulkApply = async (changes: Partial<MenuItem>) => {
-        const updates = Array.from(selectedItemIds).map(id => {
-            const item = allItems.find(i => i.id === id);
-            return item ? { menuId: selectedMenuId, categoryId: item._categoryId, itemId: id, changes } : null;
-        }).filter(Boolean) as any[];
+        if (!canManageMenu) { denyMenuManage(); return; }
+        const ids = Array.from(selectedItemIds);
         try {
+            // Bulk delete: real deletes (BulkActionsBar already confirmed).
+            if ((changes as any)._bulkDelete) {
+                for (const id of ids) {
+                    const item = allItems.find(i => i.id === id);
+                    if (item) await deleteMenuItem(selectedMenuId, item._categoryId, id);
+                }
+                setSelectedItemIds(new Set());
+                setMultiSelectMode(false);
+                info(lang === 'ar' ? `تم حذف ${ids.length} صنف` : `Deleted ${ids.length} items`);
+                return;
+            }
+            // Bulk percent: adjust each item's own price by the percentage.
+            const pct = Number((changes as any)._bulkPricePercent);
+            if (Number.isFinite(pct) && pct !== 0) {
+                for (const id of ids) {
+                    const item = allItems.find(i => i.id === id);
+                    if (!item) continue;
+                    const next = Math.max(0, Number((Number(item.price || 0) * (1 + pct / 100)).toFixed(2)));
+                    await updateMenuItem(selectedMenuId, item._categoryId, { ...item, price: next });
+                }
+                setSelectedItemIds(new Set());
+                setMultiSelectMode(false);
+                info(lang === 'ar' ? `تم تحديث أسعار ${ids.length} صنف` : `Updated prices for ${ids.length} items`);
+                return;
+            }
+            const updates = ids.map(id => {
+                const item = allItems.find(i => i.id === id);
+                return item ? { menuId: selectedMenuId, categoryId: item._categoryId, itemId: id, changes } : null;
+            }).filter(Boolean) as any[];
             await bulkUpdateItems(updates);
             setSelectedItemIds(new Set());
             setMultiSelectMode(false);
+            info(lang === 'ar' ? `تم تحديث ${updates.length} صنف` : `Updated ${updates.length} items`);
         } catch (err: any) {
             showError(err?.message || (lang === 'ar' ? 'تعذر حفظ التعديل الجماعي' : 'Could not save bulk changes'));
         }
@@ -414,6 +474,7 @@ const MenuProfitCenter: React.FC = () => {
 
     const handleQuickAdd = async () => {
         if (!quickAdd.name.trim() || !quickAdd.price) return;
+        if (!canManageMenu) { denyMenuManage(); return; }
         const firstCat = selectedCategory ?? filteredCategories[0];
         if (!firstCat) {
             info(lang === 'ar' ? 'أضف قسم أولاً قبل إضافة صنف.' : 'Add a category before adding an item.');
@@ -445,15 +506,15 @@ const MenuProfitCenter: React.FC = () => {
         ? allItems.reduce((s, i) => s + (i.cost && i.price > 0 ? ((i.price - i.cost) / i.price) * 100 : 0), 0) / allItems.length
         : 0;
 
-    // --- Excel Export ---
+    // --- Excel Export (includes Cost so export→import round-trips costing) ---
     const handleExportMenu = useCallback(() => {
-        const headers = ['Name', 'Name (AR)', 'Category', 'Price', 'Margin %', 'SKU', 'Barcode', 'Available', 'Tags'];
+        const headers = ['Name', 'Name (AR)', 'Category', 'Price', 'Margin %', 'SKU', 'Barcode', 'Available', 'Tags', 'Cost'];
         const rows = allItems.map(i => {
             const margin = i.cost && i.price > 0 ? ((i.price - i.cost) / i.price * 100).toFixed(1) : '';
             return [
                 i.name, i.nameAr || '', (i as any)._categoryName || '', i.price,
                 margin, i.sku || '', i.barcode || '', i.isAvailable ? 'Yes' : 'No',
-                (i.tags || []).join('; ')
+                (i.tags || []).join('; '), i.cost ?? ''
             ];
         });
         const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -473,25 +534,35 @@ const MenuProfitCenter: React.FC = () => {
 
     const handleImportConfirm = useCallback(() => {
         if (!importData.trim()) return;
+        if (!canManageMenu) { denyMenuManage(); return; }
         try {
             const lines = importData.trim().split('\n');
             if (lines.length < 2) return;
-            const firstCat = filteredCategories[0];
-            if (!firstCat) return;
-            // Skip header
+            const fallbackCat = filteredCategories[0];
+            if (!fallbackCat) return;
+            const findCategory = (name: string) =>
+                filteredCategories.find(c =>
+                    String(c.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase()
+                    || String((c as any).nameAr || '').trim() === String(name || '').trim(),
+                ) || fallbackCat;
+            // Skip header. Column map mirrors handleExportMenu (incl. Cost).
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
                 if (!cols[0]) continue;
                 const name = cols[0];
                 const nameAr = cols[1] || '';
+                const targetCat = findCategory(cols[2] || '');
                 const price = parseFloat(cols[3]) || 0;
                 const sku = cols[5] || '';
                 const barcode = cols[6] || '';
                 const isAvailable = (cols[7] || 'Yes').toLowerCase() !== 'no';
-                addMenuItem(selectedMenuId, firstCat.id, {
+                const tags = (cols[8] || '').split(';').map(t => t.trim()).filter(Boolean);
+                const cost = cols[9] !== undefined && cols[9] !== '' ? parseFloat(cols[9]) : undefined;
+                addMenuItem(selectedMenuId, targetCat.id, {
                     id: `item-${Date.now()}-${i}`,
-                    name, nameAr, price, sku, barcode, isAvailable,
-                    categoryId: firstCat.id,
+                    name, nameAr, price, sku, barcode, isAvailable, tags,
+                    ...(cost !== undefined && Number.isFinite(cost) ? { cost } : {}),
+                    categoryId: targetCat.id,
                     modifierGroups: [], priceLists: [], printerIds: [],
                 });
             }
@@ -500,7 +571,7 @@ const MenuProfitCenter: React.FC = () => {
         } catch {
             showError(lang === 'ar' ? 'تعذر استيراد الأصناف' : 'Failed to import items');
         }
-    }, [importData, filteredCategories, selectedMenuId, addMenuItem, lang, showError]);
+    }, [importData, filteredCategories, selectedMenuId, addMenuItem, lang, showError, canManageMenu]);
 
     // --- Menu Design ---
     const handleDesignMenu = useCallback(() => {
@@ -730,14 +801,14 @@ const MenuProfitCenter: React.FC = () => {
                     {/* CATEGORY CONTEXT STRIP */}
                     {selectedCategory && sidebarSection === 'menus' && (
                         <div className="px-3 sm:px-5 py-2 border-b border-gray-100 dark:border-white/[0.04] flex items-center gap-2.5 bg-card/40 shrink-0">
-                            <span className="text-[11px] font-bold text-blue-700 dark:text-indigo-400 bg-blue-50 dark:bg-indigo-500/10 border border-blue-100 dark:border-indigo-500/20 rounded-md px-2 py-0.5 tabular-nums shrink-0">
+                            <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 tabular-nums shrink-0">
                                 {filteredItems.length} {lang === 'ar' ? 'صنف' : 'items'}
                             </span>
                             <span className="text-[13px] font-semibold text-gray-800 dark:text-main truncate">
                                 {lang === 'ar' ? (selectedCategory.nameAr || selectedCategory.name) : selectedCategory.name}
                             </span>
                             <div className="flex-1" />
-                            <button onClick={handleNewItem} className="h-8 px-3 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0">
+                            <button onClick={handleNewItem} className="h-8 px-3 rounded-lg bg-primary hover:brightness-110 text-white text-[12px] font-bold flex items-center gap-1.5 transition-all shrink-0">
                                 <Plus size={14} />
                                 {lang === 'ar' ? 'صنف جديد' : 'New Item'}
                             </button>
@@ -817,6 +888,7 @@ const MenuProfitCenter: React.FC = () => {
                                                                 onArchive={handleArchive}
                                                                 onDelete={handleDelete}
                                                                 onEdit={handleEditItem}
+                                                                onQuickPrice={handleQuickPrice}
                                                                 lang={lang}
                                                                 currency={settings.currencySymbol}
                                                                 index={idx}

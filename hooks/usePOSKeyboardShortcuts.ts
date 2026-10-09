@@ -59,8 +59,8 @@ export const usePOSKeyboardShortcuts = ({
    editingItemId,
    activeOrderType,
    showMap,
-   categoryHotkeys,
-   sortedTables,
+   categoryHotkeys = [],
+   sortedTables = [],
    currentTableIndex,
    onDismissSplitModal,
    onClearEditingItem,
@@ -99,6 +99,8 @@ export const usePOSKeyboardShortcuts = ({
    });
 
    const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+      const key = typeof event.key === 'string' ? event.key : '';
+      const lowerKey = key.toLowerCase();
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName;
       const isInput = tagName === 'INPUT';
@@ -109,39 +111,39 @@ export const usePOSKeyboardShortcuts = ({
       // Help: F1 or "?" (Shift+/) works everywhere except while typing in inputs
       // (except allow "?" when NOT in a text field).
       if (!isInput && !isTextarea && !isContentEditable) {
-         if (event.key === 'F1' || event.key === '?') {
+         if (key === 'F1' || key === '?') {
             event.preventDefault();
             onOpenHelp?.();
             return;
          }
       }
       // Shift+/ produces "?" on most layouts when not in input — also catch it.
-      if (!isInput && !isTextarea && !isContentEditable && event.shiftKey && event.key === '/') {
+      if (!isInput && !isTextarea && !isContentEditable && event.shiftKey && key === '/') {
          event.preventDefault();
          onOpenHelp?.();
          return;
       }
 
-      if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'f' || event.key.toLowerCase() === 'k')) {
+      if ((event.ctrlKey || event.metaKey) && (lowerKey === 'f' || lowerKey === 'k')) {
          event.preventDefault();
          searchInputRef.current?.focus();
          return;
       }
 
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'h') {
+      if ((event.ctrlKey || event.metaKey) && lowerKey === 'h') {
          event.preventDefault();
          if (cartHasItems) onHoldOrder?.();
          return;
       }
 
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+      if ((event.ctrlKey || event.metaKey) && lowerKey === 'p') {
          event.preventDefault();
          onReprintLast?.();
          return;
       }
 
       if (isInput || isTextarea || isContentEditable) {
-         if (event.key === 'Escape') {
+         if (key === 'Escape') {
             target?.blur();
             if (showSplitModal) onDismissSplitModal();
             if (editingItemId) onClearEditingItem();
@@ -150,7 +152,7 @@ export const usePOSKeyboardShortcuts = ({
          return;
       }
 
-      if (event.key === 'Escape') {
+      if (key === 'Escape') {
          // Clear a partially typed table number first.
          if (inFloorMap && tableNumberBufferRef.current) {
             tableNumberBufferRef.current = '';
@@ -170,22 +172,22 @@ export const usePOSKeyboardShortcuts = ({
       }
 
       // Practical cashier shortcuts (work outside inputs).
-      if (event.key === 'F2') {
+      if (key === 'F2') {
          event.preventDefault();
          if (cartHasItems && !showSplitModal) onQuickPay();
          return;
       }
-      if (event.key === 'F3') {
+      if (key === 'F3') {
          event.preventDefault();
          if (cartHasItems) onHoldOrder?.();
          return;
       }
-      if (event.key === 'F4') {
+      if (key === 'F4') {
          event.preventDefault();
          onShowHeldOrders?.();
          return;
       }
-      if (event.key === 'F9') {
+      if (key === 'F9') {
          event.preventDefault();
          if (cartHasItems && !showSplitModal) onSendKitchen();
          return;
@@ -194,7 +196,7 @@ export const usePOSKeyboardShortcuts = ({
       // Floor map quick-jump: typing digits opens the table. Takes priority
       // over category hotkeys while the map is visible.
       if (inFloorMap) {
-         const normalizedKey = normalizeDigits(event.key);
+         const normalizedKey = normalizeDigits(key);
          const isDigit = normalizedKey >= '0' && normalizedKey <= '9' && normalizedKey.length === 1;
          if (isDigit && !event.ctrlKey && !event.metaKey && !event.altKey) {
             event.preventDefault();
@@ -208,13 +210,13 @@ export const usePOSKeyboardShortcuts = ({
             return;
          }
 
-         if (event.key === 'Enter') {
+         if (key === 'Enter') {
             event.preventDefault();
             commitBufferedTableNumber();
             return;
          }
 
-         if (event.key === 'Backspace' && tableNumberBufferRef.current) {
+         if (key === 'Backspace' && tableNumberBufferRef.current) {
             event.preventDefault();
             tableNumberBufferRef.current = tableNumberBufferRef.current.slice(0, -1);
             return;
@@ -222,59 +224,59 @@ export const usePOSKeyboardShortcuts = ({
       }
 
       // Category hotkeys 1-9 only when NOT on the floor map (no conflict).
-      if (!inFloorMap && event.key >= '1' && event.key <= '9' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-         const categoryIndex = parseInt(event.key, 10) - 1;
-         if (categoryIndex < categoryHotkeys.length) {
+      if (!inFloorMap && key >= '1' && key <= '9' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+         const categoryIndex = parseInt(key, 10) - 1;
+         if (categoryIndex < (categoryHotkeys?.length || 0)) {
             onSetActiveCategory(categoryHotkeys[categoryIndex]);
          }
       }
 
-      if (event.key === 'Enter' && cartHasItems) {
+      if (key === 'Enter' && cartHasItems) {
          event.preventDefault();
          onQuickPay();
          return;
       }
 
-      if (event.key === '/') {
+      if (key === '/') {
          event.preventDefault();
          searchInputRef.current?.focus();
       }
 
       if (event.altKey) {
-         if (event.key === '1') {
+         if (key === '1') {
             event.preventDefault();
             onSetOrderMode(OrderType.DINE_IN);
          }
-         if (event.key === '2') {
+         if (key === '2') {
             event.preventDefault();
             onSetOrderMode(OrderType.TAKEAWAY);
          }
-         if (event.key === '3') {
+         if (key === '3') {
             event.preventDefault();
             onSetOrderMode(OrderType.PICKUP);
          }
-         if (event.key === '4') {
+         if (key === '4') {
             event.preventDefault();
             onSetOrderMode(OrderType.DELIVERY);
          }
-         if (event.key.toLowerCase() === 'r') {
+         if (lowerKey === 'r') {
             event.preventDefault();
             onRecallShortcut();
          }
       }
 
       if (activeOrderType === OrderType.DINE_IN && event.altKey) {
-         if (event.key === 'ArrowRight' && sortedTables.length > 0) {
+         if (key === 'ArrowRight' && (sortedTables?.length || 0) > 0) {
             event.preventDefault();
             const nextIndex = currentTableIndex === -1 ? 0 : (currentTableIndex + 1) % sortedTables.length;
             onSwitchToTable(sortedTables[nextIndex].id);
          }
-         if (event.key === 'ArrowLeft' && sortedTables.length > 0) {
+         if (key === 'ArrowLeft' && (sortedTables?.length || 0) > 0) {
             event.preventDefault();
             const prevIndex = currentTableIndex <= 0 ? sortedTables.length - 1 : currentTableIndex - 1;
             onSwitchToTable(sortedTables[prevIndex].id);
          }
-         if (event.key === '0') {
+         if (key === '0') {
             event.preventDefault();
             onLeaveTable();
          }

@@ -42,7 +42,7 @@ const InventoryIntelligence: React.FC = () => {
 
     // Stock count
     const [countSession, setCountSession] = useState<any>(null);
-    const [counts, setCounts] = useState<{ itemId: string; countedQty: number; notes: string }[]>([]);
+    const [counts, setCounts] = useState<{ itemId: string; countedQty: number | null; notes: string }[]>([]);
 
     // Unit converter
     const [convertFrom, setConvertFrom] = useState('kg');
@@ -73,11 +73,19 @@ const InventoryIntelligence: React.FC = () => {
         }
     };
 
-    useEffect(() => { loadAlerts(); loadSuggestions(); loadUnits(); }, []);
+    useEffect(() => { loadUnits(); }, []);
+    // Alerts/suggestions are warehouse-scoped — refetch on warehouse change,
+    // never serve one warehouse's data under another's name.
+    useEffect(() => { loadAlerts(); loadSuggestions(); }, [warehouseId]);
 
     const handleConvert = async () => {
+        const value = Number(convertValue);
+        if (!Number.isFinite(value) || value < 0) {
+            showError(tr('Enter a valid non-negative value', 'أدخل قيمة صحيحة غير سالبة'));
+            return;
+        }
         try {
-            const result = await inventoryIntelligenceApi.convertUnit(Number(convertValue), convertFrom, convertTo);
+            const result = await inventoryIntelligenceApi.convertUnit(value, convertFrom, convertTo);
             setConvertResult(result);
         } catch (e: any) { showError(e.message); }
     };
@@ -87,18 +95,33 @@ const InventoryIntelligence: React.FC = () => {
         try {
             const session = await inventoryIntelligenceApi.createStockCount(warehouseId);
             setCountSession(session);
-            setCounts((session.items || []).map((it: any) => ({ itemId: it.itemId, countedQty: it.systemQty || 0, notes: '' })));
+            // Blank slate: prefilling system quantities lets counters
+            // copy-paste their way through a fake count.
+            setCounts((session.items || []).map((it: any) => ({ itemId: it.itemId, countedQty: null, notes: '' })));
         } catch (e: any) { showError(e.message); }
     };
 
     const handleUpdateCount = (itemId: string, field: string, value: any) => {
-        setCounts(prev => prev.map(c => c.itemId === itemId ? { ...c, [field]: value } : c));
+        const normalized = field === 'countedQty' && value === '' ? null : value;
+        setCounts(prev => prev.map(c => c.itemId === itemId ? { ...c, [field]: normalized } : c));
     };
 
     const handleCompleteCount = async (apply: boolean) => {
         if (!countSession) return;
         try {
-            await inventoryIntelligenceApi.updateStockCount(countSession.id, counts);
+            const counted = counts.filter((c: any) => c.countedQty !== null && c.countedQty !== undefined);
+            if (apply && counted.length === 0) {
+                showError(tr('Count at least one line before applying', 'اعدد صنفاً واحداً على الأقل قبل التطبيق'));
+                return;
+            }
+            if (apply && counted.length < counts.length) {
+                const ok = window.confirm(tr(
+                    `Post ${counted.length} counted lines? ${counts.length - counted.length} uncounted lines keep system values.`,
+                    `اعتماد ${counted.length} أصناف معدودة؟ ${counts.length - counted.length} غير معدودة تبقى كما هي.`,
+                ));
+                if (!ok) return;
+            }
+            await inventoryIntelligenceApi.updateStockCount(countSession.id, apply ? counted : counts);
             await inventoryIntelligenceApi.completeStockCount(countSession.id, apply);
             setCountSession(null);
             setCounts([]);
@@ -270,16 +293,19 @@ const InventoryIntelligence: React.FC = () => {
                                     <tbody className="divide-y divide-border/50">
                                         {counts.map((c, i) => {
                                             const sysItem = (countSession.items || []).find((it: any) => it.itemId === c.itemId);
-                                            const variance = c.countedQty - (sysItem?.systemQty || 0);
+                                            const counted = (c as any).countedQty;
+                                            const variance = counted === null || counted === undefined ? null : counted - (sysItem?.systemQty || 0);
                                             return (
                                                 <tr key={c.itemId} className="hover:bg-elevated/20">
                                                     <td className="px-6 py-4 text-xs font-black text-main">{sysItem?.itemName || c.itemId}</td>
                                                     <td className="px-4 py-4 font-mono text-xs text-muted">{sysItem?.systemQty || 0}</td>
                                                     <td className="px-4 py-4">
-                                                        <input type="number" value={c.countedQty} onChange={e => handleUpdateCount(c.itemId, 'countedQty', Number(e.target.value))}
+                                                        <input type="number" value={(c as any).countedQty ?? ''} placeholder="—" onChange={e => handleUpdateCount(c.itemId, 'countedQty', e.target.value === '' ? null : Number(e.target.value))}
                                                             className="w-24 px-3 py-2 bg-app border border-border rounded-lg text-xs font-black text-main text-center outline-none focus:border-cyan-500" />
                                                     </td>
-                                                    <td className="px-4 py-4"><span className={`font-mono text-xs font-black ${variance === 0 ? 'text-emerald-500' : variance > 0 ? 'text-blue-500' : 'text-rose-500'}`}>{variance > 0 ? '+' : ''}{variance}</span></td>
+                                                    <td className="px-4 py-4">{variance === null
+                                                        ? <span className="font-mono text-xs font-black text-muted">—</span>
+                                                        : <span className={`font-mono text-xs font-black ${variance === 0 ? 'text-emerald-500' : variance > 0 ? 'text-blue-500' : 'text-rose-500'}`}>{variance > 0 ? '+' : ''}{variance}</span>}</td>
                                                     <td className="px-6 py-4">
                                                         <input type="text" value={c.notes} onChange={e => handleUpdateCount(c.itemId, 'notes', e.target.value)} placeholder={tr('Notes...', 'ملاحظات...')}
                                                             className="w-full px-3 py-2 bg-app border border-border rounded-lg text-[10px] text-main outline-none focus:border-cyan-500" />

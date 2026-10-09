@@ -79,7 +79,7 @@ const MenuToolbar: React.FC<Props> = ({
     ];
 
     return (
-        <div className="bg-white dark:bg-card border-b border-gray-200 dark:border-white/[0.05]">
+        <div className="sticky top-0 z-30 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b border-gray-200 dark:border-white/[0.05]">
             {/* Top Row */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-5 py-3 gap-3 sm:gap-4">
 

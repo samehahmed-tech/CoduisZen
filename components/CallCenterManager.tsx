@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Headset, RefreshCw, Users, Bike, AlertTriangle, Shield, WifiOff, Calendar, Download, Server,
@@ -32,6 +32,14 @@ const CallCenterManager: React.FC = () => {
         loadCustomer, fmtMoney, getOrderDiscount, getOrderTotal, createEscalation, tabs
     } = state;
     const tr = (ar: string, en: string) => lang === 'ar' ? ar : en;
+
+    // Escape closes the order viewer (a11y: keyboard users).
+    useEffect(() => {
+        if (!detailOrder) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOrderDetailId(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [detailOrder, setOrderDetailId]);
 
     return (
         <div className="flex flex-col h-screen bg-app font-neo overflow-hidden relative z-10 selection:bg-primary/20">
@@ -67,15 +75,15 @@ const CallCenterManager: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 bg-app/50 p-1.5 rounded-2xl border border-border/30 shadow-inner">
-                        <button onClick={() => setAutoRefresh((p: boolean) => !p)} className={`p-2.5 rounded-xl transition-colors group relative ${autoRefresh ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm' : 'hover:bg-elevated/50 text-muted hover:text-main'}`}>
+                        <button onClick={() => setAutoRefresh((p: boolean) => !p)} aria-label={tr('تحديث تلقائي', 'Auto refresh')} aria-pressed={autoRefresh} title={tr('تحديث تلقائي', 'Auto refresh')} className={`p-2.5 rounded-xl transition-colors group relative ${autoRefresh ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shadow-sm' : 'hover:bg-elevated/50 text-muted hover:text-main'}`}>
                             <RefreshCw size={18} className={autoRefresh ? 'animate-spin' : ''} />
                         </button>
                         <div className="w-px h-5 bg-border/50" />
-                        <button onClick={() => setSoundEnabled((p: boolean) => !p)} className={`p-2.5 rounded-xl transition-colors group relative ${soundEnabled ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-sm' : 'hover:bg-elevated/50 text-muted hover:text-main'}`}>
+                        <button onClick={() => setSoundEnabled((p: boolean) => !p)} aria-label={tr('الصوت', 'Sound')} aria-pressed={soundEnabled} title={tr('الصوت', 'Sound')} className={`p-2.5 rounded-xl transition-colors group relative ${soundEnabled ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-sm' : 'hover:bg-elevated/50 text-muted hover:text-main'}`}>
                             {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
                         </button>
                         <div className="w-px h-5 bg-border/50" />
-                        <button onClick={exportCSV} className="p-2.5 rounded-xl text-success hover:bg-success/10 transition-colors group relative">
+                        <button onClick={exportCSV} aria-label={tr('تصدير CSV', 'Export CSV')} title={tr('تصدير CSV', 'Export CSV')} className="p-2.5 rounded-xl text-success hover:bg-success/10 transition-colors group relative">
                             <Download size={18} />
                         </button>
                     </div>
@@ -86,16 +94,16 @@ const CallCenterManager: React.FC = () => {
                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted mr-2">
                          {tr('الفلاتر:', 'Filters:')}
                      </div>
-                     <select value={selectedBranch} onChange={e => setSelectedBranch(e.target.value)} className="bg-card border border-border/60 p-1 pl-3 pr-2 rounded-lg shadow-sm text-[11px] font-bold text-main outline-none focus:text-primary min-w-[120px] cursor-pointer appearance-none">
-                         <option value="">{lang === 'ar' ? 'كل الشبكات' : 'Global Net'}</option>
-                         {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                     </select>
-                     <div className="flex items-center gap-2 bg-card border border-border/60 p-1 px-3 rounded-lg shadow-sm">
-                         <Calendar size={14} className="text-primary" />
-                         <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer" />
-                         <span className="text-muted">—</span>
-                         <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer" />
-                     </div>
+                      <select value={selectedBranch} onChange={e => setSelectedBranch(e.target.value)} aria-label={tr('الفرع', 'Branch')} className="bg-card border border-border/60 p-1 pl-3 pr-2 rounded-lg shadow-sm text-[11px] font-bold text-main outline-none focus:text-primary min-w-[120px] cursor-pointer appearance-none">
+                          <option value="">{lang === 'ar' ? 'كل الشبكات' : 'Global Net'}</option>
+                          {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                      <div className="flex items-center gap-2 bg-card border border-border/60 p-1 px-3 rounded-lg shadow-sm">
+                          <Calendar size={14} className="text-primary" />
+                          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} aria-label={tr('من تاريخ', 'From date')} className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer" />
+                          <span className="text-muted">—</span>
+                          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} aria-label={tr('إلى تاريخ', 'To date')} className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer" />
+                      </div>
                      <button onClick={() => load()} disabled={isLoading} className="px-5 py-2 rounded-lg bg-primary text-[10px] font-black uppercase tracking-widest text-white hover:bg-primary-hover transition-all shadow-md flex items-center gap-2">
                         {isLoading ? <RefreshCw size={14} className="animate-spin" /> : <span>{tr('فحص الشبكة', 'Scan Network')}</span>}
                      </button>
@@ -106,13 +114,15 @@ const CallCenterManager: React.FC = () => {
             <div className="flex-1 w-full overflow-hidden flex flex-col md:flex-row relative z-10">
                 {/* Advanced Side Tabs Menu */}
                 <div className="w-full md:w-[240px] flex-shrink-0 bg-sidebar/90 backdrop-blur-3xl border-r border-border/40 flex flex-col shadow-2xl z-20">
-                     <nav className="flex-1 w-full overflow-y-auto pos-scroll p-3 space-y-1.5 hide-scrollbar">
+                     <nav aria-label={tr('أقسام مركز التحكم', 'Command center sections')} className="flex-1 w-full overflow-y-auto pos-scroll p-3 space-y-1.5 hide-scrollbar">
                         {tabs.map((t: any) => {
                              const isActive = activeTab === t.id;
                              return (
                                  <button
                                      key={t.id}
                                      onClick={() => setActiveTab(t.id)}
+                                     aria-current={isActive ? 'page' : undefined}
+                                     aria-label={t.label}
                                      className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden ${isActive ? 'bg-primary/10 border border-primary/20' : 'hover:bg-elevated/50 border border-transparent'}`}
                                  >
                                      <div className="flex items-center gap-3">
@@ -154,14 +164,14 @@ const CallCenterManager: React.FC = () => {
 
             {/* Modal: Order Details */}
             {detailOrder && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-app/80 backdrop-blur-md" onClick={(e) => { if (e.target === e.currentTarget) setOrderDetailId(null); }}>
+                <div role="dialog" aria-modal="true" aria-label={`${tr('طلب', 'Order')} ${getOrderNumber(detailOrder)}`} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-app/80 backdrop-blur-md" onClick={(e) => { if (e.target === e.currentTarget) setOrderDetailId(null); }}>
                     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-2xl bg-card border border-border/50 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="bg-elevated/40 p-5 px-6 border-b border-border/50 flex justify-between items-center z-10 sticky top-0">
                              <div className="flex items-center gap-3">
                                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20"><Hash size={20} /></div>
                                  <h2 className="text-lg font-black uppercase tracking-tighter text-main">{tr('طلب', 'Order')} {getOrderNumber(detailOrder)}</h2>
                              </div>
-                             <button onClick={() => setOrderDetailId(null)} className="p-2 rounded-xl border border-border/50 hover:bg-danger/10 hover:border-danger/30 hover:text-danger text-muted transition-all"><X size={18} /></button>
+                             <button onClick={() => setOrderDetailId(null)} autoFocus aria-label={tr('إغلاق', 'Close')} className="p-2 rounded-xl border border-border/50 hover:bg-danger/10 hover:border-danger/30 hover:text-danger text-muted transition-all"><X size={18} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto pos-scroll flex-1 space-y-6 bg-app/30">
                             {/* Same beautiful details layout */}

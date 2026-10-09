@@ -97,7 +97,7 @@ export function buildPdfCover(opts: PdfCoverOptions & { dateText?: string }): st
     const dir = opts.isArabic ? 'rtl' : 'ltr';
     const system = opts.systemName || 'Coduis Zen';
     const tagline = opts.systemTagline || (opts.isArabic ? 'نظام إدارة المطاعم' : 'Restaurant OS');
-    const dateText = opts.dateText || new Date().toLocaleString(opts.isArabic ? 'ar-EG' : 'en-GB');
+    const dateText = opts.dateText || new Date().toLocaleString(opts.isArabic ? 'ar-EG-u-nu-latn' : 'en-GB');
     const chips = (opts.metaChips || []).filter(Boolean).map((m) => `<span class="pdf-chip">${esc(m)}</span>`).join('');
     const branchChip = opts.branchName ? `<span class="pdf-chip pdf-chip-branch">${esc(opts.branchName)}</span>` : '';
     const byChip = opts.generatedBy
@@ -150,7 +150,7 @@ export function buildPdfRunningHead(opts: PdfHeadFootOptions): string {
 export function buildPdfPageFooter(opts: PdfHeadFootOptions, page: number, totalPages: number): string {
     const dir = opts.isArabic ? 'rtl' : 'ltr';
     const system = opts.systemName || 'Coduis Zen';
-    const dateText = opts.dateText || new Date().toLocaleString(opts.isArabic ? 'ar-EG' : 'en-GB');
+    const dateText = opts.dateText || new Date().toLocaleString(opts.isArabic ? 'ar-EG-u-nu-latn' : 'en-GB');
     const pageText = opts.isArabic ? `صفحة ${page} / ${totalPages}` : `Page ${page} / ${totalPages}`;
     return `
     <div class="pdf-page-foot" dir="${dir}">
@@ -619,7 +619,7 @@ export async function downloadHtmlPdf(bodyHtml: string, opts: DirectPdfOptions):
         const pageBodies = paginateNodes(nodes, measureHost, geo.contentWpx, budgetForPage);
 
         // Wrap bodies into fixed A4 page boxes (cover / running head / footer).
-        const dateText = new Date().toLocaleString(opts.isArabic ? 'ar-EG' : 'en-GB');
+        const dateText = new Date().toLocaleString(opts.isArabic ? 'ar-EG-u-nu-latn' : 'en-GB');
         const pages: HTMLElement[] = pageBodies.map((body, i) => {
             const page = document.createElement('div');
             page.className = 'pdf-page';

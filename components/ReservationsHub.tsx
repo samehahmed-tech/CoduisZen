@@ -1,9 +1,18 @@
 import React from 'react';
 import { Bell, CalendarDays, Check, Clock, ListOrdered, Phone, Plus, Users, X } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useOrderStore } from '../stores/useOrderStore';
 import { reservationsApi, waitlistApi } from '../services/api/reservations';
 import { useToast } from './Toast';
 import { getActionableErrorMessage } from '../services/api/core';
+
+// Two bookings on the same table overlap when their times are within this window.
+const TABLE_OVERLAP_MINUTES = 90;
+const toMinutes = (time: string) => {
+    const [h, m] = String(time || '').split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return h * 60 + m;
+};
 
 const todayKey = () => {
     const d = new Date();
@@ -25,6 +34,9 @@ const ReservationsHub: React.FC = () => {
     const [showForm, setShowForm] = React.useState(false);
     const [showWaitForm, setShowWaitForm] = React.useState(false);
     const [form, setForm] = React.useState({ customerName: '', customerPhone: '', partySize: 2, time: '', tableId: '', specialRequests: '' });
+    // Branch tables for the picker (name/seats/live status instead of free text).
+    const tables = useOrderStore((state: any) => state.tables || []);
+    const fetchTables = useOrderStore((state: any) => state.fetchTables);
     const [waitForm, setWaitForm] = React.useState({ customerName: '', customerPhone: '', partySize: 2, quotedTimeMinutes: 15, notes: '' });
 
     const load = React.useCallback(async () => {
@@ -43,21 +55,63 @@ const ReservationsHub: React.FC = () => {
     }, [branchId, date]);
 
     React.useEffect(() => { void load(); }, [load]);
+    React.useEffect(() => {
+        if (branchId) {
+            try {
+                const maybe = (fetchTables as any)?.(branchId);
+                if (maybe && typeof maybe.catch === 'function') maybe.catch(() => {});
+            } catch { /* tables picker is best-effort */ }
+        }
+    }, [branchId, fetchTables]);
 
     const submitReservation = async () => {
         if (!form.customerName.trim() || !form.customerPhone.trim() || !form.time) {
             showToast(isAr ? 'الاسم والهاتف والوقت مطلوبة' : 'Name, phone and time are required', 'warning');
             return;
         }
+        const digits = form.customerPhone.replace(/\D/g, '');
+        if (digits.length < 8) {
+            showToast(isAr ? 'رقم الهاتف غير صحيح' : 'Invalid phone number', 'warning');
+            return;
+        }
+        const partySize = Number(form.partySize) || 2;
+        if (partySize <= 0) {
+            showToast(isAr ? 'عدد الأفراد يجب أن يكون أكبر من صفر' : 'Party size must be greater than zero', 'warning');
+            return;
+        }
+        const tableId = form.tableId.trim() || undefined;
+        const table = tableId ? (tables as any[]).find((t: any) => String(t.id) === tableId) : undefined;
+        if (tableId && !table) {
+            showToast(isAr ? 'الطاولة المختارة غير موجودة' : 'Selected table does not exist', 'warning');
+            return;
+        }
+        if (table && Number(table.seats || 0) > 0 && partySize > Number(table.seats)) {
+            showToast(isAr ? `عدد الأفراد (${partySize}) يتجاوز سعة الطاولة (${table.seats})` : `Party size (${partySize}) exceeds table seats (${table.seats})`, 'warning');
+            return;
+        }
+        // Double-booking guard: same table, live booking, overlapping time.
+        const atMinutes = toMinutes(form.time);
+        if (tableId && atMinutes !== null) {
+            const clash = (reservations as any[]).find((r: any) => {
+                if (String(r.tableId || '') !== tableId) return false;
+                if (!['CONFIRMED', 'SEATED'].includes(String(r.status || '').toUpperCase())) return false;
+                const other = toMinutes(r.time);
+                return other !== null && Math.abs(other - atMinutes) < TABLE_OVERLAP_MINUTES;
+            });
+            if (clash) {
+                showToast(isAr ? `تعارض: الطاولة محجوزة (${clash.customerName || ''} ${clash.time || ''})` : `Conflict: table already booked (${clash.customerName || ''} ${clash.time || ''})`, 'error');
+                return;
+            }
+        }
         try {
             await reservationsApi.create({
                 branchId,
                 customerName: form.customerName.trim(),
                 customerPhone: form.customerPhone.trim(),
-                partySize: Number(form.partySize) || 2,
+                partySize,
                 date,
                 time: form.time,
-                tableId: form.tableId.trim() || undefined,
+                tableId,
                 specialRequests: form.specialRequests.trim() || undefined,
                 source: 'PHONE',
             });
@@ -223,7 +277,14 @@ const ReservationsHub: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="bg-elevated border border-border/50 rounded-xl py-2.5 px-3 text-sm font-bold outline-none focus:border-indigo-500/50 text-main" dir="ltr" />
-                            <input value={form.tableId} onChange={(e) => setForm({ ...form, tableId: e.target.value })} placeholder={isAr ? 'طاولة (اختياري)' : 'Table (optional)'} className="bg-elevated border border-border/50 rounded-xl py-2.5 px-3 text-sm font-bold outline-none focus:border-indigo-500/50 text-main placeholder-muted" />
+                            <select value={form.tableId} onChange={(e) => setForm({ ...form, tableId: e.target.value })} className="bg-elevated border border-border/50 rounded-xl py-2.5 px-3 text-sm font-bold outline-none focus:border-indigo-500/50 text-main">
+                                <option value="">{isAr ? 'طاولة (اختياري)' : 'Table (optional)'}</option>
+                                {(tables as any[]).map((t: any) => (
+                                    <option key={String(t.id)} value={String(t.id)}>
+                                        {t.name || t.id}{Number(t.seats) > 0 ? ` (${t.seats})` : ''}{t.status && t.status !== 'AVAILABLE' ? ` — ${t.status}` : ''}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <input value={form.specialRequests} onChange={(e) => setForm({ ...form, specialRequests: e.target.value })} placeholder={isAr ? 'طلبات خاصة' : 'Special requests'} className="w-full bg-elevated border border-border/50 rounded-xl py-2.5 px-3 text-sm font-bold outline-none focus:border-indigo-500/50 text-main placeholder-muted" />
                         <div className="grid grid-cols-2 gap-2">

@@ -2,11 +2,16 @@ import React from 'react';
 import { AlertTriangle, CheckCircle2, Inbox, Plus, UserCheck, X } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { complaintsApi } from '../services/api/complaints';
+import { customersApi } from '../services/api/customers';
+import { ordersApi } from '../services/api/orders';
+import { usersApi } from '../services/api/users';
 import { useToast } from './Toast';
 import { getActionableErrorMessage } from '../services/api/core';
 
+// OPEN must go through IN_PROGRESS first — direct OPEN→CLOSED skipped triage
+// and resolution notes entirely.
 const STATUS_FLOW: Record<string, string[]> = {
-    OPEN: ['IN_PROGRESS', 'CLOSED'],
+    OPEN: ['IN_PROGRESS'],
     IN_PROGRESS: ['RESOLVED', 'CLOSED'],
     RESOLVED: ['CLOSED', 'OPEN'],
     CLOSED: ['OPEN'],
@@ -25,6 +30,12 @@ const ComplaintsInbox: React.FC = () => {
     const [form, setForm] = React.useState({ customerId: '', orderId: '', subject: '', description: '', priority: 'MEDIUM' });
     const [resolvingId, setResolvingId] = React.useState<string | null>(null);
     const [resolution, setResolution] = React.useState('');
+    const [staffList, setStaffList] = React.useState<any[]>([]);
+    const [assigningId, setAssigningId] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        usersApi.getAll().then((list) => setStaffList(Array.isArray(list) ? list : [])).catch(() => setStaffList([]));
+    }, []);
 
     const load = React.useCallback(async () => {
         setLoading(true);
@@ -43,15 +54,43 @@ const ComplaintsInbox: React.FC = () => {
     const filtered = items.filter((c) => statusFilter === 'ALL' || String(c.status) === statusFilter);
     const openCount = items.filter((c) => ['OPEN', 'IN_PROGRESS'].includes(String(c.status))).length;
 
+    const resolveCustomerRef = async (ref: string): Promise<string> => {
+        const value = ref.trim();
+        const digits = value.replace(/\D/g, '');
+        // Phone-like input resolves against the customer directory…
+        if (digits.length >= 8) {
+            try {
+                const found = await customersApi.getByPhone(value);
+                if (found?.id) return String(found.id);
+            } catch { /* fall through to id lookup */ }
+        }
+        // …otherwise it must be an existing customer id.
+        try {
+            const found = await customersApi.getById(value);
+            if (found?.id) return String(found.id);
+        } catch { /* unresolved below */ }
+        throw new Error(isAr ? 'العميل غير موجود — تحقق من الرقم/المعرف' : 'Customer not found — check the phone/id');
+    };
+
     const submit = async () => {
         if (!form.customerId.trim() || !form.subject.trim() || !form.description.trim()) {
             showToast(isAr ? 'العميل والموضوع والوصف مطلوبة' : 'Customer, subject and description are required', 'warning');
             return;
         }
         try {
+            const customerId = await resolveCustomerRef(form.customerId);
+            const orderRef = form.orderId.trim();
+            if (orderRef) {
+                try {
+                    await ordersApi.getById(orderRef);
+                } catch {
+                    showToast(isAr ? 'رقم الطلب غير موجود' : 'Order id not found', 'warning');
+                    return;
+                }
+            }
             await complaintsApi.create({
-                customerId: form.customerId.trim(),
-                orderId: form.orderId.trim() || undefined,
+                customerId,
+                orderId: orderRef || undefined,
                 subject: form.subject.trim(),
                 description: form.description.trim(),
                 priority: form.priority,
@@ -66,6 +105,11 @@ const ComplaintsInbox: React.FC = () => {
     };
 
     const changeStatus = async (id: string, status: string, resolutionNotes?: string) => {
+        // A resolution without a note is unauditable — require it.
+        if (status === 'RESOLVED' && !String(resolutionNotes || '').trim()) {
+            showToast(isAr ? 'اكتب ملاحظة الحل أولاً' : 'Write the resolution note first', 'warning');
+            return;
+        }
         try {
             await complaintsApi.update(id, { status, resolutionNotes });
             setResolvingId(null);
@@ -125,6 +169,33 @@ const ComplaintsInbox: React.FC = () => {
                                 {c.resolutionNotes && <span className="text-emerald-600">✓ {c.resolutionNotes}</span>}
                             </div>
                             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                                <select
+                                    value=""
+                                    onChange={(e) => {
+                                        const userId = e.target.value;
+                                        e.target.value = '';
+                                        if (!userId) return;
+                                        void (async () => {
+                                            try {
+                                                setAssigningId(String(c.id));
+                                                await complaintsApi.update(String(c.id), { assignedTo: userId });
+                                                await load();
+                                            } catch (err: any) {
+                                                showToast(getActionableErrorMessage(err, lang), 'error');
+                                            } finally {
+                                                setAssigningId(null);
+                                            }
+                                        })();
+                                    }}
+                                    className="px-2 py-1.5 rounded-lg bg-elevated border border-border/50 text-muted text-[9px] font-black uppercase tracking-widest outline-none max-w-[150px]"
+                                    title={isAr ? 'تعيين لمستخدم' : 'Assign to user'}
+                                    disabled={assigningId === String(c.id)}
+                                >
+                                    <option value="">{c.assignedTo ? `${isAr ? 'مسند:' : 'Assigned:'} ${c.assignedTo}` : (isAr ? 'تعيين…' : 'Assign…')}</option>
+                                    {staffList.map((u: any) => (
+                                        <option key={String(u.id)} value={String(u.id)}>{u.name || u.id}</option>
+                                    ))}
+                                </select>
                                 {(STATUS_FLOW[String(c.status)] || []).map((next) => (
                                     next === 'RESOLVED' ? (
                                         <button key={next} onClick={() => { setResolvingId(String(c.id)); setResolution(''); }} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all">

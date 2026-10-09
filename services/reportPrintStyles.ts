@@ -34,7 +34,7 @@ export const getReportPrintCSS = (
 ): string => {
   const guessedArabic = /[\u0600-\u06FF]/.test(`${restaurantName} ${reportTitle} ${dateRange}`);
   const isArabic = opts.isArabic ?? guessedArabic;
-  const printedAt = new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-GB');
+  const printedAt = new Date().toLocaleString(isArabic ? 'ar-EG-u-nu-latn' : 'en-GB');
   const logoUrl = opts.logoUrl
      || (typeof window !== 'undefined' ? `${window.location.origin}${DEFAULT_RESTAURANT_LOGO_URL}` : DEFAULT_RESTAURANT_LOGO_URL);
   // Never render the same image twice side-by-side.

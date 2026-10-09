@@ -39,6 +39,7 @@ import * as procController from '../controllers/procurementController';
 router.get('/grn', readProcurement, enforceBranch, procController.getGRNs);
 router.get('/invoices', readProcurement, enforceBranch, procController.getSupplierInvoices);
 router.get('/', readProcurement, enforceBranch, poController.getPOs);
+router.get('/:id/pdf', readProcurement, enforceBranch, poController.getPOPdf);
 router.get('/:id', readProcurement, enforceBranch, poController.getPOById);
 router.post('/', createPO, enforceBranch, poController.createPO);
 router.put('/:id/receive', receiveGRN, enforceBranch, poController.receivePO);

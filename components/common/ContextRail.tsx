@@ -278,14 +278,8 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                             onClick={() => navigateTransition('/')}
                             aria-label={lang === 'ar' ? 'العودة للوحة القيادة' : 'Go to dashboard'}
                         >
-                            <img src="/logo.png?v=2" alt="Xen" className="h-full w-auto max-w-none" draggable={false} />
+                            <img src="/logo.png?v=6" alt="Coduis Xen ERP Systems" className="h-full w-full object-contain" style={{ filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.45))' }} draggable={false} />
                         </button>
-                        <div className="sidebar-text-block sidebar-brand-meta min-w-0 flex-1">
-                            <div className="text-[12px] font-extrabold tracking-tight text-main leading-none">Coduis Xen</div>
-                            <div className="text-[9px] font-semibold text-muted/50 tracking-widest uppercase mt-0.5">
-                                {lang === 'ar' ? 'نظام الطعام' : 'Restaurant OS'}
-                            </div>
-                        </div>
                         <button
                             onClick={toggleSidebar}
                             className="sidebar-pin-btn hidden lg:flex shrink-0 ms-auto"

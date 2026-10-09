@@ -261,6 +261,20 @@ export const deleteUser = async (req: Request, res: Response) => {
         const id = param(req.params.id);
         if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         if (PROTECTED_USER_IDS.includes(id)) return res.status(403).json({ error: 'FORBIDDEN', message: 'System Owner cannot be deleted' });
+        // ?hard=true → permanent removal (sessions + linked employee rows go too).
+        // Anything else still referencing the user (shifts, audit) → 409 with guidance.
+        if (req.query.hard === 'true') {
+            const actorId = (req as any).user?.id;
+            if (actorId && actorId === id) return res.status(403).json({ error: 'CANNOT_DELETE_SELF' });
+            const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, id));
+            if (!existing) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+            // Sessions reference users.id — rows must go, revoke alone still blocks the delete.
+            await db.delete(userSessions).where(eq(userSessions.userId, id));
+            await db.delete(employees).where(eq(employees.userId, id));
+            await db.delete(users).where(eq(users.id, id));
+            await audit(req, 'USER_DELETED', { targetUserId: id, hard: true }, 'User account permanently deleted');
+            return res.json({ deleted: true, id });
+        }
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(eq(userSessions.userId, id));
         const [deleted] = await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(eq(users.id, id)).returning();
         if (!deleted) return res.status(404).json({ error: 'USER_NOT_FOUND' });
@@ -353,10 +367,33 @@ export const bulkAssignBranch = async (req: Request, res: Response) => {
 export const bulkDeleteUsers = async (req: Request, res: Response) => {
     try {
         const userIds = cleanStringArray(req.body?.userIds) || [];
-        const toDelete = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
-        if (toDelete.length) await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(inArray(userSessions.userId, toDelete));
-        const deleted = toDelete.length ? await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(inArray(users.id, toDelete)).returning() : [];
-        res.json({ deleted: deleted.length, skipped: userIds.length - toDelete.length, users: deleted.map(mapUserResponse) });
+        const actorId = (req as any).user?.id;
+        // Soft deactivate (default): unchanged legacy behavior — protected ids skipped.
+        if (req.body?.hard !== true) {
+            const toDelete = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
+            if (toDelete.length) await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(inArray(userSessions.userId, toDelete));
+            const deleted = toDelete.length ? await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(inArray(users.id, toDelete)).returning() : [];
+            return res.json({ deleted: deleted.length, skipped: userIds.length - toDelete.length, users: deleted.map(mapUserResponse) });
+        }
+        // Hard delete: per-user so one conflicted account doesn't block the rest.
+        // Protected ids and the actor's own account are always skipped.
+        const toDelete = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id) && id !== actorId);
+        const deleted: string[] = [];
+        const failed: Array<{ id: string; error: string }> = [];
+        for (const id of toDelete) {
+            try {
+                const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, id));
+                if (!existing) { failed.push({ id, error: 'USER_NOT_FOUND' }); continue; }
+                await db.delete(userSessions).where(eq(userSessions.userId, id));
+                await db.delete(employees).where(eq(employees.userId, id));
+                await db.delete(users).where(eq(users.id, id));
+                deleted.push(id);
+            } catch (error: any) {
+                failed.push({ id, error: isForeignKeyDeleteError(error) ? 'USER_HAS_DEPENDENCIES' : (error?.message || 'USER_DELETE_FAILED') });
+            }
+        }
+        await audit(req, 'USER_DELETED', { bulk: true, hard: true, deleted, failed: failed.length }, 'Bulk permanent user deletion');
+        res.json({ deleted: deleted.length, failed, skipped: userIds.length - toDelete.length, ids: deleted });
     } catch (error: any) {
         writeError(res, error);
     }
@@ -539,6 +576,34 @@ export const updateUserPermissions = async (req: Request, res: Response) => {
         }).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
+        res.json(mapUserResponse(updated));
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const copyUserPermissions = async (req: Request, res: Response) => {
+    try {
+        const id = param(req.params.id);
+        const sourceUserId = cleanString(req.body?.sourceUserId);
+        if (!id) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
+        if (!sourceUserId) return res.status(400).json({ error: 'SOURCE_USER_ID_REQUIRED' });
+        if (sourceUserId === id) return res.status(400).json({ error: 'COPY_SOURCE_SAME_AS_TARGET' });
+        if (PROTECTED_USER_IDS.includes(id)) return res.status(403).json({ error: 'FORBIDDEN', message: 'System Owner access cannot be overwritten' });
+        const [source] = await db.select().from(users).where(eq(users.id, sourceUserId));
+        if (!source) return res.status(404).json({ error: 'SOURCE_USER_NOT_FOUND' });
+        const [target] = await db.select().from(users).where(eq(users.id, id));
+        if (!target) return res.status(404).json({ error: 'USER_NOT_FOUND' });
+        // nvarchar columns hold JSON text (schema defaults '[]' / '{}') — stringify
+        // explicitly so objects round-trip instead of relying on driver coercion.
+        const [updated] = await db.update(users).set({
+            role: source.role,
+            permissions: JSON.stringify(parseJsonField<string[]>(source.permissions, [])),
+            customPermissions: JSON.stringify(parseJsonField<Record<string, any>>(source.customPermissions, {})),
+            updatedAt: new Date(),
+        }).where(eq(users.id, id)).returning();
+        await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
+        await audit(req, 'USER_PERMISSIONS_COPIED', { targetUserId: id, sourceUserId }, 'User access copied from another user');
         res.json(mapUserResponse(updated));
     } catch (error: any) {
         res.status(500).json({ error: error.message });

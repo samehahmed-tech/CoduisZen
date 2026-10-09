@@ -39,7 +39,7 @@ export interface RefundRequest {
     items?: RefundItem[];
     // Reason
     reason: string;
-    reasonCategory: 'QUALITY' | 'WRONG_ORDER' | 'CUSTOMER_REQUEST' | 'OVERCHARGE' | 'OTHER';
+    reasonCategory: 'QUALITY' | 'WRONG_ORDER' | 'CUSTOMER_REQUEST' | 'CUSTOMER_COMPLAINT' | 'LATE_DELIVERY' | 'OVERCHARGE' | 'OTHER';
     // Approval
     requestedBy: string;
     requestedByName: string;
@@ -71,6 +71,10 @@ export interface RefundPolicy {
     allowPartialRefund: boolean;
     allowItemRefund: boolean;
     autoRestockOnRefund: boolean;
+    // Frontend aliases (kept in sync both ways so old UI builds keep working)
+    maxRefundDays?: number;
+    requireManagerApproval?: boolean;
+    maxAutoApproveAmount?: number;
 }
 
 // =============================================================================
@@ -117,12 +121,45 @@ export const refundService = {
     // Policy
     // =========================================================================
     async getPolicy(): Promise<RefundPolicy> {
-        return readSetting<RefundPolicy>(REFUND_POLICY_KEY, defaultPolicy());
+        const stored = await readSetting<any>(REFUND_POLICY_KEY, defaultPolicy());
+        const merged: any = { ...defaultPolicy(), ...stored };
+        // Normalize frontend aliases -> canonical (old UI builds send days/approval/limit)
+        if (merged.maxRefundDays != null && merged.maxRefundWindowHours === defaultPolicy().maxRefundWindowHours) {
+            const days = Number(merged.maxRefundDays);
+            if (Number.isFinite(days) && days > 0) merged.maxRefundWindowHours = days * 24;
+        }
+        if (merged.requireManagerApproval != null) merged.requireManagerPin = Boolean(merged.requireManagerApproval);
+        if (merged.maxAutoApproveAmount != null) {
+            const limit = Number(merged.maxAutoApproveAmount);
+            if (Number.isFinite(limit)) merged.maxRefundWithoutApproval = limit;
+        }
+        // Always expose aliases so any UI build reads a consistent shape
+        merged.maxRefundDays = Number(merged.maxRefundWindowHours) / 24;
+        merged.requireManagerApproval = Boolean(merged.requireManagerPin);
+        merged.maxAutoApproveAmount = Number(merged.maxRefundWithoutApproval);
+        return merged;
     },
 
     async updatePolicy(policy: Partial<RefundPolicy>, updatedBy?: string): Promise<RefundPolicy> {
-        const current = await this.getPolicy();
-        const updated = { ...current, ...policy };
+        const current: any = await this.getPolicy();
+        const incoming: any = { ...policy };
+        // Accept frontend aliases on write
+        if (incoming.maxRefundDays != null && incoming.maxRefundWindowHours == null) {
+            const days = Number(incoming.maxRefundDays);
+            if (Number.isFinite(days) && days > 0) incoming.maxRefundWindowHours = days * 24;
+        }
+        if (incoming.requireManagerApproval != null && incoming.requireManagerPin == null) {
+            incoming.requireManagerPin = Boolean(incoming.requireManagerApproval);
+        }
+        if (incoming.maxAutoApproveAmount != null && incoming.maxRefundWithoutApproval == null) {
+            const limit = Number(incoming.maxAutoApproveAmount);
+            if (Number.isFinite(limit)) incoming.maxRefundWithoutApproval = limit;
+        }
+        const updated = { ...current, ...incoming };
+        // Re-sync aliases before persist + return
+        updated.maxRefundDays = Number(updated.maxRefundWindowHours) / 24;
+        updated.requireManagerApproval = Boolean(updated.requireManagerPin);
+        updated.maxAutoApproveAmount = Number(updated.maxRefundWithoutApproval);
         await writeSetting(REFUND_POLICY_KEY, updated, updatedBy);
         return updated;
     },
@@ -156,7 +193,15 @@ export const refundService = {
 
     async getRefundById(id: string): Promise<RefundRequest | null> {
         const refunds = await readSetting<RefundRequest[]>(REFUND_KEY, []);
-        return refunds.find(r => r.id === id) || null;
+        const found = refunds.find(r => r.id === id) || null;
+        if (!found) return null;
+        const anyRefund = found as any;
+        return {
+            ...found,
+            status: anyRefund.status === 'REQUESTED' ? 'PENDING' : anyRefund.status,
+            totalAmount: anyRefund.totalAmount ?? anyRefund.refundAmount,
+            customAmount: anyRefund.customAmount ?? anyRefund.refundAmount,
+        } as RefundRequest;
     },
 
     // =========================================================================
@@ -205,16 +250,18 @@ export const refundService = {
         // Calculate refund amount
         let refundAmount = 0;
         let refundItems: RefundItem[] | undefined;
+        // POS counter sends PARTIAL + items + customAmount; treat as item-level refund.
+        const effectiveType = (data.type === 'PARTIAL' && data.items && data.items.length > 0) ? 'ITEM' : data.type;
 
         if (data.type === 'FULL') {
             refundAmount = Number(order.total || 0);
-        } else if (data.type === 'PARTIAL' && data.customAmount) {
+        } else if (effectiveType === 'PARTIAL' && data.customAmount) {
             if (!policy.allowPartialRefund) throw new Error('Partial refunds are not enabled');
             refundAmount = data.customAmount;
             if (refundAmount > Number(order.total || 0)) {
                 throw new Error('Refund amount exceeds order total');
             }
-        } else if (data.type === 'ITEM' && data.items) {
+        } else if (effectiveType === 'ITEM' && data.items) {
             if (!policy.allowItemRefund) throw new Error('Item-level refunds are not enabled');
 
             const orderItemsList = await db.select().from(orderItems).where(eq(orderItems.orderId, data.orderId));
@@ -254,11 +301,11 @@ export const refundService = {
         const needsApproval = policy.requireManagerPin || refundAmount > policy.maxRefundWithoutApproval;
 
         const refund: RefundRequest = {
-            id: `REF-${Date.now()}`,
+            id: `REF-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
             orderId: data.orderId,
             orderNumber: Number(order.orderNumber || 0),
             branchId: order.branchId,
-            type: data.type,
+            type: effectiveType,
             status: needsApproval ? 'PENDING' : 'APPROVED',
             originalAmount: Number(order.total || 0),
             refundAmount,
@@ -447,21 +494,53 @@ export const refundService = {
         if (endDate) refunds = refunds.filter(r => r.createdAt <= endDate);
 
         const processed = refunds.filter(r => r.status === 'PROCESSED');
-        const totalRefunded = processed.reduce((sum, r) => sum + r.refundAmount, 0);
+        const totalRefunded = processed.reduce((sum, r) => sum + Number((r as any).refundAmount || 0), 0);
 
         const byCategory: Record<string, { count: number; amount: number }> = {};
         for (const r of processed) {
-            if (!byCategory[r.reasonCategory]) byCategory[r.reasonCategory] = { count: 0, amount: 0 };
-            byCategory[r.reasonCategory].count++;
-            byCategory[r.reasonCategory].amount += r.refundAmount;
+            const key = (r as any).reasonCategory || 'OTHER';
+            if (!byCategory[key]) byCategory[key] = { count: 0, amount: 0 };
+            byCategory[key].count++;
+            byCategory[key].amount += Number((r as any).refundAmount || 0);
         }
 
+        // Frontend legacy shape: reasonBreakdown + top reason
+        const reasonBreakdown = Object.entries(byCategory).map(([reason, v]) => ({
+            reason,
+            count: v.count,
+            amount: Math.round(v.amount * 100) / 100,
+        })).sort((a, b) => b.count - a.count);
+        const top = reasonBreakdown[0];
+
+        // Total orders for refund-rate (best-effort; 0 when DB unavailable)
+        let totalOrders = 0;
+        try {
+            const conditions = [];
+            if (branchId) conditions.push(eq(orders.branchId, branchId));
+            const [row]: any[] = conditions.length > 0
+                ? await db.select({ totalOrders: sql<number>`count(*)` }).from(orders).where(and(...conditions))
+                : await db.select({ totalOrders: sql<number>`count(*)` }).from(orders);
+            totalOrders = Number(row?.totalOrders || 0);
+        } catch {
+            totalOrders = 0;
+        }
+
+        const totalAmount = Math.round(totalRefunded * 100) / 100;
         return {
             totalRefunds: processed.length,
-            totalAmount: Math.round(totalRefunded * 100) / 100,
-            pendingCount: refunds.filter(r => r.status === 'PENDING' || r.status === 'REQUESTED').length,
+            totalAmount,
+            // Aliases consumed by RefundManager stats tab
+            totalRefundedAmount: totalAmount,
+            totalOrders,
+            refundRate: totalOrders > 0 ? Math.round((processed.length / totalOrders) * 1000) / 10 : 0,
+            pendingCount: refunds.filter(r => r.status === 'PENDING' || (r as any).status === 'REQUESTED').length,
+            approvedCount: refunds.filter(r => r.status === 'APPROVED').length,
+            processedCount: processed.length,
             rejectedCount: refunds.filter(r => r.status === 'REJECTED').length,
             byCategory,
+            reasonBreakdown,
+            topReason: top?.reason || null,
+            topReasonCount: top?.count || 0,
             avgRefundAmount: processed.length > 0
                 ? Math.round((totalRefunded / processed.length) * 100) / 100
                 : 0,

@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import * as shiftController from '../controllers/shiftController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
-const posAuth = requireRoles(...POS_FLOOR_ROLES);
+// Shift open/close additionally honors an explicit OP_MANAGE_SHIFTS grant.
+const posAuth = requireRoleOrPermission([...POS_FLOOR_ROLES], ['OP_MANAGE_SHIFTS']);
 
 router.get('/active', posAuth, enforceBranch, shiftController.getActiveShift);
 router.get('/open-shifts', posAuth, enforceBranch, shiftController.getOpenShifts);

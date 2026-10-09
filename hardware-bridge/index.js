@@ -21,6 +21,8 @@ const ALLOWED_BROWSER_ORIGINS = new Set([
     'http://127.0.0.1:3001',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
 ]);
 const POLL_MS = Math.max(250, Number(process.env.POLL_MS || 500));
 const BRIDGE_REQUEST_TIMEOUT_MS = Math.max(3000, Number(process.env.BRIDGE_REQUEST_TIMEOUT_MS || 10000));
@@ -537,6 +539,15 @@ if ($env:RF_CONTENT_TYPE -eq 'image') {
 }
 $stream = [IO.MemoryStream]::new()
 $stream.Write([byte[]](0x1B,0x40,0x1B,0x33,24), 0, 5)
+# Fast pixel access: LockBits + Marshal.Copy instead of GetPixel-per-pixel
+# (identical output bytes, an order of magnitude faster on long tickets).
+$rect = New-Object Drawing.Rectangle 0, 0, $bitmap.Width, $bitmap.Height
+$bmpData = $bitmap.LockBits($rect, [Drawing.Imaging.ImageLockMode]::ReadOnly, [Drawing.Imaging.PixelFormat]::Format24bppRgb)
+try {
+    $stride = $bmpData.Stride
+    $raw = New-Object byte[] ($stride * $bitmap.Height)
+    [Runtime.InteropServices.Marshal]::Copy($bmpData.Scan0, $raw, 0, $raw.Length)
+} finally { $bitmap.UnlockBits($bmpData) }
 for ($y0 = 0; $y0 -lt $bitmap.Height; $y0 += 24) {
     $header = [byte[]](0x1B,0x2A,33,($width -band 0xFF),(($width -shr 8) -band 0xFF))
     $stream.Write($header, 0, $header.Length)
@@ -546,8 +557,9 @@ for ($y0 = 0; $y0 -lt $bitmap.Height; $y0 += 24) {
             for ($bit = 0; $bit -lt 8; $bit++) {
                 $y = $y0 + $band * 8 + $bit
                 if ($y -lt $bitmap.Height) {
-                    $pixel = $bitmap.GetPixel($x, $y)
-                    $luma = ($pixel.R * 299 + $pixel.G * 587 + $pixel.B * 114) / 1000
+                    # Format24bppRgb memory order is B,G,R.
+                    $idx = ($y * $stride) + ($x * 3)
+                    $luma = ($raw[$idx+2] * 299 + $raw[$idx+1] * 587 + $raw[$idx] * 114) / 1000
                     if ($luma -lt 180) { $value = $value -bor (0x80 -shr $bit) }
                 }
             }
@@ -575,17 +587,40 @@ $stream.Dispose(); $bitmap.Dispose(); if ($sourceImage) { $sourceImage.Dispose()
     });
 };
 
-const sendTcpPayload = (address, payload) => new Promise((resolve, reject) => {
+const NETWORK_TCP_ATTEMPTS = Math.max(1, Number(process.env.NETWORK_TCP_ATTEMPTS || 3));
+const NETWORK_TCP_RETRY_MS = Math.max(0, Number(process.env.NETWORK_TCP_RETRY_MS || 400));
+
+const sendTcpPayload = (address, payload, maxAttempts = NETWORK_TCP_ATTEMPTS) => new Promise((resolve, reject) => {
     const target = String(address).replace(/^tcp:\/\//i, '');
     const [host, portText] = target.split(':');
     const port = Number(portText || 9100);
     if (!host) return reject(new Error('NETWORK_PRINTER_HOST_REQUIRED'));
-    const socket = net.createConnection({ host, port, timeout: 8000 }, () => {
-        socket.end(payload);
-    });
-    socket.on('close', hadError => hadError ? undefined : resolve(true));
-    socket.on('timeout', () => socket.destroy(new Error('NETWORK_PRINTER_TIMEOUT')));
-    socket.on('error', reject);
+    // Thermal LAN printers sleep and drop the first SYN on WiFi; retry the
+    // connection instead of failing the whole ticket on one shaky attempt.
+    let attempt = 0;
+    let settled = false;
+    const tryOnce = () => {
+        attempt += 1;
+        const socket = net.createConnection({ host, port, timeout: 8000 }, () => {
+            socket.end(payload);
+        });
+        socket.on('close', hadError => {
+            if (settled) return;
+            if (!hadError) { settled = true; resolve(true); return; }
+            if (attempt < maxAttempts) { setTimeout(tryOnce, NETWORK_TCP_RETRY_MS); return; }
+            // 'error' normally follows and rejects; this is the backstop.
+            settled = true;
+            reject(new Error('NETWORK_PRINTER_CONNECTION_FAILED'));
+        });
+        socket.on('timeout', () => socket.destroy(new Error('NETWORK_PRINTER_TIMEOUT')));
+        socket.on('error', (err) => {
+            if (settled) return;
+            if (attempt < maxAttempts) { setTimeout(tryOnce, NETWORK_TCP_RETRY_MS); return; }
+            settled = true;
+            reject(err);
+        });
+    };
+    tryOnce();
 });
 
 const printRawTcp = async (address, content, contentType) => {
@@ -643,6 +678,11 @@ const reportJobStatus = async (job, outcome, errorMessage = '') => {
 };
 
 const flushPendingReports = async () => {
+    // Best-effort: a stuck report must never stall NEW jobs (that produced
+    // "nothing prints, then everything bursts out at once"). Attempt every
+    // pending report, keep the error visible for health, and always let the
+    // caller proceed to claim fresh work.
+    let allOk = true;
     for (const report of [...pendingReports.values()]) {
         try {
             await reportJobStatus(report.job, report.outcome, report.errorMessage);
@@ -658,10 +698,10 @@ const flushPendingReports = async () => {
             runtime.lastJobReportError = `JOB_${report.outcome.toUpperCase()}_REPORT_FAILED: ${error.message}`;
             refreshLastError();
             log(runtime.lastJobReportError);
-            return false;
+            allOk = false;
         }
     }
-    return true;
+    return allOk;
 };
 
 const runPrintJob = async (job) => {
@@ -736,7 +776,9 @@ const tick = async () => {
     pollInProgress = true;
     runtime.lastPollAt = new Date().toISOString();
     try {
-        if (!(await flushPendingReports())) return;
+        // Report delivery is best-effort (see flushPendingReports): never
+        // let a stale acknowledgement block claiming fresh jobs.
+        await flushPendingReports().catch(() => false);
         // Advertise local printer capabilities so the server routes USB/local
         // jobs ONLY to the machine that actually owns the printer.
         if (!runtime.lastPrinterScanAt || Date.now() - runtime.lastPrinterScanAt > 30000) {

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Home, Mail, Bell, AlertTriangle, CheckCircle2, Info, LogOut, User, MapPin, Clock, CalendarDays, Wallet, Send, Trash2, CheckCheck, RefreshCw, Inbox } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Mail, Bell, AlertTriangle, CheckCircle2, Info, LogOut, User, MapPin, Clock, Send, Trash2, CheckCheck, RefreshCw, Inbox } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useMailStore } from '../../stores/useMailStore';
 import { useFinanceStore } from '../../stores/useFinanceStore';
@@ -299,82 +299,37 @@ const Breadcrumbs: React.FC = () => {
         <>
         <nav
             aria-label="Breadcrumb"
-            className={`px-4 sm:px-6 pt-4 pb-2 flex items-center gap-2 sm:gap-4 max-lg:ps-14 ${isRtl ? 'flex-row-reverse' : ''}`}
+            className={`workspace-breadcrumbs px-3 sm:px-4 h-12 shrink-0 gap-2 max-lg:ps-14 ${isRtl ? 'flex-row-reverse' : ''}`}
         >
-            <div className={`workspace-breadcrumbs flex-1 min-w-0 flex flex-col gap-2 ${isRtl ? 'workspace-breadcrumbs-rtl' : ''}`}>
-                <div className={`flex flex-wrap items-center gap-3 ${isRtl ? 'flex-row' : ''}`}>
-                    <div className="flex items-center gap-1.5 bg-elevated/40 border border-border/10 px-2.5 py-1 rounded-lg">
-                        <MapPin size={14} className="text-primary" />
-                        <span className="max-w-[82px] truncate text-[11px] font-bold text-main sm:max-w-none sm:text-xs">
-                            {activeBranch?.name || (isRtl ? 'الفرع الرئيسي' : 'Main Branch')}
-                        </span>
-                    </div>
-
-                    <div className="hidden sm:flex items-center gap-1.5 bg-elevated/40 border border-border/10 px-2.5 py-1 rounded-lg">
-                        <CalendarDays size={14} className="text-muted" />
-                        <span className="flex flex-col leading-tight">
-                            <span className="text-[11px] sm:text-xs font-semibold text-muted">
-                                {new Intl.DateTimeFormat(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }).format(currentTime)}
-                            </span>
-                            <span className="text-[9px] font-black text-muted/70">
-                                {isRtl ? 'تاريخ السيستم: ' : 'System: '}{systemDateLabel}
-                            </span>
-                        </span>
-                        <div className="w-[1px] h-3 bg-border/40 mx-0.5" />
-                        <Clock size={14} className="text-muted" />
-                        <span className="text-[11px] sm:text-xs font-semibold text-muted">
-                            {new Intl.DateTimeFormat(isRtl ? 'ar-EG' : 'en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).format(currentTime)}
-                        </span>
-                    </div>
-
-                    <div className={`hidden md:flex items-center gap-1.5 ${activeShift ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'} border px-2.5 py-1 rounded-lg shadow-sm`}>
-                        <Wallet size={14} className={activeShift ? 'text-emerald-500' : 'text-amber-500'} />
-                        <span className={`text-[11px] sm:text-xs font-bold ${activeShift ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                            {activeShift
-                                ? (isRtl ? `الوردية #${activeShift.id.slice(-4)}` : `Shift #${activeShift.id.slice(-4)}`)
-                                : (isRtl ? 'لا توجد وردية' : 'No Active Shift')}
-                        </span>
-                    </div>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1.5">
+                    <MapPin size={13} className="text-primary" />
+                    <span className="max-w-[90px] truncate text-xs font-bold text-main sm:max-w-[140px]">
+                        {activeBranch?.name || (isRtl ? 'الفرع الرئيسي' : 'Main Branch')}
+                    </span>
                 </div>
 
-                <ol className="hidden w-full flex-wrap items-center gap-1.5 sm:flex sm:gap-2.5">
-                {breadcrumbs.map((crumb, index) => {
-                    const isFirst = index === 0;
+                <span className="h-4 w-px shrink-0 bg-border/40" aria-hidden="true" />
 
-                    return (
-                        <li key={crumb.path} className={`flex items-center ${isRtl && index > 0 ? 'flex-row-reverse' : ''}`}>
-                            {index > 0 && (
-                                <ChevronRight
-                                    size={14}
-                                    className={`text-muted/40 mx-1 shrink-0 ${isRtl ? 'rotate-180' : ''}`}
-                                    aria-hidden="true"
-                                />
-                            )}
+                <span className="min-w-0 flex-1 truncate text-[13px] font-black text-main">
+                    {breadcrumbs[breadcrumbs.length - 1]?.name}
+                </span>
 
-                            {crumb.isLast ? (
-                                <span className="text-[11px] sm:text-[13px] font-bold text-main flex items-center gap-1.5 transition-colors">
-                                    {isFirst && <Home size={14} className="text-muted/70" />}
-                                    {crumb.name}
-                                </span>
-                            ) : (
-                                <Link
-                                    to={crumb.path}
-                                    className="text-[11px] sm:text-[13px] font-semibold text-muted hover:text-primary transition-colors flex items-center gap-1.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                                >
-                                    {isFirst && <Home size={14} className={isRtl ? 'ml-1' : 'mr-1'} />}
-                                    {crumb.name}
-                                </Link>
-                            )}
-                        </li>
-                    );
-                })}
-                </ol>
+                <span className={`hidden shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black sm:flex ${activeShift ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${activeShift ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    {activeShift
+                        ? (isRtl ? `#${activeShift.id.slice(-4)}` : `#${activeShift.id.slice(-4)}`)
+                        : (isRtl ? 'لا وردية' : 'No shift')}
+                </span>
+
+                <span className="hidden shrink-0 items-center gap-1 text-[11px] font-bold text-muted md:flex" title={systemDateLabel}>
+                    <Clock size={12} />
+                    {new Intl.DateTimeFormat(isRtl ? 'ar-EG' : 'en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).format(currentTime)}
+                </span>
             </div>
 
             {/* Right Side: Communication & User Profile */}
-            <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-                {/* Messages & Notifications */}
-                <div className="flex items-center gap-1.5 p-1 bg-elevated/40 border border-border/10 rounded-xl">
+            <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                     <button
                         onClick={() => navigate('/mail')}
                         className="p-2 rounded-lg transition-colors relative text-muted hover:text-main hover:bg-elevated"
@@ -388,7 +343,7 @@ const Breadcrumbs: React.FC = () => {
                             </span>
                         )}
                     </button>
-                    <div className="w-[1px] h-5 bg-border/20" />
+
                     <button
                         ref={msgBtnRef}
                         onClick={() => togglePopup('messages')}
@@ -404,7 +359,7 @@ const Breadcrumbs: React.FC = () => {
                             </span>
                         )}
                     </button>
-                    <div className="w-[1px] h-5 bg-border/20" />
+
                     <button
                         ref={notifBtnRef}
                         onClick={() => togglePopup('notifications')}
@@ -420,25 +375,19 @@ const Breadcrumbs: React.FC = () => {
                             </span>
                         )}
                     </button>
-                </div>
 
                 {/* User Dropdown Profile */}
-                <div>
                     <button
                         ref={userBtnRef}
                         type="button"
                         aria-label={isRtl ? 'فتح قائمة المستخدم' : 'Open user menu'}
                         aria-expanded={showUserMenu}
                         onClick={() => togglePopup('user')}
-                        className="group flex items-center gap-0 rounded-xl border border-border/10 bg-elevated/40 p-1.5 shadow-sm transition-all hover:bg-elevated sm:gap-2.5 sm:pr-3 sm:rtl:pl-3 sm:rtl:pr-1.5"
+                        title={currentUser?.name || 'User'}
+                        className="group rounded-full p-1 transition-all hover:bg-elevated"
                     >
                         <UserAvatar name={currentUser?.name} src={(currentUser as any)?.avatar} size="sm" status="online" ring={false} className="group-hover:scale-105 transition-transform" />
-                        <div className="hidden min-w-0 flex-col items-start pr-1 text-left rtl:text-right sm:flex">
-                            <span className="text-xs font-bold text-main leading-none truncate max-w-[100px]">{currentUser?.name || 'User'}</span>
-                            <span className="text-[9px] font-semibold text-muted/60 uppercase tracking-widest mt-1 truncate">{currentUser?.role}</span>
-                        </div>
                     </button>
-                </div>
             </div>
         </nav>
         {anyPopupOpen && anchor && createPortal(

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bike, MapPin, Navigation, Package, Search, Truck, LocateFixed, RefreshCw } from 'lucide-react';
-import { defaultMapCenter, loadGoogleMaps, nominatimUrl, resetGoogleMapsLoader, shouldUseGoogleMaps, shouldUseOsmMaps } from './googleMaps';
+import { defaultMapCenter, loadGoogleMaps, nominatimUrl, resetGoogleMapsLoader, shouldUseAppleMaps, shouldUseGoogleMaps, shouldUseOsmMaps } from './googleMaps';
+import { AppleLatLng, appleDrivingRoute, appleLanguage, appleSearchPlace, fetchAppleToken, fitAppleMap, loadAppleMaps, resetAppleMapsLoader } from './appleMaps';
 import { fetchOsrmRoute } from './mapRouting';
 import { addOsmTileLayer, createLeafletIcon, loadLeaflet, resetLeafletLoader } from './leafletMaps';
 
@@ -73,7 +74,11 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     route = null,
 }) => {
     const useGoogle = shouldUseGoogleMaps();
-    const useOsm = shouldUseOsmMaps();
+    const useApple = shouldUseAppleMaps();
+    // Apple failure (no token/CDN) falls through to the free OSM stack.
+    const [appleFailed, setAppleFailed] = useState(false);
+    const useAppleEff = useApple && !appleFailed;
+    const useOsm = shouldUseOsmMaps() || (useApple && appleFailed);
     const isAr = lang === 'ar';
     const mapNodeRef = useRef<HTMLDivElement | null>(null);
     const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -91,6 +96,25 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     const [loadingMap, setLoadingMap] = useState(true);
     const fittedOnceRef = useRef(false);
     const followRef = useRef(true);
+    const appleMapRef = useRef<any>(null);
+    const appleItemsRef = useRef<Array<{ kind: 'ann' | 'over'; item: any }>>([]);
+    const [appleReady, setAppleReady] = useState(false);
+    const [appleSearch, setAppleSearch] = useState('');
+    const [appleRouteCoords, setAppleRouteCoords] = useState<AppleLatLng[]>([]);
+    const [appleEtaMin, setAppleEtaMin] = useState(0);
+
+    const clearAppleItems = () => {
+        const map = appleMapRef.current;
+        if (map) {
+            appleItemsRef.current.forEach(({ kind, item }) => {
+                try {
+                    if (kind === 'ann') map.removeAnnotation(item);
+                    else map.removeOverlay(item);
+                } catch { /* already gone */ }
+            });
+        }
+        appleItemsRef.current = [];
+    };
 
     useEffect(() => {
         let active = true;
@@ -106,6 +130,91 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
 
     const validDrivers = useMemo(() => drivers.filter(driver => isValidPoint(driver.lat, driver.lng)), [drivers]);
     const validOrders = useMemo(() => orders.filter(order => isValidPoint(order.lat, order.lng)), [orders]);
+
+    // Apple Directions for the route overlay (OSRM points stay as fallback).
+    useEffect(() => {
+        if (!useAppleEff || !appleReady) return;
+        if (!route || !isValidPoint(route.from.lat, route.from.lng) || !isValidPoint(route.to.lat, route.to.lng)) {
+            setAppleRouteCoords([]);
+            setAppleEtaMin(0);
+            return;
+        }
+        let active = true;
+        loadAppleMaps()
+            .then((mk) => {
+                if (!active) return;
+                appleDrivingRoute(mk, route.from, route.to)
+                    .then((r) => {
+                        if (!active) return;
+                        setAppleRouteCoords(r.points.length > 1 ? r.points : []);
+                        setAppleEtaMin(r.etaMinutes);
+                    })
+                    .catch(() => {
+                        if (active) {
+                            setAppleRouteCoords([]);
+                            setAppleEtaMin(0);
+                        }
+                    });
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [useAppleEff, appleReady, route?.from.lat, route?.from.lng, route?.to.lat, route?.to.lng]);
+
+    useEffect(() => {
+        if (!useAppleEff) return;
+        let disposed = false;
+        setLoadingMap(true);
+        setError(null);
+        loadAppleMaps()
+            .then(async (mk) => {
+                if (disposed || !mapNodeRef.current) return;
+                // No/invalid token (server env missing) — fall through to OSM now,
+                // not after a broken Apple map paints.
+                try {
+                    await fetchAppleToken();
+                } catch {
+                    if (!disposed) {
+                        setAppleFailed(true);
+                        setLoadingMap(false);
+                    }
+                    return;
+                }
+                if (!appleMapRef.current) {
+                    appleMapRef.current = new mk.Map(mapNodeRef.current, {
+                        center: new mk.Coordinate(center.lat, center.lng),
+                        region: new mk.CoordinateRegion(
+                            new mk.Coordinate(center.lat, center.lng),
+                            new mk.CoordinateSpan(0.08, 0.08),
+                        ),
+                        mapType: mk.Map.MapTypes.Standard,
+                        showsPointsOfInterest: false,
+                        showsMapTypeControl: false,
+                        isRotationEnabled: false,
+                        language: appleLanguage(lang),
+                    });
+                }
+                setAppleReady(true);
+                setLoadingMap(false);
+            })
+            .catch(() => {
+                if (!disposed) {
+                    setAppleFailed(true);
+                    setLoadingMap(false);
+                }
+            });
+        return () => {
+            disposed = true;
+            clearAppleItems();
+            try {
+                appleMapRef.current?.destroy();
+            } catch { /* already gone */ }
+            appleMapRef.current = null;
+            fittedOnceRef.current = false;
+            followRef.current = true;
+        };
+    }, [loadAttempt, useAppleEff]);
 
     useEffect(() => {
         if (!useGoogle) return;
@@ -192,7 +301,89 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             fittedOnceRef.current = false;
             followRef.current = true;
         };
-    }, [loadAttempt]);
+    }, [loadAttempt, appleFailed]);
+
+    useEffect(() => {
+        if (!useAppleEff || !appleReady || !appleMapRef.current) return;
+        let cancelled = false;
+        loadAppleMaps()
+            .then((mk) => {
+                if (cancelled || !appleMapRef.current) return;
+                const map = appleMapRef.current;
+                clearAppleItems();
+                const pts: AppleLatLng[] = [];
+
+                const branchAnn = new mk.MarkerAnnotation(new mk.Coordinate(center.lat, center.lng), {
+                    color: '#0f172a',
+                    title: isAr ? 'الفرع' : 'Branch',
+                    glyphText: 'B',
+                });
+                map.addAnnotation(branchAnn);
+                appleItemsRef.current.push({ kind: 'ann', item: branchAnn });
+                pts.push({ lat: center.lat, lng: center.lng });
+
+                validDrivers.forEach((driver) => {
+                    const sub = [driver.status, driver.speedKmh ? `${Math.round(driver.speedKmh)} km/h` : driver.lastSeenLabel].filter(Boolean).join(' • ');
+                    const ann = new mk.MarkerAnnotation(new mk.Coordinate(driver.lat!, driver.lng!), {
+                        color: getDriverColor(driver.status),
+                        title: driver.name,
+                        subtitle: sub || undefined,
+                        glyphText: 'D',
+                    });
+                    map.addAnnotation(ann);
+                    appleItemsRef.current.push({ kind: 'ann', item: ann });
+                    pts.push({ lat: driver.lat!, lng: driver.lng! });
+                    if (Number.isFinite(driver.accuracyM) && driver.accuracyM! > 0) {
+                        const circle = new mk.CircleOverlay(
+                            new mk.Coordinate(driver.lat!, driver.lng!),
+                            Math.min(driver.accuracyM!, 500),
+                        );
+                        map.addOverlay(circle);
+                        appleItemsRef.current.push({ kind: 'over', item: circle });
+                    }
+                });
+
+                validOrders.forEach((order) => {
+                    const ann = new mk.MarkerAnnotation(new mk.Coordinate(order.lat!, order.lng!), {
+                        color: selectedOrderId && selectedOrderId === order.id ? '#dc2626' : '#2563eb',
+                        title: order.label,
+                        subtitle: [order.address, order.status].filter(Boolean).join(' • ') || undefined,
+                        glyphText: 'O',
+                    });
+                    map.addAnnotation(ann);
+                    appleItemsRef.current.push({ kind: 'ann', item: ann });
+                    pts.push({ lat: order.lat!, lng: order.lng! });
+                });
+
+                const line: AppleLatLng[] = appleRouteCoords.length > 1
+                    ? appleRouteCoords
+                    : routePoints.map(([lat, lng]) => ({ lat, lng }));
+                if (line.length > 1) {
+                    const poly = new mk.PolylineOverlay(
+                        line.map((p) => new mk.Coordinate(p.lat, p.lng)),
+                        { style: new mk.Style({ strokeColor: '#4f46e5', lineWidth: 5 }) },
+                    );
+                    map.addOverlay(poly);
+                    appleItemsRef.current.push({ kind: 'over', item: poly });
+                    line.forEach((p) => pts.push(p));
+                }
+
+                if (pts.length > 1 && (!fittedOnceRef.current || followRef.current)) {
+                    fitAppleMap(map, mk, pts);
+                    fittedOnceRef.current = true;
+                } else if (pts.length <= 1 && !fittedOnceRef.current) {
+                    map.setRegionAnimated(new mk.CoordinateRegion(
+                        new mk.Coordinate(center.lat, center.lng),
+                        new mk.CoordinateSpan(0.05, 0.05),
+                    ));
+                    fittedOnceRef.current = true;
+                }
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [useAppleEff, appleReady, center.lat, center.lng, validDrivers, validOrders, selectedOrderId, isAr, appleRouteCoords, routePoints]);
 
     useEffect(() => {
         if (!ready || !mapRef.current || !window.google?.maps) return;
@@ -333,6 +524,23 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
 
     const recenter = () => {
         followRef.current = true;
+        if (useAppleEff && appleMapRef.current) {
+            const pts: AppleLatLng[] = [{ lat: center.lat, lng: center.lng }];
+            validDrivers.forEach((d) => { if (isValidPoint(d.lat, d.lng)) pts.push({ lat: d.lat!, lng: d.lng! }); });
+            validOrders.forEach((o) => { if (isValidPoint(o.lat, o.lng)) pts.push({ lat: o.lat!, lng: o.lng! }); });
+            routePoints.forEach(([lat, lng]) => pts.push({ lat, lng }));
+            loadAppleMaps()
+                .then((mk) => {
+                    if (!appleMapRef.current) return;
+                    if (pts.length > 1) fitAppleMap(appleMapRef.current, mk, pts);
+                    else appleMapRef.current.setRegionAnimated(new mk.CoordinateRegion(
+                        new mk.Coordinate(center.lat, center.lng),
+                        new mk.CoordinateSpan(0.05, 0.05),
+                    ));
+                })
+                .catch(() => undefined);
+            return;
+        }
         if (!leafletMapRef.current) return;
         const pts: Array<[number, number]> = [[center.lat, center.lng]];
         validDrivers.forEach((d) => { if (isValidPoint(d.lat, d.lng)) pts.push([d.lat!, d.lng!]); });
@@ -345,8 +553,29 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     const retryLoad = () => {
         resetLeafletLoader();
         resetGoogleMapsLoader();
+        resetAppleMapsLoader();
+        setAppleFailed(false);
         setError(null);
         setLoadAttempt((n) => n + 1);
+    };
+
+    const searchApple = () => {
+        const q = appleSearch.trim();
+        if (!q || !appleMapRef.current) return;
+        loadAppleMaps()
+            .then((mk) => {
+                appleSearchPlace(appleMapRef.current, mk, q, lang)
+                    .then((hit) => {
+                        if (!appleMapRef.current) return;
+                        appleMapRef.current.setCenterAnimated(new mk.Coordinate(hit.lat, hit.lng));
+                        appleMapRef.current.setRegionAnimated(new mk.CoordinateRegion(
+                            new mk.Coordinate(hit.lat, hit.lng),
+                            new mk.CoordinateSpan(0.02, 0.02),
+                        ));
+                    })
+                    .catch(() => undefined);
+            })
+            .catch(() => undefined);
     };
 
     const searchOsm = () => {
@@ -426,9 +655,48 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                         </button>
                     </div>
                 )}
+                {showSearch && useAppleEff && (
+                    <div className="relative flex w-full gap-2 md:w-80">
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                        <input
+                            value={appleSearch}
+                            onChange={(event) => setAppleSearch(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    searchApple();
+                                }
+                            }}
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-elevated pr-9 pl-3 text-xs font-bold text-main outline-none focus:border-primary"
+                            placeholder={isAr ? 'ابحث على الخريطة...' : 'Search map...'}
+                        />
+                        <button type="button" onClick={searchApple} className="h-10 rounded-xl bg-primary px-3 text-[10px] font-black text-white">
+                            {isAr ? 'بحث' : 'Search'}
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {useGoogle && !error ? (
+            {useAppleEff && !error ? (
+                <>
+                    <div ref={mapNodeRef} className="absolute inset-0 z-0" />
+                    {loadingMap && (
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/80 text-xs font-black text-muted backdrop-blur-sm">
+                            {isAr ? 'جاري تحميل خريطة Apple...' : 'Loading Apple Maps...'}
+                        </div>
+                    )}
+                    {appleReady && (
+                        <button
+                            type="button"
+                            onClick={recenter}
+                            className="absolute right-3 top-20 z-30 flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card/95 text-main shadow-lg backdrop-blur transition-transform active:scale-95"
+                            title={isAr ? 'توسيط على موقعي' : 'Center on me'}
+                        >
+                            <LocateFixed size={17} />
+                        </button>
+                    )}
+                </>
+            ) : useGoogle && !error ? (
                 <>
                     <div ref={mapNodeRef} className="absolute inset-0 z-0" />
                     {!ready && (
@@ -504,6 +772,11 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             <div className="absolute bottom-3 left-3 z-30 flex items-center gap-2 rounded-full bg-card/90 px-3 py-1 text-[10px] font-black text-main shadow-sm backdrop-blur">
                 <Navigation size={13} className="text-emerald-500" />
                 LIVE
+                {appleEtaMin > 0 && (
+                    <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-indigo-500">
+                        {isAr ? `الوصول ~${appleEtaMin} د` : `ETA ~${appleEtaMin} min`}
+                    </span>
+                )}
             </div>
         </div>
     );

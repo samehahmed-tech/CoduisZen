@@ -27,7 +27,7 @@ const BulkActionsBar: React.FC<Props> = ({ selectedCount, onApply, onClearSelect
 
     return (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] animate-in slide-in-from-bottom duration-150">
-            <div className="bg-white dark:bg-card border border-gray-200 dark:border-border/30 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
+            <div className="bg-white dark:bg-card border border-gray-200 dark:border-border/30 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap justify-center max-w-[94vw]">
                 {/* Count */}
                 <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded bg-blue-100 dark:bg-indigo-500/10 text-blue-700 dark:text-indigo-400 flex items-center justify-center text-[12px] font-semibold">

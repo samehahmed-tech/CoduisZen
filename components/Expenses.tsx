@@ -15,6 +15,7 @@ import {
 import { financeApi } from '../services/api/finance';
 import { reportsApi } from '../services/api/reports';
 import { useAuthStore } from '../stores/useAuthStore';
+import { AppPermission } from '../types';
 import { useToast } from './Toast';
 import { formatLocalDate } from '../utils/formatters';
 
@@ -72,7 +73,10 @@ const isInventoryCostAccount = (account: AccountRow) => {
 };
 
 const Expenses: React.FC = () => {
-  const { settings } = useAuthStore();
+  const { settings, hasPermission } = useAuthStore() as any;
+  // Recording needs NAV_FINANCE (route gate); APPROVING needs the approval
+  // lane like ApprovalCenter — one path, one auth rule, no dual standard.
+  const canApproveExpenses = hasPermission ? hasPermission(AppPermission.NAV_APPROVAL) : true;
   const { showToast } = useToast();
   const lang = settings.language || 'en';
   const isAr = lang === 'ar';
@@ -133,8 +137,7 @@ const Expenses: React.FC = () => {
         const debitCode = entry.debitAccountCode || entry.debitAccountId || '';
         const isExpense = expenseAccounts.some((account) => account.code === debitCode);
         return isExpense;
-      })
-      .slice(0, 80);
+      });
   }, [journal, expenseAccounts]);
 
   const recentExpenses = useMemo(() => {
@@ -145,6 +148,9 @@ const Expenses: React.FC = () => {
       return `${entry.description} ${entry.referenceId} ${debitCode}`.toLowerCase().includes(needle);
     });
   }, [expenseJournalEntries, query]);
+
+  // Display window only — KPIs always sum the FULL set, never the slice.
+  const displayedExpenses = useMemo(() => recentExpenses.slice(0, 80), [recentExpenses]);
 
   const expenseSuggestions = useMemo(() => {
     const suggestions = new Set<string>();
@@ -163,10 +169,10 @@ const Expenses: React.FC = () => {
     return Array.from(suggestions).slice(0, 30);
   }, [expenseAccounts, expenseJournalEntries, isAr]);
 
-  const pendingTotal = recentExpenses
+  const pendingTotal = expenseJournalEntries
     .filter((entry) => entry.status === 'PENDING_APPROVAL')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
-  const postedTotal = recentExpenses
+  const postedTotal = expenseJournalEntries
     .filter((entry) => !entry.status || entry.status === 'POSTED')
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   const pendingApprovalExpenses = useMemo(
@@ -218,9 +224,10 @@ const Expenses: React.FC = () => {
     }
   };
 
+  const activeBranchId = settings.activeBranchId;
   useEffect(() => {
     load();
-  }, []);
+  }, [activeBranchId]);
 
   const submitExpense = async () => {
     const amount = Number(form.amount || 0);

@@ -1,0 +1,35 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   BACKGROUND ENGINE 2.0 — shell paint layer.
+   The provider sets --te2-bg-image (+ --te2-bg-size) and data-bg-engine on
+   .workspace-shell from a validated BackgroundConfig. Theme-native (default)
+   leaves the theme's own page background untouched.
+   Imported LAST so the engine layer wins ties on equal specificity.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.workspace-shell[data-bg-engine] {
+    background-image: var(--te2-bg-image) !important;
+    background-size: var(--te2-bg-size, auto) !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+}
+
+/* Ambient drift — only when the user enables a speed, never by default. */
+.workspace-shell[data-bg-engine][data-bg-speed="slow"] {
+    animation: te2-bg-drift 22s ease-in-out infinite alternate;
+}
+.workspace-shell[data-bg-engine][data-bg-speed="normal"] {
+    animation: te2-bg-drift 12s ease-in-out infinite alternate;
+}
+@keyframes te2-bg-drift {
+    from { background-position: 0 0, center; }
+    to { background-position: 60px 30px, center; }
+}
+
+/* Motion off / reduced kills ambient drift (selection & focus unaffected). */
+html[data-motion="off"] .workspace-shell[data-bg-engine],
+html[data-motion-level="reduced"] .workspace-shell[data-bg-engine] {
+    animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .workspace-shell[data-bg-engine] { animation: none; }
+}

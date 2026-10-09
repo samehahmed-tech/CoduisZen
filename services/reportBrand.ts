@@ -7,10 +7,10 @@
 export const REPORT_SYSTEM_NAME = 'Coduis Zen';
 
 /** Optional system logo (shown next to the restaurant logo on every report surface). */
-export const REPORT_SYSTEM_LOGO_URL = '/logo.png?v=2';
+export const REPORT_SYSTEM_LOGO_URL = '/logo.png?v=6';
 
 /** Default restaurant logo (the transparent system mark). Versioned to bust stale caches. */
-export const DEFAULT_RESTAURANT_LOGO_URL = '/logo.png?v=2';
+export const DEFAULT_RESTAURANT_LOGO_URL = '/logo.png?v=6';
 
 /** Cairo-first stack: Arabic + Latin render in one family, Tahoma fallback offline. */
 export const REPORT_FONT_STACK = "'Cairo','Segoe UI',Tahoma,Arial,sans-serif";
@@ -138,7 +138,7 @@ export function getReportBrand(input: ReportBrandInput): ReportBrand {
         rangeText: isArabic
             ? `الفترة: ${input.rangeStart} إلى ${input.rangeEnd}`
             : `Range: ${input.rangeStart} to ${input.rangeEnd}`,
-        generatedAt: new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-GB'),
+        generatedAt: new Date().toLocaleString(isArabic ? 'ar-EG-u-nu-latn' : 'en-GB'),
         generatedLabel: isArabic ? 'تاريخ التصدير' : 'Generated',
         pageLabel: isArabic ? 'صفحة' : 'Page',
         totalLabel: isArabic ? 'الإجمالي' : 'TOTAL',

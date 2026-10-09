@@ -155,6 +155,9 @@ export const branches = mssqlTable('branches', {
     phone: nvarchar('phone'),
     email: nvarchar('email'),
     isActive: bit('is_active').default(true),
+    // Map pin for delivery distance/ETA + dispatch centering (nullable).
+    lat: real('lat'),
+    lng: real('lng'),
     timezone: nvarchar('timezone').default('Africa/Cairo'),
     currency: nvarchar('currency').default('EGP'),
     taxRate: real('tax_rate').default(14),
@@ -1147,6 +1150,8 @@ export const deliveryPlatforms = mssqlTable('delivery_platforms', {
     priceMarkupPercentage: real('price_markup_percentage').default(0),
     priceMarkupFixed: real('price_markup_fixed').default(0),
     integrationType: nvarchar('integration_type').default('MANUAL'),
+    // Inbound-integration credential (stored, never returned in full by GET).
+    apiKey: nvarchar('api_key', { length: 500 }),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 });
@@ -1262,6 +1267,9 @@ export const deliveryZones = mssqlTable('delivery_zones', {
     minOrderAmount: real('min_order_amount').default(0),
     estimatedTime: int('estimated_time').default(45), // minutes
     isActive: bit('is_active').default(true),
+    // Zone center pin for map display + distance-from-branch sorting (nullable).
+    lat: real('lat'),
+    lng: real('lng'),
 });
 
 export const drivers = mssqlTable('drivers', {

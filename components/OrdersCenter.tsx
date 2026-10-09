@@ -119,6 +119,8 @@ const BOARD_COLUMNS: { key: string; titleAr: string; titleEn: string; statuses: 
 
 const OrdersCenter: React.FC = () => {
     const { settings, branches, printers, hasPermission } = useAuthStore(useShallow((state) => ({ settings: state.settings, branches: state.branches, printers: state.printers, hasPermission: state.hasPermission })));
+    // Full-admin emergency override: void terminal/old-day orders (server enforces role).
+    const isSuperAdmin = String((settings as any)?.currentUser?.role || '').toUpperCase() === 'SUPER_ADMIN';
     const { updateOrderStatus } = useOrderStore();
     const { showToast } = useToast();
     const navigate = useNavigate();
@@ -178,6 +180,15 @@ const OrdersCenter: React.FC = () => {
     const [refundModalOrderId, setRefundModalOrderId] = useState<string | null>(null);
     const [refundReason, setRefundReason] = useState('');
     const [refundReasonCategory, setRefundReasonCategory] = useState<'QUALITY' | 'WRONG_ORDER' | 'CUSTOMER_REQUEST' | 'OVERCHARGE' | 'OTHER'>('CUSTOMER_REQUEST');
+    // Partial-refund amount (blank/full total = FULL refund).
+    const [refundAmount, setRefundAmount] = useState('');
+    const openRefundModal = (orderId: string) => {
+        const target = orders.find(o => o.id === orderId);
+        setRefundModalOrderId(orderId);
+        setRefundReason('');
+        setRefundReasonCategory('CUSTOMER_REQUEST');
+        setRefundAmount(target ? Number(target.total || 0).toFixed(2) : '');
+    };
 
     const reviewOnlyCopy = isAr
         ? 'هذا اليوم للمراجعة فقط. لا يمكن تعديل أو إلغاء أوردر بعد انتهاء يوم تشغيله.'
@@ -549,7 +560,7 @@ const OrdersCenter: React.FC = () => {
         }
     };
 
-    const executeVoidOrder = async (orderId: string, reason: string, approvalId?: number) => {
+    const executeVoidOrder = async (orderId: string, reason: string, approvalId?: number, force?: boolean) => {
         if (pendingOrderAction) return;
         setPendingOrderAction(`${orderId}:VOID`);
         setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: OrderStatus.CANCELLED } : order));
@@ -557,6 +568,7 @@ const OrdersCenter: React.FC = () => {
             await updateOrderStatus(orderId, OrderStatus.CANCELLED, undefined, reason.trim(), {
                 skipVersionCheck: true,
                 approvalId,
+                forceVoid: force === true,
             });
             const changedAt = Date.now();
             const changeDetail = { orderId, status: OrderStatus.CANCELLED, changedAt };
@@ -578,12 +590,27 @@ const OrdersCenter: React.FC = () => {
         setVoidReason('');
     };
 
+    const isTerminalOrder = (orderId: string) => {
+        const st = String(orders.find(o => o.id === orderId)?.status || '').toUpperCase();
+        return st === 'DELIVERED' || st === 'COMPLETED';
+    };
+
     const submitVoidOrder = () => {
         if (!voidModalOrderId) return;
         const reason = voidReason.trim();
         if (!reason) {
             showToast(isAr ? 'سبب الإلغاء مطلوب' : 'Cancellation reason is required', 'error');
             return;
+        }
+        const force = isSuperAdmin && isTerminalOrder(voidModalOrderId);
+        if (force) {
+            const target = orders.find(o => o.id === voidModalOrderId);
+            const total = Number(target?.total || 0);
+            if (!window.confirm(isAr
+                ? `تجاوز طارئ: إلغاء طلب مسلّم/مغلق بإجمالي ${total}. سيُسجل باسمك في المراجعة. متابعة؟`
+                : `Emergency override: void a delivered/closed order totalling ${total}. Logged under your name. Continue?`)) {
+                return;
+            }
         }
         if (!hasPermission(AppPermission.OP_VOID_ORDER)) {
             const orderId = voidModalOrderId;
@@ -594,12 +621,22 @@ const OrdersCenter: React.FC = () => {
             setVoidReason('');
             return;
         }
+        const forceVoid = isSuperAdmin && isTerminalOrder(voidModalOrderId);
         setVoidModalOrderId(null);
         setVoidReason('');
-        executeVoidOrder(voidModalOrderId, reason);
+        executeVoidOrder(voidModalOrderId, reason, undefined, forceVoid);
     };
 
     const handleVoidOrder = (orderId: string) => {
+        // Terminal fulfilled orders must go through the refund flow — voiding
+        // a DELIVERED/COMPLETED order would erase a collected sale instead of
+        // recording money-back. SUPER_ADMIN gets an explicit force-void path.
+        const terminalStatus = String(orders.find(o => o.id === orderId)?.status || '').toUpperCase();
+        if ((terminalStatus === 'DELIVERED' || terminalStatus === 'COMPLETED') && !isSuperAdmin) {
+            showToast(isAr ? 'طلب مسلّم/مغلق — استخدم الاسترداد بدل الإلغاء' : 'Delivered/closed order — request a refund instead of void', 'error');
+            openRefundModal(orderId);
+            return;
+        }
         setVoidModalOrderId(orderId);
         setVoidReason('');
     };
@@ -609,6 +646,7 @@ const OrdersCenter: React.FC = () => {
         setRefundModalOrderId(null);
         setRefundReason('');
         setRefundReasonCategory('CUSTOMER_REQUEST');
+        setRefundAmount('');
     };
 
     const submitRefundRequest = async () => {
@@ -618,11 +656,26 @@ const OrdersCenter: React.FC = () => {
             showToast(isAr ? 'سبب الاسترداد مطلوب' : 'Refund reason is required', 'error');
             return;
         }
+        // Partial refunds: a positive amount below the order total files a
+        // PARTIAL request; blank/full total (or more) stays FULL.
+        const target = orders.find(o => o.id === refundModalOrderId);
+        const orderTotal = Number(target?.total || 0);
+        const entered = refundAmount.trim() === '' ? orderTotal : Number(refundAmount);
+        if (!Number.isFinite(entered) || entered <= 0) {
+            showToast(isAr ? 'مبلغ الاسترداد يجب أن يكون أكبر من صفر' : 'Refund amount must be greater than zero', 'error');
+            return;
+        }
+        if (entered > orderTotal + 0.01) {
+            showToast(isAr ? `المبلغ يتجاوز إجمالي الطلب (${orderTotal.toFixed(2)})` : `Amount exceeds the order total (${orderTotal.toFixed(2)})`, 'error');
+            return;
+        }
+        const isPartial = entered < orderTotal - 0.01;
         setPendingOrderAction(`${refundModalOrderId}:REFUND`);
         try {
             await refundApi.requestRefund({
                 orderId: refundModalOrderId,
-                type: 'FULL',
+                type: isPartial ? 'PARTIAL' : 'FULL',
+                ...(isPartial ? { customAmount: Number(entered.toFixed(2)) } : {}),
                 reason,
                 reasonCategory: refundReasonCategory,
                 refundMethod: 'ORIGINAL_PAYMENT',
@@ -630,6 +683,7 @@ const OrdersCenter: React.FC = () => {
             setRefundModalOrderId(null);
             setRefundReason('');
             setRefundReasonCategory('CUSTOMER_REQUEST');
+            setRefundAmount('');
             showToast(isAr ? 'تم إرسال طلب الاسترداد للموافقة' : 'Refund request sent for approval', 'success');
         } catch (err: any) {
             showToast(getActionableErrorMessage(err, lang as any), 'error');
@@ -1199,7 +1253,7 @@ const OrdersCenter: React.FC = () => {
                                                 </button>
                                             </div>
                                             {[OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(selectedOrder.status) && hasPermission(AppPermission.OP_PROCESS_REFUND) && (
-                                                <button onClick={() => { setRefundModalOrderId(selectedOrder.id); setRefundReason(''); setRefundReasonCategory('CUSTOMER_REQUEST'); }} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-600 text-xs font-black text-white disabled:opacity-50">
+                                                <button onClick={() => openRefundModal(selectedOrder.id)} disabled={Boolean(pendingOrderAction) || selectedOrderReadOnly} className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-600 text-xs font-black text-white disabled:opacity-50">
                                                     <RotateCcw size={15} />{copy.refund}
                                                 </button>
                                             )}
@@ -1317,6 +1371,16 @@ const OrdersCenter: React.FC = () => {
                             <div>
                                 <h3 className="text-base font-black text-main">{copy.voidReasonTitle}</h3>
                                 <p className="mt-1 text-sm font-semibold text-muted">{copy.voidReasonHelp}</p>
+                                {isSuperAdmin && isTerminalOrder(voidModalOrderId) && (() => {
+                                    const t = orders.find(o => o.id === voidModalOrderId);
+                                    return (
+                                        <p className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-black text-amber-600">
+                                            {isAr
+                                                ? `تجاوز طارئ: طلب ${String(t?.status || '')} بإجمالي ${Number(t?.total || 0)} — سيُسجل باسمك.`
+                                                : `Emergency override: ${String(t?.status || '')} order totalling ${Number(t?.total || 0)} — logged under your name.`}
+                                        </p>
+                                    );
+                                })()}
                             </div>
                             <button type="button" aria-label={isAr ? 'إغلاق نافذة الإلغاء' : 'Close cancellation dialog'} onClick={closeVoidModal} disabled={Boolean(pendingOrderAction)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-app text-muted hover:text-main disabled:opacity-50">
                                 <X size={17} />
@@ -1369,6 +1433,18 @@ const OrdersCenter: React.FC = () => {
                                     <option value="OVERCHARGE">{isAr ? 'زيادة في السعر' : 'Overcharge'}</option>
                                     <option value="OTHER">{isAr ? 'أخرى' : 'Other'}</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-xs font-black text-muted">{isAr ? 'المبلغ (اتركه كاملاً لاسترداد كلي)' : 'Amount (leave full for a full refund)'}</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={refundAmount}
+                                    onChange={event => setRefundAmount(event.target.value)}
+                                    placeholder={isAr ? 'مبلغ الاسترداد' : 'Refund amount'}
+                                    className="h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold tabular-nums text-main outline-none focus:border-primary"
+                                />
                             </div>
                             <textarea
                                 value={refundReason}

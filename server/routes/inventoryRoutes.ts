@@ -22,14 +22,22 @@ import {
 import { generateBarcodeLabels, previewBarcodeLabel } from '../controllers/barcodeLabelController';
 import { validate } from '../middleware/validate';
 import { directStockReceiptSchema, stockUpdateSchema, stockTransferSchema } from '../middleware/validation';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
-const posAuth = requireRoles(...POS_FLOOR_ROLES, 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER');
-const managerAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER');
-const ownerAuth = requireRoles('SUPER_ADMIN', 'OWNER');
+// Permission fallbacks keep Roles-screen grants effective: a user explicitly
+// granted a stock operation permission passes regardless of role.
+const posAuth = requireRoleOrPermission(
+    [...POS_FLOOR_ROLES, 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER'],
+    ['OP_ADJUST_STOCK'],
+);
+const managerAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'MANAGER', 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER'],
+    ['OP_TRANSFER_STOCK', 'OP_ADJUST_STOCK', 'OP_RECEIVE_GRN'],
+);
+const ownerAuth = requireRoleOrPermission(['SUPER_ADMIN', 'OWNER'], ['OP_ADJUST_STOCK']);
 const ccAuth = requireRoles(...POS_FLOOR_ROLES, 'CALL_CENTER', 'CALL_CENTER_MANAGER');
 
 router.get('/menu-availability', ccAuth, enforceBranch, getMenuAvailability);

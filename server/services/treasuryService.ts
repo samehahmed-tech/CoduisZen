@@ -38,10 +38,15 @@ const CASH_CODE_BY_TYPE: Record<string, string> = {
 };
 
 let schemaReady = false;
+let schemaInflight: Promise<void> | null = null;
 
 export const ensureTreasurySchema = async () => {
     if (schemaReady) return;
-    await pool.query(`
+    // In-flight guard: concurrent requests used to race past the boolean
+    // above and hit each other with "index already exists" 500s.
+    if (!schemaInflight) {
+        schemaInflight = (async () => {
+            await pool.query(`
         IF OBJECT_ID('dbo.treasury_vouchers', 'U') IS NULL
         CREATE TABLE dbo.treasury_vouchers (
             id nvarchar(255) NOT NULL PRIMARY KEY,
@@ -75,7 +80,14 @@ export const ensureTreasurySchema = async () => {
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'treasury_vouchers_account_idx' AND object_id = OBJECT_ID('dbo.treasury_vouchers'))
             CREATE INDEX treasury_vouchers_account_idx ON dbo.treasury_vouchers(account_id);
     `);
-    schemaReady = true;
+            schemaReady = true;
+        })().catch((err) => {
+            // Let the next caller retry instead of caching the rejection.
+            schemaInflight = null;
+            throw err;
+        });
+    }
+    await schemaInflight;
 };
 
 const fail = (code: string, message: string, status = 400, extra: Record<string, any> = {}) => {

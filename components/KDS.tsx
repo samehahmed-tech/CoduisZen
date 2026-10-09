@@ -32,6 +32,15 @@ const DEFAULT_STATIONS: StationConfig[] = [
   { name: 'BAKERY', keywords: ['bread', 'bakery', 'pastry', 'croissant', 'bun'] },
 ];
 
+/* System wallpapers for KDS ambient background — rotates randomly. */
+const KDS_WALLPAPERS = [
+  '/BG/1.png', '/BG/2.png', '/BG/3.png', '/BG/4.png', '/BG/5.png',
+  '/wallpapers/ember.png', '/wallpapers/dune.png', '/wallpapers/matcha.png',
+  '/wallpapers/neon.png', '/wallpapers/saffron.png', '/wallpapers/rose.png',
+  '/wallpapers/cocoa.png', '/wallpapers/abyss.png',
+  '/login-bg/bg-cafe-1.jpg', '/login-bg/bg-coffee-1.jpg', '/login-bg/bg-resto-dark.jpg',
+];
+
 /* ???????????????????????????????????????????????????
    ?? Web Audio Sound Generator
    ??????????????????????????????????????????????????? */
@@ -41,7 +50,21 @@ const getAudioCtx = () => {
   return audioCtxRef.current;
 };
 
-const playBeep = (frequency: number, duration: number, volume = 0.3, type: OscillatorType = 'sine', when = 0) => {
+/* ── Modern synth engine — layered envelopes, soft attacks, no harsh beeps.
+      One shared tone() helper; every kitchen sound is composed from it. ── */
+const KDS_MASTER_GAIN = 0.9;
+
+interface KdsTone {
+  freq: number;
+  freqEnd?: number;
+  dur: number;
+  type?: OscillatorType;
+  vol?: number;
+  when?: number;
+  attack?: number;
+}
+
+const playTone = ({ freq, freqEnd, dur, type = 'sine', vol = 0.25, when = 0, attack = 0.015 }: KdsTone) => {
   try {
     const ctx = getAudioCtx();
     const startAt = ctx.currentTime + when;
@@ -49,31 +72,58 @@ const playBeep = (frequency: number, duration: number, volume = 0.3, type: Oscil
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.frequency.value = frequency;
     osc.type = type;
-    gain.gain.setValueAtTime(0.001, startAt);
-    gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.01, startAt + duration);
+    osc.frequency.setValueAtTime(Math.max(30, freq), startAt);
+    if (freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freqEnd), startAt + dur);
+    const peak = Math.max(0.0002, vol * KDS_MASTER_GAIN);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(peak, startAt + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
     osc.start(startAt);
-    osc.stop(startAt + duration + 0.05);
+    osc.stop(startAt + dur + 0.05);
   } catch { /* ignore audio errors */ }
 };
 
-/* Long, cutting attention chime (~1.6s): triangle wave carries over kitchen
-   noise far better than the old two soft sine blips. */
+/* New-order bell: classic restaurant "ding-ding" service bell (metallic strike
+   with harmonics) + warm arpeggio underneath so it cuts through kitchen noise. */
+const playBellStrike = (when = 0, baseVol = 0.5) => {
+  playTone({ freq: 1567.98, dur: 1.1, type: 'triangle', vol: baseVol, when, attack: 0.003 });
+  playTone({ freq: 2093, dur: 0.9, type: 'sine', vol: baseVol * 0.55, when, attack: 0.003 });
+  playTone({ freq: 2637.02, dur: 0.7, type: 'sine', vol: baseVol * 0.3, when, attack: 0.003 });
+  playTone({ freq: 783.99, dur: 0.5, type: 'sine', vol: baseVol * 0.35, when, attack: 0.005 });
+};
 const playNewOrderSound = () => {
-  const V = 0.55;
-  playBeep(660, 0.22, V, 'triangle', 0);
-  playBeep(880, 0.22, V, 'triangle', 0.24);
-  playBeep(1174, 0.34, V, 'triangle', 0.48);
-  playBeep(880, 0.22, V, 'triangle', 0.9);
-  playBeep(1174, 0.4, V, 'triangle', 1.14);
+  playBellStrike(0, 0.55);
+  playBellStrike(0.45, 0.6);
+  playTone({ freq: 130.81, dur: 1.1, type: 'sine', vol: 0.22, attack: 0.05 });
+  playTone({ freq: 523.25, dur: 0.24, type: 'triangle', vol: 0.42, when: 0.9 });
+  playTone({ freq: 659.25, dur: 0.24, type: 'triangle', vol: 0.42, when: 1.06 });
+  playTone({ freq: 783.99, dur: 0.34, type: 'triangle', vol: 0.45, when: 1.22 });
+  playTone({ freq: 1046.5, dur: 0.55, type: 'sine', vol: 0.32, when: 1.38 });
 };
 
+/* Lane move (queued → cooking): short modern blip rising 523 → 784 Hz. */
+const playMoveSound = () => {
+  playTone({ freq: 523.25, freqEnd: 784, dur: 0.14, type: 'sine', vol: 0.32 });
+};
+
+/* Finish (→ ready): bright two-note sparkle E6 → B6 plus octave shimmer. */
+const playFinishSound = () => {
+  playTone({ freq: 659.25, dur: 0.16, type: 'triangle', vol: 0.36 });
+  playTone({ freq: 987.77, dur: 0.32, type: 'triangle', vol: 0.4, when: 0.12 });
+  playTone({ freq: 1975.53, dur: 0.28, type: 'sine', vol: 0.1, when: 0.12 });
+};
+
+/* Error (unknown order number): soft low down-chirp — never harsh. */
+const playErrorSound = () => {
+  playTone({ freq: 233.08, freqEnd: 155.56, dur: 0.2, type: 'triangle', vol: 0.32 });
+};
+
+/* Urgent (critical SLA): two soft pulsing taps — noticeable, not alarming. */
 const playUrgentAlertSound = () => {
-  playBeep(1200, 0.12, 0.5);
-  setTimeout(() => playBeep(1200, 0.12, 0.5), 200);
-  setTimeout(() => playBeep(1500, 0.25, 0.6), 400);
+  playTone({ freq: 880, dur: 0.16, type: 'sine', vol: 0.4 });
+  playTone({ freq: 880, dur: 0.16, type: 'sine', vol: 0.4, when: 0.22 });
+  playTone({ freq: 1174.66, dur: 0.3, type: 'sine', vol: 0.36, when: 0.44 });
 };
 
 /* ── Arabic voice announcement ("أوردر جديد، رقم 42") ── */
@@ -95,23 +145,24 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   } catch { /* ignore */ }
 }
 
-/** Speak "new order number X" in Arabic. No-op when voice is off or blocked. */
+/** Speak "وصل أوردر جديد يرجى الانتباه رقم X" in Arabic. No-op when voice is off or blocked. */
 const speakNewOrder = (labels: string[]) => {
   try {
     const synth = window.speechSynthesis;
     if (!synth || labels.length === 0) return;
+    try { synth.cancel(); } catch { /* ignore */ }
     const voice = pickArabicVoice();
     // Cap the queue so a burst of tickets never talks for a minute straight.
     for (const label of labels.slice(0, 3)) {
-      const utterance = new SpeechSynthesisUtterance(`أوردر جديد، رقم ${label}`);
+      const utterance = new SpeechSynthesisUtterance(`وصل أوردر جديد، يرجى الانتباه، رقم ${label}`);
       utterance.lang = 'ar-SA';
-      utterance.rate = 0.95;
-      utterance.pitch = 1;
+      utterance.rate = 0.92;
+      utterance.pitch = 1.05;
       utterance.volume = 1;
       if (voice) utterance.voice = voice;
       synth.speak(utterance);
     }
-  } catch { /* TTS unavailable — chime already played */ }
+  } catch { /* TTS unavailable — bell already played */ }
 };
 
 /* ???????????????????????????????????????????????????
@@ -164,6 +215,11 @@ const COLUMN_THEMES = {
    SLA Thresholds
    ??????????????????????????????????????????????????? */
 const SLA = { warning: 7, risk: 12, critical: 20 };
+
+/* Burning card: order open 10+ mins and not ready — creative fire alarm. */
+const BURN_AFTER_MINS = 10;
+const isBurningOrder = (order: any, elapsed: number) =>
+  order?.status !== OrderStatus.READY && Number(elapsed) >= BURN_AFTER_MINS;
 
 const getKdsItemDedupeKey = (item: any): string | null => {
   const orderItemId = item?.orderItemId ?? item?.order_item_id ?? item?.order_itemId;
@@ -260,6 +316,16 @@ const mergeTicketsByOrder = (tickets: KdsTicket[]) => {
 };
 
 const isKdsItemDone = (item: any) => Boolean(item?._done || item?.isBumped);
+
+const isFreshNewOrder = (order: any, freshNewIds?: Set<string>): boolean => {
+  if (!freshNewIds || freshNewIds.size === 0 || !order) return false;
+  if (freshNewIds.has(order.id)) return true;
+  if (order.orderId && freshNewIds.has(order.orderId)) return true;
+  const stripped = String(order.id || '').replace(/^order:/, '');
+  if (stripped && freshNewIds.has(stripped)) return true;
+  if (Array.isArray(order.ticketIds) && order.ticketIds.some((id: string) => freshNewIds.has(id))) return true;
+  return false;
+};
 
 const getKdsItemTicketId = (order: any, item: any) =>
   item?.kdsTicketId || order?.primaryTicketId || order?.id;
@@ -539,6 +605,10 @@ const KDS: React.FC = () => {
     try { return localStorage.getItem('kds_voice') !== 'OFF'; }
     catch { return true; }
   });
+  // Ref mirror so memoized action callbacks can respect the mute toggle
+  // without invalidating their identities (TicketCard is memoized).
+  const soundModeRef = React.useRef(soundMode);
+  React.useEffect(() => { soundModeRef.current = soundMode; }, [soundMode]);
   // Local display theme: kitchen screens pick their own look without
   // touching the global app theme. 'auto' follows the system theme.
   const [kdsTheme, setKdsTheme] = React.useState<'auto' | 'dark' | 'light'>(() => {
@@ -571,6 +641,41 @@ const KDS: React.FC = () => {
   const completingOrderIdsRef = React.useRef<Set<string>>(new Set());
   const knownTicketIdsRef = React.useRef<Set<string>>(new Set());
   const lastUrgentAlertAtRef = React.useRef(0);
+  const [freshArrivalIds, setFreshArrivalIds] = React.useState<Set<string>>(new Set());
+  const freshArrivalTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const markFreshArrivals = React.useCallback((orderKeys: string[]) => {
+    if (orderKeys.length === 0) return;
+    setFreshArrivalIds(prev => {
+      const next = new Set(prev);
+      for (const key of orderKeys) {
+        next.add(key);
+        const old = freshArrivalTimersRef.current.get(key);
+        if (old) clearTimeout(old);
+        const t = setTimeout(() => {
+          freshArrivalTimersRef.current.delete(key);
+          setFreshArrivalIds(cur => {
+            const n = new Set(cur);
+            n.delete(key);
+            return n;
+          });
+        }, 12000);
+        freshArrivalTimersRef.current.set(key, t);
+      }
+      return next;
+    });
+  }, []);
+  const [wallpaperIdx, setWallpaperIdx] = React.useState(() => Math.floor(Math.random() * KDS_WALLPAPERS.length));
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      setWallpaperIdx(prev => {
+        if (KDS_WALLPAPERS.length <= 1) return prev;
+        let n = Math.floor(Math.random() * KDS_WALLPAPERS.length);
+        if (n === prev) n = (n + 1) % KDS_WALLPAPERS.length;
+        return n;
+      });
+    }, 75000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const [stations, setStations] = React.useState<StationConfig[]>(DEFAULT_STATIONS);
   // Connection visibility: kitchen must KNOW when it runs on polling fallback.
@@ -623,9 +728,13 @@ const KDS: React.FC = () => {
     quickInputValueRef.current = quickInput;
   }, [quickInput]);
 
-  // Fetch orders on mount + listen for events
+  // Fetch orders on mount + listen for events.
+  // Multi-station select fetches UNFILTERED and filters client-side: the
+  // server takes a single station, so sending only the first one silently
+  // hid every other selected station.
   React.useEffect(() => {
-    const station = activeStations.has('ALL') ? undefined : Array.from(activeStations)[0];
+    const selectedStations = activeStations.has('ALL') ? null : Array.from(activeStations);
+    const station = selectedStations && selectedStations.length === 1 ? selectedStations[0] : undefined;
     const params = { branchId: activeBranchId || undefined, station };
     let cancelled = false;
     let refreshInFlight = false;
@@ -639,26 +748,26 @@ const KDS: React.FC = () => {
         setLastSyncAt(Date.now());
         const nextTickets = useKdsStore.getState().tickets.filter((ticket) =>
           (!activeBranchId || ticket.branchId === activeBranchId) &&
-          (!station || ticket.routingStation === station)
+          (!selectedStations || selectedStations.includes(ticket.routingStation))
         );
         const freshTickets = announceNewTickets
           ? nextTickets.filter((ticket) => !knownTicketIdsRef.current.has(ticket.id))
           : [];
         knownTicketIdsRef.current = new Set(nextTickets.map((ticket) => ticket.id));
-        if (freshTickets.length > 0 && soundMode === 'ALL') {
-          playNewOrderSound();
-          if (voiceEnabled) {
-            // One announcement per order — sibling tickets arrive together.
-            const seenOrders = new Set<string>();
-            const labels: string[] = [];
-            for (const ticket of freshTickets) {
-              const key = String(ticket.orderId || ticket.id);
-              if (seenOrders.has(key)) continue;
-              seenOrders.add(key);
-              const num = ticket.orderNumber ?? formatDisplayId(ticket).replace(/^#/, '');
-              labels.push(String(num));
-            }
-            speakNewOrder(labels);
+        if (freshTickets.length > 0) {
+          const seenOrders = new Set<string>();
+          const labels: string[] = [];
+          for (const ticket of freshTickets) {
+            const key = String(ticket.orderId || ticket.id);
+            if (seenOrders.has(key)) continue;
+            seenOrders.add(key);
+            const num = ticket.orderNumber ?? formatDisplayId(ticket).replace(/^#/, '');
+            labels.push(String(num));
+          }
+          markFreshArrivals(Array.from(seenOrders));
+          if (soundMode === 'ALL') {
+            playNewOrderSound();
+            if (voiceEnabled) speakNewOrder(labels);
           }
         }
       } finally {
@@ -683,9 +792,12 @@ const KDS: React.FC = () => {
        cancelled = true;
        socketService.off('kds:update', handleKdsUpdate);
        socketService.offConnectionChange(handleConnectionChange);
-       if (pollingTimer !== null) window.clearInterval(timer);
+       // Clear the FALLBACK polling interval (not the unrelated 5s tick
+       // timer) — otherwise every remount leaks another poller that
+       // re-fetches and re-announces tickets.
+       if (pollingTimer !== null) window.clearInterval(pollingTimer);
     };
-  }, [fetchOrders, soundMode, voiceEnabled, activeBranchId, activeStations]);
+  }, [fetchOrders, soundMode, voiceEnabled, activeBranchId, activeStations, markFreshArrivals]);
 
   // Timer tick — every 5s for elapsed time calculations
   React.useEffect(() => {
@@ -763,7 +875,12 @@ const KDS: React.FC = () => {
       (!activeBranchId || o.branchId === activeBranchId) &&
       (Date.now() - new Date(o.createdAt).getTime()) < MAX_AGE_MS
     );
-    if (!activeStations.has('ALL')) base = base.filter(o => activeStations.has(o.routingStation));
+    // Merged multi-station rows ('MULTI') match when ANY of their stations
+    // is selected — otherwise filtering by one station hides whole orders.
+    if (!activeStations.has('ALL')) base = base.filter(o =>
+      activeStations.has(o.routingStation) ||
+      (Array.isArray((o as any).routingStations) && (o as any).routingStations.some((s: string) => activeStations.has(s as any)))
+    );
     return base.sort(compareKdsTicketPriority);
   }, [orders, activeStations, activeBranchId, nowTick]);
 
@@ -863,6 +980,7 @@ const KDS: React.FC = () => {
       }
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
     });
+    if (soundModeRef.current === 'ALL') playFinishSound();
 
     if (order.status !== OrderStatus.READY) {
         // Add to recent bumps for undo while the ticket is in PASS/READY.
@@ -873,7 +991,7 @@ const KDS: React.FC = () => {
     }
   }, [orders, updateOrderStatus, startTicketTransition, bumpOptimistic, bumpActorId, bumpActorName]);
 
-  const completeKitchenOrder = React.useCallback(async (order: any) => {
+  const completeKitchenOrder = React.useCallback(async (order: any, silent = false) => {
     if (!order?.id || completingOrderIdsRef.current.has(order.id)) return;
     setPendingBump(null);
     completingOrderIdsRef.current.add(order.id);
@@ -888,6 +1006,8 @@ const KDS: React.FC = () => {
         await advanceKdsTicketIdsOnce(ticketIds, updateOrderStatus);
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
       });
+      // Batch callers pass silent=true and play one chime for the whole batch.
+      if (!silent && soundModeRef.current === 'ALL') playFinishSound();
     } finally {
       completingOrderIdsRef.current.delete(order.id);
     }
@@ -897,6 +1017,7 @@ const KDS: React.FC = () => {
       const bump = recentBumps.find(b => b.id === id);
       if (bump) clearTimeout(bump.timeoutId);
       setRecentBumps(prev => prev.filter(b => b.id !== id));
+      if (soundModeRef.current === 'ALL') playMoveSound();
       const ticketIds = bump?.ticketIds?.length ? bump.ticketIds : [id];
       startTicketTransition(async () => {
         ticketIds.forEach((ticketId: string) => bumpOptimistic({ id: ticketId, status: 'PREPARING' }));
@@ -908,25 +1029,31 @@ const KDS: React.FC = () => {
 
   const completeReadyBatch = React.useCallback(async () => {
     const readyOrders = activeOrders.filter(o => o.status === OrderStatus.READY);
-    for (const order of readyOrders) await completeKitchenOrder(order);
+    for (const order of readyOrders) await completeKitchenOrder(order, true);
+    if (readyOrders.length > 0 && soundModeRef.current === 'ALL') playFinishSound();
   }, [activeOrders, completeKitchenOrder]);
 
   const completeAllKitchenOrders = React.useCallback(async () => {
     if (activeOrders.length === 0 || typeof window === 'undefined') return;
     const confirmed = await confirm({
       title: isArabic ? 'إنهاء وتسليم الطلبات' : 'Finish & hand over',
+      // activeOrders is the FILTERED view — say "shown" so nobody expects
+      // hidden stations/statuses to complete. Ineligible types skip the
+      // pickup handover and only finish in the kitchen.
       message: kdsText(
         isArabic,
-        `Finish and hand over ${activeOrders.length} kitchen orders?`,
-        `إنهاء وتسليم كل طلبات المطبخ (${activeOrders.length})؟`,
+        `Finish and hand over the ${activeOrders.length} shown kitchen orders?`,
+        `إنهاء وتسليم طلبات المطبخ الظاهرة (${activeOrders.length})؟`,
       ),
       confirmText: isArabic ? 'تنفيذ' : 'Confirm',
       cancelText: isArabic ? 'إلغاء' : 'Cancel',
       variant: 'info',
     });
     if (!confirmed) return;
+    let finishedCount = 0;
     for (const order of activeOrders) {
-      await completeKitchenOrder(order);
+      await completeKitchenOrder(order, true);
+      finishedCount += 1;
       // After finishing, also hand the order over (pickup flow) so it clears
       // the packing screen instead of waiting there in READY state.
       const rawId = String(order.id || '');
@@ -938,6 +1065,7 @@ const KDS: React.FC = () => {
         } catch { /* keep finishing the remaining orders */ }
       }
     }
+    if (finishedCount > 0 && soundModeRef.current === 'ALL') playFinishSound();
   }, [activeOrders, completeKitchenOrder, confirm, isArabic]);
 
   // Live match preview — find order as user types
@@ -952,6 +1080,7 @@ const KDS: React.FC = () => {
     const trimmed = quickInputValueRef.current.trim();
     const order = trimmed ? activeOrders.find(o => getKdsOrderNumberText(o) === trimmed) : null;
     if (!order) {
+      if (trimmed && soundModeRef.current === 'ALL') playErrorSound();
       quickInputValueRef.current = '';
       setQuickInput('');
       return;
@@ -988,6 +1117,9 @@ const KDS: React.FC = () => {
   const pendingOrders = React.useMemo(() => activeOrders.filter(o => o.status === OrderStatus.PENDING), [activeOrders]);
   const preparingOrders = React.useMemo(() => activeOrders.filter(o => o.status === OrderStatus.PREPARING), [activeOrders]);
   const readyOrders = React.useMemo(() => activeOrders.filter(o => o.status === OrderStatus.READY), [activeOrders]);
+
+  // Orders bumped in the last 8s — drives the READY arrival flash + undo window.
+  const freshReadyIds = React.useMemo(() => new Set(recentBumps.map(b => b.id)), [recentBumps]);
 
   const showPending = activeStatus === 'ALL' || activeStatus === OrderStatus.PENDING;
   const showPreparing = activeStatus === 'ALL' || activeStatus === OrderStatus.PREPARING;
@@ -1073,27 +1205,66 @@ const KDS: React.FC = () => {
 
   return (
     <div
-      className={`ops-fast flex flex-col h-screen w-full font-sans ${themeScopeClass}`}
+      className={`ops-fast relative flex flex-col h-screen w-full font-sans overflow-hidden ${themeScopeClass}`}
       style={{ background: 'rgb(var(--bg-app))', color: 'rgb(var(--text-main))' }}
     >
+      {/* Ambient system wallpaper — random, crossfades, never plain. */}
+      <div className="pointer-events-none absolute inset-0" style={{ zIndex: 0 }} aria-hidden>
+        {KDS_WALLPAPERS.map((src, idx) => (
+          <img
+            key={src}
+            src={src}
+            alt=""
+            draggable={false}
+            style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              objectFit: 'cover', opacity: idx === wallpaperIdx ? 0.32 : 0,
+              transition: 'opacity 1.6s ease', filter: 'saturate(1.1)',
+            }}
+          />
+        ))}
+        <div className="kds-ambient-gradient" />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(var(--bg-app),0.72), rgba(var(--bg-app),0.88))' }} />
+      </div>
+      <div className="relative flex flex-col h-full w-full" style={{ zIndex: 1 }}>
+      {/* ⌨️ Quick-order HUD — approved V4 overlay: typing digits anywhere opens
+          this pill; Enter finishes the matched order. Fully theme-aware. */}
       <AnimatePresence>
         {quickInput && (
           <motion.div
             key="kds-keyboard-buffer"
-            initial={{ opacity: 0, y: -10, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.96 }}
-            className="pointer-events-none fixed left-1/2 top-16 z-50 -translate-x-1/2 rounded-2xl border px-8 py-4 text-center shadow-2xl backdrop-blur-xl"
+            initial={{ opacity: 0, y: -14, scale: 0.95, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
+            exit={{ opacity: 0, y: -10, scale: 0.96, x: '-50%' }}
+            transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            className="pointer-events-none fixed left-1/2 top-[76px] z-50 rounded-2xl px-7 py-3.5 text-center"
             style={{
-              background: matchedOrder ? 'rgba(var(--success), 0.14)' : 'rgba(var(--warning), 0.14)',
-              borderColor: matchedOrder ? 'rgba(var(--success), 0.45)' : 'rgba(var(--warning), 0.45)',
-              color: matchedOrder ? 'rgb(var(--success))' : 'rgb(var(--warning))',
+              background: 'rgba(var(--bg-card), 0.92)',
+              backdropFilter: 'blur(20px)',
+              border: `1.5px solid ${matchedOrder ? 'rgba(var(--success), 0.6)' : 'rgba(var(--primary), 0.6)'}`,
+              boxShadow: matchedOrder
+                ? '0 20px 50px rgba(0,0,0,0.45), 0 0 25px rgba(var(--success), 0.35)'
+                : '0 20px 50px rgba(0,0,0,0.45), 0 0 25px rgba(var(--primary), 0.35)',
             }}
           >
-            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'rgb(var(--text-muted))' }}>
-              {isArabic ? 'رقم الأوردر' : 'Order Number'}
+            <p className="font-black uppercase" style={{ fontSize: 11, letterSpacing: '0.08em', color: matchedOrder ? 'rgb(var(--success))' : 'rgb(var(--primary))' }}>
+              {isArabic ? '⚡ رقم الأوردر — Enter للإنهاء' : '⚡ Order number — Enter to finish'}
             </p>
-            <p className="mt-1 text-5xl font-black tabular-nums tracking-tight">#{quickInput}</p>
+            <p
+              className="tabular-nums"
+              style={{
+                fontSize: 34, fontWeight: 900, lineHeight: 1.15,
+                color: matchedOrder ? 'rgb(var(--success))' : (quickInput && !matchedOrder ? 'rgb(var(--danger))' : 'rgb(var(--text-main))'),
+                animation: (quickInput && !matchedOrder) ? 'kds-hud-shake 0.4s' : undefined,
+              }}
+            >
+              #{quickInput}
+            </p>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'rgb(var(--text-muted))' }}>
+              {matchedOrder
+                ? formatDisplayId(matchedOrder)
+                : (isArabic ? 'اطبع الرقم من الكيبورد مباشرة (0-9)' : 'Type digits anywhere (0-9)')}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1367,6 +1538,8 @@ const KDS: React.FC = () => {
           updateOrderStatus={completeKitchenOrder}
           toggleItemState={toggleItemState}
           isArabic={isArabic}
+          freshIds={freshReadyIds}
+          freshNewIds={freshArrivalIds}
         />
       ) : kdsMode === 'summary' ? (
         <SummaryGrid orders={activeOrders.filter(o => o.status !== OrderStatus.READY && o.status !== OrderStatus.DELIVERED)} isArabic={isArabic} />
@@ -1439,9 +1612,9 @@ const KDS: React.FC = () => {
 
           {/* ??? KANBAN COLUMNS ??? */}
           <div className={`flex-1 min-h-0 flex ${isArabic ? 'flex-row-reverse' : 'flex-row'} gap-2.5 p-2.5`}>
-            {showPending && <KanbanColumn theme={COLUMN_THEMES.PENDING} themeKey="PENDING" orders={pendingOrders} actionLabel={kdsText(isArabic, 'Complete oldest', 'إنهاء الأقدم')} actionIcon={<CheckCircle size={12} />} onAction={pendingOrders.length > 0 ? () => completeKitchenOrder(pendingOrders[0]) : undefined} getElapsedMins={getElapsedMins} getTimerUrgency={getTimerUrgency} advanceOrder={completeKitchenOrder} getStationForItem={getStationForItem} toggleItemState={toggleItemState} isArabic={isArabic} pendingBump={pendingBump} highlightedId={highlightedIdx >= 0 ? activeOrders[highlightedIdx]?.id : null} />}
-            {showPreparing && <KanbanColumn theme={COLUMN_THEMES.PREPARING} themeKey="PREPARING" orders={preparingOrders} actionLabel={kdsText(isArabic, 'Complete oldest', 'إنهاء الأقدم')} actionIcon={<CheckCircle size={12} />} onAction={preparingOrders.length > 0 ? () => completeKitchenOrder(preparingOrders[0]) : undefined} getElapsedMins={getElapsedMins} getTimerUrgency={getTimerUrgency} advanceOrder={completeKitchenOrder} getStationForItem={getStationForItem} toggleItemState={toggleItemState} isArabic={isArabic} pendingBump={pendingBump} highlightedId={highlightedIdx >= 0 ? activeOrders[highlightedIdx]?.id : null} />}
-            {showReady && <KanbanColumn theme={COLUMN_THEMES.READY} themeKey="READY" orders={readyOrders} actionLabel={kdsText(isArabic, 'Deliver all', 'تسليم الكل')} actionIcon={<Truck size={12} />} onAction={readyOrders.length > 0 ? completeReadyBatch : undefined} getElapsedMins={getElapsedMins} getTimerUrgency={getTimerUrgency} advanceOrder={completeKitchenOrder} getStationForItem={getStationForItem} toggleItemState={toggleItemState} isArabic={isArabic} pendingBump={pendingBump} highlightedId={highlightedIdx >= 0 ? activeOrders[highlightedIdx]?.id : null} />}
+            {showPending && <KanbanColumn theme={COLUMN_THEMES.PENDING} themeKey="PENDING" orders={pendingOrders} actionLabel={kdsText(isArabic, 'Complete oldest', 'إنهاء الأقدم')} actionIcon={<CheckCircle size={12} />} onAction={pendingOrders.length > 0 ? () => completeKitchenOrder(pendingOrders[0]) : undefined} getElapsedMins={getElapsedMins} getTimerUrgency={getTimerUrgency} advanceOrder={completeKitchenOrder} getStationForItem={getStationForItem} toggleItemState={toggleItemState} isArabic={isArabic} pendingBump={pendingBump} freshIds={freshReadyIds} freshNewIds={freshArrivalIds} highlightedId={highlightedIdx >= 0 ? activeOrders[highlightedIdx]?.id : null} />}
+            {showPreparing && <KanbanColumn theme={COLUMN_THEMES.PREPARING} themeKey="PREPARING" orders={preparingOrders} actionLabel={kdsText(isArabic, 'Complete oldest', 'إنهاء الأقدم')} actionIcon={<CheckCircle size={12} />} onAction={preparingOrders.length > 0 ? () => completeKitchenOrder(preparingOrders[0]) : undefined} getElapsedMins={getElapsedMins} getTimerUrgency={getTimerUrgency} advanceOrder={completeKitchenOrder} getStationForItem={getStationForItem} toggleItemState={toggleItemState} isArabic={isArabic} pendingBump={pendingBump} freshIds={freshReadyIds} freshNewIds={freshArrivalIds} highlightedId={highlightedIdx >= 0 ? activeOrders[highlightedIdx]?.id : null} />}
+            {showReady && <KanbanColumn theme={COLUMN_THEMES.READY} themeKey="READY" orders={readyOrders} actionLabel={kdsText(isArabic, 'Deliver all', 'تسليم الكل')} actionIcon={<Truck size={12} />} onAction={readyOrders.length > 0 ? completeReadyBatch : undefined} getElapsedMins={getElapsedMins} getTimerUrgency={getTimerUrgency} advanceOrder={completeKitchenOrder} getStationForItem={getStationForItem} toggleItemState={toggleItemState} isArabic={isArabic} pendingBump={pendingBump} freshIds={freshReadyIds} freshNewIds={freshArrivalIds} highlightedId={highlightedIdx >= 0 ? activeOrders[highlightedIdx]?.id : null} />}
           </div>
         </>
       )}
@@ -1591,6 +1764,7 @@ const KDS: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 };
@@ -1600,7 +1774,7 @@ const KDS: React.FC = () => {
    ??????????????????????????????????????????????????? */
 const KanbanColumn = React.memo(({
   theme, themeKey, orders, actionLabel, actionIcon, onAction,
-  getElapsedMins, getTimerUrgency, advanceOrder, getStationForItem, toggleItemState, isArabic, pendingBump, highlightedId,
+  getElapsedMins, getTimerUrgency, advanceOrder, getStationForItem, toggleItemState, isArabic, pendingBump, highlightedId, freshIds, freshNewIds,
 }: any) => {
   const copy = columnCopy(themeKey, isArabic);
   return (
@@ -1682,6 +1856,8 @@ const KanbanColumn = React.memo(({
             isArabic={isArabic}
             isPendingBump={pendingBump === order.id}
             isHighlighted={highlightedId === order.id}
+            isFreshReady={order.status === OrderStatus.READY && !!freshIds?.has(order.id)}
+            isNewArrival={isFreshNewOrder(order, freshNewIds)}
           />
         ))}
       </AnimatePresence>
@@ -1803,7 +1979,7 @@ const KdsItemDetails = React.memo(({ item, isArabic, station }: { item: any; isA
 /* ???????????????????????????????????????????????????
    ?? Ticket Card — Themed, with progress bar
    ??????????????????????????????????????????????????? */
-const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advanceOrder, getStationForItem, toggleItemState, isArabic, isPendingBump, isHighlighted }: any) => {
+const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advanceOrder, getStationForItem, toggleItemState, isArabic, isPendingBump, isHighlighted, isFreshReady, isNewArrival }: any) => {
   const elapsed = getElapsedMins(order.createdAt);
   const urgency = getTimerUrgency(elapsed, order.status);
   const isReady = order.status === OrderStatus.READY;
@@ -1814,6 +1990,7 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
 
   const isRush = order.priority === 'RUSH';
   const isRemake = order.priority === 'REMAKE';
+  const isBurning = isBurningOrder(order, elapsed);
 
   // 3-step urgency scale readable at distance: warning (amber) → risk
   // (orange, thicker border) → critical (red pulse). Risk previously shared
@@ -1826,21 +2003,25 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
           : '--success';
   const urgencyPulse = urgency === 'critical' || isRush || isRemake;
 
-  const cardBg = isReady
-    ? 'rgba(var(--success), 0.06)'
-    : urgency === 'critical'
-      ? 'rgba(var(--danger), 0.10)'
-      : urgency === 'risk'
-        ? 'rgba(var(--warning), 0.10)'
-        : 'rgba(var(--bg-elevated), 0.5)';
+  const cardBg = isBurning
+    ? 'linear-gradient(180deg, rgba(26, 9, 7, 0.88), rgba(43, 13, 9, 0.92))'
+    : isReady
+      ? 'rgba(var(--success), 0.06)'
+      : urgency === 'critical'
+        ? 'rgba(var(--danger), 0.10)'
+        : urgency === 'risk'
+          ? 'rgba(var(--warning), 0.10)'
+          : 'rgba(var(--bg-elevated), 0.5)';
 
-  const cardBorder = isReady
-    ? 'rgba(var(--success), 0.2)'
-    : urgencyPulse
-      ? 'rgba(var(--danger), 0.5)'
-      : urgency === 'risk'
-        ? '2px solid rgba(var(--warning), 0.55)'
-        : 'rgba(var(--border-color), 0.15)';
+  const cardBorder = isBurning
+    ? 'rgba(249, 115, 22, 0.55)'
+    : isReady
+      ? 'rgba(var(--success), 0.2)'
+      : urgencyPulse
+        ? 'rgba(var(--danger), 0.5)'
+        : urgency === 'risk'
+          ? '2px solid rgba(var(--warning), 0.55)'
+          : 'rgba(var(--border-color), 0.15)';
 
   const markAllDone = React.useCallback(async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -1851,12 +2032,15 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 50, scale: 0.96, transition: { duration: 0.2 } }}
-      transition={{ type: 'spring', duration: 0.15 }}
-      className="kds-ticket w-full text-left block overflow-hidden transition-all group backdrop-blur-xl"
-      data-urgency={isReady ? 'ready' : (urgency || 'normal')}
+      initial={isNewArrival ? { opacity: 0, y: -60, scale: 0.7, rotate: -2 } : { opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
+      /* Approved V4 liquid finish: lift, bloom, blur away — theme-aware glow
+         lands via .kds-arrive-ready on the READY card that appears next. */
+      exit={{ opacity: 0, y: -50, scale: 0.85, filter: 'blur(8px)', transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } }}
+      transition={isNewArrival ? { type: 'spring', stiffness: 260, damping: 18 } : { type: 'spring', duration: 0.15 }}
+      whileHover={{ y: -3 }}
+      className={`kds-ticket w-full text-left block overflow-hidden transition-all group backdrop-blur-xl${isFreshReady ? ' kds-arrive-ready' : ''}${isNewArrival ? ' kds-new-arrival' : ''}${isBurning ? ' kds-burning' : ''}`}
+      data-urgency={isBurning ? 'burning' : isReady ? 'ready' : (urgency || 'normal')}
       style={{
         contentVisibility: 'auto',
         borderRadius: 'var(--theme-radius, 12px)',
@@ -1864,9 +2048,21 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
         border: `1px solid ${cardBorder}`,
         outline: isPendingBump ? `2px solid rgb(var(--primary))` : isHighlighted ? `2px solid rgb(var(--accent))` : 'none',
         outlineOffset: isPendingBump || isHighlighted ? 2 : 0,
-        boxShadow: urgencyPulse ? '0 0 30px rgba(var(--danger), 0.3)' : urgency === 'risk' ? '0 0 18px rgba(var(--warning), 0.22)' : isReady ? '0 0 20px rgba(var(--success), 0.15)' : '0 4px 20px rgba(0,0,0,0.1)',
+        boxShadow: isBurning ? '0 0 34px rgba(249, 115, 22, 0.35), 0 0 90px rgba(239, 68, 68, 0.22)' : urgencyPulse ? '0 0 30px rgba(var(--danger), 0.3)' : urgency === 'risk' ? '0 0 18px rgba(var(--warning), 0.22)' : isReady ? '0 0 20px rgba(var(--success), 0.15)' : '0 4px 20px rgba(0,0,0,0.1)',
       }}
     >
+      {isBurning && (
+        <div className="kds-inferno" aria-hidden>
+          <div className="kds-fire-glow" />
+          <div className="kds-flames back"><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
+          <div className="kds-flames front"><i /><i /><i /><i /><i /><i /><i /></div>
+          <div className="kds-inferno-embers"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
+          <div className="kds-fire-smoke"><i /><i /><i /></div>
+          <div className="kds-firelight" />
+          <div className="kds-scrim" />
+          <div className="kds-char" />
+        </div>
+      )}
       {/* ?? Progress bar at top ?? */}
       <div style={{ height: 3, background: 'rgba(var(--border-color), 0.1)', position: 'relative', overflow: 'hidden' }}>
         <div
@@ -1882,17 +2078,27 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
         />
       </div>
 
+      {isBurning && (
+        <div className="kds-late-strip" role="alert">
+          <span className="kds-late-dot" />
+          <Flame size={13} className="kds-late-flame" />
+          <span>{isArabic ? `متأخر ${elapsed} دقيقة — تدخل فوري` : `OVERDUE ${elapsed} MIN — ACT NOW`}</span>
+          <span className="kds-embers" aria-hidden>
+            <i /><i /><i /><i /><i /><i />
+          </span>
+        </div>
+      )}
       {/* ?? Timer + Type strip ?? */}
       <div
         className="flex justify-between items-center px-3 py-1.5"
         style={{
-          background: `rgba(var(${urgencyToken}), ${urgency === 'critical' ? 0.15 : 0.08})`,
+          background: isBurning ? 'rgba(0, 0, 0, 0.35)' : `rgba(var(${urgencyToken}), ${urgency === 'critical' ? 0.15 : 0.08})`,
         }}
       >
-        <div className="flex items-center gap-1 tabular-nums uppercase" style={{ fontSize: urgency === 'risk' || urgency === 'critical' ? 15 : 12, fontWeight: 900, color: `rgb(var(${urgencyToken}))` }}>
-          <Clock size={urgency === 'risk' || urgency === 'critical' ? 14 : 12} /> {elapsed}m
-          {urgencyPulse && <span className="animate-pulse">!</span>}
-          {urgency === 'risk' && !urgencyPulse && <span>•</span>}
+        <div className={`flex items-center gap-1 tabular-nums uppercase${isBurning ? ' kds-fire-timer' : ''}`} style={{ fontSize: urgency === 'risk' || urgency === 'critical' || isBurning ? 15 : 12, fontWeight: 900, color: isBurning ? '#fdba74' : `rgb(var(${urgencyToken}))` }}>
+          {isBurning ? <Flame size={15} className="kds-fire-icon" /> : <Clock size={urgency === 'risk' || urgency === 'critical' ? 14 : 12} />} {elapsed}m
+          {urgencyPulse && !isBurning && <span className="animate-pulse">!</span>}
+          {urgency === 'risk' && !urgencyPulse && !isBurning && <span>•</span>}
         </div>
         <div className="uppercase tracking-widest flex items-center gap-2" style={{ fontSize: 9, fontWeight: 900, color: `rgb(var(${urgencyToken}))`, opacity: 0.8 }}>
           {isRemake && <span className="bg-red-500 text-white px-1.5 py-0.5 rounded opacity-100">{kdsText(isArabic, 'Remake', 'إعادة')}</span>}
@@ -1901,6 +2107,13 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
         </div>
       </div>
 
+      {isNewArrival && (
+        <div className="kds-new-banner">
+          <span className="kds-new-flame">🔔</span>
+          <span>{isArabic ? 'أوردر جديد وصل الآن' : 'NEW ORDER JUST ARRIVED'}</span>
+          <span className="kds-new-flame">🔔</span>
+        </div>
+      )}
       {/* ?? Order identifiers ?? */}
       <div
         className="flex justify-between items-center px-3 py-2"
@@ -1911,10 +2124,10 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
             {order.orderNumber ? `${kdsText(isArabic, 'Order', 'طلب')} #${order.orderNumber}` : kdsText(isArabic, 'Order', 'طلب')}
           </span>
           <span
-            className="uppercase tracking-tight leading-none tabular-nums"
+            className={`uppercase tracking-tight leading-none tabular-nums${isBurning ? ' kds-late-num' : ''}`}
             style={{
               fontSize: '1.75rem', fontWeight: 900,
-              color: isReady ? 'rgb(var(--success))' : 'rgb(var(--text-main))',
+              color: isBurning ? '#fdba74' : isReady ? 'rgb(var(--success))' : 'rgb(var(--text-main))',
             }}
           >
             {formatDisplayId(order)}
@@ -1941,8 +2154,8 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
         </div>
       )}
 
-      {/* ?? Items ?? */}
-      <div style={{ padding: 10 }}>
+      {/* ?? Items ?? — capped inner scroll so mega orders never push the action out */}
+      <div className="kds-items-scroll" style={{ padding: 10, maxHeight: 320, overflowY: 'auto' }}>
         <ul className="space-y-1.5">
           {order.items.map((item: any, idx: number) => {
             const isDone = item._done || item.isBumped;
@@ -2004,28 +2217,32 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
         </button>
       </div>
 
+      {/* Approved V4 footer: one decisive action per state — success solid
+          to finish, quiet neutral to hand over. Sheen via .kds-act (themed). */}
       <button
         type="button"
         onClick={() => advanceOrder(order)}
-        className="w-full py-3.5 text-center uppercase transition-all active:scale-[0.99]"
+        className="kds-act w-full py-3.5 text-center uppercase transition-all active:scale-[0.99]"
         style={{
           minHeight: 56,
           fontSize: 13, fontWeight: 900, letterSpacing: '0.15em',
           background: isPendingBump
             ? 'rgb(var(--primary))'
             : isReady
-              ? 'rgba(var(--success), 0.12)'
-              : 'rgba(var(--bg-elevated), 0.3)',
+              ? 'rgba(var(--bg-elevated), 0.5)'
+              : 'linear-gradient(135deg, rgb(var(--success)), rgba(var(--success), 0.72))',
           color: isPendingBump
             ? 'white'
             : isReady
               ? 'rgb(var(--success))'
-              : 'rgb(var(--text-muted))',
+              : 'white',
+          border: isReady ? '1px solid rgba(var(--success), 0.3)' : 'none',
+          boxShadow: (!isReady && !isPendingBump) ? '0 4px 16px rgba(var(--success), 0.3)' : 'none',
         }}
       >
         {isReady
-          ? kdsText(isArabic, 'Deliver order', 'تسليم الطلب')
-          : kdsText(isArabic, 'Complete order', 'إنهاء الطلب')}
+          ? kdsText(isArabic, '🛎 Deliver order', '🛎 تسليم الطلب')
+          : kdsText(isArabic, 'Mark ready ✔', '✔ جاهز للتسليم')}
       </button>
     </motion.div>
   );
@@ -2034,7 +2251,7 @@ const TicketCard = React.memo(({ order, getElapsedMins, getTimerUrgency, advance
 /* ???????????????????????????????????????????????????
    ? Simple Grid — Flat view, one-tap-to-complete
    ??????????????????????????????????????????????????? */
-const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUrgency, getStationForItem, updateOrderStatus, toggleItemState, isArabic }: any) => {
+const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUrgency, getStationForItem, updateOrderStatus, toggleItemState, isArabic, freshIds, freshNewIds }: any) => {
   const allOrders = React.useMemo(() => [...orders, ...readyOrders], [orders, readyOrders]);
 
   // Chain through proper status transitions: PENDING -> PREPARING -> READY
@@ -2066,23 +2283,37 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
               const urgencyToken = urgency === 'critical' ? '--danger' : urgency === 'risk' ? '--danger' : urgency === 'warning' ? '--warning' : urgency === 'ready' ? '--success' : '--success';
               const pendingItemsCount = (order.items || []).filter((item: any) => !isKdsItemDone(item)).length;
 
+              const isNewArrival = isFreshNewOrder(order, freshNewIds);
+              const isBurning = isBurningOrder(order, elapsed);
               return (
                 <motion.div
                   key={order.id}
                   layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                  className="overflow-hidden transition-all hover:scale-[1.01]"
+                  initial={isNewArrival ? { opacity: 0, y: -70, scale: 0.65, rotate: -2 } : { opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
+                  exit={{ opacity: 0, y: -50, scale: 0.85, filter: 'blur(8px)', transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] } }}
+                  transition={isNewArrival ? { type: 'spring', stiffness: 260, damping: 17 } : undefined}
+                  whileHover={{ scale: 1.01, y: -2 }}
+                  data-urgency={isBurning ? 'burning' : undefined}
+                  className={`overflow-hidden transition-all${isReady && freshIds?.has(order.id) ? ' kds-arrive-ready' : ''}${isNewArrival ? ' kds-new-arrival' : ''}${isBurning ? ' kds-burning' : ''}`}
                   style={{
                     contentVisibility: 'auto',
                     borderRadius: 'var(--theme-radius-lg, 16px)',
-                    background: isReady ? 'rgba(var(--success), 0.08)' : urgency === 'critical' ? 'rgba(var(--danger), 0.06)' : 'rgba(var(--bg-card), 0.65)',
-                    border: `2px solid ${isReady ? 'rgba(var(--success), 0.3)' : urgency === 'critical' ? 'rgba(var(--danger), 0.3)' : 'rgba(var(--border-color), 0.15)'}`,
+                    background: isBurning ? 'linear-gradient(180deg, rgba(26, 9, 7, 0.88), rgba(43, 13, 9, 0.92))' : isReady ? 'rgba(var(--success), 0.08)' : urgency === 'critical' ? 'rgba(var(--danger), 0.06)' : 'rgba(var(--bg-card), 0.65)',
+                    border: `2px solid ${isBurning ? 'rgba(249, 115, 22, 0.55)' : isReady ? 'rgba(var(--success), 0.3)' : urgency === 'critical' ? 'rgba(var(--danger), 0.3)' : 'rgba(var(--border-color), 0.15)'}`,
                     backdropFilter: 'blur(var(--theme-blur, 8px))',
-                    boxShadow: urgency === 'critical' ? '0 0 24px rgba(var(--danger), 0.12)' : 'var(--theme-shadow-card)',
+                    boxShadow: isBurning ? '0 0 34px rgba(249, 115, 22, 0.35), 0 0 90px rgba(239, 68, 68, 0.22)' : urgency === 'critical' ? '0 0 24px rgba(var(--danger), 0.12)' : 'var(--theme-shadow-card)',
                   }}
                 >
+                  {isBurning && (
+                    <div className="kds-inferno" aria-hidden>
+                      <div className="kds-fire-glow" />
+                      <div className="kds-flames"><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
+                      <div className="kds-fire-smoke"><i /><i /><i /></div>
+                      <div className="kds-scrim" />
+                      <div className="kds-char" />
+                    </div>
+                  )}
                   {/* Progress bar */}
                   <div style={{ height: 4, background: 'rgba(var(--border-color), 0.08)' }}>
                     <div className="transition-all duration-1000" style={{
@@ -2092,15 +2323,32 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                     }} />
                   </div>
 
+                  {isNewArrival && (
+                    <div className="kds-new-banner">
+                      <span className="kds-new-flame">🔔</span>
+                      <span>{isArabic ? 'أوردر جديد وصل الآن' : 'NEW ORDER JUST ARRIVED'}</span>
+                      <span className="kds-new-flame">🔔</span>
+                    </div>
+                  )}
+                  {isBurning && (
+                    <div className="kds-late-strip" role="alert">
+                      <span className="kds-late-dot" />
+                      <Flame size={13} className="kds-late-flame" />
+                      <span>{isArabic ? `متأخر ${elapsed} دقيقة — تدخل فوري` : `OVERDUE ${elapsed} MIN — ACT NOW`}</span>
+                      <span className="kds-embers" aria-hidden>
+                        <i /><i /><i /><i /><i /><i />
+                      </span>
+                    </div>
+                  )}
                   {/* ?? BIG ORDER NUMBER ?? */}
                   <div className="px-4 pt-3 pb-2 flex items-start justify-between">
                     <div>
-                      <span className="block uppercase tracking-widest" style={{ fontSize: 10, fontWeight: 700, color: 'rgb(var(--text-muted))' }}>
+                      <span className="block uppercase tracking-widest" style={{ fontSize: 10, fontWeight: 700, color: isBurning ? 'rgba(253, 186, 116, 0.7)' : 'rgb(var(--text-muted))' }}>
                         {orderTypeLabel(order.type, isArabic)}
                       </span>
-                      <span className="block tabular-nums" style={{
+                      <span className={`block tabular-nums${isBurning ? ' kds-late-num' : ''}`} style={{
                         fontSize: '2.5rem', fontWeight: 900, lineHeight: 1,
-                        color: isReady ? 'rgb(var(--success))' : 'rgb(var(--text-main))',
+                        color: isBurning ? '#fdba74' : isReady ? 'rgb(var(--success))' : 'rgb(var(--text-main))',
                         letterSpacing: '-0.02em',
                       }}>
                         {formatDisplayId(order)}
@@ -2108,13 +2356,13 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                     </div>
                     <div className="text-right">
                       {/* Timer */}
-                      <div className="flex items-center gap-1 justify-end tabular-nums" style={{
+                      <div className={`flex items-center gap-1 justify-end tabular-nums${isBurning ? ' kds-fire-timer' : ''}`} style={{
                         fontSize: 13, fontWeight: 900,
-                        color: `rgb(var(${urgencyToken}))`,
+                        color: isBurning ? '#fdba74' : `rgb(var(${urgencyToken}))`,
                       }}>
-                        <Clock size={14} />
+                        {isBurning ? <Flame size={15} className="kds-fire-icon" /> : <Clock size={14} />}
                         {elapsed}m
-                        {urgency === 'critical' && <span className="animate-pulse">!</span>}
+                        {urgency === 'critical' && !isBurning && <span className="animate-pulse">!</span>}
                       </div>
                       {/* Table/Mode */}
                       {(() => {
@@ -2154,7 +2402,7 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                   )}
 
                   {/* ?? Items list ?? */}
-                  <div className="px-4 pb-2" style={{ borderTop: '1px solid rgba(var(--border-color), 0.08)', paddingTop: 8 }}>
+                  <div className="px-4 pb-2 kds-items-scroll" style={{ borderTop: '1px solid rgba(var(--border-color), 0.08)', paddingTop: 8, maxHeight: 300, overflowY: 'auto' }}>
                     {order.items.map((item: any, idx: number) => {
                       const isDone = item._done || item.isBumped;
                       return (
@@ -2209,20 +2457,22 @@ const SimpleGrid = React.memo(({ orders, readyOrders, getElapsedMins, getTimerUr
                     </button>
                   </div>
 
-                  {/* ?? Footer ?? */}
+                  {/* ?? Footer — approved V4 one-tap finish (success gradient + sheen) ?? */}
                   <button
                     type="button"
                     onClick={() => completeOrder(order)}
-                    className="w-full py-3.5 text-center uppercase active:scale-[0.99]"
+                    className="kds-act w-full py-3.5 text-center uppercase active:scale-[0.99]"
                     style={{
                     minHeight: 56,
                     fontSize: 13, fontWeight: 900, letterSpacing: '0.15em',
-                    background: isReady ? 'rgba(var(--success), 0.12)' : 'rgba(var(--bg-elevated), 0.3)',
-                    color: isReady ? 'rgb(var(--success))' : 'rgb(var(--text-muted))',
+                    background: isReady ? 'rgba(var(--bg-elevated), 0.5)' : 'linear-gradient(135deg, rgb(var(--success)), rgba(var(--success), 0.72))',
+                    color: isReady ? 'rgb(var(--success))' : 'white',
+                    border: isReady ? '1px solid rgba(var(--success), 0.3)' : 'none',
+                    boxShadow: isReady ? 'none' : '0 4px 18px rgba(var(--success), 0.35)',
                   }}>
                     {isReady
-                      ? kdsText(isArabic, 'Deliver order', 'تسليم الطلب')
-                      : kdsText(isArabic, 'Complete order', 'إنهاء الطلب')}
+                      ? kdsText(isArabic, '🛎 Deliver order', '🛎 تسليم الطلب')
+                      : kdsText(isArabic, 'Finish order ✔', '✔ إنجاز وإنهاء الطلب')}
                   </button>
                 </motion.div>
               );

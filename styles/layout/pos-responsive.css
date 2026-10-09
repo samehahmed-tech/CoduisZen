@@ -626,233 +626,67 @@
     backdrop-filter: blur(8px);
 }
 
-[data-theme='aurora-glass'] .pos-menu-item-card,
-[data-theme='bento-saas'] .pos-menu-item-card {
-    --pos-card-bg: rgba(var(--bg-card), 0.68);
-    --pos-card-media-bg: rgba(var(--bg-elevated), 0.44);
+/* Engine 2.0 POS: hero art comes from provider POS tokens per theme.
+   Only structural helpers live here. */
+[data-theme='glassline'] .pos-menu-item-card,
+[data-theme='material-x'] .pos-menu-item-card,
+[data-theme='acrylic'] .pos-menu-item-card {
+    --pos-card-bg: rgba(var(--bg-card), 0.6);
+    --pos-card-media-bg: rgba(var(--bg-elevated), 0.4);
     backdrop-filter: blur(var(--theme-blur, 20px)) saturate(150%);
     -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(150%);
 }
 
-[data-theme='aurora-glass'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 76% 20%, rgba(var(--primary), 0.2), transparent 25%),
-        linear-gradient(135deg, rgba(var(--bg-card), 0.72), rgba(var(--primary), 0.16)),
-        rgba(var(--bg-card), 0.54);
-    --pos-theme-card-hero-text: var(--text-main);
-    --pos-theme-card-hero-muted: var(--text-muted);
-    --pos-theme-card-action-bg: rgba(var(--primary), 0.95);
-    --pos-theme-card-action-text: 255 255 255;
-    --pos-theme-card-control-bg: rgba(var(--bg-card), 0.42);
-    --pos-theme-card-badge-bg: rgba(var(--primary), 0.88);
-    --pos-theme-card-pattern-opacity: 0.18;
-    --pos-theme-card-art-ring: rgba(var(--primary), 0.34);
-    backdrop-filter: blur(var(--theme-blur, 20px)) saturate(160%);
-    -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(160%);
-}
-
-[data-theme='bento-saas'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 76% 18%, rgba(var(--primary), 0.14), transparent 24%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(var(--primary), 0.055)),
-        rgb(var(--bg-card));
-    --pos-theme-card-hero-text: var(--text-main);
-    --pos-theme-card-hero-muted: var(--text-muted);
-    --pos-theme-card-action-bg: rgb(var(--primary));
-    --pos-theme-card-action-text: 255 255 255;
-    --pos-theme-card-control-bg: rgba(var(--bg-elevated), 0.76);
-    --pos-theme-card-badge-bg: linear-gradient(180deg, rgb(var(--primary)), rgb(var(--primary-hover)));
-    --pos-theme-card-pattern-opacity: 0.08;
-    --pos-theme-card-art-ring: rgba(var(--primary), 0.36);
-}
-
-[data-theme='future-hud'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.14), transparent 24%),
-        linear-gradient(135deg, #182230, rgb(var(--primary))),
-        rgb(var(--primary));
-    --pos-theme-card-hero-text: 255 255 255;
-    --pos-theme-card-hero-muted: 219 234 254;
-    --pos-theme-card-action-bg: #ffffff;
-    --pos-theme-card-action-text: var(--primary);
-    --pos-theme-card-control-bg: rgba(15, 23, 42, 0.28);
-    --pos-theme-card-badge-bg: rgba(15, 23, 42, 0.78);
-    --pos-theme-card-pattern-opacity: 0.28;
-    --pos-theme-card-art-ring: rgba(255, 255, 255, 0.36);
-}
-
-[data-theme='soft-organic'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.18), transparent 24%),
-        linear-gradient(145deg, rgb(var(--primary)), rgba(var(--accent), 0.76)),
-        rgb(var(--primary));
-    --pos-theme-card-hero-text: 255 255 255;
-    --pos-theme-card-hero-muted: 237 233 254;
-    --pos-theme-card-action-bg: rgba(255, 255, 255, 0.94);
-    --pos-theme-card-action-text: var(--primary);
-    --pos-theme-card-control-bg: rgba(255, 255, 255, 0.16);
-    --pos-theme-card-badge-bg: rgba(var(--accent), 0.86);
-    --pos-theme-card-pattern-opacity: 0.2;
-    --pos-theme-card-art-ring: rgba(255, 255, 255, 0.38);
-}
-
-[data-theme='editorial-luxury'] .pos-menu-item-hero-card,
-[data-theme='terminal-ops'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg: rgb(var(--bg-card));
-    --pos-theme-card-hero-text: var(--text-main);
-    --pos-theme-card-hero-muted: var(--text-muted);
-    --pos-theme-card-action-bg: rgb(var(--primary));
-    --pos-theme-card-action-text: 255 255 255;
-    --pos-theme-card-control-bg: rgba(var(--bg-elevated), 0.72);
-    --pos-theme-card-badge-bg: rgb(var(--primary));
-    border-color: rgba(var(--border-color), 0.2);
-    box-shadow: none;
-    --pos-theme-card-pattern-opacity: 0;
-    --pos-theme-card-art-ring: rgba(var(--border-color), 0.55);
-}
-
-[data-theme='editorial-luxury'] .pos-menu-item-hero-card .pos-menu-item-add-btn,
-[data-theme='editorial-luxury'] .pos-menu-item-hero-card .pos-menu-item-add-wide,
-[data-theme='terminal-ops'] .pos-menu-item-hero-card .pos-menu-item-add-btn,
-[data-theme='terminal-ops'] .pos-menu-item-hero-card .pos-menu-item-add-wide {
-    background: rgb(var(--primary));
-    color: white;
-}
-
-[data-theme='midnight-command'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 78% 18%, rgba(128, 114, 255, 0.2), transparent 24%),
-        linear-gradient(135deg, #232326, rgb(var(--primary))),
-        rgb(var(--primary));
-    --pos-theme-card-hero-text: 255 255 255;
-    --pos-theme-card-hero-muted: 226 226 235;
-    --pos-theme-card-action-bg: rgba(255, 255, 255, 0.96);
-    --pos-theme-card-action-text: var(--primary);
-    --pos-theme-card-control-bg: rgba(20, 20, 24, 0.30);
-    --pos-theme-card-badge-bg: rgba(96, 205, 255, 0.88);
-    --pos-theme-card-pattern-opacity: 0.18;
-    --pos-theme-card-art-ring: rgba(128, 114, 255, 0.5);
-}
-
-[data-theme='industrial-ops'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.1), transparent 24%),
-        linear-gradient(135deg, #061326, rgb(var(--primary))),
-        rgb(var(--primary));
-    --pos-theme-card-hero-text: 255 255 255;
-    --pos-theme-card-hero-muted: 219 234 254;
-    --pos-theme-card-action-bg: #ffffff;
-    --pos-theme-card-action-text: var(--primary);
-    --pos-theme-card-control-bg: rgba(2, 6, 23, 0.32);
-    --pos-theme-card-badge-bg: rgba(2, 6, 23, 0.78);
-    --pos-theme-card-pattern-opacity: 0.3;
-    --pos-theme-card-art-ring: rgba(var(--primary), 0.52);
-}
-
-[data-theme='premium-hospitality'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 78% 18%, rgba(var(--primary), 0.2), transparent 24%),
-        linear-gradient(135deg, #101827, #1e293b),
-        #101827;
-    --pos-theme-card-hero-text: 248 250 252;
-    --pos-theme-card-hero-muted: 203 213 225;
-    --pos-theme-card-action-bg: rgb(var(--primary));
-    --pos-theme-card-action-text: 255 255 255;
-    --pos-theme-card-control-bg: rgba(15, 23, 42, 0.55);
-    --pos-theme-card-badge-bg: rgba(var(--primary), 0.86);
-    --pos-theme-card-pattern-opacity: 0.2;
-    --pos-theme-card-art-ring: rgba(var(--primary), 0.48);
-}
-
-[data-theme='neo-brutal'] .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        radial-gradient(circle at 78% 18%, rgba(var(--primary), 0.12), transparent 24%),
-        linear-gradient(135deg, rgba(var(--bg-card), 0.98), rgba(var(--primary), 0.1)),
-        rgb(var(--bg-card));
-    --pos-theme-card-hero-text: var(--text-main);
-    --pos-theme-card-hero-muted: var(--text-muted);
-    --pos-theme-card-action-bg: rgb(var(--primary));
-    --pos-theme-card-action-text: 255 255 255;
-    --pos-theme-card-control-bg: rgba(var(--bg-card), 0.82);
-    --pos-theme-card-badge-bg: rgb(var(--primary));
-    --pos-theme-card-pattern-opacity: 0;
-    --pos-theme-card-art-ring: rgba(var(--primary), 0.26);
-}
-
-.dark [data-theme='aurora-glass'] .pos-menu-item-hero-card,
-[data-theme='aurora-glass'].dark .pos-menu-item-hero-card,
-.dark [data-theme='bento-saas'] .pos-menu-item-hero-card,
-[data-theme='bento-saas'].dark .pos-menu-item-hero-card,
-.dark [data-theme='neo-brutal'] .pos-menu-item-hero-card,
-[data-theme='neo-brutal'].dark .pos-menu-item-hero-card {
-    --pos-theme-card-hero-bg:
-        linear-gradient(135deg, rgba(var(--bg-card), 0.78), rgba(var(--primary), 0.24)),
-        rgba(var(--bg-card), 0.78);
-    --pos-theme-card-hero-text: var(--text-main);
-}
-
-[data-theme='aurora-glass'] .pos-menu-item-artwork,
-[data-theme='bento-saas'] .pos-menu-item-artwork {
+[data-theme='glassline'] .pos-menu-item-artwork,
+[data-theme='material-x'] .pos-menu-item-artwork {
     background: rgba(var(--bg-card), 0.38);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
 }
 
-[data-theme='future-hud'] .pos-menu-item-card,
-[data-theme='editorial-luxury'] .pos-menu-item-card,
-[data-theme='terminal-ops'] .pos-menu-item-card {
+[data-theme='obsidian'] .pos-menu-item-card,
+[data-theme='canvas'] .pos-menu-item-card,
+[data-theme='command'] .pos-menu-item-card {
     --pos-card-selected-bg: rgba(var(--primary), 0.06);
     box-shadow: none;
 }
 
-[data-theme='editorial-luxury'] .pos-menu-item-card {
+[data-theme='canvas'] .pos-menu-item-card {
     border-radius: var(--theme-radius-sm, 4px);
 }
 
-[data-theme='editorial-luxury'] .pos-menu-item-card::after,
-[data-theme='terminal-ops'] .pos-menu-item-card::after {
+[data-theme='canvas'] .pos-menu-item-card::after,
+[data-theme='command'] .pos-menu-item-card::after {
     display: none;
 }
 
-[data-theme='editorial-luxury'] .pos-menu-item-hero-card::before,
-[data-theme='terminal-ops'] .pos-menu-item-hero-card::before {
+[data-theme='canvas'] .pos-menu-item-hero-card::before,
+[data-theme='command'] .pos-menu-item-hero-card::before {
     opacity: 0.35;
 }
 
-[data-theme='editorial-luxury'] .pos-menu-item-glow,
-[data-theme='terminal-ops'] .pos-menu-item-glow {
+[data-theme='canvas'] .pos-menu-item-glow,
+[data-theme='command'] .pos-menu-item-glow {
     display: none;
 }
 
-[data-theme='soft-organic'] .pos-menu-item-card {
+[data-theme='tiles'] .pos-menu-item-card {
     border: 0;
     border-radius: var(--theme-radius-xl, 20px);
 }
 
-[data-theme='neo-brutal'] .pos-menu-item-card {
-    --pos-theme-card-control-bg: rgba(var(--bg-card), 0.85);
-    border: 0;
-}
-
-[data-theme='neo-brutal'] .pos-menu-item-stepper,
-[data-theme='neo-brutal'] .pos-menu-item-artwork {
-    box-shadow:
-        inset 3px 3px 7px var(--dark-shadow),
-        inset -3px -3px 7px var(--light-shadow);
-}
-
-[data-theme='industrial-ops'] .pos-menu-item-card {
+[data-theme='fluent-pro'] .pos-menu-item-card {
     border-radius: 8px;
 }
 
-[data-theme='premium-hospitality'] .pos-menu-item-card[data-selected='true'] {
+[data-theme='touch'] .pos-menu-item-card[data-selected='true'] {
     box-shadow:
-        0 0 0 1px rgba(var(--primary), 0.22),
+        0 0 0 2px rgba(var(--primary), 0.4),
         0 12px 26px rgba(15, 23, 42, 0.16);
 }
 
-.dark [data-theme='terminal-ops'] .pos-menu-item-add-btn,
-.dark [data-theme='terminal-ops'] .pos-menu-item-qty {
+.dark [data-theme='command'] .pos-menu-item-add-btn,
+.dark [data-theme='command'] .pos-menu-item-qty {
     color: rgb(var(--bg-card));
 }
 

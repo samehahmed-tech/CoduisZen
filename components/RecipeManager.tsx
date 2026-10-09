@@ -17,6 +17,39 @@ type SizeRecipe = { sizeId: string | null; yield: number; instructions?: string 
 const UNITS = ['g', 'kg', 'ml', 'l', 'piece', 'unit', 'pack', 'tbsp', 'tsp', 'cup'];
 const TARGET_FOOD_COST = 0.3;
 
+// Unit conversion: costPrice is per ONE stock unit, so a recipe line in a
+// different unit must be converted first (500g of a per-kg item = 0.5, not
+// 500 — the old math charged 50,000 instead of 50). Same-dimension only;
+// pack/tbsp/tsp/cup have no fixed conversion and are flagged, never guessed.
+const UNIT_GROUPS: Array<{ units: Record<string, number> }> = [
+    { units: { mg: 0.001, g: 1, kg: 1000 } },
+    { units: { ml: 1, l: 1000 } },
+    { units: { piece: 1, pc: 1, pcs: 1, unit: 1 } },
+];
+const unitFactor = (fromUnit: unknown, toUnit: unknown): number | null => {
+    const from = String(fromUnit || '').trim().toLowerCase();
+    const to = String(toUnit || '').trim().toLowerCase();
+    if (!from || !to) return null;
+    if (from === to) return 1;
+    for (const group of UNIT_GROUPS) {
+        if (group.units[from] !== undefined && group.units[to] !== undefined) {
+            return group.units[from] / group.units[to];
+        }
+    }
+    return null;
+};
+// Recipe qty → stock-unit qty. Missing units on either side keep the
+// historic 1:1 assumption (legacy rows); explicitly incompatible units
+// return null so the cost is flagged instead of silently exploding.
+const toStockQty = (rowUnit: unknown, stockUnit: unknown, qty: number): number | null => {
+    if (!Number.isFinite(qty)) return null;
+    const from = String(rowUnit || '').trim();
+    const to = String(stockUnit || '').trim();
+    if (!from || !to) return qty;
+    const factor = unitFactor(from, to);
+    return factor === null ? null : qty * factor;
+};
+
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const getIngId = (ing: any) => String(ing?.itemId || ing?.inventoryItemId || '');
 const num = (v: any, fb = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fb; };
@@ -99,12 +132,12 @@ const RecipeManager: React.FC = () => {
         setDirty(false);
     }, [selectedId, sizeId, selected?.id]);
 
-    // ---- cost math ----
+    // ---- cost math (unit-converted: recipe qty → stock-unit qty) ----
     const lines = useMemo(() => bom.map((r) => {
         const inv = invById.get(getIngId(r));
         const unitCost = inv ? num(inv.costPrice) : 0;
-        const qty = num(r.quantity);
-        return { row: r, inv, ext: unitCost * qty };
+        const stockQty = inv ? toStockQty(r.unit, (inv as any).unit, num(r.quantity)) : null;
+        return { row: r, inv, stockQty, ext: stockQty === null ? 0 : unitCost * stockQty };
     }), [bom, invById]);
     const batchCost = lines.reduce((s, l) => s + l.ext, 0);
     const perPortion = yieldQty > 0 ? batchCost / yieldQty : 0;
@@ -124,6 +157,12 @@ const RecipeManager: React.FC = () => {
             if (!l.inv) a.push(tr(`مكون محذوف من المخزون`, `Deleted inventory component`));
             else if (l.inv.isActive === false) a.push(tr(`${l.inv.name} غير نشط`, `${l.inv.name} inactive`));
             if (!(num(l.row.quantity) > 0)) a.push(tr('كمية غير صالحة', 'Invalid quantity'));
+            if (l.inv && l.stockQty === null) {
+                a.push(tr(
+                    `وحدة غير قابلة للتحويل: ${l.row.quantity} ${l.row.unit || '?'} مقابل مخزون بالـ ${(l.inv as any).unit || '?'}`,
+                    `Inconvertible unit: ${l.row.quantity} ${l.row.unit || '?'} vs stock ${(l.inv as any).unit || '?'}`,
+                ));
+            }
         });
         if (bom.length > 0 && sellPrice <= 0) a.push(tr('سعر البيع صفر — راجع سعر الصنف', 'Sell price is zero'));
         if (bom.length > 0 && foodPct > 35) a.push(tr(`تكلفة الطعام مرتفعة (${fmt(foodPct, 1)}%) — المستهدف ≤ 30%`, `High food cost (${fmt(foodPct, 1)}%) — target ≤ 30%`));
@@ -131,13 +170,20 @@ const RecipeManager: React.FC = () => {
     }, [selected, bom, lines, sellPrice, foodPct, tr]);
 
     // ---- list: filter + sort + coverage ----
+    const convertedLineCost = (g: any): number => {
+        const inv = invById.get(getIngId(g));
+        if (!inv) return 0;
+        const stockQty = toStockQty((g as any).unit, (inv as any).unit, num(g.quantity));
+        if (stockQty === null) return 0;
+        return num((inv as any).costPrice) * stockQty;
+    };
     const itemFoodPct = (item: any) => {
         const rec = Array.isArray(item.recipe) && item.recipe.length > 0
             ? (item.recipe[0]?.ingredients ? (item.recipe.find((r: any) => !r.sizeId) || item.recipe[0]) : { ingredients: item.recipe, yield: 1 })
             : null;
         if (!rec || !rec.ingredients?.length) return null;
         const y = num(rec.yield, 1) || 1;
-        const c = rec.ingredients.reduce((s: number, g: any) => s + (costOf.get(getIngId(g)) || 0) * num(g.quantity), 0) / y;
+        const c = rec.ingredients.reduce((s: number, g: any) => s + convertedLineCost(g), 0) / y;
         const p = num(item.price);
         return p > 0 ? (c / p) * 100 : null;
     };
@@ -184,6 +230,20 @@ const RecipeManager: React.FC = () => {
                 return;
             }
         }
+        // Inconvertible units would persist a silently wrong portion cost —
+        // block until the cook picks a convertible unit.
+        const badUnit = bom.find((r) => {
+            const inv = invById.get(getIngId(r));
+            return inv && toStockQty(r.unit, (inv as any).unit, num(r.quantity)) === null;
+        });
+        if (badUnit) {
+            const inv = invById.get(getIngId(badUnit));
+            showToast(tr(
+                `وحدة ${badUnit.unit || '?'} غير قابلة للتحويل لمخزون ${(inv as any)?.name || ''} (${(inv as any)?.unit || '?'}) — غيّر الوحدة قبل الحفظ`,
+                `Unit ${badUnit.unit || '?'} cannot convert to stock ${(inv as any)?.unit || '?'} — change the unit before saving`,
+            ), 'error');
+            return;
+        }
         if (!(yieldQty > 0)) { showToast(RECIPE_ERROR_AR.RECIPE_YIELD_INVALID, 'error'); return; }
         const cat = categories.find((c) => c.items.some((it) => it.id === selectedId));
         if (!cat) return;
@@ -224,7 +284,7 @@ const RecipeManager: React.FC = () => {
         const rec = recipeRowsFor(item, sId);
         if (!rec) return { batch: 0, per: 0, y: 1, n: 0 };
         const y = num(rec.yield, 1) || 1;
-        const batch = (rec.ingredients || []).reduce((s: number, g: any) => s + (costOf.get(getIngId(g)) || 0) * num(g.quantity), 0);
+        const batch = (rec.ingredients || []).reduce((s: number, g: any) => s + convertedLineCost(g), 0);
         return { batch, per: batch / y, y, n: rec.ingredients?.length || 0 };
     };
 
@@ -246,7 +306,10 @@ const RecipeManager: React.FC = () => {
         const { batch, per, y } = costFor(item, sId);
         const price = num((item.sizes?.find((s: any) => s.id === sId)?.price) ?? item.price);
         const rows = (rec?.ingredients || []).map((g: any, idx: number) => {
-            const id = getIngId(g); const c = costOf.get(id) || 0; const ext = c * num(g.quantity);
+            const id = getIngId(g);
+            const inv = invById.get(id);
+            const c = inv ? num((inv as any).costPrice) : 0;
+            const ext = convertedLineCost(g);
             return `<tr><td>${idx + 1}</td><td>${esc(invName(id))}</td><td>${esc(g.quantity)} ${esc(g.unit || '')}</td><td>${fmt(c)} ${esc(currency)}</td><td>${fmt(ext)} ${esc(currency)}</td></tr>`;
         }).join('') || `<tr><td colspan="5">${esc(tr('لا توجد مكونات', 'No ingredients'))}</td></tr>`;
         return `<h2 style="margin:0 0 4px">${esc(isAr ? item.nameAr || item.name : item.name)} ${sId ? `— ${esc(item.sizes?.find((s: any) => s.id === sId)?.name || '')}` : ''}</h2>
@@ -274,8 +337,10 @@ const RecipeManager: React.FC = () => {
         const rec = recipeRowsFor(selected, sizeId);
         const head = [tr('المكون', 'Ingredient'), tr('الكمية', 'Qty'), tr('الوحدة', 'Unit'), tr('سعر الوحدة', 'Unit cost'), tr('الإجمالي', 'Ext. cost')].map(csvCell).join(',');
         const rows = (rec?.ingredients || []).map((g: any) => {
-            const id = getIngId(g); const c = costOf.get(id) || 0;
-            return [invName(id), g.quantity, g.unit || '', fmt(c), fmt(c * num(g.quantity))].map(csvCell).join(',');
+            const id = getIngId(g);
+            const inv = invById.get(id);
+            const c = inv ? num((inv as any).costPrice) : 0;
+            return [invName(id), g.quantity, g.unit || '', fmt(c), fmt(convertedLineCost(g))].map(csvCell).join(',');
         });
         download([head, ...rows].join('\n'), `recipe-${selected.id}-${sizeId || 'base'}.csv`, 'text/csv');
     };
@@ -300,7 +365,7 @@ const RecipeManager: React.FC = () => {
             const body = `<table><thead><tr><th>${tr('الصنف', 'Item')}</th><th>${tr('القسم', 'Cat')}</th><th>${tr('السعر', 'Price')}</th><th>#</th><th>${tr('تكلفة الحصة', 'Portion')}</th><th>%</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.item)}</td><td>${esc(r.cat)}</td><td>${esc(r.price)}</td><td>${r.n}</td><td>${esc(r.per)}</td><td>${esc(r.m)}</td></tr>`).join('')}</tbody></table>`;
             await downloadHtmlPdf(body, {
                 filename: `recipes-group`, title: tr('تقرير الوصفات وهندسة التكلفة', 'Recipes & cost report'),
-                restaurant, logoUrl: settings.receiptLogoUrl || '/logo.png?v=2',
+                restaurant, logoUrl: settings.receiptLogoUrl || '/logo.png?v=6',
                 metaChips: [`${filtered.length} ${tr('صنف', 'items')}`, `${tr('متوسط تكلفة الطعام', 'Avg food cost')}: ${fmt(coverage.avg, 1)}%`],
                 isArabic: isAr, orientation: 'landscape',
             });
@@ -447,12 +512,12 @@ const RecipeManager: React.FC = () => {
 
                                     <div className="space-y-2 max-h-[46vh] overflow-y-auto pe-1">
                                         {lines.length === 0 && <div className="py-12 text-center text-muted"><ChefHat size={40} className="mx-auto mb-2 opacity-40" /><p className="text-[11px] font-black uppercase">{tr('أضف مكونات من السجل', 'Add ingredients from registry')}</p></div>}
-                                        {lines.map(({ row, inv, ext }) => (
+                                        {lines.map(({ row, inv, ext, stockQty }) => (
                                             <div key={row._key} className="flex items-center gap-2 p-3 bg-elevated/50 rounded-2xl border border-transparent hover:border-indigo-500/30">
                                                 <div className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-muted shrink-0"><Package size={16} /></div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[11px] font-black truncate">{inv ? (isAr ? inv.nameAr || inv.name : inv.name) : tr('محذوف', 'Deleted')}</p>
-                                                    <p className="text-[9px] text-muted font-bold">{fmt(inv ? num(inv.costPrice) : 0)} / {inv?.unit || row.unit} → <b className="text-main">{fmt(ext)} {currency}</b>{batchCost > 0 ? ` (${fmt((ext / batchCost) * 100, 0)}%)` : ''}</p>
+                                                    <p className="text-[9px] text-muted font-bold">{fmt(inv ? num(inv.costPrice) : 0)} / {inv?.unit || row.unit}{stockQty !== null && inv && row.unit && String(row.unit).toLowerCase() !== String((inv as any).unit || '').toLowerCase() ? ` · ${row.quantity}${row.unit} = ${fmt(stockQty)}${(inv as any).unit}` : ''}{stockQty === null && inv ? ` · ${tr('وحدة غير قابلة للتحويل', 'inconvertible unit')}` : ''} → <b className="text-main">{fmt(ext)} {currency}</b>{batchCost > 0 ? ` (${fmt((ext / batchCost) * 100, 0)}%)` : ''}</p>
                                                 </div>
                                                 <input type="number" min={0.001} step={0.001} value={row.quantity}
                                                     onChange={(e) => setQty(row._key, e.target.value === '' ? 0 : e.target.valueAsNumber)}

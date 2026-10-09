@@ -26,13 +26,14 @@ type WastageEntry = {
 
 type WastageTab = 'log' | 'record' | 'analytics';
 
-const REASONS = ['Expired', 'Damaged', 'Spoiled', 'Spillage', 'Return', 'Quality Fail', 'Other'];
+// NOTE: supplier returns have their own flow (SupplierReturnModal) and must
+// not be logged here — a 'Return' reason would double-count vendor credits.
+const REASONS = ['Expired', 'Damaged', 'Spoiled', 'Spillage', 'Quality Fail', 'Other'];
 const reasonAr: Record<string, string> = {
     Expired: 'منتهي الصلاحية',
     Damaged: 'تالف',
     Spoiled: 'فساد',
     Spillage: 'انسكاب',
-    Return: 'مرتجع',
     'Quality Fail': 'رفض جودة',
     Other: 'أخرى',
 };
@@ -84,8 +85,9 @@ const WastageManager: React.FC = () => {
         Number(getWarehouseRows(item).find((row: any) => row.warehouseId === warehouseId)?.quantity || 0);
     const itemsForSelectedWarehouse = useMemo(() => {
         if (!form.warehouseId) return activeInventory;
-        const linkedItems = activeInventory.filter(item => getWarehouseRows(item).some((row: any) => row.warehouseId === form.warehouseId));
-        return linkedItems.length > 0 ? linkedItems : activeInventory;
+        // No silent fallback to the full catalog: recording against a
+        // warehouse that never stocked the item hides data errors.
+        return activeInventory.filter(item => getWarehouseRows(item).some((row: any) => row.warehouseId === form.warehouseId));
     }, [activeInventory, form.warehouseId]);
     const selectedItem = activeInventory.find(item => item.id === form.itemId);
     const currentStock = selectedItem && form.warehouseId
@@ -131,7 +133,9 @@ const WastageManager: React.FC = () => {
             setForm({ itemId: '', warehouseId: '', quantity: '1', reason: 'Expired', notes: '' });
             await useInventoryStore.getState().fetchInventory();
             await load();
-            success(tr('Wastage approval requested', 'تم إرسال طلب اعتماد الهالك'));
+            // Honest copy: there is no approval queue — recording deducts
+            // stock immediately.
+            success(tr('Wastage recorded and deducted from stock', 'تم تسجيل الهالك وخصمه من المخزون'));
         } catch (e: any) { showError(e.message); }
     };
 
@@ -162,7 +166,9 @@ const WastageManager: React.FC = () => {
                 <div className="flex gap-2">
                     <ExportButton data={entries} columns={[
                         { key: 'itemName', label: tr('Item', 'الصنف') },
+                        { key: 'warehouseName', label: tr('Warehouse', 'المخزن') },
                         { key: 'quantity', label: tr('Quantity', 'الكمية') },
+                        { key: 'unit', label: tr('Unit', 'الوحدة') },
                         { key: 'reason', label: tr('Reason', 'السبب') },
                         { key: 'notes', label: tr('Notes', 'ملاحظات') },
                         { key: 'performedBy', label: tr('Performed By', 'المسؤول') },

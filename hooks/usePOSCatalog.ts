@@ -42,16 +42,16 @@ export function usePOSCatalog({
     activeOrderType,
     activePriceListId,
     branchId,
-    categories,
+    categories = [],
     itemFilter,
     itemSort,
-    itemUsageMap,
+    itemUsageMap = {},
     lang,
     searchQuery,
-    safeActiveCart,
+    safeActiveCart = [],
     platformMarkup,
 }: UsePOSCatalogParams) {
-    const deferredSearchQuery = useDeferredValue(searchQuery);
+    const deferredSearchQuery = useDeferredValue(searchQuery || '');
 
     const currentCategories = useMemo(
         () => (categories || []).filter((category) => category.isActive !== false),
@@ -59,7 +59,7 @@ export function usePOSCatalog({
     );
 
     const categoryHotkeys = useMemo(
-        () => ['all', ...currentCategories.map((category) => category.id)],
+        () => ['all', ...(currentCategories || []).map((category) => category.id)],
         [currentCategories],
     );
 
@@ -224,10 +224,11 @@ export function usePOSCatalog({
     }, [itemUsageMap, pricedItems]);
 
     const upsellSuggestions = useMemo(() => {
-        if (safeActiveCart.length === 0) return [];
+        const cart = safeActiveCart || [];
+        if (cart.length === 0) return [];
 
-        const inCart = new Set(safeActiveCart.map((item) => item.id));
-        const anchorItem = safeActiveCart[safeActiveCart.length - 1];
+        const inCart = new Set(cart.map((item) => item.id));
+        const anchorItem = cart[cart.length - 1];
 
         const sameCategoryCandidates = pricedItems.filter((item) =>
             item.categoryId === anchorItem.categoryId

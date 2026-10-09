@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import * as customerController from '../controllers/customerController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
-const posAuth = requireRoles(...POS_FLOOR_ROLES, 'CALL_CENTER', 'CALL_CENTER_MANAGER');
+const posAuth = requireRoleOrPermission(
+    [...POS_FLOOR_ROLES, 'CALL_CENTER', 'CALL_CENTER_MANAGER'],
+    ['OP_MANAGE_CUSTOMERS'],
+);
 
 router.get('/', posAuth, enforceBranch, customerController.getAllCustomers);
 router.get('/phone/:phone', posAuth, enforceBranch, customerController.getCustomerByPhone);

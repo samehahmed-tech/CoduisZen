@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { signTrackToken, verifyTrackToken } from '../utils/trackToken';
 import { db } from '../db';
 import { getIO } from '../socket';
 import { transitionOrderStatus } from '../services/orderLifecycleService';
@@ -266,14 +267,19 @@ router.post('/orders/:orderId/handover', async (req, res) => {
 });
 
 /**
- * Public customer order tracking (no auth — link-only). Returns a privacy-safe
- * subset: no phone, no address, no payment internals. Order ids are
- * unguessable (uuid / CC-xxxxxx), which is the access control.
+ * Public customer order tracking (no login — signed link). Returns a
+ * privacy-safe subset: no phone, no address, no payment internals. Order ids
+ * are only semi-unguessable (time-based), so links carry an HMAC token
+ * (?t=) signed with the server JWT secret. Legacy token-less links are
+ * rejected — resend the tracking link from the order.
  */
 router.get('/track/:id', async (req, res) => {
     try {
         const orderId = getParam((req.params as any).id);
         if (!orderId) return res.status(400).json({ ok: false, code: 'ORDER_ID_REQUIRED' });
+        if (!verifyTrackToken(orderId, (req.query as any)?.t)) {
+            return res.status(403).json({ ok: false, code: 'TRACK_TOKEN_REQUIRED' });
+        }
         const [order] = await db.select({
             id: orders.id,
             orderNumber: orders.orderNumber,

@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import * as platformsController from '../controllers/platformsController';
-import { requireRoles } from '../middleware/auth';
+import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
 
+const platformAdmin = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
+    ['CFG_MANAGE_PLATFORMS'],
+);
+
 router.get('/', platformsController.getPlatforms);
-router.post('/', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'), platformsController.createPlatform);
-router.put('/:id', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'), platformsController.updatePlatform);
+router.post('/', platformAdmin, platformsController.createPlatform);
+router.put('/:id', platformAdmin, platformsController.updatePlatform);
 router.delete('/:id', requireRoles('SUPER_ADMIN', 'OWNER'), platformsController.deletePlatform);
 
 export default router;

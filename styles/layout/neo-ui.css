@@ -48,18 +48,16 @@
 .workspace-breadcrumbs {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.875rem 1rem;
-    border-radius: calc(var(--theme-radius-lg, 20px) - 2px);
-    border: 1px solid rgba(var(--border-color), 0.10);
-    background: linear-gradient(180deg, rgba(var(--bg-card), 0.85), rgba(var(--bg-elevated), 0.62));
-    backdrop-filter: blur(calc(var(--theme-blur, 16px) * 0.7));
-    -webkit-backdrop-filter: blur(calc(var(--theme-blur, 16px) * 0.7));
-    box-shadow: 
-        0 18px 36px rgba(15, 23, 42, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transition: box-shadow 200ms ease, border-color 200ms ease;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid rgba(var(--border-color), 0.10);
+    border-radius: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
 }
 
 .workspace-breadcrumbs-rtl {

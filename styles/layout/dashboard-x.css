@@ -1,0 +1,2166 @@
+﻿/* Dashboard X — command-center skin. Same data, cinematic motion.
+   Master switch: settings.motionEffects (default ON) -> html[data-motion].
+   data-motion="off" kills animation/transition app-wide (see bottom). */
+
+.dx { position: relative; }
+.dx::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(900px 480px at 85% -10%, rgba(var(--primary), 0.10), transparent 60%),
+    radial-gradient(800px 520px at 5% 25%, var(--theme-glow, rgba(var(--primary), 0.08)), transparent 62%);
+}
+.dx > * { position: relative; z-index: 1; }
+
+/* live ticker strip (same totals, pure visual) */
+.dx-ticker { overflow: hidden; white-space: nowrap; border-bottom: 1px solid rgb(var(--border-color)); background: rgba(var(--bg-card), 0.55); backdrop-filter: blur(14px); font-size: 11px; font-weight: 800; color: rgb(var(--text-muted)); padding: 7px 0; }
+.dx-ticker .in { display: inline-block; animation: dx-mq 26s linear infinite; }
+.dx-ticker b { color: rgb(var(--text-main)); }
+@keyframes dx-mq { from { transform: translateX(0); } to { transform: translateX(50%); } }
+html[dir="ltr"] .dx-ticker .in { animation-name: dx-mql; }
+@keyframes dx-mql { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* MetricCard cinematic upgrade (scoped, keeps layout) */
+.dx-metric {
+  min-height: 112px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.085), rgba(255,255,255,0.022) 48%, rgba(255,255,255,0.035));
+  backdrop-filter: blur(20px) saturate(135%);
+  font-family: "Cairo", system-ui, sans-serif;
+}
+.dx-metric { overflow: hidden; isolation: isolate; }
+.dx-metric::before {
+  content: ""; position: absolute; width: 190px; height: 190px; right: -95px; top: -115px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(var(--primary), 0.20), transparent 68%);
+  pointer-events: none; transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.dx-metric::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%);
+  transform: translateX(-130%); transition: transform 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+.dx-metric:hover { transform: translateY(-4px) scale(1.008); border-color: rgba(var(--primary), 0.55); box-shadow: 0 22px 60px rgba(0,0,0,0.30), 0 0 44px var(--theme-glow, rgba(var(--primary), 0.18)); }
+.dx-metric:hover::after { transform: translateX(130%); }
+.dx-metric:hover::before { transform: scale(1.35); }
+/* MetricCard restyle — theme-tinted icon glow, accent top edge, bolder type. */
+.dx-metric { border-radius: 1.4rem; border-top: 2px solid rgba(var(--primary), 0.45); }
+.dx-metric h2 { font-size: 1.7rem; font-weight: 900; letter-spacing: -0.04em; text-shadow: 0 0 30px var(--theme-glow, rgba(var(--primary), 0.15)); }
+.dx-metric div[class*="rounded-2xl"] { box-shadow: 0 8px 22px rgba(var(--primary), 0.22), inset 0 1px rgba(255,255,255,0.25); }
+.dx-metric div[class*="rounded-2xl"] svg { filter: drop-shadow(0 0 7px currentColor); }
+/* per-card orb tint variety */
+section:has(> .dx-metric) > .dx-metric:nth-child(2)::before { background: radial-gradient(circle, rgba(45,212,191,0.20), transparent 68%); }
+section:has(> .dx-metric) > .dx-metric:nth-child(3)::before { background: radial-gradient(circle, rgba(129,140,248,0.20), transparent 68%); }
+section:has(> .dx-metric) > .dx-metric:nth-child(4)::before { background: radial-gradient(circle, rgba(52,211,153,0.20), transparent 68%); }
+section:has(> .dx-metric) > .dx-metric:nth-child(n+5)::before { background: radial-gradient(circle, rgba(251,191,36,0.16), transparent 68%); }
+
+/* X-BOLD layer — approved-file effects, bound to theme variables (no fixed dark colors). */
+.dx { font-family: "Cairo", system-ui, sans-serif; }
+.dx-metric {
+  --mx: 50%;
+  --my: 0%;
+  background:
+    radial-gradient(520px circle at var(--mx) var(--my), rgba(var(--primary), 0.10), transparent 42%),
+    linear-gradient(145deg, rgba(255,255,255,0.085), rgba(255,255,255,0.022) 48%, rgba(255,255,255,0.035));
+}
+.dx-metric h2, .dx-metric h1 { font-weight: 900; letter-spacing: -0.04em; }
+.dx-ticker::after {
+  content: ""; position: absolute; left: -30%; right: -30%; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--primary), 0.45), transparent);
+  box-shadow: 0 0 18px rgba(var(--primary), 0.3);
+  animation: dx-scan 6s ease-in-out infinite; opacity: 0.65; pointer-events: none;
+}
+@keyframes dx-scan { 0%, 100% { top: 15%; } 50% { top: 85%; } }
+.dx .dashboard-section-title { letter-spacing: -0.015em; }
+@media (max-width: 760px) {
+  .dx-metric h2 { font-size: 1.35rem; }
+}
+
+/* Mobile hero v2 — media-first composition. The image is the canvas; the
+   greeting floats above a bottom information dock instead of three stacked
+   desktop cards. */
+@media (max-width: 760px) {
+  .dx2-hero {
+    display: block !important;
+    position: relative !important;
+    height: 332px !important;
+    min-height: 332px !important;
+    padding: 0 !important;
+    border-radius: 24px !important;
+    overflow: hidden !important;
+    background: #17202c !important;
+    isolation: isolate;
+  }
+  .dx2-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(7,15,25,.12) 0%, rgba(7,15,25,.04) 35%, rgba(7,15,25,.74) 100%);
+  }
+  .dx2-photo {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 0 !important;
+    height: auto !important;
+    width: auto !important;
+    grid-area: auto !important;
+  }
+  .dx2-photo img { object-position: center !important; filter: saturate(1.08) contrast(1.04) !important; }
+  .dx2-greet, .dx2-today, .dx2-rev {
+    position: absolute !important;
+    z-index: 2 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(255,255,255,.36) !important;
+    background: rgba(9,18,29,.58) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,.22), inset 0 1px rgba(255,255,255,.22) !important;
+    backdrop-filter: blur(16px) saturate(135%);
+    color: #fff !important;
+  }
+  .dx2-greet {
+    inset: 12px 12px auto !important;
+    display: block !important;
+    padding: 13px 15px !important;
+    background: linear-gradient(90deg, rgba(9,18,29,.16), rgba(9,18,29,.72)) !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+  .dx2-greet .dx2-hello,
+  .dx2-greet .dx2-wish { width: auto !important; min-width: 0 !important; color: #fff !important; text-align: right !important; }
+  .dx2-greet .dx2-hello { font-size: clamp(1.05rem, 5vw, 1.35rem) !important; line-height: 1.25 !important; }
+  .dx2-greet .dx2-wish { margin-top: 4px !important; font-size: 10px !important; color: rgba(255,255,255,.74) !important; }
+  .dx2-greet .dx2-clock { display: none !important; }
+  .dx2-today {
+    inset: auto auto 12px 12px !important;
+    width: 43% !important;
+    height: 104px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    padding: 9px !important;
+    background: rgba(8,17,28,.68) !important;
+  }
+  .dx2-today .dx2-label { color: rgba(255,255,255,.78) !important; font-size: 10px !important; margin: 0 0 3px !important; }
+  .dx2-minirings { gap: 4px !important; }
+  .dx2-miniring { transform: scale(.72) !important; transform-origin: center !important; }
+  .dx2-rev {
+    inset: auto 12px 12px auto !important;
+    width: 53% !important;
+    height: 104px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 12px 14px !important;
+    background: linear-gradient(145deg, rgba(9,18,29,.82), rgba(16,35,51,.64)) !important;
+  }
+  .dx2-rev .dx2-label { color: rgba(255,255,255,.78) !important; font-size: 10px !important; margin: 0 !important; }
+  .dx2-revnum { color: #fff !important; font-size: clamp(1.7rem, 8vw, 2.35rem) !important; line-height: 1 !important; margin: 3px 0 !important; }
+  .dx2-rev .dx2-chip { font-size: 9px !important; padding: 3px 7px !important; }
+  .dx2-rev .dx2-btn { display: none !important; }
+}
+@media (max-width: 420px) {
+  .dx2-hero { height: 318px !important; min-height: 318px !important; }
+  .dx2-greet { inset: 10px 10px auto !important; padding: 11px 12px !important; }
+  .dx2-today { inset: auto auto 10px 10px !important; height: 98px !important; width: 44% !important; }
+  .dx2-rev { inset: auto 10px 10px auto !important; height: 98px !important; width: 52% !important; padding-inline: 11px !important; }
+}
+.dx .dashboard-section-title { display: flex; align-items: center; gap: 8px; }
+.dx .dashboard-section-title::after { content: ""; width: 4px; height: 18px; border-radius: 99px; background: linear-gradient(180deg, rgb(var(--warning)), rgb(var(--primary))); box-shadow: 0 0 12px rgba(255,202,75,0.35); }
+
+/* Motion master switch — user setting, default ON. Off = calm static UI. */
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
+  animation: none !important; transition: none !important;
+}
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
+  animation: none !important; transition: none !important;
+}
+
+/* HERO — revenue pulse + refunds radar */
+.dx-hero-revenue, .dx-hero-refunds {
+  position: relative; overflow: hidden; isolation: isolate;
+  border-radius: 1.5rem; border: 1px solid rgb(var(--border-color));
+  padding: 1.5rem;
+  background:
+    radial-gradient(600px 260px at 72% 18%, rgba(var(--primary), 0.12), transparent 62%),
+    radial-gradient(450px 260px at 8% 100%, var(--theme-glow, rgba(var(--primary), 0.08)), transparent 65%),
+    rgb(var(--bg-card));
+  box-shadow: 0 16px 55px rgba(0,0,0,0.18);
+  transition: transform 0.45s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, box-shadow 0.45s;
+}
+.dx-hero-revenue:hover, .dx-hero-refunds:hover {
+  transform: translateY(-4px);
+  border-color: rgba(var(--primary), 0.45);
+  box-shadow: 0 26px 70px rgba(0,0,0,0.30), 0 0 44px var(--theme-glow, rgba(var(--primary), 0.16));
+}
+.dx-hero-label { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--text-muted)); }
+.dx-hero-num { font-size: clamp(2.6rem, 5vw, 4rem); font-weight: 900; letter-spacing: -0.04em; line-height: 1.05; margin-top: 0.25rem; font-variant-numeric: tabular-nums; text-shadow: 0 0 34px var(--theme-glow, rgba(var(--primary), 0.18)); }
+.dx-hero-num small { font-size: 0.9rem; color: rgb(var(--text-muted)); font-weight: 800; letter-spacing: 0; margin-inline-start: 0.4rem; }
+.dx-hero-dlt { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 900; padding: 5px 12px; border-radius: 999px; margin-top: 0.6rem; }
+.dx-hero-dlt.up { background: rgba(16,185,129,0.12); color: #10b981; }
+.dx-hero-dlt.dn { background: rgba(244,63,94,0.12); color: #f43f5e; }
+.dx-hero-live { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 900; letter-spacing: 0.18em; color: #10b981; border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.08); border-radius: 999px; padding: 6px 12px; }
+.dx-rings { display: flex; gap: 18px; justify-content: space-around; margin: 0.8rem 0 0.4rem; flex-wrap: wrap; }
+.dx-ring { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: transform 0.3s; }
+.dx-ring:hover { transform: scale(1.07); }
+.dx-ring span { font-size: 11px; color: rgb(var(--text-muted)); font-weight: 800; margin-top: 4px; }
+.dx-ring b { font-size: 12px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.dx-hero-note { font-size: 11px; font-weight: 700; color: rgb(var(--text-muted)); text-align: center; margin-top: 0.3rem; }
+.dx-cta { display: block; text-align: center; margin-top: 0.8rem; font-size: 12px; font-weight: 900; color: #fff; background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), 0.75)); border: 0; cursor: pointer; border-radius: 0.8rem; padding: 0.7rem; transition: transform 0.2s, filter 0.2s, box-shadow 0.3s; box-shadow: 0 8px 24px rgba(var(--primary), 0.25); width: 100%; }
+.dx-cta:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(var(--primary), 0.35); }
+.dx-cta:active { transform: scale(0.98); }
+@media (max-width: 760px) { .dx-hero-num { font-size: 2.4rem; } }
+
+/* HERO v3 — photo command backdrop + floating glass (dribbble-inspired) */
+.dx-hero { position: relative; overflow: hidden; border-radius: 1.5rem; border: 1px solid rgb(var(--border-color)); box-shadow: 0 20px 60px rgba(0,0,0,0.22); }
+.dx-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: dx-hero-drift 24s ease-in-out infinite alternate; }
+@keyframes dx-hero-drift { from { transform: scale(1.02); } to { transform: scale(1.12) translate(-1.5%, 1%); } }
+.dx-hero-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(var(--bg-app), 0.55) 0%, rgba(var(--bg-app), 0.72) 55%, rgba(var(--bg-app), 0.88) 100%); }
+.dx-hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr; gap: 1rem; padding: 1.5rem; }
+@media (min-width: 1024px) { .dx-hero-grid { grid-template-columns: 1.4fr 1fr; padding: 2rem; } }
+.dx-hero-eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+.dx-hero-num { font-size: clamp(2.6rem, 5vw, 4.2rem); font-weight: 900; letter-spacing: -0.04em; line-height: 1.05; color: #fff; text-shadow: 0 4px 24px rgba(0,0,0,0.55); font-variant-numeric: tabular-nums; margin-top: 0.25rem; }
+.dx-hero-num small { font-size: 0.95rem; font-weight: 800; opacity: 0.85; margin-inline-start: 0.4rem; }
+.dx-hero-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin-top: 0.7rem; }
+.dx-hero-dlt { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 900; padding: 6px 13px; border-radius: 999px; backdrop-filter: blur(8px); }
+.dx-hero-dlt.up { background: rgba(16,185,129,0.22); color: #d1fae5; border: 1px solid rgba(16,185,129,0.4); }
+.dx-hero-dlt.dn { background: rgba(244,63,94,0.22); color: #ffe4e6; border: 1px solid rgba(244,63,94,0.4); }
+.dx-hero-btn { font-size: 12px; font-weight: 900; color: #fff; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(8px); border-radius: 999px; padding: 7px 16px; cursor: pointer; transition: transform 0.2s, background 0.2s; }
+.dx-hero-btn:hover { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
+.dx-hero-glass { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); backdrop-filter: blur(20px) saturate(140%); border-radius: 1.25rem; padding: 1.1rem 1.2rem; color: #fff; box-shadow: 0 16px 44px rgba(0,0,0,0.3); }
+.dx-hero-glass .dx-hero-label { color: rgba(255,255,255,0.75); }
+.dx-hero-glass .dx-ring span { color: rgba(255,255,255,0.75); }
+.dx-hero-glass .dx-ring b, .dx-hero-glass .dx-ring text { color: #fff; }
+.dx-hero-glass .dx-cta { margin-top: 0.7rem; }
+.dx-hero-status { position: relative; z-index: 1; margin: 0 1.5rem 1.4rem; background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(14px); border-radius: 1rem; padding: 0.8rem 1rem; }
+@media (min-width: 1024px) { .dx-hero-status { margin: 0 2rem 1.8rem; } }
+.dx-seg { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: rgba(150,150,150,0.20); box-shadow: inset 0 1px 3px rgba(0,0,0,0.12); }
+.dx-seg span { display: block; height: 100%; transition: width 0.8s cubic-bezier(0.16,1,0.3,1); }
+.dx-seg span + span { border-inline-start: 2px solid rgba(var(--bg-card), 0.9); }
+.dx-seg-labels { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin-top: 0.55rem; font-size: 11.5px; font-weight: 800; color: rgb(var(--text-main)); }
+
+/* HERO v3 fixes: darker legibility shade, responsive min-height */
+.dx-hero { min-height: 340px; }
+@media (min-width: 1024px) { .dx-hero { min-height: 380px; } }
+.dx-hero-shade {
+  background:
+    radial-gradient(700px 300px at 75% 18%, rgba(var(--primary), 0.30), transparent 60%),
+    linear-gradient(180deg, rgba(4,7,5,0.68) 0%, rgba(4,7,5,0.82) 55%, rgba(2,4,3,0.94) 100%);
+}
+/* Hero is always dark command — text forced light in every theme. */
+.dx-hero-label { color: rgba(255,255,255,0.78); }
+.dx-hero-num { color: #fff; }
+.dx-hero-note { color: rgba(255,255,255,0.72); }
+/* PANELS — one glow language for every dashboard section card */
+.dx div[class*="rounded-[2rem]"] { position: relative; transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, box-shadow 0.35s; }
+.dx div[class*="rounded-[2rem]"]:hover { transform: translateY(-3px); border-color: rgba(var(--primary), 0.4); box-shadow: 0 22px 55px rgba(0,0,0,0.22), 0 0 38px var(--theme-glow, rgba(var(--primary), 0.14)); }
+/* Briefing banner re-themed (was fixed indigo) */
+.dx div[class*="from-indigo-500/15"] { background: linear-gradient(to right, rgba(var(--primary), 0.12), var(--theme-glow, rgba(var(--primary), 0.08)), rgba(var(--primary), 0.12)); border-color: rgba(var(--primary), 0.3); }
+
+/* DX2 — posted-design system, theme-variable bound */
+.dx2-hero { display: grid; grid-template-columns: 1.05fr 1fr 1.25fr 1fr; gap: 1rem; }
+@media (max-width: 1100px) { .dx2-hero { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .dx2-hero { grid-template-columns: 1fr; } }
+.dx2-greet, .dx2-today, .dx2-rev {
+  background: rgb(var(--bg-card)); border: 1px solid rgb(var(--border-color));
+  border-radius: 1.5rem; padding: 1.25rem 1.35rem;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.10);
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, box-shadow 0.35s;
+  min-height: 210px; display: flex; flex-direction: column; justify-content: center;
+}
+.dx2-greet:hover, .dx2-today:hover, .dx2-rev:hover { transform: translateY(-4px); border-color: rgba(var(--primary), 0.45); box-shadow: 0 22px 55px rgba(0,0,0,0.16), 0 0 38px var(--theme-glow, rgba(var(--primary), 0.14)); }
+.dx2-hello { font-size: 1.15rem; font-weight: 900; }
+.dx2-wish { font-size: 12px; font-weight: 700; color: rgb(var(--text-muted)); margin-top: 2px; }
+.dx2-clock { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; font-weight: 800; color: rgb(var(--text-muted)); }
+.dx2-label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--text-muted)); }
+.dx2-minirings { display: flex; gap: 18px; margin-top: 10px; }
+.dx2-miniring { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dx2-miniring span { font-size: 11px; color: rgb(var(--text-muted)); font-weight: 800; }
+.dx2-miniring b { font-size: 12px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.dx2-photo { border-radius: 1.5rem; overflow: hidden; min-height: 210px; border: 1px solid rgb(var(--border-color)); box-shadow: 0 14px 40px rgba(0,0,0,0.12); }
+.dx2-photo img { width: 100%; height: 100%; min-height: 210px; object-fit: cover; display: block; transition: transform 0.8s cubic-bezier(0.16,1,0.3,1); }
+.dx2-photo:hover img { transform: scale(1.05); }
+.dx2-revnum { font-size: clamp(1.8rem, 2.6vw, 2.5rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.dx2-revnum small { font-size: 0.85rem; color: rgb(var(--text-muted)); font-weight: 800; margin-inline-start: 4px; }
+.dx2-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 900; padding: 4px 11px; border-radius: 999px; margin-top: 8px; width: fit-content; }
+.dx2-chip.up { background: rgba(16,185,129,0.12); color: #10b981; }
+.dx2-chip.dn { background: rgba(244,63,94,0.12); color: #f43f5e; }
+.dx2-btn { margin-top: 10px; font-size: 12px; font-weight: 900; color: #fff; background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), 0.75)); border: 0; cursor: pointer; border-radius: 0.8rem; padding: 0.65rem 1rem; transition: transform 0.2s, filter 0.2s; box-shadow: 0 8px 22px rgba(var(--primary), 0.28); width: fit-content; }
+.dx2-btn:hover { filter: brightness(1.08); transform: translateY(-2px); }
+.dx2-status { display: flex; align-items: center; gap: 1rem; background: linear-gradient(160deg, rgba(var(--primary), 0.07), rgb(var(--bg-card)) 60%); border: 1px solid rgb(var(--border-color)); border-radius: 1.1rem; padding: 0.8rem 1.1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.08); backdrop-filter: blur(12px); flex-wrap: wrap; transition: border-color 0.3s, box-shadow 0.3s; }
+.dx2-status:hover { border-color: rgba(var(--primary), 0.4); box-shadow: 0 14px 36px rgba(0,0,0,0.12), 0 0 30px var(--theme-glow, rgba(var(--primary), 0.12)); }
+.dx2-allbtn { font-size: 11.5px; font-weight: 900; color: #fff; background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), 0.78)); border: 0; border-radius: 0.8rem; padding: 0.6rem 1.1rem; cursor: pointer; white-space: nowrap; transition: transform 0.2s, filter 0.2s, box-shadow 0.3s; box-shadow: 0 6px 18px rgba(var(--primary), 0.30); }
+.dx2-allbtn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 10px 24px rgba(var(--primary), 0.4); }
+.dx2-allbtn:active { transform: scale(0.97); }
+.dx2-segwrap { flex: 1; min-width: 220px; }
+.dx2-refchip { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 900; color: #fff; background: linear-gradient(135deg, #f43f5e, #e11d48); border: 0; border-radius: 999px; padding: 0.55rem 1rem; cursor: pointer; white-space: nowrap; transition: transform 0.2s, filter 0.2s, box-shadow 0.3s; box-shadow: 0 6px 18px rgba(244,63,94,0.30); }
+.dx2-refchip:hover { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 10px 24px rgba(244,63,94,0.4); }
+.dx2-refchip:active { transform: scale(0.97); }
+.dx2-refchip b { background: #f43f5e; color: #fff; border-radius: 999px; min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+.dx2-panel { background: rgb(var(--bg-card)); border: 1px solid rgb(var(--border-color)); border-radius: 1.5rem; padding: 1.25rem 1.35rem; box-shadow: 0 14px 40px rgba(0,0,0,0.08); transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, box-shadow 0.35s; }
+.dx2-panel:hover { transform: translateY(-3px); border-color: rgba(var(--primary), 0.4); box-shadow: 0 20px 50px rgba(0,0,0,0.14), 0 0 34px var(--theme-glow, rgba(var(--primary), 0.12)); }
+.dx2-panelhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.dx2-panelhead h3 { font-size: 14px; font-weight: 900; }
+.dx2-link { font-size: 11px; font-weight: 900; color: rgb(var(--primary)); background: none; border: 0; cursor: pointer; }
+.dx2-link:hover { text-decoration: underline; }
+.dx2-orders { display: flex; flex-direction: column; }
+.dx2-order { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px dashed rgba(150,150,150,0.25); font-size: 12px; }
+.dx2-order:last-child { border-bottom: 0; }
+.dx2-oid { font-weight: 900; }
+.dx2-ototal { margin-inline-start: auto; font-weight: 900; font-variant-numeric: tabular-nums; }
+.dx2-order time { color: rgb(var(--text-muted)); font-size: 10.5px; font-weight: 700; }
+.dx2-empty { font-size: 12px; font-weight: 700; color: rgb(var(--text-muted)); padding: 12px 0; }
+.dx2-st { font-size: 9.5px; font-weight: 900; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.dx2-st-ok { background: rgba(16,185,129,0.14); color: #10b981; }
+.dx2-st-warn { background: rgba(245,158,11,0.16); color: #d97706; }
+.dx2-st-cancel { background: rgba(244,63,94,0.14); color: #f43f5e; }
+.dx2-st-info { background: rgba(99,102,241,0.14); color: #6366f1; }
+.dx2-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 6px; }
+@media (max-width: 640px) { .dx2-quick { grid-template-columns: repeat(4, 1fr); } }
+.dx2-tile { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 10px; font-weight: 900; color: rgb(var(--text-main)); background: rgba(150,150,150,0.07); border: 1px solid transparent; border-radius: 1rem; padding: 11px 4px; cursor: pointer; transition: transform 0.2s, border-color 0.2s, background 0.2s; }
+.dx2-tile:hover { transform: translateY(-3px) scale(1.03); border-color: rgba(var(--primary), 0.4); background: rgba(var(--primary), 0.08); }
+.dx2-tile:active { transform: scale(0.95); }
+.dx2-tileic { width: 38px; height: 38px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD V4 — unified command center surface
+   Visual-only layer: all values, routes, permissions and existing themes stay
+   intact. The surface is intentionally token-driven so every theme can carry
+   the same information architecture without inheriting a fixed palette.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx {
+  --dash-radius: clamp(16px, 1.5vw, 24px);
+  --dash-gap: clamp(14px, 1.5vw, 24px);
+  background:
+    radial-gradient(900px 520px at 100% 0%, rgba(var(--primary), .08), transparent 68%),
+    radial-gradient(760px 460px at 0% 36%, rgba(var(--accent), .055), transparent 65%),
+    rgb(var(--bg-app));
+}
+.dx::before {
+  opacity: .7;
+  background-image:
+    linear-gradient(rgba(var(--border-color), .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--border-color), .035) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+.dx > .relative.z-10 {
+  width: min(100%, 1920px);
+  padding-inline: clamp(14px, 2.5vw, 42px);
+  padding-block: clamp(18px, 2.4vw, 38px);
+  gap: var(--dash-gap);
+}
+.dx > .relative.z-10 > header {
+  padding: clamp(18px, 2vw, 28px);
+  border: 1px solid rgba(var(--border-color), .22);
+  border-radius: var(--dash-radius);
+  background: linear-gradient(135deg, rgba(var(--bg-card), .92), rgba(var(--bg-elevated), .64));
+  box-shadow: 0 18px 44px rgba(0,0,0,.08), inset 0 1px rgba(255,255,255,.06);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+.dx > .relative.z-10 > header > div:first-child > div:first-child {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(var(--primary), .2);
+}
+.dx > .relative.z-10 > header h1 {
+  font-size: clamp(1.4rem, 2.4vw, 2.25rem);
+  letter-spacing: -.045em;
+}
+.dx > .relative.z-10 > header .bg-card\/60 {
+  border-color: rgba(var(--border-color), .22);
+  background: rgba(var(--bg-elevated), .58);
+  border-radius: 14px;
+}
+.dx > .relative.z-10 > header .bg-card\/60 button[aria-pressed="true"] {
+  background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), .78));
+  box-shadow: 0 8px 20px rgba(var(--primary), .26);
+}
+.dx-ticker {
+  position: relative;
+  border: 1px solid rgba(var(--border-color), .16);
+  border-inline: 0;
+  color: rgb(var(--text-muted));
+  background: rgba(var(--bg-card), .48);
+  letter-spacing: .01em;
+}
+.dx-ticker b { color: rgb(var(--primary)); }
+
+/* The four-part hero is the visual anchor: calm surfaces, one image, one CTA. */
+.dx2-hero {
+  gap: var(--dash-gap);
+  grid-template-columns: minmax(180px, .9fr) minmax(220px, 1.08fr) minmax(250px, 1.45fr) minmax(200px, .95fr);
+}
+.dx2-greet, .dx2-today, .dx2-rev, .dx2-photo {
+  min-height: clamp(190px, 16vw, 238px);
+  border-radius: var(--dash-radius);
+  border-color: rgba(var(--border-color), .22);
+  box-shadow: 0 16px 42px rgba(0,0,0,.09), inset 0 1px rgba(255,255,255,.055);
+}
+.dx2-greet, .dx2-today, .dx2-rev {
+  background: linear-gradient(145deg, rgba(var(--bg-card), .96), rgba(var(--bg-elevated), .68));
+}
+.dx2-greet { position: relative; overflow: hidden; }
+.dx2-greet::after {
+  content: "";
+  position: absolute;
+  width: 180px; height: 180px; inset-inline-end: -80px; bottom: -95px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--primary), .22), transparent 68%);
+  pointer-events: none;
+}
+.dx2-hello { font-size: clamp(1.05rem, 1.5vw, 1.35rem); }
+.dx2-photo { position: relative; }
+.dx2-photo::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(var(--primary), .08), transparent 52%, rgba(0,0,0,.32));
+  pointer-events: none;
+}
+.dx2-rev { border-color: rgba(var(--primary), .28); }
+.dx2-revnum { font-size: clamp(2rem, 3.1vw, 3.15rem); }
+.dx2-btn { border-radius: 12px; padding-inline: 14px; }
+.dx2-status {
+  gap: 14px;
+  border-radius: 16px;
+  border-color: rgba(var(--border-color), .22);
+  background: rgba(var(--bg-card), .68);
+  box-shadow: 0 12px 30px rgba(0,0,0,.06), inset 0 1px rgba(255,255,255,.05);
+  backdrop-filter: blur(14px);
+}
+.dx-seg { height: 10px; }
+
+/* Consistent surfaces for every report block, live widget and utility card. */
+.dx2-panel,
+.dx .theme-card,
+.dx div[class*="rounded-[2rem]"] {
+  border-radius: var(--dash-radius);
+  border-color: rgba(var(--border-color), .22);
+  background: linear-gradient(145deg, rgba(var(--bg-card), .88), rgba(var(--bg-elevated), .58));
+  box-shadow: 0 14px 36px rgba(0,0,0,.065), inset 0 1px rgba(255,255,255,.045);
+}
+.dx2-panel:hover,
+.dx .theme-card:hover,
+.dx div[class*="rounded-[2rem]"]:hover {
+  border-color: rgba(var(--primary), .36);
+  box-shadow: 0 20px 46px rgba(0,0,0,.11), 0 0 30px rgba(var(--primary), .08), inset 0 1px rgba(255,255,255,.06);
+}
+.dx2-panelhead h3,
+.dx2-panel h3,
+.dx .theme-card h3 { letter-spacing: -.025em; }
+.dx2-panelhead h3::before,
+.dx .theme-card h3::before {
+  content: ""; display: inline-block; width: 4px; height: 18px; margin-inline-end: 9px;
+  vertical-align: -3px; border-radius: 99px;
+  background: linear-gradient(180deg, rgb(var(--primary)), rgb(var(--accent)));
+  box-shadow: 0 0 12px rgba(var(--primary), .32);
+}
+
+/* Decision cards use a quiet four-color rhythm, still derived from theme vars. */
+.dx section[aria-label] > .dx-metric,
+.dx section[aria-label] > button.dx-metric { min-height: 164px; }
+.dx section[aria-label] > .dx-metric:nth-child(1) { --card-accent: var(--primary); }
+.dx section[aria-label] > .dx-metric:nth-child(2) { --card-accent: 245 158 11; }
+.dx section[aria-label] > .dx-metric:nth-child(3) { --card-accent: 244 63 94; }
+.dx section[aria-label] > .dx-metric:nth-child(4) { --card-accent: var(--success); }
+.dx section[aria-label] > .dx-metric {
+  border-top-color: rgba(var(--card-accent, var(--primary)), .62);
+  background: linear-gradient(145deg, rgba(var(--card-accent, var(--primary)), .085), rgba(var(--bg-card), .86) 52%);
+}
+
+.dx button:focus-visible, .dx a:focus-visible, .dx input:focus-visible {
+  outline: 3px solid rgba(var(--primary), .42);
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .dx2-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dx2-photo { order: -1; }
+}
+@media (max-width: 640px) {
+  .dx > .relative.z-10 { padding-inline: 12px; }
+  .dx2-hero { grid-template-columns: 1fr; }
+  .dx2-photo { order: initial; min-height: 168px; }
+  .dx2-photo img { min-height: 168px; }
+  .dx2-status { align-items: stretch; }
+  .dx2-allbtn, .dx2-refchip { justify-content: center; }
+  .dx2-segwrap { min-width: 100%; order: 3; }
+  .dx section[aria-label] > .dx-metric,
+  .dx section[aria-label] > button.dx-metric { min-height: 142px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOWER DASHBOARD — bring the full information surface into the same language
+   as the hero. This intentionally covers the legacy KPI/report/live sections.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx .dx-metric {
+  min-height: 186px;
+  border-radius: var(--dash-radius);
+  border: 1px solid rgba(var(--border-color), .24);
+  border-top: 3px solid rgba(var(--primary), .45);
+  background:
+    radial-gradient(260px 150px at 100% 0%, rgba(var(--primary), .12), transparent 72%),
+    linear-gradient(145deg, rgba(var(--bg-card), .96), rgba(var(--bg-elevated), .66));
+  box-shadow: 0 12px 32px rgba(0,0,0,.065), inset 0 1px rgba(255,255,255,.06);
+  backdrop-filter: blur(14px) saturate(115%);
+  transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s, box-shadow .28s, background .25s;
+}
+.dx .dx-metric::before {
+  inset: auto -55px -90px auto;
+  width: 210px; height: 180px;
+  background: radial-gradient(circle, rgba(var(--primary), .16), transparent 68%);
+}
+.dx .dx-metric::after {
+  background: linear-gradient(110deg, transparent 28%, rgba(255,255,255,.16) 50%, transparent 72%);
+}
+.dx .dx-metric:hover {
+  transform: translateY(-5px);
+  border-color: rgba(var(--primary), .42);
+  box-shadow: 0 22px 48px rgba(0,0,0,.12), 0 0 28px rgba(var(--primary), .09), inset 0 1px rgba(255,255,255,.09);
+}
+.dx .dx-metric > div[style*="background"] { opacity: .22; }
+.dx .dx-metric p { letter-spacing: .01em; }
+.dx .dx-metric h2 { font-size: clamp(1.55rem, 2.3vw, 2.05rem); }
+.dx .dx-metric > .relative.z-10:first-child > div {
+  width: 48px; height: 48px; padding: 11px;
+  border-radius: 15px;
+  box-shadow: 0 10px 24px rgba(var(--primary), .14), inset 0 1px rgba(255,255,255,.16);
+}
+.dx .dx-metric > .relative.z-10:first-child > div svg { width: 21px; height: 21px; }
+.dx .dx-metric .recharts-responsive-container,
+.dx .dx-metric svg { filter: saturate(.95); }
+
+/* Soft color rhythm for the KPI matrix. Text remains theme-owned. */
+.dx .dx-metric:nth-child(4n + 1) { border-top-color: rgba(var(--primary), .7); }
+.dx .dx-metric:nth-child(4n + 2) { border-top-color: rgba(var(--info), .65); }
+.dx .dx-metric:nth-child(4n + 3) { border-top-color: rgba(var(--danger), .58); }
+.dx .dx-metric:nth-child(4n + 4) { border-top-color: rgba(var(--success), .66); }
+
+/* Every lower section gets the same spacing and neutral surface treatment. */
+.dx > .relative.z-10 > section {
+  position: relative;
+  scroll-margin-top: 24px;
+}
+.dx > .relative.z-10 > section:not(:first-of-type) { padding-top: 2px; }
+.dx .dx2-panel,
+.dx .theme-card {
+  min-height: 100%;
+  background:
+    radial-gradient(420px 220px at 100% 0%, rgba(var(--primary), .055), transparent 70%),
+    linear-gradient(145deg, rgba(var(--bg-card), .94), rgba(var(--bg-elevated), .62));
+}
+.dx .dx2-panel > h3,
+.dx .theme-card > h3,
+.dx .dx2-panelhead h3,
+.dx .theme-card h3 { font-size: clamp(1rem, 1.35vw, 1.18rem); }
+.dx .dx2-panel .border-dashed,
+.dx .theme-card .border-dashed {
+  border-color: rgba(var(--border-color), .34);
+  background: rgba(var(--bg-elevated), .34);
+}
+.dx .dx2-order {
+  min-height: 43px;
+  padding-inline: 8px;
+  border-bottom-style: solid;
+  border-color: rgba(var(--border-color), .24);
+  border-radius: 10px;
+}
+.dx .dx2-order:hover { background: rgba(var(--primary), .055); }
+.dx .dx2-tile {
+  min-height: 86px;
+  background: rgba(var(--bg-elevated), .58);
+  border-color: rgba(var(--border-color), .2);
+  box-shadow: inset 0 1px rgba(255,255,255,.05);
+}
+.dx .dx2-tileic { box-shadow: 0 8px 18px rgba(var(--primary), .12); }
+
+/* Replace the old fixed-indigo briefing accents with the active theme. */
+.dx div[class*="from-indigo-500"] {
+  background: linear-gradient(135deg, rgba(var(--primary), .13), rgba(var(--accent), .10), rgba(var(--primary), .08));
+  border-color: rgba(var(--primary), .25);
+  box-shadow: 0 14px 32px rgba(var(--primary), .08);
+}
+.dx div[class*="from-indigo-500"] [class*="bg-indigo-500\/20"] {
+  background: rgba(var(--primary), .14);
+  border-color: rgba(var(--primary), .24);
+}
+.dx div[class*="from-indigo-500"] [class*="text-indigo-500"] { color: rgb(var(--primary)); }
+.dx div[class*="from-indigo-500"] button[class*="bg-indigo-500"] {
+  background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), .74));
+  box-shadow: 0 10px 24px rgba(var(--primary), .24);
+}
+
+/* Charts are framed as data panels instead of floating legacy islands. */
+.dx .recharts-wrapper,
+.dx .recharts-surface { overflow: visible; }
+.dx .recharts-cartesian-grid line { stroke: rgba(var(--border-color), .34); }
+.dx .recharts-default-tooltip {
+  border: 1px solid rgba(var(--border-color), .3) !important;
+  border-radius: 12px !important;
+  background: rgba(var(--bg-card), .94) !important;
+  color: rgb(var(--text-main)) !important;
+  box-shadow: 0 14px 30px rgba(0,0,0,.12) !important;
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 640px) {
+  .dx .dx-metric { min-height: 160px; }
+  .dx .dx-metric h2 { font-size: 1.45rem; }
+  .dx .theme-card, .dx .dx2-panel { padding: 1.1rem !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOWER REDESIGN / EDITORIAL BENTO
+   These rules deliberately change the silhouette and interaction language of
+   the lower half. It is not another copy of the hero: KPI cards are sculpted
+   tiles, while reports are editorial data sheets with different proportions.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx > .relative.z-10 > section:nth-of-type(n+2) { gap: clamp(16px, 1.8vw, 28px); }
+
+/* Sculpted KPI tiles: staggered corners, floating icon plate, split content. */
+.dx .dx-metric {
+  isolation: isolate;
+  border: 0;
+  border-radius: 26px 12px 26px 12px;
+  background:
+    linear-gradient(135deg, rgba(var(--bg-card), .98) 0%, rgba(var(--bg-card), .86) 62%, rgba(var(--primary), .08) 100%);
+  box-shadow:
+    10px 10px 0 rgba(var(--primary), .045),
+    0 22px 42px rgba(15,23,42,.10),
+    inset 0 0 0 1px rgba(var(--border-color), .34),
+    inset 0 1px rgba(255,255,255,.72);
+  transform: translateZ(0);
+}
+.dx .dx-metric:nth-child(even) { border-radius: 12px 26px 12px 26px; }
+.dx .dx-metric::before {
+  inset: auto -30px -70px auto;
+  width: 190px; height: 160px;
+  opacity: .8;
+  background: conic-gradient(from 210deg, rgba(var(--primary), .20), rgba(var(--accent), .06), transparent 65%);
+  filter: blur(2px);
+  clip-path: polygon(28% 0,100% 0,100% 100%,0 100%);
+}
+.dx .dx-metric::after {
+  inset: 0;
+  opacity: 0;
+  border-radius: inherit;
+  background: linear-gradient(120deg, transparent 18%, rgba(255,255,255,.32) 48%, transparent 72%);
+  transition: opacity .3s, transform .7s cubic-bezier(.16,1,.3,1);
+  transform: translateX(-115%);
+}
+.dx .dx-metric:hover {
+  transform: translateY(-9px) rotateX(2deg) rotateZ(-.35deg);
+  border-color: transparent;
+  background:
+    linear-gradient(135deg, rgba(var(--bg-card), 1), rgba(var(--primary), .13));
+  box-shadow:
+    12px 14px 0 rgba(var(--primary), .08),
+    0 30px 60px rgba(15,23,42,.17),
+    inset 0 0 0 1px rgba(var(--primary), .36),
+    0 0 36px rgba(var(--primary), .12);
+}
+.dx .dx-metric:hover::after { opacity: 1; transform: translateX(115%); }
+.dx .dx-metric > .relative.z-10:first-child > div {
+  position: relative;
+  width: 54px; height: 54px; padding: 13px;
+  border: 0 !important;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(var(--primary), .16), rgba(var(--primary), .04)) !important;
+  box-shadow: 0 12px 22px rgba(var(--primary), .13), inset 0 1px rgba(255,255,255,.46) !important;
+}
+.dx .dx-metric > .relative.z-10:first-child > div::after {
+  content: ""; position: absolute; inset: 5px; border-radius: 13px;
+  border: 1px solid rgba(var(--primary), .18); pointer-events: none;
+}
+.dx .dx-metric > .relative.z-10:first-child > div svg { filter: drop-shadow(0 4px 8px rgba(var(--primary), .22)); }
+.dx .dx-metric p { font-size: 11px; font-weight: 900; color: rgb(var(--text-muted)); }
+.dx .dx-metric h2 { margin-top: 5px; font-size: clamp(1.7rem, 2.6vw, 2.35rem); letter-spacing: -.065em; }
+.dx .dx-metric h2 span { font-size: .72em; letter-spacing: -.02em; }
+.dx .dx-metric .mt-2 { margin-top: 13px; }
+.dx .dx-metric .mt-4 { margin-top: 17px; }
+
+/* No repeated rectangles in the report grid: sheets alternate shape + depth. */
+.dx > .relative.z-10 > section:nth-of-type(5) > .dx2-panel,
+.dx > .relative.z-10 > section:nth-of-type(6) > div,
+.dx > .relative.z-10 > section:nth-of-type(7) > div,
+.dx > .relative.z-10 > section:nth-of-type(8) > div,
+.dx > .relative.z-10 > section:nth-of-type(9) > .theme-card {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 30px 14px 30px 14px;
+  background:
+    linear-gradient(145deg, rgba(var(--bg-card), .98), rgba(var(--bg-elevated), .78));
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.09),
+    inset 0 0 0 1px rgba(var(--border-color), .36),
+    inset 0 1px rgba(255,255,255,.72);
+}
+.dx > .relative.z-10 > section:nth-of-type(5) > .dx2-panel:nth-child(even),
+.dx > .relative.z-10 > section:nth-of-type(6) > div:nth-child(even),
+.dx > .relative.z-10 > section:nth-of-type(7) > div:nth-child(even),
+.dx > .relative.z-10 > section:nth-of-type(8) > div:nth-child(even),
+.dx > .relative.z-10 > section:nth-of-type(9) > .theme-card:nth-child(even) {
+  border-radius: 14px 30px 14px 30px;
+}
+.dx > .relative.z-10 > section:nth-of-type(5) > .dx2-panel::before,
+.dx > .relative.z-10 > section:nth-of-type(6) > div::before,
+.dx > .relative.z-10 > section:nth-of-type(7) > div::before,
+.dx > .relative.z-10 > section:nth-of-type(8) > div::before,
+.dx > .relative.z-10 > section:nth-of-type(9) > .theme-card::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 5px;
+  background: linear-gradient(90deg, rgb(var(--primary)), rgba(var(--accent), .55), transparent 82%);
+  opacity: .88;
+}
+.dx > .relative.z-10 > section:nth-of-type(5) > .dx2-panel:nth-child(2)::before,
+.dx > .relative.z-10 > section:nth-of-type(6) > div:nth-child(2)::before,
+.dx > .relative.z-10 > section:nth-of-type(7) > div:nth-child(2)::before,
+.dx > .relative.z-10 > section:nth-of-type(8) > div:nth-child(2)::before,
+.dx > .relative.z-10 > section:nth-of-type(9) > .theme-card:nth-child(2)::before {
+  background: linear-gradient(90deg, rgb(var(--accent)), rgba(var(--primary), .45), transparent 82%);
+}
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div:hover {
+  transform: translateY(-7px) rotateZ(-.25deg);
+  box-shadow: 0 28px 58px rgba(15,23,42,.14), 0 0 34px rgba(var(--primary), .10), inset 0 0 0 1px rgba(var(--primary), .28);
+}
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div h3 {
+  position: relative;
+  z-index: 1;
+  padding-bottom: 13px;
+  border-bottom: 1px solid rgba(var(--border-color), .22);
+}
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div h3::before { height: 24px; width: 5px; }
+
+/* Data lists become deliberate rows rather than text floating in a box. */
+.dx .dx2-order,
+.dx .dx2-panel .space-y-3 > div,
+.dx .dx2-panel .space-y-4 > div,
+.dx .dx2-panel .space-y-5 > div {
+  position: relative;
+  border-radius: 13px;
+  padding: 10px 12px;
+  background: rgba(var(--bg-elevated), .42);
+  border: 1px solid rgba(var(--border-color), .18);
+  transition: transform .22s, background .22s, border-color .22s;
+}
+.dx .dx2-order:hover,
+.dx .dx2-panel .space-y-3 > div:hover,
+.dx .dx2-panel .space-y-4 > div:hover,
+.dx .dx2-panel .space-y-5 > div:hover {
+  transform: translateX(-4px);
+  background: rgba(var(--primary), .075);
+  border-color: rgba(var(--primary), .25);
+}
+.dx .dx2-panel .space-y-3 > div + div,
+.dx .dx2-panel .space-y-4 > div + div,
+.dx .dx2-panel .space-y-5 > div + div { margin-top: 8px; }
+
+/* Operational live cards get a distinct monitor treatment. */
+.dx > .relative.z-10 > section:nth-of-type(9) > .theme-card {
+  border-radius: 34px 16px 34px 16px;
+  background:
+    radial-gradient(420px 260px at 100% 0%, rgba(var(--primary), .12), transparent 68%),
+    linear-gradient(145deg, rgba(var(--bg-card), .98), rgba(var(--bg-elevated), .74));
+}
+.dx > .relative.z-10 > section:nth-of-type(9) > .theme-card:nth-child(2) {
+  border-radius: 16px 34px 16px 34px;
+  background:
+    radial-gradient(420px 260px at 0% 0%, rgba(var(--info), .12), transparent 68%),
+    linear-gradient(145deg, rgba(var(--bg-card), .98), rgba(var(--bg-elevated), .74));
+}
+
+@media (max-width: 1100px) {
+  .dx .dx-metric { box-shadow: 7px 7px 0 rgba(var(--primary), .045), 0 18px 34px rgba(15,23,42,.09), inset 0 0 0 1px rgba(var(--border-color), .34); }
+}
+@media (max-width: 640px) {
+  .dx .dx-metric,
+  .dx .dx-metric:nth-child(even),
+  .dx > .relative.z-10 > section:nth-of-type(n+5) > div,
+  .dx > .relative.z-10 > section:nth-of-type(n+5) > div:nth-child(even) { border-radius: 22px 10px 22px 10px; }
+  .dx .dx-metric:hover,
+  .dx > .relative.z-10 > section:nth-of-type(n+5) > div:hover { transform: translateY(-4px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONCEPT FIDELITY PASS
+   Adapted from output/dashboard-concept.html: asymmetric 12-column rhythm,
+   restrained glass, soft borders, compact cards and calm upward motion.
+   This final pass intentionally supersedes the earlier heavy tile treatment.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx2-hero {
+  grid-template-columns: minmax(220px, 1.05fr) minmax(220px, 1fr) minmax(300px, 1.7fr) minmax(240px, 1.15fr);
+  grid-auto-rows: minmax(0, 1fr);
+  height: clamp(260px, 28vw, 350px);
+  min-height: 0;
+  align-items: stretch;
+}
+.dx2-greet, .dx2-today, .dx2-rev, .dx2-photo {
+  min-height: 0;
+  height: 100%;
+  border-radius: 22px;
+  border: 1px solid rgba(var(--border-color), .22);
+  box-shadow: 0 14px 34px rgba(15,23,42,.08), inset 0 1px rgba(255,255,255,.48);
+}
+.dx2-greet, .dx2-today, .dx2-rev {
+  padding: clamp(18px, 2vw, 26px);
+  background: rgba(var(--bg-card), .72);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+.dx2-photo { background: rgba(var(--bg-card), .6); }
+.dx2-photo img { height: 100%; min-height: 0; }
+.dx2-rev { border-color: rgba(var(--primary), .28); }
+.dx2-revnum { font-size: clamp(2rem, 3.4vw, 3.2rem); }
+.dx2-greet:hover, .dx2-today:hover, .dx2-rev:hover, .dx2-photo:hover {
+  transform: translateY(-3px);
+  border-color: rgba(var(--primary), .35);
+  box-shadow: 0 20px 44px rgba(15,23,42,.12), 0 0 22px rgba(var(--primary), .07);
+}
+
+/* Concept cards: one coherent silhouette, not a collection of exaggerated tiles. */
+.dx .dx-metric,
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div,
+.dx .theme-card {
+  border-radius: 22px !important;
+  border: 1px solid rgba(var(--border-color), .22) !important;
+  background: rgba(var(--bg-card), .70) !important;
+  backdrop-filter: blur(14px) saturate(120%);
+  box-shadow: 0 14px 34px rgba(15,23,42,.08), inset 0 1px rgba(255,255,255,.48) !important;
+  transition: transform .22s cubic-bezier(.16,1,.3,1), border-color .22s, box-shadow .22s, background .22s !important;
+}
+.dx .dx-metric:nth-child(even),
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div:nth-child(even),
+.dx > .relative.z-10 > section:nth-of-type(n+5) > .theme-card:nth-child(even) { border-radius: 22px !important; }
+.dx .dx-metric::before,
+.dx .dx-metric::after { border-radius: inherit; }
+.dx .dx-metric::before {
+  inset: 0; width: auto; height: auto; opacity: .38;
+  background: radial-gradient(300px 190px at 100% 0%, rgba(var(--primary), .12), transparent 70%);
+  clip-path: none; filter: none;
+}
+.dx .dx-metric::after { opacity: 0; }
+.dx .dx-metric:hover,
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div:hover,
+.dx .theme-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(var(--primary), .34) !important;
+  background: rgba(var(--bg-card), .84) !important;
+  box-shadow: 0 20px 42px rgba(15,23,42,.12), 0 0 24px rgba(var(--primary), .08), inset 0 1px rgba(255,255,255,.62) !important;
+}
+.dx .dx-metric > .relative.z-10:first-child > div {
+  width: 46px; height: 46px; padding: 10px;
+  border-radius: 14px;
+  background: rgba(var(--primary), .08) !important;
+  box-shadow: inset 0 0 0 1px rgba(var(--primary), .18), 0 8px 18px rgba(var(--primary), .08) !important;
+}
+.dx .dx-metric > .relative.z-10:first-child > div::after { display: none; }
+.dx .dx-metric h2 { font-size: clamp(1.55rem, 2.2vw, 2rem); letter-spacing: -.045em; }
+
+/* 12-column concept rhythm for the lower reports. */
+.dx > .relative.z-10 > section:nth-of-type(5),
+.dx > .relative.z-10 > section:nth-of-type(6),
+.dx > .relative.z-10 > section:nth-of-type(7),
+.dx > .relative.z-10 > section:nth-of-type(8) { gap: 14px; }
+.dx > .relative.z-10 > section:nth-of-type(5) > div,
+.dx > .relative.z-10 > section:nth-of-type(6) > div,
+.dx > .relative.z-10 > section:nth-of-type(7) > div,
+.dx > .relative.z-10 > section:nth-of-type(8) > div { padding: 20px !important; }
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div::before,
+.dx > .relative.z-10 > section:nth-of-type(n+5) > .theme-card::before { height: 3px; opacity: .7; }
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div h3 { border-bottom: 0; padding-bottom: 3px; }
+.dx .dx2-panel .space-y-3 > div,
+.dx .dx2-panel .space-y-4 > div,
+.dx .dx2-panel .space-y-5 > div,
+.dx .dx2-order {
+  border-radius: 13px;
+  background: rgba(var(--bg-elevated), .32);
+  border: 1px solid rgba(var(--border-color), .16);
+  box-shadow: none;
+}
+.dx .dx2-panel .space-y-3 > div:hover,
+.dx .dx2-panel .space-y-4 > div:hover,
+.dx .dx2-panel .space-y-5 > div:hover,
+.dx .dx2-order:hover { transform: translateY(-2px); }
+
+@keyframes dx-concept-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dx > .relative.z-10 > section:nth-of-type(n+2) { animation: dx-concept-up .55s cubic-bezier(.16,1,.3,1) both; }
+.dx > .relative.z-10 > section:nth-of-type(3) { animation-delay: 70ms; }
+.dx > .relative.z-10 > section:nth-of-type(4) { animation-delay: 120ms; }
+.dx > .relative.z-10 > section:nth-of-type(5) { animation-delay: 170ms; }
+.dx > .relative.z-10 > section:nth-of-type(6) { animation-delay: 220ms; }
+.dx > .relative.z-10 > section:nth-of-type(7) { animation-delay: 270ms; }
+.dx > .relative.z-10 > section:nth-of-type(8) { animation-delay: 320ms; }
+.dx > .relative.z-10 > section:nth-of-type(9) { animation-delay: 370ms; }
+html[data-motion="off"] {
+  .dx > .relative.z-10 > section:nth-of-type(n+2) { animation: none; }
+}
+@media (max-width: 1100px) {
+  .dx2-hero { height: auto; min-height: 520px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dx2-photo { order: -1; min-height: 250px; }
+}
+@media (max-width: 640px) {
+  .dx2-hero { min-height: 0; grid-template-columns: 1fr; }
+  .dx2-greet, .dx2-today, .dx2-rev, .dx2-photo { min-height: 190px; height: auto; }
+  .dx2-photo { order: initial; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERO CONTROL STRIP — high-contrast, theme-safe and intentionally legible.
+   The previous concept rule forced white labels, which disappeared on light
+   themes. This is a compact command bar with clear state chips and a readable
+   segmented track.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx2-status {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 74px;
+  padding: 12px 16px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--border-color), .24);
+  border-radius: 20px;
+  background:
+    linear-gradient(100deg, rgba(var(--bg-card), .92), rgba(var(--bg-elevated), .68));
+  box-shadow: 0 14px 34px rgba(15,23,42,.08), inset 0 1px rgba(255,255,255,.6);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+.dx2-status::before {
+  content: "";
+  position: absolute; inset: 0 12% auto;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgb(var(--success)), rgb(var(--primary)), transparent);
+  opacity: .75;
+}
+.dx2-status::after {
+  content: "";
+  position: absolute; width: 260px; height: 120px; inset-inline-start: -90px; bottom: -90px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(var(--primary), .12), transparent 70%);
+  pointer-events: none;
+}
+.dx2-allbtn,
+.dx2-refchip {
+  position: relative;
+  z-index: 1;
+  min-height: 40px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .01em;
+  transition: transform .2s, border-color .2s, background .2s, box-shadow .2s;
+}
+.dx2-allbtn {
+  padding: 0 16px;
+  color: rgb(var(--text-main));
+  background: rgba(var(--primary), .10);
+  border: 1px solid rgba(var(--primary), .28);
+  box-shadow: inset 0 1px rgba(255,255,255,.34);
+}
+.dx2-allbtn:hover {
+  transform: translateY(-2px);
+  color: rgb(var(--primary));
+  background: rgba(var(--primary), .16);
+  border-color: rgba(var(--primary), .44);
+  box-shadow: 0 8px 18px rgba(var(--primary), .12);
+}
+.dx2-segwrap { position: relative; z-index: 1; min-width: 0; }
+.dx2-segwrap .dx-seg {
+  height: 12px;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 99px;
+  background: rgba(var(--border-color), .32);
+  box-shadow: inset 0 1px 3px rgba(15,23,42,.13);
+}
+.dx2-segwrap .dx-seg span { border-radius: 99px; min-width: 4px; }
+.dx2-seg-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+  color: rgb(var(--text-muted)) !important;
+  text-shadow: none !important;
+  font-size: 11px;
+  font-weight: 900;
+}
+.dx2-seg-labels span {
+  padding: 3px 8px;
+  border: 1px solid rgba(var(--border-color), .2);
+  border-radius: 999px;
+  background: rgba(var(--bg-card), .52);
+  color: rgb(var(--text-main));
+  white-space: nowrap;
+}
+.dx2-refchip {
+  padding: 0 13px;
+  color: rgb(var(--danger));
+  background: rgba(var(--danger), .08);
+  border: 1px solid rgba(var(--danger), .28);
+}
+.dx2-refchip:hover {
+  transform: translateY(-2px);
+  background: rgba(var(--danger), .14);
+  border-color: rgba(var(--danger), .44);
+  box-shadow: 0 8px 18px rgba(var(--danger), .12);
+}
+.dx2-refchip b { box-shadow: 0 3px 8px rgba(var(--danger), .25); }
+
+/* General polish: one calm canvas, stronger section rhythm, quieter chrome. */
+.dx > .relative.z-10 { gap: clamp(18px, 2.1vw, 30px); }
+.dx > .relative.z-10 > section:nth-of-type(2) { margin-top: 2px; }
+.dx > .relative.z-10 > section:nth-of-type(n+3) { margin-top: 2px; }
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div::after,
+.dx > .relative.z-10 > section:nth-of-type(n+5) > .theme-card::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, rgba(255,255,255,.12), transparent 28%, transparent 72%, rgba(var(--primary), .035));
+  pointer-events: none;
+  opacity: .7;
+}
+.dx > .relative.z-10 > section:nth-of-type(n+5) > div > *,
+.dx > .relative.z-10 > section:nth-of-type(n+5) > .theme-card > * { position: relative; z-index: 1; }
+@media (max-width: 820px) {
+  .dx2-status { grid-template-columns: 1fr 1fr; }
+  .dx2-segwrap { grid-column: 1 / -1; grid-row: 2; }
+  .dx2-seg-labels { justify-content: flex-start; }
+}
+@media (max-width: 520px) {
+  .dx2-status { display: flex; flex-wrap: wrap; align-items: stretch; }
+  .dx2-allbtn, .dx2-refchip { flex: 1; justify-content: center; }
+  .dx2-segwrap { flex-basis: 100%; order: 3; }
+  .dx2-seg-labels { gap: 5px; font-size: 10px; }
+  .dx2-seg-labels span { flex: 1; text-align: center; padding-inline: 4px; }
+}
+
+/* The embedded browser is commonly 640–720px wide. Treat that range as the
+   compact layout too; otherwise the tablet hero remains 520px tall and hides
+   the dashboard below the fold. */
+@media (max-width: 760px) {
+  .dx > .relative.z-10 { padding-inline: 14px; gap: 16px; }
+  .dx2-hero {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .dx2-greet, .dx2-today, .dx2-rev, .dx2-photo {
+    height: auto;
+    min-height: 128px;
+  }
+  .dx2-photo { grid-column: 1 / -1; order: -1; min-height: 170px; }
+  .dx2-photo img { min-height: 170px; }
+  .dx2-greet { grid-column: 1; }
+  .dx2-today { grid-column: 2; }
+  .dx2-rev { grid-column: 1 / -1; min-height: 128px; }
+  .dx2-status { grid-template-columns: 1fr 1fr; min-height: 0; }
+  .dx2-segwrap { grid-column: 1 / -1; grid-row: 2; }
+  .dx2-seg-labels { justify-content: flex-start; }
+  .dx .dx-metric { min-height: 156px; }
+  .dx .dx-metric h2 { font-size: 1.55rem; }
+  .dx > .relative.z-10 > section:nth-of-type(3) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dx > .relative.z-10 > section:nth-of-type(n+5) > div,
+  .dx > .relative.z-10 > section:nth-of-type(n+5) > .theme-card { padding: 16px !important; }
+
+  /* The stale-business-date warning remains available but stops obscuring the
+     dashboard on compact viewports. */
+  body:has(.dx) .workspace-shell > [role="alert"] {
+    left: 10px;
+    right: 10px;
+    bottom: 8px;
+    width: auto;
+    min-height: 0;
+    padding: 9px 12px;
+    border-radius: 14px;
+    font-size: 11px;
+  }
+  body:has(.dx) .workspace-shell > [role="alert"] p { line-height: 1.35; }
+  body:has(.dx) .workspace-shell > [role="alert"] button {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTION + SHOWCASE FINISH — the dashboard should feel alive, but remain calm.
+   The ticker is a real marquee (rather than a static strip), while cards use
+   a restrained lift, accent rail and theme variables so every theme survives.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx-ticker {
+  isolation: isolate;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(15,23,42,.07), inset 0 1px rgba(255,255,255,.48);
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+.dx-ticker::before,
+.dx-ticker::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  width: 44px;
+  pointer-events: none;
+}
+.dx-ticker::before { inset-inline-start: 0; background: linear-gradient(90deg, rgba(var(--bg-main), .96), transparent); }
+.dx-ticker::after { inset-inline-end: 0; background: linear-gradient(270deg, rgba(var(--bg-main), .96), transparent); }
+.dx-ticker .in {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-width: max-content;
+  padding-inline: 5vw;
+  will-change: transform;
+  animation: dx-mq-live 18s linear infinite;
+}
+html[dir="ltr"] .dx-ticker .in { animation-name: dx-mql-live; }
+@keyframes dx-mq-live {
+  from { transform: translateX(0); }
+  to { transform: translateX(50%); }
+}
+@keyframes dx-mql-live {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.dx .dx-metric {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 22px;
+  border: 1px solid rgba(var(--border-color), .22);
+  border-top: 2px solid rgba(var(--card-accent, var(--primary)), .62);
+  background:
+    linear-gradient(145deg, rgba(var(--bg-card), .95), rgba(var(--bg-elevated), .68));
+  box-shadow: 0 12px 30px rgba(15,23,42,.07), inset 0 1px rgba(255,255,255,.5);
+  transition: transform .24s cubic-bezier(.2,.8,.2,1), box-shadow .24s, border-color .24s;
+}
+.dx .dx-metric::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(var(--card-accent, var(--primary)), .72), transparent);
+  opacity: .9;
+}
+.dx .dx-metric::after {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  inset-inline-end: -90px;
+  inset-block-end: -110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--card-accent, var(--primary)), .14), transparent 70%);
+  pointer-events: none;
+}
+.dx .dx-metric:hover {
+  transform: translateY(-5px);
+  border-color: rgba(var(--card-accent, var(--primary)), .5);
+  box-shadow: 0 20px 42px rgba(15,23,42,.13), 0 0 30px rgba(var(--card-accent, var(--primary)), .1);
+}
+.dx .dx-metric > * { position: relative; z-index: 1; }
+
+@media (max-width: 520px) {
+  .dx2-hero { grid-template-columns: 1fr; }
+  .dx2-photo, .dx2-greet, .dx2-today, .dx2-rev { grid-column: 1; }
+  .dx2-photo { min-height: 170px; }
+}
+
+html[data-motion="off"] {
+  .dx-ticker .in { animation: none !important; transform: none !important; }
+  .dx .dx-metric, .dx2-allbtn, .dx2-refchip { transition: none !important; }
+}
+
+/* Explicit product choice: motion is on unless the app's own master switch is
+   set to off. This keeps the requested ticker alive in compact Chromium shells
+   that report OS-level reduced motion by default. */
+html:not([data-motion="off"]) .dx-ticker .in {
+  animation: dx-mq-live 18s linear infinite !important;
+}
+html[dir="ltr"]:not([data-motion="off"]) .dx-ticker .in {
+  animation-name: dx-mql-live !important;
+}
+
+@media (max-width: 760px) {
+  .dx2-hero > .dx2-greet,
+  .dx2-hero > .dx2-today,
+  .dx2-hero > .dx2-photo,
+  .dx2-hero > .dx2-rev {
+    height: auto !important;
+    align-self: start;
+  }
+  .dx2-hero > .dx2-photo {
+    height: 170px !important;
+    min-height: 170px !important;
+    max-height: 170px !important;
+  }
+  .dx2-photo img { width: 100%; height: 100% !important; object-fit: cover; }
+  .dx .dx-metric {
+    height: auto !important;
+    align-self: start;
+  }
+}
+
+/* Final visual authority: utility classes and theme skins must not flatten the
+   dashboard back to the old white-card treatment. */
+.dx > .relative.z-10 section[aria-label] > .dx-metric,
+.dx > .relative.z-10 section[aria-label] > button.dx-metric {
+  min-height: 164px !important;
+  height: auto !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(var(--border-color), .28) !important;
+  border-top: 3px solid rgba(var(--card-accent, var(--primary)), .76) !important;
+  background-color: rgba(var(--bg-card), .86) !important;
+  background-image:
+    radial-gradient(240px 140px at 108% 112%, rgba(var(--card-accent, var(--primary)), .18), transparent 68%),
+    linear-gradient(145deg, rgba(var(--bg-card), .96), rgba(var(--bg-elevated), .68)) !important;
+  box-shadow: 0 16px 36px rgba(15,23,42,.09), inset 0 1px rgba(255,255,255,.56) !important;
+  transform: translateZ(0);
+}
+.dx > .relative.z-10 section[aria-label] > .dx-metric:hover,
+.dx > .relative.z-10 section[aria-label] > button.dx-metric:hover {
+  transform: translateY(-6px) !important;
+  box-shadow: 0 24px 52px rgba(15,23,42,.15), 0 0 32px rgba(var(--card-accent, var(--primary)), .14) !important;
+}
+.dx > .relative.z-10 section[aria-label] > .dx-metric > h2,
+.dx > .relative.z-10 section[aria-label] > button.dx-metric > h2 {
+  letter-spacing: -.045em;
+  text-shadow: 0 8px 24px rgba(var(--primary), .12);
+}
+
+.dx2-status {
+  border-radius: 24px !important;
+  border: 1px solid rgba(var(--primary), .2) !important;
+  background:
+    linear-gradient(110deg, rgba(var(--bg-card), .94), rgba(var(--primary), .055) 52%, rgba(var(--bg-elevated), .82)) !important;
+  box-shadow: 0 16px 34px rgba(15,23,42,.1), inset 0 1px rgba(255,255,255,.62) !important;
+}
+.dx2-status .dx2-seg-labels span { 
+  border-color: rgba(var(--border-color), .3) !important;
+  background: rgba(var(--bg-card), .78) !important;
+  box-shadow: 0 4px 12px rgba(15,23,42,.06);
+}
+.dx2-status .dx-seg { 
+  height: 14px !important;
+  background: rgba(var(--border-color), .24) !important;
+}
+.dx2-status .dx-seg span { box-shadow: 0 0 12px currentColor; }
+
+@media (max-width: 760px) {
+  .dx > .relative.z-10 section[aria-label] > .dx-metric,
+  .dx > .relative.z-10 section[aria-label] > button.dx-metric {
+    min-height: 148px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD RECOMPOSE — a full information architecture skin.
+   This layer deliberately re-composes every dashboard band, not just colors:
+   hero bento -> live status -> decision cards -> KPI matrix -> operations.
+   It consumes the active theme variables and leaves the data/components intact.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx {
+  --dash-ink: rgb(var(--text-main));
+  --dash-muted: rgb(var(--text-muted));
+  --dash-line: rgba(var(--border-color), .24);
+  --dash-surface: rgba(var(--bg-card), .78);
+  --dash-raised: rgba(var(--bg-elevated), .72);
+  --dash-accent: rgb(var(--primary));
+  background:
+    radial-gradient(900px 520px at 90% -8%, rgba(var(--primary), .09), transparent 62%),
+    radial-gradient(760px 520px at -6% 38%, rgba(var(--accent), .06), transparent 65%),
+    rgb(var(--bg-app));
+}
+.dx > .relative.z-10 {
+  width: min(100%, 1640px);
+  padding: clamp(16px, 2.5vw, 34px) clamp(14px, 3vw, 42px) 56px !important;
+  gap: clamp(16px, 2vw, 28px) !important;
+}
+.dx > .relative.z-10 > header {
+  position: relative;
+  padding: 22px 24px 20px !important;
+  border: 1px solid var(--dash-line) !important;
+  border-radius: 26px;
+  background: linear-gradient(135deg, rgba(var(--bg-card), .94), rgba(var(--bg-elevated), .72));
+  box-shadow: 0 18px 50px rgba(15,23,42,.08), inset 0 1px rgba(255,255,255,.58);
+  overflow: hidden;
+}
+.dx > .relative.z-10 > header::before {
+  content: "";
+  position: absolute; inset: 0 auto 0 0; width: 5px;
+  background: linear-gradient(180deg, rgb(var(--primary)), rgb(var(--accent)));
+  box-shadow: 0 0 26px rgba(var(--primary), .36);
+}
+.dx > .relative.z-10 > header h1 { margin: 0; font-size: clamp(1.45rem, 2.6vw, 2.45rem) !important; }
+.dx > .relative.z-10 > header > div:last-child { position: relative; z-index: 1; }
+
+/* Trust chips become a compact command rail. */
+.dx > .relative.z-10 > div[aria-label="شريط الثقة"],
+.dx > .relative.z-10 > div[aria-label="Trust strip"] {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px !important;
+  padding: 8px !important;
+  border: 1px solid var(--dash-line);
+  border-radius: 18px;
+  background: rgba(var(--bg-card), .5);
+  box-shadow: inset 0 1px rgba(255,255,255,.42);
+}
+.dx > .relative.z-10 > div[aria-label="شريط الثقة"] > *,
+.dx > .relative.z-10 > div[aria-label="Trust strip"] > * {
+  min-height: 34px;
+  justify-content: center;
+  border-radius: 11px;
+  border: 1px solid rgba(var(--border-color), .14);
+  background: rgba(var(--bg-elevated), .52);
+  color: var(--dash-muted);
+}
+
+/* Hero: asymmetric 12-column bento on desktop. */
+.dx2-hero {
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(2, minmax(116px, 1fr));
+  height: clamp(320px, 27vw, 410px) !important;
+  gap: 14px !important;
+}
+.dx2-greet, .dx2-today, .dx2-photo, .dx2-rev {
+  min-width: 0;
+  min-height: 0 !important;
+  height: auto !important;
+  border-radius: 26px !important;
+  border: 1px solid var(--dash-line) !important;
+  box-shadow: 0 18px 46px rgba(15,23,42,.1), inset 0 1px rgba(255,255,255,.52) !important;
+}
+.dx2-greet { grid-column: span 3; grid-row: span 2; }
+.dx2-today { grid-column: span 3; grid-row: span 2; }
+.dx2-photo { grid-column: span 4; grid-row: span 2; }
+.dx2-rev { grid-column: span 2; grid-row: span 2; }
+.dx2-photo img { filter: saturate(1.08) contrast(1.02); }
+.dx2-rev { background: linear-gradient(145deg, rgba(var(--primary), .15), rgba(var(--bg-card), .9) 56%) !important; }
+.dx2-revnum { font-size: clamp(1.9rem, 3.5vw, 3.4rem) !important; }
+
+/* Status strip under hero: turn it into a readable status dashboard. */
+.dx2-status {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  min-height: 82px !important;
+  padding: 12px 14px !important;
+  gap: 14px !important;
+  border-radius: 22px !important;
+}
+.dx2-status .dx2-seg-labels { margin-top: 7px; }
+.dx2-status .dx2-seg-labels span { font-size: 10px; }
+.dx2-status .dx2-allbtn, .dx2-status .dx2-refchip { min-height: 42px; border-radius: 13px; }
+
+/* Operational briefing strip: visible hierarchy and a moving accent rail. */
+.dx > .relative.z-10 > div:nth-child(5) {
+  position: relative;
+  min-height: 88px;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px !important;
+  padding: 16px 22px !important;
+  border: 1px solid rgba(var(--primary), .2) !important;
+  border-radius: 22px;
+  background: linear-gradient(105deg, rgba(var(--primary), .12), rgba(var(--accent), .045) 48%, rgba(var(--bg-card), .72));
+  box-shadow: 0 14px 38px rgba(var(--primary), .08), inset 0 1px rgba(255,255,255,.45);
+  overflow: hidden;
+}
+.dx > .relative.z-10 > div:nth-child(5)::after {
+  content: "";
+  position: absolute; inset: auto -10% 0; height: 3px;
+  background: linear-gradient(90deg, transparent, rgb(var(--primary)), rgb(var(--accent)), transparent);
+  animation: dx-briefing-sweep 5s ease-in-out infinite;
+}
+@keyframes dx-briefing-sweep { 0%,100% { transform: translateX(-18%); opacity: .35; } 50% { transform: translateX(18%); opacity: .9; } }
+
+/* Quick decisions: from generic cards to a control deck. */
+.dx > .relative.z-10 > section[aria-label="قرارات سريعة"],
+.dx > .relative.z-10 > section[aria-label="Decision row"] {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+.dx > .relative.z-10 > section[aria-label="قرارات سريعة"] > *,
+.dx > .relative.z-10 > section[aria-label="Decision row"] > * {
+  min-height: 148px;
+  border-radius: 22px !important;
+  border: 1px solid var(--dash-line);
+  background: linear-gradient(145deg, rgba(var(--bg-card), .9), rgba(var(--bg-elevated), .62));
+  box-shadow: 0 14px 34px rgba(15,23,42,.08), inset 0 1px rgba(255,255,255,.5);
+}
+
+/* KPI matrix: colored identity rail + consistent information rhythm. */
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+.dx > .relative.z-10 > section[aria-label="Performance reports"] {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric {
+  min-height: 188px !important;
+}
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric:nth-child(1),
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric:nth-child(1) { --card-accent: var(--primary); }
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric:nth-child(2),
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric:nth-child(2) { --card-accent: var(--info); }
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric:nth-child(3),
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric:nth-child(3) { --card-accent: var(--danger); }
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric:nth-child(4),
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric:nth-child(4) { --card-accent: var(--success); }
+
+/* Every lower panel shares one editorial frame, while its inner content stays
+   data-specific (charts, orders, quick actions, live resources). */
+.dx2-panel,
+.dx > .relative.z-10 > section:nth-child(n+8) > div,
+.dx > .relative.z-10 > div:nth-child(n+10) > div {
+  border-radius: 24px !important;
+  border: 1px solid var(--dash-line) !important;
+  background: linear-gradient(145deg, rgba(var(--bg-card), .84), rgba(var(--bg-elevated), .58)) !important;
+  box-shadow: 0 16px 42px rgba(15,23,42,.08), inset 0 1px rgba(255,255,255,.5) !important;
+}
+.dx2-panelhead { padding-bottom: 14px; border-bottom: 1px solid rgba(var(--border-color), .16); }
+.dx2-panelhead h3, .dx2-panel h3 { letter-spacing: -.025em; }
+.dx2-order { border-color: rgba(var(--border-color), .16) !important; background: rgba(var(--bg-elevated), .36); }
+.dx2-tile { border-radius: 16px !important; border: 1px solid rgba(var(--border-color), .16) !important; transition: transform .22s, border-color .22s, box-shadow .22s; }
+.dx2-tile:hover { transform: translateY(-4px); border-color: rgba(var(--primary), .42) !important; box-shadow: 0 12px 26px rgba(var(--primary), .12); }
+
+@media (max-width: 1100px) {
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 760px) {
+  .dx > .relative.z-10 { padding-inline: 12px !important; }
+  .dx > .relative.z-10 > header { padding: 17px !important; border-radius: 20px; }
+  .dx > .relative.z-10 > div[aria-label="شريط الثقة"],
+  .dx > .relative.z-10 > div[aria-label="Trust strip"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dx2-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: 170px 150px 150px;
+    height: auto !important;
+  }
+  .dx2-photo { grid-column: 1 / -1; grid-row: 1; height: 170px !important; }
+  .dx2-greet { grid-column: 1; grid-row: 2; }
+  .dx2-today { grid-column: 2; grid-row: 2; }
+  .dx2-rev { grid-column: 1 / -1; grid-row: 3; }
+  .dx2-status { grid-template-columns: 1fr 1fr !important; min-height: 112px !important; }
+  .dx2-segwrap { grid-column: 1 / -1; grid-row: 2; }
+  .dx > .relative.z-10 > div:nth-child(5) { grid-template-columns: 1fr; gap: 8px !important; padding: 14px !important; }
+  .dx > .relative.z-10 > section[aria-label="قرارات سريعة"],
+  .dx > .relative.z-10 > section[aria-label="Decision row"],
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: 1fr !important; }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric { min-height: 158px !important; }
+}
+@media (max-width: 520px) {
+  .dx2-hero { grid-template-columns: 1fr !important; grid-template-rows: 170px repeat(3, minmax(145px, auto)); }
+  .dx2-photo, .dx2-greet, .dx2-today, .dx2-rev { grid-column: 1; }
+  .dx2-photo { grid-row: 1; }
+  .dx2-greet { grid-row: 2; }
+  .dx2-today { grid-row: 3; }
+  .dx2-rev { grid-row: 4; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE FINAL PASS — size by the available content rail, not just the
+   viewport. This prevents the fixed sidebar from squeezing the hero into a
+   narrow 12-column sliver at laptop widths.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx2-hero > *,
+.dx > .relative.z-10 > section,
+.dx > .relative.z-10 > section > *,
+.dx2-panel { min-width: 0; }
+
+@media (min-width: 1101px) {
+  .dx2-hero {
+    grid-template-columns: minmax(190px, .95fr) minmax(230px, 1.18fr) minmax(250px, 1.3fr) minmax(190px, .95fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    height: clamp(300px, 28vw, 390px) !important;
+  }
+  .dx2-greet, .dx2-today, .dx2-photo, .dx2-rev {
+    grid-column: auto !important;
+    grid-row: 1 !important;
+  }
+  .dx2-rev { overflow: hidden !important; }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .dx > .relative.z-10 { padding-inline: 18px !important; }
+  .dx2-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: 190px 150px 150px !important;
+    height: auto !important;
+  }
+  .dx2-photo { grid-column: 1 / -1 !important; grid-row: 1 !important; height: 190px !important; }
+  .dx2-greet { grid-column: 1 !important; grid-row: 2 !important; }
+  .dx2-today { grid-column: 2 !important; grid-row: 2 !important; }
+  .dx2-rev { grid-column: 1 / -1 !important; grid-row: 3 !important; }
+  .dx2-status { grid-template-columns: 1fr 1fr !important; min-height: 108px !important; }
+  .dx2-segwrap { grid-column: 1 / -1; grid-row: 2; }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .dx2-panel { overflow: hidden; }
+}
+
+@media (max-width: 760px) {
+  .dx2-hero > *, .dx2-status, .dx2-panel,
+  .dx > .relative.z-10 > section > * { min-width: 0; max-width: 100%; }
+  .dx2-hello, .dx2-wish, .dx2-clock, .dx2-label, .dx2-revnum { overflow-wrap: anywhere; }
+  .dx2-status { width: 100%; }
+  .dx2-seg-labels { gap: 5px; }
+  .dx2-seg-labels span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .dx > .relative.z-10 > section[aria-label="قرارات سريعة"] > *,
+  .dx > .relative.z-10 > section[aria-label="Decision row"] > * { min-height: 132px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SMART INTERACTIONS — cursor-reactive light, energy borders and layered depth.
+   No zoom-only hover: the pointer position drives the visual response through
+   the --mx/--my values already updated by Dashboard.tsx.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx .dx-metric,
+.dx2-panel,
+.dx2-greet, .dx2-today, .dx2-photo, .dx2-rev,
+.dx2-status {
+  --mx: 50%;
+  --my: 50%;
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+}
+.dx .dx-metric::before,
+.dx2-panel::before,
+.dx2-greet::before, .dx2-today::before, .dx2-rev::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(280px circle at var(--mx) var(--my), rgba(var(--card-accent, var(--primary)), .24), transparent 62%);
+  mix-blend-mode: multiply;
+  transition: opacity .32s var(--theme-ease, cubic-bezier(.2,.8,.2,1));
+}
+.dx .dx-metric::after,
+.dx2-panel::after,
+.dx2-greet::after, .dx2-today::after, .dx2-rev::after {
+  content: "";
+  position: absolute;
+  inset: -30% -70%;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(112deg, transparent 41%, rgba(255,255,255,.5) 49%, rgba(var(--primary), .18) 52%, transparent 61%);
+  transform: translateX(-42%) rotate(8deg);
+  transition: opacity .25s, transform .75s cubic-bezier(.16,1,.3,1);
+}
+.dx .dx-metric:hover,
+.dx2-panel:hover,
+.dx2-greet:hover, .dx2-today:hover, .dx2-rev:hover,
+.dx2-status:hover {
+  transform: translateY(-6px) rotateX(1.1deg) rotateY(-.65deg) !important;
+  box-shadow: 0 26px 62px rgba(15,23,42,.16), 0 0 0 1px rgba(var(--primary), .22), 0 0 34px rgba(var(--primary), .13) !important;
+}
+.dx .dx-metric:hover::before,
+.dx2-panel:hover::before,
+.dx2-greet:hover::before, .dx2-today:hover::before, .dx2-rev:hover::before { opacity: 1; }
+.dx .dx-metric:hover::after,
+.dx2-panel:hover::after,
+.dx2-greet:hover::after, .dx2-today:hover::after, .dx2-rev:hover::after {
+  opacity: .8;
+  transform: translateX(42%) rotate(8deg);
+}
+.dx .dx-metric > .flex.items-start,
+.dx2-panelhead,
+.dx2-greet > *, .dx2-today > *, .dx2-rev > * {
+  position: relative;
+  z-index: 3;
+  transform: translateZ(0);
+  transition: transform .35s cubic-bezier(.16,1,.3,1), color .25s;
+}
+.dx .dx-metric:hover > .flex.items-start { transform: translate3d(0,-2px,14px); }
+.dx .dx-metric:hover > .flex.items-start > div:first-child {
+  transform: translateZ(12px) rotate(-7deg);
+  box-shadow: 0 12px 28px rgba(var(--card-accent, var(--primary)), .28), 0 0 0 5px rgba(var(--card-accent, var(--primary)), .07) !important;
+}
+.dx .dx-metric:hover h2 { transform: translate3d(0,-2px,10px); color: rgb(var(--text-main)); }
+.dx2-status::before { animation: dx-status-breathe 3.6s ease-in-out infinite; }
+@keyframes dx-status-breathe { 0%,100% { opacity: .35; transform: scaleX(.82); } 50% { opacity: 1; transform: scaleX(1); } }
+.dx2-status .dx2-seg-labels span { transition: transform .25s, border-color .25s, box-shadow .25s; }
+.dx2-status .dx2-seg-labels span:hover { transform: translateY(-3px); border-color: rgba(var(--primary), .48) !important; box-shadow: 0 8px 18px rgba(var(--primary), .14); }
+.dx-ticker::before, .dx-ticker::after { transition: opacity .3s; }
+.dx-ticker:hover::before, .dx-ticker:hover::after { opacity: .45; }
+
+html[data-motion="off"] .dx .dx-metric,
+html[data-motion="off"] .dx2-panel,
+html[data-motion="off"] .dx2-greet, html[data-motion="off"] .dx2-today,
+html[data-motion="off"] .dx2-rev, html[data-motion="off"] .dx2-status {
+  transform: none !important;
+  will-change: auto;
+}
+html[data-motion="off"] .dx .dx-metric::after,
+html[data-motion="off"] .dx2-panel::after,
+html[data-motion="off"] .dx2-greet::after, html[data-motion="off"] .dx2-today::after,
+html[data-motion="off"] .dx2-rev::after { transition: none; }
+
+@media (hover: none), (pointer: coarse) {
+  .dx .dx-metric:hover, .dx2-panel:hover,
+  .dx2-greet:hover, .dx2-today:hover, .dx2-rev:hover, .dx2-status:hover { transform: none !important; }
+  .dx .dx-metric::before, .dx .dx-metric::after,
+  .dx2-panel::before, .dx2-panel::after { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERACTION CALIBRATION — keep the pointer light visible and make the order
+   rail editorial/quiet instead of a glowing pill bar.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx .dx-metric::before {
+  opacity: .22;
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(var(--card-accent, var(--primary)), .3), transparent 64%);
+  mix-blend-mode: multiply;
+  transition: opacity .2s ease, background .08s linear;
+}
+.dx .dx-metric:hover::before { opacity: .95; }
+.dx .dx-metric::after {
+  opacity: 0;
+  background: linear-gradient(112deg, transparent 40%, rgba(255,255,255,.72) 49%, rgba(var(--card-accent, var(--primary)), .32) 52%, transparent 62%);
+  transition: opacity .16s ease, transform .65s cubic-bezier(.16,1,.3,1);
+}
+.dx .dx-metric:hover::after { opacity: .9; transform: translateX(44%) rotate(8deg); }
+.dx .dx-metric:hover {
+  box-shadow: 0 20px 44px rgba(15,23,42,.14), 0 0 0 1px rgba(var(--card-accent, var(--primary)), .36) !important;
+}
+
+/* A clean operational rail: readable status, no heavy pill shadows or neon
+   wash. The colored segments carry the signal; labels stay calm. */
+.dx2-status {
+  border: 1px solid rgba(var(--border-color), .34) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, rgba(var(--bg-card), .98), rgba(var(--bg-elevated), .88)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.62) !important;
+}
+.dx2-status::before { height: 2px !important; opacity: .8; }
+.dx2-status::after { display: none; }
+.dx2-status .dx2-segwrap .dx-seg {
+  height: 10px !important;
+  padding: 1px !important;
+  border: 1px solid rgba(var(--border-color), .28);
+  background: rgba(var(--border-color), .16) !important;
+  box-shadow: none !important;
+}
+.dx2-status .dx2-segwrap .dx-seg span { box-shadow: none !important; filter: saturate(.92); }
+.dx2-status .dx2-seg-labels {
+  margin-top: 7px;
+  gap: 18px;
+  color: rgb(var(--text-muted)) !important;
+}
+.dx2-status .dx2-seg-labels span,
+.dx2-status .dx2-seg-labels span:hover {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  font-size: 10px;
+  font-weight: 800;
+}
+.dx2-status .dx2-allbtn,
+.dx2-status .dx2-refchip {
+  min-height: 38px !important;
+  border-radius: 11px !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.dx2-status .dx2-allbtn { border-color: rgba(var(--primary), .42); }
+.dx2-status .dx2-refchip { border-color: rgba(var(--danger), .34); }
+.dx2-status .dx2-allbtn:hover,
+.dx2-status .dx2-refchip:hover { transform: translateY(-2px); box-shadow: 0 7px 16px rgba(15,23,42,.08) !important; }
+
+html[data-motion="off"] .dx .dx-metric::before,
+html[data-motion="off"] .dx .dx-metric::after { opacity: 0 !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REFERENCE COMPOSITION — same dashboard silhouette as the supplied concept:
+   image-led hero, horizontal order rail, five-card KPI row, then a three-panel
+   operating row. Color remains token-driven for every theme and color-scheme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dx > .relative.z-10 {
+  display: flex !important;
+  flex-direction: column;
+  overflow-x: hidden !important;
+}
+.dx > .relative.z-10 > header { order: 1; }
+.dx > .relative.z-10 > div[aria-label="شريط الثقة"],
+.dx > .relative.z-10 > div[aria-label="Trust strip"] { order: 2; }
+.dx > .relative.z-10 > .dx2-hero { order: 3; }
+.dx > .relative.z-10 > .dx2-status { order: 4; }
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+.dx > .relative.z-10 > section[aria-label="Performance reports"] { order: 5; }
+.dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+.dx > .relative.z-10 > section[aria-label="Operations pulse"] { order: 6; }
+.dx > .relative.z-10 > div:nth-child(5),
+.dx > .relative.z-10 > section[aria-label="قرارات سريعة"],
+.dx > .relative.z-10 > section[aria-label="Decision row"] { order: 7; }
+.dx > .relative.z-10 > section:nth-child(n+8),
+.dx > .relative.z-10 > div:nth-child(n+10) { order: 8; }
+
+/* Hero becomes one coherent image surface with three glass information panes. */
+.dx2-hero {
+  position: relative;
+  direction: ltr;
+  display: grid !important;
+  grid-template-columns: 1.05fr 1.15fr 1.05fr !important;
+  grid-template-areas: "greet today rev" !important;
+  grid-template-rows: 1fr !important;
+  height: clamp(300px, 25vw, 360px) !important;
+  padding: 10px !important;
+  border: 1px solid rgba(var(--border-color), .34);
+  border-radius: 24px !important;
+  background: rgba(var(--bg-card), .28);
+  overflow: hidden;
+}
+.dx2-photo {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  opacity: 1 !important;
+}
+.dx2-photo::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(var(--bg-app), .1), rgba(var(--bg-app), .06) 48%, rgba(var(--bg-app), .22));
+  pointer-events: none;
+}
+.dx2-photo img { width: 100% !important; height: 100% !important; object-fit: cover; filter: saturate(1.08) contrast(1.03); }
+.dx2-greet, .dx2-today, .dx2-rev {
+  direction: rtl;
+  z-index: 2 !important;
+  align-self: stretch;
+  margin: 6px !important;
+  min-width: 0;
+  height: auto !important;
+  border: 1px solid rgba(var(--border-color), .38) !important;
+  background: color-mix(in srgb, rgb(var(--bg-card)) 76%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(135%);
+  box-shadow: 0 16px 34px rgba(0,0,0,.14), inset 0 1px rgba(255,255,255,.28) !important;
+}
+.dx2-greet { grid-area: greet; }
+.dx2-today { grid-area: today; }
+.dx2-rev { grid-area: rev; }
+.dx2-revnum { font-size: clamp(2rem, 3.2vw, 3.6rem) !important; }
+.dx2-greet:hover, .dx2-today:hover, .dx2-rev:hover { background: color-mix(in srgb, rgb(var(--bg-card)) 86%, transparent) !important; }
+
+/* The status rail follows the reference: one track, one action, clean labels. */
+.dx2-status {
+  direction: ltr;
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  align-items: center;
+  min-height: 70px !important;
+  padding: 10px 14px !important;
+  border-color: rgba(var(--primary), .5) !important;
+  background: color-mix(in srgb, rgb(var(--bg-card)) 90%, transparent) !important;
+}
+.dx2-status > * { direction: rtl; }
+.dx2-status .dx2-seg-labels { justify-content: flex-end; }
+
+/* KPI row: five prominent cards like the reference; remaining KPIs continue
+   underneath in the same visual system instead of disappearing. */
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+.dx > .relative.z-10 > section[aria-label="Performance reports"] {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric {
+  min-height: 208px !important;
+  padding: 18px !important;
+  border-radius: 18px !important;
+}
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric:nth-child(n+6),
+.dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric:nth-child(n+6) { min-height: 156px !important; }
+
+/* Reference lower band: chart / latest orders / quick actions. */
+.dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+.dx > .relative.z-10 > section[aria-label="Operations pulse"] {
+  grid-template-columns: 1.08fr 1.28fr .92fr !important;
+  gap: 12px !important;
+}
+.dx > .relative.z-10 > section[aria-label="نبض التشغيل"] > *,
+.dx > .relative.z-10 > section[aria-label="Operations pulse"] > * { min-width: 0; }
+.dx2-panel { padding: 16px !important; border-radius: 18px !important; }
+
+@media (max-width: 1180px) and (min-width: 761px) {
+  .dx2-hero { grid-template-columns: 1fr 1fr !important; grid-template-areas: "greet rev" "today today" !important; height: 440px !important; }
+  .dx2-photo { grid-area: 1 / 1 / -1 / -1 !important; }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+  .dx > .relative.z-10 > section[aria-label="Operations pulse"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 760px) {
+  .dx2-hero {
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-areas: "greet today" "rev rev" !important;
+    grid-template-rows: 150px 150px !important;
+    height: 320px !important;
+    padding: 7px !important;
+  }
+  .dx2-photo { grid-area: 1 / 1 / -1 / -1 !important; }
+  .dx2-greet, .dx2-today, .dx2-rev { margin: 4px !important; padding: 13px !important; }
+  .dx2-status { grid-template-columns: 1fr 1fr !important; min-height: 104px !important; }
+  .dx2-status .dx2-segwrap { grid-column: 1 / -1; grid-row: 2; }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric { min-height: 164px !important; }
+  .dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+  .dx > .relative.z-10 > section[aria-label="Operations pulse"] { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 520px) {
+  .dx2-hero { grid-template-columns: 1fr !important; grid-template-areas: "greet" "today" "rev" !important; grid-template-rows: repeat(3, 132px) !important; height: 410px !important; }
+  .dx2-photo { grid-area: 1 / 1 / -1 / -1 !important; }
+  .dx2-status { grid-template-columns: 1fr !important; min-height: 148px !important; }
+  .dx2-status .dx2-segwrap { grid-column: 1; grid-row: 2; }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: 1fr !important; }
+}
+
+/* The dashboard content rail is a vertical flex scroller. Keep composed
+   sections from shrinking to their text line when the rail contains all
+   analytics bands; the rail itself remains scrollable at every breakpoint. */
+.dx > .relative.z-10 > * { flex-shrink: 0 !important; }
+.dx2-hero { flex: 0 0 auto !important; }
+.dx2-status,
+.dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+.dx > .relative.z-10 > section[aria-label="Performance reports"],
+.dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+.dx > .relative.z-10 > section[aria-label="Operations pulse"] { flex-shrink: 0 !important; }
+
+/* KPI cards are a compact dashboard band, not equal-height columns that
+   stretch to the tallest analytics content. */
+@media (min-width: 1181px) {
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] {
+    grid-template-rows: 208px 156px !important;
+    align-content: start !important;
+  }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric {
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+}
+@media (min-width: 761px) and (max-width: 1180px) {
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] {
+    grid-auto-rows: minmax(174px, auto) !important;
+    align-content: start !important;
+  }
+}
+
+/* Responsive from the real dashboard rail width, not the browser viewport.
+   The sidebar can remove 250–300px from the available content area. */
+.dx > .relative.z-10 { container: dashboard-rail / inline-size; }
+@container dashboard-rail (max-width: 1100px) {
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(178px, auto)) !important;
+    align-content: start !important;
+  }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric {
+    min-height: 178px !important;
+    height: 100% !important;
+  }
+  .dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+  .dx > .relative.z-10 > section[aria-label="Operations pulse"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@container dashboard-rail (max-width: 760px) {
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: none !important;
+    grid-auto-rows: minmax(164px, auto) !important;
+  }
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"] > .dx-metric,
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] > .dx-metric { min-height: 164px !important; height: auto !important; }
+  .dx > .relative.z-10 > section[aria-label="نبض التشغيل"],
+  .dx > .relative.z-10 > section[aria-label="Operations pulse"] { grid-template-columns: 1fr !important; }
+}
+@container dashboard-rail (max-width: 500px) {
+  .dx > .relative.z-10 > section[aria-label="تقارير أداء المنظومة"],
+  .dx > .relative.z-10 > section[aria-label="Performance reports"] { grid-template-columns: 1fr !important; }
+}
+
+/* Mobile hero: one composed story over the image, rather than three desktop
+   panes squeezed into a narrow column. */
+@media (max-width: 760px) {
+  .dx2-hero {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 126px 106px 106px !important;
+    grid-template-areas: "greet" "today" "rev" !important;
+    height: 354px !important;
+    min-height: 354px !important;
+    padding: 8px !important;
+    gap: 7px !important;
+    border-radius: 22px !important;
+  }
+  .dx2-photo { grid-area: 1 / 1 / -1 / -1 !important; }
+  .dx2-greet, .dx2-today, .dx2-rev {
+    grid-column: 1 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    border-radius: 16px !important;
+    padding: 12px 14px !important;
+    align-self: stretch !important;
+    overflow: hidden !important;
+  }
+  .dx2-greet { grid-area: greet !important; }
+  .dx2-today { grid-area: today !important; }
+  .dx2-rev { grid-area: rev !important; }
+  .dx2-hello { font-size: clamp(1rem, 5vw, 1.35rem) !important; line-height: 1.35 !important; }
+  .dx2-wish, .dx2-clock { font-size: 10px !important; }
+  .dx2-label { font-size: 10px !important; margin-bottom: 3px !important; }
+  .dx2-minirings { gap: 10px !important; }
+  .dx2-miniring { transform: scale(.82); transform-origin: center; }
+  .dx2-revnum { font-size: clamp(1.7rem, 9vw, 2.35rem) !important; }
+  .dx2-rev .dx2-btn { min-height: 32px !important; padding: 6px 10px !important; font-size: 10px !important; }
+}
+@media (max-width: 420px) {
+  .dx2-hero { grid-template-rows: 116px 102px 102px !important; height: 334px !important; min-height: 334px !important; }
+  .dx2-greet, .dx2-today, .dx2-rev { padding: 10px 11px !important; }
+  .dx2-hello { font-size: 1rem !important; }
+  .dx2-minirings { gap: 5px !important; }
+  .dx2-miniring { transform: scale(.72); }
+}
+
+@media (max-width: 760px) {
+  .dx2-hero {
+    border: 1px solid color-mix(in srgb, rgb(var(--primary)) 28%, transparent) !important;
+    box-shadow: 0 16px 36px rgba(15,23,42,.12), inset 0 1px rgba(255,255,255,.62) !important;
+    background: rgba(var(--bg-card), .20) !important;
+  }
+  .dx2-greet, .dx2-today, .dx2-rev {
+    border: 1px solid rgba(255,255,255,.58) !important;
+    background: color-mix(in srgb, rgb(var(--bg-card)) 68%, transparent) !important;
+    box-shadow: 0 8px 20px rgba(15,23,42,.10), inset 0 1px rgba(255,255,255,.62) !important;
+    backdrop-filter: blur(18px) saturate(125%);
+  }
+  .dx2-greet {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    gap: 2px 8px !important;
+  }
+  .dx2-greet .dx2-hello { grid-column: 1 !important; grid-row: 1 !important; min-width: 0 !important; width: auto !important; display: block !important; white-space: normal !important; }
+  .dx2-greet .dx2-wish { grid-column: 1 !important; grid-row: 2 !important; min-width: 0 !important; width: auto !important; display: block !important; white-space: normal !important; }
+  .dx2-greet .dx2-clock { grid-column: 2 !important; grid-row: 1 / 3 !important; width: auto !important; max-width: 168px !important; min-width: 0 !important; }
+  .dx2-today { justify-content: center !important; }
+  .dx2-rev { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; }
+  .dx2-revnum { margin-inline-start: auto !important; }
+}
+
+/* Mobile hero v2.1: keep the bottom dock compact even when the ring widget
+   carries its desktop-sized internal geometry. */
+@media (max-width: 760px) {
+  .dx2-today,
+  .dx2-rev {
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .dx2-today .dx2-minirings {
+    min-height: 0 !important;
+    height: 58px !important;
+    overflow: hidden !important;
+    align-items: center !important;
+  }
+  .dx2-today .dx2-miniring {
+    width: 62px !important;
+    height: 62px !important;
+    flex: 0 0 62px !important;
+    transform: scale(.76) !important;
+    transform-origin: center !important;
+  }
+  .dx2-rev .dx2-label,
+  .dx2-rev .dx2-chip {
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .dx2-rev {
+    height: 108px !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    gap: 2px !important;
+  }
+  .dx2-revnum {
+    margin-inline-start: 0 !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    font-size: clamp(1.65rem, 8vw, 2.15rem) !important;
+  }
+}
+
+/* HERO v4 — pure gradient command, no photo. Always dark, theme-accented. */
+.dx2-hero {
+  background:
+    radial-gradient(700px 320px at 78% 10%, rgba(var(--primary), 0.30), transparent 62%),
+    radial-gradient(560px 300px at 8% 95%, var(--theme-glow, rgba(var(--primary), 0.10)), transparent 65%),
+    linear-gradient(160deg, #0d1120 0%, #070a12 55%, #04060b 100%);
+  border-color: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+.dx2-visual { position: relative; border-radius: 1.5rem; overflow: hidden; min-height: 210px;
+  background:
+    radial-gradient(420px 220px at 70% 20%, rgba(var(--primary), 0.35), transparent 65%),
+    radial-gradient(360px 240px at 20% 85%, rgba(255,255,255,0.06), transparent 60%),
+    linear-gradient(150deg, #111a30 0%, #070b14 70%);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.dx-orb { position: absolute; border-radius: 50%; filter: blur(38px); pointer-events: none; animation: dx-orb-float 11s ease-in-out infinite alternate; }
+.dx-orb-a { width: 190px; height: 190px; top: -50px; right: 8%; background: rgba(var(--primary), 0.45); }
+.dx-orb-b { width: 130px; height: 130px; bottom: -40px; left: 12%; background: rgba(255,255,255,0.07); animation-delay: -4s; }
+.dx-orb-c { width: 90px; height: 90px; top: 34%; left: 44%; background: var(--theme-glow, rgba(var(--primary), 0.25)); animation-delay: -8s; }
+@keyframes dx-orb-float { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(-24px,18px,0) scale(1.12); } }
+.dx2-visual::after { content: ""; position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(75% 75% at 50% 50%, black, transparent);
+}
+.dx2-rings-art { position: absolute; inset: 0; display: grid; place-items: center; }
+.dx2-rings-art i { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.14); }
+.dx2-rings-art i:nth-child(1) { width: 120px; height: 120px; box-shadow: 0 0 30px rgba(var(--primary), 0.35), inset 0 0 24px rgba(var(--primary), 0.25); border-color: rgba(var(--primary), 0.55); }
+.dx2-rings-art i:nth-child(2) { width: 190px; height: 190px; opacity: 0.7; }
+.dx2-rings-art i:nth-child(3) { width: 260px; height: 260px; opacity: 0.4; }
+/* hero text forced light on the dark command backdrop */
+.dx2-hero .dx2-label { color: rgba(255,255,255,0.66); }
+.dx2-hero .dx2-hello { color: #fff; }
+.dx2-hero .dx2-wish { color: rgba(255,255,255,0.6); }
+.dx2-hero .dx2-clock { color: rgba(255,255,255,0.7); }
+.dx2-hero .dx2-miniring span { color: rgba(255,255,255,0.66); }
+.dx2-hero .dx2-miniring b { color: #fff; }
+.dx2-hero .dx2-revnum { color: #fff; }
+.dx2-hero .dx2-revnum small { color: rgba(255,255,255,0.6); }
+
+/* HERO v5 — gallery command strip: gradient frame, orbs, grid texture */
+.dx2-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid rgba(var(--primary), 0.35);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.16), 0 0 60px var(--theme-glow, rgba(var(--primary), 0.12));
+}
+.dx2-hero::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(var(--primary), 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--primary), 0.05) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(80% 90% at 50% 10%, black, transparent);
+}
+.dx2-greet { position: relative; overflow: hidden; }
+.dx2-greet::after { content: ""; position: absolute; width: 220px; height: 220px; left: -110px; bottom: -140px; border-radius: 50%; background: radial-gradient(circle, rgba(var(--primary), 0.22), transparent 68%); pointer-events: none; }
+.dx2-hello { font-size: 1.3rem; }
+.dx2-today { position: relative; overflow: hidden; border-color: rgba(var(--primary), 0.25); }
+.dx2-miniring svg { filter: drop-shadow(0 0 10px rgba(var(--primary), 0.25)); transition: transform 0.3s; }
+.dx2-miniring:hover svg { transform: scale(1.1) rotate(6deg); }
+.dx2-photo { position: relative; box-shadow: 0 18px 50px rgba(0,0,0,0.20), 0 0 0 1px rgba(var(--primary), 0.15); }
+.dx2-photo::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, transparent 55%, rgba(var(--primary), 0.14)); }
+.dx2-rev { position: relative; overflow: hidden; border-color: rgba(var(--primary), 0.30); }
+.dx2-revnum { text-shadow: 0 0 34px var(--theme-glow, rgba(var(--primary), 0.25)); }
+.dx2-chip { box-shadow: 0 0 16px rgba(16,185,129,0.18); }
+.dx2-btn { position: relative; overflow: hidden; }
+.dx2-btn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent); transform: translateX(-130%); transition: transform 0.7s; }
+.dx2-btn:hover::after { transform: translateX(130%); }
+
+/* HERO v6 — dark command strip, fully responsive */
+.hx { display: grid; grid-template-columns: 1.15fr 1fr 1.25fr 1fr; gap: 1rem; }
+@media (max-width: 1100px) { .hx { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .hx { grid-template-columns: 1fr; } }
+.hx-greet, .hx-today, .hx-rev {
+  background: linear-gradient(165deg, #10182b 0%, #0a0f1e 60%, #070b14 100%);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 1.5rem; padding: 1.25rem 1.35rem; color: #fff;
+  box-shadow: 0 16px 44px rgba(0,0,0,0.28);
+  min-height: 212px; display: flex; flex-direction: column; justify-content: center;
+  position: relative; overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), border-color 0.3s, box-shadow 0.35s;
+  animation: hx-in 0.6s cubic-bezier(0.16,1,0.3,1) both;
+}
+.hx-today { animation-delay: 0.08s; } .hx-visual { animation-delay: 0.16s; } .hx-rev { animation-delay: 0.24s; }
+@keyframes hx-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.hx-greet:hover, .hx-today:hover, .hx-rev:hover { transform: translateY(-4px); border-color: rgba(var(--primary), 0.5); box-shadow: 0 22px 55px rgba(0,0,0,0.35), 0 0 40px var(--theme-glow, rgba(var(--primary), 0.16)); }
+.hx-greet::after { content: ""; position: absolute; width: 230px; height: 230px; left: -115px; bottom: -150px; border-radius: 50%; background: radial-gradient(circle, rgba(var(--primary), 0.28), transparent 68%); pointer-events: none; }
+.hx-avatar { width: 46px; height: 46px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #fff; background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), 0.55)); box-shadow: 0 8px 22px rgba(var(--primary), 0.35); margin-bottom: 10px; }
+.hx-hello { font-size: 1.05rem; font-weight: 900; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.hx-wish { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.hx-greet-tx { min-width: 0; }
+.hx-clock { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.hx-chiplet { font-size: 11.5px; font-weight: 800; color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 6px 12px; }
+.hx-chiplet-biz { color: #a7f3d0; background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.35); }
+.hx-label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.62); }
+.hx-rings { display: flex; gap: 20px; margin-top: 12px; }
+.hx-ring { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.hx-ring span { font-size: 11px; color: rgba(255,255,255,0.62); font-weight: 800; }
+.hx-ring b { font-size: 12px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+.hx-arc { transition: stroke-dasharray 1.1s cubic-bezier(0.16,1,0.3,1); filter: drop-shadow(0 0 8px rgba(var(--primary), 0.5)); }
+.hx-visual { position: relative; border-radius: 1.5rem; overflow: hidden; min-height: 212px; border: 1px solid rgba(255,255,255,0.10);
+  background: linear-gradient(150deg, #131c33 0%, #070b14 70%); box-shadow: 0 16px 44px rgba(0,0,0,0.28); }
+.hx-visual img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.9; }
+.hx-visual::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(4,6,11,0.55)); pointer-events: none; }
+.hx-revnum { font-size: clamp(1.9rem, 2.8vw, 2.6rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; color: #fff; margin-top: 4px; font-variant-numeric: tabular-nums; text-shadow: 0 0 34px var(--theme-glow, rgba(var(--primary), 0.3)); }
+.hx-revnum small { font-size: 0.85rem; color: rgba(255,255,255,0.6); font-weight: 800; margin-inline-start: 5px; }
+.hx-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 900; padding: 5px 12px; border-radius: 999px; margin-top: 10px; width: fit-content; }
+.hx-chip.up { background: rgba(16,185,129,0.16); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.35); }
+.hx-chip.dn { background: rgba(244,63,94,0.16); color: #fda4af; border: 1px solid rgba(244,63,94,0.35); }
+.hx-btn { margin-top: 12px; font-size: 12.5px; font-weight: 900; color: #fff; background: linear-gradient(135deg, rgb(var(--primary)), rgba(var(--primary), 0.72)); border: 0; cursor: pointer; border-radius: 0.9rem; padding: 0.75rem 1rem; transition: transform 0.2s, filter 0.2s, box-shadow 0.3s; box-shadow: 0 10px 26px rgba(var(--primary), 0.35); width: 100%; }
+.hx-btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+.hx-btn:active { transform: scale(0.98); }
+
+.hx-visual { position: relative; border-radius: 1.5rem; overflow: hidden; min-height: 212px;
+  background: linear-gradient(150deg, #111a30 0%, #070b14 70%);
+  border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 16px 44px rgba(0,0,0,0.28); }
+.hx-visual::after { content: ""; position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(75% 75% at 50% 50%, black, transparent); }
+.hx-rings-art { position: absolute; inset: 0; display: grid; place-items: center; }
+.hx-rings-art i { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.14); }
+.hx-rings-art i:nth-child(1) { width: 120px; height: 120px; box-shadow: 0 0 30px rgba(var(--primary), 0.35), inset 0 0 24px rgba(var(--primary), 0.25); border-color: rgba(var(--primary), 0.55); }
+.hx-rings-art i:nth-child(2) { width: 190px; height: 190px; opacity: 0.7; }
+.hx-rings-art i:nth-child(3) { width: 260px; height: 260px; opacity: 0.4; }
+
+.hx-tip { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
+  backdrop-filter: blur(14px); border-radius: 1rem; padding: 10px 13px; }
+.hx-tip-ic { font-size: 17px; filter: drop-shadow(0 0 8px rgba(251,191,36,0.6)); flex-shrink: 0; }
+.hx-tip-tx { font-size: 12px; font-weight: 800; color: #fff; line-height: 1.7; animation: hx-tip-in 0.65s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes hx-tip-in { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+.hx-tip-dots { display: flex; gap: 4px; margin-inline-start: auto; flex-shrink: 0; }
+.hx-tip-dots i { width: 5px; height: 5px; border-radius: 99px; background: rgba(255,255,255,0.25); transition: all 0.3s; }
+.hx-tip-dots i.on { width: 16px; background: rgb(var(--primary)); box-shadow: 0 0 8px rgba(var(--primary), 0.7); }
+.hx-ministats { display: flex; gap: 18px; margin-top: 12px; }
+.hx-ministats div { display: flex; flex-direction: column; }
+.hx-ministats b { font-size: 15px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+.hx-ministats span { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.6); }

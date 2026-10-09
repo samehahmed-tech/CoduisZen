@@ -1,0 +1,68 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE PLUS — one codebase, mobile-tuned experience.
+   Desktop components, mobile ergonomics: touch targets, bottom-sheet
+   dialogs, compact tables, staggered mobile entrances. No separate pages.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Small screens: shared shell comfort ── */
+@media (max-width: 768px) {
+    .workspace-shell main {
+        padding-bottom: calc(var(--safe-bottom, 0px) + 12px);
+    }
+
+    /* Dialogs become bottom sheets */
+    .theme-modal-content {
+        position: fixed !important;
+        inset: auto 0 0 0 !important;
+        max-height: 92dvh !important;
+        width: 100% !important;
+        border-radius: 20px 20px 0 0 !important;
+        animation: sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes sheet-up { from { opacity: 0; transform: translateY(48px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Compact readable tables */
+    .theme-table th, .theme-table td {
+        padding: 0.5rem 0.625rem;
+        font-size: 12px;
+    }
+    .theme-table th { white-space: nowrap; }
+
+    /* KPI + menu cards: two-up rhythm, tighter */
+    .theme-card { border-radius: 16px; }
+
+    /* Mobile-only staggered entrances (desktop keeps its own motion) */
+    html:not([data-motion="off"]) .dx-metric,
+    html:not([data-motion="off"]) .pos-menu-item-card {
+        animation: rise-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    }
+    html:not([data-motion="off"]) .dx-metric:nth-child(2),
+    html:not([data-motion="off"]) .pos-menu-item-card:nth-child(2) { animation-delay: 60ms; }
+    html:not([data-motion="off"]) .dx-metric:nth-child(3),
+    html:not([data-motion="off"]) .pos-menu-item-card:nth-child(3) { animation-delay: 120ms; }
+    html:not([data-motion="off"]) .dx-metric:nth-child(n+4),
+    html:not([data-motion="off"]) .pos-menu-item-card:nth-child(n+4) { animation-delay: 180ms; }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+}
+
+/* ── Coarse pointers (touch laptops included): guaranteed touch targets ── */
+@media (pointer: coarse) {
+    .theme-btn, .theme-btn-primary, .theme-btn-secondary {
+        min-height: 44px;
+    }
+    .theme-input, select.theme-input, textarea.theme-input {
+        min-height: 44px;
+        font-size: 16px; /* prevents iOS zoom-on-focus */
+    }
+    .sidebar-nav-item { min-height: 46px; }
+    .pos-menu-item-add-btn, .pos-menu-item-add-wide { min-height: 44px; min-width: 44px; }
+    button[aria-label], .theme-icon-button { min-width: 40px; min-height: 40px; }
+}
+
+/* ── Motion safety ── */
+html[data-motion="off"] .theme-modal-content,
+html[data-motion="off"] .dx-metric,
+html[data-motion="off"] .pos-menu-item-card { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+    .theme-modal-content, .dx-metric, .pos-menu-item-card { animation: none; }
+}

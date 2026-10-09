@@ -76,7 +76,7 @@ const PERM_LABELS: Record<string, { en: string; ar: string }> = {
     NAV_WHATSAPP: { en: 'WhatsApp', ar: 'واتساب' },
     NAV_PLATFORMS: { en: 'Platforms', ar: 'المنصات' },
     NAV_WEBHOOKS: { en: 'Webhooks', ar: 'Webhooks' },
-    NAV_REFUNDS: { en: 'Refunds', ar: 'المبالغ المستردة' },
+    NAV_REFUNDS: { en: 'Refunds', ar: 'المرتجعات والاسترداد' },
     NAV_FISCAL: { en: 'E-Invoicing', ar: 'الفاتورة الإلكترونية' },
     DATA_VIEW_REVENUE: { en: 'View Revenue', ar: 'عرض الإيرادات' },
     DATA_VIEW_COSTS: { en: 'View Costs', ar: 'عرض التكاليف' },
@@ -99,18 +99,106 @@ const PERM_LABELS: Record<string, { en: string; ar: string }> = {
     OP_APPROVE_SUPPLIER_INVOICE: { en: 'Approve Supplier Invoice', ar: 'اعتماد فاتورة مورد' },
     OP_PROCESS_PAYROLL: { en: 'Process Payroll', ar: 'معالجة الرواتب' },
     OP_MANAGE_CASH_DRAWER: { en: 'Manage Cash Drawer', ar: 'إدارة الدرج النقدي' },
+    OP_MANAGE_SHIFTS: { en: 'Manage Shifts', ar: 'إدارة الشيفتات' },
     OP_MANAGE_DELIVERY: { en: 'Manage Delivery', ar: 'إدارة التوصيل' },
     OP_MANAGE_MARKETING: { en: 'Manage Marketing', ar: 'إدارة التسويق' },
-    OP_MANAGE_WHATSAPP: { en: 'Manage WhatsApp', ar: 'إدارة واتساب' },
+    OP_MANAGE_WASTAGE: { en: 'Record Wastage', ar: 'تسجيل الهدر' },
+    OP_MANAGE_PRODUCTION: { en: 'Manage Production', ar: 'إدارة الإنتاج' },
+    OP_MANAGE_BUDGETS: { en: 'Manage Budgets', ar: 'إدارة الميزانيات' },
+    OP_MANAGE_CUSTOMERS: { en: 'Manage Customers', ar: 'إدارة العملاء' },
+    OP_MANAGE_FINANCE: { en: 'Manage Finance', ar: 'إدارة المالية' },
+    OP_KDS_OPERATE: { en: 'Operate KDS', ar: 'تشغيل شاشة المطبخ' },
     CFG_MANAGE_USERS: { en: 'Manage Users', ar: 'إدارة المستخدمين' },
     CFG_MANAGE_ROLES: { en: 'Manage Roles', ar: 'إدارة الأدوار' },
     CFG_EDIT_MENU_PRICING: { en: 'Edit Menu Pricing', ar: 'تعديل أسعار المنيو' },
     CFG_EDIT_FLOOR_PLAN: { en: 'Edit Floor Plan', ar: 'تعديل مخطط القاعة' },
     CFG_MANAGE_BRANCHES: { en: 'Manage Branches', ar: 'إدارة الفروع' },
     CFG_OFFLINE_MODE: { en: 'Offline Mode', ar: 'الوضع غير المتصل' },
-    CFG_MANAGE_PRINTERS: { en: 'Manage Printers', ar: 'إدارة الطابعات' },
     CFG_MANAGE_SETTINGS: { en: 'Manage Settings', ar: 'إدارة الإعدادات' },
+    CFG_MANAGE_PRINTERS: { en: 'Manage Printers', ar: 'إدارة الطابعات' },
     CFG_MANAGE_PLATFORMS: { en: 'Manage Platforms', ar: 'إدارة المنصات' },
+    CFG_MANAGE_WAREHOUSES: { en: 'Manage Warehouses', ar: 'إدارة المخازن' },
+};
+
+// What each permission actually unlocks (shown under every toggle).
+const PERM_HINTS: Record<string, { en: string; ar: string }> = {
+    NAV_DASHBOARD: { en: 'Home command dashboard', ar: 'لوحة القيادة الرئيسية' },
+    NAV_ADMIN_DASHBOARD: { en: 'Management overview screens', ar: 'شاشات نظرة الإدارة' },
+    NAV_POS: { en: 'Sell at the counter', ar: 'البيع من الكاشير' },
+    NAV_KDS: { en: 'Kitchen screens', ar: 'شاشات المطبخ' },
+    NAV_PICKUP: { en: 'Pickup and packing', ar: 'الاستلام والتغليف' },
+    NAV_CALL_CENTER: { en: 'Take phone orders', ar: 'استقبال طلبات التليفون' },
+    NAV_INVENTORY: { en: 'Stock, suppliers, warehouses', ar: 'المخزون والموردين والمخازن' },
+    NAV_FINANCE: { en: 'Treasury and accounts', ar: 'الخزينة والحسابات' },
+    NAV_REPORTS: { en: 'All reports and exports', ar: 'كل التقارير والتصدير' },
+    NAV_CRM: { en: 'Customers and loyalty', ar: 'العملاء والولاء' },
+    NAV_MENU_MANAGER: { en: 'Edit menu items and prices', ar: 'تعديل أصناف وأسعار المنيو' },
+    NAV_ORDERS: { en: 'Orders center screen', ar: 'شاشة مركز الطلبات' },
+    NAV_RECIPES: { en: 'Recipes and food cost', ar: 'الوصفات وتكلفة الطعام' },
+    NAV_FORENSICS: { en: 'Audit investigations', ar: 'تحقيقات المراجعة' },
+    NAV_AI_ASSISTANT: { en: 'AI copilot', ar: 'المساعد الذكي' },
+    NAV_SETTINGS: { en: 'System settings', ar: 'إعدادات النظام' },
+    NAV_SECURITY: { en: 'Security screens', ar: 'شاشات الأمان' },
+    NAV_PRINTERS: { en: 'Printers and routing', ar: 'الطابعات والتوجيه' },
+    NAV_PRODUCTION: { en: 'Production orders', ar: 'أوامر الإنتاج' },
+    NAV_PEOPLE: { en: 'Staff and HR', ar: 'الموظفين والموارد البشرية' },
+    NAV_FLOOR_PLAN: { en: 'Tables and hall map', ar: 'الطاولات وخريطة القاعة' },
+    NAV_DRIVER: { en: 'Driver app screens', ar: 'شاشات الطيار' },
+    NAV_TREASURY: { en: 'Cash vaults and vouchers', ar: 'الخزن والسندات' },
+    NAV_PAYROLL: { en: 'Payroll screens', ar: 'شاشات الرواتب' },
+    NAV_QUALITY: { en: 'Quality checks', ar: 'فحوصات الجودة' },
+    NAV_ATTENDANCE: { en: 'Check-in and shifts', ar: 'الحضور والشيفتات' },
+    NAV_WASTAGE: { en: 'Wastage recording', ar: 'تسجيل الهالك' },
+    NAV_DISPATCH: { en: 'Dispatch hub', ar: 'مركز التوزيع' },
+    NAV_FRANCHISE: { en: 'Franchise screens', ar: 'شاشات الامتياز' },
+    NAV_APPROVAL: { en: 'Approval center', ar: 'مركز الموافقات' },
+    NAV_USER_MANAGEMENT: { en: 'Create and edit users', ar: 'إنشاء وتعديل المستخدمين' },
+    NAV_MARKETING: { en: 'Campaigns and promos', ar: 'الحملات والعروض' },
+    NAV_WHATSAPP: { en: 'WhatsApp hub', ar: 'مركز واتساب' },
+    NAV_PLATFORMS: { en: 'Delivery platforms', ar: 'منصات التوصيل' },
+    NAV_WEBHOOKS: { en: 'Webhook settings', ar: 'إعدادات Webhooks' },
+    NAV_REFUNDS: { en: 'Refund requests screen', ar: 'شاشة طلبات المرتجعات' },
+    NAV_FISCAL: { en: 'E-invoicing', ar: 'الفاتورة الإلكترونية' },
+    DATA_VIEW_REVENUE: { en: 'See sales numbers', ar: 'رؤية أرقام المبيعات' },
+    DATA_VIEW_COSTS: { en: 'See cost numbers', ar: 'رؤية أرقام التكاليف' },
+    DATA_VIEW_PROFITS: { en: 'See profit numbers', ar: 'رؤية أرقام الأرباح' },
+    DATA_VIEW_CUSTOMER_SENSITIVE: { en: 'See phones and addresses', ar: 'رؤية الهواتف والعناوين' },
+    DATA_VIEW_STOCK_LEVELS: { en: 'See stock quantities', ar: 'رؤية كميات المخزون' },
+    DATA_VIEW_AUDIT_LOGS: { en: 'See who did what', ar: 'رؤية سجل من فعل ماذا' },
+    DATA_VIEW_SALARIES: { en: 'See salary figures', ar: 'رؤية أرقام الرواتب' },
+    OP_VOID_ORDER: { en: 'Cancel any order', ar: 'إلغاء أي طلب' },
+    OP_APPLY_DISCOUNT: { en: 'Give discounts', ar: 'منح الخصومات' },
+    OP_PROCESS_REFUND: { en: 'Approve and pay refunds', ar: 'اعتماد ودفع المرتجعات' },
+    OP_TRANSFER_STOCK: { en: 'Move stock between stores', ar: 'نقل مخزون بين المخازن' },
+    OP_ADJUST_STOCK: { en: 'Correct stock counts', ar: 'تصحيح أرصدة المخزون' },
+    OP_PLACE_ORDER: { en: 'Create new orders', ar: 'إنشاء طلبات جديدة' },
+    OP_CLOSE_DAY: { en: 'Close the business day', ar: 'إقفال اليوم التشغيلي' },
+    OP_CREATE_PO: { en: 'Create purchase orders', ar: 'إنشاء أوامر الشراء' },
+    OP_RECEIVE_GRN: { en: 'Receive goods', ar: 'استلام البضائع' },
+    OP_APPROVE_PO: { en: 'Approve purchase orders', ar: 'اعتماد أوامر الشراء' },
+    OP_CREATE_SUPPLIER_INVOICE: { en: 'Enter supplier invoices', ar: 'إدخال فواتير الموردين' },
+    OP_APPROVE_SUPPLIER_INVOICE: { en: 'Approve supplier invoices', ar: 'اعتماد فواتير الموردين' },
+    OP_PROCESS_PAYROLL: { en: 'Run payroll', ar: 'تشغيل الرواتب' },
+    OP_MANAGE_CASH_DRAWER: { en: 'Open drawer and count cash', ar: 'فتح الدرج وجرد النقدية' },
+    OP_MANAGE_SHIFTS: { en: 'Open and close shifts', ar: 'فتح وقفل الشيفتات' },
+    OP_MANAGE_DELIVERY: { en: 'Assign drivers and zones', ar: 'تعيين الطيارين والمناطق' },
+    OP_MANAGE_MARKETING: { en: 'Launch campaigns', ar: 'إطلاق الحملات' },
+    OP_MANAGE_WASTAGE: { en: 'Record wasted items', ar: 'تسجيل الأصناف المهدرة' },
+    OP_MANAGE_PRODUCTION: { en: 'Run production', ar: 'تشغيل الإنتاج' },
+    OP_MANAGE_BUDGETS: { en: 'Set budgets', ar: 'وضع الميزانيات' },
+    OP_MANAGE_CUSTOMERS: { en: 'Edit customer files', ar: 'تعديل ملفات العملاء' },
+    OP_MANAGE_FINANCE: { en: 'Post finance entries', ar: 'ترحيل قيود مالية' },
+    OP_KDS_OPERATE: { en: 'Bump kitchen tickets', ar: 'تمرير تذاكر المطبخ' },
+    CFG_MANAGE_USERS: { en: 'Create users and reset PINs', ar: 'إنشاء المستخدمين وتصفير الأكواد' },
+    CFG_MANAGE_ROLES: { en: 'Edit this permissions screen', ar: 'تعديل شاشة الصلاحيات هذه' },
+    CFG_EDIT_MENU_PRICING: { en: 'Change menu prices', ar: 'تغيير أسعار المنيو' },
+    CFG_EDIT_FLOOR_PLAN: { en: 'Edit tables map', ar: 'تعديل خريطة الطاولات' },
+    CFG_MANAGE_BRANCHES: { en: 'Add and edit branches', ar: 'إضافة وتعديل الفروع' },
+    CFG_OFFLINE_MODE: { en: 'Work without internet', ar: 'العمل بدون إنترنت' },
+    CFG_MANAGE_SETTINGS: { en: 'Change system settings', ar: 'تغيير إعدادات النظام' },
+    CFG_MANAGE_PRINTERS: { en: 'Add printers and routes', ar: 'إضافة الطابعات والتوجيه' },
+    CFG_MANAGE_PLATFORMS: { en: 'Connect delivery platforms', ar: 'ربط منصات التوصيل' },
+    CFG_MANAGE_WAREHOUSES: { en: 'Add warehouses', ar: 'إضافة المخازن' },
 };
 
 // ROLE_LABELS is now centralized in utils/roleLabels.ts (bilingual en/ar).
@@ -128,7 +216,7 @@ const RolesPermissions: React.FC = () => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [permSearchQuery, setPermSearchQuery] = useState('');
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
     const [selectedRoleId, setSelectedRoleId] = useState<string>(UserRole.BRANCH_MANAGER);
     const [editingPermissions, setEditingPermissions] = useState<AppPermission[]>([]);
     const [hasChanges, setHasChanges] = useState(false);
@@ -725,6 +813,11 @@ const RolesPermissions: React.FC = () => {
                                                             {isRemoved && <span className="text-[7px] font-black text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded uppercase">{tn('Removed', 'محذوف')}</span>}
                                                         </div>
                                                         <p className="text-[7px] font-mono text-muted/60 font-bold truncate">{perm}</p>
+                                                        {PERM_HINTS[perm] && (
+                                                            <p className="text-[9px] font-bold text-muted/90 leading-relaxed mt-0.5">
+                                                                {lang === 'ar' ? PERM_HINTS[perm].ar : PERM_HINTS[perm].en}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {/* Category dot */}

@@ -14,7 +14,7 @@ const WarehousesPage: React.FC = () => {
     branchTransferItemId, setBranchTransferItemId, branchTransferFromWh, setBranchTransferFromWh,
     branchTransferToWh, setBranchTransferToWh, branchTransferQty, setBranchTransferQty,
     branchTransferReason, setBranchTransferReason, destinationWarehouses,
-    handleCreateBranchTransfer, transferMovements,
+    handleCreateBranchTransfer, branchTransferOnHand, handleToggleWarehouseActive, transferMovements,
   } = useInventoryWorkspace();
 
   const [subTab, setSubTab] = useState<'WAREHOUSES' | 'TRANSFERS'>('WAREHOUSES');
@@ -123,6 +123,9 @@ const WarehousesPage: React.FC = () => {
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">{lang === 'ar' ? 'نظرة عامة على المخزن' : 'Warehouse overview'}</p>
               <h3 className="mt-1 text-2xl font-black text-main">{displayWarehouseName(warehouseById.get(selectedWarehouse.id) || selectedWarehouse)}</h3>
               <p className="mt-1 text-xs font-bold text-muted">{branchById.get(selectedWarehouse.branchId)?.name || 'Central'} / {selectedWarehouse.type}</p>
+              <button onClick={() => handleToggleWarehouseActive(selectedWarehouse)} className="mt-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border-border/40 text-muted hover:text-main">
+                {selectedWarehouse.isActive === false ? (lang === 'ar' ? 'تفعيل المخزن' : 'Activate') : (lang === 'ar' ? 'إيقاف المخزن' : 'Deactivate')}
+              </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
               {[
@@ -165,8 +168,13 @@ const WarehousesPage: React.FC = () => {
             </select>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted text-[10px] font-black uppercase">{lang === 'ar' ? 'كمية' : 'Qty'}</span>
-              <input type="number" className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-elevated/40 border border-border/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all text-main font-bold text-sm shadow-inner" value={branchTransferQty} onChange={(e) => setBranchTransferQty(Number(e.target.value || 0))} />
+              <input type="number" min={0} className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-elevated/40 border border-border/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all text-main font-bold text-sm shadow-inner" value={branchTransferQty} onChange={(e) => setBranchTransferQty(Math.max(0, Number(e.target.value || 0)))} />
             </div>
+            {branchTransferItemId && branchTransferFromWh && (
+              <p className={`text-[11px] font-black tabular-nums ${branchTransferQty > branchTransferOnHand ? 'text-rose-500' : 'text-muted'}`}>
+                {lang === 'ar' ? 'المتاح في المصدر:' : 'On hand at source:'} {branchTransferOnHand}
+              </p>
+            )}
             <input className="w-full px-4 py-3.5 rounded-2xl bg-elevated/40 border border-border/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all text-main font-bold text-sm placeholder:text-muted/50 shadow-inner" placeholder={lang === 'ar' ? 'سبب التحويل...' : 'Reason for Transfer...'} value={branchTransferReason} onChange={(e) => setBranchTransferReason(e.target.value)} />
           </div>
           <div className="pt-4 border-t border-border/20 relative z-10">
