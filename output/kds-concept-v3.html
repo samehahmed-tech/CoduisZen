@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KDS — تصور عملي هادئ (V3)</title>
+<style>
+/* ── نفس توكنز السيستم: rgb(var(--…)) عشان يركب على أي ثيم ── */
+[data-kds-theme="light"]{
+  --primary:37,99,235; --success:16,185,129; --warning:245,158,11; --danger:239,68,68;
+  --bg-app:244,245,247; --bg-card:255,255,255; --bg-elevated:255,255,255;
+  --text-main:23,32,48; --text-muted:107,114,128; --border-color:226,230,236;
+  color-scheme:light;
+}
+[data-kds-theme="dark"]{
+  --primary:96,140,255; --success:52,211,153; --warning:251,191,36; --danger:248,113,113;
+  --bg-app:9,13,22; --bg-card:17,24,39; --bg-elevated:24,33,54;
+  --text-main:241,245,249; --text-muted:139,149,167; --border-color:255,255,255;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:rgb(var(--bg-app));color:rgb(var(--text-main));min-height:100vh;font-size:14px;}
+.wrap{max-width:1500px;margin:0 auto;padding:0 14px 110px}
+
+/* ── هيدر نحيف ── */
+header{position:sticky;top:0;z-index:50;background:rgb(var(--bg-card));border-bottom:1px solid rgba(var(--border-color),.35);}
+.hd{max-width:1500px;margin:0 auto;padding:9px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px}
+.brand .mk{width:32px;height:32px;border-radius:9px;background:rgb(var(--primary));color:#fff;display:grid;place-items:center;font-size:16px}
+.clock{color:rgb(var(--text-muted));font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.count{background:rgb(var(--bg-app));border:1px solid rgba(var(--border-color),.5);border-radius:9px;padding:5px 12px;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.count b{font-size:15px}
+.sp{flex:1}
+/* بحث الرقم — بارز */
+.qbox{display:flex;align-items:center;gap:0;border:1.5px solid rgba(var(--border-color),.6);border-radius:11px;overflow:hidden;background:rgb(var(--bg-app));transition:.15s}
+.qbox.ok{border-color:rgb(var(--success))}
+.qbox.bad{border-color:rgb(var(--danger))}
+.qbox input{border:none;outline:none;background:transparent;color:rgb(var(--text-main));font-family:inherit;font-size:14px;font-weight:800;width:130px;padding:9px 12px;font-variant-numeric:tabular-nums}
+.qbox input::placeholder{color:rgb(var(--text-muted));font-weight:600;font-size:12px}
+.qbox button{border:none;background:rgb(var(--primary));color:#fff;font-family:inherit;font-weight:800;font-size:12px;padding:10px 14px;cursor:pointer}
+.btn{border:1px solid rgba(var(--border-color),.6);background:rgb(var(--bg-app));color:rgb(var(--text-main));font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:rgb(var(--primary))}
+.btn.primary{background:rgb(var(--primary));border-color:rgb(var(--primary));color:#fff}
+.btn.danger-soft{color:rgb(var(--success));border-color:rgba(var(--success),.4)}
+.btn.on{border-color:rgb(var(--primary));color:rgb(var(--primary))}
+.btn:active{transform:scale(.97)}
+.thsw{display:flex;border:1px solid rgba(var(--border-color),.6);border-radius:10px;overflow:hidden}
+.thsw button{border:none;background:transparent;color:rgb(var(--text-muted));font-family:inherit;font-size:12px;font-weight:700;padding:9px 12px;cursor:pointer}
+.thsw button.on{background:rgb(var(--text-main));color:rgb(var(--bg-card))}
+
+/* ── شريط حالة نحيف (بدل KPIs) ── */
+.statusbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
+.fbtn{border:1px solid rgba(var(--border-color),.55);background:rgb(var(--bg-card));color:rgb(var(--text-muted));font-family:inherit;font-size:12.5px;font-weight:800;padding:8px 14px;border-radius:999px;cursor:pointer}
+.fbtn b{font-variant-numeric:tabular-nums;background:rgb(var(--bg-app));border-radius:20px;padding:1px 8px;margin-inline-start:4px;font-size:11.5px}
+.fbtn.on{background:rgb(var(--text-main));color:rgb(var(--bg-card));border-color:rgb(var(--text-main))}
+.fbtn.on b{background:rgba(128,128,128,.25)}
+.stsep{width:1px;height:22px;background:rgba(var(--border-color),.6)}
+.station{border:1px dashed rgba(var(--border-color),.9);background:transparent;color:rgb(var(--text-muted));font-family:inherit;font-size:12px;font-weight:700;padding:8px 13px;border-radius:999px;cursor:pointer}
+.station.on{border-style:solid;border-color:rgb(var(--primary));color:rgb(var(--primary));background:rgba(var(--primary),.07)}
+.hint{margin-inline-start:auto;font-size:11.5px;color:rgb(var(--text-muted));font-weight:600}
+
+/* ── الأعمدة ── */
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start}
+@media(max-width:1050px){.cols{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.cols{grid-template-columns:1fr}}
+.col{background:rgb(var(--bg-card));border:1px solid rgba(var(--border-color),.45);border-radius:16px;overflow:hidden}
+.col-h{padding:11px 14px;border-bottom:1px solid rgba(var(--border-color),.4);display:flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px}
+.col-h .n{margin-inline-start:auto;background:rgb(var(--bg-app));border-radius:20px;font-size:12px;padding:2px 11px;font-variant-numeric:tabular-nums}
+.col-b{padding:10px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 250px);overflow-y:auto}
+@media(max-width:700px){.col-b{max-height:none}}
+.empty{border:1.5px dashed rgba(var(--border-color),.8);border-radius:12px;padding:30px 10px;text-align:center;color:rgb(var(--text-muted));font-size:12.5px;font-weight:600}
+
+/* ── الكارت: هادئ، عملي ── */
+.t{background:rgb(var(--bg-card));border:1px solid rgba(var(--border-color),.6);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;max-height:640px;animation:inn .25s ease}
+@keyframes inn{from{opacity:0;transform:translateY(8px)}}
+.t.late{border-inline-end:4px solid rgb(var(--danger))}
+.t.risk{border-inline-end:4px solid rgb(var(--warning))}
+.t.ready{border-inline-end:4px solid rgb(var(--success))}
+/* مؤشر الخطوات */
+.steps{display:flex;gap:5px;padding:10px 13px 0;align-items:center}
+.steps i{flex:1;height:4px;border-radius:99px;background:rgba(var(--border-color),.7)}
+.steps i.fill{background:rgb(var(--primary))}
+.steps.ready i.fill{background:rgb(var(--success))}
+.steps span{font-size:10.5px;color:rgb(var(--text-muted));font-weight:700;white-space:nowrap}
+.t-top{display:flex;align-items:center;gap:10px;padding:8px 13px 6px}
+.tnum{font-size:27px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.tnum small{display:block;font-size:10px;color:rgb(var(--text-muted));font-weight:600}
+.timer{margin-inline-start:auto;font-size:12.5px;font-weight:800;padding:6px 12px;border-radius:9px;background:rgb(var(--bg-app));border:1px solid rgba(var(--border-color),.6);color:rgb(var(--text-muted));font-variant-numeric:tabular-nums;white-space:nowrap}
+.timer.warn{color:rgb(var(--warning));border-color:rgba(var(--warning),.45)}
+.timer.risk{color:rgb(var(--warning));border-color:rgba(var(--warning),.6);background:rgba(var(--warning),.08)}
+.timer.crit{color:rgb(var(--danger));border-color:rgba(var(--danger),.6);background:rgba(var(--danger),.08);animation:blk 1.2s infinite}
+@keyframes blk{50%{opacity:.65}}
+.meta{padding:0 13px 8px;font-size:11.5px;color:rgb(var(--text-muted));font-weight:600;display:flex;gap:8px;flex-wrap:wrap}
+.meta b{color:rgb(var(--text-main))}
+.tag{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;border:1px solid rgba(var(--border-color),.7);color:rgb(var(--text-muted))}
+.tag.rush{color:rgb(var(--danger));border-color:rgba(var(--danger),.5)}
+.note{margin:0 13px 8px;font-size:12px;font-weight:700;padding:7px 10px;border-radius:9px;background:rgba(var(--warning),.09);border:1px solid rgba(var(--warning),.25);line-height:1.8}
+.note.red{background:rgba(var(--danger),.07);border-color:rgba(var(--danger),.25)}
+/* الأصناف: سكرول داخلي + فوتر ثابت */
+.items{flex:1;min-height:0;overflow-y:auto;border-top:1px solid rgba(var(--border-color),.4);padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+.it{display:flex;gap:9px;align-items:flex-start;padding:8px 7px;border-radius:9px;cursor:pointer;border-bottom:1px solid rgba(var(--border-color),.3)}
+.it:last-child{border-bottom:none}
+.it:hover{background:rgb(var(--bg-app))}
+.it.done{opacity:.42}
+.it.done .nm{text-decoration:line-through}
+.qty{min-width:34px;height:30px;padding:0 8px;border-radius:8px;background:rgb(var(--bg-app));border:1px solid rgba(var(--border-color),.7);display:grid;place-items:center;font-size:13px;font-weight:800;flex-shrink:0;font-variant-numeric:tabular-nums}
+.it.done .qty{background:rgb(var(--success));border-color:rgb(var(--success));color:#fff}
+.tx{flex:1;min-width:0}
+.nm{font-size:13.5px;font-weight:700;line-height:1.65}
+.sub2{font-size:11.5px;color:rgb(var(--text-muted));font-weight:600;line-height:1.8}
+.sub2 .ex{color:rgb(var(--warning))}
+.inote{font-size:11px;font-weight:700;color:rgb(var(--danger))}
+.more{border:none;background:rgb(var(--bg-app));color:rgb(var(--primary));font-family:inherit;font-size:12px;font-weight:800;padding:9px;border-radius:9px;cursor:pointer;margin:2px 4px}
+/* الفوتر ثابت دايمًا ظاهر */
+.t-foot{border-top:1px solid rgba(var(--border-color),.45);padding:10px 12px;display:flex;gap:8px;background:rgb(var(--bg-card))}
+.act{flex:1;border:none;font-family:inherit;font-weight:800;font-size:14px;border-radius:11px;padding:13px;cursor:pointer;min-height:52px;background:rgb(var(--primary));color:#fff}
+.act.green{background:rgb(var(--success))}
+.act.dim{background:rgb(var(--bg-app));color:rgb(var(--text-muted));border:1px solid rgba(var(--border-color),.6)}
+.act:active{transform:scale(.98)}
+.undo2{border:1px solid rgba(var(--border-color),.6);background:transparent;color:rgb(var(--text-muted));border-radius:11px;padding:0 15px;font-size:16px;cursor:pointer;font-family:inherit}
+/* توست */
+.toasts{position:fixed;bottom:22px;right:50%;transform:translateX(50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:rgb(var(--text-main));color:rgb(var(--bg-card));font-weight:700;font-size:13px;padding:12px 18px;border-radius:12px;display:flex;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.3);animation:inn .25s}
+.toast button{background:transparent;border:1px solid currentColor;color:inherit;font-family:inherit;font-weight:800;font-size:12px;border-radius:8px;padding:6px 13px;cursor:pointer;opacity:.85}
+.demobar{position:fixed;bottom:18px;left:18px;z-index:150;display:flex;gap:8px}
+.demobar button{font-family:inherit;font-weight:800;font-size:12px;border-radius:11px;padding:12px 16px;cursor:pointer;border:1px solid rgba(var(--border-color),.6);background:rgb(var(--bg-card));color:rgb(var(--text-muted))}
+.demobar .sim{background:rgb(var(--text-main));color:rgb(var(--bg-card));border:none}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:rgba(128,128,128,.35);border-radius:99px}
+.kbd{background:rgb(var(--bg-app));border:1px solid rgba(var(--border-color),.7);border-radius:5px;padding:0 6px;font-size:10.5px;font-family:monospace}
+</style>
+</head>
+<body data-kds-theme="light">
+
+<header>
+  <div class="hd">
+    <div class="brand"><div class="mk">🍳</div> شاشة المطبخ</div>
+    <div class="clock" id="clock">--:--</div>
+    <div class="count"><b id="activeN">0</b> نشط</div>
+    <div class="sp"></div>
+    <!-- إنهاء برقم: واضح ومكتوب عليه -->
+    <div class="qbox" id="qbox" title="اكتب رقم الأوردر ودوس Enter لإنهائه">
+      <input id="q" inputmode="numeric" placeholder="رقم الأوردر + Enter ⏎">
+      <button onclick="quickComplete()">إنهاء ⏎</button>
+    </div>
+    <button class="btn" id="btnSound" onclick="toggleSound()">🔔 الصوت يعمل</button>
+    <button class="btn" onclick="testSound()">🎵 تجربة</button>
+    <button class="btn" onclick="toggleFull()">⛶ ملء</button>
+    <div class="thsw" title="ثيم الشاشة — نفس توكنز السيستم">
+      <button id="thL" class="on" onclick="setTheme('light')">فاتح</button>
+      <button id="thD" onclick="setTheme('dark')">داكن</button>
+    </div>
+    <button class="btn danger-soft" onclick="finishAll()">✔ إنهاء الكل</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="statusbar">
+    <button class="fbtn on" data-f="ALL" onclick="setStatus('ALL',this)">الكل <b id="cAll">0</b></button>
+    <button class="fbtn" data-f="PENDING" onclick="setStatus('PENDING',this)">الطابور <b id="cP">0</b></button>
+    <button class="fbtn" data-f="PREPARING" onclick="setStatus('PREPARING',this)">تحضير <b id="cC">0</b></button>
+    <button class="fbtn" data-f="READY" onclick="setStatus('READY',this)">جاهز <b id="cR">0</b></button>
+    <div class="stsep"></div>
+    <div id="sts" style="display:flex;gap:7px;flex-wrap:wrap"></div>
+    <span class="hint">دوس على الصنف لتعليمه ✓ • <span class="kbd">Enter</span> ينهي الرقم المكتوب • زر الإنهاء آخر الكارت ثابت حتى لو الأوردر طويل</span>
+  </div>
+  <div class="cols" id="board"></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div class="demobar">
+  <button class="sim" onclick="simOrder()">＋ أوردر جديد (بصوت)</button>
+  <button onclick="simBigOrder()">🧾 أوردر كبير (10 أصناف)</button>
+  <button onclick="location.reload()">↺</button>
+</div>
+
+<script>
+// ─── صوت حقيقي (WebAudio مثل السيستم) ───
+let AC=null, soundOn=true;
+function ac(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended')AC.resume(); return AC; }
+function beep(f,d,v=.25,t=0){ if(!soundOn)return; try{ const c=ac(),o=c.createOscillator(),g=c.createGain(),s=c.currentTime+t;
+  o.connect(g);g.connect(c.destination);o.type='triangle';o.frequency.value=f;
+  g.gain.setValueAtTime(.001,s);g.gain.exponentialRampToValueAtTime(v,s+.02);g.gain.exponentialRampToValueAtTime(.01,s+d);
+  o.start(s);o.stop(s+d+.05);}catch(e){} }
+function chime(){ beep(660,.22,.4,0);beep(880,.22,.4,.24);beep(1174,.34,.4,.48); }
+function testSound(){ const was=soundOn; soundOn=true; chime(); soundOn=was; toast('🎵 ده صوت الأوردر الجديد'); }
+function toggleSound(){ soundOn=!soundOn; document.getElementById('btnSound').textContent=soundOn?'🔔 الصوت يعمل':'🔕 صامت';
+  document.getElementById('btnSound').classList.toggle('on',!soundOn); if(!soundOn&&window.speechSynthesis)try{speechSynthesis.cancel()}catch(e){} }
+['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,()=>{try{ac()}catch(e){}},{once:true}));
+
+// ─── بيانات ───
+let statusF='ALL', stationF='الكل', seq=1050, lastUndo=null;
+const STATIONS=['الكل','جريل','فراير','بار','حلويات'];
+function mk(id,num,type,table,min,st,station,prio,items,note){return{id,num,type,table,createdAt:Date.now()-min*60000,status:st,station,prio,note:note||'',collapsed:items.length>6,items:items.map((x,i)=>({...x,done:false,k:i}))};}
+let orders=[
+ mk('a1',1050,'صالة','T-12',2,'PENDING','جريل',null,[
+  {n:'تشيز برجر دبل',q:2,s:'وسط',e:'شيدر زيادة',nt:''},{n:'بطاطس مقلية',q:2,s:'كبير',e:'',nt:''},{n:'موهيتو',q:1,s:'',e:'',nt:'ثلج قليل'}],''),
+ mk('a2',1049,'توصيل','—',9,'PREPARING','جريل','RUSH',[
+  {n:'شاورما عربي دجاج',q:3,s:'كبير',e:'ثومية زيادة',nt:'مستعجل'}],'عميل منتظر — استعجال'),
+ mk('a3',1048,'صالة','T-04',14,'PREPARING','بار',null,[
+  {n:'لاتيه',q:2,s:'كبير',e:'',nt:'لبن قليل الدسم'},{n:'تشيز كيك',q:1,s:'',e:'',nt:''}],''),
+ mk('a4',1047,'استلام','—',1,'READY','حلويات',null,[
+  {n:'مولتن كيك',q:2,s:'',e:'',nt:''}],''),
+ mk('a5',1046,'صالة','T-07',4,'PENDING','فراير',null,[
+  {n:'كرسبي ستربس',q:2,s:'',e:'باربكيو + رانش',nt:''},{n:'حلقات بصل',q:1,s:'',e:'',nt:''}],'حساسية: بدون مكسرات'),
+];
+const POOL=[{n:'سلايدرز لحم',q:2,s:'',e:'شيدر',nt:''},{n:'أجنحة بافلو',q:1,s:'',e:'سبايسي وسط',nt:''},{n:'فتة شاورما',q:1,s:'كبير',e:'',nt:'ثومية على جنب'},{n:'سموذي مانجو',q:2,s:'كبير',e:'',nt:''},{n:'سيزر سلاد',q:1,s:'',e:'دريسنج على جنب',nt:'بدون خبز'}];
+
+// ─── عرض ───
+const $=s=>document.querySelector(s);
+const el=o=>Math.floor((Date.now()-o.createdAt)/1000);
+const fm=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+function urg(o){const m=el(o)/60;if(o.status==='READY')return'ok';if(m>=12)return'crit';if(m>=7)return'risk';if(m>=3)return'warn';return'ok';}
+function setTheme(t){document.body.dataset.kdsTheme=t;document.getElementById('thL').classList.toggle('on',t==='light');document.getElementById('thD').classList.toggle('on',t==='dark');}
+function toggleFull(){if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});else document.exitFullscreen();}
+function setStatus(f,btn){statusF=f;document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');render();}
+function setStation(s){stationF=s;render();}
+function list(){let L=[...orders];
+ if(statusF!=='ALL')L=L.filter(o=>o.status===statusF);
+ if(stationF!=='الكل')L=L.filter(o=>o.station===stationF);
+ const q=$('#q').value.trim(); if(q)L=L.filter(o=>String(o.num).includes(q));
+ L.sort((a,b)=>(a.prio?0:1)-(b.prio?0:1)||a.createdAt-b.createdAt);return L;}
+
+function stepHTML(o){const i=o.status==='PENDING'?1:o.status==='PREPARING'?2:3;
+ return `<div class="steps ${o.status==='READY'?'ready':''}"><i class="${i>=1?'fill':''}"></i><i class="${i>=2?'fill':''}"></i><i class="${i>=3?'fill':''}"></i><span>${i===1?'طابور':i===2?'تحضير':'جاهز'} • خطوة ${i}/3</span></div>`;}
+
+function card(o){
+ const s=el(o),u=urg(o);
+ const tcls=o.status==='READY'?'':u==='crit'?'crit':u==='risk'?'risk':u==='warn'?'warn':'';
+ const cls='t '+(o.status==='READY'?'ready':u==='crit'&&o.status!=='READY'?'late':u==='risk'?'risk':'');
+ const vis=o.collapsed?o.items.slice(0,5):o.items;
+ return `<div class="${cls}">
+  ${stepHTML(o)}
+  <div class="t-top"><div class="tnum"><small>أوردر</small>#${o.num}</div>
+   <div class="timer ${tcls}">⏱ ${fm(s)}</div></div>
+  <div class="meta"><span><b>${o.type}</b>${o.table!=='—'?' • طاولة <b>'+o.table+'</b>':''} • ${o.station}</span>
+   ${o.prio?'<span class="tag rush">⚡ مستعجل</span>':''}
+   <span class="tag">${o.items.filter(i=>i.done).length}/${o.items.length} أصناف</span></div>
+  ${o.note?`<div class="note ${/حساسية|مستعجل|استعجال/.test(o.note)?'red':''}">${o.note}</div>`:''}
+  <div class="items">
+   ${vis.map(it=>`<div class="it ${it.done?'done':''}" onclick="tgl('${o.id}',${it.k})">
+     <div class="qty">${it.done?'✓':'×'+it.q}</div>
+     <div class="tx"><div class="nm">${it.n}${it.s?` <span class="sub2">(${it.s})</span>`:''}</div>
+      ${it.e?`<div class="sub2">+ <span class="ex">${it.e}</span></div>`:''}
+      ${it.nt?`<div class="inote">! ${it.nt}</div>`:''}</div></div>`).join('')}
+   ${o.collapsed&&o.items.length>5?`<button class="more" onclick="exp('${o.id}')">عرض باقي الأصناف (${o.items.length-5}) ↓</button>`:''}
+   ${!o.collapsed&&o.items.length>5?`<button class="more" onclick="exp('${o.id}')">طي ↑</button>`:''}
+  </div>
+  <div class="t-foot">
+   <button class="undo2" onclick="recall('${o.id}')" title="إرجاع خطوة">↩</button>
+   ${o.status==='PENDING'?`<button class="act dim" onclick="adv('${o.id}')">🔥 بدء التحضير</button>`
+    :o.status==='PREPARING'?`<button class="act" onclick="adv('${o.id}')">✔ إنهاء الطلب</button>`
+    :`<button class="act green" onclick="deliver('${o.id}')">🛎 تسليم — خلص</button>`}
+  </div></div>`;
+}
+
+function render(){
+ const L=list();
+ $('#activeN').textContent=orders.length;
+ $('#cAll').textContent=orders.length;
+ $('#cP').textContent=orders.filter(o=>o.status==='PENDING').length;
+ $('#cC').textContent=orders.filter(o=>o.status==='PREPARING').length;
+ $('#cR').textContent=orders.filter(o=>o.status==='READY').length;
+ const cnt={};orders.forEach(o=>cnt[o.station]=(cnt[o.station]||0)+1);
+ $('#sts').innerHTML=STATIONS.map(s=>`<button class="station ${stationF===s?'on':''}" onclick="setStation('${s}')">${s} (${s==='الكل'?orders.length:(cnt[s]||0)})</button>`).join('');
+ const cols=[['PENDING','الطابور'],['PREPARING','قيد التحضير'],['READY','جاهز للتسليم']];
+ $('#board').innerHTML=cols.map(([k,t])=>{
+  let it=L.filter(o=>o.status===k); if(statusF!=='ALL'&&statusF!==k)it=[];
+  return `<div class="col"><div class="col-h">${t}<span class="n">${it.length}</span></div>
+   <div class="col-b">${it.length?it.map(card).join(''):'<div class="empty">لا يوجد — المطبخ هادئ هنا</div>'}</div></div>`;}).join('');
+ // لون مربع البحث حسب المطابقة
+ const q=$('#q').value.trim(),box=$('#qbox');box.classList.remove('ok','bad');
+ if(q){box.classList.add(orders.some(o=>String(o.num)===q)?'ok':'bad');}
+}
+
+// ─── أفعال: الإنهاء واضح 3 خطوات ───
+function toast(m,undo){const t=document.createElement('div');t.className='toast';
+ t.innerHTML=`<span>${m}</span>${undo?'<button onclick="doUndo()">تراجع</button>':''}`;
+ $('#toasts').appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300)},undo?8000:2600);}
+function adv(id){const o=orders.find(x=>x.id===id);if(!o)return;lastUndo={id,st:o.status};
+ o.status=o.status==='PENDING'?'PREPARING':'READY';if(o.status==='READY')o.items.forEach(i=>i.done=true);
+ try{navigator.vibrate&&navigator.vibrate(10)}catch(e){} render();
+ if(o.status==='READY')toast(`أوردر #${o.num} جاهز — مستني التسليم`,true);}
+function deliver(id){const o=orders.find(x=>x.id===id);if(!o)return;lastUndo={id,st:'READY',gone:o,idx:orders.indexOf(o)};
+ orders=orders.filter(x=>x.id!==id);render();toast(`تم تسليم #${o.num} — خلص ✔`,true);}
+function doUndo(){if(!lastUndo)return;const u=lastUndo;
+ if(u.gone&&!orders.includes(u.gone)){orders.splice(Math.min(u.idx,orders.length),0,u.gone);u.gone.status='READY';}
+ else{const o=orders.find(x=>x.id===u.id);if(o){o.status=u.st;if(u.st!=='READY')o.items.forEach(i=>i.done=false);}}
+ lastUndo=null;document.querySelectorAll('.toast').forEach(t=>t.remove());render();}
+function recall(id){const o=orders.find(x=>x.id===id);if(!o)return;
+ o.status=o.status==='READY'?'PREPARING':'PENDING';o.items.forEach(i=>i.done=false);render();}
+function tgl(oid,k){const o=orders.find(x=>x.id===oid);const it=o.items.find(i=>i.k===k);it.done=!it.done;
+ try{navigator.vibrate&&navigator.vibrate(5)}catch(e){} render();}
+function exp(id){const o=orders.find(x=>x.id===id);o.collapsed=!o.collapsed;render();}
+function finishAll(){const vis=list().filter(o=>o.status!=='READY');
+ if(!vis.length){toast('لا يوجد طلبات ظاهرة لإنهائها');return;}
+ if(!confirm(`تجهيز ${vis.length} أوردر ظاهر؟`))return;
+ vis.forEach(o=>{o.status='READY';o.items.forEach(i=>i.done=true);});render();toast(`تم تجهيز ${vis.length} أوردر ✔`);}
+// إنهاء برقم + Enter = يخلص ويمسح
+function quickComplete(){const q=$('#q').value.trim();if(!q)return;
+ const o=orders.find(x=>String(x.num)===q);
+ if(!o){toast(`لا يوجد أوردر رقم ${q}`);return;}
+ if(o.status==='READY')deliver(o.id);else{adv(o.id);
+  // لو بقى جاهز والوضع سريع: سلّمه فورًا؟ لا — نسيبه جاهز. بس نمسح الرقم
+ }
+ $('#q').value='';render();$('#q').focus();}
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();quickComplete();}});
+$('#q').addEventListener('input',render);
+
+function simOrder(){seq++;const o=mk('n'+Date.now(),seq,['صالة','توصيل','استلام'][Math.floor(Math.random()*3)],'T-'+(1+Math.floor(Math.random()*12)),0,'PENDING',STATIONS[1+Math.floor(Math.random()*4)],Math.random()<.15?'RUSH':null,
+ [JSON.parse(JSON.stringify(POOL[Math.floor(Math.random()*POOL.length)]))],Math.random()<.15?'استعجال':'');
+ orders.unshift(o);chime();render();toast(`🔔 أوردر جديد #${seq} وصل`);}
+function simBigOrder(){seq++;const items=Array.from({length:10},(_,i)=>({n:['تشيز برجر','شاورما عربي','بيتزا خضار','كرسبي ستربس','سيزر سلاد','بطاطس','موهيتو','لاتيه','مولتن كيك','شوربة عدس'][i],q:1+(i%3===0?1:0),s:i%2?'كبير':'',e:i%3?'إضافة جبنة':'',nt:i===4?'بدون خبز':''}));
+ const o=mk('b'+Date.now(),seq,'صالة','T-20',0,'PENDING','جريل',null,items,'عزومة — نزلوا السلطات الأول');
+ orders.unshift(o);chime();render();toast(`🧾 أوردر كبير #${seq} (10 أصناف) — الفوتر ثابت تحت والسكرول جوه الكارت`);}
+
+function tick(){const d=new Date();$('#clock').textContent='🕓 '+d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})+' • '+d.toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'numeric'});}
+tick();setInterval(tick,10000);render();setInterval(render,10000);
+</script>
+</body>
+</html>

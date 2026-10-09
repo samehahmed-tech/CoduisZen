@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Menu Manager — Concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1017;--card:rgba(255,255,255,.05);--card2:rgba(255,255,255,.08);--line:rgba(255,255,255,.1);--txt:#f1f5f9;--mut:#93a3b8;--amber:#fbbf24;--teal:#2dd4bf;--rose:#fb7185;--grn:#34d399;--ind:#818cf8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Tajawal","Cairo",system-ui,sans-serif;background:radial-gradient(1000px 500px at 85% -10%,rgba(251,191,36,.07),transparent 60%),radial-gradient(900px 600px at 5% 110%,rgba(45,212,191,.08),transparent 60%),var(--bg);color:var(--txt);min-height:100dvh}
+.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;padding:12px 20px;background:rgba(13,16,23,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.logo{font-family:"Cairo";font-weight:900;font-size:15px;letter-spacing:.06em}.logo b{color:var(--amber)}
+.search{flex:1;max-width:380px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:8px 13px;font-size:12px;color:var(--mut)}
+.search input{flex:1;background:none;border:0;outline:none;color:var(--txt);font-family:inherit;font-size:12px;font-weight:700}
+.seg{display:flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--mut);font-family:inherit;font-size:11px;font-weight:800;padding:7px 13px;border-radius:9px;cursor:pointer}
+.seg button.on{background:rgba(251,191,36,.18);color:#fff;box-shadow:inset 0 0 0 1px rgba(251,191,36,.4)}
+.btn{cursor:pointer;border:0;border-radius:12px;padding:9px 16px;font-size:11.5px;font-weight:800;font-family:inherit;background:linear-gradient(135deg,var(--amber),#f59e0b);color:#0b0f0e;transition:.2s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.ghost{background:rgba(255,255,255,.06);color:var(--txt);border:1px solid var(--line)}
+.layout{display:grid;grid-template-columns:250px 1fr;min-height:calc(100dvh - 57px)}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.side{display:none}.side.open{display:block;position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6)}.side.open .sidein{background:var(--bg);width:270px;height:100%;overflow:auto}}
+.side{border-inline-end:1px solid var(--line);padding:16px}
+.side h4{font-size:10.5px;color:var(--mut);font-weight:800;letter-spacing:.1em;margin:14px 4px 8px}
+.cat{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;color:var(--mut);font-family:inherit;font-size:12.5px;font-weight:700;padding:9px 11px;border-radius:11px;cursor:pointer;text-align:start}
+.cat:hover{background:rgba(255,255,255,.05);color:#fff}
+.cat.on{background:rgba(251,191,36,.13);color:#fff}
+.cat b{margin-inline-start:auto;font-size:10px;background:rgba(255,255,255,.08);border-radius:99px;padding:1px 8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin-bottom:9px}
+.stat small{font-size:10.5px;color:var(--mut);font-weight:700}
+.stat b{display:block;font-size:19px;font-family:"Cairo";margin-top:2px}
+.main{padding:18px 20px;min-width:0}
+.bar{display:flex;align-items:center;gap:9px;margin-bottom:14px;flex-wrap:wrap}
+.chipf{cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--mut);border-radius:999px;padding:7px 14px;font-size:11px;font-weight:800;font-family:inherit}
+.chipf.on{background:rgba(45,212,191,.14);color:var(--teal);border-color:rgba(45,212,191,.4)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px}
+@media(max-width:560px){.grid{grid-template-columns:repeat(2,1fr);gap:10px}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;transition:.22s;position:relative;animation:up .5s both}
+.card:hover{transform:translateY(-4px);border-color:rgba(251,191,36,.4);box-shadow:0 18px 40px -18px rgba(0,0,0,.7)}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.ph{height:118px;position:relative;background:linear-gradient(150deg,rgba(251,191,36,.16),rgba(45,212,191,.1)),rgba(255,255,255,.03);display:grid;place-items:center;overflow:hidden}
+.ph .art{font-size:44px;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4))}
+.ph .nop{position:absolute;bottom:8px;inset-inline-end:8px;font-size:9px;font-weight:800;background:rgba(0,0,0,.55);padding:3px 9px;border-radius:99px;color:#ffd9a0}
+.ph .off{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--rose)}
+.qedit{position:absolute;top:8px;inset-inline-start:8px;display:flex;gap:5px;opacity:0;transition:.2s}
+.card:hover .qedit{opacity:1}
+@media(pointer:coarse){.qedit{opacity:1}}
+.qedit button{width:28px;height:28px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:900;cursor:pointer;backdrop-filter:blur(6px)}
+.bd{padding:12px 13px}
+.bd h5{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd .cat2{font-size:10.5px;color:var(--mut)}
+.prow{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+.price{font-family:"Cairo";font-size:17px;font-weight:800}
+.price small{font-size:10px;color:var(--mut)}
+.mg{font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px}
+.mg.hi{background:rgba(52,211,153,.13);color:var(--grn)}.mg.md{background:rgba(251,191,36,.13);color:var(--amber)}.mg.lo{background:rgba(251,113,133,.13);color:var(--rose)}
+.tog{margin-top:10px;width:100%;cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--txt);border-radius:11px;padding:8px;font-size:11px;font-weight:800;font-family:inherit;transition:.2s}
+.tog.off{color:var(--mut)}
+.bulk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:35;display:flex;gap:8px;align-items:center;background:rgba(20,24,33,.95);border:1px solid rgba(251,191,36,.35);border-radius:16px;padding:10px 14px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.bulk button{cursor:pointer;border:0;border-radius:10px;padding:8px 13px;font-size:11px;font-weight:800;font-family:inherit;background:rgba(255,255,255,.07);color:#fff}
+.bulk button.go{background:linear-gradient(135deg,var(--amber),#f59e0b);color:#0b0f0e}
+.note{max-width:1400px;margin:14px auto 0;padding:0 20px 30px;font-size:11.5px;color:var(--mut);line-height:2}
+.note b{color:var(--amber)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo">CODUIS <b>XEN</b> · Menu</div>
+  <div class="search">🔍 <input id="q" placeholder="ابحث صنف… (فوري)"></div>
+  <div class="seg" id="viewSeg"><button class="on">شبكة</button><button>قائمة</button><button>تحليل</button></div>
+  <button class="btn" onclick="openDrawer()">+ صنف جديد</button>
+</header>
+<div class="layout">
+  <aside class="side" id="side"><div class="sidein" style="padding:16px">
+    <div class="stat"><small>إجمالي الأصناف</small><b>148</b></div>
+    <div class="stat"><small>متوسط الهامش</small><b style="color:var(--grn)">62%</b></div>
+    <div class="stat"><small>بدون صور</small><b style="color:var(--amber)">17</b></div>
+    <h4>الأقسام</h4>
+    <button class="cat on">🍔 برجر <b>24</b></button>
+    <button class="cat">🍕 بيتزا <b>18</b></button>
+    <button class="cat">🥤 مشروبات <b>31</b></button>
+    <button class="cat">🍰 حلويات <b>15</b></button>
+    <button class="cat">🥗 سلطات <b>12</b></button>
+    <h4>فلاتر سريعة</h4>
+    <button class="cat">⚠️ هامش منخفض</button>
+    <button class="cat">📷 بدون صورة</button>
+    <button class="cat">🔥 الأكثر مبيعا</button>
+  </div></aside>
+  <main class="main">
+    <div class="bar">
+      <button class="chipf on">الكل</button><button class="chipf">نشط</button><button class="chipf">غير نشط</button>
+      <button class="chipf">هامش منخفض</button><button class="chipf">بدون صورة</button>
+      <span style="flex:1"></span>
+      <button class="chipf">⇅ السعر</button><button class="chipf">⇅ الهامش</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+</div>
+<div class="bulk" id="bulk" style="display:none"><b id="bulkN">0</b><span style="font-size:11px">محدد</span><button>تفعيل</button><button>إيقاف</button><button>خصم %</button><button class="go">حفظ</button></div>
+<style>
+.ovl{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;backdrop-filter:blur(4px)}
+.ovl.open{display:block}
+.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(560px,100%);z-index:51;background:#12161f;border-inline-start:1px solid var(--line);display:none;flex-direction:column;animation:slidein .3s cubic-bezier(.16,1,.3,1)}
+.drawer.open{display:flex}
+@keyframes slidein{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
+html[dir="ltr"] .drawer{animation-name:slideinL}
+@keyframes slideinL{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.dh{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.dh .th{width:52px;height:52px;border-radius:14px;background:linear-gradient(150deg,rgba(251,191,36,.25),rgba(45,212,191,.15));display:grid;place-items:center;font-size:26px}
+.dh h3{font-size:16px;font-weight:800}
+.dh small{font-size:11px;color:var(--mut)}
+.dh .x{margin-inline-start:auto;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--txt);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:15px}
+.dtabs{display:flex;gap:6px;padding:12px 18px 0;overflow-x:auto}
+.dtabs button{border:0;background:none;color:var(--mut);font-family:inherit;font-size:12px;font-weight:800;padding:9px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.dtabs button.on{color:var(--amber);border-color:var(--amber)}
+.dbody{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.fld label{display:block;font-size:10.5px;font-weight:800;color:var(--mut);letter-spacing:.06em;margin-bottom:6px}
+.fld input,.fld select,.fld textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:11px;color:var(--txt);padding:10px 12px;font-family:inherit;font-size:13px;font-weight:700;outline:none}
+.fld input:focus{border-color:rgba(251,191,36,.5)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.drop{border:1.5px dashed rgba(251,191,36,.4);border-radius:14px;padding:22px;text-align:center;font-size:12px;color:var(--mut);cursor:pointer;background:rgba(251,191,36,.04)}
+.meter{height:10px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--grn),var(--amber))}
+.mrow{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:11px;padding:9px 11px;font-size:12px;font-weight:700}
+.mrow input{width:64px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;color:#fff;padding:6px;font-family:inherit;font-size:12px}
+.dfoot{display:flex;gap:9px;padding:14px 18px;border-top:1px solid var(--line)}
+.dfoot .btn{flex:1;padding:13px}
+.dirtytag{font-size:10px;font-weight:800;color:var(--amber)}
+table.cmp{width:100%;border-collapse:collapse;font-size:12px}
+table.cmp th,table.cmp td{padding:9px 6px;border-bottom:1px dashed rgba(255,255,255,.08);text-align:start}
+table.cmp th{color:var(--mut);font-size:10.5px}
+table.cmp input{width:74px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;color:#fff;padding:6px;font-family:inherit}
+@media(max-width:640px){.drawer{top:auto;height:92dvh;border-radius:22px 22px 0 0;animation:sheetup .3s cubic-bezier(.16,1,.3,1)}@keyframes sheetup{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}}
+</style>
+<div class="ovl" id="ovl" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="dh"><div class="th">🍔</div><div><h3>سماش برجر</h3><small>برجر · <span class="dirtytag" id="dirty" style="display:none">● تغييرات غير محفوظة</span></small></div><button class="x" onclick="tryClose()">✕</button></div>
+  <div class="dtabs" id="dtabs"><button class="on">أساسي</button><button>أسعار الفروع</button><button>الوصفة والتكلفة</button><button>خيارات</button><button>النشر</button></div>
+  <div class="dbody" id="dbody"></div>
+  <div class="dfoot"><button class="btn ghost" onclick="tryClose()">رجوع</button><button class="btn" onclick="saveMock()">💾 حفظ ونشر</button></div>
+</aside>
+<div class="note">💡 <b>أفكار مطبقة هنا:</b> شريط sticky موحد + تحرير سعر سريع من كارت (قلم −/+) + badge بلا صورة + bulk عائم + درج tabs + مؤشر unsaved + جدول أسعار فروع + عداد هامش حي + bottom-sheet موبايل + ثيم داكن كامل. قل <b>طبق</b> للتنفيذ.</div>
+<script>
+var ITEMS = [
+  { n: "سماش برجر", c: "برجر", p: 145, cost: 52, art: "🍔", mg: 64, img: true },
+  { n: "مارجريتا", c: "بيتزا", p: 120, cost: 88, art: "🍕", mg: 27, img: true },
+  { n: "موهيتو كلاسيك", c: "مشروبات", p: 45, cost: 9, art: "🥤", mg: 80, img: false },
+  { n: "مولتن كيك", c: "حلويات", p: 95, cost: 30, art: "🍰", mg: 68, img: false },
+  { n: "سيزر سالاد", c: "سلطات", p: 85, cost: 28, art: "🥗", mg: 67, img: true },
+  { n: "شيش طاووق", c: "برجر", p: 130, cost: 61, art: "🍢", mg: 53, img: false }
+];
+var sel = 0;
+function mgCls(m) { return m >= 50 ? "hi" : (m >= 30 ? "md" : "lo"); }
+function render() {
+  var g = document.getElementById("grid"), html = "";
+  ITEMS.forEach(function (it, i) {
+    html += "<div class=\"card\" style=\"animation-delay:" + (i * 60) + "ms\">"
+      + "<div class=\"ph\"><span class=\"art\">" + it.art + "</span>"
+      + (it.img ? "" : "<span class=\"nop\">📷 بلا صورة</span>")
+      + "<span class=\"qedit\"><button onclick=\"event.stopPropagation();bump(" + i + ",-5)\">−</button><button onclick=\"event.stopPropagation();bump(" + i + ",5)\">+</button></span></div>"
+      + "<div class=\"bd\"><h5>" + it.n + "</h5><div class=\"cat2\">" + it.c + "</div>"
+      + "<div class=\"prow\"><span class=\"price\">" + it.p + " <small>ج.م</small></span><span class=\"mg " + mgCls(it.mg) + "\">" + it.mg + "%</span></div>"
+      + "<button class=\"tog\" onclick=\"event.stopPropagation();tog(" + i + ")\">👁 إخفاء / إظهار</button></div></div>";
+  });
+  g.innerHTML = html;
+  var b = document.getElementById("bulk");
+  b.style.display = sel > 0 ? "flex" : "none";
+  document.getElementById("bulkN").textContent = sel;
+}
+function bump(i, d) { ITEMS[i].p = Math.max(0, ITEMS[i].p + d); render(); }
+function tog(i) { sel = sel > 0 ? 0 : 2; render(); }
+var TABS = ["أساسي", "أسعار الفروع", "الوصفة والتكلفة", "خيارات", "النشر"];
+var BODIES = [
+  "<div class=\"fld\"><label>اسم الصنف</label><input value=\"سماش برجر\" oninput=\"dirty()\"></div><div class=\"frow\"><div class=\"fld\"><label>السعر</label><input value=\"145\" oninput=\"dirty()\"></div><div class=\"fld\"><label>التكلفة</label><input value=\"52\" oninput=\"dirty()\"></div></div><div class=\"drop\" onclick=\"dirty()\">📷 اسحب صورة أو اضغط للرفع (ضغط تلقائي)</div>",
+  "<table class=\"cmp\"><tr><th>الفرع</th><th>السعر</th><th>الحالة</th></tr><tr><td>مدينة نصر</td><td><input value=\"145\"></td><td>✅</td></tr><tr><td>المعادي</td><td><input value=\"150\"></td><td>✅</td></tr><tr><td>الزمالك</td><td><input value=\"145\"></td><td>⏸️</td></tr></table><button class=\"btn ghost\" style=\"width:100%\">نسخ السعر لكل الفروع</button>",
+  "<div class=\"fld\"><label>هامش حي: 64%</label><div class=\"meter\"><i style=\"width:64%\"></i></div></div><div className=\"x\"></div><div class=\"mrow\">🥩 لحم <input value=\"0.2\"> كجم</div><div class=\"mrow\">🧀 شيدر <input value=\"2\"> شريحة</div><button class=\"btn ghost\" style=\"width:100%\">+ مكون</button>",
+  "<div class=\"mrow\">🧀 إضافة جبنة +15 <input value=\"15\"></div><div class=\"mrow\">🍟 بطاطس +25 <input value=\"25\"></div><button class=\"btn ghost\" style=\"width:100%\">+ مجموعة خيارات</button>",
+  "<div class=\"mrow\">📅 متاح: السبت – الخميس</div><div class=\"mrow\">⏰ من 12ظ إلى 12م</div><div class=\"mrow\">🖨️ طابعة: مطبخ رئيسي</div>"
+];
+var curTab = 0, isDirty = false;
+function openDrawer() { document.getElementById("ovl").classList.add("open"); document.getElementById("drawer").classList.add("open"); setTab(0); }
+function closeDrawer() { document.getElementById("ovl").classList.remove("open"); document.getElementById("drawer").classList.remove("open"); isDirty = false; paintDirty(); }
+function tryClose() { if (isDirty && !confirm("تغييرات غير محفوظة — تجاهلها والخروج؟")) return; closeDrawer(); }
+function dirty() { isDirty = true; paintDirty(); }
+function paintDirty() { document.getElementById("dirty").style.display = isDirty ? "inline" : "none"; }
+function saveMock() { isDirty = false; paintDirty(); alert("✅ اتحفظ (تجريبي)"); closeDrawer(); }
+function setTab(i) {
+  curTab = i;
+  var bs = document.querySelectorAll("#dtabs button");
+  bs.forEach(function (b, j) { b.classList.toggle("on", i === j); });
+  document.getElementById("dbody").innerHTML = BODIES[i];
+}
+document.querySelectorAll("#dtabs button").forEach(function (b, j) { b.onclick = function () { setTab(j); }; });
+document.querySelectorAll("#viewSeg button").forEach(function (b) { b.onclick = function () { document.querySelectorAll("#viewSeg button").forEach(function (x) { x.classList.remove("on"); }); b.classList.add("on"); }; });
+document.getElementById("q").oninput = function (e) {
+  var q = e.target.value.trim();
+  document.querySelectorAll("#grid .card").forEach(function (c) { c.style.display = (!q || c.textContent.includes(q)) ? "" : "none"; });
+};
+render();
+</script>
+</body>
+</html>

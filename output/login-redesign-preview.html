@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coduis Zen — Login Concept v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--txt:#f1f5f9;--mut:#9aa8bd;--amber:#fbbf24;--teal:#2dd4bf;--rose:#fb7185;--line:rgba(255,255,255,.1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Tajawal","Cairo",system-ui,sans-serif;color:var(--txt);background:#000;min-height:100dvh}
+/* photo slideshow — divs with background-image (same technique as the app) + fallback gradient */
+.slides{position:fixed;inset:0;z-index:0;background:radial-gradient(1000px 600px at 70% 20%,#123b32,#050807 70%)}
+.slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.6s ease}
+.slide.on{opacity:1;animation:kenburns 10s ease forwards}
+@keyframes kenburns{from{transform:scale(1.04) translate(0,0)}to{transform:scale(1.15) translate(-1.5%,1%)}}
+.shade{position:fixed;inset:0;z-index:1;background:
+  linear-gradient(180deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.55) 45%,rgba(0,0,0,.78) 100%);}
+.grain{position:fixed;inset:0;z-index:2;opacity:.06;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");}
+/* top bar */
+.top{position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;padding:18px 26px}
+.brand{display:flex;align-items:center;gap:11px}
+.brand{position:relative;display:flex;align-items:center}
+.brand .halo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:130%;height:170%;border-radius:50%;filter:blur(40px);
+  background:radial-gradient(ellipse at center,rgba(255,255,255,.30),rgba(251,191,36,.14) 55%,transparent 72%)}
+.brand img{position:relative;height:clamp(72px,10vw,120px);width:auto;max-width:min(360px,60vw);object-fit:contain;
+  filter:drop-shadow(0 0 14px rgba(255,255,255,.55)) drop-shadow(0 8px 24px rgba(0,0,0,.5))}
+.brand b{font-size:15px;letter-spacing:.14em}
+.brand small{display:block;font-size:9px;letter-spacing:.28em;color:var(--mut);font-weight:700}
+.chip{cursor:pointer;border:1px solid var(--line);background:rgba(0,0,0,.45);color:var(--mut);backdrop-filter:blur(10px);
+  border-radius:12px;padding:9px 15px;font-size:11px;font-weight:800;letter-spacing:.1em;font-family:inherit;transition:.18s}
+.chip:hover{color:#fff;border-color:rgba(251,191,36,.5)}
+/* centered card */
+.wrap{position:relative;z-index:3;min-height:calc(100dvh - 150px);display:flex;align-items:center;justify-content:center;padding:10px 18px 26px}
+.card{width:100%;max-width:400px;background:rgba(10,14,13,.62);border:1px solid var(--line);border-radius:26px;
+  padding:32px 28px 26px;backdrop-filter:blur(24px);box-shadow:0 30px 90px rgba(0,0,0,.65);animation:rise .6s cubic-bezier(.16,1,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.card h3{font-family:"Cairo";font-size:24px;font-weight:800;text-align:center}
+.card .sub{color:var(--mut);font-size:12.5px;margin:4px 0 20px;text-align:center}
+.tabs{display:flex;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:14px;padding:4px;margin-bottom:18px}
+.tabs button{flex:1;border:0;cursor:pointer;background:transparent;color:var(--mut);font-family:inherit;
+  font-size:11.5px;font-weight:800;padding:10px;border-radius:10px;transition:.2s}
+.tabs button.on{background:rgba(251,191,36,.16);color:#fff;box-shadow:inset 0 0 0 1px rgba(251,191,36,.4)}
+.dots{display:flex;gap:11px;justify-content:center;padding:13px;border:1px solid var(--line);border-radius:15px;background:rgba(0,0,0,.35);margin-bottom:13px;cursor:text}
+.dots i{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.13);transition:.15s}
+.dots i.f{background:var(--amber);transform:scale(1.25);box-shadow:0 0 12px rgba(251,191,36,.6)}
+.dots i.next{border:1px solid var(--amber);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.pad{direction:ltr;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:280px;margin:0 auto}
+.key{cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.04);color:#e8eef5;border-radius:15px;
+  height:53px;font-size:19px;font-weight:700;font-family:inherit;transition:.12s}
+.key:hover{background:rgba(251,191,36,.13);border-color:rgba(251,191,36,.45)}
+.key:active{transform:scale(.92);background:rgba(251,191,36,.32);color:#0b0f0e}
+.key.fn{font-size:10px;font-weight:800;color:var(--rose)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--mut);margin-bottom:6px}
+.inp{position:relative}
+.inp input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:13px;color:#fff;
+  padding:12px 14px;font-size:14px;font-family:inherit;outline:none;direction:ltr;text-align:left;transition:.15s}
+.inp input::placeholder{color:#54637a}
+.inp input:focus{border-color:rgba(251,191,36,.55);box-shadow:0 0 0 3px rgba(251,191,36,.12)}
+.eye{position:absolute;top:50%;transform:translateY(-50%);right:8px;background:none;border:0;cursor:pointer;color:#5b6b7f;padding:6px}
+.eye:hover{color:#fff}
+.msg{display:none;margin-top:13px;padding:10px;border-radius:12px;font-size:12.5px;font-weight:700;text-align:center}
+.msg.err{display:block;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.35);color:#fda4af;animation:shake .35s}
+.msg.ok{display:block;background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.35);color:#5eead4}
+@keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+.go{position:relative;overflow:hidden;width:100%;margin-top:16px;border:0;cursor:pointer;border-radius:14px;padding:14px;
+  font-family:"Cairo";font-size:15px;font-weight:800;color:#0b0f0e;background:linear-gradient(135deg,var(--teal),var(--amber));transition:.2s}
+.go:hover{filter:brightness(1.08)}
+.go:active{transform:scale(.98)}
+.go:disabled{opacity:.45;cursor:not-allowed}
+.go .shine{position:absolute;top:0;bottom:0;width:60px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);animation:sweep 3.2s ease-in-out infinite}
+@keyframes sweep{0%{inset-inline-start:-80px}60%,100%{inset-inline-start:110%}}
+.spin{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(0,0,0,.25);border-top-color:#0b0f0e;border-radius:50%;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.foot{position:relative;z-index:3;text-align:center;color:rgba(255,255,255,.35);font-size:11px;padding-bottom:18px;font-weight:500}
+</style>
+</head>
+<body>
+<div class="slides" id="slides">
+  <div class="slide on" style="background-image:url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2000&auto=format&fit=crop')"></div>
+  <div class="slide" style="background-image:url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2000&auto=format&fit=crop')"></div>
+  <div class="slide" style="background-image:url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2000&auto=format&fit=crop')"></div>
+  <div class="slide" style="background-image:url('https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=2000&auto=format&fit=crop')"></div>
+  <div class="slide" style="background-image:url('https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?q=80&w=2000&auto=format&fit=crop')"></div>
+</div>
+<div class="shade"></div><div class="grain"></div>
+<header class="top">
+  <div class="brand"><span class="halo"></span><img src="../public/logo.png" alt="Coduis Xen ERP Systems"></div>
+  <button class="chip" id="langBtn">ENGLISH</button>
+</header>
+<main class="wrap">
+  <div class="card">
+    <h3 data-i18n="welcome">مرحباً بعودتك</h3>
+    <p class="sub" data-i18n="subtitle">سجل دخولك إلى نظامك</p>
+    <div class="tabs"><button id="tabPin" class="on" data-i18n="pinTab">كود سريع</button><button id="tabPass" data-i18n="passTab">إيميل وباسوورد</button></div>
+    <div id="pinPane">
+      <div class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pad" id="pad">
+        <button class="key">1</button><button class="key">2</button><button class="key">3</button>
+        <button class="key">4</button><button class="key">5</button><button class="key">6</button>
+        <button class="key">7</button><button class="key">8</button><button class="key">9</button>
+        <button class="key fn" id="clr">CLR</button><button class="key">0</button>
+        <button class="key fn" id="bk">&#9003;</button>
+      </div>
+    </div>
+    <div id="passPane" style="display:none">
+      <div class="field"><label data-i18n="email">البريد الإلكتروني</label>
+        <div class="inp"><input id="email" type="email" placeholder="admin@zen.com" autocomplete="email"></div></div>
+      <div class="field"><label data-i18n="pass">كلمة المرور</label>
+        <div class="inp"><input id="pass" type="password" placeholder="••••••••" autocomplete="current-password">
+        <button class="eye" id="eye" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    </div>
+    <div class="msg" id="msg"></div>
+    <button class="go" id="go"><span class="shine"></span><span id="goTxt" data-i18n="login">تسجيل الدخول</span></button>
+  </div>
+</main>
+<p class="foot">Coduis Zen • v3.0 — <span id="clock">--:--</span></p>
+<script>
+var STR = {
+  ar: { tag:"نظام تحكم المطاعم", welcome:"مرحباً بعودتك", subtitle:"سجل دخولك إلى نظامك",
+    pinTab:"كود سريع", passTab:"إيميل وباسوورد", email:"البريد الإلكتروني", pass:"كلمة المرور",
+    login:"تسجيل الدخول", errPin:"اكمل 6 أرقام أولا", okPin:"تم — جارٍ الدخول (تجريبي)", errMail:"اكتب إيميل وباسوورد" },
+  en: { tag:"RESTAURANT CONTROL OS", welcome:"Welcome Back", subtitle:"Sign in to your workspace",
+    pinTab:"Quick PIN", passTab:"Email Login", email:"Email Address", pass:"Password",
+    login:"Sign In", errPin:"Enter all 6 digits first", okPin:"Done — signing in (demo)", errMail:"Enter email and password" }
+};
+var lang = "ar", mode = "pin", pin = "";
+var dots = document.getElementById("dots").children;
+function paint(){ for (var i = 0; i < 6; i++){ dots[i].className = i < pin.length ? "f" : (i === pin.length ? "next" : ""); } }
+function flash(type, txt){ var m = document.getElementById("msg"); m.className = "msg " + type; m.textContent = txt;
+  clearTimeout(flash.t); flash.t = setTimeout(function(){ m.className = "msg"; }, 2600); }
+document.getElementById("pad").addEventListener("click", function(e){
+  var b = e.target.closest("button"); if (!b) return;
+  if (b.id === "clr"){ pin = ""; } else if (b.id === "bk"){ pin = pin.slice(0, -1); }
+  else if (pin.length < 6){ pin += b.textContent.trim(); }
+  paint();
+});
+document.addEventListener("keydown", function(e){
+  if (mode !== "pin") return;
+  if (/^[0-9]$/.test(e.key) && pin.length < 6){ pin += e.key; paint(); }
+  else if (e.key === "Backspace"){ pin = pin.slice(0, -1); paint(); }
+  else if (e.key === "Enter"){ doGo(); }
+});
+var tabPin = document.getElementById("tabPin"), tabPass = document.getElementById("tabPass");
+tabPin.onclick = function(){ mode = "pin"; tabPin.classList.add("on"); tabPass.classList.remove("on");
+  document.getElementById("pinPane").style.display = ""; document.getElementById("passPane").style.display = "none"; };
+tabPass.onclick = function(){ mode = "pass"; tabPass.classList.add("on"); tabPin.classList.remove("on");
+  document.getElementById("passPane").style.display = ""; document.getElementById("pinPane").style.display = "none"; };
+document.getElementById("eye").onclick = function(){
+  var p = document.getElementById("pass"); p.type = p.type === "password" ? "text" : "password"; };
+function doGo(){
+  var go = document.getElementById("go"), txt = document.getElementById("goTxt"), q = String.fromCharCode(34);
+  if (mode === "pin" && pin.length !== 6){ flash("err", STR[lang].errPin); return; }
+  if (mode === "pass" && (!document.getElementById("email").value || !document.getElementById("pass").value)){
+    flash("err", STR[lang].errMail); return; }
+  go.disabled = true; txt.innerHTML = "<span class=" + q + "spin" + q + "></span>";
+  setTimeout(function(){ go.disabled = false; txt.textContent = STR[lang].login; flash("ok", STR[lang].okPin); }, 900);
+}
+document.getElementById("go").onclick = doGo;
+document.getElementById("langBtn").onclick = function(){
+  lang = lang === "ar" ? "en" : "ar";
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  this.textContent = lang === "ar" ? "ENGLISH" : "العربية";
+  document.querySelectorAll("[data-i18n]").forEach(function(el){
+    var k = el.getAttribute("data-i18n"); if (STR[lang][k]) el.textContent = STR[lang][k]; });
+  document.getElementById("goTxt").textContent = STR[lang].login;
+};
+var imgs = document.querySelectorAll("#slides .slide"), cur = 0;
+setInterval(function(){ imgs[cur].classList.remove("on"); cur = (cur + 1) % imgs.length; imgs[cur].classList.add("on"); }, 8000);
+function tick(){ try { document.getElementById("clock").textContent =
+  new Date().toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour:"2-digit", minute:"2-digit" }); } catch(e){} }
+tick(); setInterval(tick, 15000); paint();
+</script>
+</body>
+</html>

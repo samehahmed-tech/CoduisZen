@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro KDS — Futuristic Smooth Experience</title>
+
+<!-- استدعاء خط Cairo -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-deep: #07090e;
+  --panel-bg: rgba(18, 24, 38, 0.6);
+  --card-bg: linear-gradient(145deg, rgba(26, 35, 52, 0.8), rgba(16, 22, 34, 0.9));
+  --card-border: rgba(255, 255, 255, 0.08);
+  
+  --text-main: #f8fafc;
+  --text-muted: #8b9bb4;
+  
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  
+  --status-pending: #f59e0b;
+  --status-cooking: #3b82f6;
+  --status-ready: #10b981;
+  --status-ready-glow: rgba(16, 185, 129, 0.45);
+  --status-late: #ef4444;
+  
+  --font-cairo: 'Cairo', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+body {
+  background: var(--bg-deep);
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 90% 90%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+  color: var(--text-main);
+  font-family: var(--font-cairo);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Global Key Listener Search HUD */
+.global-input-overlay {
+  position: fixed;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px) scale(0.95);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6), 0 0 25px var(--accent-glow);
+  border-radius: 16px;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.global-input-overlay.active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.hud-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.hud-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-family: var(--font-cairo);
+  font-size: 22px;
+  font-weight: 900;
+  width: 160px;
+  text-align: center;
+}
+
+/* Header */
+header {
+  height: 74px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  z-index: 20;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-title { font-size: 21px; font-weight: 900; color: #fff; letter-spacing: 0.5px; }
+.brand-badge { 
+  background: linear-gradient(135deg, #6366f1, #4f46e5); 
+  color: #fff; 
+  font-size: 11px; 
+  padding: 3px 10px; 
+  border-radius: 20px; 
+  font-weight: 800;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* Mode Switcher */
+.view-switcher {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  gap: 4px;
+}
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px 20px;
+  border-radius: 10px;
+  font-family: var(--font-cairo);
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+/* Header Keyboard Hint */
+.keyboard-hint-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.04);
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.key-cap {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+}
+
+.header-stats { display: flex; gap: 24px; align-items: center; }
+.stat-box { text-align: center; line-height: 1.2; }
+.stat-val { font-size: 22px; font-weight: 900; }
+.stat-lbl { font-size: 11px; color: var(--text-muted); font-weight: 700; }
+
+/* Container Layout */
+.kds-container {
+  flex: 1;
+  padding: 22px 28px;
+  overflow: hidden;
+}
+
+.detailed-view {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  height: 100%;
+}
+
+.column {
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 35px rgba(0,0,0,0.3);
+}
+
+.column-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.015);
+}
+.column-title { font-size: 16.5px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.badge-count { background: rgba(255,255,255,0.08); color: #fff; font-size: 13px; padding: 2px 12px; border-radius: 12px; font-weight: 800; }
+
+.card-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Simple View Grid */
+.simple-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 10px;
+}
+
+/* Cards */
+.order-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.3);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+  animation: cardAppear 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.order-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(0,0,0,0.45);
+  border-color: rgba(255,255,255,0.18);
+}
+
+@keyframes cardAppear {
+  from { opacity: 0; transform: translateY(28px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 🌟 LIQUID-SMOOTH FINISH ANIMATION 🌟 */
+.order-card.finishing {
+  pointer-events: none;
+  animation: liquidFinish 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+}
+
+@keyframes liquidFinish {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(16, 185, 129, 0);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.03);
+    border-color: var(--status-ready);
+    box-shadow: 0 0 35px var(--status-ready-glow);
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.15), rgba(16, 22, 34, 0.9));
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.85);
+    filter: blur(8px);
+  }
+}
+
+.order-card.late {
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+.card-header {
+  padding: 14px 18px;
+  background: rgba(0,0,0,0.22);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--card-border);
+}
+.order-id { font-size: 21px; font-weight: 900; color: #fff; }
+.order-type { font-size: 12px; color: var(--text-muted); font-weight: 700; margin-right: 4px; }
+.order-time { 
+  font-size: 12.5px; 
+  font-weight: 800; 
+  background: rgba(255,255,255,0.06);
+  padding: 4px 11px;
+  border-radius: 8px;
+  color: var(--status-pending);
+}
+.order-card.late .order-time { color: var(--status-late); background: rgba(239, 68, 68, 0.15); }
+
+/* Items List */
+.card-items { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+.item-row:hover { background: rgba(255,255,255,0.06); }
+
+.item-left { display: flex; align-items: center; gap: 12px; }
+.item-qty { font-weight: 900; font-size: 17px; color: var(--accent); }
+.item-name { font-size: 15px; font-weight: 800; }
+.item-note { font-size: 12px; color: #f87171; font-weight: 700; display: block; margin-top: 2px; }
+
+/* Buttons */
+.card-footer { padding: 12px 18px; background: rgba(0,0,0,0.15); border-top: 1px solid var(--card-border); }
+.btn-action {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-cairo);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-action:active { transform: scale(0.97); }
+.btn-start { background: var(--status-cooking); color: #fff; box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3); }
+.btn-ready { background: var(--status-ready); color: #fff; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3); }
+.btn-deliver { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid var(--card-border); }
+.btn-deliver:hover { background: rgba(255,255,255,0.14); }
+.btn-simple-finish { background: linear-gradient(135deg, #10b981, #059669); color: #fff; box-shadow: 0 4px 18px var(--status-ready-glow); }
+
+/* Toast Notification */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(50px);
+  background: var(--status-ready);
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 14.5px;
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
+  z-index: 200;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.hidden { display: none !important; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<!-- Floating Global Input HUD (Auto Appears on Typing) -->
+<div class="global-input-overlay" id="hudOverlay">
+  <span class="hud-label">⚡ أوردر رقم:</span>
+  <input type="text" id="hudInput" class="hud-input" autocomplete="off" placeholder="000">
+  <span class="key-cap">Enter ↵</span>
+</div>
+
+<header>
+  <div class="brand">
+    <span class="brand-title">KITCHEN FLOW PRO</span>
+    <span class="brand-badge">AUTO-KEYBOARD</span>
+  </div>
+
+  <div class="view-switcher">
+    <button class="mode-btn active" id="btn-detailed" onclick="switchView('detailed')">📋 تفصيلي (أعمدة)</button>
+    <button class="mode-btn" id="btn-simple" onclick="switchView('simple')">⚡ بسيط (مباشر)</button>
+  </div>
+
+  <div class="keyboard-hint-badge">
+    <span>اطبع رقم الأوردر مباشرة من الكيبورد</span>
+    <span class="key-cap">0-9</span>
+  </div>
+
+  <div class="header-stats">
+    <div class="stat-box">
+      <div class="stat-val" style="color:var(--status-pending)" id="cnt-queue">2</div>
+      <div class="stat-lbl">في الانتظار</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:var(--status-cooking)" id="cnt-cooking">1</div>
+      <div class="stat-lbl">قيد التحضير</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:var(--status-ready)" id="cnt-ready">1</div>
+      <div class="stat-lbl">جاهز</div>
+    </div>
+  </div>
+</header>
+
+<main class="kds-container">
+
+  <!-- Detailed View -->
+  <div class="detailed-view" id="detailedView">
+    <section class="column">
+      <div class="column-header">
+        <div class="column-title"><span>🕒 الانتظار</span></div>
+        <span class="badge-count" id="badge-queue">2</span>
+      </div>
+      <div class="card-list" id="lane-queue"></div>
+    </section>
+
+    <section class="column">
+      <div class="column-header">
+        <div class="column-title"><span>🔥 قيد التحضير</span></div>
+        <span class="badge-count" id="badge-cooking">1</span>
+      </div>
+      <div class="card-list" id="lane-cooking"></div>
+    </section>
+
+    <section class="column">
+      <div class="column-header">
+        <div class="column-title"><span>✅ جاهز للاستلام</span></div>
+        <span class="badge-count" id="badge-ready">1</span>
+      </div>
+      <div class="card-list" id="lane-ready"></div>
+    </section>
+  </div>
+
+  <!-- Simple View -->
+  <div class="simple-view hidden" id="simpleView"></div>
+
+</main>
+
+<div class="toast" id="toast">تم تحديث الأوردر بنجاح!</div>
+
+<script>
+const ordersData = [
+  {
+    id: "1049",
+    type: "دليفري",
+    time: "12:40 م متأخر",
+    isLate: true,
+    lane: "lane-queue",
+    items: [
+      { qty: "3×", name: "شاورما لحم", note: "⚠️ بدون بصل" },
+      { qty: "2×", name: "بطاطس عائلي" }
+    ]
+  },
+  {
+    id: "1050",
+    type: "صالة (طاولة 4)",
+    time: "02:15 م",
+    isLate: false,
+    lane: "lane-queue",
+    items: [
+      { qty: "1×", name: "برجر كلاسيك دبل" }
+    ]
+  },
+  {
+    id: "1048",
+    type: "سفري",
+    time: "05:10 م",
+    isLate: false,
+    lane: "lane-cooking",
+    items: [
+      { qty: "2×", name: "برجر دجاج مشوي" },
+      { qty: "1×", name: "حلقات بصل" }
+    ]
+  },
+  {
+    id: "1045",
+    type: "صالة",
+    time: "مكتمل",
+    isLate: false,
+    lane: "lane-ready",
+    items: [
+      { qty: "✓", name: "تم تجهيز جميع الأصناف" }
+    ]
+  }
+];
+
+let currentView = "detailed";
+let hudTimer = null;
+
+// Sound Synthesizer
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  if (type === 'move') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, now);
+    osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.12);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  } else if (type === 'finish') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, now);
+    osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.25);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.start(now);
+    osc.stop(now + 0.25);
+  } else if (type === 'error') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.linearRampToValueAtTime(140, now + 0.18);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    osc.start(now);
+    osc.stop(now + 0.18);
+  }
+}
+
+// Global Keypress Detection (Instant Keyboard Trigger)
+window.addEventListener('keydown', (e) => {
+  const hudInput = document.getElementById('hudInput');
+  const hudOverlay = document.getElementById('hudOverlay');
+
+  // If typing numbers directly anywhere on the screen
+  if (/^[0-9]$/.test(e.key)) {
+    if (document.activeElement !== hudInput) {
+      hudOverlay.classList.add('active');
+      hudInput.focus();
+    }
+  }
+
+  // Handle Enter key inside HUD input
+  if (e.key === 'Enter' && document.activeElement === hudInput) {
+    const num = hudInput.value.trim();
+    if (num) processOrderCommand(num);
+    
+    // Hide HUD after action
+    hudInput.value = '';
+    hudOverlay.classList.remove('active');
+    hudInput.blur();
+  }
+
+  // Hide HUD on Escape
+  if (e.key === 'Escape') {
+    hudInput.value = '';
+    hudOverlay.classList.remove('active');
+    hudInput.blur();
+  }
+});
+
+function processOrderCommand(num) {
+  const order = ordersData.find(o => o.id === num);
+  if (order) {
+    if (currentView === 'simple') {
+      finishOrder(num);
+    } else {
+      if (order.lane === 'lane-queue') moveCard(num, 'lane-cooking');
+      else if (order.lane === 'lane-cooking') moveCard(num, 'lane-ready');
+      else if (order.lane === 'lane-ready') finishOrder(num);
+    }
+  } else {
+    playSound('error');
+    showToast(`⚠ الطلب #${num} غير موجود!`, true);
+  }
+}
+
+// Render Logic
+function renderOrders() {
+  const laneQueue = document.getElementById('lane-queue');
+  const laneCooking = document.getElementById('lane-cooking');
+  const laneReady = document.getElementById('lane-ready');
+  const simpleView = document.getElementById('simpleView');
+
+  laneQueue.innerHTML = '';
+  laneCooking.innerHTML = '';
+  laneReady.innerHTML = '';
+  simpleView.innerHTML = '';
+
+  ordersData.forEach(order => {
+    if (currentView === 'detailed') {
+      const card = createDetailedCard(order);
+      document.getElementById(order.lane).appendChild(card);
+    } else {
+      const card = createSimpleCard(order);
+      simpleView.appendChild(card);
+    }
+  });
+
+  updateCounts();
+}
+
+function createDetailedCard(order) {
+  const card = document.createElement('div');
+  card.className = `order-card ${order.isLate ? 'late' : ''}`;
+  card.id = `order-${order.id}`;
+
+  let buttonHtml = '';
+  if (order.lane === 'lane-queue') {
+    buttonHtml = `<button class="btn-action btn-start" onclick="moveCard('${order.id}', 'lane-cooking')">بدء التحضير ➔</button>`;
+  } else if (order.lane === 'lane-cooking') {
+    buttonHtml = `<button class="btn-action btn-ready" onclick="moveCard('${order.id}', 'lane-ready')">جاهز للتسليم ✔</button>`;
+  } else {
+    buttonHtml = `<button class="btn-action btn-deliver" onclick="finishOrder('${order.id}')">أرشفة / تسليم النهائي</button>`;
+  }
+
+  let itemsHtml = order.items.map(i => `
+    <div class="item-row">
+      <div class="item-left">
+        <span class="item-qty">${i.qty}</span>
+        <div>
+          <span class="item-name">${i.name}</span>
+          ${i.note ? `<span class="item-note">${i.note}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div>
+        <span class="order-id">#${order.id}</span>
+        <span class="order-type">• ${order.type}</span>
+      </div>
+      <span class="order-time">${order.time}</span>
+    </div>
+    <div class="card-items">${itemsHtml}</div>
+    <div class="card-footer">${buttonHtml}</div>
+  `;
+  return card;
+}
+
+function createSimpleCard(order) {
+  const card = document.createElement('div');
+  card.className = `order-card ${order.isLate ? 'late' : ''}`;
+  card.id = `simple-order-${order.id}`;
+
+  let itemsHtml = order.items.map(i => `
+    <div class="item-row">
+      <div class="item-left">
+        <span class="item-qty">${i.qty}</span>
+        <span class="item-name">${i.name}</span>
+      </div>
+    </div>
+  `).join('');
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div>
+        <span class="order-id">#${order.id}</span>
+        <span class="order-type">• ${order.type}</span>
+      </div>
+      <span class="order-time">${order.time}</span>
+    </div>
+    <div class="card-items">${itemsHtml}</div>
+    <div class="card-footer">
+      <button class="btn-action btn-simple-finish" onclick="finishOrder('${order.id}')">إنجاز وإنهاء الطلب ✔</button>
+    </div>
+  `;
+  return card;
+}
+
+function moveCard(orderId, targetLane) {
+  const order = ordersData.find(o => o.id === orderId);
+  if (order) {
+    order.lane = targetLane;
+    playSound('move');
+    renderOrders();
+  }
+}
+
+function finishOrder(orderId) {
+  const cardId = currentView === 'detailed' ? `order-${orderId}` : `simple-order-${orderId}`;
+  const card = document.getElementById(cardId);
+
+  if (card) {
+    playSound('finish');
+    card.classList.add('finishing');
+    
+    setTimeout(() => {
+      const index = ordersData.findIndex(o => o.id === orderId);
+      if (index !== -1) ordersData.splice(index, 1);
+      renderOrders();
+      showToast(`تم إنجاز الطلب #${orderId} بنجاح ✨`);
+    }, 600);
+  }
+}
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('btn-detailed').classList.toggle('active', view === 'detailed');
+  document.getElementById('btn-simple').classList.toggle('active', view === 'simple');
+  
+  document.getElementById('detailedView').classList.toggle('hidden', view !== 'detailed');
+  document.getElementById('simpleView').classList.toggle('hidden', view !== 'simple');
+
+  renderOrders();
+}
+
+function updateCounts() {
+  const q = ordersData.filter(o => o.lane === 'lane-queue').length;
+  const c = ordersData.filter(o => o.lane === 'lane-cooking').length;
+  const r = ordersData.filter(o => o.lane === 'lane-ready').length;
+
+  document.getElementById('badge-queue').textContent = q;
+  document.getElementById('badge-cooking').textContent = c;
+  document.getElementById('badge-ready').textContent = r;
+
+  document.getElementById('cnt-queue').textContent = q;
+  document.getElementById('cnt-cooking').textContent = c;
+  document.getElementById('cnt-ready').textContent = r;
+}
+
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.background = isError ? 'var(--status-late)' : 'var(--status-ready)';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+renderOrders();
+</script>
+</body>
+</html>

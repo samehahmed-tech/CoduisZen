@@ -1,0 +1,283 @@
+[
+ {
+  "name": "sales-daily",
+  "clicked": "ok:المبيعات اليومية\nDAILY_SALES · Excel · P",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640",
+   "TFOOT| w=366"
+  ],
+  "errors": []
+ },
+ {
+  "name": "sales-hourly",
+  "clicked": "ok:اتجاهات المبيعات بالساعة\nHOURLY_TRENDS ·",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [],
+  "errors": []
+ },
+ {
+  "name": "sales-paymix",
+  "clicked": "ok:توزيع طرق الدفع\nPAYMENT_MIX · Excel · PD",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640"
+  ],
+  "errors": []
+ },
+ {
+  "name": "sales-cashier",
+  "clicked": "ok:ملخص الكاشير\nCASHIER_SUMMARY · Excel · P",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=419",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=419"
+  ],
+  "errors": []
+ },
+ {
+  "name": "sales-byitem",
+  "clicked": "ok:المبيعات حسب الصنف\nSALES_BY_ITEM · Excel",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=619",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=619",
+   "TBODY|divide-y.divide-border/30 w=504",
+   "TR|hover:bg-elevated/40.transition-colors w=504"
+  ],
+  "errors": []
+ },
+ {
+  "name": "sales-discounts",
+  "clicked": "ok:الخصومات\nDISCOUNT_ANALYSIS · Excel · PDF",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=363",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=363"
+  ],
+  "errors": []
+ },
+ {
+  "name": "sales-cancelled",
+  "clicked": "ok:الطلبات الملغاة\nCANCELLED_ORDERS · Excel",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=506",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=506"
+  ],
+  "errors": []
+ },
+ {
+  "name": "sales-peakheat",
+  "clicked": "ok:خريطة ساعات الذروة\nPEAK_HOURS_HEATMAP · ",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640"
+  ],
+  "errors": []
+ },
+ {
+  "name": "fin-pnl",
+  "clicked": "ok:الأرباح والخسائر\nPROFIT_LOSS · Excel · P",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=467",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=467",
+   "TBODY|divide-y.divide-border/30 w=523",
+   "TR|hover:bg-elevated/40.transition-colors w=523"
+  ],
+  "errors": []
+ },
+ {
+  "name": "fin-trial",
+  "clicked": "ok:ميزان المراجعة\nTRIAL_BALANCE · Excel · P",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=506",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=506",
+   "TBODY|divide-y.divide-border/30 w=539",
+   "TR|hover:bg-elevated/40.transition-colors w=539"
+  ],
+  "errors": []
+ },
+ {
+  "name": "fin-expense",
+  "clicked": "ok:تقرير المصروفات\nEXPENSE_REPORT · Excel ·",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=513",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=513",
+   "TBODY|divide-y.divide-border/30 w=639",
+   "TR|hover:bg-elevated/40.transition-colors w=639"
+  ],
+  "errors": []
+ },
+ {
+  "name": "fin-shift",
+  "clicked": "ok:ملخص الورديات\nSHIFT_SUMMARY · Excel · PD",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=648",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=648",
+   "TBODY|divide-y.divide-border/30 w=563",
+   "TR|hover:bg-elevated/40.transition-colors w=563"
+  ],
+  "errors": []
+ },
+ {
+  "name": "inv-movement",
+  "clicked": "ok:حركة المخزون\nSTOCK_MOVEMENTS · Excel · P",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [],
+  "errors": []
+ },
+ {
+  "name": "inv-valuation",
+  "clicked": "ok:تقييم المخزون\nINVENTORY_VALUATION · Exce",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=440",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=440"
+  ],
+  "errors": []
+ },
+ {
+  "name": "inv-suppliers",
+  "clicked": "ok:الموردون\nSUPPLIERS · Excel · PDF",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640"
+  ],
+  "errors": []
+ },
+ {
+  "name": "hr-payroll",
+  "clicked": "ok:ملخص الرواتب\nPAYROLL · Excel · PDF",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [],
+  "errors": []
+ },
+ {
+  "name": "hr-attendance",
+  "clicked": "ok:الحضور والتأخير\nATTENDANCE · Excel · PDF",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [],
+  "errors": []
+ },
+ {
+  "name": "hr-productivity",
+  "clicked": "ok:إنتاجية الموظفين\nEMPLOYEE_PRODUCTIVITY ·",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [],
+  "errors": []
+ },
+ {
+  "name": "crm-ltv",
+  "clicked": "ok:القيمة العمرية للعميل\nCUSTOMER_LTV · Exc",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [],
+  "errors": []
+ },
+ {
+  "name": "crm-newvsret",
+  "clicked": "ok:عملاء جدد مقابل عائدين\nNEW_VS_RETURNING ",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640"
+  ],
+  "errors": []
+ },
+ {
+  "name": "ops-branch",
+  "clicked": "ok:أداء الفروع\nBRANCH_PERFORMANCE · Excel ·",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=488",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=488",
+   "TBODY|divide-y.divide-border/30 w=371",
+   "TR|hover:bg-elevated/40.transition-colors w=371"
+  ],
+  "errors": []
+ },
+ {
+  "name": "ops-unpaid",
+  "clicked": "ok:طلبات غير مدفوعة\nUNPAID_ORDERS · Excel ·",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640"
+  ],
+  "errors": []
+ },
+ {
+  "name": "ops-kitchen",
+  "clicked": "ok:أداء المطبخ\nKITCHEN_PERFORMANCE · Excel ",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "THEAD| w=375",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=375"
+  ],
+  "errors": []
+ },
+ {
+  "name": "ai-flash",
+  "clicked": "ok:التقرير اليومي السريع\nDAILY_FLASH · Exce",
+  "pageOverflow": 0,
+  "secOverflow": 0,
+  "offenders": [
+   "TABLE|w-full.text-xs.min-w-[640px] w=640",
+   "THEAD| w=640",
+   "TR|bg-elevated/20.text-muted.text-[10px] w=640",
+   "TBODY|divide-y.divide-border/30 w=640",
+   "TR|hover:bg-elevated/40.transition-colors w=640",
+   "TD|px-5.py-3.5.text-right w=366"
+  ],
+  "errors": []
+ }
+]
