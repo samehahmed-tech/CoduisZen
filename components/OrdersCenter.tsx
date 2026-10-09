@@ -48,6 +48,7 @@ import { refundApi } from '../services/api/refunds';
 import { useToast } from './Toast';
 import { apiRequest, getActionableErrorMessage } from '../services/api/core';
 import PageSkeleton from './common/PageSkeleton';
+import PagerBar from './common/PagerBar';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatDisplayId } from '../src/utils/idGenerator';
 import { ManagerApprovalModal } from '../src/features/pos/components/ManagerApprovalModal';
@@ -891,9 +892,6 @@ const OrdersCenter: React.FC = () => {
 
     const pipelineTabs = [{ key: 'ALL', label: copy.all, count: total || orders.length }, ...orderStatusOptions.map(s => ({ key: s, label: getStatusLabel(s as OrderStatus), count: stats.perStatus[s] || 0 }))];
     const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
-    const safePage = Math.min(Math.max(1, page), totalPages);
-    const rangeStart = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
-    const rangeEnd = Math.min(safePage * pageSize, total);
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-app text-main" dir={isAr ? 'rtl' : 'ltr'}>
@@ -1035,46 +1033,17 @@ const OrdersCenter: React.FC = () => {
                     <span className="ms-auto hidden text-[11px] font-black text-muted sm:inline">{filteredSorted.length} / {total || filteredSorted.length}</span>
                 </div>
                 {/* ── Pager (Phase-6): page sizes 10/25/50/100, exact totals ── */}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <div className="flex h-9 items-center gap-1 rounded-xl border border-border bg-elevated px-2">
-                        <button
-                            type="button"
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={safePage <= 1 || isLoading}
-                            aria-label={isAr ? 'الصفحة السابقة' : 'Previous page'}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:text-main disabled:opacity-40"
-                        >
-                            {isAr ? '›' : '‹'}
-                        </button>
-                        <span className="min-w-[120px] text-center text-[11px] font-black text-main tabular-nums" aria-live="polite">
-                            {total === 0 ? (isAr ? 'لا نتائج' : 'No results') : `${rangeStart}–${rangeEnd} / ${total}`}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={safePage >= totalPages || isLoading}
-                            aria-label={isAr ? 'الصفحة التالية' : 'Next page'}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:text-main disabled:opacity-40"
-                        >
-                            {isAr ? '‹' : '›'}
-                        </button>
-                    </div>
-                    <div className="flex h-9 items-center gap-2 rounded-xl border border-border bg-elevated px-2.5">
-                        <span className="text-[10px] font-black text-muted">{isAr ? 'لكل صفحة' : 'Per page'}</span>
-                        <select
-                            value={pageSize}
-                            onChange={e => setPageSize(Number(e.target.value))}
-                            aria-label={isAr ? 'عدد السجلات لكل صفحة' : 'Records per page'}
-                            className="bg-transparent text-[11px] font-black text-main outline-none"
-                        >
-                            {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                        </select>
-                    </div>
-                    {totalPages > 1 && (
-                        <span className="text-[11px] font-black text-muted tabular-nums">
-                            {isAr ? `صفحة ${safePage} من ${totalPages}` : `Page ${safePage} of ${totalPages}`}
-                        </span>
-                    )}
+                <div className="mt-2">
+                    <PagerBar
+                        page={page}
+                        totalPages={totalPages}
+                        total={total}
+                        pageSize={pageSize}
+                        lang={lang as 'en' | 'ar'}
+                        isLoading={isLoading}
+                        onPage={setPage}
+                        onPageSize={(n) => { setPageSize(n); setPage(1); }}
+                    />
                 </div>
             </div>
 

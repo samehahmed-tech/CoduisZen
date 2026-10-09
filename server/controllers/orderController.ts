@@ -562,14 +562,16 @@ export const getAllOrders = async (req: Request, res: Response) => {
             : sortMode === 'waiting' ? [openFirst, asc(orders.createdAt)]
             : [desc(orders.createdAt)];
 
-        // Page-size ceiling (Phase-6 policy): never serve more than 100
-        // records per response. Ops screens page through `mode=page`.
-        const max = Math.min(Number(limit) || 100, 100);
-
-        // Offset mode (Phase-6 pager): `?mode=page&page=2` returns an
-        // envelope with an exact total. Legacy array + cursor shapes stay
-        // byte-compatible for existing callers (POS, KDS, call center).
+        // Page-size policy: the opt-in pager contract (`mode=page`) never
+        // serves more than 100 records per response. Legacy callers (live
+        // ops screens that must see complete active sets: POS, KDS, call
+        // center, dispatch) keep the historical 500 ceiling — capping them
+        // without a pager UI would HIDE live orders, which integrity forbids.
+        // Documented Phase-6 ops exception; each gets a pager before any cut.
         const wantPage = String(req.query.mode || '') === 'page';
+        const max = wantPage
+            ? Math.min(Number(limit) || 100, 100)
+            : Math.min(Number(limit) || 100, 500);
         const pageNum = wantPage ? Math.max(1, Math.floor(Number(req.query.page) || 1)) : 1;
         const pageOffset = (pageNum - 1) * max;
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { eq, inArray } from 'drizzle-orm';
-import { orders, users } from '../src/db/schema';
+import { orders, users, customers } from '../src/db/schema';
 import { parsePagination, parseCursorPagination } from '../server/middleware/pagination';
 
 let app: any;
@@ -68,14 +68,28 @@ describe('Phase-6 pagination policy', () => {
         expect(parsePagination(fake({ page: '-3', limit: '10' })).page).toBe(1);
     });
 
-    it('legacy list never exceeds 100 records', async () => {
+    it('legacy list preserves complete sets for live ops screens (500 ceiling)', async () => {
         await freshAuth();
         const res = await request(app)
             .get('/api/orders?branch_id=b1&limit=10000')
             .set('Authorization', `Bearer ${token}`);
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
-        expect(res.body.length).toBeLessThanOrEqual(100);
+        // Ops exception: no record may be hidden from live screens.
+        expect(res.body.length).toBeLessThanOrEqual(500);
+        const total: any = await request(app)
+            .get('/api/orders?branch_id=b1&mode=page&page=1&limit=100')
+            .set('Authorization', `Bearer ${token}`);
+        expect(res.body.length).toBe(total.body.pagination.total);
+    });
+
+    it('page mode never exceeds 100 records per response', async () => {
+        await freshAuth();
+        const res = await request(app)
+            .get('/api/orders?branch_id=b1&mode=page&page=1&limit=10000')
+            .set('Authorization', `Bearer ${token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data.length).toBeLessThanOrEqual(100);
     });
 
     it('page mode returns exact totals across boundaries', async () => {
@@ -122,5 +136,43 @@ describe('Phase-6 pagination policy', () => {
         const totals = hi.body.data.map((o: any) => Number(o.total || 0));
         const sorted = [...totals].sort((a, b) => b - a);
         expect(totals).toEqual(sorted);
+    });
+
+    it('customer directory pages with exact totals and summary', async () => {
+        await freshAuth();
+        // Seed 12 uniquely-named customers (boundary: 10 + 2).
+        const cids = Array.from({ length: 12 }, (_, i) => `test-page-cust-${i}`);
+        for (let i = 0; i < cids.length; i++) {
+            await db.insert(customers).values({
+                id: cids[i],
+                name: `PAGECUST-${i}`,
+                phone: `010900000${String(i).padStart(2, '0')}`,
+            } as any).catch(() => undefined);
+        }
+        try {
+            const p1: any = await request(app)
+                .get('/api/customers?mode=page&page=1&limit=10')
+                .set('Authorization', `Bearer ${token}`);
+            expect(p1.status).toBe(200);
+            expect(p1.body.data.length).toBe(10);
+            expect(p1.body.pagination.total).toBeGreaterThanOrEqual(12);
+            expect(p1.body.summary).toBeTruthy();
+            expect(p1.body.summary.total).toBe(p1.body.pagination.total);
+
+            const q: any = await request(app)
+                .get('/api/customers?mode=page&search=PAGECUST-7&limit=100')
+                .set('Authorization', `Bearer ${token}`);
+            expect(q.status).toBe(200);
+            expect(q.body.data.length).toBeGreaterThanOrEqual(1);
+            expect(q.body.data.every((c: any) => String(c.name || '').includes('PAGECUST'))).toBe(true);
+
+            const over: any = await request(app)
+                .get('/api/customers?mode=page&page=1&limit=10000')
+                .set('Authorization', `Bearer ${token}`);
+            expect(over.status).toBe(200);
+            expect(over.body.data.length).toBeLessThanOrEqual(100);
+        } finally {
+            await db.delete(customers).where(inArray(customers.id, cids)).catch(() => undefined);
+        }
     });
 });

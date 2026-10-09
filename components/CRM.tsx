@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   Search, Plus, Star, Phone, MapPin, UserCheck,
   ShieldCheck, TrendingUp, ShoppingBag, Save, Users as UsersGroup,
@@ -9,6 +9,8 @@ import { useCRMStore } from '../stores/useCRMStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useOrderStore } from '../stores/useOrderStore';
 import { useDebounce } from '../hooks';
+import { customersApi } from '../services/api/customers';
+import PagerBar from './common/PagerBar';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CRMMetric: React.FC<{
@@ -48,10 +50,57 @@ const CRM: React.FC = () => {
   const orders = useOrderStore((state) => state.orders);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearch = useDebounce(searchQuery, 250);
+  const debouncedSearch = useDebounce(searchQuery, 400);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [formError, setFormError] = useState('');
+  // Server-driven directory pager (Phase-6). The store list stays for
+  // other consumers (POS/CallCenter typeaheads); this page pages exactly.
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [pageRows, setPageRows] = useState<Customer[]>([]);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [summary, setSummary] = useState<null | { total: number; loyaltyMembers: number; avgLTV: number; atRisk: number }>(null);
+  const pageReq = useRef(0);
+
+  const loadPage = useCallback(async () => {
+    const id = ++pageReq.current;
+    setPageLoading(true);
+    try {
+      const params: any = { mode: 'page', page, limit: pageSize };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      const data: any = await customersApi.getAll(params);
+      if (id !== pageReq.current) return;
+      if (data && Array.isArray(data.data)) {
+        setPageRows(data.data);
+        const serverTotal = Number(data.pagination?.total || 0);
+        setTotal(serverTotal);
+        if (data.summary) setSummary(data.summary);
+        const pages = Math.max(1, Math.ceil(serverTotal / pageSize));
+        if (page > pages) setPage(pages);
+      } else if (Array.isArray(data)) {
+        setPageRows(data);
+        setTotal(data.length);
+        setSummary(null);
+      }
+    } catch {
+      if (id === pageReq.current) {
+        setPageRows([]);
+        setTotal(0);
+      }
+    } finally {
+      if (id === pageReq.current) setPageLoading(false);
+    }
+  }, [debouncedSearch, page, pageSize]);
+
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, pageSize]);
 
   const [newCustomer, setNewCustomer] = useState<Partial<Customer>>({ name: '', phone: '', address: '' });
 
@@ -59,16 +108,17 @@ const CRM: React.FC = () => {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  const filteredCustomers = useMemo(() => {
-    return customers.filter(c =>
-      c.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      c.phone.includes(debouncedSearch) ||
-      (c.loyaltyTier && c.loyaltyTier.toLowerCase().includes(debouncedSearch.toLowerCase()))
-    );
-  }, [customers, debouncedSearch]);
+  const filteredCustomers = pageRows;
+  const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
 
-  const activeLoyaltyMembers = useMemo(() => customers.filter(c => c.loyaltyPoints > 0).length, [customers]);
-  const avgLTV = useMemo(() => customers.length > 0 ? customers.reduce((s, c) => s + c.totalSpent, 0) / customers.length : 0, [customers]);
+  const activeLoyaltyMembers = useMemo(
+    () => summary ? summary.loyaltyMembers : customers.filter(c => c.loyaltyPoints > 0).length,
+    [customers, summary]
+  );
+  const avgLTV = useMemo(
+    () => summary ? summary.avgLTV : (customers.length > 0 ? customers.reduce((s, c) => s + c.totalSpent, 0) / customers.length : 0),
+    [customers, summary]
+  );
 
   // One canonical phone shape (01xxxxxxxxx) shared with the call center —
   // +20/0020 variants collapse to it so the same caller is never two rows.
@@ -95,13 +145,16 @@ const CRM: React.FC = () => {
     return Math.max(created || 0, ...orderTimes, 0);
   };
 
-  // At risk = genuinely dormant (no order or profile touch in 30+ days),
-  // not merely "new with few visits".
-  const atRiskProfiles = useMemo(() => customers.filter(c => {
-    const last = lastActivityOf(c);
-    if (!last) return false;
-    return (Date.now() - last) / (1000 * 3600 * 24) > 30;
-  }).length, [customers, orders]);
+  // At-risk comes from the server directory summary when paged (exact,
+  // directory-wide); the client computation stays as the legacy fallback.
+  const atRiskProfiles = useMemo(() => {
+    if (summary) return summary.atRisk;
+    return customers.filter(c => {
+      const last = lastActivityOf(c);
+      if (!last) return false;
+      return (Date.now() - last) / (1000 * 3600 * 24) > 30;
+    }).length;
+  }, [customers, orders, summary]);
 
   const isPhoneValid = (phone?: string) => /^01[0-9]{9}$/.test(normalizePhone(phone));
 
@@ -140,6 +193,8 @@ const CRM: React.FC = () => {
       setFormError('');
       setShowAddModal(false);
       setNewCustomer({ name: '', phone: '', address: '' });
+      setPage(1);
+      loadPage();
     } catch (error) {
       setFormError(tr('Could not save customer. Try again.', 'تعذر حفظ العميل. حاول مرة أخرى.'));
     }
@@ -260,7 +315,7 @@ const CRM: React.FC = () => {
 
         {/* Metrics Row */}
         <motion.section initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          <CRMMetric label={tr('Customers', 'العملاء')} value={customers.length.toLocaleString()} icon={UsersGroup} color="#6366f1" />
+          <CRMMetric label={tr('Customers', 'العملاء')} value={(summary ? summary.total : customers.length).toLocaleString()} icon={UsersGroup} color="#6366f1" />
           <CRMMetric label={tr('Active Loyalty', 'أعضاء الولاء')} value={activeLoyaltyMembers.toLocaleString()} icon={Award} color="#10b981" />
           <CRMMetric label={tr('Average Spend', 'متوسط الإنفاق')} value={`${avgLTV.toFixed(0)} LE`} icon={TrendingUp} color="#0ea5e9" />
           <CRMMetric label={tr('At Risk', 'معرضون للتسرب')} value={atRiskProfiles} icon={AlertTriangle} color="#f43f5e" />
@@ -388,6 +443,21 @@ const CRM: React.FC = () => {
               )}
             </motion.tbody>
           </table>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <PagerBar
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            lang={isAr ? 'ar' : 'en'}
+            isLoading={pageLoading}
+            onPage={setPage}
+            onPageSize={(n) => { setPageSize(n); setPage(1); }}
+          />
+          {pageLoading && (
+            <span className="text-[11px] font-black text-muted">{tr('Loading…', 'جاري التحميل…')}</span>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { customers, customerAddresses } from '../../src/db/schema';
 import { eq, or, and, desc, lt, gt, sql, isNull } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
@@ -54,19 +54,90 @@ export const getAllCustomers = async (req: Request, res: Response) => {
             return res.json(results);
         }
 
+        // Offset pager (Phase-6): `?mode=page&page=2` returns an envelope
+        // with an exact total. Applies to both the directory and search
+        // branches so no customer is ever hidden behind a silent cap.
+        const wantPage = String(req.query.mode || '') === 'page';
+        const pageSize = wantPage ? Math.min(Math.max(1, Number(req.query.limit) || 10), 100) : 0;
+        const pageNum = wantPage ? Math.max(1, Math.floor(Number(req.query.page) || 1)) : 1;
+
+        // Shared directory-wide KPI summary for page envelopes.
+        const directorySummary = () => pool.query(`
+            SELECT COUNT(*) AS total,
+                SUM(CASE WHEN c.loyalty_points > 0 THEN 1 ELSE 0 END) AS loyaltyMembers,
+                AVG(CAST(c.total_spent AS FLOAT)) AS avgLTV,
+                SUM(CASE WHEN c.created_at < DATEADD(day, -30, GETDATE()) AND ro.cid IS NULL THEN 1 ELSE 0 END) AS atRisk
+            FROM customers c
+            LEFT JOIN (
+                SELECT customer_id AS cid FROM orders
+                WHERE created_at >= DATEADD(day, -30, GETDATE()) AND customer_id IS NOT NULL
+                UNION
+                SELECT c2.id AS cid FROM customers c2
+                INNER JOIN orders o ON o.customer_phone = c2.phone
+                WHERE c2.phone IS NOT NULL AND o.created_at >= DATEADD(day, -30, GETDATE())
+            ) ro ON ro.cid = c.id
+            WHERE c.deleted_at IS NULL
+        `).then((r: any) => {
+            const agg: any = r?.rows?.[0] || {};
+            return {
+                loyaltyMembers: Number(agg.loyaltyMembers || 0),
+                avgLTV: Number(agg.avgLTV || 0),
+                atRisk: Number(agg.atRisk || 0),
+            };
+        });
+
         // Search mode (limited, no cursor)
         if (search) {
-            const results = await db.select(customerSelect).top(100).from(customers).where(
-                and(
-                    isNull(customers.deletedAt),
-                    or(
-                        likeSearch(customers.name, search),
-                        likeSearch(customers.phone, search),
-                        likeSearch(customers.email, search)
-                    )
+            const cond = and(
+                isNull(customers.deletedAt),
+                or(
+                    likeSearch(customers.name, search),
+                    likeSearch(customers.phone, search),
+                    likeSearch(customers.email, search)
                 )
             );
-            return res.json(results);
+            if (!wantPage) {
+                const results = await db.select(customerSelect).top(100).from(customers).where(cond);
+                return res.json(results);
+            }
+            const [countRows, rows, summary] = await Promise.all([
+                db.select({ n: sql<number>`count(*)` }).from(customers).where(cond),
+                db.select(customerSelect).from(customers).where(cond)
+                    .orderBy(desc(customers.createdAt), desc(customers.id))
+                    .offset((pageNum - 1) * pageSize).fetch(pageSize),
+                directorySummary(),
+            ]);
+            const total = Number((countRows as any[])[0]?.n || 0);
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            return res.json({
+                data: rows,
+                pagination: {
+                    page: pageNum, limit: pageSize, total, totalPages,
+                    hasNext: pageNum < totalPages, hasPrev: pageNum > 1,
+                },
+                summary: { total, ...summary },
+            });
+        }
+
+        if (wantPage) {
+            const base = and(isNull(customers.deletedAt));
+            const [countRows, rows, summary] = await Promise.all([
+                db.select({ n: sql<number>`count(*)` }).from(customers).where(base),
+                db.select(customerSelect).from(customers).where(base)
+                    .orderBy(desc(customers.createdAt), desc(customers.id))
+                    .offset((pageNum - 1) * pageSize).fetch(pageSize),
+                directorySummary(),
+            ]);
+            const total = Number((countRows as any[])[0]?.n || 0);
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            return res.json({
+                data: rows,
+                pagination: {
+                    page: pageNum, limit: pageSize, total, totalPages,
+                    hasNext: pageNum < totalPages, hasPrev: pageNum > 1,
+                },
+                summary: { total, ...summary },
+            });
         }
 
         // Cursor pagination mode
