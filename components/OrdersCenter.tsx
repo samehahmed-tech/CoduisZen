@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useOrderStore } from '../stores/useOrderStore';
+import { useDebounce } from '../hooks/useDebounce';
 import { AppPermission, Order, OrderStatus, OrderType } from '../types';
 import { translations } from '../services/translations';
 import { ordersApi } from '../services/api/orders';
@@ -167,6 +168,17 @@ const OrdersCenter: React.FC = () => {
     const [onlyDelayed, setOnlyDelayed] = useState(false);
     const [onlyUrgent, setOnlyUrgent] = useState(false);
     const [detailTab, setDetailTab] = useState<DetailTab>('ops');
+    // Server-driven pager (Phase-6): page size selector 10/25/50/100,
+    // default 100 keeps the ops-room density; search/sort/filters run
+    // server-side so every page is exact.
+    const [pageSize, setPageSize] = useState(100);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [serverSummary, setServerSummary] = useState<null | {
+        active: number; delayed: number; delivery: number; urgent: number;
+        revenue: number; avgWait: number; perStatus: Record<string, number>;
+    }>(null);
+    const debouncedQuery = useDebounce(searchQuery, 400);
 
     // ── selection / actions ───────────────────────────────
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -330,29 +342,69 @@ const OrdersCenter: React.FC = () => {
     };
 
     // ── loading (same API contract) ───────────────────────
-    const loadOrders = useCallback(async () => {
+    const loadOrders = useCallback(async (quiet = false) => {
         const requestId = ++loadRequestRef.current;
-        setIsLoading(true);
+        if (!quiet) setIsLoading(true);
         setError(null);
         try {
-            const params: any = { limit: 150 };
+            const params: any = { limit: pageSize, mode: 'page', page };
             if (statusFilter !== 'ALL') params.status = statusFilter;
             if (branchFilter !== 'ALL') params.branch_id = branchFilter;
             if (typeFilter !== 'ALL') params.type = typeFilter;
             if (dateFilter) params.date = dateFilter;
+            if (debouncedQuery.trim()) params.q = debouncedQuery.trim();
+            params.sort = sortMode;
+            if (onlyDelayed) params.delayed = '1';
+            if (onlyUrgent) params.urgent = '1';
 
-            const data = await ordersApi.getAll(params);
-            if (requestId === loadRequestRef.current) setOrders(Array.isArray(data) ? data.map(normalizeOrder) : []);
+            const data: any = await ordersApi.getAll(params);
+            if (requestId !== loadRequestRef.current) return;
+            if (data && Array.isArray(data.data)) {
+                setOrders(data.data.map(normalizeOrder));
+                const serverTotal = Number(data.pagination?.total || 0);
+                setTotal(serverTotal);
+                if (data.summary) setServerSummary(data.summary);
+                // Filter shrank under the current page — step back to validity.
+                const serverPages = Math.max(1, Math.ceil(serverTotal / pageSize));
+                if (page > serverPages) setPage(serverPages);
+            } else {
+                // Legacy array shape (fallback, never expected from this server).
+                const rows = Array.isArray(data) ? data : [];
+                setOrders(rows.map(normalizeOrder));
+                setTotal(rows.length);
+                setServerSummary(null);
+            }
         } catch (err: any) {
             if (requestId === loadRequestRef.current) setError(getActionableErrorMessage(err, lang as any));
         } finally {
-            if (requestId === loadRequestRef.current) setIsLoading(false);
+            if (requestId === loadRequestRef.current && !quiet) setIsLoading(false);
         }
-    }, [statusFilter, branchFilter, typeFilter, dateFilter, lang]);
+    }, [statusFilter, branchFilter, typeFilter, dateFilter, lang, pageSize, page, debouncedQuery, sortMode, onlyDelayed, onlyUrgent]);
+
+    // Quiet coalesced reload after live socket bursts: keeps page counts
+    // and totals exact without flashing the skeleton mid-scroll.
+    const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const scheduleQuietReload = useCallback(() => {
+        if (reloadTimer.current) clearTimeout(reloadTimer.current);
+        reloadTimer.current = setTimeout(() => {
+            reloadTimer.current = null;
+            void loadOrders(true);
+        }, 1500);
+    }, [loadOrders]);
+    useEffect(() => () => {
+        if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    }, []);
+    const pageRef = useRef(page);
+    pageRef.current = page;
 
     useEffect(() => {
         loadOrders();
     }, [loadOrders]);
+
+    // Page resets whenever the result set definition changes.
+    useEffect(() => {
+        setPage(1);
+    }, [statusFilter, branchFilter, typeFilter, dateFilter, debouncedQuery, sortMode, onlyDelayed, onlyUrgent, pageSize]);
 
     // Live clock for ages (re-render each minute)
     useEffect(() => {
@@ -373,14 +425,22 @@ const OrdersCenter: React.FC = () => {
             if (!raw?.id) return;
             const normalized = normalizeOrder(raw);
             setOrders(prev => {
-                if (!orderMatchesFilters(normalized)) return prev.filter(order => order.id !== normalized.id);
                 const exists = prev.some(order => order.id === normalized.id);
+                // Beyond page 1, never prepend strangers — the quiet reload
+                // below pulls the exact page + totals instead.
+                if (!exists && pageRef.current !== 1) {
+                    scheduleQuietReload();
+                    return prev;
+                }
+                if (!orderMatchesFilters(normalized)) return prev.filter(order => order.id !== normalized.id);
                 if (!exists) return [normalized, ...prev];
+                scheduleQuietReload();
                 return prev.map(order => order.id === normalized.id ? { ...order, ...normalized } : order);
             });
         };
         const patchOrder = (payload: any) => {
             if (!payload?.id) return;
+            scheduleQuietReload();
             setOrders(prev => prev.flatMap(order => {
                 if (order.id !== payload.id) return [order];
                 const normalized = normalizeOrder({ ...order, ...payload });
@@ -397,7 +457,7 @@ const OrdersCenter: React.FC = () => {
             socketService.off('order:status', patchOrder);
             socketService.off('dispatch:assigned', patchOrder);
         };
-    }, [orderMatchesFilters]);
+    }, [orderMatchesFilters, scheduleQuietReload]);
 
     useEffect(() => {
         setCheckedItems(new Set());
@@ -437,8 +497,21 @@ const OrdersCenter: React.FC = () => {
     }, [refundModalOrderId, selectedOrderId, showApprovalModal, voidModalOrderId]);
 
     // ── smart aggregations ────────────────────────────────
+    // Server summary (filter-scope exact counts) wins; client-side math
+    // stays as the fallback for legacy array responses.
     const stats = useMemo(() => {
         void liveTick;
+        if (serverSummary) {
+            return {
+                active: serverSummary.active,
+                delayed: serverSummary.delayed,
+                delivery: serverSummary.delivery,
+                urgent: serverSummary.urgent,
+                revenue: serverSummary.revenue,
+                avgWait: serverSummary.avgWait,
+                perStatus: serverSummary.perStatus || {},
+            };
+        }
         const acc = { active: 0, delayed: 0, delivery: 0, urgent: 0, revenue: 0, waitSum: 0, waitN: 0 };
         const perStatus: Record<string, number> = {};
         for (const order of orders) {
@@ -454,39 +527,13 @@ const OrdersCenter: React.FC = () => {
             if (isRevenueCounted(order)) acc.revenue += Number(order.total || 0);
         }
         return { ...acc, avgWait: acc.waitN ? Math.round(acc.waitSum / acc.waitN) : 0, perStatus };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orders, liveTick]);
+    }, [orders, liveTick, serverSummary]);
 
+    // Server pages, sorts, searches and filters — rows render as returned.
     const filteredSorted = useMemo(() => {
         void liveTick;
-        const q = searchQuery.trim().toLowerCase();
-        const base = orders.filter(order => {
-            if (q && !(
-                order.id.toLowerCase().includes(q) ||
-                String(order.orderNumber || '').includes(q) ||
-                String(order.customerName || '').toLowerCase().includes(q) ||
-                String(order.customerPhone || '').includes(q) ||
-                String(order.deliveryAddress || '').toLowerCase().includes(q)
-            )) return false;
-            if (onlyDelayed && slaFor(order) !== 'late') return false;
-            if (onlyUrgent && !order.isUrgent) return false;
-            return true;
-        });
-        const sorted = [...base];
-        switch (sortMode) {
-            case 'oldest': sorted.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)); break;
-            case 'highest': sorted.sort((a, b) => Number(b.total || 0) - Number(a.total || 0)); break;
-            case 'waiting':
-                sorted.sort((a, b) => {
-                    const rank = (o: Order) => (CLOSED_STATUSES.includes(o.status) ? 1 : 0) * 100000 - getOrderAgeMins(o.createdAt);
-                    return rank(a) - rank(b);
-                });
-                break;
-            case 'newest':
-            default: sorted.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)); break;
-        }
-        return sorted;
-    }, [orders, searchQuery, onlyDelayed, onlyUrgent, sortMode, liveTick]);
+        return orders;
+    }, [orders, liveTick]);
 
     const sortedOrdersRef = useRef<Order[]>([]);
     sortedOrdersRef.current = filteredSorted;
@@ -842,7 +889,11 @@ const OrdersCenter: React.FC = () => {
         return <div className="h-full p-8"><PageSkeleton type="table" rows={10} /></div>;
     }
 
-    const pipelineTabs = [{ key: 'ALL', label: copy.all, count: orders.length }, ...orderStatusOptions.map(s => ({ key: s, label: getStatusLabel(s as OrderStatus), count: stats.perStatus[s] || 0 }))];
+    const pipelineTabs = [{ key: 'ALL', label: copy.all, count: total || orders.length }, ...orderStatusOptions.map(s => ({ key: s, label: getStatusLabel(s as OrderStatus), count: stats.perStatus[s] || 0 }))];
+    const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
+    const safePage = Math.min(Math.max(1, page), totalPages);
+    const rangeStart = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const rangeEnd = Math.min(safePage * pageSize, total);
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-app text-main" dir={isAr ? 'rtl' : 'ltr'}>
@@ -981,7 +1032,49 @@ const OrdersCenter: React.FC = () => {
                             {branches.map(branch => <option key={branch.id} value={branch.id}>{isAr ? branch.nameAr || branch.name : branch.name}</option>)}
                         </select>
                     </div>
-                    <span className="ms-auto hidden text-[11px] font-black text-muted sm:inline">{filteredSorted.length} / {orders.length}</span>
+                    <span className="ms-auto hidden text-[11px] font-black text-muted sm:inline">{filteredSorted.length} / {total || filteredSorted.length}</span>
+                </div>
+                {/* ── Pager (Phase-6): page sizes 10/25/50/100, exact totals ── */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="flex h-9 items-center gap-1 rounded-xl border border-border bg-elevated px-2">
+                        <button
+                            type="button"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={safePage <= 1 || isLoading}
+                            aria-label={isAr ? 'الصفحة السابقة' : 'Previous page'}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:text-main disabled:opacity-40"
+                        >
+                            {isAr ? '›' : '‹'}
+                        </button>
+                        <span className="min-w-[120px] text-center text-[11px] font-black text-main tabular-nums" aria-live="polite">
+                            {total === 0 ? (isAr ? 'لا نتائج' : 'No results') : `${rangeStart}–${rangeEnd} / ${total}`}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={safePage >= totalPages || isLoading}
+                            aria-label={isAr ? 'الصفحة التالية' : 'Next page'}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition hover:text-main disabled:opacity-40"
+                        >
+                            {isAr ? '‹' : '›'}
+                        </button>
+                    </div>
+                    <div className="flex h-9 items-center gap-2 rounded-xl border border-border bg-elevated px-2.5">
+                        <span className="text-[10px] font-black text-muted">{isAr ? 'لكل صفحة' : 'Per page'}</span>
+                        <select
+                            value={pageSize}
+                            onChange={e => setPageSize(Number(e.target.value))}
+                            aria-label={isAr ? 'عدد السجلات لكل صفحة' : 'Records per page'}
+                            className="bg-transparent text-[11px] font-black text-main outline-none"
+                        >
+                            {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                    </div>
+                    {totalPages > 1 && (
+                        <span className="text-[11px] font-black text-muted tabular-nums">
+                            {isAr ? `صفحة ${safePage} من ${totalPages}` : `Page ${safePage} of ${totalPages}`}
+                        </span>
+                    )}
                 </div>
             </div>
 

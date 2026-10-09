@@ -33,7 +33,10 @@ export interface PaginatedResponse<T> {
 }
 
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
+// Global page-size ceiling: no list endpoint may serve more than 100
+// records per page (Phase-6 policy). Exact-totals report paths that need
+// wider windows use their own explicit constants and stay documented.
+const MAX_LIMIT = 100;
 const MIN_LIMIT = 1;
 
 /**

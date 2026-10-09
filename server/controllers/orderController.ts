@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
 import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, menuItemModifiers, modifierOptions, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons, kdsTickets, dayCloseReports } from '../../src/db/schema';
-import { eq, and, desc, gte, lte, inArray, gt, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, lte, inArray, gt, sql } from 'drizzle-orm';
 import { inventoryService } from '../services/inventoryService';
 import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
@@ -500,39 +500,78 @@ export const getAllOrders = async (req: Request, res: Response) => {
         const toDate = cleanQueryString(req.query.to_date) || cleanQueryString(req.query.endDate);
         const isCallCenterOrder = parseBooleanQuery(req.query.is_call_center_order ?? req.query.isCallCenterOrder);
         const conditions = [];
+        const baseConditions: any[] = [];
 
         if (status) conditions.push(eq(orders.status, status as string));
-        if (requestedBranchId) conditions.push(eq(orders.branchId, requestedBranchId));
-        if (type) conditions.push(eq(orders.type, type as string));
-        if (source) conditions.push(eq(orders.source, source));
-        if (isCallCenterOrder !== undefined) conditions.push(eq(orders.isCallCenterOrder, isCallCenterOrder));
+        if (requestedBranchId) { conditions.push(eq(orders.branchId, requestedBranchId)); baseConditions.push(eq(orders.branchId, requestedBranchId)); }
+        if (type) { conditions.push(eq(orders.type, type as string)); baseConditions.push(eq(orders.type, type as string)); }
+        if (source) { conditions.push(eq(orders.source, source as string)); baseConditions.push(eq(orders.source, source as string)); }
+        if (isCallCenterOrder !== undefined) { conditions.push(eq(orders.isCallCenterOrder, isCallCenterOrder)); baseConditions.push(eq(orders.isCallCenterOrder, isCallCenterOrder)); }
 
         if (date) {
             const dateStr = date as string;
-            conditions.push(
-                sql`(${orders.businessDate} = ${dateStr} OR (
+            const dateCond = sql`(${orders.businessDate} = ${dateStr} OR (
                     ${orders.businessDate} IS NULL AND
                     ${orders.createdAt} >= CAST(${dateStr} AS DATE) AND
                     ${orders.createdAt} < DATEADD(day, 1, CAST(${dateStr} AS DATE))
-                ))`
-            );
+                ))`;
+            conditions.push(dateCond);
+            baseConditions.push(dateCond);
         }
         if (!date && (fromDate || toDate)) {
             const startDate = fromDate || toDate;
             const endDate = toDate || fromDate;
-            conditions.push(
-                sql`(
+            const rangeCond = sql`(
                     (${orders.businessDate} IS NOT NULL AND ${orders.businessDate} >= ${startDate} AND ${orders.businessDate} <= ${endDate})
                     OR (
                         ${orders.businessDate} IS NULL AND
                         ${orders.createdAt} >= CAST(${startDate} AS DATE) AND
                         ${orders.createdAt} < DATEADD(day, 1, CAST(${endDate} AS DATE))
                     )
-                )`
-            );
+                )`;
+            conditions.push(rangeCond);
+            baseConditions.push(rangeCond);
         }
 
-        const max = Math.min(Number(limit) || 100, 500);
+        // Server-side text search (pager-safe): id / number / customer / phone / address.
+        const searchRaw = cleanQueryString(req.query.q);
+        if (searchRaw) {
+            const like = `%${searchRaw.replace(/[%_]/g, '')}%`;
+            const searchCond = sql`(${orders.customerName} LIKE ${like} OR ${orders.customerPhone} LIKE ${like} OR ${orders.deliveryAddress} LIKE ${like} OR CAST(${orders.id} AS NVARCHAR(100)) LIKE ${like} OR CAST(${orders.orderNumber} AS NVARCHAR(20)) LIKE ${like})`;
+            conditions.push(searchCond);
+            baseConditions.push(searchCond);
+        }
+        // SLA / urgency flags (mirror the ops-room badges).
+        if (cleanQueryString(req.query.delayed) === '1') {
+            const delayedCond = sql`(${orders.status} NOT IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') AND ${orders.createdAt} < DATEADD(minute, -30, GETDATE()))`;
+            conditions.push(delayedCond);
+            baseConditions.push(delayedCond);
+        }
+        if (cleanQueryString(req.query.urgent) === '1') {
+            const urgentCond = sql`(${orders.isUrgent} = 1)`;
+            conditions.push(urgentCond);
+            baseConditions.push(urgentCond);
+        }
+
+        // Server-side sort (pager-safe). `waiting` = open tickets oldest-first.
+        const sortMode = String(req.query.sort || 'newest');
+        const openFirst = sql`CASE WHEN ${orders.status} IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') THEN 1 ELSE 0 END`;
+        const sortCols: any[] =
+            sortMode === 'oldest' ? [asc(orders.createdAt)]
+            : sortMode === 'highest' ? [desc(orders.total)]
+            : sortMode === 'waiting' ? [openFirst, asc(orders.createdAt)]
+            : [desc(orders.createdAt)];
+
+        // Page-size ceiling (Phase-6 policy): never serve more than 100
+        // records per response. Ops screens page through `mode=page`.
+        const max = Math.min(Number(limit) || 100, 100);
+
+        // Offset mode (Phase-6 pager): `?mode=page&page=2` returns an
+        // envelope with an exact total. Legacy array + cursor shapes stay
+        // byte-compatible for existing callers (POS, KDS, call center).
+        const wantPage = String(req.query.mode || '') === 'page';
+        const pageNum = wantPage ? Math.max(1, Math.floor(Number(req.query.page) || 1)) : 1;
+        const pageOffset = (pageNum - 1) * max;
 
         // Item 13: Cursor-based pagination
         if (cursor && typeof cursor === 'string') {
@@ -545,16 +584,41 @@ export const getAllOrders = async (req: Request, res: Response) => {
             }
         }
 
-        const fetchLimit = cursor ? max + 1 : max;
+        const fetchLimit = cursor && !wantPage ? max + 1 : max;
         let query = db.select(orderSelect).from(orders);
         if (conditions.length > 0) {
             // @ts-ignore
             query = query.where(and(...conditions));
         }
-        const allOrders = await query.orderBy(desc(orders.createdAt)).offset(0).fetch(fetchLimit);
+        const countQuery = wantPage
+            ? db.select({ n: sql<number>`count(*)` }).from(orders).where(conditions.length ? and(...conditions) : undefined)
+            : null;
+        // KPI summary over the filter scope (ignores the status tab so the
+        // pipeline tabs keep global counts, like the ops room expects).
+        const summaryQuery = wantPage
+            ? Promise.all([
+                db.select({
+                    active: sql<number>`SUM(CASE WHEN ${orders.status} NOT IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') THEN 1 ELSE 0 END)`,
+                    delayed: sql<number>`SUM(CASE WHEN ${orders.status} NOT IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') AND ${orders.createdAt} < DATEADD(minute, -30, GETDATE()) THEN 1 ELSE 0 END)`,
+                    delivery: sql<number>`SUM(CASE WHEN ${orders.type} = 'DELIVERY' THEN 1 ELSE 0 END)`,
+                    urgent: sql<number>`SUM(CASE WHEN ${orders.isUrgent} = 1 AND ${orders.status} NOT IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') THEN 1 ELSE 0 END)`,
+                    revenue: sql<number>`SUM(CASE WHEN ${orders.status} NOT IN ('CANCELLED','REFUNDED','VOID','VOIDED') THEN ${orders.total} ELSE 0 END)`,
+                    waitSum: sql<number>`SUM(CASE WHEN ${orders.status} NOT IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') THEN DATEDIFF(minute, ${orders.createdAt}, GETDATE()) ELSE 0 END)`,
+                    waitN: sql<number>`SUM(CASE WHEN ${orders.status} NOT IN ('DELIVERED','COMPLETED','CANCELLED','REFUNDED') THEN 1 ELSE 0 END)`,
+                }).from(orders).where(baseConditions.length ? and(...baseConditions) : undefined),
+                db.select({ status: orders.status, n: sql<number>`count(*)` }).from(orders).where(baseConditions.length ? and(...baseConditions) : undefined).groupBy(orders.status),
+            ])
+            : null;
+        const [allOrders, countRows, summaryRows] = await Promise.all([
+            query.orderBy(...sortCols).offset(wantPage ? pageOffset : 0).fetch(fetchLimit),
+            countQuery || Promise.resolve(null),
+            summaryQuery || Promise.resolve(null),
+        ]);
+        const total = countRows ? Number((countRows as any[])[0]?.n || 0) : 0;
 
         if (allOrders.length === 0) {
-            if (cursor) return res.json({ data: [], pagination: { limit: max, nextCursor: null, hasMore: false } });
+            if (cursor && !wantPage) return res.json({ data: [], pagination: { limit: max, nextCursor: null, hasMore: false } });
+            if (wantPage) return res.json({ data: [], pagination: { page: pageNum, limit: max, total, totalPages: 1, hasNext: false, hasPrev: pageNum > 1 } });
             return res.json([]);
         }
 
@@ -644,7 +708,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
                 : (paymentsByOrderId.get(order.id) || []).reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
         }));
 
-        if (cursor) {
+        if (cursor && !wantPage) {
             const hasMore = allOrders.length > max;
             const last = enrichedOrders[enrichedOrders.length - 1];
             const { encodeCursor } = await import('../middleware/pagination');
@@ -654,6 +718,35 @@ export const getAllOrders = async (req: Request, res: Response) => {
                     limit: max,
                     nextCursor: last && hasMore ? encodeCursor(last.createdAt || new Date(), last.id) : null,
                     hasMore,
+                },
+            });
+        }
+        if (wantPage) {
+            const totalPages = Math.max(1, Math.ceil(total / max));
+            const agg: any = (summaryRows as any[])?.[0]?.[0] || {};
+            const perStatus: Record<string, number> = {};
+            for (const r of ((summaryRows as any[])?.[1] || []) as any[]) {
+                perStatus[String(r.status)] = Number(r.n || 0);
+            }
+            const waitN = Number(agg.waitN || 0);
+            return res.json({
+                data: enrichedOrders,
+                pagination: {
+                    page: pageNum,
+                    limit: max,
+                    total,
+                    totalPages,
+                    hasNext: pageNum < totalPages,
+                    hasPrev: pageNum > 1,
+                },
+                summary: {
+                    active: Number(agg.active || 0),
+                    delayed: Number(agg.delayed || 0),
+                    delivery: Number(agg.delivery || 0),
+                    urgent: Number(agg.urgent || 0),
+                    revenue: Number(agg.revenue || 0),
+                    avgWait: waitN ? Math.round(Number(agg.waitSum || 0) / waitN) : 0,
+                    perStatus,
                 },
             });
         }
