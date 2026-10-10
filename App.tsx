@@ -277,6 +277,7 @@ const App: React.FC = () => {
     const run = () => {
       auditService.init();
       aiIntelligenceService.init();
+      import('./services/rumService').then((m) => m.initClientRum()).catch(() => undefined);
     };
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
       const idleId = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(run, { timeout: 3000 });

@@ -18,9 +18,11 @@ import { authenticateToken, requireRoles } from './middleware/auth';
 import { isOriginAllowed } from './config/cors';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { attachRequestId, requestLogger } from './middleware/requestContext';
+import { requestTiming } from './middleware/requestTiming';
 import { errorContractMiddleware } from './middleware/errorContract';
 import { apiCacheHeaders } from './middleware/cacheHeaders';
 import { errorTrackingMiddleware, getRecentErrors, getErrorStats } from './services/errorTrackingService';
+import { apiRateLimiter } from './middleware/rateLimit';
 import { enforceHttps, hstsHeader } from './middleware/sslEnforcement';
 import { healthService } from './services/healthService';
 import { ensureUploadsDirectory, uploadsDirectory } from './utils/imageStorage';
@@ -60,10 +62,12 @@ app.use(express.json({
     },
 }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
+app.use('/api', apiRateLimiter);
 app.use(inputSanitizer);
 app.use(csrfProtection);
 app.use(auditMiddleware);
 app.use(attachRequestId);
+app.use(requestTiming);
 app.use(requestLogger);
 app.use(errorContractMiddleware);
 app.use(apiCacheHeaders);
@@ -106,6 +110,12 @@ app.get('/api/health', async (req, res) => {
         status: status.status === 'HEALTHY' ? 'ok' : 'degraded',
         health: status,
     });
+});
+
+// Client-RUM ingest (Public — numeric aggregates only, rate-limited).
+app.post('/api/rum/client', async (req, res) => {
+    const { ingestClientRum } = await import('./controllers/rumController');
+    return ingestClientRum(req, res);
 });
 
 // Protected Routes

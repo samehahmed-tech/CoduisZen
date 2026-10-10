@@ -41,6 +41,13 @@ const writeReadyFile = () => {
 
 const server = http.createServer(app);
 
+// Fail fast instead of hanging sockets forever: slowloris protection and
+// bounded slow-client tolerance. Values generous for LAN + big exports.
+server.setTimeout(120_000);
+server.headersTimeout(65_000);
+server.requestTimeout(120_000);
+server.keepAliveTimeout(5_000);
+
 const shouldStartWhatsAppEngine = () => {
     const provider = String(process.env.WHATSAPP_PROVIDER ?? 'whatsapp-web.js').toLowerCase().trim();
     if (provider === 'disabled' || provider === 'off' || provider === 'false') return false;
@@ -103,6 +110,9 @@ const start = async () => {
     import('./controllers/orderController')
         .then(m => (m as any).ensureOrderScheduledColumn?.())
         .catch((err: any) => console.error('Startup scheduled column ensure failed:', err?.message));
+    import('./services/perfIndexService')
+        .then(m => (m as any).ensurePerfIndexes?.())
+        .catch((err: any) => console.error('Startup perf indexes ensure failed:', err?.message));
     import('./services/scheduledOrderService')
         .then(m => (m as any).scheduledOrderService?.start?.())
         .catch((err: any) => console.error('Scheduled-order dispatcher failed to start:', err?.message));

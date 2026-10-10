@@ -14,7 +14,16 @@ const connectionString = process.env.DATABASE_URL ||
 
 dbLogger.info({ url: connectionString.replace(/Password=[^;]+/, 'Password=***') }, 'Connecting to SQL Server');
 
-const sqlPool = new mssql.ConnectionPool({ connectionString });
+const sqlPool = new mssql.ConnectionPool({
+    connectionString,
+    // Dashboard fan-out is ~15 parallel aggregates per viewer; the driver
+    // default (max 10, cold start) queues everything past the first user.
+    // Tuned for a single-instance ERP: warm floor, headroom for bursts,
+    // fail-fast instead of hanging on saturation.
+    pool: { max: 30, min: 2, idleTimeoutMillis: 30_000 },
+    requestTimeout: 30_000,
+    connectionTimeout: 15_000,
+});
 let databaseConnectPromise: Promise<void> | null = null;
 
 const connectDatabase = async () => {
