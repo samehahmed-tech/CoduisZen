@@ -43,10 +43,11 @@ const server = http.createServer(app);
 
 // Fail fast instead of hanging sockets forever: slowloris protection and
 // bounded slow-client tolerance. Values generous for LAN + big exports.
+// NOTE: setTimeout is a method; the rest are plain properties (ms).
 server.setTimeout(120_000);
-server.headersTimeout(65_000);
-server.requestTimeout(120_000);
-server.keepAliveTimeout(5_000);
+server.headersTimeout = 65_000;
+server.requestTimeout = 120_000;
+server.keepAliveTimeout = 5_000;
 
 const shouldStartWhatsAppEngine = () => {
     const provider = String(process.env.WHATSAPP_PROVIDER ?? 'whatsapp-web.js').toLowerCase().trim();
