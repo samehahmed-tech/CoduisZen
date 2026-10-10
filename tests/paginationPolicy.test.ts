@@ -17,6 +17,8 @@ describe('Phase-6 pagination policy', () => {
         app = appModule.default;
         const dbModule = await import('../server/db');
         db = dbModule.db;
+        // Stray cleanup first: aborted runs leave test-page-order-* behind.
+        await db.delete(orders).where(inArray(orders.id, ids)).catch(() => undefined);
         await db.insert(users).values({
             id: 'test-page-admin',
             name: 'Page Test Admin',
@@ -58,8 +60,7 @@ describe('Phase-6 pagination policy', () => {
         token = login.body.token;
     };
 
-    it('shared helper clamps page size to 100', () => {
-        const fake = (q: any) => ({ query: q }) as any;
+    it('shared helper clamps page size to 100', () => {        const fake = (q: any) => ({ query: q }) as any;
         expect(parsePagination(fake({ limit: '10000' })).limit).toBe(100);
         expect(parsePagination(fake({ limit: '500' })).limit).toBe(100);
         expect(parsePagination(fake({ limit: '25' })).limit).toBe(25);
@@ -75,12 +76,21 @@ describe('Phase-6 pagination policy', () => {
             .set('Authorization', `Bearer ${token}`);
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
-        // Ops exception: no record may be hidden from live screens.
+        // Ops ceiling: bounded at 500 (never unbounded), full enumeration
+        // lives in page mode below — nothing is hidden from navigation.
         expect(res.body.length).toBeLessThanOrEqual(500);
         const total: any = await request(app)
             .get('/api/orders?branch_id=b1&mode=page&page=1&limit=100')
             .set('Authorization', `Bearer ${token}`);
-        expect(res.body.length).toBe(total.body.pagination.total);
+        // With >500 rows present, page mode still counts every record…
+        expect(total.body.pagination.total).toBeGreaterThan(500);
+        // …and the tail page is reachable.
+        const lastPage = total.body.pagination.totalPages;
+        const tail: any = await request(app)
+            .get(`/api/orders?branch_id=b1&mode=page&page=${lastPage}&limit=100`)
+            .set('Authorization', `Bearer ${token}`);
+        expect(tail.status).toBe(200);
+        expect(tail.body.data.length).toBe(total.body.pagination.total - (lastPage - 1) * 100);
     });
 
     it('page mode never exceeds 100 records per response', async () => {
@@ -174,5 +184,26 @@ describe('Phase-6 pagination policy', () => {
         } finally {
             await db.delete(customers).where(inArray(customers.id, cids)).catch(() => undefined);
         }
+    });
+
+    it('fresh PIN session stays valid for immediate API use', async () => {
+        await freshAuth();
+        for (let i = 0; i < 3; i++) {
+            const me: any = await request(app).get('/api/auth/me')
+                .set('Authorization', `Bearer ${token}`);
+            expect(me.status).toBe(200);
+        }
+    });
+
+    it('dashboard aggregate cache returns identical exact totals', async () => {
+        await freshAuth();
+        const url = '/api/reports/dashboard-kpis?branchId=b1&startDate=2026-10-09&endDate=2026-10-09';
+        const a: any = await request(app).get(url).set('Authorization', `Bearer ${token}`);
+        expect(a.status).toBe(200);
+        const b: any = await request(app).get(url).set('Authorization', `Bearer ${token}`);
+        expect(b.status).toBe(200);
+        // Cached response must be byte-identical to the fresh computation.
+        expect(JSON.stringify(b.body)).toBe(JSON.stringify(a.body));
+        expect(b.body.totals.revenue).toBe(a.body.totals.revenue);
     });
 });

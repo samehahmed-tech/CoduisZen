@@ -27,6 +27,20 @@ export const ensurePerfIndexes = async () => {
                 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_orders_branch_status_created' AND object_id = OBJECT_ID('dbo.orders'))
                     CREATE INDEX IX_orders_branch_status_created ON dbo.orders(branch_id, status, created_at) INCLUDE (total);
             `);
+            // Covering index for dashboard/report range scans: branch + created
+            // range with all aggregated money columns included, so the 15-leg
+            // fan-out never does key lookups. Supersedes idx_orders_branch_date
+            // (same key prefix without INCLUDEs) which is dropped to avoid a
+            // redundant twin.
+            await pool.query(`
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_orders_branch_created_cover' AND object_id = OBJECT_ID('dbo.orders'))
+                    CREATE INDEX IX_orders_branch_created_cover ON dbo.orders(branch_id, created_at) INCLUDE (status, total, subtotal, discount, tax, business_date);
+            `);
+            await pool.query(`
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_branch_date' AND object_id = OBJECT_ID('dbo.orders'))
+                AND EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_orders_branch_created_cover' AND object_id = OBJECT_ID('dbo.orders'))
+                    DROP INDEX idx_orders_branch_date ON dbo.orders;
+            `);
             await pool.query(`
                 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_audit_logs_createdAt' AND object_id = OBJECT_ID('dbo.audit_logs'))
                     CREATE INDEX IX_audit_logs_createdAt ON dbo.audit_logs(created_at DESC);

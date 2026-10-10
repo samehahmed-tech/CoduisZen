@@ -42,6 +42,13 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
         const branchId = resolveScopedBranchId(req, rawBranchId);
         const { start, end } = parseLocalDateRange(startDate, endDate);
         const scopeValue: DashboardScope = (scope || 'DAILY') as DashboardScope;
+        // Short-TTL aggregate cache: 15 heavy legs per viewer; concurrent
+        // dashboard loads were queueing 15:1 on the pool (p95 ~7s at 30x).
+        // 45s is shorter than any review cycle and clients show data age.
+        const { peekAggregate, rememberAggregate, DASHBOARD_KPI_TTL_MS } = await import('../utils/aggregateCache');
+        const dashKey = `dash:${branchId || 'ALL'}:${startDate}:${endDate}:${scopeValue}`;
+        const cached = peekAggregate(dashKey, DASHBOARD_KPI_TTL_MS);
+        if (cached) return res.json(cached);
         const orderDateInRange = sql`(
             (${orders.businessDate} IS NOT NULL AND ${orders.businessDate} >= ${startDate} AND ${orders.businessDate} <= ${endDate})
             OR (${orders.businessDate} IS NULL AND ${orders.createdAt} >= ${start} AND ${orders.createdAt} <= ${end})
@@ -301,7 +308,7 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
         const delivered = Number(opsStatusRows.find(r => r.status === 'DELIVERED')?.count || 0)
             + Number(opsStatusRows.find(r => r.status === 'COMPLETED')?.count || 0);
 
-        res.json({
+        const __payload = {
             branchId: branchId || 'ALL',
             scope: scopeValue,
             period: { start, end },
@@ -374,7 +381,9 @@ export const getDashboardKpis = async (req: Request, res: Response) => {
                     serviceChargeTotal: Number(summary.serviceChargeTotal || 0),
                 },
             },
-        });
+        };
+        rememberAggregate(dashKey, __payload);
+        return res.json(__payload);
     } catch (error: any) {
         const message = error?.message || 'Failed to load dashboard KPIs';
         console.error('[DashboardKPIs] Error:', error);
