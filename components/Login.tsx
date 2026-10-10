@@ -220,6 +220,33 @@ const Login: React.FC = () => {
         return () => clearInterval(id);
     }, []);
 
+    // While the user types the PIN, warm the post-login chunks (dashboard +
+    // POS cover every role's landing) so the first navigation feels instant.
+    // Idle-only, staggered, saveData-aware; failures are silent.
+    useEffect(() => {
+        let cancelled = false;
+        const warm = () => {
+            if (cancelled) return;
+            try {
+                const conn = (navigator as unknown as { connection?: { saveData?: boolean } })?.connection;
+                if (conn?.saveData) return;
+            } catch {
+                // unknown — prefetch anyway on LAN ERP
+            }
+            window.setTimeout(() => { if (!cancelled) void import('./Dashboard').catch(() => undefined); }, 3000);
+            window.setTimeout(() => { if (!cancelled) void import('../src/features/pos/POS').catch(() => undefined); }, 7000);
+        };
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            const idleId = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(warm, { timeout: 5000 });
+            return () => {
+                cancelled = true;
+                (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(idleId);
+            };
+        }
+        const timer = window.setTimeout(warm, 2500);
+        return () => { cancelled = true; window.clearTimeout(timer); };
+    }, []);
+
 
     const t = {
         en: {
