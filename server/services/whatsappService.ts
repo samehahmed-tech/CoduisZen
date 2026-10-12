@@ -78,11 +78,15 @@ export const normalizeBaileysInbound = (m: any): NormalizedInbound | null => {
     return { from, body: text, hasMedia, id: String(m?.key?.id || `bl-${Date.now()}`) };
 };
 
-const STOP_PATTERNS = ['stop', 'ايقاف', 'إيقاف', 'الغاء الاشتراك', 'إلغاء الاشتراك'];
+const STOP_AR_PATTERNS = ['ايقاف', 'إيقاف', 'الغاء الاشتراك', 'إلغاء الاشتراك'];
+const STOP_LATIN_RE = /\bstop\b/i;
 
 export const isStopOptOut = (text: string): boolean => {
-    const lower = String(text || '').trim().toLowerCase();
-    return lower.length > 0 && STOP_PATTERNS.some((p) => lower.includes(p));
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return false;
+    if (STOP_LATIN_RE.test(trimmed)) return true;
+    const lower = trimmed.toLowerCase();
+    return STOP_AR_PATTERNS.some((p) => lower.includes(p));
 };
 
 const optedOutPhones = new Set<string>();
@@ -98,10 +102,16 @@ export const shouldSkipQueuedMessage = (msg: Pick<QueueMessage, 'to' | 'isMarket
     Boolean(msg.isMarketing) && isOptedOut(msg.to);
 
 export const mapReceiptToStatus = (receipt: any): 'READ' | 'DELIVERED' | null => {
-    if (!receipt || typeof receipt !== 'object') return null;
-    if ((receipt as any).readTimestamp) return 'READ';
-    if ((receipt as any).receiptTimestamp) return 'DELIVERED';
-    return null;
+    if (!receipt) return null;
+    const candidates = Array.isArray(receipt) ? receipt : [receipt];
+    let found: 'READ' | 'DELIVERED' | null = null;
+    for (const r of candidates) {
+        if (!r || typeof r !== 'object') continue;
+        const inner = (r as any).receipt && typeof (r as any).receipt === 'object' ? (r as any).receipt : r;
+        if (inner.readTimestamp) return 'READ';
+        if (inner.receiptTimestamp) found = 'DELIVERED';
+    }
+    return found;
 };
 
 export const shouldRequeueAfterFailure = (msg: Pick<QueueMessage, '_retried'>): boolean =>
@@ -226,9 +236,12 @@ class WhatsAppService {
             sock.ev.on('message-receipt.update', async (updates: any[]) => {
                 for (const u of updates || []) {
                     try {
-                        const status = mapReceiptToStatus((u as any)?.receipt);
+                        const status = mapReceiptToStatus((u as any)?.receipt ?? u);
                         const externalId = String((u as any)?.key?.id || '');
-                        if (!status || !externalId) continue;
+                        if (!status || !externalId) {
+                            console.warn('Baileys receipt update skipped: unmapped shape for', externalId || 'unknown-id');
+                            continue;
+                        }
                         await db.update(whatsappMessages)
                             .set(status === 'READ' ? { status, readAt: new Date() } : { status, deliveredAt: new Date() })
                             .where(eq(whatsappMessages.externalId, externalId));
@@ -750,6 +763,9 @@ class WhatsAppService {
                 this.queue.unshift(msg);
                 console.log(`WhatsApp requeue once for ${msg.to}`);
                 try { getIO().emit('whatsapp:queue', { count: this.queue.length }); } catch { /* noop */ }
+                // Retry goes through the normal send delay, not immediately.
+                const retryDelayMs = Math.max(500, Number(process.env.WHATSAPP_TRANSACTIONAL_DELAY_MS || 1500));
+                await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
             } else if (msg.messageId) {
                 try {
                     await db.update(whatsappMessages)

@@ -2,7 +2,15 @@ import { describe, expect, test, vi } from 'vitest';
 import { mapConnectionUpdate, reconnectDelay } from '../server/services/whatsappConnection';
 
 vi.mock('@whiskeysockets/baileys', () => ({
-  default: () => ({ ev: { on() {} } }),
+  default: () => ({
+    ev: {
+      on(e: string, h: (...a: any[]) => void) {
+        const g = globalThis as any;
+        (g.__baileysEv ??= {});
+        (g.__baileysEv[e] ??= []).push(h);
+      },
+    },
+  }),
   DisconnectReason: { loggedOut: 401 },
   fetchLatestBaileysVersion: async () => ({ version: [2, 3000, 0] as any }),
   useMultiFileAuthState: async () => ({ state: {}, saveCreds() {} }),
@@ -21,7 +29,10 @@ import {
   noteOptOut,
   shouldRequeueAfterFailure,
   shouldSkipQueuedMessage,
+  whatsappService,
 } from '../server/services/whatsappService';
+import { db } from '../server/db';
+import { customers, whatsappMessages } from '../src/db/schema';
 
 describe('whatsapp baileys connection mapping', () => {
   test('close 401 maps to AUTH_ERROR needing fresh QR', () => {
@@ -60,6 +71,8 @@ describe('whatsapp baileys task 3: incoming, receipts, STOP', () => {
   test('STOP skips queued marketing to that number', () => {
     expect(isStopOptOut('STOP')).toBe(true);
     expect(isStopOptOut('stop please')).toBe(true);
+    expect(isStopOptOut('STOP!')).toBe(true);
+    expect(isStopOptOut('nonstop music please')).toBe(false);
     expect(isStopOptOut('إيقاف')).toBe(true);
     expect(isStopOptOut('الغاء الاشتراك')).toBe(true);
     expect(isStopOptOut('hello, I want to order pizza')).toBe(false);
@@ -75,6 +88,9 @@ describe('whatsapp baileys task 3: incoming, receipts, STOP', () => {
   test('receipt ack maps to READ status update', () => {
     expect(mapReceiptToStatus({ readTimestamp: 1728660000 })).toBe('READ');
     expect(mapReceiptToStatus({ receiptTimestamp: 1728660000 })).toBe('DELIVERED');
+    expect(mapReceiptToStatus({ receipt: { readTimestamp: 1728660000 } })).toBe('READ');
+    expect(mapReceiptToStatus([{ receiptTimestamp: 1728660000 }])).toBe('DELIVERED');
+    expect(mapReceiptToStatus([{ receipt: { readTimestamp: 1728660000 } }])).toBe('READ');
     expect(mapReceiptToStatus({})).toBeNull();
     expect(mapReceiptToStatus(null)).toBeNull();
   });
@@ -92,5 +108,67 @@ describe('whatsapp baileys task 3: incoming, receipts, STOP', () => {
       message: { conversation: 'menu' },
     });
     expect(inbound).toMatchObject({ from: '201011100003', body: 'menu', hasMedia: false, id: 'm1' });
+  });
+});
+
+describe('whatsapp baileys task 3 fix round 1: wiring', () => {
+  const mockDbUpdate = () => {
+    const calls: { table: unknown; set: unknown }[] = [];
+    const spy = vi.spyOn(db, 'update').mockImplementation(((table: unknown) => ({
+      set: (values: unknown) => ({
+        where: async () => {
+          calls.push({ table, set: values });
+          return [];
+        },
+      }),
+    })) as any);
+    return { calls, restore: () => spy.mockRestore() };
+  };
+
+  test('STOP inbound purges queued marketing and persists opt-out', async () => {
+    const { calls, restore } = mockDbUpdate();
+    try {
+      const phone = '201077700001';
+      const before = whatsappService.getQueueCount();
+      whatsappService.enqueueMessage({ to: phone, text: 'sale offer', isMarketing: true });
+      whatsappService.enqueueMessage({ to: phone, text: 'order confirmed' });
+      await whatsappService.handleIncomingWebhookMessage({ from: phone, body: 'STOP' });
+      expect(isOptedOut(phone)).toBe(true);
+      // Marketing purged (-1), STOP confirmation enqueued (+1): net before + 2.
+      expect(whatsappService.getQueueCount()).toBe(before + 2);
+      const persisted = calls.filter((c) => c.table === customers);
+      expect(persisted.length).toBeGreaterThan(0);
+      expect(persisted[0]!.set).toMatchObject({ marketingOptIn: false });
+    } finally {
+      restore();
+    }
+  });
+
+  test('receipt listener updates message status and warns on unknown shape', async () => {
+    await vi.waitFor(() => {
+      const handlers = (globalThis as any).__baileysEv?.['message-receipt.update'];
+      if (!handlers?.length) throw new Error('receipt listener not registered yet');
+    });
+    const handler = (globalThis as any).__baileysEv['message-receipt.update'][0];
+    const { calls, restore } = mockDbUpdate();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await handler([{ key: { id: 'ext-1' }, receipt: { readTimestamp: 1728660000 } }]);
+      const receiptWrites = calls.filter((c) => c.table === whatsappMessages);
+      expect(receiptWrites.length).toBe(1);
+      expect(receiptWrites[0]!.set).toMatchObject({ status: 'READ' });
+      expect((receiptWrites[0]!.set as any).readAt).toBeInstanceOf(Date);
+
+      const writesBefore = calls.length;
+      await handler([{ key: { id: 'ext-2' }, receipt: {} }]);
+      expect(calls.length).toBe(writesBefore);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('unmapped shape'),
+        expect.anything(),
+      );
+    } finally {
+      restore();
+      warnSpy.mockRestore();
+    }
   });
 });
