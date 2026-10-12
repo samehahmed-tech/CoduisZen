@@ -8,7 +8,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getIO } from '../socket';
 import { db } from '../db';
-import { whatsappMessages } from '../../src/db/schema';
+import { eq } from 'drizzle-orm';
+import { customers, whatsappMessages } from '../../src/db/schema';
 import { mapConnectionUpdate, reconnectDelay } from './whatsappConnection';
 
 export type QueueMessage = {
@@ -21,6 +22,8 @@ export type QueueMessage = {
     sessionId?: string | null;
     sessionName?: string | null;
     sessionRole?: string | null;
+    messageId?: string;
+    _retried?: boolean;
 };
 
 type OpenWaSessionConfig = {
@@ -40,6 +43,69 @@ type WhatsAppStatus =
     | 'DISCONNECTED'
     | 'DISABLED'
     | 'AUTH_ERROR';
+
+// --- Task 3 pure helpers: inbound normalize, STOP opt-out, receipts, requeue ---
+
+export type NormalizedInbound = { from: string; body: string; hasMedia: boolean; id: string };
+
+const toDigits = (phone: string): string => {
+    let cleaned = String(phone || '').replace(/[^\d]/g, '');
+    if (cleaned.startsWith('01')) cleaned = `2${cleaned}`;
+    return cleaned;
+};
+
+// Baileys raw upsert -> handler shape. Null = drop (group, broadcast, empty).
+export const normalizeBaileysInbound = (m: any): NormalizedInbound | null => {
+    const remoteJid = String(m?.key?.remoteJid || '');
+    if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('status@broadcast')) return null;
+    const from = toDigits(remoteJid.split('@')[0] || '');
+    if (!from) return null;
+    const text = String(
+        m?.message?.conversation
+        || m?.message?.extendedTextMessage?.text
+        || m?.message?.imageMessage?.caption
+        || m?.message?.videoMessage?.caption
+        || m?.message?.documentMessage?.caption
+        || '',
+    );
+    const hasMedia = Boolean(
+        m?.message?.imageMessage
+        || m?.message?.videoMessage
+        || m?.message?.documentMessage
+        || m?.message?.audioMessage
+        || m?.message?.stickerMessage,
+    );
+    return { from, body: text, hasMedia, id: String(m?.key?.id || `bl-${Date.now()}`) };
+};
+
+const STOP_PATTERNS = ['stop', 'ايقاف', 'إيقاف', 'الغاء الاشتراك', 'إلغاء الاشتراك'];
+
+export const isStopOptOut = (text: string): boolean => {
+    const lower = String(text || '').trim().toLowerCase();
+    return lower.length > 0 && STOP_PATTERNS.some((p) => lower.includes(p));
+};
+
+const optedOutPhones = new Set<string>();
+
+export const noteOptOut = (phone: string): void => {
+    const digits = toDigits(phone);
+    if (digits) optedOutPhones.add(digits);
+};
+
+export const isOptedOut = (phone: string): boolean => optedOutPhones.has(toDigits(phone));
+
+export const shouldSkipQueuedMessage = (msg: Pick<QueueMessage, 'to' | 'isMarketing'>): boolean =>
+    Boolean(msg.isMarketing) && isOptedOut(msg.to);
+
+export const mapReceiptToStatus = (receipt: any): 'READ' | 'DELIVERED' | null => {
+    if (!receipt || typeof receipt !== 'object') return null;
+    if ((receipt as any).readTimestamp) return 'READ';
+    if ((receipt as any).receiptTimestamp) return 'DELIVERED';
+    return null;
+};
+
+export const shouldRequeueAfterFailure = (msg: Pick<QueueMessage, '_retried'>): boolean =>
+    !(msg as any)?._retried;
 
 const resolveProvider = (): WhatsAppProvider => {
     const raw = String(process.env.WHATSAPP_PROVIDER || 'whatsapp-web.js').toLowerCase().trim();
@@ -143,28 +209,31 @@ class WhatsAppService {
                 for (const m of messages || []) {
                     try {
                         if (m?.key?.fromMe) continue;
-                        const remoteJid = String(m?.key?.remoteJid || '');
-                        if (remoteJid.includes('status@broadcast')) continue;
-                        const text = String(
-                            m?.message?.conversation
-                            || m?.message?.extendedTextMessage?.text
-                            || '',
-                        );
-                        const hasMedia = Boolean(
-                            m?.message?.imageMessage
-                            || m?.message?.videoMessage
-                            || m?.message?.documentMessage
-                            || m?.message?.audioMessage
-                            || m?.message?.stickerMessage,
-                        );
+                        const inbound = normalizeBaileysInbound(m);
+                        if (!inbound) continue;
                         await this.handleIncomingLocalMessage({
-                            from: remoteJid,
-                            body: text,
-                            hasMedia,
-                            id: { _serialized: String(m?.key?.id || `bl-${Date.now()}`) },
+                            from: inbound.from,
+                            body: inbound.body,
+                            hasMedia: inbound.hasMedia,
+                            id: { _serialized: inbound.id },
                         });
                     } catch (err) {
                         console.warn('Baileys inbound message skipped:', (err as any)?.message || err);
+                    }
+                }
+            });
+
+            sock.ev.on('message-receipt.update', async (updates: any[]) => {
+                for (const u of updates || []) {
+                    try {
+                        const status = mapReceiptToStatus((u as any)?.receipt);
+                        const externalId = String((u as any)?.key?.id || '');
+                        if (!status || !externalId) continue;
+                        await db.update(whatsappMessages)
+                            .set(status === 'READ' ? { status, readAt: new Date() } : { status, deliveredAt: new Date() })
+                            .where(eq(whatsappMessages.externalId, externalId));
+                    } catch (err) {
+                        console.warn('Baileys receipt update skipped:', (err as any)?.message || err);
                     }
                 }
             });
@@ -592,11 +661,18 @@ class WhatsAppService {
         const msg = this.queue.shift()!;
         try { getIO().emit('whatsapp:queue', { count: this.queue.length }); } catch { /* noop */ }
 
+        if (msg.isMarketing && isOptedOut(this.normalizePhone(msg.to))) {
+            console.log(`WhatsApp skip: ${msg.to} opted out (STOP), dropping queued marketing`);
+            this.processQueue();
+            return;
+        }
+
         const normalizedPhone = this.normalizePhone(msg.to);
         const finalPhone = `${normalizedPhone}@c.us`;
         const finalText = this.parseSpintax(msg.text);
 
         try {
+            let sentResult: any = null;
             if (this.provider === 'openwa') {
                 const sessionId = await this.ensureOpenWaSession(this.chooseOpenWaSession(msg));
                 await this.openWaRequest(`/sessions/${encodeURIComponent(sessionId)}/messages/send-text`, {
@@ -624,15 +700,26 @@ class WhatsAppService {
                             const response = await fetch(msg.mediaUrl);
                             if (!response.ok) throw new Error(`media fetch ${response.status}`);
                             const buffer = Buffer.from(await response.arrayBuffer());
-                            await this.client.sendMessage(jid, { image: buffer, caption: finalText });
+                            const mime = String(response.headers.get('content-type') || '');
+                            sentResult = mime.startsWith('image/')
+                                ? await this.client.sendMessage(jid, { image: buffer, caption: finalText })
+                                : await this.client.sendMessage(jid, { document: buffer, fileName: 'attachment', caption: finalText, ...(mime ? { mimetype: mime } : {}) });
                         } catch {
                             console.error('Media fetch failed, falling back to text');
-                            await this.client.sendMessage(jid, { text: finalText });
+                            sentResult = await this.client.sendMessage(jid, { text: finalText });
                         }
                     } else {
-                        await this.client.sendMessage(jid, { text: finalText });
+                        sentResult = await this.client.sendMessage(jid, { text: finalText });
                     }
                     console.log(`WhatsApp sent to ${jid}`);
+                    const externalId = String(sentResult?.key?.id || '');
+                    if (msg.messageId && externalId) {
+                        try {
+                            await db.update(whatsappMessages).set({ externalId }).where(eq(whatsappMessages.id, msg.messageId));
+                        } catch (err) {
+                            console.warn('WhatsApp externalId link skipped:', (err as any)?.message || err);
+                        }
+                    }
                 } else {
                     console.log(`WhatsApp skip: ${jid} is not registered on WP`);
                 }
@@ -658,6 +745,20 @@ class WhatsAppService {
             }
         } catch (error) {
             console.error(`Failed to send WhatsApp message to ${msg.to}:`, error);
+            if (shouldRequeueAfterFailure(msg)) {
+                msg._retried = true;
+                this.queue.unshift(msg);
+                console.log(`WhatsApp requeue once for ${msg.to}`);
+                try { getIO().emit('whatsapp:queue', { count: this.queue.length }); } catch { /* noop */ }
+            } else if (msg.messageId) {
+                try {
+                    await db.update(whatsappMessages)
+                        .set({ status: 'FAILED', failureReason: String((error as any)?.message || error).slice(0, 500) })
+                        .where(eq(whatsappMessages.id, msg.messageId));
+                } catch (dbErr) {
+                    console.warn('WhatsApp FAILED mark skipped:', (dbErr as any)?.message || dbErr);
+                }
+            }
         }
 
         this.processQueue();
@@ -677,6 +778,32 @@ class WhatsAppService {
             this.sessions.set(from, session);
         }
         session.lastActivity = Date.now();
+
+        if (isStopOptOut(text)) {
+            noteOptOut(from);
+            this.queue = this.queue.filter((m) => !shouldSkipQueuedMessage(m));
+            const candidates = new Set([from, from.startsWith('2') ? `0${from.slice(1)}` : from]);
+            for (const phone of candidates) {
+                try {
+                    await db.update(customers)
+                        .set({ marketingOptIn: false, marketingOptOutAt: new Date() })
+                        .where(eq(customers.phone, phone));
+                } catch (err) {
+                    console.warn('STOP opt-out persist skipped:', (err as any)?.message || err);
+                }
+            }
+            console.log(`WhatsApp STOP opt-out for ${from}, queued marketing dropped`);
+            this.enqueueMessage({ to: from, text: 'تم إيقاف الرسائل التسويقية بنجاح.' });
+            if (this.customMessageHandler) {
+                await this.customMessageHandler({
+                    from,
+                    body: text,
+                    hasMedia: msg.hasMedia,
+                    id: String(msg.id?._serialized || `msg-${Date.now()}`),
+                });
+            }
+            return;
+        }
 
         if (lower === 'منيو' || lower === 'menu' || lower === 'المنيو') {
             this.enqueueMessage({ to: from, text: 'أهلا بك! يمكنك استعراض المنيو أو أخبرني ماذا تريد أن تطلب الآن.' });
@@ -750,6 +877,7 @@ export const sendWhatsAppText = async (payload: {
     sessionName?: string | null;
     isMarketing?: boolean;
 }) => {
+    const messageId = `wa-out-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     whatsappService.enqueueMessage({
         to: payload.to,
         text: payload.text,
@@ -759,8 +887,8 @@ export const sendWhatsAppText = async (payload: {
         sessionId: payload.sessionId,
         sessionName: payload.sessionName,
         isMarketing: Boolean(payload.isMarketing),
+        messageId,
     });
-    const messageId = `wa-out-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
         await db.insert(whatsappMessages).values({
             id: messageId,
