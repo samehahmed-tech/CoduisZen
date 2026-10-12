@@ -18,6 +18,7 @@ coverage
 # Runtime/cache folders
 .wwebjs_auth/
 .wwebjs_cache/
+sessions/baileys-*/
 artifacts/load/
 
 # Scratch/debug workspace
@@ -71,6 +72,9 @@ stream-test.xlsx
 
 # Temp / scratch runtime artifacts
 .tmp-*
+# Lighthouse audit outputs (generated, may embed local URLs)
+reports/lighthouse/
+scripts/lighthouse/.session*
 .playwright-cli/
 *.rar
 *.zip

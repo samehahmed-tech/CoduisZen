@@ -1,11 +1,15 @@
-import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth, MessageMedia } = pkg;
-import fsSync from 'fs';
+import makeWASocket, {
+    DisconnectReason,
+    fetchLatestBaileysVersion,
+    useMultiFileAuthState,
+} from '@whiskeysockets/baileys';
+import pino from 'pino';
 import fs from 'fs/promises';
 import path from 'path';
 import { getIO } from '../socket';
 import { db } from '../db';
 import { whatsappMessages } from '../../src/db/schema';
+import { mapConnectionUpdate, reconnectDelay } from './whatsappConnection';
 
 export type QueueMessage = {
     to: string;
@@ -46,7 +50,11 @@ const resolveProvider = (): WhatsAppProvider => {
 
 class WhatsAppService {
     private provider: WhatsAppProvider = resolveProvider();
-    private client: any;
+    private client: any = null;
+    private creatingSocket = false;
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private reconnectAttempt = 0;
+    private pairingCode: string | null = null;
     private isReady = false;
     private qrCode: string | null = null;
     private qrIssuedAt: string | null = null;
@@ -83,24 +91,19 @@ class WhatsAppService {
             return;
         }
 
-        this.createLocalClient();
+        if (String(process.env.WHATSAPP_CHROME_PATH || process.env.WHATSAPP_CHROME_ARGS || process.env.PUPPETEER_EXECUTABLE_PATH || '').trim()) {
+            console.log('WhatsApp Baileys transport needs no browser: WHATSAPP_CHROME_*/PUPPETEER_* is ignored.');
+        }
+
+        void this.createLocalClient();
     }
 
     private getLocalClientId() {
         return String(process.env.WHATSAPP_WEB_CLIENT_ID || 'erp-hub');
     }
 
-    private resolveChromeExecutable() {
-        const explicit = String(process.env.WHATSAPP_CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
-        const candidates = [
-            explicit,
-            process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
-            process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)']!, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
-            process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
-            process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : '',
-            process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)']!, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : '',
-        ].filter(Boolean);
-        return candidates.find((candidate) => fsSync.existsSync(candidate)) || undefined;
+    private getAuthDir() {
+        return path.join(process.cwd(), 'sessions', `baileys-${this.getLocalClientId()}`);
     }
 
     private withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -110,23 +113,76 @@ class WhatsAppService {
         ]);
     }
 
-    private createLocalClient() {
-        this.client = new Client({
-            authStrategy: new LocalAuth({ clientId: this.getLocalClientId() }),
-            puppeteer: {
-                headless: String(process.env.WHATSAPP_HEADLESS || 'true').toLowerCase() !== 'false',
-                executablePath: this.resolveChromeExecutable(),
-                protocolTimeout: 60000,
-                // Some Windows Chrome builds briefly expose the native headless surface.
-                // Keep that fallback surface off-screen without disabling WhatsApp Web.
-                args: String(process.env.WHATSAPP_CHROME_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--window-position=-32000,-32000,--window-size=1,1')
-                    .split(',')
-                    .map((arg) => arg.trim())
-                    .filter(Boolean),
-            },
-        });
+    private async createLocalClient() {
+        if (this.client || this.creatingSocket) return;
+        this.creatingSocket = true;
+        try {
+            let version: any = undefined;
+            try {
+                version = (await fetchLatestBaileysVersion()).version;
+            } catch (err: any) {
+                console.warn('Baileys version fetch failed, using bundled default:', err?.message || err);
+            }
+            const { state, saveCreds } = await useMultiFileAuthState(this.getAuthDir());
+            const sock = makeWASocket({
+                ...(version ? { version } : {}),
+                logger: pino({ level: 'silent' }) as any,
+                auth: state,
+                browser: ['CoduisZen', 'Chrome', '1.0'],
+            });
+            this.client = sock;
 
-        this.client.on('qr', (qr: string) => {
+            sock.ev.on('creds.update', saveCreds);
+
+            sock.ev.on('connection.update', (update: any) => {
+                void this.handleConnectionUpdate(update);
+            });
+
+            sock.ev.on('messages.upsert', async ({ messages, type }: any) => {
+                if (type !== 'notify') return;
+                for (const m of messages || []) {
+                    try {
+                        if (m?.key?.fromMe) continue;
+                        const remoteJid = String(m?.key?.remoteJid || '');
+                        if (remoteJid.includes('status@broadcast')) continue;
+                        const text = String(
+                            m?.message?.conversation
+                            || m?.message?.extendedTextMessage?.text
+                            || '',
+                        );
+                        const hasMedia = Boolean(
+                            m?.message?.imageMessage
+                            || m?.message?.videoMessage
+                            || m?.message?.documentMessage
+                            || m?.message?.audioMessage
+                            || m?.message?.stickerMessage,
+                        );
+                        await this.handleIncomingLocalMessage({
+                            from: remoteJid,
+                            body: text,
+                            hasMedia,
+                            id: { _serialized: String(m?.key?.id || `bl-${Date.now()}`) },
+                        });
+                    } catch (err) {
+                        console.warn('Baileys inbound message skipped:', (err as any)?.message || err);
+                    }
+                }
+            });
+        } catch (err: any) {
+            const message = err?.message || 'Could not start whatsapp engine';
+            this.isReady = false;
+            this.lastError = String(message);
+            console.error('Could not start whatsapp engine:', err);
+            try { getIO().emit('whatsapp:status', { status: 'DISCONNECTED', provider: this.provider, reason: message }); } catch { /* noop */ }
+            this.scheduleReconnect();
+        } finally {
+            this.creatingSocket = false;
+        }
+    }
+
+    private async handleConnectionUpdate(update: { connection?: string; lastDisconnect?: any; qr?: string }) {
+        const qr = (update as any)?.qr as string | undefined;
+        if (qr) {
             this.qrCode = qr;
             this.qrIssuedAt = new Date().toISOString();
             this.authenticatedAt = null;
@@ -134,52 +190,99 @@ class WhatsAppService {
             this.lastError = null;
             try { getIO().emit('whatsapp:qr', qr); } catch { /* noop */ }
             try { getIO().emit('whatsapp:status', { status: 'AWAITING_SCAN', provider: this.provider, qr, qrAt: this.qrIssuedAt }); } catch { /* noop */ }
-        });
+        }
 
-        // Fired the instant the phone accepts the scan — minutes before
-        // 'ready' finishes warming the session. The UI switches to a
-        // "linking…" state immediately instead of hanging on the QR screen.
-        this.client.on('authenticated', () => {
-            console.log('WhatsApp Web Client authenticated (scan accepted, warming up)');
-            this.authenticatedAt = new Date().toISOString();
-            this.qrCode = null;
-            this.qrIssuedAt = null;
-            this.isReady = false;
-            this.lastError = null;
-            try { getIO().emit('whatsapp:status', { status: 'AUTHENTICATED', provider: this.provider, authenticatedAt: this.authenticatedAt }); } catch { /* noop */ }
-        });
+        const connection = (update as any)?.connection as string | undefined;
+        // Baileys has no 'authenticated' event: a 'connecting' update AFTER a
+        // QR was issued means the phone accepted the scan and the session is
+        // warming up. Same linking state as before, same AUTHENTICATED emit.
+        if (connection === 'connecting') {
+            if (this.qrCode && !this.authenticatedAt) {
+                console.log('WhatsApp scan accepted, warming up');
+                this.authenticatedAt = new Date().toISOString();
+                this.qrCode = null;
+                this.qrIssuedAt = null;
+                this.isReady = false;
+                this.lastError = null;
+            }
+            if (this.authenticatedAt) {
+                try { getIO().emit('whatsapp:status', { status: 'AUTHENTICATED', provider: this.provider, authenticatedAt: this.authenticatedAt }); } catch { /* noop */ }
+            }
+            return;
+        }
+        if (!connection) return;
 
-        this.client.on('ready', () => {
-            console.log('WhatsApp Web Client is READY');
+        if (connection === 'open') {
+            console.log('WhatsApp Baileys socket is READY');
             this.isReady = true;
             this.qrCode = null;
             this.qrIssuedAt = null;
             this.authenticatedAt = null;
+            this.pairingCode = null;
             this.lastError = null;
+            this.reconnectAttempt = 0;
             try { getIO().emit('whatsapp:status', { status: 'READY', provider: this.provider }); } catch { /* noop */ }
             this.processQueue();
-        });
+            return;
+        }
 
-        this.client.on('disconnected', (reason: string) => {
+        if (connection === 'close') {
+            const mapped = mapConnectionUpdate(
+                { connection: 'close', lastDisconnect: (update as any)?.lastDisconnect, qr },
+                { qrScanned: Boolean(this.authenticatedAt) },
+            );
+            const statusCode = (update as any)?.lastDisconnect?.error?.output?.statusCode;
+            const loggedOut = statusCode === DisconnectReason.loggedOut || mapped.status === 'AUTH_ERROR';
             this.isReady = false;
             this.authenticatedAt = null;
-            this.lastError = reason || null;
-            console.log('WhatsApp disconnected:', reason);
-            try { getIO().emit('whatsapp:status', { status: 'DISCONNECTED', reason }); } catch { /* noop */ }
-            setTimeout(() => this.initialize(), 5000);
-        });
+            this.client = null;
+            if (loggedOut) {
+                console.error('WhatsApp Baileys logged out (401): wiping creds for fresh QR');
+                this.lastError = mapped.reason || 'Logged out, scan fresh QR';
+                try {
+                    await fs.rm(this.getAuthDir(), { recursive: true, force: true });
+                } catch (error: any) {
+                    console.warn('WhatsApp session reset warning:', error?.message || error);
+                }
+                this.reconnectAttempt = 0;
+                try { getIO().emit('whatsapp:status', { status: 'AUTH_ERROR', provider: this.provider, reason: this.lastError }); } catch { /* noop */ }
+                this.scheduleReconnect();
+                return;
+            }
+            this.lastError = mapped.reason || 'Connection closed';
+            console.log('WhatsApp disconnected:', this.lastError);
+            try { getIO().emit('whatsapp:status', { status: 'DISCONNECTED', provider: this.provider, reason: this.lastError }); } catch { /* noop */ }
+            this.scheduleReconnect();
+        }
+    }
 
-        this.client.on('auth_failure', (msg: string) => {
-            console.error('WhatsApp Auth failure', msg);
-            this.isReady = false;
-            this.authenticatedAt = null;
-            this.lastError = msg || 'AUTH_ERROR';
-            try { getIO().emit('whatsapp:status', { status: 'AUTH_ERROR', reason: msg }); } catch { /* noop */ }
-        });
+    private scheduleReconnect() {
+        if (this.reconnectTimer) return;
+        const delayMs = reconnectDelay(this.reconnectAttempt);
+        this.reconnectAttempt += 1;
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            if (this.provider !== 'whatsapp-web.js') return;
+            void this.createLocalClient();
+        }, delayMs);
+    }
 
-        this.client.on('message', async (msg: any) => {
-            await this.handleIncomingLocalMessage(msg);
-        });
+    private clearReconnectTimer() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+    }
+
+    public async getPairingCode(phone: string) {
+        const cleaned = this.normalizePhone(phone);
+        if (!this.client?.requestPairingCode) {
+            throw new Error('WhatsApp engine is not connected yet; wait for QR first');
+        }
+        const code = String(await this.client.requestPairingCode(cleaned));
+        this.pairingCode = code;
+        try { getIO().emit('whatsapp:pairing', { pairingCode: code }); } catch { /* noop */ }
+        return code;
     }
 
     public onMessage(handler: (message: { from: string, body: string, hasMedia: boolean, id: string }) => Promise<void>) {
@@ -199,15 +302,9 @@ class WhatsAppService {
         }
         this.startedAt = new Date();
         this.lastError = null;
-        console.log('Initializing WhatsApp Engine...');
+        console.log('Initializing WhatsApp Engine (Baileys)...');
         try { getIO().emit('whatsapp:status', { status: 'INITIALIZING', provider: this.provider }); } catch { /* noop */ }
-        this.client?.initialize().catch((err: any) => {
-            const message = err?.message || 'Could not start whatsapp engine';
-            this.isReady = false;
-            this.lastError = String(message);
-            console.error('Could not start whatsapp engine:', err);
-            try { getIO().emit('whatsapp:status', { status: 'DISCONNECTED', provider: this.provider, reason: message }); } catch { /* noop */ }
-        });
+        void this.createLocalClient();
     }
 
     public async restart(options: { resetSession?: boolean } = {}) {
@@ -225,24 +322,27 @@ class WhatsAppService {
         this.qrCode = null;
         this.qrIssuedAt = null;
         this.authenticatedAt = null;
+        this.pairingCode = null;
         this.lastError = null;
+        this.reconnectAttempt = 0;
+        this.clearReconnectTimer();
         try { getIO().emit('whatsapp:status', { status: 'INITIALIZING', provider: this.provider }); } catch { /* noop */ }
         try {
-            await this.client?.destroy?.();
+            await this.client?.end?.();
         } catch (error: any) {
             console.warn('WhatsApp client destroy warning:', error?.message || error);
         }
+        this.client = null;
 
         if (options.resetSession) {
-            const sessionPath = path.join(process.cwd(), '.wwebjs_auth', `session-${this.getLocalClientId()}`);
             try {
-                await fs.rm(sessionPath, { recursive: true, force: true });
+                await fs.rm(this.getAuthDir(), { recursive: true, force: true });
             } catch (error: any) {
                 console.warn('WhatsApp session reset warning:', error?.message || error);
             }
         }
 
-        this.createLocalClient();
+        await this.createLocalClient();
         this.initialize();
     }
 
@@ -266,6 +366,7 @@ class WhatsAppService {
             sessionName: this.getLocalClientId(),
             startedAt: this.startedAt?.toISOString() || null,
             reason: this.lastError || undefined,
+            ...(this.pairingCode ? { pairingCode: this.pairingCode } : {}),
         };
         if (this.isReady) return this.decorateStatus({ ...base, status: 'READY' });
         // Scan accepted but session not warm yet — report it instead of a
@@ -504,32 +605,36 @@ class WhatsAppService {
                 });
                 console.log(`OpenWA sent to ${finalPhone}`);
             } else {
+                const jid = `${normalizedPhone}@s.whatsapp.net`;
                 let isRegistered = true;
                 try {
-                    isRegistered = await this.withTimeout(
-                        this.client.isRegisteredUser(finalPhone),
+                    const contacts = await this.withTimeout(
+                        this.client.onWhatsApp(jid),
                         5000,
-                        true,
+                        [] as any[],
                     );
+                    isRegistered = (contacts as any[])?.[0]?.exists ?? true;
                 } catch (regErr: any) {
-                    console.warn(`isRegisteredUser failed for ${finalPhone}, sending anyway:`, regErr?.message || regErr);
+                    console.warn(`onWhatsApp failed for ${jid}, sending anyway:`, regErr?.message || regErr);
                     isRegistered = true;
                 }
                 if (isRegistered) {
                     if (msg.mediaUrl) {
                         try {
-                            const media = await MessageMedia.fromUrl(msg.mediaUrl);
-                            await this.client.sendMessage(finalPhone, media, { caption: finalText });
+                            const response = await fetch(msg.mediaUrl);
+                            if (!response.ok) throw new Error(`media fetch ${response.status}`);
+                            const buffer = Buffer.from(await response.arrayBuffer());
+                            await this.client.sendMessage(jid, { image: buffer, caption: finalText });
                         } catch {
                             console.error('Media fetch failed, falling back to text');
-                            await this.client.sendMessage(finalPhone, finalText);
+                            await this.client.sendMessage(jid, { text: finalText });
                         }
                     } else {
-                        await this.client.sendMessage(finalPhone, finalText);
+                        await this.client.sendMessage(jid, { text: finalText });
                     }
-                    console.log(`WhatsApp sent to ${finalPhone}`);
+                    console.log(`WhatsApp sent to ${jid}`);
                 } else {
-                    console.log(`WhatsApp skip: ${finalPhone} is not registered on WP`);
+                    console.log(`WhatsApp skip: ${jid} is not registered on WP`);
                 }
             }
 
