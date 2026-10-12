@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>دليل الاختبار الشامل — Coduis Xen</title>
+<style>
+:root{--ok:#16a34a;--fail:#dc2626;--block:#d97706;--skip:#64748b;--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--mut:#94a3b8;--acc:#38bdf8}
+*{box-sizing:border-box}body{font-family:system-ui,'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--txt);margin:0;padding:0 12px 70px}
+.wrap{max-width:1180px;margin:0 auto}
+header.top{position:sticky;top:0;background:var(--bg);padding:10px 2px;border-bottom:1px solid var(--line);z-index:5}
+h1{font-size:1.25rem;margin:2px 0}.sub{color:var(--mut);font-size:.83rem;line-height:1.8}
+.sub code{background:#0b1220;padding:1px 7px;border-radius:6px;direction:ltr;display:inline-block}
+#progress{height:10px;background:var(--card);border-radius:99px;overflow:hidden;margin:8px 0}#progress>div{height:100%;background:linear-gradient(90deg,#22c55e,#15803d);width:0%}
+#counters{font-size:.85rem;font-weight:700}
+.part{border:1px solid var(--line);border-radius:14px;margin:16px 0;overflow:hidden}
+.part>h2{margin:0;padding:12px 16px;background:#0b1220;font-size:1.05rem;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.part>h2 .pprog{font-size:.78rem;color:var(--mut)}
+.area{padding:0 14px 14px}.area>h3{color:var(--acc);font-size:.95rem;margin:16px 0 4px}
+.goal{color:var(--mut);font-size:.8rem;margin:0 0 8px}
+table{width:100%;border-collapse:collapse;font-size:.82rem}th,td{border:1px solid var(--line);padding:7px 9px;vertical-align:top}thead th{background:#0b1220;font-size:.78rem}
+tr[data-status="pass"]{background:rgba(22,163,74,.09)}tr[data-status="fail"]{background:rgba(220,38,38,.11)}tr[data-status="blocked"]{background:rgba(217,119,6,.11)}tr[data-status="skip"]{opacity:.55}
+ol.steps,ul.exp{margin:4px 0;padding-inline-start:20px;line-height:1.9}ol.steps li{margin:1px 0}ul.exp{color:#a7f3a7;list-style:'✓  '}
+.route{display:inline-block;background:#0b1220;border:1px solid var(--line);border-radius:6px;padding:1px 8px;font-size:.72rem;color:var(--acc);text-decoration:none;margin-top:4px;direction:ltr}
+.st{min-width:150px}.st .row{display:flex;gap:4px;margin:2px 0}
+.st button{flex:1;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:7px;padding:5px 4px;font-size:.72rem;font-weight:700}
+.st button.on{outline:2px solid #fff;outline-offset:1px}
+textarea{width:100%;min-height:46px;background:#0b1220;color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:6px;font-size:.78rem}
+select.sev{background:#0b1220;color:var(--txt);border:1px solid var(--line);border-radius:6px;font-size:.72rem;margin-top:4px;width:100%}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:10px 0}
+.meta label{font-size:.75rem;color:var(--mut)}.meta input{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--txt)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
+button.act{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:8px;padding:8px 14px;font-weight:700}
+button.primary{background:#2563eb;border-color:#2563eb}button.danger{background:#7f1d1d;border-color:#7f1d1d}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.filters select,.filters input{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px}
+#importBox{width:100%;min-height:90px;background:#0b1220;color:var(--txt);border:1px solid var(--line);border-radius:8px}
+details.how{margin:8px 0;font-size:.82rem}details.how summary{cursor:pointer;color:var(--acc);font-weight:700}
+.id{color:var(--mut);font-size:.7rem}
+@media print{header.top .bar,.filters,textarea,select.sev,.st,.no-print{display:none}body{background:#fff;color:#000}tr[data-status]{background:none}.part{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+<h1>دليل الاختبار الشامل — Coduis Xen ERP</h1>
+<div class="sub">نفّذ بالترتيب على النظام الحقيقي، وسجّل <b>الحالة + الملاحظات</b> لكل اختبار. الاختبارات الفاشلة تحتاج <b>الخطورة</b> أيضًا. في النهاية صدّر JSON والصقه في المحادثة مع أرقام الفاشلة.</div>
+<div id="progress"><div></div></div>
+<div id="counters"></div>
+</header>
+
+<div class="bar">
+<div class="meta" style="flex:1;min-width:260px">
+<label>رابط النظام<input id="mBase" dir="ltr" value="http://127.0.0.1:3000"></label>
+<label>المتصفح/الجهاز<input id="mBrowser" placeholder="Chrome ويندوز"></label>
+<label>المستخدم والدور<input id="mUser" placeholder="admin@coduiszen.com"></label>
+<label>الفرع<input id="mBranch" placeholder="b1"></label>
+</div>
+</div>
+
+<details class="how"><summary>طريقة الاستخدام (اضغط للعرض)</summary>
+<div class="sub">
+1) افتح رابط الصفحة من زر المسار تحت عنوان كل اختبار.<br>
+2) نفّذ الخطوات المرقمة واحدة واحدة.<br>
+3) قارن بالنتيجة المتوقعة (علامات ✓) — لو طابقت اضغط <b>ناجح</b>، لو لا اضغط <b>فاشل</b> واختر الخطورة واكتب ما حدث فعلًا.<br>
+4) <b>محظور</b> = لا يمكن التنفيذ لسبب خارجي (صلاحية/بيانات ناقصة) مع توضيح السبب. <b>تخطي</b> = غير منطبق على فرعك.<br>
+5) زر <b>تصدير</b> في الأسفل بعد الانتهاء.
+</div>
+</details>
+
+<div class="filters">
+<select id="fPart"><option value="">كل الأجزاء</option></select>
+<select id="fStatus"><option value="">كل الحالات</option><option value="none">لم يُختبر</option><option value="pass">ناجح</option><option value="fail">فاشل</option><option value="blocked">محظور</option><option value="skip">تخطي</option></select>
+<input id="fSearch" placeholder="بحث برقم أو كلمة">
+</div>
+
+<div id="parts"></div>
+
+<div class="bar no-print">
+<button class="act primary" onclick="exportJSON(false)">تصدير JSON (تحميل)</button>
+<button class="act" onclick="exportJSON(true)">نسخ JSON</button>
+<button class="act" onclick="document.getElementById('impWrap').style.display='block'">استيراد سابق</button>
+<button class="act" onclick="window.print()">طباعة / PDF</button>
+<button class="act danger" onclick="if(confirm('مسح كل النتائج؟')){state={};save();render()}">مسح الكل</button>
+</div>
+<div id="impWrap" style="display:none" class="no-print">
+<textarea id="importBox" placeholder="الصق JSON هنا"></textarea>
+<div class="bar"><button class="act primary" onclick="importJSON()">تحميل</button></div>
+</div>
+<div class="sub">صيغة التصدير للمطور: <code dir="ltr">results:[{id,status,severity,note}]</code> — الحالات <code dir="ltr">pass/fail/blocked/skip</code> والخطورة <code dir="ltr">critical/major/minor</code>.</div>
+</div>
+
+<script>
+const PARTS={"P1":"الجزء 1 — الدخول والأمان واللوحات","P2":"الجزء 2 — البيع والتشغيل اليومي","P3":"الجزء 3 — المخزون والإنتاج","P4":"الجزء 4 — التوصيل والمالية","P5":"الجزء 5 — العملاء والموارد والتقارير","P6":"الجزء 6 — الإعدادات والاختبارات الشاملة"};
+// [part, area, id, route, title, steps[], expected[]]
+const TESTS=[
+["P1","المصادقة","A01","/login","دخول صحيح",["افتح صفحة الدخول","أدخل بريدًا وكلمة مرور صحيحة واضغط دخول"],["توجيه لصفحة الدور الافتراضية","لا رسائل خطأ ولا أخطاء في الكونسول"]],
+["P1","المصادقة","A02","/login","دخول خاطئ مرفوض",["أدخل كلمة مرور خاطئة لحساب موجود","كرر 3 مرات"],["رسالة خطأ واضحة بالعربية في كل مرة","لا دخول ولا تلميح يفرّق بين بريد خاطئ وكلمة خاطئة"]],
+["P1","المصادقة","A03","/login","دخول PIN",["افتح الدخول بالـ PIN (إن مفعل) واختر الفرع","أدخل PIN موظف صحيح"],["دخول ناجح بصلاحيات دور الموظف فقط"]],
+["P1","المصادقة","A04","/setup","صفحة التجهيز بعد الإعداد",["افتح /setup والنظام مجهز already","لاحظ السلوك"],["تحويل تلقائي لصفحة الدخول (لا معالج فارغ)","لا إمكانية إعادة تجهيز تمسح بيانات"]],
+["P1","المصادقة","A05","/t/:id","تتبع طلب عمومي",["من مجلد المشروع نفّذ: npm run ops:track-link -- رقم_الطلب (مثال 1) وانسخ الرابط","افتح الرابط من متصفح خفي (بدون دخول)","جرّب نفس الرابط بعد حذف ?t= من آخره"],["صفحة التتبع تفتح ومراحل الحالة ظاهرة بدون دخول","الرابط بدون توقيع مرفوض برسالة خطأ (لا بيانات)","ملاحظة: الأمر يحتاج سيرفر محدث — إن فشل بـ 404 أعد تشغيل السيرفر أولًا"]],
+["P1","المصادقة","A06","/login","تسجيل خروج",["من القائمة اضغط خروج","حدّث الصفحة (F5)"],["رجوع للدخول فورًا","التحديث لا يعيد الدخول تلقائيًا بجلسة ميتة"]],
+["P1","المصادقة","A07","/pos","صفحة محمية بدون دخول",["امسح بيانات الموقع ثم افتح /pos مباشرة"],["تحويل لصفحة الدخول","بعد الدخول يرجع بك لنفس الصفحة المطلوبة"]],
+["P1","اللوحات","D01","/","تحميل الرئيسية",["افتح / بعد الدخول وراقب التحميل","انتظر اكتمال البطاقات"],["بطاقات KPI + رسوم + تنبيه إغلاق اليوم (إن وُجد)","الاكتمال خلال ~10 ثوانٍ على شبكة طبيعية"]],
+["P1","اللوحات","D02","/","تفاعل بطاقات اللوحة",["اضغط بطاقة إيرادات ثم بطاقة طلبات"],["انتقال للصفحة المرتبطة أو تطبيق الفلتر الصحيح"]],
+["P1","اللوحات","D03","/admin-dashboard","لوحة الإدارة",["افتح /admin-dashboard"],["مؤشرات الفروع والأداء ظاهرة بدون أخطاء"]],
+["P2","المبيعات","S01","/pos","طلب POS كامل",["اختر DINE-IN وطاولة","أضف صنفين وخصمًا إن أمكن","ادفع نقديًا وأغلق الطلب"],["فاتورة مطبوعة/معروضة صحيحة","الطلب يظهر في KDS وفي مركز الطلبات","المخزون نقص بالمكونات"]],
+["P2","المبيعات","S02","/pos","أنواع الطلبات",["أنشئ طلب توصيل (عميل + عنوان + سائق)","أنشئ طلب سفري"],["التوصيل يظهر في التوصيل Dispatch","السفري يتبع مسار الاستلام حسب الإعداد"]],
+["P2","المبيعات","S03","/pos","تعليق واستدعاء",["ابدأ طلبًا وعلّقه (Hold)","استدعه من القائمة"],["رجوع بنفس الأصناف والمبالغ","لا ازدواج في المخزون"]],
+["P2","المبيعات","S04","/call-center","طلب كول سنتر",["أنشئ طلبًا بعنوان داخل منطقة","أكّد السعر"],["سعر التوصيل حسب المنطقة","الطلب في مسار التوصيل"]],
+["P2","المبيعات","S05","/call-center-manager","إدارة الكول سنتر",["افتح الصفحة وراجع الإحصائيات"],["مشغلون ومكالمات معلقة وأداء ظاهر"]],
+["P2","المبيعات","S06","/kds","دورة المطبخ",["من KDS غيّر طلبًا: جديد ← تحضير ← جاهز"],["تحديث لحظي بدون تحديث الصفحة","تنبيه صوتي/بصري (إن مفعل)"]],
+["P2","المبيعات","S07","/pickup","تسليم الاستلام",["سلّم طلبًا جاهزًا من /pickup"],["تغير الحالة لمُسلّم","طباعة إتمام حسب الإعداد"]],
+["P2","المبيعات","S08","/orders","فلاتر وصفحات الطلبات",["رشّح (حالة + نوع + فرع + تاريخ)","بدّل الصفحة والحجم (10/25/50)"],["النتائج مطابقة للفلاتر","العدادات والإجماليات دقيقة"]],
+["P2","المبيعات","S09","/kiosk","طلب الكيوسك",["اطلب كعميل بدون دخول حتى الدفع"],["طلب برقم متابعة ظاهر","يظهر في KDS/الطلبات"]],
+["P3","المخزون","I01","/inventory","نظرة المخزون",["افتح /inventory وراجع الأرصدة والتنبيهات"],["الأرصدة مطابقة لآخر حركات","تنبيهات النواقص منطقية"]],
+["P3","المخزون","I02","/inventory/items","إدارة الأصناف",["ابحث عن صنف وعدّل سعره/حده","راجع كميته بالمخازن"],["الحفظ يثبت بعد التحديث","الكمية موزعة صح على المخازن"]],
+["P3","المخزون","I03","/inventory/suppliers","الموردون",["أضف موردًا جديدًا","عدّل موردًا موجودًا"],["ظهور المورد في المشتريات"]],
+["P3","المخزون","I04","/inventory/procurement","أمر شراء واستلام",["أنشئ PO بأصناف وكميات","استلم الكمية كاملة"],["زيادة الرصيد بنفس الكمية","حركة وارد مسجلة بتاريخ الاستلام"]],
+["P3","المخزون","I05","/inventory/warehouses","تحويل مخزني",["انقل كمية من مخزن لآخر"],["نقص المصدر = زيادة الوجهة","سجل حركة تحويل موجود"]],
+["P3","المخزون","I06","/inventory/counts","جرد وتسوية",["ابدأ جردًا وسجّل كمية مختلفة","سوِّ الفروقات"],["الفروق تحتاج اعتماد حسب الإعداد","الرصيد النهائي = المجرود"]],
+["P3","المخزون","I07","/inventory/movements","سجل الحركات",["نفّذ (بيع + شراء + تحويل) ثم راجع السجل"],["كل حركة مسجلة بنوعها ووقتها","لا حركات ناقصة أو مكررة"]],
+["P3","المخزون","I08","/stock-requests","طلب بين الفروع",["اطلب صنفًا من فرعك للمخزن الرئيسي"],["دورة طلب ← اعتماد ← توريد تكتمل"]],
+["P3","المخزون","I09","/inventory-intelligence","ذكاء المخزون",["افتح الصفحة وراجع التوصيات"],["تنبيهات إعادة الطلب مبنية على الاستهلاك فعلًا"]],
+["P3","المخزون","I10","/wastage","تسجيل هالك",["سجّل هالكًا بسبب واضح"],["نقص الرصيد + ظهوره في تقرير الهالك"]],
+["P3","المخزون","I11","/recipes","الوصفات",["افتح وصفة صنف وراجع مكوناتها","بِع الصنف ثم راجع المكونات"],["استهلاك المكونات محسوب تلقائيًا عند البيع"]],
+["P3","المخزون","I12","/menu","إدارة القائمة",["أضف صنفًا جديدًا بسعر","افتحه في POS"],["الصنف والسعر ظاهران فورًا في البيع"]],
+["P3","الإنتاج","P01","/production","أمر إنتاج",["أنشئ أمر إنتاج لمنتج تام بكمية"],["خصم المكونات من المخزن","إضافة المنتج التام للرصيد"]],
+["P3","الإنتاج","P02","/butchery","عملية تشفية",["سجّل تشفية بوزن مدخل ومخرجات"],["المخرجات محسوبة والنسبة منطقية","الهالك مسجل"]],
+["P4","التوصيل","L01","/dispatch","تعيين سائق",["عيّن سائقًا متاحًا لطلب توصيل"],["الطلب ينتقل لحالة مع السائق","يظهر في لوحة السائق"]],
+["P4","التوصيل","L02","/drivers","حساب السائق",["راجع تحصيل سائق بعد تسليمات"],["نقدية السائق = مجموع المحصّل فعلًا"]],
+["P4","التوصيل","L03","/driver","لوحة السائق",["ادخل بحساب سائق"],["طلباته فقط ظاهرة","التسليم والتحصيل يعملان"]],
+["P4","التوصيل","L04","/reservations","حجز طاولة",["احجز طاولة بتاريخ ووقت واسم"],["الحجز ظاهر في خريطة الصالة","لا تعارض حجوزات مزدوجة"]],
+["P4","التوصيل","L05","/zones","أسعار المناطق",["عدّل سعر توصيل منطقة","أنشئ طلبًا جديدًا لنفس المنطقة"],["الطلب الجديد بالسعر الجديد","القديم لا يتأثر"]],
+["P4","التوصيل","L06","/floor-designer","تصميم الصالة",["حرّك طاولة واحفظ","حدّث الصفحة"],["الموضع الجديد ثابت بعد التحديث"]],
+["P4","المالية","F01","/finance","مطابقة المالية",["قارن الأصول/الإيراد/المصروف مع التقارير"],["الأرقام متطابقة بين الشاشتين"]],
+["P4","المالية","F02","/treasury","قبض وصرف وشيفت",["سجّل قبضًا ثم صرفًا","افتح شيفتًا جديدًا"],["رصيد الخزينة يتحرك صحيحًا","الشيفت مسجل باسمك"]],
+["P4","المالية","F03","/expenses","مصروف جديد",["أضف مصروفًا بتصنيف ومرفق"],["ظهوره في الملخص والتقارير"]],
+["P4","المالية","F04","/fiscal","الضرائب",["راجع نسبة 14% على فاتورة","تحقق بيانات المنشأة"],["الضريبة محسوبة صح","البيانات مكتملة للفواتير الرسمية"]],
+["P4","المالية","F05","/day-close","إغلاق اليوم",["نفّذ الإغلاق (جرد + مطبخ فارغ + عهد مسواة)"],["إغلاق ناجح + منع أي عملية بتاريخ مغلق برسالة واضحة"]],
+["P4","المالية","F06","/refunds","مرتجع",["ارتجع صنفًا من طلب مدفوع"],["عكس المخزون والقيد المالي","موافقة حسب الإعداد قبل التنفيذ"]],
+["P5","العملاء والتسويق","M01","/crm","ملف عميل",["ابحث عن عميل وعدّل بياناته","راجع نقاطه وسجل طلباته"],["الحفظ ثابت","السجل والطلبات مطابقة"]],
+["P5","العملاء والتسويق","M02","/complaints","دورة شكوى",["سجّل شكوى جديدة","عالجها ثم أغلقها"],["الحالات تتحرك: مفتوحة ← قيد المعالجة ← مغلقة","التواريخ مسجلة"]],
+["P5","العملاء والتسويق","M03","/marketing","حملة تجريبية",["أنشئ حملة واتساب على عينة صغيرة"],["الإرسال بالدفعات والتأخير المضبوط","تقرير الإرسال يعكس الواقع"]],
+["P5","العملاء والتسويق","M04","/platforms","طلبات المنصات",["راجع طلبًا مجمعًا من منصة"],["أسعار المنصة مطبقة والفروق عن المنيو ظاهرة"]],
+["P5","العملاء والتسويق","M05","/mail","البريد الداخلي",["أرسل رسالة داخلية لمستخدم آخر"],["الوصول + زيادة عدّاد غير المقروء عنده"]],
+["P5","العملاء والتسويق","M06","/whatsapp","ربط واتساب",["تحقق حالة الجلسة (QR إن لزم)","أرسل رسالة تجريبية"],["الحالة متصلة","الرسالة تصل فعلًا للرقم"]],
+["P5","الموارد","H01","/hr","ملفات الموظفين",["افتح /hr وراجع ملف موظف"],["البيانات والتعيينات سليمة"]],
+["P5","الموارد","H02","/attendance","حضور وانصراف",["سجّل حضورًا ثم انصرافًا يدويًا"],["الساعات والتأخير محسوبة صح"]],
+["P5","الموارد","H03","/payroll","مسير مرتبات",["شغّل مسير شهر تجريبي لموظف"],["الصافي = أساسي + بدلات − خصومات بالأرقام"]],
+["P5","الموارد","H04","/scheduling","جدولة وردية",["أنشئ وردية لموظف بتاريخ"],["ظهورها في مهام الموظف"]],
+["P5","الموارد","H05","/shift-tasks","إنجاز مهمة",["أكمل مهمة وردية من القائمة"],["توثيق الإنجاز بالوقت والمنفذ"]],
+["P5","الموارد","H06","/hr-settings","سياسة HR",["عدّل سياسة تأخير/إجازات","احسب حالة متأثرة"],["القاعدة الجديدة مطبقة على الجديد فقط (لا رجعي إلا إن نصت)"]],
+["P5","الموارد","H07","/hr-guide","الدليل",["افتح /hr-guide وقارن بالشاشات"],["الشرح مطابق للشاشات الحالية"]],
+["P5","الموارد","H08","/biometric-devices","جهاز البصمة",["تحقق اتصال الجهاز","اسحب حركة حديثة"],["الحالة متصل والسحب يعمل"]],
+["P5","الموارد","H09","/migration","ترحيل تجريبي",["شغّل الترحيل على بيانات تجريبية"],["لا فقد بيانات + تقرير أخطاء واضح"]],
+["P5","الموارد","H10","/user-management","مستخدم جديد",["أنشئ مستخدمًا بدور وفرع وصلاحيات","سجّل دخول به"],["الدخول يعمل","يرى فقط المسموح لدوره"]],
+["P5","التقارير","R01","/reports","تقرير وتصدير",["طبّق مدى تاريخ + فلتر","صدّر Excel وPDF"],["الأرقام = نفس الفترة في المالية","الملفات تفتح سليمة"]],
+["P5","التقارير","R02","/ai-insights","الرؤى",["افتح /ai-insights وراجع توصية واحدة"],["التوصية مبنية على بيانات حقيقية لا كلام عام"]],
+["P5","التقارير","R03","/ai-assistant","سؤال تشغيلي",["اسأل: إجمالي مبيعات أمس"],["إجابة برقم يطابق التقرير (لا هلوسة)"]],
+["P5","التقارير","R04","/forensics","سجل تدقيق",["ابحث عن حدث (طلب/خصم) تعرفه"],["الحدث موثق: من + متى + قبل/بعد"]],
+["P6","الإعدادات","G01","/settings","تغيير إعداد",["غيّر (عملة/ضريبة/لغة/ثيم) واحفظ","حدّث الصفحة"],["التطبيق فوري","الثبات بعد التحديث"]],
+["P6","الإعدادات","G02","/printers","طابعة جديدة",["أضف طابعة ونفّذ اختبار نبضة"],["الحالة متصلة وصفحة تجريبية تخرج"]],
+["P6","الإعدادات","G03","/receipt-designer","قالب فاتورة",["عدّل القالب واحفظ","اطبع فاتورة"],["الفاتورة المطبوعة بالتصميم الجديد"]],
+["P6","الإعدادات","G04","/franchise","الفرانشايز",["افتح /franchise وقارن فرعين"],["البيانات متماسكة بلا تعارض"]],
+["P6","الإعدادات","G05","/approvals","اعتماد طلب",["اعتمد طلبًا معلقًا ثم ارفض آخر"],["تنفيذ المعتمد + إشعار الطالب بالقرارين"]],
+["P6","الإعدادات","G06","/theme-lab","تبديل ثيم",["بدّل ثيمًا داكن/فاتح وتجول"],["لا عناصر مكسورة ولا نص غير مقروء"]],
+["P6","الإعدادات","G07","/user-management","تعديل صلاحية",["احذف صلاحية من دور ثم سجّل دخول بمستخدمه"],["المنع فوري وواضح (تحويل لمساره)"]],
+["P6","شاملة","X01","/pos","منع صلاحية",["ادخل بدور محدود وافتح مسارًا ممنوعًا"],["تحويل لمسار مسموح","لا بيانات مسربة في الشبكة"]],
+["P6","شاملة","X02","/","تبديل الفرع",["بدّل الفرع النشط من المبدّل"],["كل الشاشات تعرض بيانات الفرع الجديد","الطلبات الجديدة عليه"]],
+["P6","شاملة","X03","/pos","أوفلاين ومزامنة",["افصل النت وبِع طلبًا","أعد الاتصال وراقب"],["الطلب يتزامن كاملًا بدون تكرار"]],
+["P6","شاملة","X04","/kds","لحظي طرفيتان",["اطلب من POS وراقب KDS بجهاز/متصفح آخر"],["الظهور خلال ~5 ثوانٍ بدون تحديث يدوي"]],
+["P6","شاملة","X05","/","بحث Ctrl+K",["اضغط Ctrl+K وابحث عن صفحة","انتقل بالنتيجة"],["نتائج فورية والانتقال يعمل"]],
+["P6","شاملة","X06","/","إشعارات",["نفّذ حدثًا يستحق إشعارًا (طلب/اعتماد)"],["الجرس والبريد يتحدثان بالتفاصيل الصحيحة"]],
+["P6","شاملة","X07","/","تبديل اللغة",["بدّل عربي ← إنجليزي"],["انعكاس RTL/LTR كامل","لا نصوص مقطوعة أو متداخلة"]],
+["P6","شاملة","X08","/pos","شاشة جوال",["صغّر العرض لـ 390px وجرّب البيع"],["لا تمرير أفقي","الأزرار صالحة للمس"]],
+["P6","شاملة","X09","/pos","مطابقة الفاتورة",["اطبع فاتورة وقارنها بالشاشة"],["البنود والضريبة والإجمالي مطابقة"]],
+["P6","شاملة","X10","/day-close","يوم مغلق يمنع",["بعد الإغلاق حاول عملية بنفس التاريخ"],["رفض برسالة عربية واضحة"]],
+];
+let state={};
+try{const s=JSON.parse(localStorage.getItem('uat-xen')||'{}');state=s.results||s||{}}catch(e){state={}}
+function save(){try{localStorage.setItem('uat-xen',JSON.stringify({meta:meta(),results:state}))}catch(e){}}
+function meta(){return{base:val('mBase'),browser:val('mBrowser'),user:val('mUser'),branch:val('mBranch')}}
+function val(id){return document.getElementById(id).value}
+(function initMeta(){try{const m=(JSON.parse(localStorage.getItem('uat-xen')||'{}').meta)||{};for(const k of['mBase','mBrowser','mUser','mBranch'])if(m[k.slice(1).toLowerCase()])document.getElementById(k).value=m[k.slice(1).toLowerCase()]}catch(e){}})();
+['mBase','mBrowser','mUser','mBranch'].forEach(id=>document.getElementById(id).addEventListener('change',save));
+const base=()=>document.getElementById('mBase').value.replace(/\/+$/,'');
+const fPart=document.getElementById('fPart');
+Object.entries(PARTS).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v;fPart.appendChild(o)});
+['fPart','fStatus','fSearch'].forEach(id=>document.getElementById(id).addEventListener('input',render));
+function setStatus(id,st){const r=state[id]||{};r.status=st;if(st!=='fail')delete r.severity;state[id]=r;save();render()}
+function setNote(id,v){const r=state[id]||{};r.note=v;state[id]=r;save();updateCounts()}
+function setSev(id,v){const r=state[id]||{};r.severity=v;state[id]=r;save()}
+function counts(ids){const c={none:0,pass:0,fail:0,blocked:0,skip:0};ids.forEach(id=>c[(state[id]||{}).status||'none']++);return c}
+function render(){
+const fp=fPart.value,fs=document.getElementById('fStatus').value,q=document.getElementById('fSearch').value.trim();
+const host=document.getElementById('parts');host.innerHTML='';
+for(const pk of Object.keys(PARTS)){
+if(fp&&pk!==fp)continue;
+const rows=TESTS.filter(t=>t[0]===pk&&(!fs||((state[t[2]]||{}).status||'none')===fs)&&(!q||(t[2]+t[4]+t[1]).includes(q)));
+if(!rows.length)continue;
+const allIds=TESTS.filter(t=>t[0]===pk).map(t=>t[2]);const c=counts(allIds);const done=allIds.length-c.none;
+let h=`<div class="part"><h2>${PARTS[pk]}<span class="pprog">ناجح ${c.pass} — فاشل ${c.fail} — متبق ${c.none}</span></h2>`;
+const areas=[...new Set(rows.map(t=>t[1]))];
+areas.forEach(a=>{
+h+=`<div class="area"><h3>${a}</h3>`;
+const ar=rows.filter(t=>t[1]===a);
+h+=`<table><thead><tr><th style="width:46px">#</th><th>الاختبار والخطوات</th><th style="width:26%">النتيجة المتوقعة ✓</th><th style="width:170px">الحالة والملاحظات</th></tr></thead><tbody>`;
+ar.forEach(t=>{const[,area,id,route,title,steps,exp]=t;const r=state[id]||{};const st=r.status||'none';
+h+=`<tr data-status="${st}"><td><b>${id}</b></td><td><b>${title}</b><a class="route" href="${base()}${route}" target="_blank">${route} ⬈</a><ol class="steps">${steps.map(s=>`<li>${s}</li>`).join('')}</ol></td><td><ul class="exp">${exp.map(s=>`<li>${s}</li>`).join('')}</ul></td><td class="st"><div class="row"><button style="${st==='pass'?'background:#14532d':''}" class="${st==='pass'?'on':''}" onclick="setStatus('${id}','pass')">ناجح</button><button style="${st==='fail'?'background:#7f1d1d':''}" class="${st==='fail'?'on':''}" onclick="setStatus('${id}','fail')">فاشل</button></div><div class="row"><button style="${st==='blocked'?'background:#78350a':''}" class="${st==='blocked'?'on':''}" onclick="setStatus('${id}','blocked')">محظور</button><button class="${st==='skip'?'on':''}" onclick="setStatus('${id}','skip')">تخطي</button></div>${st==='fail'?`<select class="sev" onchange="setSev('${id}',this.value)"><option value="">اختر الخطورة</option><option ${r.severity==='critical'?'selected':''} value="critical">حرج — يعطل التشغيل</option><option ${r.severity==='major'?'selected':''} value="major">كبير — workaround صعب</option><option ${r.severity==='minor'?'selected':''} value="minor">صغير — شكلي/نص</option></select>`:''}<textarea oninput="setNote('${id}',this.value)" placeholder="ملاحظات: ماذا حدث فعلًا؟ رقم فاتورة/طلب للمراجعة…">${(r.note||'').replace(/</g,'&lt;')}</textarea></td></tr>`;
+});
+h+='</tbody></table></div>';
+});
+h+='</div>';host.innerHTML+=h;
+}
+updateCounts();
+}
+function updateCounts(){
+const ids=TESTS.map(t=>t[2]);const c=counts(ids);const done=ids.length-c.none;
+document.querySelector('#progress>div').style.width=(done/ids.length*100)+'%';
+document.getElementById('counters').textContent=`الإجمالي ${ids.length} — ناجح ${c.pass} — فاشل ${c.fail} — محظور ${c.blocked} — تخطي ${c.skip} — متبقٍ ${c.none}`;
+}
+function payload(){return{tool:'uat-xen',version:2,exportedAt:new Date().toISOString(),meta:meta(),results:TESTS.map(t=>({id:t[2],part:t[0],area:t[1],route:t[3],title:t[4],status:((state[t[2]]||{}).status||'none'),severity:(state[t[2]]||{}).severity||null,note:(state[t[2]]||{}).note||''})).filter(r=>r.status!=='none')}}
+function exportJSON(copy){
+const s=JSON.stringify(payload(),null,1);
+if(copy){navigator.clipboard.writeText(s).then(()=>alert('اتنسخ. الصقه في المحادثة مع أرقام الفاشلة.')).catch(()=>alert('النسخ فشل — استخدم التحميل'))}
+else{const b=new Blob([s],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='uat-xen-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
+}
+function importJSON(){
+try{const p=JSON.parse(document.getElementById('importBox').value);(p.results||[]).forEach(r=>{if(r.id)state[r.id]={status:r.status,severity:r.severity||undefined,note:r.note||''}});if(p.meta){for(const k of['mBase','mBrowser','mUser','mBranch'])if(p.meta[k.slice(1).toLowerCase()])document.getElementById(k).value=p.meta[k.slice(1).toLowerCase()]}save();render();alert('اتحمّل '+(p.results||[]).length+' نتيجة')}catch(e){alert('JSON غير صالح')}
+}
+render();
+</script>
+</body>
+</html>

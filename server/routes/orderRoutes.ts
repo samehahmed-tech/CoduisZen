@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { createOrderSchema, updateOrderStatusSchema } from '../middleware/validation';
 import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
+import { signTrackToken } from '../utils/trackToken';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
 const router = Router();
@@ -19,6 +20,16 @@ const orderReadAuth = requireRoles(...POS_FLOOR_ROLES, 'KITCHEN_STAFF', 'PICKUP_
 
 router.get('/', orderReadAuth, enforceBranch, orderController.getAllOrders);
 router.get('/:id', orderReadAuth, enforceBranch, orderController.getOrderById);
+// Signed public-tracking link for the customer (resend when the WhatsApp
+// send failed). Signed with the server secret — never forge client-side.
+router.get('/:id/track-link', orderReadAuth, enforceBranch, (_req, res) => {
+    const orderId = String((_req.params as any)?.id || '').trim();
+    if (!orderId) return res.status(400).json({ ok: false, code: 'ORDER_ID_REQUIRED' });
+    const token = signTrackToken(orderId);
+    if (!token) return res.status(503).json({ ok: false, code: 'TRACK_SIGNING_UNAVAILABLE' });
+    const base = String(process.env.PUBLIC_TRACKING_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+    return res.json({ ok: true, url: `${base || ''}/t/${orderId}?t=${token}` });
+});
 router.post('/coupons/validate', posAuth, orderController.validateCoupon);
 router.post('/', posAuth, enforceBranch, validate(createOrderSchema), orderController.createOrder);
 router.post('/split', posAuth, enforceBranch, orderController.splitOrder);

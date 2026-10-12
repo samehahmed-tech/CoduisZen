@@ -38,7 +38,12 @@
     "ops:dev:init": "npm run ops:dev:env-init && npm run ops:dev:bootstrap-auth",
     "bridge:install": "npm --prefix hardware-bridge install",
     "bridge:start": "npm --prefix hardware-bridge start",
-    "validate-env": "tsx scripts/validate-env.ts"
+    "validate-env": "tsx scripts/validate-env.ts",
+    "ops:track-link": "tsx scripts/gen-track-link.ts",
+    "lighthouse:run": "node scripts/lighthouse/run.mjs",
+    "lighthouse:report": "node scripts/lighthouse/report.mjs",
+    "lighthouse:baseline": "node scripts/lighthouse/report.mjs --save-baseline",
+    "lighthouse:all": "node scripts/lighthouse/run.mjs && node scripts/lighthouse/report.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.982.0",

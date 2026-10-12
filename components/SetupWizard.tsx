@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setupApi } from '../services/api/setup';
+import { settingsApi } from '../services/api/settings';
+import { branchesApi } from '../services/api/branches';
 import { useAuthStore } from '../stores/useAuthStore';
 import {
     CheckCircle2, ArrowRight, ArrowLeft, Globe, Loader2, Printer, Users, Layout,
@@ -202,6 +204,8 @@ const SetupWizard: React.FC = () => {
     const [step, setStep] = useState<WizardStep>(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // True while asking the server whether this instance still needs setup.
+    const [checking, setChecking] = useState(true);
     const [createdAccounts, setCreatedAccounts] = useState<Array<{ name: string; email: string; pin?: string; role: string }>>([]);
     const [copied, setCopied] = useState(false);
 
@@ -299,6 +303,52 @@ const SetupWizard: React.FC = () => {
         } catch { /* corrupted draft — start fresh */ }
     }, []);
 
+    // Setup guard + prefill: an initialized instance must not show a fresh
+    // wizard. Redirect to login; when setup is still needed, prefill
+    // restaurant/branch fields from existing dealer data (if a session
+    // exists) without clobbering the on-site draft.
+    useEffect(() => {
+        let active = true;
+        const timeout = window.setTimeout(() => { if (active) setChecking(false); }, 6000);
+        (async () => {
+            try {
+                const st = await setupApi.status();
+                if (!active) return;
+                if (!st?.needsSetup) {
+                    navigate('/login', { replace: true });
+                    return;
+                }
+                const hasDraft = (() => { try { return !!sessionStorage.getItem(DRAFT_KEY); } catch { return false; } })();
+                const hasToken = (() => { try { return !!localStorage.getItem('auth_token'); } catch { return false; } })();
+                if (!hasDraft && hasToken) {
+                    const [settingsData, branchesData] = await Promise.all([
+                        settingsApi.getAll().catch(() => null),
+                        branchesApi.getAll().catch(() => []),
+                    ]);
+                    if (!active) return;
+                    if (settingsData && typeof settingsData === 'object') {
+                        const s = settingsData as Record<string, any>;
+                        if (typeof s.restaurantName === 'string' && s.restaurantName) setRestaurantName(s.restaurantName);
+                        if (typeof s.currency === 'string' && s.currency) setCurrency(s.currency);
+                        if (typeof s.currencySymbol === 'string' && s.currencySymbol) setCurrencySymbol(s.currencySymbol);
+                        if (typeof s.taxRate === 'number') setTaxRate(s.taxRate);
+                        if (typeof s.serviceCharge === 'number') setServiceCharge(s.serviceCharge);
+                        if (typeof s.phone === 'string' && s.phone) setBranchPhone(s.phone);
+                        if (typeof s.branchAddress === 'string' && s.branchAddress) setBranchAddress(s.branchAddress);
+                    }
+                    const b = Array.isArray(branchesData) ? branchesData[0] : null;
+                    if (b) {
+                        const name = (b as any).name_ar || (b as any).nameAr || (b as any).name || '';
+                        if (name) setBranchName(String(name));
+                        if ((b as any).address) setBranchAddress(String((b as any).address));
+                        if ((b as any).phone) setBranchPhone(String((b as any).phone));
+                    }
+                }
+            } catch { /* fail-open: first setup must work even if status flakes; bootstrap is 409-guarded server-side */ }
+            finally { if (active) { window.clearTimeout(timeout); setChecking(false); } }
+        })();
+        return () => { active = false; window.clearTimeout(timeout); };
+    }, []);
     // Persist draft on every change (passwords excluded).
     useEffect(() => {
         if (!unlocked) return;
@@ -553,9 +603,12 @@ const SetupWizard: React.FC = () => {
                 : code.includes('PASSWORD_POLICY_FAILED')
                     ? (language === 'ar' ? `الباسورد اترفض من السيرفر: ${afterColon} — ارجع خطوة الحسابات وظبطه` : `Password rejected by server: ${afterColon} — go back to Accounts and fix it`)
                     : code.includes('ALREADY_INITIALIZED')
-                    ? (language === 'ar' ? 'النسخة دي متجهزة قبل كده' : 'This instance is already initialized')
+                    ? (language === 'ar' ? 'النسخة دي متجهزة قبل كده — جاري تحويلك للدخول' : 'This instance is already initialized — taking you to login')
                     : code;
             setError(friendly);
+            if (code.includes('ALREADY_INITIALIZED')) {
+                window.setTimeout(() => navigate('/login', { replace: true }), 2500);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -581,6 +634,16 @@ const SetupWizard: React.FC = () => {
 
     // Coduis Master lock screen — key is verified against the server immediately,
     // so a wrong key can never waste the on-site work that follows.
+    if (checking) {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-neo" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                <div className="flex flex-col items-center gap-3 text-slate-400 text-sm font-bold">
+                    <Loader2 className="animate-spin" size={22} />
+                    {language === 'ar' ? 'جاري التحقق من حالة التجهيز...' : 'Checking setup status...'}
+                </div>
+            </div>
+        );
+    }
     if (!unlocked) {
         return (
             <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-neo relative overflow-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
