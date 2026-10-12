@@ -184,6 +184,17 @@ export const resetWhatsAppSession = async (_req: Request, res: Response) => {
     }
 };
 
+export const requestPairingCode = async (req: Request, res: Response) => {
+    try {
+        const phone = String(req.body?.phone || '').trim();
+        if (!phone) return res.status(400).json({ error: 'PHONE_REQUIRED' });
+        const pairingCode = await whatsappService.getPairingCode(phone);
+        res.json({ ok: true, pairingCode });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message || 'WHATSAPP_PAIRING_FAILED' });
+    }
+};
+
 export const getWhatsAppAutomationConfig = async (_req: Request, res: Response) => {
     try {
         const [row] = await db.select().top(1).from(settings).where(eq(settings.key, WHATSAPP_AUTOMATION_CONFIG_KEY));

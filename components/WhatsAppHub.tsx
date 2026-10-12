@@ -11,6 +11,7 @@ import {
     Inbox,
     MessageCircle,
     MessageSquareReply,
+    Phone,
     Power,
     QrCode,
     RefreshCw,
@@ -122,6 +123,7 @@ export const WhatsAppHub = () => {
         statusData,
         qrCode,
         qrUpdatedAt,
+        pairingCode,
         inbox,
         escalations,
         automationConfig,
@@ -134,6 +136,7 @@ export const WhatsAppHub = () => {
         saveAutomationConfig,
         restartEngine,
         resetSession,
+        requestPairingCode,
         sendCampaign,
         sendDirectMessage,
         subscribeSocket,
@@ -149,6 +152,7 @@ export const WhatsAppHub = () => {
     const [replyText, setReplyText] = useState('');
     const [chatSearch, setChatSearch] = useState('');
     const [testPhone, setTestPhone] = useState('');
+    const [pairingPhone, setPairingPhone] = useState('');
     const [testMessage, setTestMessage] = useState('أهلاً، دي رسالة اختبار من نظام المطعم.');
     const [configDraft, setConfigDraft] = useState<WhatsAppAutomationConfig>(defaultConfig);
 
@@ -287,6 +291,14 @@ export const WhatsAppHub = () => {
         const ok = await sendDirectMessage(testPhone.trim(), testMessage.trim());
         if (ok) toast.success('تم إرسال رسالة الاختبار');
         else toast.error('تعذر إرسال رسالة الاختبار — تأكد من اتصال واتساب');
+    };
+
+    const pairingValue = pairingCode || statusData?.pairingCode || null;
+    const handlePairing = async () => {
+        if (!pairingPhone.trim()) return toast.error('اكتب رقم الموبايل الدولي (مثال: 2010...)');
+        const ok = await requestPairingCode(pairingPhone.trim());
+        if (ok) toast.success('وصل كود الربط — دخله في واتساب');
+        else toast.error('تعذر طلب كود الربط — تأكد أن المحرك شغال');
     };
 
     const handleSaveConfig = async () => {
@@ -456,6 +468,24 @@ export const WhatsAppHub = () => {
                                         </button>
                                     </div>
                                 )}
+                            </div>
+                            <div className="mt-4 rounded-2xl border border-border/60 bg-elevated/30 p-4">
+                                <div className="flex items-center gap-2 text-sm font-black"><Phone className="h-4 w-4 text-sky-600" /> ربط برقم الموبايل (Pairing Code)</div>
+                                {pairingValue ? (
+                                    <div className="mt-3 text-center">
+                                        <div className="mx-auto w-fit rounded-xl bg-main px-6 py-3 text-2xl font-black tracking-[0.3em] text-app ltr">{pairingValue}</div>
+                                        <div className="mt-2 text-xs font-bold text-muted">دخل الكود في واتساب: Linked devices ثم Link with phone number</div>
+                                    </div>
+                                ) : (
+                                    <div className="mt-2 text-xs font-bold text-muted">بديل المسح: اطلب كود 8 أرقام ودخله في واتساب من الموبايل.</div>
+                                )}
+                                <div className="mt-3 flex gap-2">
+                                    <input value={pairingPhone} onChange={(e) => setPairingPhone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handlePairing()} placeholder="رقم دولي 2010..." className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-elevated px-4 text-sm font-bold outline-none focus:border-sky-400 ltr" />
+                                    <button onClick={handlePairing} disabled={isLoading} className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-sky-600 px-4 text-sm font-black text-white transition hover:bg-sky-700 disabled:opacity-50">
+                                        <Phone className="h-4 w-4" />
+                                        طلب الكود
+                                    </button>
+                                </div>
                             </div>
                         </section>
 

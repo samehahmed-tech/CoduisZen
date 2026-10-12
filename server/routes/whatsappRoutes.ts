@@ -7,6 +7,7 @@ import {
     getWhatsAppStatus,
     resolveWhatsAppEscalation,
     resetWhatsAppSession,
+    requestPairingCode,
     saveWhatsAppAutomationConfig,
     sendWhatsAppTest,
     restartWhatsAppEngine,
@@ -29,6 +30,7 @@ const whatsappOperators = [
 router.get('/status', requireRoles(...whatsappOperators), getWhatsAppStatus);
 router.post('/restart', requireRoles(...whatsappOperators), restartWhatsAppEngine);
 router.post('/reset-session', requireRoles(...whatsappOperators), resetWhatsAppSession);
+router.post('/pairing-code', requireRoles(...whatsappOperators), requestPairingCode);
 router.get('/automation-config', requireRoles(...whatsappOperators), getWhatsAppAutomationConfig);
 router.put('/automation-config', requireRoles(...whatsappOperators), saveWhatsAppAutomationConfig);
 router.post('/campaign', requireRoles(...whatsappOperators), sendWhatsAppCampaign);

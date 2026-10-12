@@ -9,6 +9,7 @@ export type WhatsAppStatusPayload = {
     status: 'INITIALIZING' | 'AWAITING_SCAN' | 'AUTHENTICATED' | 'READY' | 'DISCONNECTED' | 'DISABLED' | 'AUTH_ERROR';
     qr?: string;
     qrAt?: string | null;
+    pairingCode?: string | null;
     authenticatedAt?: string | null;
     bridgeUrl?: string;
     sessionId?: string;
@@ -45,6 +46,8 @@ interface WhatsAppState {
     error: string | null;
     qrCode: string | null;
     qrUpdatedAt: string | null;
+    pairingCode: string | null;
+    requestPairingCode: (phone: string) => Promise<boolean>;
     fetchStatus: (silent?: boolean) => Promise<void>;
     fetchInbox: () => Promise<void>;
     fetchEscalations: () => Promise<void>;
@@ -93,6 +96,28 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
     error: null,
     qrCode: null,
     qrUpdatedAt: null,
+    pairingCode: null,
+
+    requestPairingCode: async (phone: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const data = await apiRequest<{ ok: boolean; pairingCode: string }>('/whatsapp/pairing-code', {
+                method: 'POST',
+                body: JSON.stringify({ phone }),
+            });
+            set({
+                pairingCode: data.pairingCode || null,
+                isLoading: false,
+                statusData: useWhatsAppStore.getState().statusData
+                    ? { ...useWhatsAppStore.getState().statusData!, pairingCode: data.pairingCode }
+                    : useWhatsAppStore.getState().statusData,
+            });
+            return true;
+        } catch (err: any) {
+            set({ error: err.message, isLoading: false });
+            return false;
+        }
+    },
 
     fetchStatus: async (silent = false) => {
         if (!silent) set({ isLoading: true, error: null });
@@ -102,22 +127,26 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
                 // READY and AUTHENTICATED both clear the QR: the code is
                 // consumed the moment the phone accepts the scan.
                 if (data.status === 'READY' || data.status === 'AUTHENTICATED') {
-                    return { statusData: data, isLoading: false, qrCode: null, qrUpdatedAt: null };
+                    return { statusData: data, isLoading: false, qrCode: null, qrUpdatedAt: null, pairingCode: null };
+                }
+                if (data.pairingCode) {
+                    return { statusData: data, isLoading: false, pairingCode: data.pairingCode, qrCode: data.qr ? data.qr : prev.qrCode, qrUpdatedAt: data.qr ? (data.qrAt || new Date().toISOString()) : prev.qrUpdatedAt };
                 }
                 if (data.qr) {
-                    return { statusData: data, isLoading: false, qrCode: data.qr, qrUpdatedAt: data.qrAt || new Date().toISOString() };
+                    return { statusData: data, isLoading: false, qrCode: data.qr, qrUpdatedAt: data.qrAt || new Date().toISOString(), pairingCode: prev.pairingCode };
                 }
                 // No qr in this poll — NEVER wipe a known-good QR while the
                 // engine is still booting or awaiting scan; the poll simply
                 // arrived before puppeteer emitted the next QR.
                 if (prev.qrCode && (data.status === 'AWAITING_SCAN' || data.status === 'INITIALIZING')) {
-                    return { statusData: { ...data, qr: prev.qrCode, qrAt: prev.qrUpdatedAt }, isLoading: false };
+                    return { statusData: { ...data, qr: prev.qrCode, qrAt: prev.qrUpdatedAt, pairingCode: data.pairingCode ?? prev.pairingCode }, isLoading: false, pairingCode: data.pairingCode ?? prev.pairingCode };
                 }
                 return {
                     statusData: data,
                     isLoading: false,
                     qrCode: null,
                     qrUpdatedAt: null,
+                    pairingCode: data.pairingCode ?? null,
                 };
             });
         } catch (err: any) {
@@ -233,6 +262,7 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
                         statusData: { ...prev.statusData!, ...data, ok: true, qr: undefined },
                         qrCode: null,
                         qrUpdatedAt: null,
+                        pairingCode: null,
                         error: null,
                     };
                 }
@@ -262,6 +292,14 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
                     : { ok: true, status: 'AWAITING_SCAN', qr, qrAt: new Date().toISOString() } as WhatsAppStatusPayload,
             }));
         };
+        const onPairing = (data: any) => {
+            const code = String(data?.pairingCode || data || '').trim();
+            if (!code) return;
+            set((prev) => ({
+                pairingCode: code,
+                statusData: prev.statusData ? { ...prev.statusData, pairingCode: code } : prev.statusData,
+            }));
+        };
         const onQueue = (data: any) => {
             set((prev) => ({
                 statusData: prev.statusData ? { ...prev.statusData, queueCount: data?.count ?? prev.statusData.queueCount } : prev.statusData,
@@ -273,6 +311,7 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
         };
         socketService.on('whatsapp:status', onStatus);
         socketService.on('whatsapp:qr', onQr);
+        socketService.on('whatsapp:pairing', onPairing);
         socketService.on('whatsapp:queue', onQueue);
         socketService.on('whatsapp:inbox_new', onInboxNew);
         // Missed-event safety: if the socket dropped and reconnected (e.g.
@@ -283,7 +322,7 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
         };
         socketService.onReconnect(onSocketReconnect);
         // Store handlers for cleanup
-        (useWhatsAppStore as any).__socketHandlers = { onStatus, onQr, onQueue, onInboxNew, onSocketReconnect };
+        (useWhatsAppStore as any).__socketHandlers = { onStatus, onQr, onPairing, onQueue, onInboxNew, onSocketReconnect };
     },
 
     unsubscribeSocket: () => {
@@ -292,6 +331,7 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
         if (!handlers) return;
         socketService.off('whatsapp:status', handlers.onStatus);
         socketService.off('whatsapp:qr', handlers.onQr);
+        socketService.off('whatsapp:pairing', handlers.onPairing);
         socketService.off('whatsapp:queue', handlers.onQueue);
         socketService.off('whatsapp:inbox_new', handlers.onInboxNew);
         if (handlers.onSocketReconnect) socketService.offReconnect(handlers.onSocketReconnect);

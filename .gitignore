@@ -18,6 +18,7 @@ coverage
 # Runtime/cache folders
 .wwebjs_auth/
 .wwebjs_cache/
+sessions/
 sessions/baileys-*/
 artifacts/load/
 
