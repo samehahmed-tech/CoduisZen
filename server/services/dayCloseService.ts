@@ -45,6 +45,7 @@ import { getBusinessDateBounds } from '../utils/businessDate';
 import { revenueRecognizedOrder } from '../utils/orderRevenue';
 import { reconcilePaymentRows } from './paymentReconciliation';
 import { emitBranchEvent } from '../utils/socketEmit';
+import { DEFAULT_DAY_CLOSE_AUTO_CLOSE, type DayCloseAutoClose } from '../../types';
 
 // Day close status
 type DayCloseStatus = 'OPEN' | 'CLOSING' | 'CLOSED';
@@ -318,6 +319,29 @@ const getDayCloseRules = async (): Promise<DayCloseRules> => {
         requireDriverCash: r.requireDriverCash ?? DEFAULT_DAY_CLOSE_RULES.requireDriverCash,
         requireVarianceNote: r.requireVarianceNote ?? DEFAULT_DAY_CLOSE_RULES.requireVarianceNote,
         allowManagerOverride: r.allowManagerOverride ?? DEFAULT_DAY_CLOSE_RULES.allowManagerOverride,
+    };
+};
+
+/** Accepts HH:mm 24h only (server-local auto-close time). */
+export const isValidAutoCloseTime = (v: unknown): boolean => {
+    if (typeof v !== 'string') return false;
+    const match = /^(\d{2}):(\d{2})$/.exec(v);
+    if (!match) return false;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+};
+
+/**
+ * Merged auto-close schedule: the `dayCloseAutoClose` object wins,
+ * falling back to DEFAULT_DAY_CLOSE_AUTO_CLOSE when unset or invalid.
+ */
+export const getDayCloseAutoClose = async (): Promise<DayCloseAutoClose> => {
+    const stored = await getSettingValue<Partial<DayCloseAutoClose>>('dayCloseAutoClose', {});
+    const s = (typeof stored === 'object' && stored !== null ? stored : {}) as Partial<DayCloseAutoClose>;
+    return {
+        enabled: Boolean(s.enabled),
+        time: isValidAutoCloseTime(s.time) ? (s.time as string) : DEFAULT_DAY_CLOSE_AUTO_CLOSE.time,
     };
 };
 

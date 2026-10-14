@@ -1191,6 +1191,11 @@ export const DEFAULT_DAY_CLOSE_RULES: DayCloseRules = {
   allowManagerOverride: true,
 };
 
+/** Global day-close auto-close schedule (Settings → Day Close). One time for all branches, server-local. */
+export interface DayCloseAutoClose { enabled: boolean; time: string }
+
+export const DEFAULT_DAY_CLOSE_AUTO_CLOSE: DayCloseAutoClose = { enabled: false, time: '23:59' };
+
 export interface AppSettings {
   restaurantName: string;
   restaurantNameAr?: string;
@@ -1244,6 +1249,7 @@ export interface AppSettings {
    * blockers with a written reason (audited as DAY_CLOSE_OVERRIDE).
    */
   dayCloseRules?: DayCloseRules;
+  dayCloseAutoClose?: DayCloseAutoClose;
   blindShiftReconciliation?: boolean;
   maxKitchenPrinters?: number;
   activeBranchId?: string; // Current operating branch context
