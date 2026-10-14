@@ -1312,6 +1312,7 @@ export const dayCloseService = {
             enforceShiftsClosed?: boolean;
             autoCloseOpenShifts?: boolean;
             overrideReason?: string; // Item 22: override with written reason
+            notifyWhatsapp?: boolean; // default true; auto-close passes false and sends its own AUTO text
         }
     ) {
         const existingClose = await this.getClosedReport(branchId, date);
@@ -1584,7 +1585,9 @@ export const dayCloseService = {
             await this.sendDayCloseEmail(report, options.emailConfig);
         }
 
-        const whatsappRecipients = normalizeRecipients(await getDayCloseWhatsappRecipients());
+        const whatsappRecipients = options?.notifyWhatsapp === false
+            ? []
+            : normalizeRecipients(await getDayCloseWhatsappRecipients());
         if (whatsappRecipients.length > 0) {
             const text = buildDayCloseWhatsAppText(report);
             const deliveryResults = await Promise.allSettled(whatsappRecipients.map((to) => sendWhatsAppText({
