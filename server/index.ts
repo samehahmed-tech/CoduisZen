@@ -144,6 +144,8 @@ const start = async () => {
     import('./services/alertService').then(a => a.alertService.startHealthMonitor());
     import('./services/deploymentHeartbeatService').then(d => d.deploymentHeartbeatService.start(30000));
     import('./services/backupCronService').then(b => b.backupCronService.startDailyBackup(3));
+    import('./services/dayCloseAutoCloseService').then(m => m.dayCloseAutoCloseService.start())
+        .catch(err => console.error('Could not start day-close auto-close scheduler:', err));
     
     await initRedisCache();
     import('./workers/checkoutWorker').then(w => w.startCheckoutWorker());
