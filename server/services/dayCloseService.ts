@@ -355,7 +355,7 @@ const localDateKey = (date = new Date()) => {
     return `${year}-${month}-${day}`;
 };
 
-const isValidDateKey = (date: string) => {
+export const isValidDateKey = (date: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
     const parsed = new Date(`${date}T00:00:00.000Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
@@ -1860,7 +1860,9 @@ Please find the detailed End Of Day Report attached as a PDF document.
      * Auto-close status for the DayCloseHub result banner (Task 4).
      * getClosedReport carries no override info, so the banner reads the
      * latest DAY_CLOSED audit row for branch+date instead of a new table.
-     * Returns null when the day was never closed or predates audit detail.
+     * The date predicate runs in the DB (any date resolves, not just the
+     * recent window); the 10-row cap is safety only. Returns null when the
+     * day was never closed or predates audit detail.
      */
     async getAutoCloseStatus(branchId: string, date: string) {
         const rows = await db.select({
@@ -1869,7 +1871,12 @@ Please find the detailed End Of Day Report attached as a PDF document.
             createdAt: auditLogs.createdAt,
         })
             .from(auditLogs)
-            .where(and(eq(auditLogs.eventType, 'DAY_CLOSED'), eq(auditLogs.branchId, branchId)))
+            .where(and(
+                eq(auditLogs.eventType, 'DAY_CLOSED'),
+                eq(auditLogs.branchId, branchId),
+                // JSON text predicates require an explicit SQL expression here.
+                sql`JSON_VALUE(${auditLogs.payload}, '$.date') = ${date}`,
+            ))
             .orderBy(desc(auditLogs.createdAt))
             .offset(0).fetch(10);
         const match = (rows || []).find((row: any) => (row.payload as any)?.date === date);

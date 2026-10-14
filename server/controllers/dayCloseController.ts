@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { dayCloseService } from '../services/dayCloseService';
+import { dayCloseService, isValidDateKey } from '../services/dayCloseService';
 import { generateDayClosePDF, generateDayCloseXlsx } from '../services/pdfService';
 
 /**
@@ -259,10 +259,12 @@ export const getAutoCloseStatus = async (req: Request, res: Response) => {
                 message: 'Please provide branch and date',
             });
         }
+        if (!isValidDateKey(date)) return res.status(400).json({ error: 'INVALID_BUSINESS_DATE' });
         const status = await dayCloseService.getAutoCloseStatus(branchId, date);
         res.json(status || { overrideReason: null, blockedReasons: [], closedBy: null, closedAt: null });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        const code = String(error?.message || 'AUTO_CLOSE_STATUS_FAILED');
+        res.status(500).json({ error: code });
     }
 };
 
