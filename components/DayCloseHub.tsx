@@ -426,27 +426,18 @@ const DayCloseHub: React.FC = () => {
         loadHistory();
     }, [branchId, date]);
 
-    // Auto-close banner data: closed days only, inline audit payload first,
-    // endpoint fallback (DB closed reports carry no override info).
+    // Auto-close banner data: closed days only, from the auto-close-status
+    // endpoint (DB closed reports carry no override info — verified sole
+    // source, so no inline branch). Depends on the whole report payload so a
+    // same-session override close refires without navigation.
     useEffect(() => {
         if (report?.status !== 'CLOSED' || !branchId || !date) { setAutoCloseStatus(null); return; }
-        const inlineReason = (report as any)?.overrideReason || (report as any)?.audit?.overrideReason || null;
-        if (typeof inlineReason === 'string' && inlineReason) {
-            const inlineBlocked = (report as any)?.blockedReasons || (report as any)?.audit?.blockedReasons || [];
-            setAutoCloseStatus({
-                overrideReason: inlineReason,
-                blockedReasons: Array.isArray(inlineBlocked) ? inlineBlocked : [],
-                closedBy: report.closedBy || null,
-                closedAt: report.closedAt || null,
-            });
-            return;
-        }
         let cancelled = false;
         apiRequest<any>(`/day-close/${branchId}/auto-close-status?date=${encodeURIComponent(date)}`)
             .then((s) => { if (!cancelled) setAutoCloseStatus(s && typeof s === 'object' ? s : null); })
             .catch(() => { if (!cancelled) setAutoCloseStatus(null); });
         return () => { cancelled = true; };
-    }, [branchId, date, report?.status]);
+    }, [branchId, date, report]);
 
     // Keep numbers fresh while the manager watches the active day: silent
     // background refresh every minute (visible tab only, never mid-close).

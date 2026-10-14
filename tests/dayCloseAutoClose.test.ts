@@ -5,18 +5,40 @@ const mockState = vi.hoisted(() => ({
     branchRows: [] as any[],
     closedRows: [] as any[],
     userRows: [] as any[],
+    auditRows: [] as any[],
 }));
 const mockCloseDay = vi.hoisted(() => vi.fn());
 
 vi.mock('../server/db', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../server/db')>();
     const schema = await import('../src/db/schema');
-    const resolveRows = (table: any) => {
+    // Pull bind-param string literals (e.g. settings keys) out of drizzle
+    // SQL predicates so the mock can mirror DB-side WHERE filtering.
+    const sqlLiterals = (node: any, out: string[] = []): string[] => {
+        if (node === null || node === undefined || typeof node === 'string') return out;
+        if (Array.isArray(node)) { for (const item of node) sqlLiterals(item, out); return out; }
+        if (typeof node !== 'object') return out;
+        if ((node as any)?.constructor?.name === 'Param' && typeof (node as any).value === 'string') {
+            out.push((node as any).value);
+            return out;
+        }
+        if (Array.isArray((node as any).queryChunks)) {
+            for (const chunk of (node as any).queryChunks) sqlLiterals(chunk, out);
+        }
+        return out;
+    };
+    const resolveRows = (table: any, whereArgs: any[] = []) => {
         // The mock stands in for the DB, so it mirrors the service's DB-side
         // WHERE clauses: active branches only; active SUPER_ADMIN/OWNER users only.
-        if (table === (schema as any).settings) return mockState.settingsRows;
+        if (table === (schema as any).settings) {
+            const lits = new Set<string>();
+            for (const arg of whereArgs) for (const lit of sqlLiterals(arg)) lits.add(lit);
+            if (lits.size === 0) return mockState.settingsRows;
+            return mockState.settingsRows.filter((r) => !('key' in r) || lits.has(String((r as any).key)));
+        }
         if (table === (schema as any).branches) return mockState.branchRows.filter((r) => r?.isActive !== false);
         if (table === (schema as any).dayCloseReports) return mockState.closedRows;
+        if (table === (schema as any).auditLogs) return mockState.auditRows;
         if (table === (schema as any).users) {
             return mockState.userRows
                 .filter((u) => u?.isActive === true && ['SUPER_ADMIN', 'OWNER'].includes(String(u?.role)))
@@ -24,16 +46,18 @@ vi.mock('../server/db', async (importOriginal) => {
         }
         return [];
     };
-    const makeTop = (table: any) => () => Promise.resolve(resolveRows(table));
-    const makeWhere = (table: any) => {
-        const out: any = Promise.resolve(resolveRows(table));
-        out.top = makeTop(table);
-        out.orderBy = () => ({ top: makeTop(table) });
+    const makeFetch = (table: any, args: any[]) => (n?: number) =>
+        Promise.resolve(resolveRows(table, args).slice(0, n ?? 10));
+    const makeTop = (table: any, args: any[] = []) => () => Promise.resolve(resolveRows(table, args));
+    const makeWhere = (table: any) => (...args: any[]) => {
+        const out: any = Promise.resolve(resolveRows(table, args));
+        out.top = makeTop(table, args);
+        out.orderBy = () => ({ top: makeTop(table, args), offset: () => ({ fetch: makeFetch(table, args) }) });
         return out;
     };
     const makeFrom = (table: any) => {
         const pending: any = Promise.resolve(resolveRows(table));
-        pending.where = () => makeWhere(table);
+        pending.where = makeWhere(table);
         return pending;
     };
     const mockedSelect = () => ({
@@ -61,7 +85,7 @@ vi.mock('../server/services/dayCloseService', async (importOriginal) => {
 vi.mock('../server/utils/socketEmit', () => ({ emitBranchEvent: vi.fn() }));
 vi.mock('../server/services/whatsappService', () => ({ sendWhatsAppText: vi.fn(async () => 'mock-wa-id') }));
 
-import { getDayCloseAutoClose, isValidAutoCloseTime } from '../server/services/dayCloseService';
+import { dayCloseService, getDayCloseAutoClose, isValidAutoCloseTime } from '../server/services/dayCloseService';
 import { clearLastRunForTests, runAutoCloseOnce } from '../server/services/dayCloseAutoCloseService';
 import { emitBranchEvent } from '../server/utils/socketEmit';
 import { sendWhatsAppText } from '../server/services/whatsappService';
@@ -82,6 +106,7 @@ beforeEach(() => {
     mockState.branchRows = [];
     mockState.closedRows = [];
     mockState.userRows = [];
+    mockState.auditRows = [];
     mockCloseDay.mockReset();
     mockCloseDay.mockResolvedValue({ id: 'mock-report' });
     vi.mocked(emitBranchEvent).mockClear();
@@ -164,5 +189,54 @@ describe('day close auto-close scheduler', () => {
         enableAtMidnight();
         await runAutoCloseOnce(new Date(), { catchUp: true });
         expect(String(mockCloseDay.mock.calls[0][3]?.overrideReason)).toContain('(catch-up)');
+    });
+    it('still closes when WhatsApp send throws (warn-only notify)', async () => {
+        enableAtMidnight();
+        mockState.settingsRows = [
+            { key: 'dayCloseAutoClose', value: { enabled: true, time: '00:00' } },
+            { key: 'dayCloseWhatsappRecipients', value: ['+201012345678'] },
+        ];
+        vi.mocked(sendWhatsAppText).mockRejectedValueOnce(new Error('WA_DOWN'));
+        const res = await runAutoCloseOnce(new Date());
+        expect(res.closed).toContain('b1');
+        expect(vi.mocked(sendWhatsAppText)).toHaveBeenCalled();
+        expect(String((vi.mocked(sendWhatsAppText).mock.calls[0][0] as any)?.to)).toContain('201012345678');
+        const events = vi.mocked(emitBranchEvent).mock.calls.map((c) => c[1]);
+        expect(events).toContain('day-close:auto');
+        expect(events).not.toContain('day-close:auto-failure');
+    });
+});
+
+describe('day close auto-close status', () => {
+    const seedClosed = (date: string, payload: any) => {
+        mockState.auditRows = [{
+            userId: 'admin-1',
+            payload: { date, ...payload },
+            createdAt: new Date(`${date}T23:59:00.000Z`),
+        }];
+    };
+    it('returns override info for an AUTO_CLOSE date', async () => {
+        const date = '2026-10-13';
+        seedClosed(date, {
+            overrideReason: 'AUTO_CLOSE scheduled 00:00',
+            blockedReasons: ['OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE'],
+        });
+        await expect(dayCloseService.getAutoCloseStatus('b1', date)).resolves.toEqual({
+            overrideReason: 'AUTO_CLOSE scheduled 00:00',
+            blockedReasons: ['OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE'],
+            closedBy: 'admin-1',
+            closedAt: new Date(`${date}T23:59:00.000Z`),
+        });
+    });
+    it('returns nulls for a normal close without override detail', async () => {
+        const date = '2026-10-12';
+        seedClosed(date, {});
+        await expect(dayCloseService.getAutoCloseStatus('b1', date)).resolves.toEqual({
+            overrideReason: null,
+            blockedReasons: [],
+            closedBy: 'admin-1',
+            closedAt: new Date(`${date}T23:59:00.000Z`),
+        });
+        await expect(dayCloseService.getAutoCloseStatus('b1', '2026-01-01')).resolves.toBeNull();
     });
 });
