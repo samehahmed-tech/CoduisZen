@@ -1320,6 +1320,27 @@ const SettingsHub: React.FC = () => {
                                         </div>
                                         <Toggle enabled={rules.allowManagerOverride !== false} onChange={(value) => setRule('allowManagerOverride', value)} />
                                     </div>
+
+                                    <div className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between gap-5 mt-4">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-black text-main uppercase">{tn('Auto-Close Day', 'الإغلاق التلقائي لليوم')}</p>
+                                            <p className="text-[10px] text-muted font-bold mt-1 leading-relaxed">
+                                                {tn(
+                                                    'Automatically close all open branch days every day at this time (server time). Problems are force-closed with a recorded reason and announced.',
+                                                    'يقفل كل أيام الفروع المفتوحة تلقائيا كل يوم في هذا الموعد (بتوقيت السيرفر). المشاكل تتجاوز بسبب مسجل مع تنبيه.'
+                                                )}
+                                            </p>
+                                            <input type="time" value={settings.dayCloseAutoClose?.time || '23:59'}
+                                                onChange={e => {
+                                                    const nextTime = e.target.value;
+                                                    if (!nextTime) return;
+                                                    handleChange('dayCloseAutoClose', { enabled: (settings.dayCloseAutoClose?.enabled ?? false), time: nextTime });
+                                                }}
+                                                className="mt-3 px-3 py-2 bg-elevated/40 border border-border/20 rounded-xl text-[10px] font-bold text-main outline-none w-24"
+                                            />
+                                        </div>
+                                        <Toggle enabled={settings.dayCloseAutoClose?.enabled ?? false} onChange={(value) => handleChange('dayCloseAutoClose', { enabled: value, time: (settings.dayCloseAutoClose?.time || '23:59') })} />
+                                    </div>
                                 </>
                             );
                         })()}
