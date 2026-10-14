@@ -325,10 +325,9 @@ const getDayCloseRules = async (): Promise<DayCloseRules> => {
 /** Accepts HH:mm 24h only (server-local auto-close time). */
 export const isValidAutoCloseTime = (v: unknown): boolean => {
     if (typeof v !== 'string') return false;
-    const match = /^(\d{2}):(\d{2})$/.exec(v);
-    if (!match) return false;
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
+    if (!/^\d{2}:\d{2}$/.test(v)) return false;
+    const hours = Number(v.slice(0, 2));
+    const minutes = Number(v.slice(3, 5));
     return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 };
 
@@ -340,7 +339,7 @@ export const getDayCloseAutoClose = async (): Promise<DayCloseAutoClose> => {
     const stored = await getSettingValue<Partial<DayCloseAutoClose>>('dayCloseAutoClose', {});
     const s = (typeof stored === 'object' && stored !== null ? stored : {}) as Partial<DayCloseAutoClose>;
     return {
-        enabled: Boolean(s.enabled),
+        enabled: s.enabled === true,
         time: isValidAutoCloseTime(s.time) ? (s.time as string) : DEFAULT_DAY_CLOSE_AUTO_CLOSE.time,
     };
 };
