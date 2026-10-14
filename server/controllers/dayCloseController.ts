@@ -244,6 +244,29 @@ export const reopenDay = async (req: Request, res: Response) => {
 };
 
 /**
+ * Auto-close status for the DayCloseHub result banner.
+ * GET /api/day-close/:branchId/auto-close-status?date=YYYY-MM-DD
+ * Reads the latest DAY_CLOSED audit row (override reason + overridden
+ * blocker codes); nulls when the day was never closed.
+ */
+export const getAutoCloseStatus = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.params.branchId as string;
+        const date = String(req.query.date || '');
+        if (!branchId || !date) {
+            return res.status(400).json({
+                error: 'BRANCH_ID_AND_DATE_REQUIRED',
+                message: 'Please provide branch and date',
+            });
+        }
+        const status = await dayCloseService.getAutoCloseStatus(branchId, date);
+        res.json(status || { overrideReason: null, blockedReasons: [], closedBy: null, closedAt: null });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/**
  * Get day close history
  * GET /api/day-close/:branchId/history
  */

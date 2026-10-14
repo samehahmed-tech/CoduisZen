@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
     getDayCloseReport,
+    getAutoCloseStatus,
     downloadDayClosePdf,
     downloadDayCloseXlsx,
     closeDay,
@@ -20,6 +21,10 @@ router.put('/:branchId/business-date', enforceBranch, requireRoleOrPermission(
     ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
     ['OP_CLOSE_DAY'],
 ), updateBusinessDate);
+
+// Auto-close result banner data — registered BEFORE '/:branchId/:date'
+// so 'auto-close-status' is never swallowed as a date param.
+router.get('/:branchId/auto-close-status', enforceBranch, getAutoCloseStatus);
 
 // Get day close report preview
 router.get('/:branchId/:date/pdf', enforceBranch, downloadDayClosePdf);

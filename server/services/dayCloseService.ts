@@ -1857,6 +1857,33 @@ Please find the detailed End Of Day Report attached as a PDF document.
     },
 
     /**
+     * Auto-close status for the DayCloseHub result banner (Task 4).
+     * getClosedReport carries no override info, so the banner reads the
+     * latest DAY_CLOSED audit row for branch+date instead of a new table.
+     * Returns null when the day was never closed or predates audit detail.
+     */
+    async getAutoCloseStatus(branchId: string, date: string) {
+        const rows = await db.select({
+            userId: auditLogs.userId,
+            payload: auditLogs.payload,
+            createdAt: auditLogs.createdAt,
+        })
+            .from(auditLogs)
+            .where(and(eq(auditLogs.eventType, 'DAY_CLOSED'), eq(auditLogs.branchId, branchId)))
+            .orderBy(desc(auditLogs.createdAt))
+            .offset(0).fetch(10);
+        const match = (rows || []).find((row: any) => (row.payload as any)?.date === date);
+        if (!match) return null;
+        const payload = (match.payload as any) || {};
+        return {
+            overrideReason: payload.overrideReason || null,
+            blockedReasons: Array.isArray(payload.blockedReasons) ? payload.blockedReasons : [],
+            closedBy: match.userId || null,
+            closedAt: match.createdAt || null,
+        };
+    },
+
+    /**
      * Get day close history for a branch
      */
     async getCloseHistory(branchId: string, limit = 30) {

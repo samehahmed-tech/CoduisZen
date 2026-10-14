@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { dayCloseApi } from '../services/api/dayClose';
+import { apiRequest } from '../services/api/core';
 import { shiftsApi } from '../services/api/shifts';
 import { settingsApi } from '../services/api/settings';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -247,6 +248,12 @@ const DayCloseHub: React.FC = () => {
     const [showOverrideModal, setShowOverrideModal] = useState(false);
     const [overrideReason, setOverrideReason] = useState('');
     const [isOverriding, setIsOverriding] = useState(false);
+    const [autoCloseStatus, setAutoCloseStatus] = useState<{
+        overrideReason: string | null;
+        blockedReasons: string[];
+        closedBy: string | null;
+        closedAt: string | Date | null;
+    } | null>(null);
 
     const activeBranch = useMemo(() => branches.find((branch) => branch.id === branchId), [branches, branchId]);
     const today = todayLocalDate();
@@ -323,6 +330,18 @@ const DayCloseHub: React.FC = () => {
     const hasOpenShiftBlocker = blockingChecks.some((check: any) => check.code === 'OPEN_SHIFTS_EXIST_FOR_DAY_CLOSE');
     const isClosedDay = report?.status === 'CLOSED';
     const closedSnapshot = report?.closedSnapshot || null;
+    // Last auto-close result: inline audit payload first (fresh close
+    // responses may carry it), else GET auto-close-status (closed reports
+    // from the DB carry no override info). Manual overrides never match.
+    const autoCloseInfo = useMemo(() => {
+        const reason = autoCloseStatus?.overrideReason;
+        if (!isClosedDay || typeof reason !== 'string' || !reason.startsWith('AUTO_CLOSE')) return null;
+        return autoCloseStatus;
+    }, [isClosedDay, autoCloseStatus]);
+    const autoOverriddenCodes = useMemo(
+        () => new Set(autoCloseInfo?.blockedReasons || []),
+        [autoCloseInfo],
+    );
     const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
     const cashVariance = Number(report?.shiftCashSummary?.variance || 0);
@@ -406,6 +425,28 @@ const DayCloseHub: React.FC = () => {
         loadReport();
         loadHistory();
     }, [branchId, date]);
+
+    // Auto-close banner data: closed days only, inline audit payload first,
+    // endpoint fallback (DB closed reports carry no override info).
+    useEffect(() => {
+        if (report?.status !== 'CLOSED' || !branchId || !date) { setAutoCloseStatus(null); return; }
+        const inlineReason = (report as any)?.overrideReason || (report as any)?.audit?.overrideReason || null;
+        if (typeof inlineReason === 'string' && inlineReason) {
+            const inlineBlocked = (report as any)?.blockedReasons || (report as any)?.audit?.blockedReasons || [];
+            setAutoCloseStatus({
+                overrideReason: inlineReason,
+                blockedReasons: Array.isArray(inlineBlocked) ? inlineBlocked : [],
+                closedBy: report.closedBy || null,
+                closedAt: report.closedAt || null,
+            });
+            return;
+        }
+        let cancelled = false;
+        apiRequest<any>(`/day-close/${branchId}/auto-close-status?date=${encodeURIComponent(date)}`)
+            .then((s) => { if (!cancelled) setAutoCloseStatus(s && typeof s === 'object' ? s : null); })
+            .catch(() => { if (!cancelled) setAutoCloseStatus(null); });
+        return () => { cancelled = true; };
+    }, [branchId, date, report?.status]);
 
     // Keep numbers fresh while the manager watches the active day: silent
     // background refresh every minute (visible tab only, never mid-close).
@@ -1002,6 +1043,34 @@ const DayCloseHub: React.FC = () => {
                             </span>
                         </div>
 
+                        {autoCloseInfo && (
+                            <div className="mt-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 px-4 py-3">
+                                <p className="text-[11px] font-black uppercase tracking-widest text-indigo-700 flex items-center gap-1.5">
+                                    <Sparkles size={14} />
+                                    {isAr ? 'إغلاق تلقائي مجدول' : 'Scheduled auto-close'}
+                                    {String(autoCloseInfo.overrideReason || '').includes('(catch-up)') && (
+                                        <span className="rounded-full bg-indigo-600/15 px-2 py-0.5 normal-case">
+                                            {isAr ? 'تعويضي' : 'catch-up'}
+                                        </span>
+                                    )}
+                                </p>
+                                <p className="mt-1.5 text-xs font-bold text-main leading-6">
+                                    {isAr
+                                        ? `أُغلق يوم ${date} تلقائياً${autoCloseInfo.closedAt ? ` في ${new Date(autoCloseInfo.closedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}${autoCloseInfo.closedBy ? ` بواسطة ${autoCloseInfo.closedBy}` : ''}.`
+                                        : `Day ${date} was auto-closed${autoCloseInfo.closedAt ? ` at ${new Date(autoCloseInfo.closedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}${autoCloseInfo.closedBy ? ` by ${autoCloseInfo.closedBy}` : ''}.`}
+                                </p>
+                                {autoOverriddenCodes.size > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {[...autoOverriddenCodes].map((code: string) => (
+                                            <span key={code} className="rounded-full bg-indigo-600/10 border border-indigo-500/25 px-2.5 py-1 text-[11px] font-black text-indigo-700">
+                                                {isAr ? (readinessCopy[code]?.titleAr || code) : (readinessCopy[code]?.titleEn || code)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {optionalSkipped.length > 0 && (
                             <div className="mt-3 rounded-2xl border border-sky-500/25 bg-sky-500/5 px-4 py-2.5 text-[11px] font-bold text-sky-700 flex items-center gap-2">
                                 <Info size={14} className="shrink-0" />
@@ -1032,12 +1101,19 @@ const DayCloseHub: React.FC = () => {
                                                         : (isAr ? check.copy.readyAr : check.copy.readyEn)}
                                                 </p>
                                             </div>
-                                            <span className={`shrink-0 text-[11px] font-black px-2 py-1 rounded-full ${check.isBlocked ? 'bg-white text-amber-800' : check.isOptional && Number(check.count || 0) > 0 ? 'bg-white text-sky-700' : 'bg-white text-emerald-700'}`}>
+                                            <span className="flex shrink-0 items-center gap-1.5">
+                                            {autoOverriddenCodes.has(check.code) && (
+                                                <span className="text-[11px] font-black px-2 py-1 rounded-full bg-indigo-600 text-white">
+                                                    {isAr ? 'تجاوز تلقائي' : 'Auto override'}
+                                                </span>
+                                            )}
+                                            <span className={`text-[11px] font-black px-2 py-1 rounded-full ${check.isBlocked ? 'bg-white text-amber-800' : check.isOptional && Number(check.count || 0) > 0 ? 'bg-white text-sky-700' : 'bg-white text-emerald-700'}`}>
                                                 {check.isBlocked
                                                     ? `${check.count || 0} ${isAr ? 'معلق' : 'pending'}`
                                                     : check.isOptional && Number(check.count || 0) > 0
                                                         ? (isAr ? `اختياري (${check.count})` : `Optional (${check.count})`)
                                                         : (isAr ? 'تم' : 'Done')}
+                                            </span>
                                             </span>
                                         </div>
                                         {(check.isBlocked || (check.isOptional && Number(check.count || 0) > 0)) && (
