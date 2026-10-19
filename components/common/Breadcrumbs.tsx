@@ -349,7 +349,7 @@ const Breadcrumbs: React.FC = () => {
                         onClick={() => togglePopup('messages')}
                         className={`p-2 rounded-lg transition-colors relative ${showMessagesPanel ? 'text-main bg-elevated' : 'text-muted hover:text-main hover:bg-elevated'}`}
                         title={isRtl ? 'الرسائل الداخلية' : 'Internal Messages'}
-                        aria-label={isRtl ? 'الرسائل الداخلية' : 'Internal Messages'}
+                        aria-label={isRtl ? (msgUnread > 0 ? `الرسائل الداخلية، ${msgUnread} جديدة` : 'الرسائل الداخلية') : (msgUnread > 0 ? `Internal messages, ${msgUnread} unread` : 'Internal Messages')}
                         aria-expanded={showMessagesPanel}
                     >
                         <Mail size={16} />
@@ -365,7 +365,7 @@ const Breadcrumbs: React.FC = () => {
                         onClick={() => togglePopup('notifications')}
                         className={`p-2 rounded-lg transition-colors relative ${showNotificationsPanel ? 'text-main bg-elevated' : 'text-muted hover:text-main hover:bg-elevated'}`}
                         title={isRtl ? 'الإشعارات' : 'Notifications'}
-                        aria-label={isRtl ? 'الإشعارات' : 'Notifications'}
+                        aria-label={isRtl ? (notifUnread > 0 ? `الإشعارات، ${notifUnread} غير مقروءة` : 'الإشعارات') : (notifUnread > 0 ? `Notifications, ${notifUnread} unread` : 'Notifications')}
                         aria-expanded={showNotificationsPanel}
                     >
                         <Bell size={16} />

@@ -100,7 +100,7 @@ const normalizeOrder = (raw: any): Order => ({
 });
 
 type SortMode = 'newest' | 'oldest' | 'highest' | 'waiting';
-type ViewMode = 'list' | 'board';
+type ViewMode = 'list' | 'tiles' | 'board';
 type DetailTab = 'ops' | 'items' | 'customer';
 
 const CLOSED_STATUSES = [OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED];
@@ -165,14 +165,14 @@ const OrdersCenter: React.FC = () => {
         || formatLocalDate(new Date())
     ));
     const [sortMode, setSortMode] = useState<SortMode>('newest');
-    const [viewMode, setViewMode] = useState<ViewMode>('list');
+    const [viewMode, setViewMode] = useState<ViewMode>('tiles');
     const [onlyDelayed, setOnlyDelayed] = useState(false);
     const [onlyUrgent, setOnlyUrgent] = useState(false);
     const [detailTab, setDetailTab] = useState<DetailTab>('ops');
     // Server-driven pager (Phase-6): page size selector 10/25/50/100,
-    // default 100 keeps the ops-room density; search/sort/filters run
-    // server-side so every page is exact.
-    const [pageSize, setPageSize] = useState(100);
+    // Default 10 keeps the operations view light; search/sort/filters run
+    // server-side so every page is exact while the operator can expand it.
+    const [pageSize, setPageSize] = useState(10);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [serverSummary, setServerSummary] = useState<null | {
@@ -285,8 +285,9 @@ const OrdersCenter: React.FC = () => {
         slaOk: isAr ? 'في الموعد' : 'On time',
         slaWarn: isAr ? 'يقترب من التأخير' : 'Getting late',
         slaLate: isAr ? 'متأخر' : 'Late',
-        board: isAr ? 'لوحة' : 'Board',
-        list: isAr ? 'قائمة' : 'List',
+         board: isAr ? 'لوحة' : 'Board',
+         tiles: isAr ? 'بطاقات' : 'Tiles',
+         list: isAr ? 'قائمة' : 'List',
     };
 
     const statusLabels: Record<string, { ar: string; en: string }> = {
@@ -807,6 +808,78 @@ const OrdersCenter: React.FC = () => {
         return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700"><Zap size={11} />{copy.slaOk}</span>;
     };
 
+    const orderNumberLabel = (order: Order) => {
+        if (order.orderNumber && Number(order.orderNumber) > 0) return String(order.orderNumber);
+        return formatDisplayId(order).replace(/^#/, '');
+    };
+
+    const renderOrderTile = (order: Order) => {
+        const age = getOrderAgeMins(order.createdAt);
+        const sla = slaFor(order);
+        const selected = selectedOrderId === order.id;
+        const tableName = getTableDisplayName(order);
+        const next = nextActionFor(order);
+        const typeTone = order.type === OrderType.DELIVERY
+            ? 'border-violet-500/30 bg-violet-500/[0.06] text-violet-600 dark:text-violet-300'
+            : order.type === OrderType.DINE_IN
+                ? 'border-cyan-500/30 bg-cyan-500/[0.06] text-cyan-700 dark:text-cyan-300'
+                : order.type === OrderType.TAKEAWAY
+                    ? 'border-amber-500/30 bg-amber-500/[0.06] text-amber-700 dark:text-amber-300'
+                    : 'border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-300';
+        const typeIcon = order.type === OrderType.DELIVERY
+            ? <Bike size={18} />
+            : order.type === OrderType.DINE_IN
+                ? <UtensilsCrossed size={18} />
+                : order.type === OrderType.TAKEAWAY
+                    ? <ShoppingBag size={18} />
+                    : <Store size={18} />;
+        const lifecycleTone = order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED
+            ? 'opacity-70 grayscale-[.25] border-rose-300/50 bg-rose-500/[0.035]'
+            : CLOSED_STATUSES.includes(order.status)
+                ? 'border-emerald-300/50 bg-emerald-500/[0.035]'
+                : sla === 'late'
+                    ? 'border-rose-300/70 bg-rose-500/[0.045] shadow-lg shadow-rose-500/10'
+                    : 'border-border bg-card hover:border-primary/45 hover:shadow-xl hover:-translate-y-0.5';
+        return (
+            <article
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                onClick={() => setSelectedOrderId(order.id)}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedOrderId(order.id); } }}
+                className={`group relative min-h-[238px] overflow-hidden rounded-[1.35rem] border p-4 text-start transition-all duration-300 ${lifecycleTone} ${selected ? 'ring-2 ring-primary/30 border-primary bg-primary/[0.06]' : ''}`}
+            >
+                <div className={`absolute inset-x-0 top-0 h-1 ${sla === 'late' ? 'bg-rose-500' : sla === 'warn' ? 'bg-amber-400' : CLOSED_STATUSES.includes(order.status) ? 'bg-emerald-500' : 'bg-primary'}`} />
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="text-[2.15rem] font-black leading-none tracking-[-0.09em] text-main transition-transform duration-300 group-hover:scale-[1.04] origin-top-start" dir="ltr">{orderNumberLabel(order)}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black ${typeTone}`}>{typeIcon}{getTypeLabel(order.type)}</span>
+                            {tableName && <span className="rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-black text-primary">{copy.table} {tableName}</span>}
+                            {order.isUrgent && <span className="rounded-lg bg-amber-400 px-2 py-1 text-[10px] font-black text-amber-950">URGENT</span>}
+                        </div>
+                    </div>
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:rotate-6 ${typeTone}`}>{typeIcon}</span>
+                </div>
+                <div className="mt-4 min-w-0">
+                    <div className="truncate text-sm font-black text-main">{order.customerName || (isAr ? 'عميل' : 'Customer')}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold text-muted">
+                        {order.customerPhone && <span dir="ltr">{order.customerPhone}</span>}
+                        <span className={sla === 'late' ? 'font-black text-rose-600' : sla === 'warn' ? 'font-black text-amber-600' : ''}><Clock size={11} className="inline align-[-2px]" /> {age}{copy.min}</span>
+                    </div>
+                </div>
+                <div className="mt-3 min-h-[34px] text-[11px] font-bold leading-5 text-muted">{order.items?.slice(0, 3).map(item => `${item.quantity || 1}× ${item.name}`).join('، ') || (isAr ? 'لا توجد أصناف' : 'No items')}</div>
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+                    <div className="flex flex-col items-start gap-1">
+                        {slaBadge(sla)}
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-main">{getStatusIcon(order.status, 11)}{getStatusLabel(order.status)}</span>
+                    </div>
+                    <div className="text-end"><div className="text-lg font-black text-primary">{Number(order.total || 0).toFixed(0)} <span className="text-[10px]">{settings.currencySymbol || 'EGP'}</span></div>{next && !CLOSED_STATUSES.includes(order.status) ? <button type="button" onClick={(event) => { event.stopPropagation(); needsDriverForNext(order, next.status) ? navigate('/dispatch') : handleUpdateStatus(order.id, next.status); }} className="mt-1 rounded-lg bg-primary px-2.5 py-1.5 text-[10px] font-black text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100">{needsDriverForNext(order, next.status) ? (isAr ? 'تعيين طيار' : 'Assign driver') : next.label}</button> : <span className="text-[10px] font-black text-muted">{isAr ? 'مغلق' : 'Closed'}</span>}</div>
+                </div>
+            </article>
+        );
+    };
+
     const renderOrderCard = (order: Order, compact = false) => {
         const age = getOrderAgeMins(order.createdAt);
         const sla = slaFor(order);
@@ -831,7 +904,7 @@ const OrdersCenter: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-sm font-black text-main">{formatDisplayId(order)}</span>
+                        <span className="text-sm font-black text-main">{orderNumberLabel(order)}</span>
                         <span className="rounded-full bg-elevated px-2 py-0.5 text-[10px] font-black text-muted">{getTypeLabel(order.type)}</span>
                         {tableName && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black text-primary">{copy.table} {tableName}</span>}
                         {order.isUrgent && <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-amber-950">URGENT</span>}
@@ -925,6 +998,9 @@ const OrdersCenter: React.FC = () => {
                             />
                         </div>
                         <div className="flex h-10 items-center gap-1 rounded-xl border border-border bg-elevated p-1">
+                            <button type="button" onClick={() => setViewMode('tiles')} aria-pressed={viewMode === 'tiles'} title={copy.tiles} className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11px] font-black transition ${viewMode === 'tiles' ? 'bg-card text-primary shadow' : 'text-muted hover:text-main'}`}>
+                                <LayoutGrid size={14} />{copy.tiles}
+                            </button>
                             <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title={copy.list} className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11px] font-black transition ${viewMode === 'list' ? 'bg-card text-primary shadow' : 'text-muted hover:text-main'}`}>
                                 <List size={14} />{copy.list}
                             </button>
@@ -989,7 +1065,7 @@ const OrdersCenter: React.FC = () => {
                             className={`flex h-8 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[11px] font-black transition ${statusFilter === tab.key ? 'bg-primary text-white shadow' : 'border border-border bg-elevated text-muted hover:text-main'}`}
                         >
                             {tab.label}
-                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${statusFilter === tab.key ? 'bg-white/25 text-white' : 'bg-app text-muted'}`}>{tab.count}</span>
+                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${statusFilter === tab.key ? 'bg-black/25 text-white' : 'bg-app text-muted'}`}>{tab.count}</span>
                         </button>
                     ))}
                 </div>
@@ -1008,7 +1084,7 @@ const OrdersCenter: React.FC = () => {
                     </div>
                     <div className="flex h-9 items-center gap-2 rounded-xl border border-border bg-elevated px-2.5">
                         <Calendar size={12} className="shrink-0 text-muted" />
-                        <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent text-[11px] font-black text-main outline-none" />
+                        <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} aria-label={isAr ? 'تصفية بالتاريخ' : 'Filter by date'} className="bg-transparent text-[11px] font-black text-main outline-none" />
                         {dateFilter ? (
                             <button type="button" onClick={() => setDateFilter('')} className="shrink-0 text-[10px] font-black text-muted hover:text-main">{copy.allDates}</button>
                         ) : (
@@ -1025,7 +1101,7 @@ const OrdersCenter: React.FC = () => {
                             setBranchFilter(nextBranchId);
                             const nextBranch = branches.find(branch => branch.id === nextBranchId);
                             setDateFilter(nextBranch?.businessDate || formatLocalDate(new Date()));
-                        }} className="max-w-[150px] bg-transparent text-[11px] font-black text-main outline-none">
+                        }} className="max-w-[150px] bg-transparent text-[11px] font-black text-main outline-none" aria-label={copy.allBranches}>
                             <option value="ALL">{copy.allBranches}</option>
                             {branches.map(branch => <option key={branch.id} value={branch.id}>{isAr ? branch.nameAr || branch.name : branch.name}</option>)}
                         </select>
@@ -1089,6 +1165,10 @@ const OrdersCenter: React.FC = () => {
                                 })}
                             </div>
                         </div>
+                    ) : viewMode === 'tiles' ? (
+                        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 xl:p-4">
+                            {filteredSorted.map(order => <React.Fragment key={order.id}>{renderOrderTile(order)}</React.Fragment>)}
+                        </div>
                     ) : (
                         <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-x-auto overflow-y-hidden p-3 xl:grid-cols-5 xl:p-4">
                             {BOARD_COLUMNS.map(col => {
@@ -1132,7 +1212,7 @@ const OrdersCenter: React.FC = () => {
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="text-base font-black">{formatDisplayId(selectedOrder)}</h2>
+                                            <h2 className="text-base font-black">{orderNumberLabel(selectedOrder)}</h2>
                                             <span className="inline-flex items-center gap-1 rounded-full border border-border bg-app px-2.5 py-1 text-[10px] font-black">
                                                 {getStatusIcon(selectedOrder.status, 12)}{getStatusLabel(selectedOrder.status)}
                                             </span>

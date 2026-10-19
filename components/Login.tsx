@@ -87,9 +87,12 @@ const LOGIN_MEDIA: { type: 'image' | 'video'; src: string }[] = [
     // Bundled local media first — guaranteed to work offline / behind strict firewalls.
     { type: 'video', src: '/login-bg/bg-latte-1.mp4' }, // latte art pour
     { type: 'video', src: '/login-bg/bg-pour-1.mp4' }, // barista pour
-    { type: 'image', src: '/login-bg/bg-cafe-1.jpg' }, // restaurant interior
-    { type: 'image', src: '/login-bg/bg-coffee-1.jpg' }, // coffee art
-    { type: 'image', src: '/login-bg/bg-baklava-1.jpg' }, // baklava
+    // Keep Login and the system wallpaper gallery on the exact same WebP
+    // assets, so the brand scene is consistent and the browser only decodes
+    // one optimized image format.
+    { type: 'image', src: '/wallpapers/webp/midnight.webp' }, // restaurant interior
+    { type: 'image', src: '/wallpapers/webp/violet.webp' }, // coffee art
+    { type: 'image', src: '/wallpapers/webp/copper.webp' }, // baklava
     // Remote pool for extra variety (same subjects, halal-safe).
     { type: 'video', src: 'https://videos.pexels.com/video-files/13736555/13736555-hd_720_1280_24fps.mp4' },
     { type: 'video', src: 'https://videos.pexels.com/video-files/34505177/14619761_720_1280_30fps.mp4' }, // barista pour

@@ -115,6 +115,7 @@ const POSHeader: React.FC<POSHeaderProps> = React.memo(({
                     <select
                         value={activePriceListId || 'standard'}
                         onChange={(e) => onSetPriceList(e.target.value === 'standard' ? null : e.target.value)}
+                        aria-label={isAr ? 'قائمة الأسعار' : 'Price list'}
                         className="bg-transparent text-[11px] font-bold text-main outline-none cursor-pointer appearance-none"
                     >
                         <option value="standard">{isAr ? 'قياسي' : 'Standard'}</option>

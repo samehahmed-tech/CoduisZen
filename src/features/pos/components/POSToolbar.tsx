@@ -110,24 +110,24 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
 
             {/* Context Actions */}
             {activeOrderType === OrderType.DINE_IN && (
-                <button onClick={onShowTables} className="shrink-0 flex items-center gap-1 px-2.5 h-7 rounded-lg bg-blue-500/8 text-blue-600 text-[10px] font-bold hover:bg-blue-500 hover:text-white transition-colors active:scale-95">
+                <button onClick={onShowTables} aria-label={isAr ? 'الطاولات' : 'Tables'} className="shrink-0 flex items-center gap-1 px-2.5 h-7 rounded-lg bg-blue-500/8 text-blue-600 text-[10px] font-bold hover:bg-blue-500 hover:text-white transition-colors active:scale-95">
                     <LayoutGrid size={12} />
                     <span className="hidden sm:inline">{isAr ? 'الطاولات' : 'Tables'}</span>
                 </button>
             )}
             {activeOrderType === OrderType.DELIVERY && (
                 <div className="flex items-center gap-0.5 shrink-0">
-                    <button onClick={onShowCustomers} className="flex items-center gap-1 px-2.5 h-7 rounded-lg bg-amber-500/8 text-amber-600 text-[10px] font-bold hover:bg-amber-500 hover:text-white transition-colors active:scale-95">
+                    <button onClick={onShowCustomers} aria-label={isAr ? 'العملاء' : 'Customers'} className="flex items-center gap-1 px-2.5 h-7 rounded-lg bg-amber-500/8 text-amber-600 text-[10px] font-bold hover:bg-amber-500 hover:text-white transition-colors active:scale-95">
                         <Truck size={12} />
                         <span className="hidden sm:inline">{isAr ? 'العملاء' : 'Customers'}</span>
                     </button>
-                    <button onClick={onNewCustomer} className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white transition-all active:scale-90">
+                    <button onClick={onNewCustomer} aria-label={isAr ? 'عميل جديد' : 'New customer'} className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white transition-all active:scale-90">
                         <Plus size={12} />
                     </button>
                 </div>
             )}
             {(activeOrderType === OrderType.TAKEAWAY || activeOrderType === OrderType.PICKUP) && onSetOrderName && (
-                <button onClick={onSetOrderName} className="shrink-0 flex items-center gap-1 px-2.5 h-7 rounded-lg bg-violet-500/8 text-violet-600 text-[10px] font-bold hover:bg-violet-500 hover:text-white transition-colors active:scale-95">
+                <button onClick={onSetOrderName} aria-label={isAr ? 'اسم العميل' : 'Customer name'} className="shrink-0 flex items-center gap-1 px-2.5 h-7 rounded-lg bg-violet-500/8 text-violet-600 text-[10px] font-bold hover:bg-violet-500 hover:text-white transition-colors active:scale-95">
                     <User size={12} />
                     <span className="hidden sm:inline truncate max-w-[80px]">{orderName || (isAr ? 'اسم العميل' : 'Name')}</span>
                 </button>
@@ -142,7 +142,7 @@ const POSToolbar: React.FC<POSToolbarProps> = ({
                     </button>
                 )}
                 {onRecallOrders && (
-                    <button onClick={onRecallOrders} className="relative flex items-center gap-1 px-2 h-7 rounded-lg text-muted hover:text-main hover:bg-elevated/60 text-[10px] font-bold transition-colors active:scale-95">
+                    <button onClick={onRecallOrders} aria-label={isAr ? (heldOrdersCount > 0 ? `طلبات معلقة، ${heldOrdersCount}` : 'طلبات معلقة') : (heldOrdersCount > 0 ? `Recalled orders, ${heldOrdersCount}` : 'Recalled orders')} className="relative flex items-center gap-1 px-2 h-7 rounded-lg text-muted hover:text-main hover:bg-elevated/60 text-[10px] font-bold transition-colors active:scale-95">
                         <Clock size={12} />
                         <span className="hidden md:inline">{isAr ? 'معلقة' : 'Recall'}</span>
                         {heldOrdersCount > 0 && (

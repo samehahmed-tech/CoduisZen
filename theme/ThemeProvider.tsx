@@ -359,6 +359,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 shell.removeAttribute('data-bg-engine');
                 shell.style.removeProperty('--te2-bg-image');
                 shell.style.removeProperty('--te2-bg-size');
+                shell.style.removeProperty('--te2-bg-opacity');
             } else {
                 shell.removeAttribute('data-wallpaper');
                 shell.style.setProperty('--wallpaper-opacity', '0');
@@ -368,6 +369,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 if (bgCfg.type !== 'theme-native') {
                     const built = buildBackgroundCSS(bgCfg);
                     shell.style.setProperty('--te2-bg-image', built.backgroundImage);
+                    shell.style.setProperty('--te2-bg-opacity', String(bgCfg.opacity ?? 0.82));
                     if (built.backgroundSize) shell.style.setProperty('--te2-bg-size', built.backgroundSize);
                     else shell.style.removeProperty('--te2-bg-size');
                     shell.setAttribute('data-bg-engine', bgCfg.type);
@@ -377,6 +379,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                     shell.removeAttribute('data-bg-speed');
                     shell.style.removeProperty('--te2-bg-image');
                     shell.style.removeProperty('--te2-bg-size');
+                    shell.style.removeProperty('--te2-bg-opacity');
                 }
             }
         }

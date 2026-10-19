@@ -102,15 +102,46 @@ export const paymentGatewayService = {
         throw new Error('PAYMENT_PROVIDER_CONFIGURATION_NOT_IMPLEMENTED');
     },
 
-    async listProviders(_branchId: string) {
-        return [];
+    async listProviders(branchId: string) {
+        const { getPaymobConfigRaw } = await import('../modules/payments/paymobService');
+        const paymob = await getPaymobConfigRaw();
+        const enabledForBranch = (cfg: { enabled?: boolean; branchIds?: string[] }) =>
+            Boolean(cfg.enabled) && (!Array.isArray(cfg.branchIds) || cfg.branchIds.length === 0 || (branchId && cfg.branchIds.includes(branchId)));
+        const out: Array<{ provider: string; enabled: boolean; methods: string[] }> = [];
+        if (paymob.enabled) {
+            out.push({
+                provider: 'PAYMOB',
+                enabled: enabledForBranch(paymob),
+                methods: [
+                    ...(paymob.cardIntegrationId ? ['CARD'] : []),
+                    ...(paymob.instapayIntegrationId ? ['INSTAPAY'] : []),
+                ],
+            });
+        }
+        return out;
     },
 
-    async createCheckout(_input: Record<string, any>): Promise<{ checkoutUrl?: string; [key: string]: any }> {
-        throw new Error('PAYMENT_CHECKOUT_NOT_IMPLEMENTED');
+    async createCheckout(input: Record<string, any>): Promise<{ checkoutUrl?: string; [key: string]: any }> {
+        const provider = String(input.provider || input.method || 'PAYMOB').toUpperCase();
+        if (provider === 'PAYMOB' || provider === 'CARD') {
+            const { paymobAdapter } = await import('../gateway-adapters/paymobAdapter');
+            const intention = await paymobAdapter.createCheckout(input);
+            return { checkoutUrl: intention.iframeUrl, ...intention };
+        }
+        if (provider === 'INSTAPAY') {
+            const { instaPayAdapter } = await import('../gateway-adapters/instaPayAdapter');
+            const intention = await instaPayAdapter.createCheckout(input);
+            return { checkoutUrl: intention.iframeUrl, ...intention };
+        }
+        throw new Error(`Unsupported payment provider: ${provider}`);
     },
 
     async handleWebhook(provider: string, payload: any) {
+        const name = String(provider || '').toUpperCase();
+        if (name === 'PAYMOB' || name === 'INSTAPAY' || name === 'CARD') {
+            const { handleCallback } = await import('../modules/payments/paymobService');
+            return handleCallback(payload?.obj ?? payload);
+        }
         return this.handleGatewayWebhook(provider as PaymentProvider, payload);
     },
 

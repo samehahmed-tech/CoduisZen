@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, DollarSign, Edit, Globe, Layers, Plus, RefreshCw, Trash2, X } from 'lucide-react';
-import { platformsApi } from '../services/api/platforms';
+import { CheckCircle2, DollarSign, Edit, Globe, Layers, Plus, RefreshCw, Trash2, X, Link2, FlaskConical } from 'lucide-react';
+import { platformsApi, talabatApi } from '../services/api/platforms';
+import { branchesApi } from '../services/api/branches';
+import AggregatorIntegrations from './AggregatorIntegrations';
+import PaymentIntegrations from './PaymentIntegrations';
 import { useAuthStore } from '../stores/useAuthStore';
 import ExportButton from './common/ExportButton';
 import { useToast } from './common/ToastProvider';
@@ -52,6 +55,179 @@ const PlatformAggregator: React.FC = () => {
     const [form, setForm] = useState<PlatformForm>(createEmptyForm);
     const currency = settings.currency || 'EGP';
 
+    // ── Talabat direct integration (Partner API v2) ──
+    const [talabat, setTalabat] = useState<any>(null);
+    const [talabatForm, setTalabatForm] = useState<any>({ enabled: false, chainId: '', clientId: '', clientSecret: '', webhookSecret: '', transport: 'LOGISTICS_DELIVERY', autoAccept: true, defaultBranchId: '', storeBranchMap: {}, sandbox: false });
+    const [talabatSaving, setTalabatSaving] = useState(false);
+    const [talabatTesting, setTalabatTesting] = useState(false);
+    const [branches, setBranches] = useState<any[]>([]);
+    const [mapStore, setMapStore] = useState('');
+    const [mapBranch, setMapBranch] = useState('');
+
+    // ── Talabat catalog sync ──
+    const [catalogVendor, setCatalogVendor] = useState('');
+    const [catalogInfo, setCatalogInfo] = useState<any>(null);
+    const [catalogBusy, setCatalogBusy] = useState(false);
+
+    const previewCatalog = async () => {
+        setCatalogBusy(true);
+        try {
+            setCatalogInfo(await talabatApi.catalogPreview());
+        } catch (err: any) {
+            showError(err?.message || t('Preview failed', 'فشلت المعاينة'));
+        } finally {
+            setCatalogBusy(false);
+        }
+    };
+
+    const pushCatalog = async () => {
+        if (!catalogVendor.trim()) {
+            showError(t('Enter vendor id', 'اكتب vendor id'));
+            return;
+        }
+        setCatalogBusy(true);
+        try {
+            const job = await talabatApi.catalogPush(catalogVendor.trim());
+            setCatalogInfo(job);
+            success(t(`Push queued ${job.job_id}`, `أُرسل ${job.job_id}`));
+        } catch (err: any) {
+            showError(err?.message || t('Push failed', 'فشل الإرسال'));
+        } finally {
+            setCatalogBusy(false);
+        }
+    };
+
+    const checkCatalogJob = async () => {
+        const jobId = String(catalogInfo?.job_id || '').trim();
+        if (!jobId) return;
+        setCatalogBusy(true);
+        try {
+            setCatalogInfo(await talabatApi.catalogJob(jobId));
+        } catch (err: any) {
+            showError(err?.message || t('Job check failed', 'تعذر فحص المهمة'));
+        } finally {
+            setCatalogBusy(false);
+        }
+    };
+
+    // ── Talabat outlet status ──
+    const [outletVendor, setOutletVendor] = useState('');
+    const [outletInfo, setOutletInfo] = useState<any>(null);
+    const [outletBusy, setOutletBusy] = useState(false);
+    const [busyMinutes, setBusyMinutes] = useState('30');
+
+    const loadOutlet = async () => {
+        if (!outletVendor.trim()) {
+            showError(t('Enter vendor id', 'اكتب vendor id'));
+            return;
+        }
+        setOutletBusy(true);
+        try {
+            setOutletInfo(await talabatApi.outletStatus(outletVendor.trim()));
+        } catch (err: any) {
+            showError(err?.message || t('Status check failed', 'تعذر فحص الحالة'));
+        } finally {
+            setOutletBusy(false);
+        }
+    };
+
+    const setOutlet = async (data: any) => {
+        if (!outletVendor.trim()) {
+            showError(t('Enter vendor id', 'اكتب vendor id'));
+            return;
+        }
+        setOutletBusy(true);
+        try {
+            setOutletInfo(await talabatApi.outletUpdate(outletVendor.trim(), data));
+            success(t('Outlet updated', 'تم تحديث الفرع'));
+        } catch (err: any) {
+            showError(err?.message || t('Update failed', 'فشل التحديث'));
+        } finally {
+            setOutletBusy(false);
+        }
+    };
+
+    // ── Talabat promotions ──
+    const [promo, setPromo] = useState<any>({ vendors: '', name: '', skus: '', discountValue: '10', startTime: '', endTime: '', reason: 'COMPETITIVENESS' });
+    const [promoInfo, setPromoInfo] = useState<any>(null);
+    const [promoBusy, setPromoBusy] = useState(false);
+
+    const pushPromo = async () => {
+        setPromoBusy(true);
+        try {
+            const job = await talabatApi.promoPush(promo);
+            setPromoInfo(job);
+            success(t(`Promo queued ${job.job_id}`, `أُرسل العرض ${job.job_id}`));
+        } catch (err: any) {
+            showError(err?.message || t('Promo failed', 'فشل العرض'));
+        } finally {
+            setPromoBusy(false);
+        }
+    };
+
+    const checkPromoJob = async () => {
+        const jobId = String(promoInfo?.job_id || '').trim();
+        if (!jobId) return;
+        setPromoBusy(true);
+        try {
+            setPromoInfo(await talabatApi.promoJob(jobId));
+        } catch (err: any) {
+            showError(err?.message || t('Job check failed', 'تعذر فحص المهمة'));
+        } finally {
+            setPromoBusy(false);
+        }
+    };
+
+    const loadTalabat = async () => {
+        try {
+            const cfg = await talabatApi.getConfig();
+            setTalabat(cfg);
+            setTalabatForm({
+                enabled: Boolean(cfg.enabled),
+                chainId: cfg.chainId || '',
+                clientId: cfg.clientId || '',
+                clientSecret: '',
+                webhookSecret: '',
+                transport: cfg.transport || 'LOGISTICS_DELIVERY',
+                autoAccept: cfg.autoAccept !== false,
+                defaultBranchId: cfg.defaultBranchId || '',
+                storeBranchMap: cfg.storeBranchMap || {},
+                sandbox: Boolean(cfg.sandbox),
+            });
+        } catch { /* optional feature */ }
+        try {
+            setBranches(await branchesApi.getAll());
+        } catch { /* optional */ }
+    };
+
+    const saveTalabat = async () => {
+        setTalabatSaving(true);
+        try {
+            const payload: any = { ...talabatForm };
+            if (!payload.clientSecret) delete payload.clientSecret;
+            if (!payload.webhookSecret) delete payload.webhookSecret;
+            await talabatApi.saveConfig(payload);
+            await loadTalabat();
+            success(t('Talabat config saved', 'تم حفظ إعدادات طلبات'));
+        } catch (err: any) {
+            showError(err?.message || t('Failed to save', 'تعذر الحفظ'));
+        } finally {
+            setTalabatSaving(false);
+        }
+    };
+
+    const sendTalabatTest = async () => {
+        setTalabatTesting(true);
+        try {
+            const r = await talabatApi.testOrder({});
+            success(t(`Test order ${r.orderId}`, `طلب تجريبي ${r.orderId}`));
+        } catch (err: any) {
+            showError(err?.message || t('Test failed', 'فشل الاختبار'));
+        } finally {
+            setTalabatTesting(false);
+        }
+    };
+
     const t = (en: string, ar: string) => (isAr ? ar : en);
     const toNonNegativeNumber = (value: string) => {
         const parsed = Number(value);
@@ -71,6 +247,8 @@ const PlatformAggregator: React.FC = () => {
     };
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => { loadTalabat(); }, []);
 
     const openCreate = () => {
         setEditingPlatform(null);
@@ -218,6 +396,186 @@ const PlatformAggregator: React.FC = () => {
                     </div>
                 ))}
             </div>
+
+            {/* ── Talabat direct integration ── */}
+            <div className="card-primary border border-orange-500/30 rounded-2xl p-6 shadow-sm mb-6">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+                            <Link2 size={24} />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-black text-main">{isAr ? 'ربط طلبات المباشر' : 'Talabat Direct'}</h4>
+                            <p className="text-[9px] font-bold text-muted uppercase">Partner API v2 · webhook: <span dir="ltr">/api/integrations/talabat/webhook</span></p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setTalabatForm({ ...talabatForm, enabled: !talabatForm.enabled })}
+                        className={`w-12 h-6 rounded-full transition-all flex items-center ${talabatForm.enabled ? 'bg-orange-500 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'}`}
+                    >
+                        <span className="w-5 h-5 bg-white rounded-full shadow mx-0.5" />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">chainId</label>
+                        <input value={talabatForm.chainId} onChange={(e) => setTalabatForm({ ...talabatForm, chainId: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" placeholder="xxxxxxxx-xxxx-..." />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">client_id</label>
+                        <input value={talabatForm.clientId} onChange={(e) => setTalabatForm({ ...talabatForm, clientId: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">client_secret {talabat?.clientSecretSet && <span className="text-emerald-500">(محفوظ)</span>}</label>
+                        <input type="password" value={talabatForm.clientSecret} onChange={(e) => setTalabatForm({ ...talabatForm, clientSecret: e.target.value })} placeholder={isAr ? 'فارغ = الاحتفاظ' : 'Blank keeps saved'} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">webhook secret {talabat?.webhookSecretSet && <span className="text-emerald-500">(محفوظ)</span>}</label>
+                        <input type="password" value={talabatForm.webhookSecret} onChange={(e) => setTalabatForm({ ...talabatForm, webhookSecret: e.target.value })} placeholder={isAr ? 'إجباري من Partner Portal' : 'Required'} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'نوع التوصيل' : 'Transport'}</label>
+                        <select value={talabatForm.transport} onChange={(e) => setTalabatForm({ ...talabatForm, transport: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main">
+                            <option value="LOGISTICS_DELIVERY">{isAr ? 'طيار طلبات (READY_FOR_PICKUP)' : 'Talabat rider'}</option>
+                            <option value="VENDOR_DELIVERY">{isAr ? 'توصيل المطعم (DISPATCHED)' : 'Own delivery'}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'الفرع الافتراضي' : 'Default branch'}</label>
+                        <select value={talabatForm.defaultBranchId} onChange={(e) => setTalabatForm({ ...talabatForm, defaultBranchId: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main">
+                            <option value="">{isAr ? 'اختر' : 'Select'}</option>
+                            {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name || b.id}</option>)}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-app/60 p-3 mb-3">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-2">{isAr ? 'ربط المتاجر بالفروع (store_id → فرع)' : 'Store → branch map'}</p>
+                    {Object.entries(talabatForm.storeBranchMap || {}).map(([s, b]) => (
+                        <div key={s} className="flex items-center gap-2 mb-1 text-xs">
+                            <code className="px-2 py-1 bg-card border border-border rounded-lg font-bold" dir="ltr">{s}</code>
+                            <span className="text-muted">→</span>
+                            <span className="font-bold">{branches.find((x: any) => x.id === b)?.name || b}</span>
+                            <button className="text-rose-500 font-black px-2" onClick={() => { const m = { ...talabatForm.storeBranchMap }; delete m[s]; setTalabatForm({ ...talabatForm, storeBranchMap: m }); }}>×</button>
+                        </div>
+                    ))}
+                    <div className="flex gap-2 mt-2">
+                        <input value={mapStore} onChange={(e) => setMapStore(e.target.value)} placeholder="store_id" className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-xs font-bold text-main" dir="ltr" />
+                        <select value={mapBranch} onChange={(e) => setMapBranch(e.target.value)} className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-xs font-bold text-main">
+                            <option value="">{isAr ? 'فرع' : 'Branch'}</option>
+                            {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name || b.id}</option>)}
+                        </select>
+                        <button
+                            className="px-4 py-2 bg-app border border-border rounded-lg text-xs font-black"
+                            onClick={() => { if (!mapStore.trim() || !mapBranch) return; setTalabatForm({ ...talabatForm, storeBranchMap: { ...(talabatForm.storeBranchMap || {}), [mapStore.trim()]: mapBranch } }); setMapStore(''); setMapBranch(''); }}
+                        >+</button>
+                    </div>
+                </div>
+
+                <div className="flex gap-2">
+                    <button onClick={saveTalabat} disabled={talabatSaving} className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60">
+                        {talabatSaving ? t('Saving...', 'جار الحفظ...') : t('Save Talabat', 'حفظ طلبات')}
+                    </button>
+                    <button onClick={sendTalabatTest} disabled={talabatTesting} className="px-4 py-3 bg-app border border-border rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-1 disabled:opacity-60">
+                        <FlaskConical size={14} /> {isAr ? 'طلب تجريبي' : 'Test'}
+                    </button>
+                </div>
+
+                <label className="flex items-center justify-between gap-4 mt-3 rounded-xl border border-border bg-app/60 px-3 py-2">
+                    <span className="text-[10px] font-bold text-muted">{isAr ? 'وضع Sandbox (كتالوج وأوردرات فقط)' : 'Sandbox mode (catalog + orders only)'}</span>
+                    <button
+                        type="button"
+                        onClick={() => setTalabatForm({ ...talabatForm, sandbox: !talabatForm.sandbox })}
+                        className={`w-12 h-6 rounded-full transition-all flex items-center ${talabatForm.sandbox ? 'bg-orange-500 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'}`}
+                    >
+                        <span className="w-5 h-5 bg-white rounded-full shadow mx-0.5" />
+                    </button>
+                </label>
+            </div>
+
+            {/* ── Talabat catalog sync ── */}
+            <div className="card-primary border border-orange-500/30 rounded-2xl p-6 shadow-sm mb-6">
+                <h4 className="text-sm font-black text-main mb-1">{isAr ? 'مزامنة أسعار وإتاحة المنيو' : 'Menu price & availability sync'}</h4>
+                <p className="text-[10px] font-bold text-muted mb-3">{isAr ? 'تعديل السعر أو الإتاحة في المنيو يُدفع تلقائيا لكل الفروع المربوطة. PUT غير متزامن (202 + متابعة المهمة).' : 'Menu price/availability edits auto-push to all mapped vendors. Async PUT (202 + job tracking).'}</p>
+                <div className="flex gap-2 mb-3">
+                    <input value={catalogVendor} onChange={(e) => setCatalogVendor(e.target.value)} placeholder="vendor_id" className="flex-1 px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    <button onClick={previewCatalog} disabled={catalogBusy} className="px-4 py-3 bg-app border border-border rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-60">{isAr ? 'معاينة' : 'Preview'}</button>
+                    <button onClick={pushCatalog} disabled={catalogBusy} className="px-4 py-3 bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60">{isAr ? 'دفع الكل' : 'Push all'}</button>
+                    {catalogInfo?.job_id && <button onClick={checkCatalogJob} disabled={catalogBusy} className="px-4 py-3 bg-app border border-border rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-60">{isAr ? 'حالة المهمة' : 'Job status'}</button>}
+                </div>
+                {catalogInfo && (
+                    <pre className="max-h-48 overflow-auto rounded-xl border border-border bg-app p-3 text-[10px] font-mono text-muted" dir="ltr">{JSON.stringify(catalogInfo, null, 2).slice(0, 2000)}</pre>
+                )}
+            </div>
+
+            {/* ── Talabat outlet status ── */}
+            <div className="card-primary border border-orange-500/30 rounded-2xl p-6 shadow-sm mb-6">
+                <h4 className="text-sm font-black text-main mb-1">{isAr ? 'حالة الفرع على طلبات' : 'Outlet status on Talabat'}</h4>
+                <p className="text-[10px] font-bold text-muted mb-3">{isAr ? 'مشغول = إغلاق مؤقت بسبب المطبخ. الإنتاج فقط.' : 'Busy = temporary kitchen closure. Production only.'}</p>
+                <div className="flex gap-2 mb-3">
+                    <input value={outletVendor} onChange={(e) => setOutletVendor(e.target.value)} placeholder="vendor_id" className="flex-1 px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    <button onClick={loadOutlet} disabled={outletBusy} className="px-4 py-3 bg-app border border-border rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-60">{isAr ? 'الحالة' : 'Status'}</button>
+                    <button onClick={() => setOutlet({ status: 'OPEN' })} disabled={outletBusy} className="px-4 py-3 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-colors disabled:opacity-60">{isAr ? 'فتح' : 'Open'}</button>
+                </div>
+                <div className="flex gap-2">
+                    <input type="number" min="5" step="5" value={busyMinutes} onChange={(e) => setBusyMinutes(e.target.value)} className="w-24 px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    <button onClick={() => setOutlet({ busyMinutes: Number(busyMinutes) || 30 })} disabled={outletBusy} className="flex-1 py-3 bg-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-600 transition-colors disabled:opacity-60">{isAr ? 'مشغول (دقائق)' : 'Set busy (mins)'}</button>
+                    <button onClick={() => setOutlet({ status: 'CLOSED_TODAY', closed_reason: 'CLOSED' })} disabled={outletBusy} className="px-4 py-3 bg-app border border-rose-500/40 rounded-xl text-xs font-black uppercase tracking-widest text-rose-500 disabled:opacity-60">{isAr ? 'غلق اليوم' : 'Close day'}</button>
+                </div>
+                {outletInfo && (
+                    <pre className="max-h-32 overflow-auto rounded-xl border border-border bg-app p-3 text-[10px] font-mono text-muted mt-3" dir="ltr">{JSON.stringify(outletInfo, null, 2).slice(0, 1000)}</pre>
+                )}
+            </div>
+
+            {/* ── Talabat promotions ── */}
+            <div className="card-primary border border-orange-500/30 rounded-2xl p-6 shadow-sm mb-6">
+                <h4 className="text-sm font-black text-main mb-1">{isAr ? 'عرض سعر على طلبات' : 'Talabat strikethrough promo'}</h4>
+                <p className="text-[10px] font-bold text-muted mb-3">{isAr ? 'الهوية = الاسم + الفروع + التواريخ. نفس البيانات تحدث العرض. الإنتاج فقط.' : 'Identity = name + vendors + dates. Same values update the promo. Production only.'}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'الاسم' : 'Name'}</label>
+                        <input value={promo.name} onChange={(e) => setPromo({ ...promo, name: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">vendors (* = الكل)</label>
+                        <input value={promo.vendors} onChange={(e) => setPromo({ ...promo, vendors: e.target.value })} placeholder="urd8, ..." className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">SKUs (فاصلة)</label>
+                        <textarea value={promo.skus} onChange={(e) => setPromo({ ...promo, skus: e.target.value })} rows={2} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'خصم %' : 'Discount %'}</label>
+                        <input type="number" min="1" max="100" value={promo.discountValue} onChange={(e) => setPromo({ ...promo, discountValue: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'السبب' : 'Reason'}</label>
+                        <select value={promo.reason} onChange={(e) => setPromo({ ...promo, reason: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main">
+                            {['COMPETITIVENESS', 'OVERSTOCK', 'EXPIRING_SOON', 'TRADING', 'DELISTING', 'NMR'].map((r) => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'من' : 'From'}</label>
+                        <input type="datetime-local" value={promo.startTime} onChange={(e) => setPromo({ ...promo, startTime: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1 block">{isAr ? 'إلى' : 'To'}</label>
+                        <input type="datetime-local" value={promo.endTime} onChange={(e) => setPromo({ ...promo, endTime: e.target.value })} className="w-full px-4 py-3 bg-app border border-border rounded-xl text-xs font-bold outline-none focus:border-orange-500 text-main" dir="ltr" />
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={pushPromo} disabled={promoBusy} className="flex-1 py-3 bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60">{isAr ? 'إرسال العرض' : 'Push promo'}</button>
+                    {promoInfo?.job_id && <button onClick={checkPromoJob} disabled={promoBusy} className="px-4 py-3 bg-app border border-border rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-60">{isAr ? 'حالة المهمة' : 'Job status'}</button>}
+                </div>
+                {promoInfo && (
+                    <pre className="max-h-32 overflow-auto rounded-xl border border-border bg-app p-3 text-[10px] font-mono text-muted mt-3" dir="ltr">{JSON.stringify(promoInfo, null, 2).slice(0, 1000)}</pre>
+                )}
+            </div>
+
+            <AggregatorIntegrations />
+            <PaymentIntegrations />
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {isLoading && <p className="text-muted col-span-full text-center py-12">{isAr ? 'جار التحميل...' : 'Loading...'}</p>}

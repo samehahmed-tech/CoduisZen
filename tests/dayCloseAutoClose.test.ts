@@ -95,9 +95,18 @@ const localKey = (d = new Date()) => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+// A business date is only auto-closed once it is strictly before today.
+// Tests model the normal case: at the configured time the branch still holds
+// yesterday's business date (the day that just finished).
+const yesterdayKey = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return localKey(d);
+};
+
 const enableAtMidnight = () => {
     mockState.settingsRows = [{ value: { enabled: true, time: '00:00' } }];
-    mockState.branchRows = [{ id: 'b1', businessDate: localKey(), name: 'B1', currency: 'EGP', isActive: true }];
+    mockState.branchRows = [{ id: 'b1', businessDate: yesterdayKey(), name: 'B1', currency: 'EGP', isActive: true }];
     mockState.userRows = [{ id: 'admin-1', role: 'OWNER', isActive: true }];
 };
 
@@ -154,8 +163,8 @@ describe('day close auto-close scheduler', () => {
     it('never attempts inactive branches', async () => {
         enableAtMidnight();
         mockState.branchRows = [
-            { id: 'b1', businessDate: localKey(), isActive: true },
-            { id: 'b2', businessDate: localKey(), isActive: false },
+            { id: 'b1', businessDate: yesterdayKey(), isActive: true },
+            { id: 'b2', businessDate: yesterdayKey(), isActive: false },
         ];
         const res = await runAutoCloseOnce(new Date());
         expect(res.closed).toContain('b1');
@@ -189,6 +198,40 @@ describe('day close auto-close scheduler', () => {
         enableAtMidnight();
         await runAutoCloseOnce(new Date(), { catchUp: true });
         expect(String(mockCloseDay.mock.calls[0][3]?.overrideReason)).toContain('(catch-up)');
+    });
+    it('does not close a business date that is today (fresh day)', async () => {
+        enableAtMidnight();
+        mockState.branchRows = [{ id: 'b1', businessDate: localKey(), isActive: true }];
+        const res = await runAutoCloseOnce(new Date());
+        expect(res.closed).toEqual([]);
+        expect(mockCloseDay).not.toHaveBeenCalled();
+    });
+    it('never closes a future business date', async () => {
+        enableAtMidnight();
+        const future = new Date();
+        future.setDate(future.getDate() + 5);
+        mockState.branchRows = [{ id: 'b1', businessDate: localKey(future), isActive: true }];
+        const res = await runAutoCloseOnce(new Date());
+        expect(res.closed).toEqual([]);
+        expect(mockCloseDay).not.toHaveBeenCalled();
+    });
+    it('closes at most one day per calendar day when the branch is behind', async () => {
+        enableAtMidnight();
+        const twoDaysAgo = new Date();
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        mockState.branchRows = [{ id: 'b1', businessDate: localKey(twoDaysAgo), isActive: true }];
+        // Mirror the real service: a successful close advances the business date by one day.
+        mockCloseDay.mockImplementation(async (_branchId: string, date: string) => {
+            const next = new Date(`${date}T00:00:00.000Z`);
+            next.setUTCDate(next.getUTCDate() + 1);
+            mockState.branchRows[0].businessDate = next.toISOString().slice(0, 10);
+            return { id: `report-${date}` };
+        });
+        const first = await runAutoCloseOnce(new Date());
+        const second = await runAutoCloseOnce(new Date());
+        expect(first.closed).toContain('b1');
+        expect(second.closed).toEqual([]);
+        expect(mockCloseDay).toHaveBeenCalledTimes(1);
     });
     it('still closes when WhatsApp send throws (warn-only notify)', async () => {
         enableAtMidnight();

@@ -43,10 +43,12 @@ function expectedSchema() {
   for (const match of source.matchAll(/mssqlTable\((?:'|")([^'"]+)(?:'|")\s*,\s*\{([\s\S]*?)\n\s*\}(?:\s*,|\s*\))/g)) {
     const columns = new Map();
     for (const line of match[2].split(/\r?\n/)) {
-      const property = line.match(/^\s*([A-Za-z_$][\w$]*):\s*(nvarchar|int|real|numeric|bit|date|datetime2|jsonText)\s*\((.*)$/);
-      if (!property) continue;
-      const explicit = property[3].match(/^\s*(?:'|")([^'"]+)(?:'|")/);
-      columns.set(explicit?.[1] || snake(property[1]), sqlTypes[property[2]]);
+      // A line may declare several columns (e.g. `id: nvarchar('id').primaryKey(), branchId: ...`),
+      // so match every `name: type(` occurrence instead of only the first one.
+      for (const property of line.matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*):\s*(nvarchar|int|real|numeric|bit|date|datetime2|jsonText)\s*\(([^)]*)\)/g)) {
+        const explicit = property[3].match(/^\s*(?:'|")([^'"]+)(?:'|")/);
+        columns.set(explicit?.[1] || snake(property[1]), sqlTypes[property[2]]);
+      }
     }
     expected.set(match[1], columns);
   }

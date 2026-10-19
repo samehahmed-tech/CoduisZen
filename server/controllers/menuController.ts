@@ -8,6 +8,21 @@ import { pool } from '../db';
 import { dbCacheService } from '../services/dbCacheService';
 import { createSignedAuditLog } from '../services/auditService';
 import { randomUUID } from 'node:crypto';
+import { queueTalabatCatalogSync } from '../modules/talabat/talabatCatalogService';
+import { resolvePlatformOverride } from '../services/pricingService';
+
+/** Fire-and-forget Talabat price/availability sync for one saved menu row. */
+const syncTalabatCatalogRow = (row: any) => {
+    const sku = String(row?.sku || '').trim();
+    if (!sku) return;
+    const override = resolvePlatformOverride(row?.platformPricing ?? row?.platform_pricing, 'talabat');
+    const price = override > 0 ? override : Number(row?.price || 0);
+    queueTalabatCatalogSync({
+        sku,
+        ...(price > 0 ? { price } : {}),
+        active: row?.isAvailable !== false && !row?.deletedAt,
+    });
+};
 
 const tableColumnsCache = new Map<string, Set<string>>();
 
@@ -463,6 +478,9 @@ export const createItem = async (req: Request, res: Response) => {
         }
 
         dbCacheService.invalidatePattern('menu:');
+        // New SKUs must exist in the Talabat catalog first (Partner Portal);
+        // the push below updates price/active for known SKUs (fire-and-forget).
+        if (item[0]) syncTalabatCatalogRow(item[0]);
         res.status(201).json(item[0]);
     } catch (error: any) {
         const errorNumber = error?.number ?? error?.originalError?.number;
@@ -574,6 +592,10 @@ export const updateItem = async (req: Request, res: Response) => {
         });
 
         dbCacheService.invalidatePattern('menu:');
+        // Talabat catalog follows price/availability (fire-and-forget).
+        if (['price', 'isAvailable', 'is_available', 'sku', 'platformPricing', 'platform_pricing'].some((k) => cleanUpdate[k] !== undefined)) {
+            syncTalabatCatalogRow({ ...updated[0], ...cleanUpdate });
+        }
         res.json(updated[0]);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -609,10 +631,13 @@ export const deleteItem = async (req: Request, res: Response) => {
             .where(eq(menuItems.id, id));
 
         dbCacheService.invalidatePattern('menu:');
+        const archivedRow = (archived as any[])[0] ?? (archived as any)?.rows?.[0];
+        // Archiving deactivates the SKU on Talabat too (fire-and-forget).
+        if (archivedRow) syncTalabatCatalogRow({ ...archivedRow, isAvailable: false });
         res.json({
             message: 'Item archived successfully',
             archived: true,
-            item: (archived as any[])[0] ?? (archived as any)?.rows?.[0],
+            item: archivedRow,
         });
     } catch (error: any) {
         res.status(500).json({
@@ -770,6 +795,7 @@ export const publishItem = async (req: Request, res: Response) => {
 
         if (updated.length === 0) return res.status(404).json({ error: 'Item not found' });
         dbCacheService.invalidatePattern('menu:');
+        if (updated[0]) syncTalabatCatalogRow(updated[0]);
         res.json(updated[0]);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -849,6 +875,7 @@ export const approvePriceChange = async (req: Request, res: Response) => {
         });
 
         dbCacheService.invalidatePattern('menu:');
+        if (updated[0]) syncTalabatCatalogRow(updated[0]);
         res.json({ ...updated[0], message: 'Price change approved and applied' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

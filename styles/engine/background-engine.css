@@ -7,10 +7,83 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .workspace-shell[data-bg-engine] {
-    background-image: var(--te2-bg-image) !important;
-    background-size: var(--te2-bg-size, auto) !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
+    background-color: rgb(var(--bg-app)) !important;
+    /* One controlled veil over the photo. The cards/rail below provide their
+       own readability surface; avoid stacking a second opaque backdrop here. */
+    background-image: linear-gradient(rgba(var(--bg-app), calc(1 - var(--te2-bg-opacity, .96))), rgba(var(--bg-app), calc(1 - var(--te2-bg-opacity, .96)))), var(--te2-bg-image) !important;
+    background-size: auto, var(--te2-bg-size, auto) !important;
+    background-position: center, center !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-attachment: scroll, fixed !important;
+}
+
+/* Keep the photo in a dedicated paint layer. Some theme personality rules
+   apply an opaque shell background after mount; relying only on the shell's
+   own background-image makes the photo flash during refresh and then vanish.
+   This layer is below main/rail content (z-index 10+) but above the fallback
+   shell color, so it remains visible for the whole session. */
+.workspace-shell[data-bg-engine]::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: var(--te2-bg-image) center / cover no-repeat;
+    opacity: var(--te2-bg-opacity, .96);
+}
+.workspace-shell[data-bg-engine] {
+    background-image: none !important;
+}
+.neo-ui.workspace-shell[data-bg-engine] .workspace-backdrop-layer,
+.neo-ui.workspace-shell[data-bg-engine] .workspace-backdrop-grid,
+.neo-ui.workspace-shell[data-bg-engine] .workspace-backdrop-glow {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+.workspace-shell[data-bg-engine] > main {
+    background: transparent !important;
+}
+
+/* Dashboard X has its own full-page theme wash. It is useful with the native
+   theme background, but it completely hides a selected photo. Let the photo
+   show through the dashboard canvas while keeping its cards readable. */
+.workspace-shell[data-bg-engine] .dx {
+    background: transparent !important;
+    background-image: none !important;
+}
+.workspace-shell[data-bg-engine] .dx-ticker,
+.workspace-shell[data-bg-engine] .dx2-status,
+.workspace-shell[data-bg-engine] .dx2-panel,
+.workspace-shell[data-bg-engine] .dx-metric {
+    background-color: rgba(var(--bg-card), .62) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* A selected photo should read as a photo, not as a blurred glass wallpaper.
+   Keep surfaces translucent and crisp; reserve blur for explicit glass themes
+   when no photo is selected. */
+.workspace-shell[data-bg-engine] .theme-card:not(.pos-menu-item-card),
+.workspace-shell[data-bg-engine] .card-primary,
+.workspace-shell[data-bg-engine] .glass-card,
+.workspace-shell[data-bg-engine] .stat-card-premium,
+.workspace-shell[data-bg-engine] .bg-card {
+    background: rgba(var(--bg-card), .72) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+.workspace-shell[data-bg-engine] .workspace-rail,
+.workspace-shell[data-bg-engine] .context-rail {
+    background: rgba(var(--bg-sidebar), .84) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+.workspace-shell[data-bg-engine] .workspace-breadcrumbs,
+.workspace-shell[data-bg-engine] .workspace-topbar,
+.workspace-shell[data-bg-engine] .topbar {
+    background: rgba(var(--bg-card), .78) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 /* Ambient drift — only when the user enables a speed, never by default. */
@@ -32,4 +105,29 @@ html[data-motion-level="reduced"] .workspace-shell[data-bg-engine] {
 }
 @media (prefers-reduced-motion: reduce) {
     .workspace-shell[data-bg-engine] { animation: none; }
+}
+
+/* Final rail invariant. Theme paint may vary, but navigation geometry is
+   shared by every theme and must remain a fixed edge-to-edge rail. This is
+   intentionally in the last imported stylesheet so legacy/theme rules cannot
+   reintroduce a detached floating sidebar (notably tiles and glassline). */
+.workspace-rail,
+.workspace-rail:hover,
+.workspace-rail:focus-within,
+.workspace-rail.rail-pinned {
+    position: fixed !important;
+    inset-block-start: 0 !important;
+    inset-block-end: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    height: 100dvh !important;
+}
+
+@media (min-width: 1024px) {
+    .workspace-rail:not(.rail-pinned):hover,
+    .workspace-rail:not(.rail-pinned):focus-within {
+        width: var(--rail-w-collapsed) !important;
+    }
 }

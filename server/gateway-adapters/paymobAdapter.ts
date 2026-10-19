@@ -1,39 +1,33 @@
 /**
- * Paymob Adapter (scaffold) — P1 Financial Backbone
- *
- * Real integration steps once an API key is configured:
- * 1. POST /v1/authentication/tokens → get JWT
- * 2. POST /v2/ecommerce/orders → register order
- * 3. POST /v2/acceptance/payment_keys/joins → get payment_key
- * 4. POST /v2/iframe → POST payment_key, receive redirect page URL
- * Webhooks: HmacSHA512(secret, obj.id,obj.amount_cents,...) verified against
- * HMAC header before completing the session.
- * Until then, the adapter refuses checkouts with a configuration error.
+ * Paymob Adapter — delegates to the settings-driven paymobService.
+ * Single source of truth is the `paymob_config` settings key.
  */
-
 import type { GatewayAdapter } from '../services/paymentGatewayService';
+import { createIntention, handleCallback, refundTransaction } from '../modules/payments/paymobService';
 
 export const paymobAdapter: GatewayAdapter = {
     name: 'Paymob',
 
     async createCheckout(input) {
-        const apiKey = String(input.providerConfig.apiKey || '');
-        if (!apiKey) {
-            throw Object.assign(new Error('PAYMOB_NOT_CONFIGURED'), { code: 'PAYMOB_NOT_CONFIGURED' });
-        }
-        throw Object.assign(new Error('PAYMOB_ADAPTER_PENDING_VERIFICATION'), { code: 'PAYMOB_ADAPTER_PENDING_VERIFICATION' });
+        return createIntention({
+            amount: Number(input.amount),
+            currency: input.currency || 'EGP',
+            merchantOrderId: input.merchantOrderId || input.orderId,
+            billing: input.billing,
+            method: 'CARD',
+            branchId: input.branchId,
+        });
     },
 
     async handleWebhook(input) {
-        return { status: 'FAILED' as const, failureReason: 'PAYMOB_NOT_CONFIGURED' };
+        const result = await handleCallback(input.payload ?? input);
+        return result.verified && result.success
+            ? { status: 'SUCCESS' as const }
+            : { status: 'FAILED' as const, failureReason: result.verified ? 'PAYMOB_DECLINED' : 'PAYMOB_BAD_HMAC' };
     },
 
     async refund(input) {
-        const apiKey = String(input.providerConfig.apiKey || '');
-        if (!apiKey) {
-            throw Object.assign(new Error('PAYMOB_NOT_CONFIGURED'), { code: 'PAYMOB_NOT_CONFIGURED' });
-        }
-        throw Object.assign(new Error('PAYMOB_ADAPTER_PENDING_VERIFICATION'), { code: 'PAYMOB_ADAPTER_PENDING_VERIFICATION' });
+        return refundTransaction(input.transactionId, input.amountCents);
     },
 };
 

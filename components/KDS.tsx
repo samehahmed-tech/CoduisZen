@@ -1409,6 +1409,7 @@ const KDS: React.FC = () => {
           {/* Mode toggle */}
           <button
             onClick={toggleKdsMode}
+            aria-label={kdsText(isArabic, 'Switch KDS display mode', 'تبديل وضع شاشة المطبخ')}
             className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200"
             style={{
               borderRadius: 'var(--theme-radius-sm, 8px)',
@@ -1469,6 +1470,7 @@ const KDS: React.FC = () => {
 
           <button
             onClick={toggleSoundMode}
+            aria-label={kdsText(isArabic, 'Toggle kitchen sound', 'تبديل صوت المطبخ')}
             className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200"
             style={{
               borderRadius: 'var(--theme-radius-sm, 8px)',
@@ -1499,6 +1501,7 @@ const KDS: React.FC = () => {
           </button>
           <button
             onClick={toggleFullscreen}
+            aria-label={kdsText(isArabic, 'Toggle fullscreen', 'تبديل ملء الشاشة')}
             className="flex items-center gap-1.5 px-3 py-2 uppercase transition-all duration-200"
             style={{
               borderRadius: 'var(--theme-radius-sm, 8px)',

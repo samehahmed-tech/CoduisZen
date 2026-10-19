@@ -1,15 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   SIDEBAR — FLOATING GLASS RAIL
-   A premium, detached "island" sidebar with frosted glass, ambient glow,
-   and micro-interactions that rival the best SaaS products in the world.
+   SIDEBAR — FIXED THEME RAIL
+   A structural, edge-to-edge rail. Visual personality belongs to the active
+   theme; the layout itself stays stable and predictable in every mode.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Design Tokens ── */
 :root {
     --rail-w-collapsed: clamp(52px, 4.2vw, 60px);
     --rail-w-expanded: clamp(248px, 19vw, 288px);
-    --rail-margin: 8px;
-    --rail-radius: 22px;
+    --rail-margin: 0px;
+    --rail-radius: 0px;
     --rail-ease: cubic-bezier(0.22, 1, 0.36, 1);
     --rail-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
     --rail-duration: 260ms;
@@ -1302,4 +1302,182 @@
 .sidebar-logout-btn:hover {
     background: rgba(var(--danger), 0.06);
     color: rgb(var(--danger));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME RAIL SYSTEM
+   The rail is always a real, edge-attached layout surface. Themes may change
+   its visual language and interaction cues, but never turn it into a floating
+   island that shifts the page or obscures the mobile header.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.workspace-rail,
+.workspace-rail:not(.rail-pinned):hover,
+.workspace-rail:not(.rail-pinned):focus-within {
+    top: 0 !important;
+    bottom: 0 !important;
+    border-radius: 0 !important;
+    border-block: 0 !important;
+    background: var(--theme-rail-bg, rgb(var(--bg-sidebar))) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: 1px 0 0 rgba(var(--border-color), .18), 8px 0 26px rgba(15, 23, 42, .035) !important;
+}
+
+[dir='rtl'] .workspace-rail,
+[dir='rtl'] .workspace-rail:not(.rail-pinned):hover,
+[dir='rtl'] .workspace-rail:not(.rail-pinned):focus-within {
+    box-shadow: -1px 0 0 rgba(var(--border-color), .18), -8px 0 26px rgba(15, 23, 42, .035) !important;
+    border-left: 1px solid rgba(var(--border-color), .18) !important;
+}
+
+.workspace-rail::after {
+    border-radius: 0;
+    opacity: .012;
+}
+
+.workspace-rail::before {
+    height: 220px;
+    opacity: .55;
+    animation-duration: 10s;
+}
+
+/* The rail's fixed width is the only thing the shell uses for layout. */
+.workspace-shell > main {
+    margin-inline-start: var(--rail-w-collapsed) !important;
+}
+
+.workspace-shell:has(.rail-pinned) > main {
+    margin-inline-start: var(--rail-w-expanded) !important;
+}
+
+@media (max-width: 1023px) {
+    .workspace-rail {
+        top: 0 !important;
+        bottom: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: 12px 0 36px rgba(15, 23, 42, .14) !important;
+    }
+
+    [dir='rtl'] .workspace-rail {
+        box-shadow: -12px 0 36px rgba(15, 23, 42, .14) !important;
+    }
+
+    /* The rail is a fixed mobile drawer, never a layout column. Keep the
+       content full-width while the drawer is closed or open. This must be
+       after the desktop rail offset rules because the theme system uses
+       !important margins for the fixed desktop rail. */
+    .workspace-shell > main,
+    .workspace-shell:has(.rail-pinned) > main {
+        width: 100% !important;
+        margin-inline-start: 0 !important;
+        margin-inline-end: 0 !important;
+    }
+}
+
+/* Meridian — editorial navigation: quiet paper, indigo rule, measured rhythm. */
+html[data-theme="meridian"] .workspace-rail {
+    background: linear-gradient(180deg, var(--theme-rail-bg), var(--theme-card-bg)) !important;
+    border-inline-end: 3px solid rgb(var(--primary)) !important;
+}
+html[data-theme="meridian"] .sidebar-hero { border-bottom: 1px solid rgba(var(--primary), .18); }
+html[data-theme="meridian"] .sidebar-nav-item { border-radius: 8px; }
+html[data-theme="meridian"] .sidebar-nav-item.active { box-shadow: inset 3px 0 0 rgb(var(--primary)); background: rgba(var(--primary), .08); }
+
+/* Command — dense operations console with a readable technical grid. */
+html[data-theme="command"] .workspace-rail {
+    background-color: var(--theme-rail-bg) !important;
+    background-image: linear-gradient(rgba(var(--primary), .045) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--primary), .045) 1px, transparent 1px) !important;
+    background-size: 18px 18px !important;
+    border-inline-end: 1px solid rgba(var(--primary), .35) !important;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+html[data-theme="command"] .sidebar-hero { border-bottom: 1px dashed rgba(var(--primary), .35); }
+html[data-theme="command"] .sidebar-nav-item { border-radius: 3px; border: 1px solid transparent; }
+html[data-theme="command"] .sidebar-nav-item:hover,
+html[data-theme="command"] .sidebar-nav-item.active { border-color: rgba(var(--primary), .38); background: rgba(var(--primary), .12); }
+
+/* Glassline — attached acrylic strip with a luminous active lane. */
+html[data-theme="glassline"] .workspace-rail {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--theme-rail-bg) 92%, transparent), color-mix(in srgb, var(--theme-card-bg) 82%, transparent)) !important;
+    border-inline-end: 1px solid rgba(var(--primary), .28) !important;
+    backdrop-filter: blur(22px) saturate(1.45) !important;
+}
+html[data-theme="glassline"] .sidebar-nav-item { border-radius: 999px; }
+html[data-theme="glassline"] .sidebar-nav-item.active { box-shadow: 0 0 0 1px rgba(var(--primary), .28), 0 0 22px rgba(var(--primary), .16); }
+html[data-theme="glassline"] .sidebar-nav-icon { border-radius: 999px !important; }
+
+/* Canvas — warm, tactile paper with an ink-like vertical register. */
+html[data-theme="canvas"] .workspace-rail {
+    background: var(--theme-rail-bg) !important;
+    border-inline-end: 1px solid rgba(120, 91, 52, .24) !important;
+    box-shadow: 5px 0 0 rgba(120, 91, 52, .035) !important;
+}
+html[data-theme="canvas"] .sidebar-hero { border-bottom: 2px solid rgba(var(--accent), .22); }
+html[data-theme="canvas"] .sidebar-nav-item { border-radius: 4px; }
+html[data-theme="canvas"] .sidebar-nav-item.active { background: rgba(var(--accent), .11); border-inline-start: 4px solid rgb(var(--accent)); }
+
+/* Fluent Pro — compact, precise and familiar to keyboard-heavy operators. */
+html[data-theme="fluent-pro"] .workspace-rail {
+    background: var(--theme-rail-bg) !important;
+    border-inline-end: 1px solid rgba(var(--border-color), .8) !important;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, .06) !important;
+}
+html[data-theme="fluent-pro"] .sidebar-nav-item { border-radius: 2px; min-height: 36px; }
+html[data-theme="fluent-pro"] .sidebar-nav-item.active { background: rgba(var(--primary), .12); border-inline-start: 2px solid rgb(var(--primary)); }
+html[data-theme="fluent-pro"] .sidebar-nav-icon { border-radius: 3px !important; }
+
+/* Material X — elevated surfaces and pill-shaped, gesture-friendly sections. */
+html[data-theme="material-x"] .workspace-rail {
+    background: linear-gradient(180deg, var(--theme-rail-bg), var(--theme-card-bg)) !important;
+    border-inline-end: 0 !important;
+    box-shadow: 5px 0 24px rgba(76, 29, 149, .12) !important;
+}
+html[data-theme="material-x"] .sidebar-hero { margin: .65rem; border-radius: 18px; background: rgba(var(--primary), .06); }
+html[data-theme="material-x"] .sidebar-nav-item { border-radius: 999px; margin-inline: .35rem; }
+html[data-theme="material-x"] .sidebar-nav-item.active { background: rgb(var(--primary)); color: white; box-shadow: 0 8px 18px rgba(var(--primary), .24); }
+
+/* Obsidian — low-light command surface, fine borders and signal glow. */
+html[data-theme="obsidian"] .workspace-rail {
+    background: #0b0d10 !important;
+    border-inline-end: 1px solid rgba(94, 106, 210, .42) !important;
+    box-shadow: 3px 0 24px rgba(0, 0, 0, .34) !important;
+}
+html[data-theme="obsidian"] .sidebar-hero { border-bottom: 1px solid rgba(56, 189, 248, .24); }
+html[data-theme="obsidian"] .sidebar-nav-item { border-radius: 5px; color: rgba(226, 232, 240, .78); }
+html[data-theme="obsidian"] .sidebar-nav-item:hover,
+html[data-theme="obsidian"] .sidebar-nav-item.active { background: rgba(94, 106, 210, .16); box-shadow: inset 2px 0 rgb(56, 189, 248), 0 0 18px rgba(56, 189, 248, .08); }
+
+/* Tiles — modular navigation made of small, obvious blocks. */
+html[data-theme="tiles"] .workspace-rail {
+    background: var(--theme-rail-bg) !important;
+    border-inline-end: 1px solid rgba(var(--primary), .2) !important;
+}
+html[data-theme="tiles"] .sidebar-nav-item { border-radius: 10px 4px 10px 4px; margin-block: 3px; }
+html[data-theme="tiles"] .sidebar-nav-item:nth-child(2n) { border-radius: 4px 10px 4px 10px; }
+html[data-theme="tiles"] .sidebar-nav-item.active { background: linear-gradient(135deg, rgba(var(--primary), .16), rgba(var(--accent), .08)); box-shadow: inset 4px 0 rgb(var(--primary)); }
+
+/* Acrylic — soft layered panel, but still attached to the application frame. */
+html[data-theme="acrylic"] .workspace-rail {
+    background: color-mix(in srgb, var(--theme-rail-bg) 84%, transparent) !important;
+    border-inline-end: 1px solid rgba(255, 255, 255, .32) !important;
+    backdrop-filter: blur(24px) saturate(1.35) !important;
+    box-shadow: 7px 0 30px rgba(15, 23, 42, .09), inset -1px 0 rgba(255, 255, 255, .3) !important;
+}
+html[data-theme="acrylic"] .sidebar-nav-item { border-radius: 14px; }
+html[data-theme="acrylic"] .sidebar-nav-item.active { background: rgba(var(--primary), .11); box-shadow: 0 8px 22px rgba(var(--primary), .1), inset 0 1px rgba(255,255,255,.45); }
+
+/* Touch — large targets and clear states for tablets and touch POS devices. */
+html[data-theme="touch"] .workspace-rail {
+    background: var(--theme-rail-bg) !important;
+    border-inline-end: 2px solid rgba(var(--accent), .28) !important;
+}
+html[data-theme="touch"] .sidebar-nav-item { min-height: 48px; border-radius: 16px; margin-block: 4px; }
+html[data-theme="touch"] .sidebar-nav-item.active { background: rgb(var(--primary)); color: white; box-shadow: 0 7px 16px rgba(var(--primary), .22); }
+html[data-theme="touch"] .sidebar-nav-icon { width: 34px !important; height: 34px !important; border-radius: 12px !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .workspace-rail,
+    .workspace-rail::before,
+    .sidebar-nav-item { animation: none !important; transition: none !important; }
 }

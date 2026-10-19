@@ -1527,7 +1527,7 @@ const POS: React.FC = () => {
       // owned by the POS: it renders the designed (ReceiptDesigner) ticket as
       // image bytes and enqueues it in the background — never blocking the
       // cashier, with failures surfaced via the failed-print banner + reprint.
-      await kdsApi.dispatchOrder(order.id, branchId, false);
+      await kdsApi.dispatchOrder(order.id, branchId, true);
       await updateOrderStatus(order.id, OrderStatus.PREPARING, undefined, undefined, { skipVersionCheck: true });
    };
 

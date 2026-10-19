@@ -444,7 +444,7 @@ const DriversHub: React.FC = () => {
                                             {driver.name.charAt(0) || '?'}
                                         </div>
                                         <div className="min-w-0">
-                                            <h3 className="truncate text-sm font-black text-main">{driver.name}</h3>
+                                            <h2 className="truncate text-sm font-black text-main">{driver.name}</h2>
                                             <p className="text-[11px] font-bold text-muted" dir="ltr">{driver.phone}</p>
                                         </div>
                                     </div>

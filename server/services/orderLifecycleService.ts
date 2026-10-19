@@ -138,6 +138,16 @@ const runPostTransitionEffects = async (order: any, previousStatus: string, next
         updatedAt: order.updatedAt,
     }, order.branchId || undefined).catch(() => {});
 
+    // Talabat back-sync: READY -> READY_FOR_PICKUP (or DISPATCHED for vendor
+    // delivery), CANCELLED -> CANCELLED. Fire-and-forget, never blocks.
+    try {
+        if (String((order as any).deliverySource || '').toLowerCase() === 'talabat'
+            && ['READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].includes(nextStatus)) {
+            const { syncTalabatStatus } = await import('../modules/talabat/talabatSyncService');
+            syncTalabatStatus(String(order.id), nextStatus, { cancellationReason: String((order as any).cancelReason || 'TOO_BUSY') }).catch(() => undefined);
+        }
+    } catch { /* best effort */ }
+
     whatsappAutomationService.onOrderStatusChanged(order, nextStatus).catch(() => {});
 
     if (['DELIVERED', 'COMPLETED'].includes(nextStatus)) {

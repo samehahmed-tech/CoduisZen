@@ -1344,6 +1344,8 @@ export const dayCloseService = {
             (error as any).businessDate = activeBusinessDate;
             throw error;
         }
+        // Guard: never close a future business date via any path.
+        if (date > localDateKey()) throw new Error('FUTURE_BUSINESS_DATE_NOT_ALLOWED');
 
         if (options?.autoCloseOpenShifts || options?.overrideReason) {
             await this.autoCloseBranchShifts(branchId, userId);

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo, useEffect, useState, useRef, useCallback, useTransition } from 'react';
+import React, { useMemo, useEffect, useState, useRef, useCallback, useTransition } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
     Pin,
@@ -51,8 +51,6 @@ const PATH_LOADER_MAP: Record<string, string> = {
     '/admin-dashboard': 'AdminDashboardPage', '/roles': 'RolesPermissions', '/settings': 'SettingsHub',
 };
 
-const AppearanceModal = lazy(() => import('./AppearanceModal'));
-
 interface ContextRailProps { onOpenCommand: () => void; }
 
 const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
@@ -87,7 +85,6 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
     const [showMessagesPanel, setShowMessagesPanel] = useState(false);
     const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
     const [syncStats, setSyncStats] = useState({ total: 0, pending: 0, failed: 0, synced: 0 });
-    const [showAppearanceModal, setShowAppearanceModal] = useState(false);
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
     const navRef = useRef<HTMLElement>(null);
     const toggleAssistant = useAIWidgetStore(state => state.toggleAssistant);
@@ -310,7 +307,7 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                             onClick={onOpenCommand}
                             className="sidebar-search-btn"
                             title={lang === 'ar' ? 'فتح البحث' : 'Open Search'}
-                            aria-label={lang === 'ar' ? 'فتح البحث السريع' : 'Open quick search'}
+                            aria-label={lang === 'ar' ? 'فتح البحث السريع (Ctrl K)' : 'Open quick search (Ctrl K)'}
                         >
                             <Search size={13} />
                             <span className="sidebar-nav-label">{lang === 'ar' ? 'بحث سريع' : 'Quick Search'}</span>
@@ -497,7 +494,7 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                         </button>
 
                         <button
-                            onClick={() => setShowAppearanceModal(true)}
+                            onClick={() => navigateTransition('/theme-lab')}
                             className="w-full sidebar-text-block p-1.5 rounded-lg text-muted hover:text-main hover:bg-elevated transition-colors flex items-center justify-center gap-2"
                             title={lang === 'ar' ? 'إعدادات المظهر' : 'Appearance Settings'}
                         >
@@ -507,11 +504,6 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                     </div>
                 </div>
             </aside>
-            <Suspense fallback={null}>
-                {showAppearanceModal ? (
-                    <AppearanceModal isOpen={showAppearanceModal} onClose={() => setShowAppearanceModal(false)} />
-                ) : null}
-            </Suspense>
         </>
     );
 };

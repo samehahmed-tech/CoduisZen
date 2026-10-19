@@ -1,11 +1,17 @@
 /**
- * Day-close auto-close scheduler: closes every still-open branch business
- * date once the global configured time has passed. Force-close reuses the
- * existing override path (`closeDay` with `autoCloseOpenShifts: true` and a
- * written `overrideReason`); no gate-logic changes. Server-local timezone is
- * authoritative. WhatsApp failure never fails the close. The boot sweep acts
- * as catch-up for downtime covering the configured time and notes that in
- * the override reason.
+ * Day-close auto-close scheduler: closes each branch's finished business day
+ * once the global configured time (e.g. 06:00, the next morning) has passed.
+ * Force-close reuses the existing override path (`closeDay` with
+ * `autoCloseOpenShifts: true` and a written `overrideReason`); no gate-logic
+ * changes. Server-local timezone is authoritative. WhatsApp failure never
+ * fails the close. The boot sweep acts as catch-up for downtime covering the
+ * configured time and notes that in the override reason.
+ *
+ * Safety rails (added after a drift incident auto-closed 12 future days in a row):
+ *   - A branch's business date is only closed when it is STRICTLY BEFORE today,
+ *     so a fresh "today" is never closed and a future date is never touched.
+ *   - At most ONE day is closed per branch per calendar day, so a branch that
+ *     fell behind cannot chain-close day after day in a single run.
  */
 import { db } from '../db';
 import { branches, settings, users } from '../../src/db/schema';
@@ -21,6 +27,10 @@ let timer: ReturnType<typeof setInterval> | null = null;
 let running = false;
 const lastRun = new Set<string>();
 const MAX_LAST_RUN = 500;
+// branchId -> calendar day (YYYY-MM-DD) on which this branch was last auto-closed.
+// Caps auto-close at one business day per branch per calendar day so a drifted
+// or lagging branch cannot chain-close many days in a single run.
+const lastClosedDay = new Map<string, string>();
 
 const markLastRun = (key: string) => {
     lastRun.add(key);
@@ -31,8 +41,8 @@ const markLastRun = (key: string) => {
     }
 };
 
-/** Test-only reset for the in-memory dedupe guard. No production effect. */
-export const clearLastRunForTests = () => { lastRun.clear(); };
+/** Test-only reset for the in-memory dedupe guards. No production effect. */
+export const clearLastRunForTests = () => { lastRun.clear(); lastClosedDay.clear(); };
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const localHm = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
@@ -107,15 +117,27 @@ export const runAutoCloseOnce = async (
             const date = (b as any)?.businessDate
                 ? String((b as any).businessDate).slice(0, 10)
                 : localDateKey(now);
+            // Guard 1: only close a business date that is strictly before today.
+            // `date >= today` covers both a fresh "today" business date (never
+            // close the day that just started) and any future/ drifted date.
+            if (date >= localDateKey(now)) {
+                skipped.push(branchId);
+                log.warn({ branchId, date, today: localDateKey(now) }, 'day-close auto-close skipped: business date not before today');
+                continue;
+            }
             const key = `${branchId}:${date}`;
             try {
+                // Guard 2: at most one day closed per branch per calendar day.
+                // Stops a lagging branch from chain-closing several days in a row.
+                if (lastClosedDay.get(branchId) === localDateKey(now)) { skipped.push(branchId); continue; }
                 if (lastRun.has(key)) { skipped.push(branchId); continue; }
                 const existing = await dayCloseService.getClosedReport(branchId, date);
-                if (existing) { markLastRun(key); skipped.push(branchId); continue; }
+                if (existing) { markLastRun(key); lastClosedDay.set(branchId, localDateKey(now)); skipped.push(branchId); continue; }
                 // closeDay's own generic WhatsApp is suppressed (notifyWhatsapp: false);
                 // the service sends its own AUTO text below so recipients get exactly one.
                 await dayCloseService.closeDay(branchId, date, actorId, { autoCloseOpenShifts: true, overrideReason, notifyWhatsapp: false });
                 markLastRun(key);
+                lastClosedDay.set(branchId, localDateKey(now));
                 closed.push(branchId);
                 const text = [
                     `Day Close AUTO ${date}`,

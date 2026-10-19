@@ -864,10 +864,10 @@ const Reports: React.FC = () => {
                         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] sm:items-center rounded-lg border border-border bg-card p-2">
                            <div className="flex items-center gap-2">
                               <Calendar size={14} className="text-primary" />
-                              <input type="date" value={dateRange.start} max={todayKey} onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
+                              <input type="date" value={dateRange.start} max={todayKey} onChange={(event) => setDateRange((prev) => ({ ...prev, start: event.target.value }))} aria-label={isArabic ? 'من تاريخ' : 'From date'} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
                            </div>
                            <ChevronLeft size={14} className="hidden text-muted sm:block rtl:rotate-180" />
-                           <input type="date" value={dateRange.end} max={todayKey} onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
+                           <input type="date" value={dateRange.end} max={todayKey} onChange={(event) => setDateRange((prev) => ({ ...prev, end: event.target.value }))} aria-label={isArabic ? 'إلى تاريخ' : 'To date'} className="w-full bg-transparent text-xs font-bold text-main outline-none" />
                             <button onClick={() => startFilterTransition(() => setAppliedRange(
                               dateRange.start > dateRange.end
                                  ? { start: dateRange.end, end: dateRange.start }

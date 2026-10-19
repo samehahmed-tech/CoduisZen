@@ -1732,10 +1732,11 @@ const [createdOrExistingCustomer] = await tx
         // as image bytes, so the server must NOT also enqueue its plain-text
         // fallback for the same order (slow PowerShell raster + duplicates).
         // KDS screen tickets are always created; only the PRINT enqueue is
-        // gated. Non-POS sources (call center, kiosk without client print)
+        // gated. Gated on order source (not the client flag) so older POS
+        // builds that never send clientHandlesPrinting can't double-print.
+        // Non-POS sources (call center, kiosk without client print)
         // keep the server text fallback so they never go kitchen-blind.
-        const posHandlesPrinting = isPosOrder && orderData.clientHandlesPrinting === true;
-        const dispatchPrintJobs = !posHandlesPrinting;
+        const dispatchPrintJobs = !isPosOrder;
         if (!skipAutoKitchenDispatch && ['DINE_IN', 'KIOSK'].includes(String(savedOrder.type))) {
             await kdsController.dispatchToKitchen(savedOrder.branchId, savedOrder.id, { enqueuePrintJobs: dispatchPrintJobs }).catch((error) => {
                 console.error('[Orders] KDS auto-dispatch failed', savedOrder.id, error);

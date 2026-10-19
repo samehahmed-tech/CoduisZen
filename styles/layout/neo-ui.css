@@ -23,6 +23,14 @@
     opacity: 0 !important;
 }
 
+/* The background engine is a real workspace paint layer. Do not let the
+   default decorative veil cover the selected image underneath it. */
+.neo-ui.workspace-shell[data-bg-engine] .workspace-backdrop-layer,
+.neo-ui.workspace-shell[data-bg-engine] .workspace-backdrop-grid,
+.neo-ui.workspace-shell[data-bg-engine] .workspace-backdrop-glow {
+    opacity: 0 !important;
+}
+
 .neo-ui.workspace-shell .workspace-backdrop-layer {
     background:
         radial-gradient(circle at 12% 10%, rgba(var(--primary), 0.08), transparent 0 24%),
@@ -463,10 +471,41 @@
 @media (max-width: 767px) {
     .workspace-breadcrumbs {
         align-items: flex-start;
-        flex-direction: column;
+        /* Keep the mobile chrome as one compact row. The previous column
+           layout was fighting the fixed h-12 utility and stacking the route
+           title, branch and action icons on top of each other. */
+        flex-direction: row;
+        align-items: center;
+        min-height: 3.25rem;
+        height: 3.25rem;
+        padding-inline-end: 0.75rem;
+        gap: 0.35rem;
     }
 
-    .workspace-breadcrumbs-rtl {
-        align-items: flex-end;
+    .workspace-breadcrumbs.flex-row-reverse {
+        flex-direction: row-reverse;
+    }
+
+    .workspace-breadcrumbs > div:first-child {
+        min-width: 0;
+        gap: 0.35rem;
+    }
+
+    .workspace-breadcrumbs > div:first-child > div:first-child {
+        max-width: 6rem;
+        min-width: 0;
+        gap: 0.2rem;
+    }
+
+    .workspace-breadcrumbs > div:first-child > div:first-child span {
+        max-width: 4.5rem;
+    }
+
+    .workspace-breadcrumbs > div:last-child {
+        gap: 0;
+    }
+
+    .workspace-breadcrumbs > div:last-child button {
+        padding: 0.4rem;
     }
 }

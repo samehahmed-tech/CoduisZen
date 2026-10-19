@@ -416,7 +416,7 @@ const StockItemsPage: React.FC = () => {
                           {item.isComposite ? <Layers size={18} /> : <Package size={18} />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-sm font-black text-main">{displayItemName(item)}</h3>
+                          <h2 className="truncate text-sm font-black text-main">{displayItemName(item)}</h2>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted">
                             <span>{item.category || (lang === 'ar' ? 'بدون تصنيف' : 'Uncategorized')}</span>
                             {item.sku && <span className="rounded-md bg-elevated px-1.5 py-0.5 font-mono">{item.sku}</span>}

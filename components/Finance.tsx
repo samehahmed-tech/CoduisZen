@@ -746,7 +746,7 @@ const Finance: React.FC = () => {
                     <div className={`absolute top-0 right-0 w-16 h-16 bg-${stat.color}-500/10 blur-2xl group-hover:scale-150 transition-transform`} />
                     <div className={`w-10 h-10 rounded-xl bg-${stat.color}-500/10 text-${stat.color}-500 flex items-center justify-center mb-5 group-hover:rotate-12 transition-transform shadow-lg border border-${stat.color}-500/10`}><stat.icon size={18} /></div>
                     <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-2 opacity-50">{stat.label}</p>
-                    <h4 className="text-xl font-black text-main font-mono tabular-nums">{stat.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                    <p className="text-xl font-black text-main font-mono tabular-nums">{stat.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                 ))}
               </div>

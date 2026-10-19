@@ -111,8 +111,8 @@ export const buildBackgroundCSS = (cfg: BackgroundConfig): { backgroundImage: st
         case 'geometric': return { backgroundImage: `repeating-linear-gradient(45deg, ${a(colors[0], pat)} 0 2px, transparent 2px 18px), repeating-linear-gradient(-45deg, ${a(colors[0], pat)} 0 2px, transparent 2px 18px), var(--theme-page-bg)` };
         case 'ambient': return { backgroundImage: `radial-gradient(1000px 400px at 50% -10%, ${a(colors[0], 0.16)}, transparent 60%), var(--theme-page-bg)` };
         case 'gradient-texture': return { backgroundImage: `${NOISE_URI}, linear-gradient(${angle}deg, ${colors.join(', ')})`, backgroundSize: '200px 200px, auto' };
-        case 'image': return { backgroundImage: `url("${cfg.imageUrl}")` };
-        case 'image-overlay': return { backgroundImage: `linear-gradient(${a(cfg.overlay ?? '#000000', cfg.overlayOpacity ?? 0.45)}, ${a(cfg.overlay ?? '#000000', cfg.overlayOpacity ?? 0.45)}), url("${cfg.imageUrl}")` };
+        case 'image': return { backgroundImage: `url("${cfg.imageUrl}")`, backgroundSize: 'cover' };
+        case 'image-overlay': return { backgroundImage: `linear-gradient(${a(cfg.overlay ?? '#000000', cfg.overlayOpacity ?? 0.08)}, ${a(cfg.overlay ?? '#000000', cfg.overlayOpacity ?? 0.08)}), url("${cfg.imageUrl}")`, backgroundSize: 'cover' };
         default: return { backgroundImage: 'var(--theme-page-bg)' };
     }
 };

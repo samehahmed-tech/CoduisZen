@@ -14,6 +14,9 @@ import marketingModule from './modules/marketing';
 import coreModule from './modules/core';
 import admsRoutes from './routes/admsRoutes';
 import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes';
+import talabatWebhookRoutes from './routes/talabatWebhookRoutes';
+import aggregatorWebhookRoutes from './routes/aggregatorWebhookRoutes';
+import { handleWebhook as paymobWebhook } from './controllers/paymobController';
 import { authenticateToken, requireRoles } from './middleware/auth';
 import { isOriginAllowed } from './config/cors';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -92,6 +95,9 @@ import deploymentRoutes from './routes/deploymentRoutes';
 app.use('/api/auth', authRoutes); // Expose auth globally before token check
 app.use('/api/setup', setupRoutes); // Expose setup globally
 app.use('/api/whatsapp', whatsappWebhookRoutes); // Public WhatsApp webhook only
+app.use('/api/integrations/talabat', talabatWebhookRoutes); // Public Talabat webhook (shared-secret auth)
+app.use('/api/integrations', aggregatorWebhookRoutes); // Public aggregator webhooks (per-provider secret; Talabat handled above)
+app.post('/api/payments/paymob/webhook', paymobWebhook); // Public Paymob callback (HMAC auth)
 app.use('/api/attendance-bridge', attendanceBridgeRoutes); // Expose branch attendance bridge ingest
 app.use('/api/public-screens', publicScreenRoutes); // Link-only KDS/Packing screens for legacy operator displays
 app.use('/api/deployment', deploymentRoutes);
@@ -213,10 +219,14 @@ import migrationRoutes from './routes/migrationRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import attendanceOpsRoutes from './routes/attendanceOpsRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import paymobRoutes from './routes/paymobRoutes';
 import rolesRoutes from './routes/rolesRoutes';
+import talabatAdminRoutes from './routes/talabatAdminRoutes';
+import aggregatorAdminRoutes from './routes/aggregatorAdminRoutes';
 
 app.use('/api/approvals', approvalRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payments/paymob', paymobRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/call-center', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CALL_CENTER_MANAGER', 'CALL_CENTER', 'CALL_CENTER_AGENT'), callCenterSupervisorRoutes);
@@ -225,6 +235,8 @@ app.use('/api/migration', requireRoles('SUPER_ADMIN', 'OWNER'), migrationRoutes)
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/attendance-ops', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'HR_MANAGER'), attendanceOpsRoutes);
 app.use('/api/maps', mapsRoutes);
+app.use('/api/integrations/talabat', talabatAdminRoutes);
+app.use('/api/integrations', aggregatorAdminRoutes);
 
 
 // Error tracking API (ops)

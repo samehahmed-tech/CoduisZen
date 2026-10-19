@@ -21,6 +21,10 @@ const ALLOWED_BROWSER_ORIGINS = new Set([
     'http://127.0.0.1:3001',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://localhost:4173',
+    'http://127.0.0.1:4173',
+    'http://localhost:4174',
+    'http://127.0.0.1:4174',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]);
@@ -45,6 +49,7 @@ const pendingReportsFile = path.join(logDir, 'pending-print-reports.json');
 // server receives the COMPLETED report. Keep a small durable ledger so a
 // reconnect does not print that same job again. Failed jobs are never added.
 const completedJobsFile = path.join(logDir, 'completed-print-jobs.json');
+const tempToken = (prefix, extension = '') => `${prefix}_${Date.now()}_${process.pid}_${Math.random().toString(36).slice(2, 8)}${extension}`;
 if (fs.existsSync(logFile) && fs.statSync(logFile).size >= 5 * 1024 * 1024) {
     fs.rmSync(`${logFile}.1`, { force: true });
     fs.renameSync(logFile, `${logFile}.1`);
@@ -262,7 +267,7 @@ const printPngFile = (printerName, pngPath) => new Promise((resolve, reject) => 
     // is also what makes "primary printer = PDF" usable as a speed test.
     const toPdfFile = isPdfPrinterName(printerName);
     const pdfPath = toPdfFile
-        ? path.join(ensurePdfOutDir(), `receipt-${Date.now()}.pdf`)
+        ? path.join(ensurePdfOutDir(), tempToken('receipt', '.pdf'))
         : '';
     const psCommand = `
         Add-Type -AssemblyName System.Drawing
@@ -310,7 +315,7 @@ const printPngFile = (printerName, pngPath) => new Promise((resolve, reject) => 
 });
 
 const printImage = (printerName, imageBase64) => {
-    const tmpFile = path.join(os.tmpdir(), `rf_img_${Date.now()}.png`);
+    const tmpFile = path.join(os.tmpdir(), tempToken('rf_img', '.png'));
     fs.writeFileSync(tmpFile, Buffer.from(imageBase64, 'base64'));
     return printPngFile(printerName, tmpFile).then(
         (result) => { removeTempFile(tmpFile); return result; },
@@ -323,7 +328,7 @@ const printImage = (printerName, imageBase64) => {
 // wrapped on word boundaries — a hard mid-word cut breaks Arabic shaping and
 // prints disconnected/garbled glyphs.
 const renderTextPng = (text, widthPx = 576, maxChars = 28) => new Promise((resolve, reject) => {
-    const inputFile = path.join(os.tmpdir(), `rf_txt_${Date.now()}_${process.pid}.txt`);
+    const inputFile = path.join(os.tmpdir(), tempToken('rf_txt', '.txt'));
     const outputFile = `${inputFile}.png`;
     fs.writeFileSync(inputFile, '﻿' + String(text), 'utf8');
     const psCommand = `
@@ -374,7 +379,7 @@ $graphics.Dispose(); $bitmap.Dispose()
 
 const printTextLegacy = (printerName, text) => {
     return new Promise((resolve, reject) => {
-        const tmpFile = path.join(os.tmpdir(), `rf_txt_${Date.now()}.txt`);
+        const tmpFile = path.join(os.tmpdir(), tempToken('rf_txt', '.txt'));
         // Write UTF-8 with BOM so PowerShell reads Arabic correctly
         fs.writeFileSync(tmpFile, '﻿' + text, 'utf8');
         const psCommand = 'Get-Content $env:RF_PRINT_FILE -Raw -Encoding UTF8 | Out-Printer -Name $env:RF_PRINTER_NAME';
@@ -411,7 +416,7 @@ const printText = async (printerName, text) => {
 };
 
 const printRawWindows = (printerName, content) => new Promise((resolve, reject) => {
-    const tmpFile = path.join(os.tmpdir(), `rf_raw_${Date.now()}.bin`);
+    const tmpFile = path.join(os.tmpdir(), tempToken('rf_raw', '.bin'));
     fs.writeFileSync(tmpFile, Buffer.from(content, 'latin1'));
     const psCommand = `
 Add-Type -TypeDefinition @'
@@ -487,7 +492,7 @@ const renderNetworkRaster = (content, contentType) => {
         return Promise.resolve(pngToEscPos(Buffer.from(source, 'base64'), 576));
     }
     return new Promise((resolve, reject) => {
-    const inputFile = path.join(os.tmpdir(), `rf_lan_${Date.now()}_${process.pid}.${contentType === 'image' ? 'png' : 'txt'}`);
+    const inputFile = path.join(os.tmpdir(), tempToken('rf_lan', `.${contentType === 'image' ? 'png' : 'txt'}`));
     const outputFile = `${inputFile}.bin`;
     const source = contentType === 'image' ? String(content).replace(/^data:image\/[^;]+;base64,/i, '') : '\uFEFF' + String(content);
     fs.writeFileSync(inputFile, contentType === 'image' ? Buffer.from(source, 'base64') : source, contentType === 'image' ? undefined : 'utf8');
@@ -601,23 +606,34 @@ const sendTcpPayload = (address, payload, maxAttempts = NETWORK_TCP_ATTEMPTS) =>
     let settled = false;
     const tryOnce = () => {
         attempt += 1;
+        let attemptFinished = false;
+        let retryTimer = null;
+        const retryOrReject = (error) => {
+            if (settled || attemptFinished) return;
+            attemptFinished = true;
+            if (attempt < maxAttempts) {
+                retryTimer = setTimeout(tryOnce, NETWORK_TCP_RETRY_MS);
+                return;
+            }
+            settled = true;
+            reject(error);
+        };
         const socket = net.createConnection({ host, port, timeout: 8000 }, () => {
             socket.end(payload);
         });
         socket.on('close', hadError => {
-            if (settled) return;
-            if (!hadError) { settled = true; resolve(true); return; }
-            if (attempt < maxAttempts) { setTimeout(tryOnce, NETWORK_TCP_RETRY_MS); return; }
-            // 'error' normally follows and rejects; this is the backstop.
-            settled = true;
-            reject(new Error('NETWORK_PRINTER_CONNECTION_FAILED'));
+            if (settled || attemptFinished) return;
+            if (!hadError) {
+                attemptFinished = true;
+                settled = true;
+                resolve(true);
+                return;
+            }
+            retryOrReject(new Error('NETWORK_PRINTER_CONNECTION_FAILED'));
         });
         socket.on('timeout', () => socket.destroy(new Error('NETWORK_PRINTER_TIMEOUT')));
         socket.on('error', (err) => {
-            if (settled) return;
-            if (attempt < maxAttempts) { setTimeout(tryOnce, NETWORK_TCP_RETRY_MS); return; }
-            settled = true;
-            reject(err);
+            retryOrReject(err);
         });
     };
     tryOnce();

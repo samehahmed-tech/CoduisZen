@@ -127,6 +127,10 @@ const resolveProvider = (): WhatsAppProvider => {
 class WhatsAppService {
     private provider: WhatsAppProvider = resolveProvider();
     private client: any = null;
+    // Ignore late events from a socket that was replaced by restart/reconnect.
+    // Baileys can emit `close` after a new socket has already been created;
+    // letting that old event null the new client strands the UI on a stale QR.
+    private socketGeneration = 0;
     private creatingSocket = false;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private reconnectAttempt = 0;
@@ -207,11 +211,13 @@ class WhatsAppService {
                 browser: ['CoduisZen', 'Chrome', '1.0'],
             });
             this.client = sock;
+            const generation = ++this.socketGeneration;
 
             sock.ev.on('creds.update', saveCreds);
 
             sock.ev.on('connection.update', (update: any) => {
-                void this.handleConnectionUpdate(update);
+                if (generation !== this.socketGeneration || this.client !== sock) return;
+                void this.handleConnectionUpdate(update, sock);
             });
 
             sock.ev.on('messages.upsert', async ({ messages, type }: any) => {
@@ -262,7 +268,8 @@ class WhatsAppService {
         }
     }
 
-    private async handleConnectionUpdate(update: { connection?: string; lastDisconnect?: any; qr?: string }) {
+    private async handleConnectionUpdate(update: { connection?: string; lastDisconnect?: any; qr?: string }, sourceSocket?: any) {
+        if (sourceSocket && sourceSocket !== this.client) return;
         const qr = (update as any)?.qr as string | undefined;
         if (qr) {
             this.qrCode = qr;
@@ -309,6 +316,12 @@ class WhatsAppService {
         }
 
         if (connection === 'close') {
+            // A QR is single-use. Never leave the closed socket's QR in the
+            // status response: the frontend would faithfully render it even
+            // though WhatsApp has already invalidated it.
+            const wasAuthenticated = Boolean(this.authenticatedAt);
+            this.qrCode = null;
+            this.qrIssuedAt = null;
             const mapped = mapConnectionUpdate(
                 { connection: 'close', lastDisconnect: (update as any)?.lastDisconnect, qr },
                 { qrScanned: Boolean(this.authenticatedAt) },
@@ -328,6 +341,17 @@ class WhatsAppService {
                 }
                 this.reconnectAttempt = 0;
                 try { getIO().emit('whatsapp:status', { status: 'AUTH_ERROR', provider: this.provider, reason: this.lastError }); } catch { /* noop */ }
+                this.scheduleReconnect();
+                return;
+            }
+            if (wasAuthenticated) {
+                // 515 / "QR refs attempts ended" can be Baileys' normal
+                // restart boundary immediately after the phone accepts the
+                // QR. Keep the UI in AUTHENTICATED while the saved creds are
+                // reused by the replacement socket.
+                this.authenticatedAt = new Date().toISOString();
+                this.lastError = null;
+                try { getIO().emit('whatsapp:status', { status: 'AUTHENTICATED', provider: this.provider, authenticatedAt: this.authenticatedAt }); } catch { /* noop */ }
                 this.scheduleReconnect();
                 return;
             }

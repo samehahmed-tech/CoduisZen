@@ -8,6 +8,15 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+  /* The desktop rail offset must never survive on phones. The sidebar is a
+     fixed drawer, so a closed drawer must contribute zero layout width. */
+  .workspace-shell:not(.pos-ui) > main,
+  .workspace-shell:not(.pos-ui):has(.rail-pinned) > main {
+    width: 100% !important;
+    margin-inline-start: 0 !important;
+    margin-inline-end: 0 !important;
+  }
+
   /* No page may scroll sideways: inner regions scroll instead. */
   .workspace-shell:not(.pos-ui),
   .workspace-shell:not(.pos-ui) main {

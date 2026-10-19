@@ -25,6 +25,15 @@ export default defineConfig(({ mode }) => {
         },
       }
     },
+    preview: {
+      port: 3000,
+      host: '0.0.0.0',
+      // Mirror dev proxy so production-preview audits hit the live API.
+      proxy: {
+        '/api': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+        '/socket.io': { target: 'http://127.0.0.1:3001', changeOrigin: true, ws: true },
+      },
+    },
     build: {
       // Modern baseline (React 19 requires it): evergreen browsers only.
       // This drops the ~49KB legacy polyfill chunk + duplicate legacy bundles.

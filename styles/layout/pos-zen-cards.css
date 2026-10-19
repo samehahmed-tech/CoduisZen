@@ -2573,9 +2573,20 @@ body[data-mode='dense'] .zen-glass, body[data-mode='dense'] .zen-split { min-hei
 .np-empty { background: radial-gradient(90% 70% at 50% 30%, rgba(var(--primary), 0.14), transparent 70%), var(--pos-theme-card-hero-bg); }
 .np-empty::before { background-size: 18px 18px; opacity: calc(var(--pos-theme-card-pattern-opacity, 0.15) * 0.7); }
 .np-empty::after { background: radial-gradient(120% 95% at 50% 8%, transparent 52%, rgba(0, 0, 0, 0.18)); }
-.np-empty svg { width: 82%; height: 82%; max-width: 150px; filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.28)); animation: np-float 5s ease-in-out infinite; }
-@keyframes np-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-@media (pointer: coarse), (prefers-reduced-motion: reduce) { .np-empty svg { animation: none; } }
+.np-empty svg {
+  width: 82%;
+  height: 82%;
+  max-width: 150px;
+  filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.28));
+  /* Keep POS product art calm at rest. A perpetual float looked like a
+     hardware/rendering glitch on some installed clients. */
+  animation: none;
+  transition: transform 220ms ease, filter 220ms ease;
+}
+.pos-items-panel .zen-card:hover[data-available='true'] .np-empty svg {
+  transform: translateY(-3px) scale(1.02);
+  filter: drop-shadow(0 17px 18px rgba(0, 0, 0, 0.32));
+}
 .pos-img-fallback { filter: saturate(0.85) brightness(1.02); }
 .pos-img-fallback::after { background: radial-gradient(120% 95% at 50% 8%, transparent 55%, rgba(0, 0, 0, 0.16)); }
 

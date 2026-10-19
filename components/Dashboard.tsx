@@ -213,7 +213,6 @@ const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: 
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-      aria-label={label}
       className={`dx-metric animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible bg-card/60 border border-border/30 rounded-[1.5rem] p-5 h-full transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] ${onClick ? 'cursor-pointer' : ''}`}
       style={{ animationFillMode: 'both', animationDelay: `${delay}ms` }}
     >
@@ -557,8 +556,16 @@ const Dashboard: React.FC = () => {
     activeStaff: employees.filter((e: any) => e.isActive !== false).length
   }), [totals, employees]);
 
-  const goToFinance = useCallback(() => navigate('/reports'), [navigate]);
+  const goToReports = useCallback(() => navigate('/reports'), [navigate]);
+  const goToFinance = useCallback(() => navigate('/finance'), [navigate]);
+  const goToExpenses = useCallback(() => navigate('/expenses'), [navigate]);
+  const goToOrders = useCallback(() => navigate('/orders'), [navigate]);
+  const goToFiscal = useCallback(() => navigate('/fiscal'), [navigate]);
   const goToHR = useCallback(() => navigate('/hr'), [navigate]);
+  const cardNavigation = useCallback((path: string) => (event: React.MouseEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('button,a,[role="button"]')) return;
+    navigate(path);
+  }, [navigate]);
 
   // Derived Trend Analysis
   const trends = useMemo(() => {
@@ -1010,7 +1017,7 @@ const Dashboard: React.FC = () => {
               <div><b>{fmtMoney(totals.avgTicket)}</b><span>{isAr ? 'متوسط الفاتورة' : 'avg ticket'}</span></div>
               <div><b>{fmtMoney(totals.netProfit)}</b><span>{isAr ? 'صافي الربح' : 'net profit'}</span></div>
             </div>
-            <button type="button" onClick={goToFinance} className="hx-btn">
+            <button type="button" onClick={goToReports} className="hx-btn">
               {isAr ? 'التقارير التفصيلية' : 'Detailed reports'}
             </button>
           </div>
@@ -1082,7 +1089,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
-            onClick={goToFinance}
+            onClick={goToReports}
             trendData={payload.trendData.map(d => num(d.revenue))}
             help={isAr ? 'إجمالي قيمة الطلبات المكتملة أو المسلّمة في الفترة الحالية مقارنة بالفترة السابقة.' : 'Total value of completed or delivered orders in the current period compared with the previous period.'}
             delay={0}
@@ -1128,7 +1135,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
-            onClick={goToFinance}
+            onClick={goToReports}
             trendData={payload.trendData.map(d => num(d.revenue))}
             help={isAr ? 'إجمالي قيمة الطلبات المكتملة أو المسلّمة خلال الفترة المحددة، قبل خصم الخصومات والضريبة.' : 'Total value of completed or delivered orders in the selected period, before discounts and tax.'}
             detail={{ label: isAr ? 'الخصومات' : 'Discounts', value: `${fmtMoney(totals.discounts)} ${currencySymbol}`, help: isAr ? 'إجمالي الخصومات المطبقة على الطلبات خلال الفترة المحددة. هذا المبلغ يُخصم من إجمالي المبيعات للوصول إلى صافي المبيعات.' : 'Total discounts applied to orders in the selected period. This amount is deducted from gross sales to calculate net sales.' }}
@@ -1143,7 +1150,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
-            onClick={goToFinance}
+            onClick={goToFiscal}
             help={isAr ? 'إجمالي الضريبة المسجلة على الطلبات المعترف بها في الفترة المحددة.' : 'Total tax recorded on recognized orders in the selected period.'}
             delay={200}
           />
@@ -1156,7 +1163,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
-            onClick={goToFinance}
+            onClick={goToExpenses}
             help={isAr ? 'المصروفات المعتمدة والمرحّلة ماليًا خلال الفترة، ولا تشمل المصروفات المعلقة.' : 'Approved and posted expenses in the period; pending expenses are excluded.'}
             delay={300}
           />
@@ -1183,7 +1190,7 @@ const Dashboard: React.FC = () => {
             target={targets.orders}
             lang={lang}
             hasPermission={hasPermission}
-            onClick={goToFinance}
+            onClick={goToOrders}
             help={isAr ? 'عدد كل الطلبات المعترف بها في الفترة المحددة.' : 'Count of all recognized orders in the selected period.'}
             delay={500}
           />
@@ -1196,7 +1203,7 @@ const Dashboard: React.FC = () => {
             trend={trends.avgTicket}
             lang={lang}
             hasPermission={hasPermission}
-            onClick={goToFinance}
+            onClick={goToReports}
             help={isAr ? 'متوسط قيمة الطلب = إجمالي المبيعات ÷ عدد الطلبات.' : 'Average ticket = gross sales divided by order count.'}
             delay={600}
           />
@@ -1221,7 +1228,7 @@ const Dashboard: React.FC = () => {
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
-            onClick={goToFinance}
+            onClick={goToOrders}
             help={isAr ? 'عدد الطلبات الملغاة وقيمتها خلال الفترة المحددة.' : 'Cancelled order count and their value in the selected period.'}
             delay={800}
           />
@@ -1230,7 +1237,7 @@ const Dashboard: React.FC = () => {
         {/* ?? Row 2: Live Resources Pulse (ERP Expansion) ?? */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 min-h-[160px] animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '700ms', animationFillMode: 'both'}} aria-label={isAr ? 'نبض الموارد الحية' : 'Live Resources Pulse'}>
           {/* Active Shifts & Cash */}
-          <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20 rounded-[2rem] p-6 shadow-xl flex items-center justify-between relative overflow-hidden group">
+          <div onClick={cardNavigation('/day-close')} className="cursor-pointer bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20 rounded-[2rem] p-6 shadow-xl flex items-center justify-between relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all duration-500" />
             <div className="relative z-10 flex-1">
               <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 mb-1">
@@ -1254,7 +1261,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Predictive Inventory Alerts */}
-          <div className="bg-gradient-to-br from-rose-500/10 to-orange-500/5 border border-rose-500/20 rounded-[2rem] p-6 shadow-xl flex flex-col sm:flex-row gap-6 relative overflow-hidden group">
+          <div onClick={cardNavigation('/inventory')} className="cursor-pointer bg-gradient-to-br from-rose-500/10 to-orange-500/5 border border-rose-500/20 rounded-[2rem] p-6 shadow-xl flex flex-col sm:flex-row gap-6 relative overflow-hidden group">
             <div className="absolute -left-4 -bottom-4 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition-all duration-500" />
             <div className="relative z-10 w-full sm:w-1/3 flex flex-row sm:flex-col justify-between sm:justify-center border-b sm:border-b-0 sm:border-r border-rose-500/10 pb-4 sm:pb-0 sm:pr-6">
                <div>
@@ -1288,7 +1295,7 @@ const Dashboard: React.FC = () => {
 
         {/* PULSE ROW — sales curve + latest orders + quick actions (same data) */}
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-5" aria-label={isAr ? 'نبض التشغيل' : 'Operations pulse'}>
-          <div className="dx2-panel xl:col-span-1">
+          <div onClick={cardNavigation('/reports')} className="cursor-pointer dx2-panel xl:col-span-1">
             <div className="dx2-panelhead">
               <h3>{isAr ? 'المبيعات خلال آخر 7 أيام' : 'Sales over the last 7 days'}</h3>
             </div>
@@ -1298,7 +1305,7 @@ const Dashboard: React.FC = () => {
               </Suspense>
             </div>
           </div>
-          <div className="dx2-panel xl:col-span-1">
+          <div onClick={cardNavigation('/orders')} className="cursor-pointer dx2-panel xl:col-span-1">
             <div className="dx2-panelhead">
               <h3>{isAr ? 'أحدث الطلبات' : 'Latest orders'}</h3>
               <button type="button" onClick={() => navigate('/pos')} className="dx2-link">{isAr ? 'عرض الكل' : 'View all'}</button>
@@ -1354,7 +1361,7 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '800ms', animationFillMode: 'both'}}>
           
           {/* Main Chart: Revenue Comparison */}
-          <div className="xl:col-span-2 bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 flex flex-col shadow-xl">
+          <div onClick={cardNavigation('/reports')} className="cursor-pointer xl:col-span-2 bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 flex flex-col shadow-xl">
             <div className="flex items-center justify-between mb-8">
               <div>
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{t.sales_trends_comparison}<DashboardHelp text={isAr ? 'يقارن اتجاه الإيراد بين الأيام أو الفترات المحددة والفترة السابقة.' : 'Compares revenue direction across the selected period and the comparison period.'} label={isAr ? 'شرح اتجاه المبيعات' : 'Explain sales trend'} /></h3>
@@ -1379,13 +1386,15 @@ const Dashboard: React.FC = () => {
 
           {/* AI Revenue Forecast */}
           <Suspense fallback={<div className="glass-1 h-[400px] animate-pulse rounded-[2rem]" />}>
-            <RevenueForecastWidget />
+            <div onClick={cardNavigation('/reports')} className="cursor-pointer">
+              <RevenueForecastWidget />
+            </div>
           </Suspense>
         </div>
 
         {/* ZONE 2 — Where is it heading? Dayparts, peak hours, why revenue moved. */}
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" aria-label={isAr ? 'اتجاهات التشغيل' : 'Operational trends'}>
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
+          <div onClick={cardNavigation('/reports')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'الفترات (Dayparts)' : 'Dayparts'}<DashboardHelp text={isAr ? 'توزيع المبيعات والطلبات حسب فترة اليوم مثل الصباح والظهر والمساء.' : 'Sales and order distribution by parts of the day such as morning, afternoon and evening.'} label={isAr ? 'شرح فترات اليوم' : 'Explain dayparts'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{isAr ? 'أي فترة شايلة اليوم؟' : 'Which part of the day carries revenue?'}</p>
             <div className="w-full h-[260px] mt-4">
@@ -1411,7 +1420,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
+          <div onClick={cardNavigation('/reports')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'خريطة الذروة' : 'Peak map'}<DashboardHelp text={isAr ? 'توضح الأيام والساعات التي تحتوي على أكبر عدد من الطلبات.' : 'Shows the days and hours with the highest order volume.'} label={isAr ? 'شرح خريطة الذروة' : 'Explain peak map'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{viewScope === 'DAILY' ? (isAr ? 'المبيعات ساعة بساعة اليوم' : 'Hour-by-hour today') : (isAr ? 'الكثافة: يوم × ساعة' : 'Density: day × hour')}</p>
             {viewScope === 'DAILY' ? (
@@ -1448,7 +1457,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
+          <div onClick={cardNavigation('/reports')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
             <h3 className="flex items-center gap-2 text-xl font-black text-main tracking-tight">{isAr ? 'ليه اتغيرنا؟' : 'Why did we move?'}<DashboardHelp text={isAr ? 'يوضح الفرق بين إيراد الفترة الحالية والسابقة، ويقسم التغير إلى حجم الطلبات والخصومات والإلغاءات وباقي العوامل.' : 'Explains the difference between current and previous revenue by separating order volume, discounts, cancellations and other factors.'} label={isAr ? 'شرح تغير الإيراد' : 'Explain revenue movement'} /></h3>
             <p className="text-xs text-muted font-bold mt-1">{isAr ? 'تفكيك فرق الإيراد عن الفترة السابقة' : 'Revenue bridge vs previous period'}</p>
             <div className="mt-5 space-y-3">
@@ -1473,7 +1482,7 @@ const Dashboard: React.FC = () => {
         {/* ?? Row 4: Team, Top Items & Sources ?? */}
         <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '900ms', animationFillMode: 'both'}}>
             {/* Top Employees */}
-            <div className="bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
+            <div onClick={cardNavigation('/hr')} className="cursor-pointer bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-black text-main tracking-tight flex items-center gap-3">
                   <Trophy className="text-yellow-500" />
@@ -1515,7 +1524,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Trending Items Today */}
-            <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
+            <div onClick={cardNavigation('/menu')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
               <h3 className="text-xl font-black text-main tracking-tight mb-8 flex items-center gap-3">
                 <Flame className="text-orange-500" />
                 {t.trending_items}
@@ -1550,7 +1559,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Platform / Order Source Breakdown */}
-            <div className="bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
+            <div onClick={cardNavigation('/reports')} className="cursor-pointer bg-card/60  border border-border/30 rounded-[2rem] dx2-panel p-6 lg:p-8 shadow-xl">
               <h3 className="mb-8 flex items-center gap-2 text-xl font-black text-main tracking-tight">{t.order_source_distribution}<DashboardHelp text={isAr ? 'نسبة الطلبات حسب القناة: صالة، تيك أواي، دليفري أو مصدر خارجي.' : 'Order share by channel: dine-in, takeaway, delivery or an external source.'} label={isAr ? 'شرح مصادر الطلبات' : 'Explain order sources'} /></h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <div className="h-[250px]">
@@ -1584,7 +1593,7 @@ const Dashboard: React.FC = () => {
 
         {/* ZONE 3 — What needs action? Payments, slow items, branches, cash variance. */}
         <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 animate-in slide-in-from-bottom-8 fade-in duration-700" aria-label={isAr ? 'تفاصيل تحتاج تدخل' : 'Details needing action'}>
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
+          <div onClick={cardNavigation('/finance')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
               <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'مبيعات كل طريقة دفع' : 'Sales by payment method'} <DashboardHelp text={isAr ? 'القيمة هنا مأخوذة من سجلات المدفوعات المكتملة خلال الفترة. النسبة هي حصة كل طريقة من إجمالي المدفوعات.' : 'Values come from completed payment records in the selected period. The percentage is each method’s share of total payments.'} label={isAr ? 'شرح مزيج المدفوعات' : 'Explain payment mix'} /></h3>
             {paymentMix.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -1605,7 +1614,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
+          <div onClick={cardNavigation('/menu')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
             <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'أصناف تحتاج قرار' : 'Items needing a call'}<DashboardHelp text={isAr ? 'الأصناف الأقل حركة خلال الفترة مع بيانات الهامش لمساعدتك في قرار التسعير أو الإيقاف.' : 'Slowest-moving items in the period with margin data to guide pricing or menu decisions.'} label={isAr ? 'شرح الأصناف البطيئة' : 'Explain slow items'} /></h3>
             <p className="text-[11px] text-muted font-bold mt-1">{isAr ? 'الأبطأ حركة + الهامش' : 'Slowest movers + margin'}</p>
             {slowItems.length > 0 ? (
@@ -1623,7 +1632,7 @@ const Dashboard: React.FC = () => {
             <button type="button" onClick={() => navigate('/reports')} className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary hover:underline">{isAr ? 'هندسة المنيو الكاملة' : 'Full menu engineering'}</button>
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
+          <div onClick={cardNavigation('/reports')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
             <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'أداء الفروع' : 'Branch performance'}<DashboardHelp text={isAr ? 'مقارنة عدد الطلبات والإيراد بين الفروع خلال نفس الفترة.' : 'Compares order count and revenue across branches for the same period.'} label={isAr ? 'شرح أداء الفروع' : 'Explain branch performance'} /></h3>
             {branchPerfRows.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -1644,7 +1653,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
+          <div onClick={cardNavigation('/day-close')} className="cursor-pointer bg-card/60 border border-border/30 rounded-[2rem] dx2-panel p-6 shadow-xl">
             <h3 className="flex items-center gap-2 text-lg font-black text-main tracking-tight">{isAr ? 'فروقات الكاش (شيفتات)' : 'Cash variance (shifts)'}<DashboardHelp text={isAr ? 'الفرق بين النقد المتوقع والنقد الفعلي المسجل عند إغلاق الوردية.' : 'Difference between expected cash and the amount counted when a shift is closed.'} label={isAr ? 'شرح فروقات الكاش' : 'Explain cash variance'} /></h3>
             {shiftVariance.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -1664,7 +1673,7 @@ const Dashboard: React.FC = () => {
 
         {/* ?? Row 5: Real-time Operational Live Monitoring ?? */}
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 min-h-[500px] animate-in slide-in-from-bottom-8 fade-in duration-700" style={{ animationDelay: '1000ms', animationFillMode: 'both'}}>
-          <div className="theme-card overflow-hidden flex flex-col p-8 bg-card/60 backdrop-blur-md rounded-[2rem] shadow-xl">
+          <div onClick={cardNavigation('/kds')} className="cursor-pointer theme-card overflow-hidden flex flex-col p-8 bg-card/60 backdrop-blur-md rounded-[2rem] shadow-xl">
              <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-black text-main tracking-tight flex items-center gap-3">
                  <Flame className="text-rose-500" />
@@ -1688,7 +1697,7 @@ const Dashboard: React.FC = () => {
                 <KitchenPerformanceWidget />
              </Suspense>
           </div>
-          <div className="theme-card overflow-hidden flex flex-col p-8 bg-card/60 backdrop-blur-md rounded-[2rem] shadow-xl">
+          <div onClick={cardNavigation('/dispatch')} className="cursor-pointer theme-card overflow-hidden flex flex-col p-8 bg-card/60 backdrop-blur-md rounded-[2rem] shadow-xl">
              <h3 className="text-xl font-black text-main tracking-tight mb-8 flex items-center gap-3">
                <Truck className="text-cyan-500" />
                {t.delivery_logistics}
