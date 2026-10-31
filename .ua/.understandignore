@@ -1,0 +1,149 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Lines below are suggestions — uncomment to activate.
+# Use ! prefix to force-include something excluded by defaults.
+#
+# Built-in defaults (always excluded unless negated):
+#   node_modules/, .git/, dist/, build/, obj/, *.lock, *.min.js, etc.
+#
+
+# --- From .gitignore (uncomment to exclude) ---
+
+# logs
+# npm-debug.log*
+# yarn-debug.log*
+# yarn-error.log*
+# pnpm-debug.log*
+# lerna-debug.log*
+# node_modules_old
+dist-ssr
+*.local
+.wwebjs_auth/
+.wwebjs_cache/
+sessions/
+sessions/baileys-*/
+artifacts/load/
+# .agent/
+# .codex/
+# scratch/
+dist-server/
+client-delivery/
+artifacts/*
+# !artifacts/evidence/
+# !artifacts/evidence/**
+# !artifacts/gates/
+# !artifacts/gates/**
+# !artifacts/pilot/
+# !artifacts/pilot/**
+# !artifacts/rollback/
+# !artifacts/rollback/**
+# !artifacts/uat/
+# !artifacts/uat/**
+drizzle/meta/
+# attendance-bridge/
+# CoduisZenAttendanceBridge-Branches/
+# CoduisZenBridgeBranches.json
+# .vscode/*
+# !.vscode/extensions.json
+# .DS_Store
+# *.suo
+# *.ntvs*
+# *.njsproj
+# *.sln
+# *.sw?
+.env
+.env.local
+.env.*.local
+# stream-test.xlsx
+# .tmp-*
+# reports/lighthouse/
+# scripts/lighthouse/.session*
+# .playwright-cli/
+*.rar
+*.sha256.txt
+payload/
+# Testing/
+output/
+# /pos-menu-cards-concepts.html
+# tsconfig.scratch.json
+# verify-prod-detail.tmp.ts
+restoflow-erp.zip
+restoflow-erp.rar
+One Click Builder.rar
+RestoFlow-HotFix-*.zip
+RestoFlow-HotFix-*/
+# Apply Latest Fixes.bat
+# Apply Latest Fixes.ps1
+# build_hot_fix.bat
+# build_hot_fix - Copy.bat
+# scripts/sameh-installer/latest-fixes/payload/database/
+# scripts/sameh-installer/latest-fixes/payload/runtime/
+# scripts/sameh-installer/hotfix/payload/dist/
+# scripts/sameh-installer/hotfix/payload/dist-server/
+# scripts/sameh-installer/latest-fixes/payload/dist/
+# scripts/sameh-installer/latest-fixes/payload/dist-server/
+# scripts/sameh-installer/logs/
+# scripts/sameh-installer/prerequisites/SQLEXPR*.exe
+# tmp-installed.env
+# userlist.cjs
+runtime/
+backups/
+*.bak
+# One Click Builder.bat
+
+# --- Detected directories (uncomment to exclude) ---
+
+# docs/
+# scripts/
+# tests/
+
+# --- Test file patterns (uncomment to exclude) ---
+
+# JS / TS
+# *.test.*
+# *.spec.*
+# *.snap
+# C# / .NET
+# **/*Tests.cs
+# **/*Test.cs
+# **/*Fixture.cs
+# **/*.Tests.csproj
+# Java / Kotlin
+# **/src/test/**
+# **/*Test.java
+# **/*IT.java
+# **/*Spec.kt
+# Go
+# **/*_test.go
+# C++
+# **/*_test.cc
+# **/*_test.cpp
+# **/*_test.cxx
+# **/*Test.cc
+# **/*Test.cpp
+# **/*_unittest.cc
+# **/*_unittest.cpp
+# **/*_browsertest.cc
+# **/*_benchmark.cc
+# **/*Benchmark.cpp
+# Python
+# **/test_*.py
+# **/*_test.py
+# **/tests.py
+# **/conftest.py
+# Rust
+# **/tests.rs
+# **/test_*.rs
+# **/*_test.rs
+# **/bench_*.rs
+# **/*_bench.rs
+# Ruby
+# **/*_spec.rb
+# **/*_test.rb
+# **/test_*.rb
+# **/spec_helper.rb
+# **/test_helper.rb
+# **/rails_helper.rb
+# Swift
+# **/Tests/**/*.swift
+# **/Specs/**/*.swift

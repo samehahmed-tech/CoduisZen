@@ -68,4 +68,21 @@ describe('payment session safety', () => {
         });
         expect(stored).toMatchObject({ status: 'initiated', verified: false });
     });
+
+    it('reserves pending payment amounts and returns the same session on a replay after settlement', async () => {
+        const first = await PaymentSessionService.initiatePayment(
+            orderId, 100, 'manual_cash', 'test-device', 'test-user', 'test-payment-reservation-1', branchId,
+        );
+
+        await expect(PaymentSessionService.initiatePayment(
+            orderId, 100, 'manual_cash', 'test-device', 'test-user', 'test-payment-reservation-2', branchId,
+        )).rejects.toMatchObject({ code: 'PAYMENT_EXCEEDS_ORDER_TOTAL', status: 409 });
+
+        await PaymentSessionService.confirmPayment(first.sessionId, undefined, 'test-user', branchId);
+
+        const replay = await PaymentSessionService.initiatePayment(
+            orderId, 100, 'manual_cash', 'test-device', 'test-user', 'test-payment-reservation-1', branchId,
+        );
+        expect(replay).toMatchObject({ sessionId: first.sessionId, orderId, idempotentReplay: true });
+    });
 });

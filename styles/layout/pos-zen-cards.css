@@ -2307,7 +2307,7 @@ body[data-mode='dense'] .zen-glass, body[data-mode='dense'] .zen-split { min-hei
   font-weight: 900; font-size: 14px; font-variant-numeric: tabular-nums;
 }
 .zen-gold .gd-body { padding: 18px; text-align: center; display: flex; flex-direction: column; flex: 1; }
-.zen-gold .gd-eyebrow { font-size: 10px; letter-spacing: .3em; color: var(--pos-theme-card-badge-bg); font-weight: 700; }
+.zen-gold .gd-eyebrow { font-size: 10px; letter-spacing: .3em; color: rgb(var(--text-muted)); font-weight: 700; }
 .zen-gold h3 {
   font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   margin: 8px 0 4px; font-size: 21px; font-weight: 700; color: rgb(var(--text-main));
@@ -2320,7 +2320,7 @@ body[data-mode='dense'] .zen-glass, body[data-mode='dense'] .zen-split { min-hei
 }
 .zen-gold .gd-price {
   font-family: "Playfair Display", Georgia, "Times New Roman", serif;
-  font-size: 24px; color: var(--pos-theme-card-badge-bg); font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-size: 24px; color: rgb(var(--text-main)); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .zen-gold .gd-step {
   display: flex; align-items: center; justify-content: space-between;
@@ -2331,10 +2331,10 @@ body[data-mode='dense'] .zen-glass, body[data-mode='dense'] .zen-split { min-hei
   font-size: 19px; font-weight: 900; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.zen-gold .gd-step b { color: var(--pos-theme-card-badge-bg); font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.zen-gold .gd-step b { color: rgb(var(--text-main)); font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; }
 .zen-gold .gd-add {
   flex: 1; min-height: 48px; cursor: pointer; margin-top: auto;
-  background: transparent; border: 1px solid var(--pos-theme-card-badge-bg); color: var(--pos-theme-card-badge-bg);
+  background: transparent; border: 1px solid rgb(var(--border-color)); color: rgb(var(--text-main));
   letter-spacing: .15em; font-size: 12px; font-weight: 700; font-family: inherit;
   transition: background 200ms ease, color 200ms ease;
 }

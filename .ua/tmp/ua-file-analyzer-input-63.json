@@ -1,0 +1,105 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "styles/engine/animations.css",
+      "language": "css",
+      "sizeLines": 247,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/background-engine.css",
+      "language": "css",
+      "sizeLines": 133,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/dashboard-hover.css",
+      "language": "css",
+      "sizeLines": 86,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/density.css",
+      "language": "css",
+      "sizeLines": 32,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/fluid-motion.css",
+      "language": "css",
+      "sizeLines": 185,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/interaction-system.css",
+      "language": "css",
+      "sizeLines": 53,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/micro-interactions.css",
+      "language": "css",
+      "sizeLines": 372,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/motion-fx.css",
+      "language": "css",
+      "sizeLines": 63,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/motion-personalities.css",
+      "language": "css",
+      "sizeLines": 95,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/theme-components.css",
+      "language": "css",
+      "sizeLines": 231,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/theme-operations.css",
+      "language": "css",
+      "sizeLines": 331,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/theme-overrides.css",
+      "language": "css",
+      "sizeLines": 834,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/theme-worlds.css",
+      "language": "css",
+      "sizeLines": 442,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/engine/ux-elevation.css",
+      "language": "css",
+      "sizeLines": 175,
+      "fileCategory": "markup"
+    }
+  ],
+  "batchImportData": {
+    "styles/engine/animations.css": [],
+    "styles/engine/background-engine.css": [],
+    "styles/engine/dashboard-hover.css": [],
+    "styles/engine/density.css": [],
+    "styles/engine/fluid-motion.css": [],
+    "styles/engine/interaction-system.css": [],
+    "styles/engine/micro-interactions.css": [],
+    "styles/engine/motion-fx.css": [],
+    "styles/engine/motion-personalities.css": [],
+    "styles/engine/theme-components.css": [],
+    "styles/engine/theme-operations.css": [],
+    "styles/engine/theme-overrides.css": [],
+    "styles/engine/theme-worlds.css": [],
+    "styles/engine/ux-elevation.css": []
+  }
+}

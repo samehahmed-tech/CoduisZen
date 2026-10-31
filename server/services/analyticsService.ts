@@ -6,6 +6,7 @@
  */
 
 import { db, pool } from '../db';
+import { randomUUID } from 'node:crypto';
 import {
     orders,
     orderItems,
@@ -20,10 +21,13 @@ import {
 } from '../../src/db/schema';
 import { eq, and, sql, desc, gte, lte } from 'drizzle-orm';
 import logger from '../utils/logger';
+import { reconcileDailyBranchSnapshots, type ReconciliationDay } from '../utils/analyticsReconciliation';
 
 const log = logger.child({ service: 'analytics' });
 
 let analyticsSchemaReady = false;
+let userPerformanceIdRequiresValue = false;
+let userPerformanceHasBusinessDate = false;
 
 const ensureAnalyticsSchema = async () => {
     if (analyticsSchemaReady) return;
@@ -98,7 +102,7 @@ const ensureAnalyticsSchema = async () => {
 
         IF OBJECT_ID('user_daily_performance', 'U') IS NULL
         CREATE TABLE user_daily_performance (
-            id int IDENTITY(1,1) NOT NULL,
+            id nvarchar(255) NOT NULL,
             user_id nvarchar(255) NOT NULL,
             branch_id nvarchar(255) NOT NULL,
             [date] nvarchar(255) NOT NULL,
@@ -112,7 +116,33 @@ const ensureAnalyticsSchema = async () => {
             CONSTRAINT fk_user_daily_performance_user FOREIGN KEY (user_id) REFERENCES users(id),
             CONSTRAINT fk_user_daily_performance_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
         );
+
+        -- Older installations used business_date/orders_processed while the
+        -- current analytics contract writes date/order_count. Add the current
+        -- column in place so reporting recovers without destructive rebuilds.
+        IF OBJECT_ID('user_daily_performance', 'U') IS NOT NULL
+           AND COL_LENGTH('user_daily_performance', 'date') IS NULL
+        BEGIN
+            EXEC(N'ALTER TABLE user_daily_performance ADD [date] nvarchar(255) NULL');
+            IF COL_LENGTH('user_daily_performance', 'business_date') IS NOT NULL
+                EXEC(N'UPDATE user_daily_performance
+                      SET [date] = COALESCE([date], CONVERT(nvarchar(255), business_date, 23))
+                      WHERE [date] IS NULL');
+        END;
     `);
+
+    const idMetadata = await pool.query(`
+        SELECT c.name, c.is_identity
+        FROM sys.columns c
+        WHERE c.object_id = OBJECT_ID('user_daily_performance')
+          AND c.name IN ('id', 'business_date')
+    `);
+    const metadataRows = Array.isArray(idMetadata)
+        ? idMetadata
+        : ((idMetadata as any)?.recordset ?? (idMetadata as any)?.rows ?? []);
+    const idRow = metadataRows.find((row: any) => row.name === 'id');
+    userPerformanceIdRequiresValue = !Boolean(idRow?.is_identity);
+    userPerformanceHasBusinessDate = metadataRows.some((row: any) => row.name === 'business_date');
 
     analyticsSchemaReady = true;
 };
@@ -243,7 +273,7 @@ export const analyticsService = {
     /**
      * Compute/Update RFM metrics for a single customer.
      */
-    async updateCustomerRfm(customerId: string, branchId?: string) {
+    async updateCustomerRfm(customerId: string, branchId?: string): Promise<boolean> {
         try {
             await ensureAnalyticsSchema();
             // Get all customer orders
@@ -260,7 +290,7 @@ export const analyticsService = {
                 )
             );
 
-            if (customerOrders.length === 0) return;
+            if (customerOrders.length === 0) return false;
 
             const totalSpent = customerOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
             const orderCount = customerOrders.length;
@@ -300,18 +330,23 @@ export const analyticsService = {
                     lastOrderDate,
                     updatedAt: new Date(),
                 });
+            return true;
 
         } catch (error: any) {
             log.error({ err: error.message, customerId }, 'Failed to update RFM metrics');
+            return false;
         }
     },
 
     /**
      * Update user (employee) performance metrics
      */
-    async recordUserPerformance(userId: string, branchId: string, date: string, amount: number, order: any) {
+    async recordUserPerformance(userId: string, branchId: string, date: string | Date, amount: number, order: any) {
         try {
             await ensureAnalyticsSchema();
+            const normalizedDate = date instanceof Date
+                ? date.toISOString().slice(0, 10)
+                : String(date).slice(0, 10);
             // Calculate points: 10 per order + 1 per 100 units of currency
             let points = 10 + Math.floor(amount / 100);
 
@@ -319,41 +354,127 @@ export const analyticsService = {
             if (order.completedAt && order.createdAt) {
                 const processingTime = (new Date(order.completedAt).getTime() - new Date(order.createdAt).getTime()) / 1000;
                 if (processingTime < 600) points += 5; // Speed bonus
-                
-                await db.insert(userDailyPerformance)
-                    .values({
-                        userId,
-                        branchId,
-                        date,
-                        orderCount: 1,
-                        totalSales: amount,
-                        totalPoints: points,
-                        avgProcessingTime: processingTime,
-                        updatedAt: new Date(),
-                    });
+                await this.insertUserPerformanceRow({ userId, branchId, date: normalizedDate, amount, points, processingTime });
             } else {
-                 await db.insert(userDailyPerformance)
-                    .values({
-                        userId,
-                        branchId,
-                        date,
-                        orderCount: 1,
-                        totalSales: amount,
-                        totalPoints: points,
-                        updatedAt: new Date(),
-                    });
+                await this.insertUserPerformanceRow({ userId, branchId, date: normalizedDate, amount, points });
             }
         } catch (error: any) {
             log.error({ err: error.message, userId }, 'Failed to update user performance');
         }
     },
 
+    async insertUserPerformanceRow(input: {
+        userId: string;
+        branchId: string;
+        date: string;
+        amount: number;
+        points: number;
+        processingTime?: number;
+    }) {
+        const columns = ['user_id', 'branch_id', '[date]', 'order_count', 'total_sales', 'total_points'];
+        const values: unknown[] = [input.userId, input.branchId, input.date, 1, input.amount, input.points];
+        if (userPerformanceIdRequiresValue) {
+            columns.unshift('id');
+            values.unshift(randomUUID());
+        }
+        if (userPerformanceHasBusinessDate) {
+            columns.push('business_date');
+            values.push(new Date(`${input.date}T00:00:00.000Z`));
+        }
+        if (input.processingTime !== undefined) {
+            columns.push('avg_processing_time');
+            values.push(input.processingTime);
+        }
+        columns.push('updated_at');
+        values.push(new Date());
+        const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+        await pool.query(
+            `INSERT INTO user_daily_performance (${columns.join(', ')}) VALUES (${placeholders})`,
+            values,
+        );
+    },
+
     /**
      * Batch recompute for a whole branch (used to populate initial snapshots)
      */
     async recomputeBranchSnapshots(branchId: string, daysBack: number = 30) {
-        log.info({ branchId, daysBack }, 'Recomputing branch analytics snapshots');
-        // Implementation would iterate through past orders and call recordOrderImpact
-        // For brevity, we focus on the incremental approach for now.
+        const end = new Date();
+        const start = new Date(end);
+        start.setUTCDate(start.getUTCDate() - Math.max(1, Math.min(366, Math.floor(daysBack))));
+        return this.reconcileBranchSnapshots(branchId, start.toISOString().slice(0, 10), end.toISOString().slice(0, 10));
+    },
+
+    /**
+     * Read-only reconciliation job: compare canonical completed orders to the
+     * persisted daily summary. Repair stays explicit and separate from reads.
+     */
+    async reconcileBranchSnapshots(branchId: string, fromDate: string, toDate: string) {
+        await ensureAnalyticsSchema();
+        const orderRows = await db.select({
+            businessDate: orders.businessDate,
+            status: orders.status,
+            total: orders.total,
+            subtotal: orders.subtotal,
+            tax: orders.tax,
+            discount: orders.discount,
+        }).from(orders).where(and(
+            eq(orders.branchId, branchId),
+            gte(orders.businessDate, fromDate),
+            lte(orders.businessDate, toDate),
+            sql`${orders.status} IN ('COMPLETED', 'DELIVERED')`,
+        ));
+        const expectedByDate = new Map<string, ReconciliationDay>();
+        for (const row of orderRows) {
+            const date = String(row.businessDate || '').slice(0, 10);
+            if (!date) continue;
+            const current = expectedByDate.get(date) || { date, revenue: 0, netRevenue: 0, orders: 0, tax: 0, discounts: 0 };
+            current.revenue += Number(row.total || 0);
+            current.netRevenue += Number(row.subtotal || 0);
+            current.orders += 1;
+            current.tax += Number(row.tax || 0);
+            current.discounts += Number(row.discount || 0);
+            expectedByDate.set(date, current);
+        }
+
+        const snapshotFrom = new Date(`${fromDate}T00:00:00.000Z`);
+        const snapshotTo = new Date(`${toDate}T23:59:59.999Z`);
+        const snapshotRows = await db.select({
+            date: dailyBranchSummaries.date,
+            revenue: dailyBranchSummaries.totalRevenue,
+            netRevenue: dailyBranchSummaries.netRevenue,
+            orders: dailyBranchSummaries.totalOrders,
+            tax: dailyBranchSummaries.totalTax,
+            discounts: dailyBranchSummaries.totalDiscounts,
+        }).from(dailyBranchSummaries).where(and(
+            eq(dailyBranchSummaries.branchId, branchId),
+            gte(dailyBranchSummaries.date, snapshotFrom),
+            lte(dailyBranchSummaries.date, snapshotTo),
+        ));
+        const actual = snapshotRows.map(row => ({
+            date: String(row.date || '').slice(0, 10),
+            revenue: Number(row.revenue || 0),
+            netRevenue: Number(row.netRevenue || 0),
+            orders: Number(row.orders || 0),
+            tax: Number(row.tax || 0),
+            discounts: Number(row.discounts || 0),
+        }));
+        const expected = Array.from(expectedByDate.values()).map(row => ({
+            ...row,
+            revenue: Number(row.revenue.toFixed(4)),
+            netRevenue: Number(row.netRevenue.toFixed(4)),
+            tax: Number(row.tax.toFixed(4)),
+            discounts: Number(row.discounts.toFixed(4)),
+        }));
+        const mismatches = reconcileDailyBranchSnapshots(expected, actual);
+        return {
+            branchId,
+            period: { from: fromDate, to: toDate },
+            checkedAt: new Date().toISOString(),
+            expectedDays: expected.length,
+            snapshotDays: actual.length,
+            mismatchCount: mismatches.length,
+            status: mismatches.length === 0 ? 'MATCH' : 'MISMATCH',
+            mismatches,
+        };
     }
 };

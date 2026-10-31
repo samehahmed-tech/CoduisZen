@@ -166,7 +166,7 @@ export interface EffectsTokens {
    Master Theme Config — full UI personality
    ═══════════════════════════════════════════════ */
 export interface ThemeConfig {
-    id: AppTheme;
+    id: string;
     name: string;
     description: string;
     tags: string[];
@@ -188,28 +188,30 @@ export interface ThemeConfig {
     effects?: EffectsTokens;
 }
 
-import { meridianTheme } from './themes/meridian';
-import { commandTheme } from './themes/command';
-import { glasslineTheme } from './themes/glassline';
-import { canvasTheme } from './themes/canvas';
-import { fluentProTheme } from './themes/fluent-pro';
-import { materialXTheme } from './themes/material-x';
-import { obsidianTheme } from './themes/obsidian';
-import { tilesTheme } from './themes/tiles';
-import { acrylicTheme } from './themes/acrylic';
-import { touchTheme } from './themes/touch';
+import {
+    aeroTheme,
+    citrusTheme,
+    porcelainTheme,
+    blueprintTheme,
+    clayTheme,
+    nocturneTheme,
+    foundryTheme,
+    neonTheme,
+    slateTheme,
+    cinemaTheme,
+} from './themes/v5';
 
 export const THEME_REGISTRY: Record<AppTheme, ThemeConfig> = {
-    'meridian': meridianTheme,
-    'command': commandTheme,
-    'glassline': glasslineTheme,
-    'canvas': canvasTheme,
-    'fluent-pro': fluentProTheme,
-    'material-x': materialXTheme,
-    'obsidian': obsidianTheme,
-    'tiles': tilesTheme,
-    'acrylic': acrylicTheme,
-    'touch': touchTheme
+    aero: aeroTheme,
+    citrus: citrusTheme,
+    porcelain: porcelainTheme,
+    blueprint: blueprintTheme,
+    clay: clayTheme,
+    nocturne: nocturneTheme,
+    foundry: foundryTheme,
+    neon: neonTheme,
+    slate: slateTheme,
+    cinema: cinemaTheme,
 };
 
 export const THEME_LIST: ThemeConfig[] = Object.values(THEME_REGISTRY);

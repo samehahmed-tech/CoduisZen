@@ -6,6 +6,9 @@ export type ActionSpec = {
     mutates: boolean;
 };
 
+export const AI_EXECUTION_CONFIRMATION = 'AI_EXECUTE';
+export const requiresAiConfirmation = (spec?: ActionSpec): boolean => Boolean(spec?.mutates);
+
 export const AI_ACTION_SPECS: Record<string, ActionSpec> = {
     UPDATE_INVENTORY: { permission: 'OP_ADJUST_STOCK', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
     UPDATE_MENU_ITEM: { permission: 'CFG_EDIT_MENU_PRICING', allowedRoles: ['SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'], mutates: true },
@@ -36,6 +39,21 @@ export const hasPermission = (user: AuthUser, permission?: string) => {
     if (!permission) return true;
     if (user.role === 'SUPER_ADMIN') return true;
     return Boolean(user.permissions?.includes(permission) || user.permissions?.includes('*'));
+};
+
+/**
+ * AI actions are proposals, but their target branch is still security
+ * sensitive. Never let an action payload expand a user's branch scope.
+ */
+export const isAiActionBranchAllowed = (user: AuthUser, action: any): boolean => {
+    if (user.role === 'SUPER_ADMIN') return true;
+    const data = action?.data || {};
+    const targetBranch = String(
+        data.branchId || action?.branchId || data.assignedBranchId || action?.assignedBranchId || '',
+    ).trim();
+    if (!targetBranch) return true;
+    const allowed = new Set([user.branchId, ...(user.allowedBranches || [])].filter(Boolean).map(String));
+    return allowed.has(targetBranch);
 };
 
 export const evaluateActionAuthorization = (

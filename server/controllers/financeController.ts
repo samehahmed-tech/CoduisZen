@@ -8,6 +8,7 @@ import { eq, sql, desc, or, and, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { COASeedService } from '../services/coaSeedService';
 import { createSignedAuditLog } from '../services/auditService';
+import { canAccessFinanceException, canRetryFinanceExceptionStatus, sanitizeFinanceException } from '../utils/financeExceptionSecurity';
 import { PostingRuleEngine } from '../services/postingRuleEngine';
 import { writeDbError } from '../utils/dbErrors';
 
@@ -471,6 +472,9 @@ export const createJournalEntry = async (req: Request, res: Response) => {
             status: 'PENDING_APPROVAL',
             date: body.date ? new Date(body.date) : undefined,
             branchId: req.effectiveBranchId,
+            actorId: req.user?.id || 'system',
+            source: body.source || 'MANUAL',
+            correlationId: `FINANCE_MANUAL:${body.referenceId || req.requestId || Date.now()}`,
         });
 
         const entryId = typeof result === 'object' && result && 'entryId' in result ? String(result.entryId) : '';
@@ -495,6 +499,18 @@ export const createJournalEntry = async (req: Request, res: Response) => {
                 createdAt: new Date(),
             });
         }
+
+        await createSignedAuditLog({
+            eventType: 'JOURNAL_ENTRY_SUBMITTED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { entryId, source: body.source || 'MANUAL', referenceId: body.referenceId || null, lineCount: lines.length, amount: Number(body.amount || 0) },
+            after: { status: 'PENDING_APPROVAL' },
+            reason: 'Journal entry submitted for approval',
+        });
 
         res.status(201).json({ success: true, entryId, message: 'Journal entry submitted for approval' });
     } catch (error: any) {
@@ -528,7 +544,20 @@ export const approveJournalEntry = async (req: Request, res: Response) => {
         await db.update(journalEntries)
             .set({ status: 'POSTED' })
             .where(eq(journalEntries.id, id));
-            
+
+        await createSignedAuditLog({
+            eventType: 'JOURNAL_ENTRY_APPROVED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { entryId: id, makerId: entry[0].createdBy || null },
+            before: { status: entry[0].status },
+            after: { status: 'POSTED' },
+            reason: 'Journal entry approved',
+        });
+
         res.json({ success: true, message: 'Journal entry approved and posted' });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -541,6 +570,17 @@ export const reverseJournalEntry = async (req: Request, res: Response) => {
         if (!id) return res.status(400).json({ error: 'JOURNAL_ENTRY_ID_REQUIRED' });
         const { reason } = req.body;
         const reversed = await GLService.reverseEntry(id, reason || `REV-${id}`, req.user?.id || 'system');
+        await createSignedAuditLog({
+            eventType: 'JOURNAL_ENTRY_REVERSED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { entryId: id, reversalId: reversed },
+            after: { status: 'REVERSED' },
+            reason: 'Journal entry reversed',
+        });
         res.json({ message: 'Journal reversed', id: reversed });
     } catch (error: any) {
         console.error('Reverse Error:', error);
@@ -574,13 +614,11 @@ export const getTrialBalance = async (req: Request, res: Response) => {
 
 export const getExceptions = async (req: Request, res: Response) => {
     try {
-        // Finance exceptions are stored without a branch_id column.  Do not
-        // build a branch predicate from a non-existent schema field: on SQL
-        // Server that turns the query into an invalid `and` expression and
-        // makes the whole finance page fail before it can render accounts.
-        const exceptions = await db.select().from(financeExceptions)
-            .orderBy(desc(financeExceptions.createdAt));
-        res.json(exceptions);
+        const query = db.select().from(financeExceptions);
+        const exceptions = req.effectiveBranchId
+            ? await query.where(eq(financeExceptions.branchId, req.effectiveBranchId)).orderBy(desc(financeExceptions.createdAt))
+            : await query.orderBy(desc(financeExceptions.createdAt));
+        res.json(exceptions.map(sanitizeFinanceException));
     } catch (error: any) {
         return writeDbError(res, error);
     }
@@ -594,19 +632,74 @@ export const resolveException = async (req: Request, res: Response) => {
         if (exception.length === 0) return res.status(404).json({ error: 'Exception not found' });
         
         const exc = exception[0];
+        if (!canAccessFinanceException({
+            effectiveBranchId: req.effectiveBranchId,
+            exceptionBranchId: exc.branchId,
+            role: req.user?.role,
+        })) {
+            return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
+        }
         if (action === 'DISMISS') {
             await db.update(financeExceptions)
                 .set({ status: 'DISMISSED', resolvedBy: req.user?.id || 'system', resolvedAt: new Date() })
                 .where(eq(financeExceptions.id, id));
+            await createSignedAuditLog({
+                eventType: 'FINANCE_EXCEPTION_DISMISSED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: exc.branchId || req.effectiveBranchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { exceptionId: id },
+                after: { status: 'DISMISSED' },
+                reason: 'Finance exception dismissed',
+            });
             return res.json({ success: true, message: 'Exception dismissed' });
         }
 
         if (action === 'RETRY') {
+            if (!canRetryFinanceExceptionStatus(exc.status)) {
+                return res.status(409).json({ error: 'FINANCE_EXCEPTION_NOT_RETRYABLE' });
+            }
+            const [claimed] = await db.update(financeExceptions)
+                .set({ status: 'PROCESSING', updatedAt: new Date() })
+                .output()
+                .where(and(
+                    eq(financeExceptions.id, id),
+                    or(eq(financeExceptions.status, 'PENDING'), eq(financeExceptions.status, 'DEAD_LETTER')),
+                ));
+            if (!claimed) return res.status(409).json({ error: 'FINANCE_EXCEPTION_ALREADY_PROCESSING' });
             const payload = exc.payload as any;
-            await GLService.postJournalEntry(payload);
-            await db.update(financeExceptions)
-                .set({ status: 'RESOLVED', resolvedBy: req.user?.id || 'system', resolvedAt: new Date() })
-                .where(eq(financeExceptions.id, id));
+            const branchId = exc.branchId || req.effectiveBranchId || req.user?.branchId;
+            try {
+                await GLService.postJournalEntry({
+                    ...payload,
+                    branchId,
+                    createdBy: payload.createdBy || req.user?.id || 'system',
+                    actorId: req.user?.id || 'system',
+                    source: payload.source || 'FINANCE_EXCEPTION_RETRY',
+                    correlationId: `FINANCE_EXCEPTION_RETRY:${exc.id}`,
+                });
+                await db.update(financeExceptions)
+                    .set({ status: 'RESOLVED', resolvedBy: req.user?.id || 'system', resolvedAt: new Date() })
+                    .where(eq(financeExceptions.id, id));
+            } catch (error) {
+                await db.update(financeExceptions)
+                    .set({ status: 'PENDING', updatedAt: new Date() })
+                    .where(and(eq(financeExceptions.id, id), eq(financeExceptions.status, 'PROCESSING')));
+                throw error;
+            }
+            await createSignedAuditLog({
+                eventType: 'FINANCE_EXCEPTION_RESOLVED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { exceptionId: id, retry: true },
+                after: { status: 'RESOLVED' },
+                reason: 'Finance exception retried and resolved',
+            });
             return res.json({ success: true, message: 'Exception resolved and posted' });
         }
 
@@ -637,6 +730,17 @@ export const createReconciliation = async (req: Request, res: Response) => {
             branchId: req.effectiveBranchId,
             bookBalance: await getRealAccountBalance(String(body.accountCode || ''), req.effectiveBranchId),
         });
+        await createSignedAuditLog({
+            eventType: 'RECONCILIATION_CREATED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { reconciliationId: created.id, accountCode: body.accountCode, statementBalance: Number(body.statementBalance || 0) },
+            after: { status: created.status || 'OPEN' },
+            reason: 'Reconciliation created',
+        });
         res.status(201).json(created);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -659,6 +763,17 @@ export const resolveReconciliation = async (req: Request, res: Response) => {
         const realBookBalance = await getRealAccountBalance(resolved.accountCode, req.effectiveBranchId);
         resolved.bookBalance = realBookBalance;
         resolved.difference = Number(resolved.statementBalance || 0) - realBookBalance;
+        await createSignedAuditLog({
+            eventType: 'RECONCILIATION_RESOLVED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { reconciliationId: id, adjustWithJournal: Boolean(body.adjustWithJournal), difference: resolved.difference },
+            after: { status: resolved.status || 'RESOLVED' },
+            reason: 'Reconciliation resolved',
+        });
         res.json(resolved);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -692,6 +807,17 @@ export const closePeriod = async (req: Request, res: Response) => {
             periodEnd: body.periodEnd,
             updatedBy: req.user?.id || 'system',
             trialBalance: { debit, credit, balanced: Math.abs(debit - credit) < 0.01 },
+        });
+        await createSignedAuditLog({
+            eventType: 'FINANCIAL_PERIOD_CLOSED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { periodStart: body.periodStart, periodEnd: body.periodEnd, debit, credit, balanced: Math.abs(debit - credit) < 0.01 },
+            after: { status: 'CLOSED' },
+            reason: 'Financial period closed',
         });
         res.status(201).json(closed);
     } catch (error: any) {

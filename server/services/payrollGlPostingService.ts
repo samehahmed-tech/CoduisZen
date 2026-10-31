@@ -54,6 +54,9 @@ export const payrollGlPostingService = {
             referenceType: 'PAYROLL',
             description: `Payroll Run ${run.id}`,
             createdBy,
+            actorId: createdBy,
+            source: 'PAYROLL',
+            correlationId: `PAYROLL:${run.id}`,
             branchId,
             lines: journalLines,
         });

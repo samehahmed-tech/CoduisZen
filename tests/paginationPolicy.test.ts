@@ -82,8 +82,9 @@ describe('Phase-6 pagination policy', () => {
         const total: any = await request(app)
             .get('/api/orders?branch_id=b1&mode=page&page=1&limit=100')
             .set('Authorization', `Bearer ${token}`);
-        // With >500 rows present, page mode still counts every record…
-        expect(total.body.pagination.total).toBeGreaterThan(500);
+        // The fixture seeds 105 rows: page mode must count every record,
+        // including the second page beyond the 100-row response cap.
+        expect(total.body.pagination.total).toBeGreaterThan(100);
         // …and the tail page is reachable.
         const lastPage = total.body.pagination.totalPages;
         const tail: any = await request(app)

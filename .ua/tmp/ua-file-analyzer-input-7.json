@@ -1,0 +1,367 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "tests/aiChatRoute.test.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/apiErrorContract.test.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/attendanceSmartInference.test.ts",
+      "language": "typescript",
+      "sizeLines": 535,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/businessDateBounds.test.ts",
+      "language": "typescript",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/businessDateReports.test.ts",
+      "language": "typescript",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/butchery.test.ts",
+      "language": "typescript",
+      "sizeLines": 128,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/butcheryApi.test.ts",
+      "language": "typescript",
+      "sizeLines": 190,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/campaignDispatchSafety.test.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/cancelledRevenueFlow.test.ts",
+      "language": "typescript",
+      "sizeLines": 152,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/couponPricing.test.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dailyOrderNumber.test.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dashboardExpenseAndConsumption.test.ts",
+      "language": "typescript",
+      "sizeLines": 170,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dayCloseAutoClose.test.ts",
+      "language": "typescript",
+      "sizeLines": 285,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dayCloseBusinessDate.test.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dayCloseExports.test.ts",
+      "language": "typescript",
+      "sizeLines": 73,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dayCloseIdempotency.test.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dayCloseReopen.test.ts",
+      "language": "typescript",
+      "sizeLines": 145,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dineInTableReport.test.ts",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/directStockReceiptCost.test.ts",
+      "language": "typescript",
+      "sizeLines": 124,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/e2e/comprehensiveOrderFlow.test.ts",
+      "language": "typescript",
+      "sizeLines": 283,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/e2e/coreOrderFlow.test.ts",
+      "language": "typescript",
+      "sizeLines": 827,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/financeAccountCreation.test.ts",
+      "language": "typescript",
+      "sizeLines": 91,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/fiscalSafety.test.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/hrDocumentVault.test.ts",
+      "language": "typescript",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/hrEmployeeAccountCreation.test.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/hrExecutiveReports.test.ts",
+      "language": "typescript",
+      "sizeLines": 149,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/hrLegacyBranchIsolation.test.ts",
+      "language": "typescript",
+      "sizeLines": 140,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/hrReadiness.test.ts",
+      "language": "typescript",
+      "sizeLines": 142,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/inventoryDeductionGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 228,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/inventoryWarehouseAssignment.test.ts",
+      "language": "typescript",
+      "sizeLines": 128,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/kdsHandoverGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/managerApprovalAuth.test.ts",
+      "language": "typescript",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderBusinessDayGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderIdempotency.test.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderSideEffectsVisibility.test.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "tests/aiChatRoute.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/apiErrorContract.test.ts": [
+      "server/middleware/errorContract.ts"
+    ],
+    "tests/attendanceSmartInference.test.ts": [
+      "server/db/index.ts",
+      "server/services/attendanceOpsService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/businessDateBounds.test.ts": [
+      "server/utils/businessDate.ts"
+    ],
+    "tests/businessDateReports.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/butchery.test.ts": [
+      "server/services/butcheryService.ts"
+    ],
+    "tests/butcheryApi.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/campaignDispatchSafety.test.ts": [
+      "server/controllers/campaignController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/cancelledRevenueFlow.test.ts": [
+      "server/controllers/report/advancedFinanceReports.ts",
+      "server/controllers/report/operationsReports.ts",
+      "server/controllers/reportController.ts",
+      "server/controllers/shiftController.ts",
+      "server/db/index.ts",
+      "server/services/dayCloseService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/couponPricing.test.ts": [
+      "server/services/couponPricing.ts"
+    ],
+    "tests/dailyOrderNumber.test.ts": [
+      "server/services/orderNumberService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/dashboardExpenseAndConsumption.test.ts": [
+      "server/services/coaSeedService.ts",
+      "server/services/dayCloseService.ts",
+      "server/services/glService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/dayCloseAutoClose.test.ts": [
+      "server/services/dayCloseAutoCloseService.ts",
+      "server/services/dayCloseService.ts",
+      "server/services/whatsappService.ts",
+      "server/utils/socketEmit.ts"
+    ],
+    "tests/dayCloseBusinessDate.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/dayCloseExports.test.ts": [
+      "server/services/pdfService.ts"
+    ],
+    "tests/dayCloseIdempotency.test.ts": [
+      "server/services/dayCloseService.ts"
+    ],
+    "tests/dayCloseReopen.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/dineInTableReport.test.ts": [
+      "server/controllers/report/extendedSalesReports.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/directStockReceiptCost.test.ts": [
+      "server/controllers/inventoryController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/e2e/comprehensiveOrderFlow.test.ts": [
+      "server/services/coaSeedService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/e2e/coreOrderFlow.test.ts": [
+      "server/services/coaSeedService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/financeAccountCreation.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/fiscalSafety.test.ts": [
+      "server/db/index.ts",
+      "server/services/fiscalService.ts",
+      "server/services/fiscalSubmitService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/hrDocumentVault.test.ts": [
+      "server/db/index.ts",
+      "server/services/hrExtendedService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/hrEmployeeAccountCreation.test.ts": [
+      "server/controllers/userController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/hrExecutiveReports.test.ts": [
+      "server/db/index.ts",
+      "server/services/hrExecutiveReportsService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/hrLegacyBranchIsolation.test.ts": [
+      "server/controllers/hrController.ts",
+      "server/db/index.ts",
+      "server/services/hrExtendedService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/hrReadiness.test.ts": [
+      "server/db/index.ts",
+      "server/services/attendanceOpsService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/inventoryDeductionGuard.test.ts": [
+      "server/services/inventoryService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/inventoryWarehouseAssignment.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/kdsHandoverGuard.test.ts": [
+      "server/db/index.ts",
+      "server/services/orderLifecycleService.ts",
+      "server/utils/businessDate.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/managerApprovalAuth.test.ts": [
+      "server/services/managerApprovalAuth.ts"
+    ],
+    "tests/orderBusinessDayGuard.test.ts": [
+      "server/db/index.ts",
+      "server/services/orderLifecycleService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/orderIdempotency.test.ts": [
+      "server/services/idempotencyService.ts"
+    ],
+    "tests/orderSideEffectsVisibility.test.ts": [
+      "server/services/financePostingService.ts",
+      "server/services/postingRuleEngine.ts",
+      "src/db/schema.ts"
+    ]
+  }
+}

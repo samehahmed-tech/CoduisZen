@@ -1,0 +1,182 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/advance-business-date/advance-business-date.cjs",
+      "language": "javascript",
+      "sizeLines": 177,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/ai-copilot-hotfix/verify-installed.cjs",
+      "language": "javascript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/audit-sqlserver-columns.cjs",
+      "language": "javascript",
+      "sizeLines": 67,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/audit-sqlserver-fks.cjs",
+      "language": "javascript",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/audit-sqlserver-schema-drift.cjs",
+      "language": "javascript",
+      "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/build-inventory-import-xlsx.cjs",
+      "language": "javascript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/build-server.mjs",
+      "language": "javascript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/business-day-reopen-fix/reopen-business-day.cjs",
+      "language": "javascript",
+      "sizeLines": 186,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/cafe-menu-data.cjs",
+      "language": "javascript",
+      "sizeLines": 225,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/check-orders-columns.cjs",
+      "language": "javascript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/check-tables.cjs",
+      "language": "javascript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/check-users.cjs",
+      "language": "javascript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/cleanup-future-days/cleanup-future-days.cjs",
+      "language": "javascript",
+      "sizeLines": 222,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/close-day-17-open-18/close-day-17-open-18.cjs",
+      "language": "javascript",
+      "sizeLines": 241,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/convert-schema.mjs",
+      "language": "javascript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/core-smoke.ts",
+      "language": "typescript",
+      "sizeLines": 211,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/dev-env-init.ts",
+      "language": "typescript",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-receipt-css.cjs",
+      "language": "javascript",
+      "sizeLines": 85,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-record-defaults.mjs",
+      "language": "javascript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-schema-closures.mjs",
+      "language": "javascript",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-schema-commas.mjs",
+      "language": "javascript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-schema-patterns.mjs",
+      "language": "javascript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-schema-remaining.mjs",
+      "language": "javascript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/gen-track-link.ts",
+      "language": "typescript",
+      "sizeLines": 58,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/generate-theme-backgrounds.mjs",
+      "language": "javascript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "scripts/advance-business-date/advance-business-date.cjs": [],
+    "scripts/ai-copilot-hotfix/verify-installed.cjs": [],
+    "scripts/audit-sqlserver-columns.cjs": [],
+    "scripts/audit-sqlserver-fks.cjs": [],
+    "scripts/audit-sqlserver-schema-drift.cjs": [],
+    "scripts/build-inventory-import-xlsx.cjs": [],
+    "scripts/build-server.mjs": [],
+    "scripts/business-day-reopen-fix/reopen-business-day.cjs": [],
+    "scripts/cafe-menu-data.cjs": [],
+    "scripts/check-orders-columns.cjs": [],
+    "scripts/check-tables.cjs": [],
+    "scripts/check-users.cjs": [],
+    "scripts/cleanup-future-days/cleanup-future-days.cjs": [],
+    "scripts/close-day-17-open-18/close-day-17-open-18.cjs": [],
+    "scripts/convert-schema.mjs": [],
+    "scripts/core-smoke.ts": [],
+    "scripts/dev-env-init.ts": [],
+    "scripts/fix-receipt-css.cjs": [],
+    "scripts/fix-record-defaults.mjs": [],
+    "scripts/fix-schema-closures.mjs": [],
+    "scripts/fix-schema-commas.mjs": [],
+    "scripts/fix-schema-patterns.mjs": [],
+    "scripts/fix-schema-remaining.mjs": [],
+    "scripts/gen-track-link.ts": [],
+    "scripts/generate-theme-backgrounds.mjs": []
+  }
+}

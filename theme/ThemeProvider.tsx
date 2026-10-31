@@ -6,16 +6,6 @@ import { sanitizeColorOverrides } from './engine/validation';
 import { sanitizeBackgroundConfig, buildBackgroundCSS } from './engine/background';
 import { resolveUserOverrides } from './engine/resolve';
 import type { AppTheme } from '../types';
-import meridianThemeUrl from '../styles/themes/meridian.css?url';
-import commandThemeUrl from '../styles/themes/command.css?url';
-import glasslineThemeUrl from '../styles/themes/glassline.css?url';
-import canvasThemeUrl from '../styles/themes/canvas.css?url';
-import fluentProThemeUrl from '../styles/themes/fluent-pro.css?url';
-import materialXThemeUrl from '../styles/themes/material-x.css?url';
-import obsidianThemeUrl from '../styles/themes/obsidian.css?url';
-import tilesThemeUrl from '../styles/themes/tiles.css?url';
-import acrylicThemeUrl from '../styles/themes/acrylic.css?url';
-import touchThemeUrl from '../styles/themes/touch.css?url';
 
 export interface ThemeContextValue {
     theme: AppTheme;
@@ -26,21 +16,6 @@ export interface ThemeContextValue {
 }
 
 export const ThemeContext = createContext<ThemeContextValue | null>(null);
-
-const THEME_STYLESHEET_ID = 'restoflow-theme-stylesheet';
-
-const THEME_STYLESHEET_URLS: Record<AppTheme, string> = {
-    'meridian': meridianThemeUrl,
-    'command': commandThemeUrl,
-    'glassline': glasslineThemeUrl,
-    'canvas': canvasThemeUrl,
-    'fluent-pro': fluentProThemeUrl,
-    'material-x': materialXThemeUrl,
-    'obsidian': obsidianThemeUrl,
-    'tiles': tilesThemeUrl,
-    'acrylic': acrylicThemeUrl,
-    'touch': touchThemeUrl,
-};
 
 function applySemanticTokenLayers(config: ThemeConfig) {
     const root = document.documentElement;
@@ -120,118 +95,87 @@ function applySemanticTokenLayers(config: ThemeConfig) {
 }
 
 const POS_CARD_THEME_TOKENS: Record<AppTheme, Record<string, string>> = {
-    'meridian': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(129,140,248,0.35), transparent 26%), linear-gradient(135deg, #4f46e5, #6d28d9)',
+    'aero': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(191,227,255,0.45), transparent 28%), linear-gradient(135deg, #0a5c99, #2f9fd8)',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '225 230 250',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(30, 27, 75, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgba(245, 158, 11, 0.92)',
-        '--pos-theme-card-pattern-opacity': '0.16',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+        '--pos-theme-card-hero-muted': '222 240 255',
+        '--pos-theme-card-control-bg': 'rgba(7, 45, 75, 0.32)',
+        '--pos-theme-card-pattern-opacity': '0.12',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.5)',
     },
-    'command': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(56,189,248,0.3), transparent 26%), linear-gradient(135deg, #0c4a6e, #0284c7)',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '220 235 245',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(5, 15, 25, 0.32)',
-        '--pos-theme-card-badge-bg': 'rgba(250, 204, 21, 0.92)',
+    'citrus': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #d6f05f, #f4a23c)',
+        '--pos-theme-card-hero-text': '43 36 21',
+        '--pos-theme-card-hero-muted': '92 75 30',
+        '--pos-theme-card-control-bg': 'rgba(43, 36, 21, 0.18)',
         '--pos-theme-card-pattern-opacity': '0.1',
-        '--pos-theme-card-art-ring': 'rgba(56, 189, 248, 0.5)',
+        '--pos-theme-card-art-ring': 'rgba(43, 36, 21, 0.35)',
     },
-    'glassline': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34,211,238,0.4), transparent 26%), linear-gradient(135deg, #6366f1, #06b6d4)',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '230 232 255',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(30, 27, 75, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgba(34, 211, 238, 0.9)',
-        '--pos-theme-card-pattern-opacity': '0.2',
-        '--pos-theme-card-art-ring': 'rgba(165, 180, 252, 0.55)',
+    'porcelain': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #efece6, #d8d1c5)',
+        '--pos-theme-card-hero-text': '25 24 23',
+        '--pos-theme-card-hero-muted': '98 92 84',
+        '--pos-theme-card-control-bg': 'rgba(25, 24, 23, 0.08)',
+        '--pos-theme-card-pattern-opacity': '0.05',
+        '--pos-theme-card-art-ring': 'rgba(25, 24, 23, 0.3)',
     },
-    'canvas': {
-        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #1e3a8a, #1e40af)',
+    'blueprint': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #0d4f86, #1565a0)',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '220 228 240',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(15, 23, 42, 0.28)',
-        '--pos-theme-card-badge-bg': 'rgba(146, 64, 14, 0.92)',
+        '--pos-theme-card-hero-muted': '206 229 246',
+        '--pos-theme-card-control-bg': 'rgba(6, 38, 64, 0.3)',
+        '--pos-theme-card-pattern-opacity': '0.18',
+        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
+    },
+    'clay': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #d97b45, #a94e2f)',
+        '--pos-theme-card-hero-text': '255 248 240',
+        '--pos-theme-card-hero-muted': '250 224 205',
+        '--pos-theme-card-control-bg': 'rgba(49, 37, 27, 0.28)',
+        '--pos-theme-card-pattern-opacity': '0.1',
+        '--pos-theme-card-art-ring': 'rgba(255, 248, 240, 0.45)',
+    },
+    'nocturne': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(212,175,122,0.35), transparent 28%), linear-gradient(135deg, #0c1626, #1a2740)',
+        '--pos-theme-card-hero-text': '245 238 225',
+        '--pos-theme-card-hero-muted': '212 199 176',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.42)',
         '--pos-theme-card-pattern-opacity': '0.08',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
+        '--pos-theme-card-art-ring': 'rgba(212, 175, 122, 0.45)',
     },
-    'fluent-pro': {
-        '--pos-theme-card-hero-bg': 'rgb(var(--primary))',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '220 228 240',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(15, 23, 42, 0.25)',
-        '--pos-theme-card-badge-bg': 'rgb(var(--accent))',
-        '--pos-theme-card-pattern-opacity': '0',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.4)',
-    },
-    'material-x': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(249,168,212,0.4), transparent 26%), linear-gradient(135deg, #7c3aed, #db2777)',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '240 225 245',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(50, 15, 50, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgba(219, 39, 119, 0.92)',
-        '--pos-theme-card-pattern-opacity': '0.2',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
-    },
-    'obsidian': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(94,106,210,0.3), transparent 26%), linear-gradient(135deg, #1a1a1e, #0c0c0e)',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '220 220 228',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.40)',
-        '--pos-theme-card-badge-bg': 'rgba(94, 106, 210, 0.92)',
-        '--pos-theme-card-pattern-opacity': '0.1',
-        '--pos-theme-card-art-ring': 'rgba(94, 106, 210, 0.55)',
-    },
-    'tiles': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(96,165,250,0.3), transparent 26%), linear-gradient(135deg, #2563eb, #4f46e5)',
-        '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '225 232 250',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(15, 25, 50, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgba(37, 99, 235, 0.92)',
+    'foundry': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #c2410c, #7c2d12)',
+        '--pos-theme-card-hero-text': '255 245 235',
+        '--pos-theme-card-hero-muted': '246 214 190',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.42)',
         '--pos-theme-card-pattern-opacity': '0.14',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+        '--pos-theme-card-art-ring': 'rgba(255, 245, 235, 0.4)',
     },
-    'acrylic': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(45,212,191,0.3), transparent 26%), linear-gradient(135deg, #4755ab, #0d9488)',
+    'neon': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(34,211,238,0.4), transparent 28%), linear-gradient(135deg, #ff2e88, #7c3aed)',
         '--pos-theme-card-hero-text': '255 255 255',
-        '--pos-theme-card-hero-muted': '230 235 245',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(25, 30, 50, 0.30)',
-        '--pos-theme-card-badge-bg': 'rgba(13, 148, 136, 0.9)',
-        '--pos-theme-card-pattern-opacity': '0.16',
+        '--pos-theme-card-hero-muted': '255 224 240',
+        '--pos-theme-card-control-bg': 'rgba(20, 4, 20, 0.42)',
+        '--pos-theme-card-pattern-opacity': '0.18',
         '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
     },
-    'touch': {
-        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(245,158,11,0.4), transparent 26%), linear-gradient(135deg, #c2410c, #ea580c)',
-        '--pos-theme-card-hero-text': '255 250 242',
-        '--pos-theme-card-hero-muted': '244 224 200',
-        '--pos-theme-card-action-bg': '#ffffff',
-        '--pos-theme-card-action-text': 'var(--primary)',
-        '--pos-theme-card-control-bg': 'rgba(40, 20, 10, 0.28)',
-        '--pos-theme-card-badge-bg': 'rgba(245, 158, 11, 0.92)',
-        '--pos-theme-card-pattern-opacity': '0.2',
-        '--pos-theme-card-art-ring': 'rgba(255, 255, 255, 0.45)',
+    'slate': {
+        '--pos-theme-card-hero-bg': 'linear-gradient(135deg, #13211c, #1f3a30)',
+        '--pos-theme-card-hero-text': '226 240 232',
+        '--pos-theme-card-hero-muted': '170 199 184',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.4)',
+        '--pos-theme-card-pattern-opacity': '0.1',
+        '--pos-theme-card-art-ring': 'rgba(93, 224, 164, 0.4)',
+    },
+    'cinema': {
+        '--pos-theme-card-hero-bg': 'radial-gradient(circle at 78% 18%, rgba(212,175,122,0.38), transparent 28%), linear-gradient(135deg, #0b0b0c, #1a1712)',
+        '--pos-theme-card-hero-text': '246 240 228',
+        '--pos-theme-card-hero-muted': '203 187 156',
+        '--pos-theme-card-control-bg': 'rgba(0, 0, 0, 0.48)',
+        '--pos-theme-card-pattern-opacity': '0.08',
+        '--pos-theme-card-art-ring': 'rgba(212, 175, 122, 0.5)',
     },
 };
-
 function applyThemeCSSVariables(config: ThemeConfig) {
     const root = document.documentElement;
 
@@ -276,22 +220,29 @@ function applyThemeCSSVariables(config: ThemeConfig) {
 
 function applyPOSCardThemeVariables(theme: AppTheme) {
     const root = document.documentElement;
-    const tokens = POS_CARD_THEME_TOKENS[theme] ?? POS_CARD_THEME_TOKENS['meridian'];
+    const tokens = POS_CARD_THEME_TOKENS[theme] ?? POS_CARD_THEME_TOKENS.aero;
     Object.entries(tokens).forEach(([key, value]) => {
         root.style.setProperty(key, value);
     });
+    // Controls follow mode surfaces; RGB channel values are consumed inside rgb().
+    root.style.setProperty('--pos-theme-card-action-bg', 'rgb(var(--bg-elevated))');
+    root.style.setProperty('--pos-theme-card-action-text', 'var(--text-main)');
+    root.style.setProperty('--pos-theme-card-badge-bg', 'rgb(var(--bg-elevated))');
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const settings = useAuthStore((s) => s.settings);
     const updateSettings = useAuthStore((s) => s.updateSettings);
 
-    // Engine 2.0 migration: any stored id from any generation resolves to a
-    // living V2 theme. Unknown/malformed values fall back to meridian safely.
+    // V5 migration: any stored id from any generation resolves to a living theme.
     const storedTheme = settings.theme as string | undefined;
     const themeId = migrateThemeId(storedTheme);
-    const isDark = settings.isDarkMode ?? true;
-    const config = THEME_REGISTRY[themeId as AppTheme] ?? THEME_REGISTRY['meridian' as AppTheme];
+    const isDark = settings.isDarkMode ?? false;
+    const config = THEME_REGISTRY[themeId as AppTheme] ?? THEME_REGISTRY.aero;
+
+    // Every V5 theme owns both palettes. `defaultMode` is only the initial
+    // preference when a theme is selected; it must not lock the user out of
+    // the opposite mode after the theme is active.
 
     useEffect(() => {
         const root = document.documentElement;
@@ -385,28 +336,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     }, [themeId, isDark, config, settings.language, settings.wallpaper, settings.wallpaperOpacity, settings.customWallpaperUrl, settings.density, settings.backgroundConfig]);
 
-    useEffect(() => {
-        const href = THEME_STYLESHEET_URLS[themeId as AppTheme] || THEME_STYLESHEET_URLS['meridian' as AppTheme];
-        let link = document.getElementById(THEME_STYLESHEET_ID) as HTMLLinkElement | null;
-
-        if (!link) {
-            link = document.createElement('link');
-            link.id = THEME_STYLESHEET_ID;
-            link.rel = 'stylesheet';
-            document.head.appendChild(link);
-        }
-
-        if (link.getAttribute('href') !== href) {
-            link.setAttribute('href', href);
-        }
-    }, [themeId]);
-
     const value = useMemo<ThemeContextValue>(
         () => ({
             theme: themeId,
             config,
             isDark,
-            setTheme: (t: AppTheme) => updateSettings({ theme: t }),
+            setTheme: (t: AppTheme) => {
+                const next = THEME_REGISTRY[t];
+                if (!next) return;
+                updateSettings({ theme: t, isDarkMode: next.defaultMode === 'dark' });
+            },
             toggleDark: () => updateSettings({ isDarkMode: !isDark }),
         }),
         [themeId, config, isDark, updateSettings],

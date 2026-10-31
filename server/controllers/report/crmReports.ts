@@ -3,6 +3,7 @@ import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, customers, campaigns } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
+import { ensureCampaignAttributionSchema } from '../../services/campaignAttributionService';
 
 export const getCustomerLTV = async (req: Request, res: Response) => {
     try {
@@ -60,9 +61,24 @@ export const getCustomerLTV = async (req: Request, res: Response) => {
     }
 };
 
-export const getCampaignROI = async (_req: Request, res: Response) => {
+export const getCampaignROI = async (req: Request, res: Response) => {
     try {
+        await ensureCampaignAttributionSchema();
         const rows = await db.select().from(campaigns).orderBy(desc(campaigns.createdAt)).limit(50);
+        const campaignIds = rows.map((row) => row.id);
+        const conditions: any[] = [
+            inArray(orders.campaignId, campaignIds),
+            inArray(orders.status, ['DELIVERED', 'COMPLETED']),
+        ];
+        if (req.effectiveBranchId) conditions.push(eq(orders.branchId, req.effectiveBranchId));
+        const attributedRows = campaignIds.length > 0
+            ? await db.select({
+                campaignId: orders.campaignId,
+                conversions: sql<number>`count(*)`,
+                revenue: sql<number>`coalesce(sum(${orders.total}), 0)`,
+            }).from(orders).where(and(...conditions)).groupBy(orders.campaignId)
+            : [];
+        const attributedByCampaign = new Map(attributedRows.map((row) => [String(row.campaignId), row]));
 
         res.json(rows.map(r => ({
             id: r.id,
@@ -70,14 +86,13 @@ export const getCampaignROI = async (_req: Request, res: Response) => {
             type: r.type,
             status: r.status,
             reach: r.reach || 0,
-            conversions: r.conversions || 0,
-            // Stored estimate, NOT attributed order revenue (no order-level
-            // campaign attribution exists) — treat ROI as directional.
-            revenue: Number(r.revenue || 0),
-            revenueBasis: 'STORED_ESTIMATE_UNATTRIBUTED',
+            conversions: Number(attributedByCampaign.get(r.id)?.conversions || 0),
+            revenue: Number(attributedByCampaign.get(r.id)?.revenue || 0),
+            revenueBasis: 'COMPLETED_OR_DELIVERED_ORDERS',
+            storedRevenueEstimate: Number(r.revenue || 0),
             budget: Number(r.budget || 0),
-            roi: Number(r.budget || 0) > 0 ? Number(((Number(r.revenue || 0) - Number(r.budget || 0)) / Number(r.budget || 0) * 100).toFixed(1)) : 0,
-            conversionRate: Number(r.reach || 0) > 0 ? Number((Number(r.conversions || 0) / Number(r.reach || 0) * 100).toFixed(1)) : 0,
+            roi: Number(r.budget || 0) > 0 ? Number(((Number(attributedByCampaign.get(r.id)?.revenue || 0) - Number(r.budget || 0)) / Number(r.budget || 0) * 100).toFixed(1)) : 0,
+            conversionRate: Number(r.reach || 0) > 0 ? Number((Number(attributedByCampaign.get(r.id)?.conversions || 0) / Number(r.reach || 0) * 100).toFixed(1)) : 0,
             createdAt: r.createdAt,
         })));
     } catch (error: any) {

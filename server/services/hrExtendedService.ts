@@ -308,6 +308,7 @@ export const hrExtendedService = {
         graceLateMinutes?: number;
         earlyLeaveToleranceMinutes?: number;
         overtimeThresholdMinutes?: number;
+        minimumRestMinutes?: number;
         minHoursForPresent?: number;
         attendanceProcessingMode?: string;
         operationalDayStartHour?: number;
@@ -334,6 +335,7 @@ export const hrExtendedService = {
                     graceLateMinutes: policy.graceLateMinutes ?? 15,
                     earlyLeaveToleranceMinutes: policy.earlyLeaveToleranceMinutes ?? 10,
                     overtimeThresholdMinutes: policy.overtimeThresholdMinutes ?? 30,
+                    minimumRestMinutes: Math.max(660, Math.min(1440, policy.minimumRestMinutes ?? 660)),
                     minHoursForPresent: policy.minHoursForPresent ?? 4,
                     attendanceProcessingMode: policy.attendanceProcessingMode || 'AUTO',
                     operationalDayStartHour: policy.operationalDayStartHour ?? 8,
@@ -361,6 +363,7 @@ export const hrExtendedService = {
             graceLateMinutes: policy.graceLateMinutes ?? 15,
             earlyLeaveToleranceMinutes: policy.earlyLeaveToleranceMinutes ?? 10,
             overtimeThresholdMinutes: policy.overtimeThresholdMinutes ?? 30,
+            minimumRestMinutes: Math.max(660, Math.min(1440, policy.minimumRestMinutes ?? 660)),
             minHoursForPresent: policy.minHoursForPresent ?? 4,
             attendanceProcessingMode: policy.attendanceProcessingMode || 'AUTO',
             operationalDayStartHour: policy.operationalDayStartHour ?? 8,
@@ -1288,7 +1291,7 @@ export const hrExtendedService = {
     // =========================================================================
     // Overtime
     // =========================================================================
-    async getOvertimeEntries(filters?: { employeeId?: string; status?: string; month?: string }) {
+    async getOvertimeEntries(filters?: { employeeId?: string; status?: string; month?: string; branchId?: string }) {
         let conditions = [];
         if (filters?.employeeId) conditions.push(eq(overtimeEntries.employeeId, filters.employeeId));
         if (filters?.status) conditions.push(eq(overtimeEntries.status, filters.status));
@@ -1299,6 +1302,12 @@ export const hrExtendedService = {
             orderBy: [desc(overtimeEntries.date)]
         });
 
+        if (filters?.branchId) {
+            const branchEmployees = await db.select({ id: employees.id }).from(employees).where(eq(employees.branchId, filters.branchId));
+            const branchEmployeeIds = new Set(branchEmployees.map((employee) => employee.id));
+            return entries.filter((entry) => branchEmployeeIds.has(entry.employeeId));
+        }
+
         if (filters?.month) {
             return entries.filter(e => e.date.toISOString().startsWith(filters.month!));
         }
@@ -1308,12 +1317,16 @@ export const hrExtendedService = {
 
     async recordOvertime(data: {
         employeeId: string;
+        branchId?: string;
         date: string;
         regularHours: number;
         overtimeHours: number;
         overtimeRate?: number;
         baseSalaryPerHour?: number;
     }) {
+        const [employee] = await db.select({ branchId: employees.branchId }).from(employees).where(eq(employees.id, data.employeeId)).top(1);
+        if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
+        if (data.branchId && employee.branchId !== data.branchId) throw new Error('OVERTIME_EMPLOYEE_BRANCH_MISMATCH');
         const rate = data.overtimeRate || 1.5;
         const hourlyRate = data.baseSalaryPerHour || 0;
         const amount = data.overtimeHours * hourlyRate * rate;
@@ -1333,7 +1346,11 @@ export const hrExtendedService = {
         return entry;
     },
 
-    async approveOvertime(entryId: string, approvedBy: string) {
+    async approveOvertime(entryId: string, approvedBy: string, branchId?: string) {
+        const [entry] = await db.select().from(overtimeEntries).where(eq(overtimeEntries.id, entryId)).top(1);
+        if (!entry) throw new Error('Overtime entry not found or not pending');
+        const [employee] = await db.select({ branchId: employees.branchId }).from(employees).where(eq(employees.id, entry.employeeId)).top(1);
+        if (branchId && employee?.branchId !== branchId) throw new Error('OVERTIME_EMPLOYEE_BRANCH_MISMATCH');
         const [updated] = await db.update(overtimeEntries)
             .set({ status: 'APPROVED', approvedBy })
             .output()

@@ -452,6 +452,7 @@ export interface Customer {
   name: string;
   phone: string;
   email?: string;
+  birthDate?: Date | string;
   address?: string;
   lat?: number;
   lng?: number;
@@ -710,6 +711,8 @@ export enum AppPermission {
   CFG_MANAGE_PRINTERS = 'CFG_MANAGE_PRINTERS',
   CFG_MANAGE_PLATFORMS = 'CFG_MANAGE_PLATFORMS',
   CFG_MANAGE_WAREHOUSES = 'CFG_MANAGE_WAREHOUSES',
+  CFG_MANAGE_PUBLIC_API_KEYS = 'CFG_MANAGE_PUBLIC_API_KEYS',
+  CFG_MANAGE_WEBHOOKS = 'CFG_MANAGE_WEBHOOKS',
 }
 
 export enum UserRole {
@@ -1152,16 +1155,16 @@ export const INITIAL_ROLE_PERMISSIONS: Record<UserRole, AppPermission[]> = {
 };
 
 export type AppTheme =
-  | 'meridian'
-  | 'command'
-  | 'glassline'
-  | 'canvas'
-  | 'fluent-pro'
-  | 'material-x'
-  | 'obsidian'
-  | 'tiles'
-  | 'acrylic'
-  | 'touch';
+  | 'aero'
+  | 'citrus'
+  | 'porcelain'
+  | 'blueprint'
+  | 'clay'
+  | 'nocturne'
+  | 'foundry'
+  | 'neon'
+  | 'slate'
+  | 'cinema';
 
 /** Which day-close readiness checks are mandatory (Settings → Day Close). */
 export interface DayCloseRules {

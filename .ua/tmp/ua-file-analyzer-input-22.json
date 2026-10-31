@@ -1,0 +1,262 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/TableMap.tsx",
+      "language": "typescript",
+      "sizeLines": 958,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/CalculatorWidget.tsx",
+      "language": "typescript",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/VirtualGrid.tsx",
+      "language": "typescript",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useBarcodeScanner.ts",
+      "language": "typescript",
+      "sizeLines": 140,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/usePOSCatalog.ts",
+      "language": "typescript",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/usePOSKeyboardShortcuts.ts",
+      "language": "typescript",
+      "sizeLines": 300,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/platformPricing.ts",
+      "language": "typescript",
+      "sizeLines": 49,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/POS.tsx",
+      "language": "typescript",
+      "sizeLines": 2866,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/CartItem.tsx",
+      "language": "typescript",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/CategorySidebar.tsx",
+      "language": "typescript",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/CategoryTabs.tsx",
+      "language": "typescript",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/CourseModal.tsx",
+      "language": "typescript",
+      "sizeLines": 91,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/HeldOrdersModal.tsx",
+      "language": "typescript",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/ItemGrid.tsx",
+      "language": "typescript",
+      "sizeLines": 173,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/ItemOptionsModal.tsx",
+      "language": "typescript",
+      "sizeLines": 360,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/MenuItemCard.tsx",
+      "language": "typescript",
+      "sizeLines": 713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/NoteModal.tsx",
+      "language": "typescript",
+      "sizeLines": 84,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/POSCartSidebar.tsx",
+      "language": "typescript",
+      "sizeLines": 334,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/POSItemsPanel.tsx",
+      "language": "typescript",
+      "sizeLines": 348,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/POSShortcutsHelp.tsx",
+      "language": "typescript",
+      "sizeLines": 168,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/POSToolbar.tsx",
+      "language": "typescript",
+      "sizeLines": 233,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/PaymentSummary.tsx",
+      "language": "typescript",
+      "sizeLines": 340,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/TableMap.tsx": [
+      "components/common/VirtualGrid.tsx",
+      "src/features/pos/components/POSShortcutsHelp.tsx",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/tableOrder.ts"
+    ],
+    "components/common/CalculatorWidget.tsx": [],
+    "components/common/VirtualGrid.tsx": [],
+    "hooks/useBarcodeScanner.ts": [],
+    "hooks/usePOSCatalog.ts": [
+      "services/platformPricing.ts",
+      "types.ts"
+    ],
+    "hooks/usePOSKeyboardShortcuts.ts": [
+      "types.ts"
+    ],
+    "services/platformPricing.ts": [
+      "types.ts"
+    ],
+    "src/features/pos/POS.tsx": [
+      "components/Modal.tsx",
+      "components/TableMap.tsx",
+      "components/Toast.tsx",
+      "components/common/AddressMapPicker.tsx",
+      "components/common/CalculatorWidget.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "hooks/useBarcodeScanner.ts",
+      "hooks/usePOSCatalog.ts",
+      "hooks/usePOSKeyboardShortcuts.ts",
+      "services/api.ts",
+      "services/api/delivery.ts",
+      "services/api/kds.ts",
+      "services/platformPricing.ts",
+      "services/posPrintOrchestrator.ts",
+      "services/translations.ts",
+      "src/features/pos/components/CartItem.tsx",
+      "src/features/pos/components/CategorySidebar.tsx",
+      "src/features/pos/components/CategoryTabs.tsx",
+      "src/features/pos/components/CourseModal.tsx",
+      "src/features/pos/components/CustomerSelectView.tsx",
+      "src/features/pos/components/HeldOrdersModal.tsx",
+      "src/features/pos/components/ItemGrid.tsx",
+      "src/features/pos/components/ItemOptionsModal.tsx",
+      "src/features/pos/components/ManagerApprovalModal.tsx",
+      "src/features/pos/components/MenuItemCard.tsx",
+      "src/features/pos/components/NoteModal.tsx",
+      "src/features/pos/components/POSCartSidebar.tsx",
+      "src/features/pos/components/POSHeader.tsx",
+      "src/features/pos/components/POSItemsPanel.tsx",
+      "src/features/pos/components/POSReturnModal.tsx",
+      "src/features/pos/components/POSShortcutsHelp.tsx",
+      "src/features/pos/components/POSToolbar.tsx",
+      "src/features/pos/components/PaymentSummary.tsx",
+      "src/features/pos/components/RetailModePanel.tsx",
+      "src/features/pos/components/SeatModal.tsx",
+      "src/features/pos/components/ShiftOverlays.tsx",
+      "src/features/pos/components/SplitBillModal.tsx",
+      "src/features/pos/components/TableManagementModal.tsx",
+      "src/features/pos/components/TakeawayNameModal.tsx",
+      "src/features/pos/orderPayment.ts",
+      "src/features/pos/platformDeliveryValidation.ts",
+      "src/services/printService.ts",
+      "src/utils/barcodeParser.ts",
+      "src/utils/idGenerator.ts",
+      "src/utils/tableMinimumSpend.ts",
+      "stores/useAuthStore.ts",
+      "stores/useCRMStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts",
+      "utils/tableOrder.ts"
+    ],
+    "src/features/pos/components/CartItem.tsx": [
+      "types.ts"
+    ],
+    "src/features/pos/components/CategorySidebar.tsx": [
+      "types.ts"
+    ],
+    "src/features/pos/components/CategoryTabs.tsx": [
+      "types.ts"
+    ],
+    "src/features/pos/components/CourseModal.tsx": [],
+    "src/features/pos/components/HeldOrdersModal.tsx": [],
+    "src/features/pos/components/ItemGrid.tsx": [
+      "src/features/pos/components/MenuItemCard.tsx",
+      "types.ts"
+    ],
+    "src/features/pos/components/ItemOptionsModal.tsx": [
+      "services/platformPricing.ts",
+      "src/features/pos/itemOptionPricing.ts",
+      "types.ts"
+    ],
+    "src/features/pos/components/MenuItemCard.tsx": [
+      "src/features/pos/components/ItemImage.tsx",
+      "src/features/pos/components/posClickSound.ts",
+      "src/features/pos/components/useZenTilt.ts",
+      "types.ts"
+    ],
+    "src/features/pos/components/NoteModal.tsx": [],
+    "src/features/pos/components/POSCartSidebar.tsx": [
+      "components/common/DeliveryZonePicker.tsx",
+      "src/features/pos/components/CartItem.tsx",
+      "src/features/pos/components/PaymentSummary.tsx",
+      "types.ts"
+    ],
+    "src/features/pos/components/POSItemsPanel.tsx": [
+      "src/features/pos/components/CategoryTabs.tsx",
+      "src/features/pos/components/ItemGrid.tsx",
+      "src/features/pos/components/MenuItemCard.tsx",
+      "types.ts"
+    ],
+    "src/features/pos/components/POSShortcutsHelp.tsx": [],
+    "src/features/pos/components/POSToolbar.tsx": [
+      "src/features/pos/components/POSShortcutsHelp.tsx",
+      "types.ts"
+    ],
+    "src/features/pos/components/PaymentSummary.tsx": [
+      "components/common/ToastProvider.tsx",
+      "types.ts"
+    ]
+  }
+}

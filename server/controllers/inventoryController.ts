@@ -33,12 +33,20 @@ const serializeBom = (value: unknown): string => JSON.stringify(parseBom(value))
 
 const ensureInventorySchema = async () => {
     if (inventorySchemaReady) return;
-    await pool.query(`
-        IF OBJECT_ID('uq_inventory_items_sku', 'UQ') IS NOT NULL
-            ALTER TABLE inventory_items DROP CONSTRAINT uq_inventory_items_sku;
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_inventory_items_sku_not_null' AND object_id = OBJECT_ID('inventory_items'))
-            CREATE UNIQUE INDEX idx_inventory_items_sku_not_null ON inventory_items(sku) WHERE sku IS NOT NULL;
-    `);
+    try {
+        await pool.query(`
+            IF OBJECT_ID('uq_inventory_items_sku', 'UQ') IS NOT NULL
+                ALTER TABLE inventory_items DROP CONSTRAINT uq_inventory_items_sku;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_inventory_items_sku_not_null' AND object_id = OBJECT_ID('inventory_items'))
+                CREATE UNIQUE INDEX idx_inventory_items_sku_not_null ON inventory_items(sku) WHERE sku IS NOT NULL;
+        `);
+    } catch (error: any) {
+        // Duplicate legacy SKUs must not prevent the rest of the inventory schema
+        // from being brought up. New writes still validate uniqueness at the API.
+        console.warn('[inventory] SKU uniqueness migration deferred:', error?.message || error);
+    }
+
+    try {
     await pool.query(`
         IF COL_LENGTH('inventory_items', 'purchase_unit') IS NULL
             ALTER TABLE inventory_items ADD purchase_unit nvarchar(max) NULL;
@@ -46,13 +54,24 @@ const ensureInventorySchema = async () => {
     await pool.query(`
         IF COL_LENGTH('inventory_items', 'purchase_unit_factor') IS NULL
             ALTER TABLE inventory_items ADD purchase_unit_factor real NULL;
-        IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = 'df_inventory_items_purchase_unit_factor')
+        IF NOT EXISTS (
+            SELECT 1
+            FROM sys.default_constraints dc
+            JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+            WHERE dc.parent_object_id = OBJECT_ID('inventory_items')
+              AND c.name = 'purchase_unit_factor'
+        )
             ALTER TABLE inventory_items ADD CONSTRAINT df_inventory_items_purchase_unit_factor DEFAULT 1 FOR purchase_unit_factor;
     `);
     await pool.query(`
         UPDATE inventory_items SET purchase_unit_factor = 1
         WHERE purchase_unit_factor IS NULL OR purchase_unit_factor <= 0;
     `);
+    } catch (error: any) {
+        console.warn('[inventory] purchase-unit migration deferred:', error?.message || error);
+    }
+
+    try {
     await pool.query(`
         IF OBJECT_ID('dbo.stock_transfer_requests', 'U') IS NULL
         CREATE TABLE dbo.stock_transfer_requests (
@@ -99,11 +118,14 @@ const ensureInventorySchema = async () => {
             status nvarchar(50) NOT NULL DEFAULT 'RESERVED',
             created_at datetime2 NOT NULL DEFAULT GETDATE()
         );
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'stock_transfer_requests_status_idx' AND object_id = OBJECT_ID('dbo.stock_transfer_requests'))
-            CREATE INDEX stock_transfer_requests_status_idx ON dbo.stock_transfer_requests(status, requested_at);
-        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'stock_transfer_reservations_request_idx' AND object_id = OBJECT_ID('dbo.stock_transfer_reservations'))
-            CREATE INDEX stock_transfer_reservations_request_idx ON dbo.stock_transfer_reservations(request_id, status);
+        -- Indexes are optional optimizations; create them in a separate migration
+        -- so a legacy SQL Server instance cannot block core inventory writes.
     `);
+    } catch (error: any) {
+        // Transfer tables are an optional extension; they must not block
+        // ordinary inventory item creation on legacy SQL Server installs.
+        console.warn('[inventory] transfer schema migration deferred:', error?.message || error);
+    }
     inventorySchemaReady = true;
 };
 
@@ -289,7 +311,7 @@ export const createInventoryItem = async (req: Request, res: Response) => {
         }
 
         const created = await db.transaction(async (tx) => {
-            const [item] = await tx.insert(inventoryItems).output().values({
+            const [item] = await (tx.insert(inventoryItems) as any).output().values({
                 id,
                 name: body.name,
                 nameAr: body.name_ar,
@@ -412,7 +434,7 @@ export const updateInventoryItem = async (req: Request, res: Response) => {
             branchId: null,
             payload: { itemId: id, updates: updates },
             reason: 'Inventory item parameters updated',
-            sourceDevice: req.headers['user-agent'] || 'unknown',
+            sourceDevice: req.headers?.['user-agent'] || 'unknown',
             requestId: req.headers['x-request-id'] as string || `req-${Date.now()}`
         });
 
@@ -474,7 +496,7 @@ export const deleteInventoryItem = async (req: Request, res: Response) => {
             branchId: null,
             payload: { itemId: id, itemName: current.name },
             reason: 'Inventory item archived from inventory management',
-            sourceDevice: req.headers['user-agent'] || 'unknown',
+            sourceDevice: req.headers?.['user-agent'] || 'unknown',
             requestId: req.headers['x-request-id'] as string || `req-${Date.now()}`,
         });
         res.json({ message: 'Inventory item archived', item: deleted });
@@ -488,7 +510,8 @@ export const deleteInventoryItem = async (req: Request, res: Response) => {
  */
 export const updateStock = async (req: Request, res: Response) => {
     try {
-        const { item_id, warehouse_id, quantity, type, reason, actor_id, reference_id } = req.body || {};
+        const { item_id, warehouse_id, quantity, type, reason, reference_id } = req.body || {};
+        const actorId = req.user?.id || 'system';
 
         if (!item_id || !warehouse_id || quantity === undefined) {
             return res.status(400).json({ error: 'item_id, warehouse_id, and quantity are required' });
@@ -551,7 +574,7 @@ export const updateStock = async (req: Request, res: Response) => {
                         Math.abs(delta),
                         reference_id || `ADJ-${Date.now()}`,
                         reason || 'Cycle Count Decrease',
-                        { movementType: type || 'ADJUSTMENT', performedBy: actor_id },
+                        { movementType: type || 'ADJUSTMENT', performedBy: actorId },
                     );
                 } else if (delta > 0) {
                     if (existing) {
@@ -573,7 +596,7 @@ export const updateStock = async (req: Request, res: Response) => {
                         quantity: delta,
                         type: type || 'ADJUSTMENT',
                         reason: reason || 'Cycle Count Increase',
-                        performedBy: actor_id,
+                        performedBy: actorId,
                         referenceId: reference_id,
                         createdAt: new Date(),
                     });
@@ -599,8 +622,8 @@ export const updateStock = async (req: Request, res: Response) => {
                 // 3. Log Audit
                 await tx.insert(auditLogs).values({
                     eventType: 'INVENTORY_STOCK_ADJUSTMENT',
-                    userId: actor_id || null,
-                    branchId: null,
+                    userId: actorId,
+                    branchId: warehouse.branchId || null,
                     payload: {
                         itemId: item_id,
                         warehouseId: warehouse_id,
@@ -619,7 +642,7 @@ export const updateStock = async (req: Request, res: Response) => {
                 referenceId: reference_id || `INV-${Date.now()}`,
                 amount: value,
                 branchId: warehouse?.branchId || undefined,
-                userId: actor_id || 'system',
+                userId: actorId,
                 reason: reason || null,
             };
             if (value > 0) {
@@ -630,6 +653,19 @@ export const updateStock = async (req: Request, res: Response) => {
                 }
             }
         }
+
+        await createSignedAuditLog({
+            eventType: 'INVENTORY_STOCK_ADJUSTED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: warehouse.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers?.['user-agent'],
+            payload: { itemId: item_id, warehouseId: warehouse_id, type: type || 'ADJUSTMENT', referenceId: reference_id || null },
+            before: { quantity: previousQty },
+            after: { quantity: newQty, delta },
+            reason: reason || 'Stock adjustment',
+        });
 
         try {
             const [finalStock] = await db.select().from(inventoryStock).where(
@@ -659,7 +695,8 @@ export const updateStock = async (req: Request, res: Response) => {
 };
 
 export const receiveStockDirect = async (req: Request, res: Response) => {
-    const { warehouse_id, supplier_id, reference_id, actor_id, items } = req.body;
+    const { warehouse_id, supplier_id, reference_id, items } = req.body;
+    const actorId = req.user?.id || 'system';
     const scope = 'DIRECT_STOCK_RECEIPT';
     const requestHash = buildRequestHash({ warehouse_id, supplier_id, items });
     const now = new Date();
@@ -703,6 +740,8 @@ export const receiveStockDirect = async (req: Request, res: Response) => {
 
         const [warehouse] = await db.select().top(1).from(warehouses).where(eq(warehouses.id, warehouse_id));
         if (!warehouse) throw new Error('WAREHOUSE_NOT_FOUND');
+        if (warehouse.isActive === false) throw new Error('WAREHOUSE_INACTIVE');
+        if (req.effectiveBranchId && warehouse.branchId !== req.effectiveBranchId) throw new Error('BRANCH_MISMATCH');
 
         const results = await db.transaction(async (tx) => {
             const receiptResults = [];
@@ -757,7 +796,7 @@ export const receiveStockDirect = async (req: Request, res: Response) => {
                     type: 'PURCHASE',
                     referenceId: reference_id,
                     reason: 'Direct stock receipt',
-                    performedBy: actor_id || 'system',
+                    performedBy: actorId,
                     createdAt: new Date(),
                 });
 
@@ -813,7 +852,7 @@ export const receiveStockDirect = async (req: Request, res: Response) => {
             poId: reference_id,
             amount: totalReceiptCost,
             branchId: warehouse.branchId || undefined,
-            userId: actor_id || 'system',
+            userId: actorId,
         });
 
         try {
@@ -830,6 +869,18 @@ export const receiveStockDirect = async (req: Request, res: Response) => {
         } catch {
             // Socket delivery is best-effort; reconnect resync remains authoritative.
         }
+
+        await createSignedAuditLog({
+            eventType: 'INVENTORY_STOCK_RECEIVED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: warehouse.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers?.['user-agent'],
+            payload: { referenceId: reference_id, warehouseId: warehouse_id, supplierId: supplier_id || null, itemCount: results.length, totalCost: totalReceiptCost },
+            after: { itemCount: results.length, totalCost: totalReceiptCost },
+            reason: 'Direct stock receipt',
+        });
 
         return res.json({ success: true, referenceId: reference_id, items: results, finance });
     } catch (error: any) {
@@ -854,9 +905,9 @@ export const transferStock = async (req: Request, res: Response) => {
             to_warehouse_id,
             quantity,
             reason,
-            actor_id,
             reference_id,
         } = req.body || {};
+        const actorId = req.user?.id || 'system';
 
         if (!item_id || !from_warehouse_id || !to_warehouse_id || quantity === undefined) {
             return res.status(400).json({ error: 'item_id, from_warehouse_id, to_warehouse_id, and quantity are required' });
@@ -892,6 +943,12 @@ export const transferStock = async (req: Request, res: Response) => {
             const [destWarehouse] = await tx.select().from(warehouses).where(eq(warehouses.id, to_warehouse_id));
             if (!sourceWarehouse || !destWarehouse) {
                 throw new Error('Warehouse not found');
+            }
+            if (sourceWarehouse.isActive === false || destWarehouse.isActive === false) {
+                throw new Error('WAREHOUSE_INACTIVE');
+            }
+            if (req.effectiveBranchId && (sourceWarehouse.branchId !== req.effectiveBranchId || destWarehouse.branchId !== req.effectiveBranchId)) {
+                throw new Error('BRANCH_MISMATCH');
             }
 
             const [sourceStock] = await tx.select().from(inventoryStock).where(
@@ -956,7 +1013,7 @@ export const transferStock = async (req: Request, res: Response) => {
                 quantity: transferQty,
                 type: 'TRANSFER',
                 reason: reason || 'Inter-warehouse transfer',
-                performedBy: actor_id,
+                performedBy: actorId,
                 referenceId: reference_id,
                 createdAt: new Date(),
             });
@@ -990,7 +1047,7 @@ export const transferStock = async (req: Request, res: Response) => {
             const [fromWarehouse] = await tx.select({ branchId: warehouses.branchId }).from(warehouses).where(eq(warehouses.id, from_warehouse_id));
             await tx.insert(auditLogs).values({
                 eventType: 'INVENTORY_BRANCH_TRANSFER',
-                userId: actor_id || null,
+                userId: actorId,
                 branchId: fromWarehouse?.branchId || null,
                 payload: {
                     itemId: item_id,
@@ -1042,6 +1099,18 @@ export const transferStock = async (req: Request, res: Response) => {
             console.warn('Failed to emit stock:updated socket event for transfer', e);
         }
 
+        const [sourceBranch] = await db.select({ branchId: warehouses.branchId }).from(warehouses).where(eq(warehouses.id, from_warehouse_id));
+        await createSignedAuditLog({
+            eventType: 'INVENTORY_STOCK_TRANSFERRED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: sourceBranch?.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers?.['user-agent'],
+            payload: { itemId: item_id, fromWarehouseId: from_warehouse_id, toWarehouseId: to_warehouse_id, quantity: transferQty, referenceId: reference_id || null },
+            reason: reason || 'Inter-warehouse transfer',
+        });
+
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -1070,6 +1139,11 @@ export const createStockTransferRequest = async (req: Request, res: Response) =>
         const [destinationWarehouse] = await db.select().from(warehouses).where(eq(warehouses.id, destinationWarehouseId));
         if (!destinationWarehouse || destinationWarehouse.isActive === false) return res.status(400).json({ error: 'DESTINATION_WAREHOUSE_NOT_FOUND' });
         if (destinationWarehouse.branchId !== branchId) return res.status(400).json({ error: 'DESTINATION_BRANCH_MISMATCH' });
+        if (sourceWarehouseId) {
+            const [sourceWarehouse] = await db.select().from(warehouses).where(eq(warehouses.id, sourceWarehouseId));
+            if (!sourceWarehouse || sourceWarehouse.isActive === false) return res.status(400).json({ error: 'SOURCE_WAREHOUSE_NOT_FOUND' });
+            if (sourceWarehouse.branchId !== branchId) return res.status(400).json({ error: 'SOURCE_BRANCH_MISMATCH' });
+        }
 
         const cleanItems = items.map((item: any) => ({
             itemId: getStringParam(item?.itemId || item?.item_id),
@@ -1090,7 +1164,7 @@ export const createStockTransferRequest = async (req: Request, res: Response) =>
             destinationWarehouseId,
             getStringParam(req.body?.priority) || 'NORMAL',
             getStringParam(req.body?.notes) || null,
-            req.user?.id || getStringParam(req.body?.requestedBy) || 'system',
+            req.user?.id || 'system',
         ]);
         for (const item of cleanItems) {
             await pool.query(`

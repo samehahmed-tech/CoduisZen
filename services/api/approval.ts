@@ -25,4 +25,10 @@ export const approvalApi = {
         apiRequest<any>('/approvals/verify-pin', { method: 'POST', body: JSON.stringify(data) }),
     reject: (approvalId: string, data?: { reason?: string }) =>
         apiRequest<any>(`/approvals/${approvalId}/reject`, { method: 'PUT', body: JSON.stringify(data || {}) }),
+    approveMasterDataDistribution: (approvalId: string) =>
+        apiRequest<any>(`/menu/master-data/distribution/${approvalId}/approve`, { method: 'POST' }),
+    getMasterDataDistributionApprovals: () =>
+        apiRequest<any[]>('/menu/master-data/distribution/approvals'),
+    rejectMasterDataDistribution: (approvalId: string, reason?: string) =>
+        apiRequest<any>(`/menu/master-data/distribution/${approvalId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
 };

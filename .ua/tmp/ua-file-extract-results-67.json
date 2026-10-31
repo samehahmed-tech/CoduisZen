@@ -1,0 +1,274 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 5,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 5,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 5
+    }
+  },
+  "results": [
+    {
+      "path": "tasks/integrations-plan.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 21,
+      "nonEmptyLines": 17,
+      "sections": [
+        {
+          "heading": "Integrations Plan (aggregators + payments) — separate file, do not overwrite others",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Overview",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Reality check (no live web — rate-limited)",
+          "level": 2,
+          "line": 6
+        },
+        {
+          "heading": "Slices",
+          "level": 2,
+          "line": 11
+        },
+        {
+          "heading": "Risks",
+          "level": 2,
+          "line": 16
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 5
+      }
+    },
+    {
+      "path": "tasks/lighthouse-plan.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 22,
+      "nonEmptyLines": 18,
+      "sections": [
+        {
+          "heading": "Lighthouse Audit Plan — Restoflow ERP (Vite SPA, not Next.js)",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 1
+      }
+    },
+    {
+      "path": "tasks/plan.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 87,
+      "nonEmptyLines": 61,
+      "sections": [
+        {
+          "heading": "Theme Worlds Implementation Plan",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Global Constraints",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "Review Focus",
+          "level": 2,
+          "line": 20
+        },
+        {
+          "heading": "File Structure",
+          "level": 2,
+          "line": 28
+        },
+        {
+          "heading": "Root Causes (من الاستكشاف)",
+          "level": 2,
+          "line": 35
+        },
+        {
+          "heading": "Task 1: طبقة theme-worlds.css + التسجيل",
+          "level": 3,
+          "line": 42
+        },
+        {
+          "heading": "Task 2: تفريق كونفجارات الـ10 ثيمات",
+          "level": 3,
+          "line": 52
+        },
+        {
+          "heading": "Task 3: إحالة البلوكات الميتة للتقاعد",
+          "level": 3,
+          "line": 73
+        },
+        {
+          "heading": "Risks and Mitigations",
+          "level": 2,
+          "line": 81
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 9
+      }
+    },
+    {
+      "path": "tasks/talabat-plan.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 51,
+      "nonEmptyLines": 40,
+      "sections": [
+        {
+          "heading": "Talabat Integration Plan (separate from theme plan — do not overwrite tasks/plan.md)",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Overview",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Architecture Decisions",
+          "level": 2,
+          "line": 6
+        },
+        {
+          "heading": "Task List (vertical slices)",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "Phase 1: Foundation (pure, no DB)",
+          "level": 3,
+          "line": 15
+        },
+        {
+          "heading": "Checkpoint: Foundation",
+          "level": 3,
+          "line": 19
+        },
+        {
+          "heading": "Phase 2: Ingest",
+          "level": 3,
+          "line": 22
+        },
+        {
+          "heading": "Checkpoint: Ingest",
+          "level": 3,
+          "line": 26
+        },
+        {
+          "heading": "Phase 3: Ops",
+          "level": 3,
+          "line": 29
+        },
+        {
+          "heading": "Checkpoint: Complete",
+          "level": 3,
+          "line": 36
+        },
+        {
+          "heading": "Risks",
+          "level": 2,
+          "line": 40
+        },
+        {
+          "heading": "Open Questions",
+          "level": 2,
+          "line": 49
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    },
+    {
+      "path": "tasks/todo.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 25,
+      "nonEmptyLines": 18,
+      "sections": [
+        {
+          "heading": "Todo — Theme Engine 2.0 (done, uncommitted)",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "P0 audit + baseline",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "P1 foundation",
+          "level": 2,
+          "line": 6
+        },
+        {
+          "heading": "P2 runtime",
+          "level": 2,
+          "line": 9
+        },
+        {
+          "heading": "P3 ten themes",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "P4 Theme Studio",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "P9 verification",
+          "level": 2,
+          "line": 20
+        },
+        {
+          "heading": "Checkpoint",
+          "level": 2,
+          "line": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 8
+      }
+    }
+  ]
+}

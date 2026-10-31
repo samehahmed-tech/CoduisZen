@@ -14,6 +14,16 @@ export const aggregatorsApi = {
     testOrder: (id: string, data?: any) => apiRequest<any>(`/integrations/providers/${id}/test-order`, { method: 'POST', body: JSON.stringify(data || {}) }),
 };
 
+export const healthApi = {
+    /** Health is public and may legitimately return HTTP 503 with useful JSON. */
+    integrations: async () => {
+        const response = await fetch('/api/health', { cache: 'no-store' });
+        const payload = await response.json().catch(() => ({}));
+        if (!payload?.health) throw new Error('HEALTH_RESPONSE_UNAVAILABLE');
+        return payload.health.services?.integrations || null;
+    },
+};
+
 export const paymobApi = {
     getConfig: () => apiRequest<any>('/payments/paymob/config'),
     saveConfig: (data: any) => apiRequest<any>('/payments/paymob/config', { method: 'PUT', body: JSON.stringify(data) }),

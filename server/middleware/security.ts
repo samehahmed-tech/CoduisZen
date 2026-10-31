@@ -117,6 +117,11 @@ const CSRF_BYPASS_PREFIXES = [
     '/api/deployment/heartbeat',
     '/api/deployment/commands/pull',
     '/api/deployment/commands/ack',
+    '/api/finance/p1/gateways/webhook',
+    // Versioned partner API authenticates with API keys or OAuth bearer
+    // tokens, never browser cookies; machine-to-machine POSTs must not need
+    // a browser Origin/CSRF token.
+    '/api/v1',
     '/iclock',
 ];
 

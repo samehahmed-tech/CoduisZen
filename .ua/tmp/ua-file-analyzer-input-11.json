@@ -1,0 +1,384 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/menu/MenuProfitCenter.tsx",
+      "language": "typescript",
+      "sizeLines": 1170,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/MenuSetupWizard.tsx",
+      "language": "typescript",
+      "sizeLines": 367,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/MenuSidebar.tsx",
+      "language": "typescript",
+      "sizeLines": 253,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/MenuToolbar.tsx",
+      "language": "typescript",
+      "sizeLines": 279,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/PricingEngine.tsx",
+      "language": "typescript",
+      "sizeLines": 435,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/QuickAddCard.tsx",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/useReportsState.ts",
+      "language": "typescript",
+      "sizeLines": 611,
+      "fileCategory": "code"
+    },
+    {
+      "path": "db/localDb.ts",
+      "language": "typescript",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/index.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useDataInit.ts",
+      "language": "typescript",
+      "sizeLines": 189,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useDebounce.ts",
+      "language": "typescript",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useInternalMessages.ts",
+      "language": "typescript",
+      "sizeLines": 128,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/usePageTitle.ts",
+      "language": "typescript",
+      "sizeLines": 52,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useSystemNotifications.ts",
+      "language": "typescript",
+      "sizeLines": 442,
+      "fileCategory": "code"
+    },
+    {
+      "path": "index.tsx",
+      "language": "typescript",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "routes.tsx",
+      "language": "typescript",
+      "sizeLines": 360,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/rolesController.ts",
+      "language": "typescript",
+      "sizeLines": 353,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/aiActionGuard.ts",
+      "language": "typescript",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/aiIntelligenceService.ts",
+      "language": "typescript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api.ts",
+      "language": "typescript",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/ai.ts",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/analytics.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/approval.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/audit.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/auth.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/barcode.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/branches.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/butchery.ts",
+      "language": "typescript",
+      "sizeLines": 41,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/campaigns.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/complaints.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/core.ts",
+      "language": "typescript",
+      "sizeLines": 630,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/customers.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/dayClose.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/menu/MenuProfitCenter.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "components/menu/AnalyticsPanel.tsx",
+      "components/menu/BulkActionsBar.tsx",
+      "components/menu/CategoryDrawer.tsx",
+      "components/menu/ItemCard.tsx",
+      "components/menu/ItemTable.tsx",
+      "components/menu/MenuSidebar.tsx",
+      "components/menu/MenuToolbar.tsx",
+      "components/menu/PricingEngine.tsx",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "types.ts"
+    ],
+    "components/menu/MenuSetupWizard.tsx": [
+      "types.ts"
+    ],
+    "components/menu/MenuSidebar.tsx": [
+      "types.ts"
+    ],
+    "components/menu/MenuToolbar.tsx": [
+      "components/menu/BranchSelector.tsx",
+      "components/menu/MenuProfitCenter.tsx",
+      "types.ts"
+    ],
+    "components/menu/PricingEngine.tsx": [
+      "components/common/ToastProvider.tsx",
+      "types.ts"
+    ],
+    "components/menu/QuickAddCard.tsx": [],
+    "components/reports/useReportsState.ts": [
+      "services/api/approval.ts",
+      "services/api/audit.ts",
+      "services/api/butchery.ts",
+      "services/api/campaigns.ts",
+      "services/api/complaints.ts",
+      "services/api/dayClose.ts",
+      "services/api/delivery.ts",
+      "services/api/fiscal.ts",
+      "services/api/hr.ts",
+      "services/api/inventory.ts",
+      "services/api/platforms.ts",
+      "services/api/procurement.ts",
+      "services/api/reports.ts",
+      "services/api/reservations.ts",
+      "services/api/treasury.ts",
+      "services/api/whatsapp.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "db/localDb.ts": [],
+    "hooks/index.ts": [],
+    "hooks/useDataInit.ts": [
+      "services/api/core.ts",
+      "services/authSync.ts",
+      "services/syncService.ts",
+      "stores/useAuthStore.ts",
+      "stores/useMenuStore.ts",
+      "types.ts"
+    ],
+    "hooks/useDebounce.ts": [],
+    "hooks/useInternalMessages.ts": [
+      "services/api/mail.ts",
+      "services/socketService.ts"
+    ],
+    "hooks/usePageTitle.ts": [
+      "stores/useAuthStore.ts"
+    ],
+    "hooks/useSystemNotifications.ts": [
+      "services/api/approval.ts",
+      "services/api/delivery.ts",
+      "services/api/finance.ts",
+      "services/api/fiscal.ts",
+      "services/api/inventoryIntelligence.ts",
+      "services/api/orders.ts",
+      "services/api/printGateway.ts",
+      "services/api/shifts.ts",
+      "services/socketService.ts",
+      "services/syncService.ts"
+    ],
+    "index.tsx": [
+      "App.tsx",
+      "components/Modal.tsx",
+      "src/i18n.ts"
+    ],
+    "routes.tsx": [
+      "components/MainLayout.tsx",
+      "components/common/ErrorBoundary.tsx",
+      "components/common/PageSkeleton.tsx",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "server/controllers/rolesController.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts",
+      "types.ts"
+    ],
+    "services/aiActionGuard.ts": [],
+    "services/aiIntelligenceService.ts": [
+      "services/api/ai.ts",
+      "services/eventBus.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "services/api.ts": [
+      "services/api/ai.ts",
+      "services/api/analytics.ts",
+      "services/api/approval.ts",
+      "services/api/audit.ts",
+      "services/api/auth.ts",
+      "services/api/barcode.ts",
+      "services/api/branches.ts",
+      "services/api/campaigns.ts",
+      "services/api/customers.ts",
+      "services/api/dayClose.ts",
+      "services/api/delivery.ts",
+      "services/api/finance.ts",
+      "services/api/fiscal.ts",
+      "services/api/hr.ts",
+      "services/api/inventory.ts",
+      "services/api/inventoryIntelligence.ts",
+      "services/api/menu.ts",
+      "services/api/orders.ts",
+      "services/api/platforms.ts",
+      "services/api/printGateway.ts",
+      "services/api/printers.ts",
+      "services/api/procurement.ts",
+      "services/api/recurring.ts",
+      "services/api/refunds.ts",
+      "services/api/reports.ts",
+      "services/api/settings.ts",
+      "services/api/setup.ts",
+      "services/api/shifts.ts",
+      "services/api/tables.ts",
+      "services/api/users.ts",
+      "services/api/wastage.ts",
+      "services/api/whatsapp.ts"
+    ],
+    "services/api/ai.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/analytics.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/approval.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/audit.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/auth.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/barcode.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/branches.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/butchery.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/campaigns.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/complaints.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/core.ts": [],
+    "services/api/customers.ts": [
+      "services/api/core.ts"
+    ],
+    "services/api/dayClose.ts": [
+      "services/api/core.ts"
+    ]
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 3,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 3,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 3
+    }
+  },
+  "results": [
+    {
+      "path": "docs/butchery.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 143,
+      "nonEmptyLines": 118,
+      "sections": [
+        {
+          "heading": "Butchery / Fabrication Module",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Flow",
+          "level": 2,
+          "line": 8
+        },
+        {
+          "heading": "Tables (new, additive — no existing table touched)",
+          "level": 2,
+          "line": 19
+        },
+        {
+          "heading": "Posting (atomic `db.transaction`)",
+          "level": 2,
+          "line": 37
+        },
+        {
+          "heading": "Cancellation / reversal",
+          "level": 2,
+          "line": 58
+        },
+        {
+          "heading": "Edit & delete (mistake correction)",
+          "level": 2,
+          "line": 68
+        },
+        {
+          "heading": "Costing",
+          "level": 2,
+          "line": 95
+        },
+        {
+          "heading": "Permissions (existing system, no new permission model)",
+          "level": 2,
+          "line": 103
+        },
+        {
+          "heading": "API (`/api/butchery`, also `/api/inventory/butchery`)",
+          "level": 2,
+          "line": 111
+        },
+        {
+          "heading": "UI",
+          "level": 2,
+          "line": 121
+        },
+        {
+          "heading": "Tests",
+          "level": 2,
+          "line": 131
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 11
+      }
+    },
+    {
+      "path": "docs/theme-engine-2.0-plan.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 38,
+      "nonEmptyLines": 34,
+      "sections": [
+        {
+          "heading": "Theme Engine 2.0 — Implementation Plan",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Baseline (Phase 0, recorded 2026-10-08)",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Decisions",
+          "level": 2,
+          "line": 15
+        },
+        {
+          "heading": "Task list (checkpoints: build+tests green after each phase)",
+          "level": 2,
+          "line": 25
+        },
+        {
+          "heading": "Risks",
+          "level": 2,
+          "line": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 5
+      }
+    },
+    {
+      "path": "docs/theme-engine-2.0.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 46,
+      "nonEmptyLines": 37,
+      "sections": [
+        {
+          "heading": "Theme Engine 2.0 — Architecture & Guide",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Modules (`theme/engine/`, pure + tested)",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "Token precedence",
+          "level": 2,
+          "line": 16
+        },
+        {
+          "heading": "Persistence",
+          "level": 2,
+          "line": 20
+        },
+        {
+          "heading": "Themes (10)",
+          "level": 2,
+          "line": 25
+        },
+        {
+          "heading": "Theme Studio (`AppearanceModal`)",
+          "level": 2,
+          "line": 29
+        },
+        {
+          "heading": "Motion rules",
+          "level": 2,
+          "line": 34
+        },
+        {
+          "heading": "Add a theme",
+          "level": 2,
+          "line": 38
+        },
+        {
+          "heading": "Verification",
+          "level": 2,
+          "line": 43
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 9
+      }
+    }
+  ]
+}

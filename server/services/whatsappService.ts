@@ -11,6 +11,7 @@ import { db } from '../db';
 import { eq } from 'drizzle-orm';
 import { customers, whatsappMessages } from '../../src/db/schema';
 import { mapConnectionUpdate, reconnectDelay } from './whatsappConnection';
+import { maskWhatsAppAddress } from '../utils/whatsappPrivacy';
 
 export type QueueMessage = {
     to: string;
@@ -43,6 +44,8 @@ type WhatsAppStatus =
     | 'DISCONNECTED'
     | 'DISABLED'
     | 'AUTH_ERROR';
+
+const OPENWA_REQUEST_TIMEOUT_MS = 10000;
 
 // --- Task 3 pure helpers: inbound normalize, STOP opt-out, receipts, requeue ---
 
@@ -98,7 +101,7 @@ export const noteOptOut = (phone: string): void => {
 
 export const isOptedOut = (phone: string): boolean => optedOutPhones.has(toDigits(phone));
 
-export const shouldSkipQueuedMessage = (msg: Pick<QueueMessage, 'to' | 'isMarketing'>): boolean =>
+export const shouldSkipQueuedMessage = (msg: Pick<QueueMessage, 'to' | 'text' | 'isMarketing'>): boolean =>
     Boolean(msg.isMarketing) && isOptedOut(msg.to);
 
 export const mapReceiptToStatus = (receipt: any): 'READ' | 'DELIVERED' | null => {
@@ -114,7 +117,7 @@ export const mapReceiptToStatus = (receipt: any): 'READ' | 'DELIVERED' | null =>
     return found;
 };
 
-export const shouldRequeueAfterFailure = (msg: Pick<QueueMessage, '_retried'>): boolean =>
+export const shouldRequeueAfterFailure = (msg: Pick<QueueMessage, 'to' | 'text' | '_retried'>): boolean =>
     !(msg as any)?._retried;
 
 const resolveProvider = (): WhatsAppProvider => {
@@ -540,10 +543,18 @@ class WhatsAppService {
         };
         if (this.openWaApiKey) headers['X-API-Key'] = this.openWaApiKey;
 
-        const response = await fetch(`${this.openWaBaseUrl}${path}`, {
-            ...options,
-            headers,
-        });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), OPENWA_REQUEST_TIMEOUT_MS);
+        let response: Response;
+        try {
+            response = await fetch(`${this.openWaBaseUrl}${path}`, {
+                ...options,
+                headers,
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
             const message = data?.message || data?.error || `OpenWA request failed (${response.status})`;
@@ -699,7 +710,7 @@ class WhatsAppService {
         try { getIO().emit('whatsapp:queue', { count: this.queue.length }); } catch { /* noop */ }
 
         if (msg.isMarketing && isOptedOut(this.normalizePhone(msg.to))) {
-            console.log(`WhatsApp skip: ${msg.to} opted out (STOP), dropping queued marketing`);
+            console.log(`WhatsApp skip: ${maskWhatsAppAddress(msg.to)} opted out (STOP), dropping queued marketing`);
             this.processQueue();
             return;
         }
@@ -716,7 +727,7 @@ class WhatsAppService {
                     method: 'POST',
                     body: JSON.stringify({ chatId: finalPhone, text: finalText }),
                 });
-                console.log(`OpenWA sent to ${finalPhone}`);
+                console.log(`OpenWA sent to ${maskWhatsAppAddress(finalPhone)}`);
             } else {
                 const jid = `${normalizedPhone}@s.whatsapp.net`;
                 let isRegistered = true;
@@ -728,7 +739,7 @@ class WhatsAppService {
                     );
                     isRegistered = (contacts as any[])?.[0]?.exists ?? true;
                 } catch (regErr: any) {
-                    console.warn(`onWhatsApp failed for ${jid}, sending anyway:`, regErr?.message || regErr);
+                    console.warn(`onWhatsApp failed for ${maskWhatsAppAddress(jid)}, sending anyway:`, regErr?.message || regErr);
                     isRegistered = true;
                 }
                 if (isRegistered) {
@@ -748,7 +759,7 @@ class WhatsAppService {
                     } else {
                         sentResult = await this.client.sendMessage(jid, { text: finalText });
                     }
-                    console.log(`WhatsApp sent to ${jid}`);
+                    console.log(`WhatsApp sent to ${maskWhatsAppAddress(jid)}`);
                     const externalId = String(sentResult?.key?.id || '');
                     if (msg.messageId && externalId) {
                         try {
@@ -758,7 +769,7 @@ class WhatsAppService {
                         }
                     }
                 } else {
-                    console.log(`WhatsApp skip: ${jid} is not registered on WP`);
+                    console.log(`WhatsApp skip: ${maskWhatsAppAddress(jid)} is not registered on WP`);
                 }
             }
 
@@ -781,11 +792,11 @@ class WhatsAppService {
                 await new Promise(resolve => setTimeout(resolve, waitMs));
             }
         } catch (error) {
-            console.error(`Failed to send WhatsApp message to ${msg.to}:`, error);
+            console.error(`Failed to send WhatsApp message to ${maskWhatsAppAddress(msg.to)}:`, error);
             if (shouldRequeueAfterFailure(msg)) {
                 msg._retried = true;
                 this.queue.unshift(msg);
-                console.log(`WhatsApp requeue once for ${msg.to}`);
+                console.log(`WhatsApp requeue once for ${maskWhatsAppAddress(msg.to)}`);
                 try { getIO().emit('whatsapp:queue', { count: this.queue.length }); } catch { /* noop */ }
                 // Retry goes through the normal send delay, not immediately.
                 const retryDelayMs = Math.max(500, Number(process.env.WHATSAPP_TRANSACTIONAL_DELAY_MS || 1500));
@@ -832,7 +843,7 @@ class WhatsAppService {
                     console.warn('STOP opt-out persist skipped:', (err as any)?.message || err);
                 }
             }
-            console.log(`WhatsApp STOP opt-out for ${from}, queued marketing dropped`);
+            console.log(`WhatsApp STOP opt-out for ${maskWhatsAppAddress(from)}, queued marketing dropped`);
             this.enqueueMessage({ to: from, text: 'تم إيقاف الرسائل التسويقية بنجاح.' });
             if (this.customMessageHandler) {
                 await this.customMessageHandler({

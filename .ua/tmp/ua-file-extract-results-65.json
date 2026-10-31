@@ -1,0 +1,32 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "styles/layout/dashboard-x.css",
+    "styles/layout/kds-theme.css",
+    "styles/layout/kiosk.css",
+    "styles/layout/neo-ui.css",
+    "styles/layout/pos-responsive.css",
+    "styles/layout/pos-tilt-card.css",
+    "styles/layout/pos-zen-cards.css",
+    "styles/layout/responsive-guard.css",
+    "styles/layout/responsive-plus.css",
+    "styles/layout/sidebar-worlds.css",
+    "styles/layout/sidebar.css",
+    "styles/layout/tiles.css",
+    "styles/layout/topbar.css"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

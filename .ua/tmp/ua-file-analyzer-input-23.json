@@ -1,0 +1,185 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "src/features/pos/components/RetailModePanel.tsx",
+      "language": "typescript",
+      "sizeLines": 121,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/SeatModal.tsx",
+      "language": "typescript",
+      "sizeLines": 98,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/SplitBillModal.tsx",
+      "language": "typescript",
+      "sizeLines": 230,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/TableManagementModal.tsx",
+      "language": "typescript",
+      "sizeLines": 774,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/TakeawayNameModal.tsx",
+      "language": "typescript",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/posClickSound.ts",
+      "language": "typescript",
+      "sizeLines": 171,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/useZenTilt.ts",
+      "language": "typescript",
+      "sizeLines": 158,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/itemOptionPricing.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/orderPayment.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/platformDeliveryValidation.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/tableManagementFlow.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/utils/barcodeParser.ts",
+      "language": "typescript",
+      "sizeLines": 72,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/utils/tableMinimumSpend.ts",
+      "language": "typescript",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/itemOptionPricing.test.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderPayment.test.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/platformDeliveryValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/platformMarkup.test.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/tableManagementFlow.test.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/tableMinimumSpend.test.ts",
+      "language": "typescript",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/tableOrderTotals.test.ts",
+      "language": "typescript",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/tableOrder.ts",
+      "language": "typescript",
+      "sizeLines": 120,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "src/features/pos/components/RetailModePanel.tsx": [
+      "types.ts"
+    ],
+    "src/features/pos/components/SeatModal.tsx": [],
+    "src/features/pos/components/SplitBillModal.tsx": [
+      "components/Toast.tsx",
+      "types.ts"
+    ],
+    "src/features/pos/components/TableManagementModal.tsx": [
+      "services/api.ts",
+      "src/features/pos/tableManagementFlow.ts",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/tableOrder.ts"
+    ],
+    "src/features/pos/components/TakeawayNameModal.tsx": [],
+    "src/features/pos/components/posClickSound.ts": [],
+    "src/features/pos/components/useZenTilt.ts": [],
+    "src/features/pos/itemOptionPricing.ts": [],
+    "src/features/pos/orderPayment.ts": [
+      "types.ts"
+    ],
+    "src/features/pos/platformDeliveryValidation.ts": [],
+    "src/features/pos/tableManagementFlow.ts": [],
+    "src/utils/barcodeParser.ts": [],
+    "src/utils/tableMinimumSpend.ts": [],
+    "tests/itemOptionPricing.test.ts": [
+      "src/features/pos/itemOptionPricing.ts"
+    ],
+    "tests/orderPayment.test.ts": [
+      "src/features/pos/orderPayment.ts",
+      "types.ts"
+    ],
+    "tests/platformDeliveryValidation.test.ts": [
+      "src/features/pos/platformDeliveryValidation.ts"
+    ],
+    "tests/platformMarkup.test.ts": [
+      "services/platformPricing.ts"
+    ],
+    "tests/tableManagementFlow.test.ts": [
+      "src/features/pos/tableManagementFlow.ts",
+      "utils/tableOrder.ts"
+    ],
+    "tests/tableMinimumSpend.test.ts": [
+      "src/utils/tableMinimumSpend.ts"
+    ],
+    "tests/tableOrderTotals.test.ts": [
+      "utils/tableOrder.ts"
+    ],
+    "utils/tableOrder.ts": [
+      "types.ts"
+    ]
+  }
+}

@@ -14,6 +14,7 @@ import { attendanceRawLogs, attendanceDevices, attendanceDeviceMappings } from '
 import { eq, or } from 'drizzle-orm';
 import logger from '../utils/logger';
 import { getIO } from '../socket';
+import { maskIdentifier } from '../utils/privacy';
 
 export interface NormalizedLog {
     userId: string;
@@ -36,7 +37,7 @@ class ZktecoAdmsService {
      * @param sn Serial Number of the device pushing the data
      * @param body Raw TSV string payload from the device (userId \t timestamp \t status \t type)
      */
-    public async processPushPayload(sn: string, body: string): Promise<void> {
+    public async processPushPayload(sn: string, body: string): Promise<{ accepted: number; branchId: string; deviceId: string } | null> {
         // Find mapped device by SN
         const [device] = await db.select().top(1).from(attendanceDevices)
             .where(or(
@@ -46,13 +47,14 @@ class ZktecoAdmsService {
             ));
 
         if (!device) {
-            logger.warn(`Device SN ${sn} pushed data but is not registered in system.`);
-            return;
+            logger.warn(`Device SN ${maskIdentifier(sn)} pushed data but is not registered in system.`);
+            return null;
         }
 
         // Defensive parsing
         const lines = body.split(/\r?\n/).filter(line => line.trim().length > 0);
         
+        let accepted = 0;
         for (const line of lines) {
             const parts = line.split('\t');
             if (parts.length < 2) continue; // Malformed row
@@ -80,7 +82,9 @@ class ZktecoAdmsService {
             };
 
             this.queueForProcessing(normalized);
+            accepted += 1;
         }
+        return { accepted, branchId: device.branchId, deviceId: device.id };
     }
 
     /**
@@ -114,14 +118,15 @@ class ZktecoAdmsService {
         try {
             logger.info(`Flushing ${batch.length} ADMS normalized logs to DB.`);
             
-            // Real-Time Socket Broadcast
+            // Real-Time Socket Broadcast. Never send biometric user identifiers
+            // or raw attendance rows over a global socket; consumers only need
+            // a branch-scoped invalidation/count signal.
             try {
+                const counts = new Map<string, number>();
+                for (const item of batch) counts.set(item.branchId, (counts.get(item.branchId) || 0) + 1);
                 const io = getIO();
-                if (io) {
-                    io.emit('biometrics:logs_arrived', {
-                        count: batch.length,
-                        latestLogs: batch.slice(0, 5),
-                    });
+                for (const [branchId, count] of counts) {
+                    io.to(`branch:${branchId}`).emit('biometrics:logs_arrived', { count, branchId });
                 }
             } catch (ioErr) {
                 // Ignore if socket not ready

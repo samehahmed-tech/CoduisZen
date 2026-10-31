@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/close-day-17-open-18/Close Day 17 and Open Day 18.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/close-day-17-open-18/Close Day 17 and Open Day 18.ps1",
+      "language": "powershell",
+      "sizeLines": 122,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/close-day-17-open-18/README AR.txt",
+      "language": "txt",
+      "sizeLines": 35,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/close-day-17-open-18/Close Day 17 and Open Day 18.bat": [],
+    "scripts/close-day-17-open-18/Close Day 17 and Open Day 18.ps1": [],
+    "scripts/close-day-17-open-18/README AR.txt": []
+  }
+}

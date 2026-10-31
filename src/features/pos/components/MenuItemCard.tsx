@@ -124,7 +124,7 @@ const cardClick = (e: React.MouseEvent, isAvailable: boolean, onCardClick: () =>
     }
 };
 
-const tiltHandlers = (tilt: ReturnType<typeof useZenTilt>) => ({
+const tiltHandlers = <T extends HTMLElement>(tilt: ReturnType<typeof useZenTilt<T>>) => ({
     ref: tilt.ref,
     onPointerMove: tilt.onPointerMove,
     onPointerLeave: tilt.onPointerLeave,

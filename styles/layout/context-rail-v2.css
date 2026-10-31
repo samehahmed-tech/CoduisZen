@@ -1,0 +1,1081 @@
+/* CODUIS XEN — Kinetic Command Rail
+   Final shell layer. Theme-aware, GPU-first, RTL/LTR symmetric. */
+:root {
+  --rail-w-collapsed: 76px;
+  --rail-w-expanded: clamp(316px, 24vw, 340px);
+  --rail-v2-enter: 460ms;
+  --rail-v2-exit: 320ms;
+  --rail-v2-ease-enter: cubic-bezier(.16, 1, .3, 1);
+  --rail-v2-ease-exit: cubic-bezier(.4, 0, .8, .2);
+  --rail-v2-line: color-mix(in srgb, rgb(var(--border-color)) 46%, transparent);
+  --rail-v2-quiet: color-mix(in srgb, rgb(var(--text-muted)) 88%, transparent);
+  --rail-v2-primary: rgb(var(--primary));
+  --rail-v2-glow: rgb(var(--accent));
+  --rail-v2-surface: var(--theme-rail-bg, rgb(var(--bg-sidebar)));
+  --rail-v2-raised: color-mix(in srgb, rgb(var(--bg-elevated)) 72%, transparent);
+}
+
+.workspace-rail.workspace-rail-v2 {
+  width: var(--rail-w-collapsed) !important;
+  overflow: visible !important;
+  isolation: isolate;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+}
+
+.workspace-rail-v2.rail-pinned { width: var(--rail-w-expanded) !important; }
+.workspace-rail-v2::before, .workspace-rail-v2::after { display: none !important; }
+
+.rail-v2-surface {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  display: flex;
+  width: var(--rail-w-expanded);
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  color: rgb(var(--text-main));
+  background:
+    linear-gradient(to right, color-mix(in srgb, var(--rail-v2-glow) 72%, transparent) 0 2px, transparent 2px),
+    linear-gradient(135deg, color-mix(in srgb, var(--rail-v2-primary) 8%, transparent), transparent 34%),
+    var(--rail-v2-surface);
+  border-inline-end: 1px solid var(--rail-v2-line);
+  box-shadow: 12px 0 34px color-mix(in srgb, rgb(var(--text-main)) 10%, transparent);
+  clip-path: inset(0 calc(var(--rail-w-expanded) - var(--rail-w-collapsed)) 0 0);
+  transition: clip-path var(--rail-v2-exit) var(--rail-v2-ease-exit), box-shadow var(--rail-v2-exit) ease, filter var(--rail-v2-exit) ease;
+  contain: layout paint style;
+  will-change: clip-path;
+}
+
+.rail-v2-surface::before {
+  content: '';
+  position: absolute;
+  z-index: 12;
+  inset-inline: 0;
+  top: -18%;
+  height: 14%;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--rail-v2-glow) 34%, transparent), transparent);
+  mix-blend-mode: screen;
+}
+
+.rail-v2-surface::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(230px circle at var(--rail-spot-x, 74%) var(--rail-spot-y, 24%), color-mix(in srgb, var(--rail-v2-glow) 20%, transparent), transparent 72%);
+  transition: opacity 260ms ease;
+}
+
+.rail-v2-surface > * { position: relative; z-index: 1; }
+
+[dir='rtl'] .rail-v2-surface {
+  background:
+    linear-gradient(to left, color-mix(in srgb, var(--rail-v2-glow) 72%, transparent) 0 2px, transparent 2px),
+    linear-gradient(225deg, color-mix(in srgb, var(--rail-v2-primary) 8%, transparent), transparent 34%),
+    var(--rail-v2-surface);
+  border-inline-end: 0;
+  border-inline-start: 1px solid var(--rail-v2-line);
+  box-shadow: -12px 0 34px color-mix(in srgb, rgb(var(--text-main)) 10%, transparent);
+  clip-path: inset(0 0 0 calc(var(--rail-w-expanded) - var(--rail-w-collapsed)));
+}
+
+.workspace-rail-v2.rail-pinned .rail-v2-surface,
+.workspace-rail-v2:not(.rail-selection-closing):hover .rail-v2-surface,
+.workspace-rail-v2:not(.rail-selection-closing):focus-within .rail-v2-surface {
+  clip-path: inset(0);
+  box-shadow: 24px 0 68px color-mix(in srgb, rgb(var(--text-main)) 17%, transparent);
+  transition-timing-function: var(--rail-v2-ease-enter), ease, ease;
+  transition-duration: var(--rail-v2-enter), var(--rail-v2-enter), var(--rail-v2-enter);
+}
+
+.workspace-rail-v2.rail-pinned .rail-v2-surface::after,
+.workspace-rail-v2:not(.rail-selection-closing):hover .rail-v2-surface::after,
+.workspace-rail-v2:not(.rail-selection-closing):focus-within .rail-v2-surface::after { opacity: 1; }
+
+.workspace-rail-v2:not(.rail-selection-closing):hover .rail-v2-surface::before,
+.workspace-rail-v2:not(.rail-selection-closing):focus-within .rail-v2-surface::before { animation: rail-v2-scan 1050ms var(--rail-v2-ease-enter) both; }
+
+[dir='rtl'] .workspace-rail-v2.rail-pinned .rail-v2-surface,
+[dir='rtl'] .workspace-rail-v2:not(.rail-selection-closing):hover .rail-v2-surface,
+[dir='rtl'] .workspace-rail-v2:not(.rail-selection-closing):focus-within .rail-v2-surface {
+  box-shadow: -24px 0 68px color-mix(in srgb, rgb(var(--text-main)) 17%, transparent);
+}
+
+.workspace-rail-v2.rail-selection-closing .rail-v2-surface {
+  transition-duration: 340ms, 260ms, 260ms;
+  transition-timing-function: cubic-bezier(.5, 0, .7, 1), ease, ease;
+}
+
+/* Brand masthead */
+.workspace-rail-v2 .sidebar-hero {
+  flex: none;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--rail-v2-line) !important;
+  border-radius: 0 !important;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--rail-v2-primary) 6%, transparent), transparent 64%) !important;
+}
+
+.workspace-rail-v2 .sidebar-hero-top {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: flex-start !important;
+}
+
+.workspace-rail-v2 .sidebar-logomark {
+  position: relative;
+  width: 58px !important;
+  height: 58px !important;
+  margin: 0 !important;
+  padding: 3px !important;
+  flex: 0 0 58px;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  filter: drop-shadow(0 5px 10px color-mix(in srgb, rgb(var(--text-main)) 18%, transparent)) !important;
+  transition: filter 300ms ease, transform 520ms var(--rail-v2-ease-enter) !important;
+}
+
+.workspace-rail-v2 .sidebar-logomark::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1px solid color-mix(in srgb, var(--rail-v2-glow) 58%, transparent);
+  opacity: 0;
+  transform: scale(.62) rotate(-30deg);
+  transition: opacity 240ms ease, transform 720ms var(--rail-v2-ease-enter);
+}
+
+.workspace-rail-v2:is(:hover, :focus-within, .rail-pinned) .sidebar-logomark {
+  transform: scale(1.08) rotate(-1.5deg);
+  filter: drop-shadow(0 8px 17px color-mix(in srgb, var(--rail-v2-glow) 32%, transparent)) !important;
+}
+
+.workspace-rail-v2:is(:hover, :focus-within, .rail-pinned) .sidebar-logomark::before { opacity: .82; transform: scale(1) rotate(0); }
+
+.workspace-rail-v2 .sidebar-brand-lockup {
+  display: flex;
+  min-width: 0;
+  margin-inline-start: 14px;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  opacity: 1;
+  overflow: hidden;
+  clip-path: inset(0 100% 0 0);
+  transform: translateX(18px);
+  white-space: nowrap;
+  transition: opacity 220ms ease 80ms, clip-path 500ms var(--rail-v2-ease-enter), transform 520ms var(--rail-v2-ease-enter);
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-brand-lockup { clip-path: inset(0 0 0 100%); transform: translateX(-18px); }
+.workspace-rail-v2:is(:hover, :focus-within, .rail-pinned, .rail-mobile-open) .sidebar-brand-lockup { opacity: 1; clip-path: inset(0); transform: none; }
+
+.workspace-rail-v2 .sidebar-brand-lockup strong {
+  color: rgb(var(--text-main));
+  font-family: var(--font-display, var(--font-body));
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: .09em;
+  line-height: 1;
+}
+
+.workspace-rail-v2 .sidebar-brand-lockup span { color: var(--rail-v2-quiet); font-size: 9px; font-weight: 750; letter-spacing: .04em; }
+
+.workspace-rail-v2 .sidebar-pin-btn {
+  position: static !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px;
+  margin-inline-start: auto !important;
+  color: var(--rail-v2-quiet) !important;
+  border: 1px solid var(--rail-v2-line) !important;
+  border-radius: 3px !important;
+  background: var(--rail-v2-raised) !important;
+  opacity: 0;
+  transform: translateX(8px) scale(.84);
+  transition: color 180ms ease, border-color 180ms ease, opacity 220ms ease 120ms, transform 420ms var(--rail-v2-ease-enter) !important;
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-pin-btn { transform: translateX(-8px) scale(.84); }
+.workspace-rail-v2:is(:hover, :focus-within, .rail-pinned) .sidebar-pin-btn { opacity: 1; transform: none; }
+.workspace-rail-v2 .sidebar-pin-btn:hover { color: var(--rail-v2-primary) !important; border-color: color-mix(in srgb, var(--rail-v2-primary) 45%, var(--rail-v2-line)) !important; }
+
+/* Branch context is a compact instrument, not a second card under the brand. */
+.workspace-rail-v2 .sidebar-branch-context {
+  margin: 0 12px 6px;
+  overflow: hidden;
+  transition: max-height 340ms var(--rail-v2-ease-enter), opacity 180ms ease, margin 340ms var(--rail-v2-ease-enter);
+}
+
+.workspace-rail-v2 .sidebar-branch-context .sidebar-panel {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 0;
+  border-block: 1px solid var(--rail-v2-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-rail-v2 .sidebar-branch-context .sidebar-panel-title {
+  margin: 0;
+  color: var(--rail-v2-quiet);
+  font-size: 7px;
+  letter-spacing: .1em;
+  white-space: nowrap;
+}
+
+.workspace-rail-v2 .sidebar-branch-context .sidebar-panel > .relative { min-width: 0; }
+.workspace-rail-v2 .sidebar-branch-context .sidebar-panel > :last-child { display: none; }
+.workspace-rail-v2 .sidebar-branch-context .sidebar-select {
+  height: 32px;
+  padding-block: 0;
+  border-color: color-mix(in srgb, rgb(var(--border-color)) 34%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, rgb(var(--bg-elevated)) 52%, transparent);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Navigation */
+.workspace-rail-v2 .sidebar-nav {
+  display: flex;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0;
+  padding: 6px 10px 8px !important;
+  flex-direction: column;
+  gap: 6px;
+  transform: none !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+
+.workspace-rail-v2 .sidebar-current-domain {
+  display: flex;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-rail-v2 .sidebar-current-heading {
+  display: flex;
+  min-height: 54px;
+  max-height: 54px !important;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  flex: 0 0 54px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--rail-v2-line);
+  opacity: 1;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--rail-v2-primary) 14%, transparent), transparent 72%);
+  pointer-events: auto;
+}
+
+.workspace-rail-v2 .sidebar-current-heading-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.workspace-rail-v2 .sidebar-current-heading-copy small {
+  color: var(--rail-v2-quiet);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: .08em;
+}
+
+.workspace-rail-v2 .sidebar-current-heading-copy strong {
+  overflow: hidden;
+  color: rgb(var(--text-main));
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-rail-v2 .sidebar-current-count {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  color: var(--rail-v2-primary);
+  border: 1px solid color-mix(in srgb, var(--rail-v2-primary) 26%, transparent);
+  background: color-mix(in srgb, var(--rail-v2-primary) 8%, transparent);
+  font: 800 9px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.workspace-rail-v2 .sidebar-current-list {
+  display: flex;
+  min-height: 0;
+  padding: 4px 0 2px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: color-mix(in srgb, var(--rail-v2-primary) 26%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.workspace-rail-v2 .sidebar-domain-switcher {
+  display: flex;
+  max-height: 196px !important;
+  padding: 8px 0 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 7px;
+  overflow: hidden;
+  border: 0;
+  border-top: 1px solid var(--rail-v2-line);
+  border-radius: 0;
+  opacity: 1;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.workspace-rail-v2 .sidebar-domain-switcher-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--rail-v2-quiet);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .055em;
+}
+
+.workspace-rail-v2 .sidebar-domain-switcher-label small {
+  color: var(--rail-v2-glow);
+  font: 800 9px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.workspace-rail-v2 .sidebar-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.workspace-rail-v2 .sidebar-domain-option {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 35px;
+  grid-template-columns: 18px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  overflow: hidden;
+  color: var(--rail-v2-quiet);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: color-mix(in srgb, rgb(var(--bg-card)) 34%, transparent);
+  text-align: start;
+  transition: color 180ms ease, border-color 220ms ease, background-color 220ms ease, transform 340ms var(--rail-v2-ease-enter), box-shadow 220ms ease;
+}
+
+.workspace-rail-v2 .sidebar-domain-option::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(110deg, transparent 20%, color-mix(in srgb, var(--rail-v2-glow) 22%, transparent), transparent 72%);
+  transform: translateX(-120%);
+}
+
+.workspace-rail-v2 .sidebar-domain-option:hover {
+  color: rgb(var(--text-main));
+  border-color: color-mix(in srgb, var(--rail-v2-glow) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+.workspace-rail-v2 .sidebar-domain-option:hover::before { animation: rail-v2-quick-glow 620ms var(--rail-v2-ease-enter) both; }
+
+.workspace-rail-v2 .sidebar-domain-option.is-selected {
+  color: rgb(var(--text-main));
+  border-color: color-mix(in srgb, var(--rail-v2-primary) 36%, transparent);
+  background: color-mix(in srgb, var(--rail-v2-primary) 11%, rgb(var(--bg-card)));
+  box-shadow: inset 3px 0 0 var(--rail-v2-primary), 0 7px 16px color-mix(in srgb, var(--rail-v2-primary) 10%, transparent);
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-domain-option.is-selected { box-shadow: inset -3px 0 0 var(--rail-v2-primary), 0 7px 16px color-mix(in srgb, var(--rail-v2-primary) 10%, transparent); }
+
+.workspace-rail-v2 .sidebar-domain-option > span:nth-last-child(2) {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-rail-v2 .sidebar-domain-option:hover > span:nth-last-child(2),
+.workspace-rail-v2 .sidebar-domain-option:focus-visible > span:nth-last-child(2),
+.workspace-rail-v2 .sidebar-domain-option.is-selected > span:nth-last-child(2) {
+  color: var(--rail-v2-primary);
+  font-weight: 950;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--rail-v2-glow) 72%, transparent);
+  letter-spacing: .01em;
+}
+
+.workspace-rail-v2 .sidebar-domain-switcher-label span,
+.workspace-rail-v2 .sidebar-current-heading-copy strong {
+  font-weight: 950;
+}
+
+.workspace-rail-v2 .sidebar-domain-option {
+  min-height: 42px;
+}
+
+.workspace-rail-v2 .sidebar-domain-option small { color: var(--rail-v2-quiet); font: 750 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+
+.workspace-rail-v2 .sidebar-domain-number { color: var(--rail-v2-glow); font: 800 8px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+
+.workspace-rail-v2 .sidebar-section-index {
+  width: 24px;
+  flex: 0 0 24px;
+  color: var(--rail-v2-glow);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  text-align: center;
+}
+
+
+.workspace-rail-v2 .sidebar-nav-item,
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-item {
+  --rail-order: 0;
+  position: relative;
+  display: flex;
+  width: 100% !important;
+  min-height: 42px;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  margin: 0;
+  padding: 3px 14px !important;
+  padding-inline-start: 9px !important;
+  overflow: hidden;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+  color: color-mix(in srgb, rgb(var(--text-main)) 76%, transparent);
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: translateZ(0);
+  transition: color 180ms ease, border-color 220ms ease, background-color 220ms ease, transform 360ms var(--rail-v2-ease-enter) !important;
+}
+
+.workspace-rail-v2 .sidebar-nav-item:nth-child(2) { --rail-order: 1; }
+.workspace-rail-v2 .sidebar-nav-item:nth-child(3) { --rail-order: 2; }
+.workspace-rail-v2 .sidebar-nav-item:nth-child(4) { --rail-order: 3; }
+.workspace-rail-v2 .sidebar-nav-item:nth-child(5) { --rail-order: 4; }
+.workspace-rail-v2 .sidebar-nav-item:nth-child(6) { --rail-order: 5; }
+.workspace-rail-v2 .sidebar-nav-item:nth-child(7) { --rail-order: 6; }
+.workspace-rail-v2 .sidebar-nav-item:nth-child(8) { --rail-order: 7; }
+
+.workspace-rail-v2 .sidebar-nav-item:hover {
+  color: rgb(var(--text-main));
+  border-color: color-mix(in srgb, var(--rail-v2-glow) 28%, transparent) !important;
+  background: color-mix(in srgb, var(--rail-v2-primary) 9%, transparent) !important;
+  transform: translateX(3px);
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-item:hover { transform: translateX(-3px); }
+
+.workspace-rail-v2 .sidebar-nav-item-active,
+.workspace-rail-v2 .sidebar-nav-item-active:hover {
+  color: rgb(var(--text-main));
+  border-color: color-mix(in srgb, var(--rail-v2-primary) 32%, transparent) !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rail-v2-primary) 18%, transparent), color-mix(in srgb, var(--rail-v2-primary) 6%, transparent)) !important;
+  font-weight: 850;
+}
+
+.workspace-rail-v2 .sidebar-nav-item-active::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset-block: 7px;
+  inset-inline-start: 0;
+  width: 3px;
+  height: auto;
+  border-radius: 0;
+  background: var(--rail-v2-glow);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--rail-v2-glow) 78%, transparent);
+  animation: rail-v2-active-lock 480ms var(--rail-v2-ease-enter) both;
+}
+
+.workspace-rail-v2 .sidebar-nav-item-active::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset-inline-end: -1px;
+  top: 50%;
+  width: 8px;
+  height: 18px;
+  background: var(--rail-v2-glow);
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--rail-v2-glow) 66%, transparent));
+  animation: rail-v2-notch-lock 520ms var(--rail-v2-ease-enter) both;
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-item-active::after { clip-path: polygon(0 0, 100% 50%, 0 100%); }
+
+.workspace-rail-v2 .sidebar-nav-glow {
+  display: block !important;
+  position: absolute;
+  z-index: 0;
+  inset: -1px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(108deg, transparent 18%, color-mix(in srgb, var(--rail-v2-glow) 6%, transparent) 34%, color-mix(in srgb, var(--rail-v2-glow) 40%, transparent) 49%, color-mix(in srgb, var(--rail-v2-glow) 7%, transparent) 64%, transparent 82%);
+  transform: translateX(-145%) skewX(-16deg);
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-glow { transform: translateX(145%) skewX(16deg); }
+.workspace-rail-v2 .sidebar-nav-item:hover .sidebar-nav-glow { animation: rail-v2-sliding-glow 820ms var(--rail-v2-ease-enter) both; }
+
+.workspace-rail-v2 .sidebar-nav-ripple {
+  position: absolute;
+  z-index: 1;
+  left: var(--rail-click-x, 50%);
+  top: var(--rail-click-y, 50%);
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--rail-v2-glow) 78%, transparent);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.2);
+}
+
+.workspace-rail-v2 .sidebar-nav-item-clicked .sidebar-nav-ripple { animation: rail-v2-click-wave 680ms cubic-bezier(.1, .72, .2, 1) both; }
+.workspace-rail-v2 .sidebar-nav-item-clicked { animation: rail-v2-click-impact 520ms cubic-bezier(.16, 1.4, .3, 1) both !important; }
+
+.workspace-rail-v2 .sidebar-nav-icon {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 34px !important;
+  height: 34px !important;
+  flex: 0 0 34px;
+  place-items: center;
+  color: color-mix(in srgb, rgb(var(--text-main)) 82%, transparent);
+  border: 1px solid color-mix(in srgb, rgb(var(--border-color)) 42%, transparent) !important;
+  border-radius: 3px !important;
+  background: color-mix(in srgb, rgb(var(--bg-elevated)) 68%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, rgb(var(--bg-card)) 35%, transparent) !important;
+  transform-origin: center;
+  transition: color 180ms ease, background-color 220ms ease, border-color 220ms ease, transform 440ms var(--rail-v2-ease-enter), filter 220ms ease !important;
+}
+
+.workspace-rail-v2 .sidebar-nav-item:hover .sidebar-nav-icon {
+  color: var(--rail-v2-glow);
+  border-color: color-mix(in srgb, var(--rail-v2-glow) 44%, transparent) !important;
+  background: color-mix(in srgb, var(--rail-v2-glow) 10%, rgb(var(--bg-elevated))) !important;
+  transform: scale(1.1) rotate(-3deg);
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--rail-v2-glow) 38%, transparent));
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-item:hover .sidebar-nav-icon { transform: scale(1.1) rotate(3deg); }
+
+.workspace-rail-v2 .sidebar-nav-item-active .sidebar-nav-icon {
+  color: var(--rail-v2-primary);
+  border-color: color-mix(in srgb, var(--rail-v2-primary) 48%, transparent) !important;
+  background: color-mix(in srgb, var(--rail-v2-primary) 15%, rgb(var(--bg-elevated))) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rail-v2-primary) 8%, transparent), 0 0 18px color-mix(in srgb, var(--rail-v2-primary) 17%, transparent) !important;
+}
+
+.workspace-rail-v2 .sidebar-nav-label {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  flex: 1;
+  opacity: 1;
+  overflow: hidden;
+  clip-path: inset(0 100% 0 0);
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+  font-size: 12px;
+  line-height: 1.35;
+  transform: translateX(16px);
+  transition: opacity 180ms ease 90ms, clip-path 420ms var(--rail-v2-ease-enter), transform 460ms var(--rail-v2-ease-enter) !important;
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-label { clip-path: inset(0 0 0 100%); transform: translateX(-16px); }
+
+.workspace-rail-v2:is(:hover, :focus-within, .rail-pinned, .rail-mobile-open) .sidebar-nav-label {
+  opacity: 1;
+  clip-path: inset(0);
+  transform: none;
+  transition-delay: calc(var(--rail-order) * 24ms + 80ms) !important;
+}
+
+.workspace-rail-v2 .sidebar-nav-dot,
+.workspace-rail-v2 .sidebar-nav-hint { display: none !important; }
+
+/* Compact command dock */
+.workspace-rail-v2 .sidebar-footer {
+  border-top: 1px solid var(--rail-v2-line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rail-v2-primary) 4%, transparent), var(--rail-v2-raised));
+}
+
+.workspace-rail-v2 .sidebar-sync-bar { min-height: 26px; padding: 4px 12px; opacity: 1; max-height: none; }
+.workspace-rail-v2 .sidebar-quick-actions { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; padding: 6px 10px 8px !important; }
+
+.workspace-rail-v2 .sidebar-quick-action {
+  position: relative;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  color: var(--rail-v2-quiet) !important;
+  border: 1px solid var(--rail-v2-line) !important;
+  border-radius: 3px !important;
+  background: color-mix(in srgb, rgb(var(--bg-card)) 66%, transparent) !important;
+  transform: translateZ(0);
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease, transform 320ms var(--rail-v2-ease-enter), box-shadow 220ms ease !important;
+}
+
+.workspace-rail-v2 .sidebar-quick-action::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(110deg, transparent, color-mix(in srgb, var(--rail-v2-glow) 38%, transparent), transparent);
+  transform: translateX(-130%);
+}
+
+.workspace-rail-v2 .sidebar-quick-action:hover {
+  color: var(--rail-v2-primary) !important;
+  border-color: color-mix(in srgb, var(--rail-v2-primary) 38%, transparent) !important;
+  background: color-mix(in srgb, var(--rail-v2-primary) 9%, rgb(var(--bg-card))) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--rail-v2-primary) 15%, transparent) !important;
+  transform: translateY(-2px);
+}
+
+.workspace-rail-v2 .sidebar-quick-action:hover::before { animation: rail-v2-quick-glow 680ms var(--rail-v2-ease-enter) both; }
+.workspace-rail-v2 .sidebar-quick-action.is-primary { color: var(--rail-v2-glow) !important; }
+.workspace-rail-v2 :is(button, a):focus-visible { outline: 2px solid var(--rail-v2-glow); outline-offset: 2px; }
+
+/* Layout behavior */
+@media (min-width: 1024px) {
+  .workspace-shell:has(> .workspace-rail-v2) > main {
+    margin-inline-start: var(--rail-w-collapsed) !important;
+    transition: margin-inline-start 420ms var(--rail-v2-ease-enter), transform var(--rail-v2-enter) var(--rail-v2-ease-enter), filter var(--rail-v2-enter) ease !important;
+  }
+
+  .workspace-shell:has(> .workspace-rail-v2.rail-pinned) > main { margin-inline-start: var(--rail-w-expanded) !important; }
+
+  .workspace-shell:has(> .workspace-rail-v2:not(.rail-pinned):hover) > main {
+    transform: perspective(1400px) rotateY(var(--rail-content-tilt, -.7deg)) translateX(var(--rail-content-shift, -5px));
+    filter: saturate(.94);
+  }
+
+  [dir='rtl'] .workspace-shell:has(> .workspace-rail-v2:not(.rail-pinned):hover) > main { --rail-content-tilt: .7deg; --rail-content-shift: 5px; }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-text-block,
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-brand-lockup,
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-nav-label,
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-sync-bar { opacity: 0 !important; pointer-events: none !important; }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-branch-context,
+  .workspace-rail-v2.rail-selection-closing .sidebar-branch-context {
+    max-height: 0;
+    margin-block: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-nav,
+  .workspace-rail-v2.rail-selection-closing .sidebar-nav { padding-inline: 10px !important; }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-current-domain,
+  .workspace-rail-v2.rail-selection-closing .sidebar-current-domain {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-current-heading,
+  .workspace-rail-v2.rail-selection-closing .sidebar-current-heading {
+    min-height: 0;
+    max-height: 0 !important;
+    padding-block: 0;
+    flex-basis: 0;
+    opacity: 0 !important;
+    border: 0;
+    pointer-events: none;
+  }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-domain-switcher,
+  .workspace-rail-v2.rail-selection-closing .sidebar-domain-switcher {
+    max-height: 0 !important;
+    padding-block: 0;
+    opacity: 0 !important;
+    border-color: transparent;
+    pointer-events: none !important;
+  }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-current-list,
+  .workspace-rail-v2.rail-selection-closing .sidebar-current-list { padding-block: 4px; }
+
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-quick-actions,
+  .workspace-rail-v2.rail-selection-closing .sidebar-quick-actions { grid-template-columns: 56px !important; justify-content: start; }
+
+  .workspace-rail-v2.rail-selection-closing .sidebar-nav-label { opacity: 0 !important; transition-delay: 130ms !important; }
+}
+
+@media (max-width: 1023px) {
+  :root { --rail-w-expanded: min(88vw, 326px); }
+  .workspace-rail.workspace-rail-v2 {
+    position: fixed !important;
+    width: min(88vw, 326px) !important;
+    max-width: 100vw !important;
+    overflow: hidden !important;
+    transform: translateX(-105%) !important;
+    transition: transform 480ms var(--rail-v2-ease-enter) !important;
+  }
+  [dir='rtl'] .workspace-rail.workspace-rail-v2 { transform: translateX(105%) !important; }
+  .workspace-rail-v2.rail-mobile-open,
+  [dir='rtl'] .workspace-rail-v2.rail-mobile-open { transform: translateX(0) !important; }
+
+  .workspace-rail-v2 .sidebar-pin-btn { display: none !important; }
+  .workspace-rail-v2 .sidebar-collapse-btn {
+    display: grid !important;
+    width: 34px !important;
+    height: 34px !important;
+    place-items: center;
+    border: 1px solid var(--rail-v2-line) !important;
+    border-radius: 3px !important;
+    background: var(--rail-v2-raised) !important;
+  }
+
+  .rail-v2-surface,
+  [dir='rtl'] .rail-v2-surface {
+    width: 100% !important;
+    max-width: 100vw;
+    box-sizing: border-box;
+    clip-path: inset(0) !important;
+    box-shadow: 18px 0 52px color-mix(in srgb, rgb(var(--text-main)) 22%, transparent);
+  }
+
+  .workspace-shell:has(> .workspace-rail-v2) { overflow-x: clip; }
+
+  .workspace-shell:has(> .workspace-rail-v2) > main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    margin-inline: 0 !important;
+    transform: none !important;
+  }
+  .workspace-rail-v2 .sidebar-brand-lockup,
+  .workspace-rail-v2 .sidebar-nav-label { opacity: 1; clip-path: inset(0); transform: none; }
+  .workspace-rail-v2 .sidebar-current-heading { max-height: 54px !important; opacity: 1 !important; }
+  /* Short mobile viewports cannot show the current workspace, all system
+     spaces, and the footer at once. Keep the footer reachable and make the
+     content region the scroll container instead of clipping the last rows. */
+  .workspace-rail-v2 .sidebar-nav {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--rail-v2-primary) 34%, transparent) transparent;
+  }
+  .workspace-rail-v2 .sidebar-current-domain { flex: 0 0 auto; overflow: visible; }
+  .workspace-rail-v2 .sidebar-current-list { flex: 0 0 auto; overflow: visible; }
+  .workspace-rail-v2 .sidebar-domain-switcher {
+    max-height: none !important;
+    flex: 0 0 auto;
+    overflow: visible;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* Tablet and narrow desktop are still touch-sized in practice. Treat them as
+   drawer layouts too: the rail must overlay the page instead of reserving a
+   permanent 64–72px column that squeezes settings and data screens. The
+   component uses the xl breakpoint for the matching trigger/close controls. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .workspace-rail.workspace-rail-v2 {
+    position: fixed !important;
+    width: min(88vw, 326px) !important;
+    max-width: 100vw !important;
+    overflow: hidden !important;
+    transform: translateX(-105%) !important;
+    transition: transform 480ms var(--rail-v2-ease-enter) !important;
+  }
+
+  [dir='rtl'] .workspace-rail.workspace-rail-v2 { transform: translateX(105%) !important; }
+
+  .workspace-rail-v2.rail-mobile-open,
+  [dir='rtl'] .workspace-rail-v2.rail-mobile-open { transform: translateX(0) !important; }
+
+  .workspace-shell:has(> .workspace-rail-v2) > main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    margin-inline: 0 !important;
+    transform: none !important;
+  }
+
+  .workspace-shell:has(> .workspace-rail-v2) { overflow-x: clip; }
+
+  .workspace-rail-v2 .sidebar-brand-lockup,
+  .workspace-rail-v2 .sidebar-nav-label { opacity: 1; clip-path: inset(0); transform: none; }
+
+  .workspace-rail-v2 .sidebar-nav {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+
+/* Final guardrail: older theme layers may apply the rail offset through a
+   broader selector. At drawer widths the application content always owns the
+   full shell; the fixed rail is purely visual/interactive overlay. */
+@media (max-width: 1279px) {
+  .workspace-shell > main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline-start: 0 !important;
+    margin-inline-end: 0 !important;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 1024px) {
+  .workspace-rail-v2 .sidebar-hero-top { min-height: 64px; }
+  .workspace-rail-v2 .sidebar-logomark { width: 52px !important; height: 52px !important; flex-basis: 52px; }
+  .workspace-rail-v2 .sidebar-current-heading { min-height: 48px; max-height: 48px !important; flex-basis: 48px; }
+  .workspace-rail-v2 .sidebar-nav-item { min-height: 38px; }
+  .workspace-rail-v2 .sidebar-nav-icon { width: 30px !important; height: 30px !important; flex-basis: 30px; }
+  .workspace-rail-v2 .sidebar-domain-option { min-height: 32px; }
+  .workspace-rail-v2 .sidebar-domain-switcher { max-height: 184px !important; }
+}
+
+/* Workspace navigator: one scrolling hierarchy above the fixed utility footer. */
+.workspace-rail-v2 .sidebar-workspace-tree {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rail-v2-line) transparent;
+  gap: 4px;
+  scroll-padding-block: 12px;
+}
+.workspace-rail-v2 .sidebar-tree-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px;
+  color: rgb(var(--text-muted));
+  font-size: 12px;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.workspace-rail-v2 .sidebar-workspace-group { flex: 0 0 auto; min-width: 0; }
+.workspace-rail-v2 .sidebar-workspace-trigger {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 22px 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgb(var(--text-main));
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+.workspace-rail-v2 .sidebar-workspace-symbol {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: rgb(var(--text-muted));
+  border: 1px solid var(--rail-v2-line);
+  border-radius: 8px;
+}
+.workspace-rail-v2 .sidebar-workspace-name {
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, text-shadow 180ms ease;
+}
+.workspace-rail-v2 .sidebar-workspace-count {
+  font: 700 10px/1 ui-monospace, monospace;
+  color: rgb(var(--text-muted));
+}
+.workspace-rail-v2 .sidebar-workspace-trigger:hover,
+.workspace-rail-v2 .is-expanded > .sidebar-workspace-trigger {
+  background: color-mix(in srgb, var(--rail-v2-primary) 9%, transparent);
+  border-color: color-mix(in srgb, var(--rail-v2-primary) 25%, transparent);
+}
+.workspace-rail-v2 .sidebar-workspace-trigger:hover .sidebar-workspace-name {
+  color: var(--rail-v2-primary);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--rail-v2-primary) 25%, transparent);
+}
+.workspace-rail-v2 .contains-current-page > .sidebar-workspace-trigger .sidebar-workspace-symbol {
+  color: var(--rail-v2-primary);
+  border-color: var(--rail-v2-primary);
+  background: color-mix(in srgb, var(--rail-v2-primary) 10%, transparent);
+}
+.workspace-rail-v2 .sidebar-workspace-chevron { transition: transform 180ms ease; }
+[dir='rtl'] .workspace-rail-v2 .sidebar-workspace-chevron { transform: rotate(180deg); }
+.workspace-rail-v2 .is-expanded > .sidebar-workspace-trigger .sidebar-workspace-chevron { transform: rotate(90deg); }
+.workspace-rail-v2 .sidebar-workspace-pages:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 12px;
+  margin-inline-start: 25px;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--rail-v2-line);
+}
+.workspace-rail-v2 .sidebar-workspace-pages[hidden] { display: none !important; }
+.workspace-rail-v2 .sidebar-workspace-pages .sidebar-nav-item {
+  min-height: 44px;
+  width: 100% !important;
+  margin: 0;
+}
+.workspace-rail-v2 .sidebar-workspace-trigger:focus-visible {
+  outline: 2px solid var(--rail-v2-primary);
+  outline-offset: -2px;
+}
+@media (min-width: 1024px) {
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-workspace-pages,
+  .workspace-rail-v2.rail-selection-closing .sidebar-workspace-pages,
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-tree-caption,
+  .workspace-rail-v2.rail-selection-closing .sidebar-tree-caption { display: none !important; }
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-workspace-name,
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-workspace-count,
+  .workspace-rail-v2:not(.rail-pinned):not(:hover):not(:focus-within) .sidebar-workspace-chevron,
+  .workspace-rail-v2.rail-selection-closing .sidebar-workspace-name,
+  .workspace-rail-v2.rail-selection-closing .sidebar-workspace-count,
+  .workspace-rail-v2.rail-selection-closing .sidebar-workspace-chevron { visibility: hidden; }
+}
+
+/* Motion signatures */
+@keyframes rail-v2-scan {
+  0% { top: -18%; opacity: 0; }
+  22% { opacity: .76; }
+  100% { top: 104%; opacity: 0; }
+}
+
+@keyframes rail-v2-sliding-glow {
+  0% { opacity: 0; transform: translateX(-145%) skewX(-16deg); }
+  28% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(145%) skewX(-16deg); }
+}
+
+[dir='rtl'] .workspace-rail-v2 .sidebar-nav-item:hover .sidebar-nav-glow { animation-name: rail-v2-sliding-glow-rtl; }
+@keyframes rail-v2-sliding-glow-rtl {
+  0% { opacity: 0; transform: translateX(145%) skewX(16deg); }
+  28% { opacity: .9; }
+  100% { opacity: 0; transform: translateX(-145%) skewX(16deg); }
+}
+
+@keyframes rail-v2-active-lock {
+  0% { opacity: 0; transform: scaleY(.12); }
+  68% { opacity: 1; transform: scaleY(1.12); }
+  100% { transform: scaleY(1); }
+}
+
+@keyframes rail-v2-notch-lock {
+  0% { opacity: 0; transform: translateY(-50%) translateX(10px) scale(.4); }
+  70% { opacity: 1; transform: translateY(-50%) translateX(-2px) scale(1.12); }
+  100% { transform: translateY(-50%) translateX(0) scale(1); }
+}
+
+@keyframes rail-v2-click-wave {
+  0% { opacity: .82; transform: translate(-50%, -50%) scale(.2); box-shadow: 0 0 0 0 color-mix(in srgb, var(--rail-v2-glow) 34%, transparent); }
+  65% { opacity: .28; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(18); box-shadow: 0 0 0 18px transparent; }
+}
+
+@keyframes rail-v2-click-impact {
+  0% { transform: scale(1); }
+  28% { transform: scale(.965); filter: brightness(1.16); }
+  72% { transform: scale(1.012); }
+  100% { transform: scale(1); filter: none; }
+}
+
+@keyframes rail-v2-quick-glow {
+  from { opacity: 0; transform: translateX(-130%); }
+  35% { opacity: .8; }
+  to { opacity: 0; transform: translateX(130%); }
+}
+
+html[data-motion="off"] .workspace-rail-v2 *,
+html[data-motion="off"] .workspace-rail-v2 *::before,
+html[data-motion="off"] .workspace-rail-v2 *::after,
+[data-motion="off"] .workspace-rail-v2 *,
+html[data-motion-reduced="true"] .workspace-rail-v2 * {
+  animation: none !important;
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-v2-surface,
+  .rail-v2-surface::before,
+  .rail-v2-surface::after,
+  .workspace-rail.workspace-rail-v2,
+  .workspace-shell:has(> .workspace-rail-v2) > main,
+  .workspace-rail-v2 *,
+  .workspace-rail-v2 *::before,
+  .workspace-rail-v2 *::after {
+    animation: none !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .workspace-shell:has(> .workspace-rail-v2:not(.rail-pinned):hover) > main { transform: none !important; filter: none !important; }
+}
+
+/* Keep this last: theme personality layers can add a desktop rail offset with
+   higher specificity. Drawer widths never reserve shell space. */
+@media (max-width: 1279px) {
+  .workspace-shell > main {
+    margin: 0 !important;
+    margin-inline-start: 0 !important;
+    margin-inline-end: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}

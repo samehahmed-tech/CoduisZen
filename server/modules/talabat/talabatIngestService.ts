@@ -18,6 +18,7 @@ import {
 import { getTalabatConfigRaw } from './talabatConfig';
 import {
     buildTalabatIdempotencyKey,
+    buildTalabatPayloadFingerprint,
     mapTalabatStatus,
     normalizeTalabatItems,
     TALABAT_IDEMPOTENCY_SCOPE,
@@ -66,7 +67,7 @@ const logInbound = async (payload: any, status: string, orderId?: string, error?
     } catch { /* never blocks webhook */ }
 };
 
-export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: string; created: boolean; internalStatus: string | null }> => {
+export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: string; created: boolean; internalStatus: string | null; branchId?: string | null }> => {
     const validation = validateTalabatPayload(payload);
     if (!validation.ok) {
         const code = (validation as any).code || 'INVALID_PAYLOAD';
@@ -107,16 +108,51 @@ export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: str
 
     // Idempotency first: same order_id+status twice = same result, no double order.
     const idemKey = buildTalabatIdempotencyKey(orderId, talabatStatus);
+    const payloadFingerprint = buildTalabatPayloadFingerprint(payload);
     const [claim] = await db.select().from(idempotencyKeys)
         .where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE), gt(idempotencyKeys.expiresAt, new Date())));
+    const claimRequestHash = String(claim?.requestHash || '');
+    if (claim && claimRequestHash && claimRequestHash !== payloadFingerprint && claimRequestHash !== orderId) {
+        const err: any = new Error('TALABAT_ORDER_PAYLOAD_CONFLICT');
+        err.status = 409;
+        err.code = err.message;
+        throw err;
+    }
     if (claim?.resourceId) {
-        return { orderId: claim.resourceId, created: false, internalStatus };
+        return { orderId: claim.resourceId, created: false, internalStatus, branchId };
+    }
+    if (claim) {
+        const err: any = new Error('TALABAT_ORDER_IN_PROGRESS');
+        err.status = 409;
+        err.code = err.message;
+        throw err;
     }
 
     // UPDATE_CART carries no status change — ack only (PUT flow validates separately).
     if (talabatStatus === 'UPDATE_CART') {
         await logInbound(payload, talabatStatus, orderId);
-        return { orderId, created: false, internalStatus: null };
+        return { orderId, created: false, internalStatus: null, branchId };
+    }
+
+    // Claim before any order-side effects. The unique (key, scope) index
+    // makes concurrent Talabat deliveries deterministic and retry-safe.
+    try {
+        await db.insert(idempotencyKeys).values({
+            key: idemKey,
+            scope: TALABAT_IDEMPOTENCY_SCOPE,
+            requestHash: payloadFingerprint,
+            status: 'IN_PROGRESS',
+            expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS),
+            updatedAt: new Date(),
+        });
+    } catch {
+        const [concurrentClaim] = await db.select().from(idempotencyKeys)
+            .where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE)));
+        if (concurrentClaim?.resourceId) return { orderId: concurrentClaim.resourceId, created: false, internalStatus, branchId };
+        const err: any = new Error('TALABAT_ORDER_IN_PROGRESS');
+        err.status = 409;
+        err.code = err.message;
+        throw err;
     }
 
     // CANCELLED after creation flips the existing order; no order yet → ack.
@@ -136,30 +172,43 @@ export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: str
             } catch (e: any) {
                 log.warn({ orderId: existing.id, err: e?.message }, 'Talabat cancel transition failed');
             }
-            await db.insert(idempotencyKeys).values({
-                key: idemKey, scope: TALABAT_IDEMPOTENCY_SCOPE, requestHash: orderId,
-                resourceId: existing.id, status: 'COMPLETED', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date(),
-            }).catch(() => undefined);
+            await db.update(idempotencyKeys).set({
+                resourceId: existing.id, status: 'COMPLETED', updatedAt: new Date(),
+            }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE))).catch(() => undefined);
             await logInbound(payload, talabatStatus, existing.id);
-            return { orderId: existing.id, created: false, internalStatus: 'CANCELLED' };
+            return { orderId: existing.id, created: false, internalStatus: 'CANCELLED', branchId };
         }
+        await db.update(idempotencyKeys).set({
+            resourceId: orderId, status: 'COMPLETED', updatedAt: new Date(),
+        }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE))).catch(() => undefined);
         await logInbound(payload, talabatStatus, orderId);
-        return { orderId, created: false, internalStatus: 'CANCELLED' };
+        return { orderId, created: false, internalStatus: 'CANCELLED', branchId };
     }
 
     // RECEIVED / READY_FOR_PICKUP / DISPATCHED → ensure one internal order.
     // Aggregator double-entry guard (same as POS createOrder).
-    const [dup] = await db.select({ id: orders.id }).from(orders).where(and(
+    const [dup] = await db.select({ id: orders.id, branchId: orders.branchId, total: orders.total }).from(orders).where(and(
         eq(orders.deliverySource, 'talabat'),
         eq(orders.platformOrderId, orderId),
         sql`${orders.status} NOT IN ('CANCELLED', 'REFUNDED')`,
     ));
     if (dup) {
-        await db.insert(idempotencyKeys).values({
-            key: idemKey, scope: TALABAT_IDEMPOTENCY_SCOPE, requestHash: orderId,
-            resourceId: dup.id, status: 'COMPLETED', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date(),
-        }).catch(() => undefined);
-        return { orderId: dup.id, created: false, internalStatus };
+        const row = buildTalabatOrderRow(payload, branchId);
+        if (String(dup.branchId || '') !== String(branchId || '') || Number(dup.total || 0) !== Number(row.total || 0)) {
+            await db.delete(idempotencyKeys).where(and(
+                eq(idempotencyKeys.key, idemKey),
+                eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE),
+                eq(idempotencyKeys.status, 'IN_PROGRESS'),
+            )).catch(() => undefined);
+            const err: any = new Error('TALABAT_ORDER_PAYLOAD_CONFLICT');
+            err.status = 409;
+            err.code = err.message;
+            throw err;
+        }
+        await db.update(idempotencyKeys).set({
+            resourceId: dup.id, status: 'COMPLETED', updatedAt: new Date(),
+        }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE))).catch(() => undefined);
+        return { orderId: dup.id, created: false, internalStatus, branchId };
     }
 
     const row = buildTalabatOrderRow(payload, branchId);
@@ -182,7 +231,9 @@ export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: str
     const now = new Date();
     const businessDate = branchRow?.businessDate || now.toISOString().split('T')[0];
 
-    const createdId = await db.transaction(async (tx) => {
+    let createdId: string;
+    try {
+        createdId = await db.transaction(async (tx) => {
         const dailyOrderNumber = await allocateDailyOrderNumber(tx as any, branchId, businessDate);
         const [created] = await tx.insert(orders).output().values({
             id: `TB-${orderId.slice(0, 8)}-${nanoid(6)}`,
@@ -232,7 +283,15 @@ export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: str
         }
         await tx.insert(orderStatusHistory).values({ orderId: (created as any).id, status: (created as any).status, changedBy: 'talabat-webhook', createdAt: now } as any);
         return (created as any).id as string;
-    });
+        });
+    } catch (error) {
+        await db.delete(idempotencyKeys).where(and(
+            eq(idempotencyKeys.key, idemKey),
+            eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE),
+            eq(idempotencyKeys.status, 'IN_PROGRESS'),
+        )).catch(() => undefined);
+        throw error;
+    }
 
     // Best-effort side effects — never block the 200 ack.
     try {
@@ -251,10 +310,9 @@ export const ingestTalabatWebhook = async (payload: any): Promise<{ orderId: str
     emitBranchEvent(branchId, 'order:created', { id: createdId, source: 'talabat', platformOrderId: orderId });
     webhookService.dispatch('order.created', { id: createdId, source: 'talabat', platformOrderId: orderId, branchId }, branchId).catch(() => {});
 
-    await db.insert(idempotencyKeys).values({
-        key: idemKey, scope: TALABAT_IDEMPOTENCY_SCOPE, requestHash: orderId,
-        resourceId: createdId, status: 'COMPLETED', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date(),
-    }).catch(() => undefined);
+    await db.update(idempotencyKeys).set({
+        resourceId: createdId, status: 'COMPLETED', updatedAt: new Date(),
+    }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, TALABAT_IDEMPOTENCY_SCOPE))).catch(() => undefined);
     await logInbound(payload, talabatStatus, createdId);
-    return { orderId: createdId, created: true, internalStatus };
+    return { orderId: createdId, created: true, internalStatus, branchId };
 };

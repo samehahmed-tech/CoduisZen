@@ -1,0 +1,126 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": ".env.example",
+      "language": "config",
+      "sizeLines": 142,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".env.production.example",
+      "language": "config",
+      "sizeLines": 82,
+      "fileCategory": "config"
+    },
+    {
+      "path": "AGENTS.md",
+      "language": "markdown",
+      "sizeLines": 18,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "FIX-CHECKLIST.md",
+      "language": "markdown",
+      "sizeLines": 97,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "TEST-CHECKLIST.md",
+      "language": "markdown",
+      "sizeLines": 89,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "cleardata.sql",
+      "language": "sql",
+      "sizeLines": 113,
+      "fileCategory": "data"
+    },
+    {
+      "path": "fixes.md",
+      "language": "markdown",
+      "sizeLines": 89,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "github.bat",
+      "language": "batch",
+      "sizeLines": 122,
+      "fileCategory": "script"
+    },
+    {
+      "path": "import-rosa-cafe-reset.bat",
+      "language": "batch",
+      "sizeLines": 75,
+      "fileCategory": "script"
+    },
+    {
+      "path": "index.css",
+      "language": "css",
+      "sizeLines": 591,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "index.html",
+      "language": "html",
+      "sizeLines": 100,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "package.json",
+      "language": "json",
+      "sizeLines": 135,
+      "fileCategory": "config"
+    },
+    {
+      "path": "restoflow-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 355,
+      "fileCategory": "script"
+    },
+    {
+      "path": "restore-coduiszen.bat",
+      "language": "batch",
+      "sizeLines": 51,
+      "fileCategory": "script"
+    },
+    {
+      "path": "tsconfig.json",
+      "language": "json",
+      "sizeLines": 48,
+      "fileCategory": "config"
+    },
+    {
+      "path": "tsconfig.server.json",
+      "language": "json",
+      "sizeLines": 30,
+      "fileCategory": "config"
+    },
+    {
+      "path": "uat-manual.html",
+      "language": "html",
+      "sizeLines": 234,
+      "fileCategory": "markup"
+    }
+  ],
+  "batchImportData": {
+    ".env.example": [],
+    ".env.production.example": [],
+    "AGENTS.md": [],
+    "FIX-CHECKLIST.md": [],
+    "TEST-CHECKLIST.md": [],
+    "cleardata.sql": [],
+    "fixes.md": [],
+    "github.bat": [],
+    "import-rosa-cafe-reset.bat": [],
+    "index.css": [],
+    "index.html": [],
+    "package.json": [],
+    "restoflow-fix.ps1": [],
+    "restore-coduiszen.bat": [],
+    "tsconfig.json": [],
+    "tsconfig.server.json": [],
+    "uat-manual.html": []
+  }
+}

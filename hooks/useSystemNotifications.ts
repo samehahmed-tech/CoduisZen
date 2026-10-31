@@ -83,7 +83,7 @@ export const useSystemNotifications = (options: UseSystemNotificationsOptions = 
         () => `${READ_KEY_PREFIX}${branchId || 'none'}:${userId || 'anon'}`,
         [branchId, userId]
     );
-    const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const refreshTimer = useRef<number | null>(null);
 
     useEffect(() => {
         setReadIds(loadReadIds(readKey));
@@ -272,7 +272,19 @@ export const useSystemNotifications = (options: UseSystemNotificationsOptions = 
             // 6) Offline sync backlog (real, local)
             if (syncRes.status === 'fulfilled' && syncRes.value) {
                 const s: any = syncRes.value;
-                if (Number(s?.failed || 0) > 0) {
+                if (Number(s?.conflicts || 0) > 0) {
+                    out.push({
+                        id: 'sync:conflicts',
+                        severity: 'critical',
+                        category: 'sync',
+                        title: `${s.conflicts} offline conflict(s) need review`,
+                        titleAr: `${s.conflicts} تعارضات مزامنة تحتاج مراجعة`,
+                        body: 'A server change conflicts with a local offline change.',
+                        bodyAr: 'يوجد تعارض بين تعديل محلي وتعديل أحدث على الخادم.',
+                        link: '/offline-conflicts',
+                        count: Number(s.conflicts),
+                    });
+                } else if (Number(s?.failed || 0) > 0) {
                     out.push({
                         id: 'sync:failed',
                         severity: 'critical',
@@ -410,14 +422,14 @@ export const useSystemNotifications = (options: UseSystemNotificationsOptions = 
     useEffect(() => {
         if (!enabled || !branchId) return;
         refresh();
-        const id = window.setInterval(refresh, pollMs);
+        const id: number = window.setInterval(refresh, pollMs);
         return () => window.clearInterval(id);
     }, [branchId, enabled, pollMs, refresh]);
 
     // Live refresh on socket events (debounced)
     useEffect(() => {
         if (!enabled || !branchId) return;
-        const schedule = () => {
+    const schedule = () => {
             if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
             refreshTimer.current = window.setTimeout(() => { refresh(); }, 2000);
         };

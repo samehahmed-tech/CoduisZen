@@ -19,10 +19,12 @@ import {
     payrollRuns,
     payslips,
     shiftTemplates,
+    tipPools,
 } from '../../src/db/schema';
 import payrollGlPostingService from './payrollGlPostingService';
 import eventBusService from './eventBusService';
 import payrollCalculationService from './payrollCalculationService';
+import payrollTipReconciliationService from './payrollTipReconciliationService';
 
 const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 
@@ -98,9 +100,11 @@ type PreviewResult = {
         gross: number;
         deductions: number;
         net: number;
+        tips: number;
         blockers: number;
         warnings: number;
     };
+    tipReconciliation: Awaited<ReturnType<typeof payrollTipReconciliationService.reconcileCycle>>;
     lines: Array<{
         employeeId: string;
         employeeName?: string;
@@ -114,6 +118,7 @@ type PreviewResult = {
         otherDeductions: number;
         grossPay: number;
         netPay: number;
+        tipAmount: number;
         fixedAllowances?: number;
         fixedDeductions?: number;
         attendanceDeductions?: number;
@@ -183,6 +188,8 @@ export const payrollCloseService = {
         if (!cycle) throw new Error('PAYROLL_CYCLE_NOT_FOUND');
 
         const calculationPreview = await payrollCalculationService.previewCycle(cycleId);
+        const tipReconciliation = await payrollTipReconciliationService.reconcileCycle(cycleId, cycle.branchId);
+        const tipsByEmployeeId = new Map(tipReconciliation.byEmployee.map((row) => [row.employeeId, row.allocatedAmount]));
         const payouts = await db.select().from(payrollPayouts).where(eq(payrollPayouts.cycleId, cycleId));
         const cycleEmployees = await db.select().from(employees).where(eq(employees.branchId, cycle.branchId));
         const sessions = await db.select().from(attendanceSessions)
@@ -253,10 +260,11 @@ export const payrollCloseService = {
             const fixedAllowances = Number(calculatedLine?.adjustments?.fixedAllowances || 0);
             const fixedDeductions = Number(calculatedLine?.adjustments?.fixedDeductions || 0);
             const attendanceDeductions = Number(calculatedLine?.adjustments?.attendanceDeductions || 0);
+            const tipAmount = Number(tipsByEmployeeId.get(employee.id) || 0);
             const otherDeductions = attendanceDeductions + fixedDeductions;
-            const grossPay = Number(calculatedLine?.grossPay || (baseSalary + overtime + employeeBonus + fixedAllowances));
+            const grossPay = Number(calculatedLine?.grossPay || (baseSalary + overtime + employeeBonus + fixedAllowances)) + tipAmount;
             const totalDeductions = Number(calculatedLine?.deductions || (employeePenalty + employeeLoans + otherDeductions));
-            const netPay = Number(calculatedLine?.netPay || (grossPay - totalDeductions));
+            const netPay = Number(calculatedLine?.netPay || (grossPay - totalDeductions)) + tipAmount;
             const employeeSessions = sessions.filter(session => session.employeeId === employee.id);
             const employeeLeaves = leaves.filter(leave => leave.employeeId === employee.id);
             const attendanceDays = new Set(employeeSessions.map(session => new Date(session.clockInAt).toISOString().slice(0, 10))).size;
@@ -291,12 +299,14 @@ export const payrollCloseService = {
                 attendanceSummary.crossBranchExits > 0 ? `${attendanceSummary.crossBranchExits} cross-branch exits` : '',
                 pendingLeaveDays > 0 ? `${pendingLeaveDays} pending leave days` : '',
                 attendanceSummary.absenceDays > 0 ? `${attendanceSummary.absenceDays} estimated absence days` : '',
+                tipAmount > 0 ? `Tips allocated: ${tipAmount}` : '',
             ].filter(Boolean);
             const blockers = [
                 !payout ? 'Missing payroll calculation' : '',
                 attendanceSummary.openSessions > 0 ? `${attendanceSummary.openSessions} open attendance sessions` : '',
                 attendanceSummary.exceptionSessions > 0 ? `${attendanceSummary.exceptionSessions} attendance exceptions` : '',
                 netPay < 0 ? 'Negative net pay' : '',
+                tipReconciliation.pools.some((pool) => !pool.balanced) ? 'Unbalanced tip pool' : '',
             ].filter(Boolean);
 
             lines.push({
@@ -312,6 +322,7 @@ export const payrollCloseService = {
                 otherDeductions,
                 grossPay,
                 netPay,
+                tipAmount,
                 fixedAllowances,
                 fixedDeductions,
                 attendanceDeductions,
@@ -339,16 +350,18 @@ export const payrollCloseService = {
             acc.gross += line.grossPay;
             acc.deductions += (line.penalties + line.loanDeductions + line.otherDeductions);
             acc.net += line.netPay;
+            acc.tips += line.tipAmount;
             acc.blockers += line.blockers?.length || 0;
             acc.warnings += line.warnings?.length || 0;
             return acc;
-        }, { employees: 0, gross: 0, deductions: 0, net: 0, blockers: 0, warnings: 0 });
+        }, { employees: 0, gross: 0, deductions: 0, net: 0, tips: 0, blockers: 0, warnings: 0 });
 
         return {
             cycleId,
             branchId: cycle.branchId,
             totals,
             lines,
+            tipReconciliation,
         };
     },
 
@@ -389,6 +402,7 @@ export const payrollCloseService = {
                     employeeId: line.employeeId,
                     baseSalary: line.baseSalary,
                     overtime: line.overtime,
+                    tipAmount: line.tipAmount,
                     bonuses: line.bonuses,
                     penalties: line.penalties,
                     loanDeductions: line.loanDeductions,
@@ -399,6 +413,7 @@ export const payrollCloseService = {
                         fixedAllowances: line.fixedAllowances || 0,
                         fixedDeductions: line.fixedDeductions || 0,
                         attendanceDeductions: line.attendanceDeductions || 0,
+                        tipAmount: line.tipAmount,
                         bonuses: line.bonuses,
                         penalties: line.penalties,
                         loanDeductions: line.loanDeductions,
@@ -413,6 +428,7 @@ export const payrollCloseService = {
                     payload: {
                         baseSalary: line.baseSalary,
                         overtime: line.overtime,
+                        tipAmount: line.tipAmount,
                         fixedAllowances: line.fixedAllowances || 0,
                         fixedDeductions: line.fixedDeductions || 0,
                         attendanceDeductions: line.attendanceDeductions || 0,
@@ -424,6 +440,15 @@ export const payrollCloseService = {
                         netPay: line.netPay,
                     },
                 });
+            }
+
+            const payrollTipPoolIds = preview.tipReconciliation.pools
+                .filter((pool) => pool.eligibleForPayroll)
+                .map((pool) => pool.poolId);
+            if (payrollTipPoolIds.length) {
+                await tx.update(tipPools)
+                    .set({ payrollCycleId: input.cycleId, updatedAt: new Date() })
+                    .where(inArray(tipPools.id, payrollTipPoolIds));
             }
 
             await tx.update(bonusPenaltyRecords)

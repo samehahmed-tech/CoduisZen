@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateActionAuthorization } from '../server/services/aiPolicy';
+import { evaluateActionAuthorization, isAiActionBranchAllowed } from '../server/services/aiPolicy';
 
 describe('ai backend policy guard', () => {
     it('rejects unsupported action types', () => {
@@ -43,5 +43,16 @@ describe('ai backend policy guard', () => {
         );
         expect(result.ok).toBe(false);
         expect(result.code).toBe('INSUFFICIENT_PERMISSION');
+    });
+
+    it('rejects an AI action targeting a branch outside the actor scope', () => {
+        expect(isAiActionBranchAllowed(
+            { id: 'u6', role: 'BRANCH_MANAGER', branchId: 'branch-a', allowedBranches: [], permissions: [] },
+            { type: 'CREATE_EMPLOYEE', data: { branchId: 'branch-b' } },
+        )).toBe(false);
+        expect(isAiActionBranchAllowed(
+            { id: 'u7', role: 'SUPER_ADMIN', permissions: [] },
+            { type: 'CREATE_USER', assignedBranchId: 'branch-b' },
+        )).toBe(true);
     });
 });

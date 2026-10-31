@@ -300,7 +300,8 @@
 
         window.screenActionReady = function (id) {
             var url = '/api/public-screens/tickets/' + encodeURIComponent(id) + '/bump';
-            if (key) url += '?key=' + encodeURIComponent(key);
+            url += '?branchId=' + encodeURIComponent(branchId);
+            if (key) url += '&key=' + encodeURIComponent(key);
             api('POST', url, null, function () {
                 load();
             });
@@ -308,7 +309,8 @@
 
         window.screenActionHandover = function (orderId) {
             var url = '/api/public-screens/orders/' + encodeURIComponent(orderId) + '/handover';
-            if (key) url += '?key=' + encodeURIComponent(key);
+            url += '?branchId=' + encodeURIComponent(branchId);
+            if (key) url += '&key=' + encodeURIComponent(key);
             api('POST', url, null, function () {
                 load();
             });

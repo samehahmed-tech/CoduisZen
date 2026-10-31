@@ -5,10 +5,22 @@ import { and, desc, eq, or } from 'drizzle-orm';
 import { db } from '../db';
 import { attendanceDevices, attendanceSyncRuns, branches } from '../../src/db/schema';
 import attendanceOpsService from '../services/attendanceOpsService';
+import { validateBridgeDeviceScope } from '../utils/bridgeScope';
+import { getAttendanceBridgeToken } from '../utils/bridgeToken';
+import { createSignedAuditLog } from '../services/auditService';
 
 const router = Router();
 
-const getBridgeToken = () => process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.PRINT_GATEWAY_TOKEN || '';
+const auditBridgeMutation = (eventType: string, branchId: string | null | undefined, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    branchId: branchId || null,
+    userId: null,
+    userName: 'attendance-bridge',
+    userRole: 'BRANCH_BRIDGE',
+    payload,
+    after,
+    reason: 'Authenticated attendance bridge operation',
+});
 
 const readBearerToken = (req: Request) => {
     const auth = String(req.headers.authorization || '');
@@ -25,7 +37,7 @@ const tokensMatch = (actual: string, expected: string) => {
 };
 
 const requireBridgeToken = (req: Request, res: Response) => {
-    const expected = getBridgeToken();
+    const expected = getAttendanceBridgeToken();
     const actual = readBearerToken(req);
     if (!tokensMatch(actual, expected)) {
         res.status(401).json({ ok: false, code: 'INVALID_ATTENDANCE_BRIDGE_TOKEN' });
@@ -66,6 +78,7 @@ const bridgeErrorMessage = (message?: string | null) => {
 };
 
 type BridgeCommandMetadata = {
+    gatewayId?: string;
     command?: string;
     forceFull?: boolean;
     sinceAt?: string | null;
@@ -155,8 +168,21 @@ const ensureBridgeDevice = async (input: {
                 eq(attendanceDevices.id, String(requestedId)),
                 eq(attendanceDevices.isActive, true),
             ))
-            .limit(1);
-        if (existing) return existing;
+        .limit(1);
+        if (existing) {
+            const scope = validateBridgeDeviceScope({
+                existingBranchId: existing.branchId,
+                requestedBranchId: input.branchId,
+                existingGatewayId: existing.branchGatewayId,
+                requestedGatewayId: input.gatewayId,
+            });
+            if (!scope.ok) {
+                const error: any = new Error(scope.code);
+                error.status = 403;
+                throw error;
+            }
+            return existing;
+        }
     }
 
     const conditions = [
@@ -233,6 +259,10 @@ router.post('/register', async (req: Request, res: Response) => {
             });
         }
 
+        await auditBridgeMutation('ATTENDANCE_BRIDGE_DEVICES_REGISTERED', branchId, {
+            gatewayId: gatewayId || null,
+            deviceCount: results.length,
+        }, { registered: true });
         res.json({
             ok: true,
             branchId,
@@ -242,7 +272,7 @@ router.post('/register', async (req: Request, res: Response) => {
             registeredAt: new Date().toISOString(),
         });
     } catch (error: any) {
-        res.status(500).json({ ok: false, code: 'ATTENDANCE_BRIDGE_REGISTER_FAILED', message: error.message });
+        res.status(error.status || 500).json({ ok: false, code: error.message || 'ATTENDANCE_BRIDGE_REGISTER_FAILED', message: error.message });
     }
 });
 
@@ -296,6 +326,10 @@ router.get('/commands', async (req: Request, res: Response) => {
                 .where(eq(attendanceSyncRuns.id, command.id));
         }
 
+        await auditBridgeMutation('ATTENDANCE_BRIDGE_COMMANDS_CLAIMED', branchId, {
+            gatewayId,
+            commandCount: commands.length,
+        }, { claimed: true });
         res.json({ ok: true, commands });
     } catch (error: any) {
         res.status(500).json({ ok: false, code: 'ATTENDANCE_BRIDGE_COMMANDS_FAILED', message: error.message });
@@ -309,7 +343,13 @@ router.post('/commands/:id/complete', async (req: Request, res: Response) => {
         const commandId = String(req.params.id);
         const ok = req.body?.ok !== false;
         const [existing] = await db.select().from(attendanceSyncRuns).where(eq(attendanceSyncRuns.id, commandId)).limit(1);
+        if (!existing) return res.status(404).json({ ok: false, code: 'COMMAND_NOT_FOUND' });
         const existingMetadata = (existing?.metadata || {}) as BridgeCommandMetadata;
+        const expectedGatewayId = String(existingMetadata.gatewayId || '').trim();
+        const submittedGatewayId = String(req.body?.gatewayId || '').trim();
+        if (expectedGatewayId && submittedGatewayId !== expectedGatewayId) {
+            return res.status(403).json({ ok: false, code: 'GATEWAY_COMMAND_MISMATCH' });
+        }
         const logsReceived = Number(req.body?.logsReceived || 0);
         const logsAccepted = Number(req.body?.logsAccepted || req.body?.accepted || 0);
         const logsRejected = Number(req.body?.logsRejected || req.body?.rejected || 0);
@@ -353,6 +393,14 @@ router.post('/commands/:id/complete', async (req: Request, res: Response) => {
             logsRejected,
             errorMessage: normalizedErrorMessage,
         });
+
+        await auditBridgeMutation('ATTENDANCE_BRIDGE_COMMAND_COMPLETED', existing.branchId, {
+            commandId,
+            gatewayId: submittedGatewayId,
+            logsReceived,
+            logsAccepted,
+            logsRejected,
+        }, { status: ok ? (hasBridgeErrors ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED') : 'FAILED' });
 
         if (ok && !hasBridgeErrors && existing?.deviceId && existingMetadata.command === 'SYNC_DEVICE' && existingMetadata.forceFull) {
             await attendanceOpsService.setDeviceInitialHistoryLoaded(existing.deviceId, new Date().toISOString());
@@ -408,9 +456,13 @@ router.post('/backups', async (req: Request, res: Response) => {
             createdBy: req.body?.createdBy ? String(req.body.createdBy) : null,
         });
 
+        await auditBridgeMutation('ATTENDANCE_BRIDGE_BACKUP_RECEIVED', branchId, {
+            deviceId: device.id,
+            received: logs.length,
+        }, { stored: true });
         res.json({ ok: true, backupId: backup.id, received: logs.length, deviceId: device.id });
     } catch (error: any) {
-        res.status(500).json({ ok: false, code: 'ATTENDANCE_BRIDGE_BACKUP_FAILED', message: error.message });
+        res.status(error.status || 500).json({ ok: false, code: error.message || 'ATTENDANCE_BRIDGE_BACKUP_FAILED', message: error.message });
     }
 });
 
@@ -429,7 +481,7 @@ router.post('/ingest', async (req: Request, res: Response) => {
             return res.status(404).json({ ok: false, code: 'UNKNOWN_BRANCH', branchId });
         }
         if (!logs.length) {
-            return res.json({ ok: true, received: 0, accepted: 0, duplicates: 0, rejected: 0, errors: [] });
+            return res.json({ ok: true, branchId, gatewayId: gatewayId || null, received: 0, accepted: 0, duplicates: 0, rejected: 0, errors: [] });
         }
         if (logs.length > 1000) {
             return res.status(400).json({ ok: false, code: 'TOO_MANY_LOGS', max: 1000 });
@@ -507,6 +559,16 @@ router.post('/ingest', async (req: Request, res: Response) => {
             } as any)
             .where(eq(attendanceSyncRuns.id, syncRunId));
 
+        await auditBridgeMutation('ATTENDANCE_BRIDGE_LOGS_INGESTED', branchId, {
+            gatewayId: gatewayId || null,
+            deviceId: device.id,
+            syncRunId,
+            received: logs.length,
+            accepted,
+            duplicates,
+            rejected,
+        }, { status: rejected > 0 ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED' });
+
         await db.update(attendanceDevices)
             .set({ lastSeenAt: new Date(), lastSyncAt: new Date(), updatedAt: new Date() })
             .where(eq(attendanceDevices.id, device.id));
@@ -538,7 +600,7 @@ router.post('/ingest', async (req: Request, res: Response) => {
             });
         }
     } catch (error: any) {
-        res.status(500).json({ ok: false, code: 'ATTENDANCE_BRIDGE_INGEST_FAILED', message: error.message });
+        res.status(error.status || 500).json({ ok: false, code: error.message || 'ATTENDANCE_BRIDGE_INGEST_FAILED', message: error.message });
     }
 });
 

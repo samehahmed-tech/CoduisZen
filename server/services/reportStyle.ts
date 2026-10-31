@@ -196,7 +196,7 @@ ${input.signatures ? `<section class="section"><div class="sign"><div>${htmlEsca
     const browser = await launchReportBrowser();
     try {
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'networkidle0' as any });
         return Buffer.from(await page.pdf({
             format: 'A4', landscape: wide, printBackground: true, preferCSSPageSize: false,
             displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate,

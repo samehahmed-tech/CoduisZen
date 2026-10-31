@@ -1,0 +1,2616 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="aero">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RestoFlow — Menu Atelier</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+      @import url("../styles/themes/v5.css");
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--theme-page-bg, var(--paper));
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family: "IBM Plex Sans Arabic", "Segoe UI", sans-serif;
+        font-size: 15px;
+        transition:
+          background 0.45s ease,
+          color 0.3s ease;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      :root {
+        --paper: rgb(var(--bg-app));
+        --paper-2: rgb(var(--bg-global));
+        --ink: rgb(var(--text-main));
+        --muted: rgb(var(--text-muted));
+        --line: rgb(var(--border-color));
+        --acid: rgb(var(--primary));
+        --signal: rgb(var(--secondary));
+        --white: var(--theme-card-bg);
+        --accent-ink: #fff;
+        --shadow: 0 24px 70px -32px rgba(var(--primary), 0.42);
+        --radius-sm: 12px;
+        --radius-md: 18px;
+        --radius-lg: 28px;
+        --glass: color-mix(in srgb, var(--theme-card-bg) 84%, transparent);
+        --glass-strong: color-mix(
+          in srgb,
+          var(--theme-card-bg) 94%,
+          transparent
+        );
+        color-scheme: light;
+      }
+      :root[data-theme="citrus"] {
+        --accent-ink: #172009;
+        --shadow: 7px 7px 0 rgba(43, 36, 21, 0.14);
+      }
+      :root[data-theme="porcelain"] {
+        --shadow: 0 24px 60px -44px rgba(25, 24, 23, 0.3);
+      }
+      :root[data-theme="blueprint"] {
+        --shadow: 0 24px 60px -42px rgba(8, 37, 64, 0.45);
+      }
+      :root[data-theme="clay"] {
+        --shadow: 7px 7px 0 rgba(49, 37, 27, 0.14);
+      }
+      :root[data-theme="nocturne"],
+      :root[data-theme="foundry"],
+      :root[data-theme="neon"],
+      :root[data-theme="slate"],
+      :root[data-theme="cinema"] {
+        color-scheme: dark;
+        --shadow: 0 30px 80px -34px #000;
+      }
+      :root[data-theme="nocturne"],
+      :root[data-theme="foundry"],
+      :root[data-theme="neon"],
+      :root[data-theme="slate"],
+      :root[data-theme="cinema"] {
+        --accent-ink: rgb(var(--bg-global));
+      }
+      :root[data-theme="neon"] {
+        --shadow: 0 0 34px -10px rgba(255, 46, 136, 0.46);
+      }
+      .latin {
+        font-family: "Space Grotesk", Arial, sans-serif;
+        direction: ltr;
+      }
+      .shell {
+        min-height: 100vh;
+      }
+      .mast {
+        height: 72px;
+        display: grid;
+        grid-template-columns: 220px 1fr 220px;
+        align-items: center;
+        padding: 0 2.4vw;
+        border-bottom: 1px solid var(--ink);
+        position: sticky;
+        top: 0;
+        background: color-mix(in srgb, var(--paper) 90%, transparent);
+        backdrop-filter: blur(18px);
+        z-index: 40;
+      }
+      .wordmark {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font: bold 14px "Space Grotesk";
+      }
+      .mark {
+        width: 28px;
+        height: 28px;
+        background: var(--ink);
+        color: var(--paper);
+        display: grid;
+        place-items: center;
+      }
+      .mark svg {
+        width: 15px;
+      }
+      .context {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .context b {
+        color: var(--ink);
+      }
+      .mast-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+      }
+      .icon {
+        width: 42px;
+        height: 42px;
+        border: 0;
+        background: transparent;
+        display: grid;
+        place-items: center;
+      }
+      .icon:hover {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .section-index {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        border-bottom: 1px solid var(--ink);
+        background: var(--paper);
+        position: sticky;
+        top: 72px;
+        z-index: 35;
+      }
+      .section-index button {
+        height: 64px;
+        border: 0;
+        border-inline-start: 1px solid var(--line);
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        font-weight: 600;
+      }
+      .section-index button:first-child {
+        border-inline-start: 0;
+      }
+      .section-index small {
+        font: 10px "Space Grotesk";
+        color: var(--muted);
+      }
+      .section-index button.active {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .section-index button.active small {
+        color: var(--acid);
+      }
+      .section-index button:not(.active):hover {
+        background: var(--acid);
+        color: var(--accent-ink);
+      }
+      .view {
+        display: none;
+        animation: reveal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .view.active {
+        display: block;
+      }
+      @keyframes reveal {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.55fr);
+        min-height: 270px;
+      }
+      .hero-copy {
+        padding: clamp(30px, 3vw, 48px);
+        position: relative;
+      }
+      .eyebrow {
+        font: 600 11px "Space Grotesk";
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .eyebrow:before {
+        content: "";
+        width: 34px;
+        height: 2px;
+        background: var(--acid);
+      }
+      .hero h1 {
+        font-size: clamp(46px, 5vw, 76px);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+        margin: 18px 0 14px;
+        font-weight: 700;
+        max-width: 14ch;
+      }
+      .hero-statusline {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-bottom: 24px;
+      }
+      .live-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 0 12px;
+        border: 1px solid
+          color-mix(in srgb, rgb(var(--success)) 44%, var(--line));
+        border-radius: 999px;
+        background: color-mix(in srgb, rgb(var(--success)) 10%, transparent);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .live-status i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgb(var(--success));
+        box-shadow: 0 0 0 4px
+          color-mix(in srgb, rgb(var(--success)) 15%, transparent);
+      }
+      .scope-label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .hero-description {
+        margin: 0;
+        color: var(--muted);
+        max-width: 640px;
+        line-height: 1.75;
+        font-size: 16px;
+      }
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 28px;
+      }
+      .hero-actions button {
+        min-height: 48px;
+        padding: 0 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        font-weight: 700;
+      }
+      .hero-actions .primary-action {
+        border-color: var(--acid);
+        background: var(--acid);
+        color: var(--accent-ink);
+        box-shadow: 0 12px 30px -20px rgba(var(--primary), 0.78);
+      }
+      .hero-actions .secondary-action {
+        background: color-mix(in srgb, var(--theme-card-bg) 70%, transparent);
+      }
+      .publish-card {
+        margin: 18px;
+        padding: 24px;
+        border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--theme-card-bg) 74%, transparent);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .publish-card:before {
+        content: "";
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        left: -72px;
+        top: -84px;
+        border-radius: 50%;
+        background: rgba(var(--primary), 0.09);
+        filter: blur(4px);
+      }
+      .publish-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 15px;
+        background: var(--acid);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        margin-bottom: 22px;
+        box-shadow: 0 12px 30px -18px rgba(var(--primary), 0.8);
+      }
+      .publish-card > small {
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .publish-card h2 {
+        margin: 8px 0 8px;
+        font-size: clamp(21px, 2vw, 28px);
+        line-height: 1.3;
+      }
+      .publish-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+      .publish-footer {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .publish-footer span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .publish-footer button {
+        min-height: 40px;
+        padding: 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: transparent;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .category-ribbon {
+        display: flex;
+        border-bottom: 1px solid var(--ink);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .category-ribbon::-webkit-scrollbar {
+        display: none;
+      }
+      .category-ribbon button {
+        min-width: 210px;
+        height: 92px;
+        border: 0;
+        border-inline-start: 1px solid var(--line);
+        background: transparent;
+        padding: 16px 20px;
+        text-align: right;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      .category-ribbon button:first-child {
+        border-inline-start: 0;
+      }
+      .category-ribbon b {
+        font-size: 18px;
+      }
+      .category-ribbon small {
+        display: block;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .category-ribbon strong {
+        font: 500 36px "Space Grotesk";
+      }
+      .category-ribbon button.active {
+        background: var(--acid);
+        color: var(--accent-ink);
+      }
+      .category-ribbon button.active small {
+        color: currentColor;
+        opacity: 0.7;
+      }
+      .category-ribbon .new-cat {
+        min-width: 150px;
+        justify-content: center;
+        align-items: center;
+        color: var(--muted);
+      }
+      .catalog-tools {
+        min-height: 82px;
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) auto;
+        align-items: center;
+        gap: 20px;
+        padding: 14px 2.4vw;
+        border-bottom: 1px solid var(--ink);
+        position: sticky;
+        top: 136px;
+        background: color-mix(in srgb, var(--paper) 92%, transparent);
+        backdrop-filter: blur(16px);
+        z-index: 20;
+      }
+      .search-line {
+        position: relative;
+        max-width: 620px;
+      }
+      .search-line svg {
+        position: absolute;
+        right: 0;
+        top: 12px;
+      }
+      .search-line input {
+        width: 100%;
+        height: 46px;
+        padding: 0 32px 0 8px;
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid var(--ink);
+        outline: none;
+        color: var(--ink);
+        font-size: 16px;
+      }
+      .search-line input:focus {
+        border-bottom-width: 3px;
+      }
+      .toolset {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tool {
+        height: 42px;
+        border: 1px solid var(--line);
+        background: transparent;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .tool:hover,
+      .tool.active {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .tool.acid {
+        background: var(--acid);
+        border-color: var(--ink);
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+      .editorial-head {
+        display: grid;
+        grid-template-columns: 70px 1.35fr 0.75fr 0.55fr 0.55fr 130px;
+        gap: 0;
+        padding: 12px 2.4vw;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font: 500 10px "Space Grotesk";
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .product-row {
+        display: grid;
+        grid-template-columns: 70px 1.35fr 0.75fr 0.55fr 0.55fr 130px;
+        align-items: center;
+        min-height: 118px;
+        padding: 0 2.4vw;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+        overflow: hidden;
+        transition:
+          min-height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+          background 0.25s;
+      }
+      .product-row:before {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        background: var(--acid);
+        transition: width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+        z-index: -1;
+      }
+      .product-row:hover:before {
+        width: 100%;
+      }
+      .product-row:hover {
+        min-height: 148px;
+        color: var(--accent-ink);
+      }
+      .row-no {
+        font: 500 13px "Space Grotesk";
+        color: var(--muted);
+      }
+      .product-title {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        min-width: 0;
+      }
+      .product-art {
+        width: 72px;
+        height: 72px;
+        background: var(--ink);
+        color: var(--paper);
+        display: grid;
+        place-items: center;
+        transition: transform 0.35s;
+      }
+      .product-row:hover .product-art {
+        transform: rotate(-4deg) scale(1.08);
+      }
+      .product-art svg {
+        width: 28px;
+        height: 28px;
+      }
+      .product-title h3 {
+        font-size: clamp(19px, 2vw, 29px);
+        margin: 0;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+      .product-title p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font: 11px "Space Grotesk";
+      }
+      .price {
+        font: 600 clamp(18px, 2vw, 26px) "Space Grotesk";
+      }
+      .meta {
+        font-size: 12px;
+      }
+      .meta b {
+        display: block;
+      }
+      .meta small {
+        color: var(--muted);
+      }
+      .state {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .state:before {
+        content: "";
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: rgb(var(--success));
+      }
+      .state.off:before {
+        background: var(--signal);
+      }
+      .row-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 3px;
+        opacity: 0;
+        transform: translateX(-10px);
+        transition: 0.25s;
+      }
+      .product-row:hover .row-actions {
+        opacity: 1;
+        transform: none;
+      }
+      .row-actions button {
+        width: 38px;
+        height: 38px;
+        border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+        background: transparent;
+        display: grid;
+        place-items: center;
+        color: inherit;
+      }
+      .row-actions button:hover {
+        background: var(--ink);
+        color: var(--acid);
+      }
+      .command-dock {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px;
+        background: color-mix(in srgb, var(--ink) 92%, transparent);
+        color: var(--paper);
+        box-shadow: var(--shadow);
+        z-index: 45;
+        backdrop-filter: blur(18px);
+      }
+      .command-dock button {
+        height: 48px;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .command-dock button:hover {
+        background: var(--paper-2);
+        color: var(--ink);
+      }
+      .command-dock .dock-primary {
+        background: var(--acid);
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+      .dock-divider {
+        width: 1px;
+        height: 28px;
+        background: rgba(255, 255, 255, 0.24);
+      }
+      .studio-head {
+        display: grid;
+        grid-template-columns: 1.3fr 0.7fr;
+        min-height: 270px;
+        border-bottom: 1px solid var(--ink);
+      }
+      .studio-title {
+        padding: 48px 4vw;
+        border-inline-end: 1px solid var(--ink);
+      }
+      .studio-title .eyebrow {
+        margin-bottom: 26px;
+      }
+      .studio-title h1 {
+        font-size: clamp(48px, 6vw, 92px);
+        line-height: 0.92;
+        letter-spacing: -0.055em;
+        margin: 0;
+      }
+      .studio-title p {
+        max-width: 560px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .studio-action {
+        padding: 34px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: var(--acid);
+        color: var(--accent-ink);
+      }
+      .studio-action b {
+        font: 600 11px "Space Grotesk";
+        letter-spacing: 0.12em;
+      }
+      .studio-action button {
+        height: 58px;
+        border: 1px solid var(--ink);
+        background: var(--ink);
+        color: var(--acid);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+      }
+      .campaign-stage {
+        display: grid;
+        grid-template-columns: 1.4fr 0.6fr;
+        border-bottom: 1px solid var(--ink);
+      }
+      .campaign-feature {
+        padding: 40px 4vw;
+        min-height: 390px;
+        border-inline-end: 1px solid var(--ink);
+        position: relative;
+      }
+      .campaign-feature .huge {
+        font: 600 clamp(80px, 12vw, 180px) "Space Grotesk";
+        letter-spacing: -0.09em;
+        line-height: 0.75;
+        color: var(--acid);
+        -webkit-text-stroke: 1px var(--ink);
+      }
+      .campaign-feature h2 {
+        font-size: clamp(28px, 4vw, 54px);
+        margin: 34px 0 10px;
+      }
+      .campaign-feature p {
+        color: var(--muted);
+      }
+      .campaign-meta {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--ink);
+        margin-top: 34px;
+        padding-top: 15px;
+      }
+      .campaign-meta small {
+        display: block;
+        color: var(--muted);
+      }
+      .campaign-meta b {
+        font: 600 17px "Space Grotesk";
+      }
+      .campaign-list {
+        padding: 25px;
+      }
+      .campaign-item {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .campaign-item small {
+        font: 10px "Space Grotesk";
+        color: var(--muted);
+      }
+      .campaign-item h3 {
+        font-size: 18px;
+        margin: 8px 0;
+      }
+      .campaign-item button {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        border-bottom: 1px solid var(--ink);
+        font-weight: 600;
+      }
+      .timeline {
+        padding: 30px 4vw 100px;
+      }
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 160px 1fr 130px;
+        gap: 25px;
+        align-items: center;
+        min-height: 105px;
+        border-bottom: 1px solid var(--line);
+      }
+      .timeline-row time {
+        font: 600 13px "Space Grotesk";
+      }
+      .timeline-row h3 {
+        margin: 0 0 5px;
+        font-size: 20px;
+      }
+      .timeline-row p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .timeline-row span {
+        border: 1px solid var(--ink);
+        padding: 6px 10px;
+        text-align: center;
+        font-size: 11px;
+      }
+      .price-board {
+        padding: 30px 4vw 120px;
+      }
+      .matrix {
+        display: grid;
+        grid-template-columns: 1.4fr repeat(3, 1fr);
+        border-top: 1px solid var(--ink);
+        border-inline-end: 1px solid var(--ink);
+      }
+      .cell {
+        min-height: 84px;
+        padding: 18px;
+        border-inline-start: 1px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .cell.head {
+        background: var(--ink);
+        color: var(--paper);
+        font: 600 11px "Space Grotesk";
+      }
+      .cell input {
+        width: 100px;
+        border: 0;
+        border-bottom: 1px solid var(--ink);
+        background: transparent;
+        color: var(--ink);
+        font: 600 18px "Space Grotesk";
+        outline: none;
+      }
+      .archive-list {
+        padding-bottom: 110px;
+      }
+      .archive-row {
+        display: grid;
+        grid-template-columns: 90px 1.3fr 0.7fr 0.7fr 160px;
+        align-items: center;
+        min-height: 110px;
+        padding: 0 4vw;
+        border-bottom: 1px solid var(--line);
+      }
+      .archive-row:hover {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .archive-row .restore {
+        height: 44px;
+        border: 1px solid currentColor;
+        background: transparent;
+        color: inherit;
+      }
+      .archive-row .restore:hover {
+        background: var(--acid);
+        color: var(--accent-ink);
+        border-color: var(--acid);
+      }
+      .sheet-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.54);
+        display: none;
+        align-items: flex-end;
+        justify-content: center;
+        z-index: 60;
+      }
+      .sheet-backdrop.open {
+        display: flex;
+      }
+      .sheet {
+        width: min(900px, 100%);
+        background: var(--paper);
+        box-shadow: var(--shadow);
+        animation: sheetUp 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @keyframes sheetUp {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: none;
+        }
+      }
+      .sheet-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 22px 28px;
+        border-bottom: 1px solid var(--ink);
+      }
+      .sheet-head h2 {
+        font-size: 26px;
+        margin: 0;
+      }
+      .sheet-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+        padding: 28px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .field.full {
+        grid-column: 1/-1;
+      }
+      .field label {
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .field input,
+      .field select {
+        height: 50px;
+        border: 0;
+        border-bottom: 1px solid var(--ink);
+        background: transparent;
+        color: var(--ink);
+        outline: none;
+      }
+      .field input:focus,
+      .field select:focus {
+        border-bottom: 4px solid var(--acid);
+      }
+      .sheet-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 18px 28px;
+        border-top: 1px solid var(--line);
+      }
+      .sheet-foot button {
+        height: 48px;
+        border: 1px solid var(--ink);
+        background: transparent;
+        padding: 0 24px;
+      }
+      .sheet-foot .save {
+        background: var(--ink);
+        color: var(--acid);
+      }
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 92px;
+        background: var(--acid);
+        color: var(--accent-ink);
+        padding: 14px 18px;
+        font-weight: 700;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        transform: translateY(20px);
+        transition: 0.25s;
+        z-index: 80;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: none;
+      }
+      .theme-trigger {
+        width: auto;
+        min-width: 146px;
+        padding: 0 12px;
+        grid-template-columns: 14px 1fr 18px;
+        gap: 9px;
+        border-inline-start: 1px solid var(--line);
+        border-inline-end: 1px solid var(--line);
+      }
+      .theme-trigger:hover {
+        background: var(--theme-active-bg);
+        color: var(--ink);
+      }
+      .theme-trigger svg {
+        width: 16px;
+      }
+      .theme-current {
+        font: 600 11px "Space Grotesk";
+        text-align: start;
+        white-space: nowrap;
+      }
+      .theme-live-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--acid);
+        box-shadow: 0 0 0 4px rgba(var(--primary), 0.13);
+      }
+      .theme-picker {
+        position: fixed;
+        top: 80px;
+        left: 2.4vw;
+        z-index: 70;
+        width: min(470px, calc(100vw - 28px));
+        padding: 18px;
+        background: var(--theme-popup-bg, var(--white));
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px) scale(0.985);
+        transform-origin: top left;
+        transition:
+          opacity 0.2s ease,
+          transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+          visibility 0.2s;
+      }
+      .theme-picker.open {
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+      }
+      .theme-picker-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        padding: 0 2px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .theme-picker-head b {
+        font-size: 16px;
+      }
+      .theme-picker-head small {
+        color: var(--muted);
+        font: 10px "Space Grotesk";
+        letter-spacing: 0.12em;
+      }
+      .theme-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 12px;
+        background: var(--line);
+        border: 1px solid var(--line);
+      }
+      .theme-option {
+        min-height: 68px;
+        border: 0;
+        padding: 11px 12px;
+        background: var(--theme-card-bg, var(--white));
+        display: grid;
+        grid-template-columns: 48px 1fr 16px;
+        align-items: center;
+        gap: 10px;
+        text-align: start;
+      }
+      .theme-option:hover {
+        background: var(--theme-card-hover-bg, var(--paper-2));
+      }
+      .theme-option.active {
+        box-shadow: inset 0 -3px 0 var(--acid);
+      }
+      .theme-option.active:after {
+        content: "✓";
+        color: var(--acid);
+        font-weight: 800;
+      }
+      .theme-swatch {
+        width: 48px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--sw1) 0 58%, var(--sw2) 58%);
+        border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+        position: relative;
+      }
+      .theme-swatch:after {
+        content: "";
+        position: absolute;
+        width: 11px;
+        height: 11px;
+        left: 5px;
+        bottom: 5px;
+        background: var(--sw3);
+        border-radius: 50%;
+      }
+      .theme-option b,
+      .theme-option small {
+        display: block;
+      }
+      .theme-option b {
+        font: 600 12px "Space Grotesk";
+      }
+      .theme-option small {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      :root[data-theme="porcelain"] :is(.mast, .section-index, .catalog-tools),
+      :root[data-theme="blueprint"] :is(.mast, .section-index, .catalog-tools),
+      :root[data-theme="foundry"] :is(.mast, .section-index, .catalog-tools) {
+        backdrop-filter: none;
+      }
+      :root[data-theme="citrus"] :is(.theme-picker, .command-dock),
+      :root[data-theme="clay"] :is(.theme-picker, .command-dock) {
+        box-shadow: var(--shadow);
+      }
+      :root[data-theme="neon"] .theme-picker {
+        border-color: rgba(var(--primary), 0.48);
+      }
+      /* Softer workspace language: glass surfaces, breathing room and rounded rhythm. */
+      .mast {
+        top: 12px;
+        width: calc(100% - 4.8vw);
+        margin-inline: 2.4vw;
+        border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+        border-radius: var(--radius-md);
+        background: var(--glass-strong);
+        box-shadow: 0 12px 36px -28px rgba(var(--primary), 0.48);
+      }
+      .section-index {
+        top: 96px;
+        width: calc(100% - 4.8vw);
+        margin: 20px 2.4vw 0;
+        border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        background: var(--glass);
+        backdrop-filter: blur(18px) saturate(1.2);
+      }
+      .section-index button,
+      .tool,
+      .icon,
+      .row-actions button,
+      .archive-row .restore,
+      .sheet-foot button {
+        border-radius: var(--radius-sm);
+      }
+      .tool,
+      .icon {
+        min-height: 44px;
+      }
+      .tool {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+      .hero {
+        margin: 20px 2.4vw 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--glass);
+        backdrop-filter: blur(22px) saturate(1.16);
+        box-shadow: var(--shadow);
+      }
+      .category-ribbon {
+        margin-inline: 2.4vw;
+        border-inline: 1px solid var(--line);
+      }
+      .category-ribbon {
+        margin-top: 14px;
+        gap: 10px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--glass);
+      }
+      .category-ribbon button {
+        min-height: 88px;
+        border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--theme-card-bg) 72%, transparent);
+      }
+      .catalog-tools {
+        top: 180px;
+        grid-template-columns: minmax(240px, 1fr) auto auto;
+        margin: 16px 2.4vw;
+        padding: 12px;
+        border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+        border-radius: var(--radius-md);
+        background: var(--glass-strong);
+        box-shadow: 0 16px 44px -36px rgba(var(--primary), 0.5);
+      }
+      .search-line {
+        max-width: none;
+      }
+      .search-line input {
+        padding-inline: 42px 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: color-mix(in srgb, var(--theme-input-bg) 88%, transparent);
+      }
+      .search-line input:focus {
+        border-width: 1px;
+        box-shadow: 0 0 0 3px var(--theme-focus-ring);
+      }
+      .search-line svg {
+        right: 14px;
+      }
+      .view-switch {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: color-mix(in srgb, var(--paper-2) 72%, transparent);
+      }
+      .view-switch button {
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+      }
+      .view-switch button:hover,
+      .view-switch button.active {
+        color: var(--accent-ink);
+        background: var(--acid);
+      }
+      .view-switch svg {
+        width: 17px;
+        height: 17px;
+      }
+      .editorial-head {
+        margin: 0 2.4vw 8px;
+        padding-inline: 18px;
+        border: 0;
+      }
+      #productIndex {
+        padding: 0 2.4vw 130px;
+        transition: opacity 0.18s ease;
+      }
+      .product-empty {
+        margin: -108px 2.4vw 130px;
+        padding: 42px 24px;
+        border: 1px dashed var(--line);
+        border-radius: var(--radius-md);
+        background: var(--glass);
+        text-align: center;
+      }
+      .product-empty[hidden] {
+        display: none;
+      }
+      .product-empty h3 {
+        margin: 0 0 6px;
+        font-size: 22px;
+      }
+      .product-empty p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .product-row {
+        min-height: 112px;
+        margin-bottom: 10px;
+        padding: 0 18px;
+        border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+        border-radius: var(--radius-md);
+        background: var(--glass);
+        backdrop-filter: blur(16px) saturate(1.15);
+        box-shadow: 0 16px 42px -38px rgba(var(--primary), 0.48);
+        z-index: 0;
+      }
+      .product-row:before {
+        border-radius: inherit;
+        z-index: 0;
+      }
+      .product-row > * {
+        position: relative;
+        z-index: 1;
+      }
+      .product-row:hover {
+        min-height: 126px;
+        box-shadow: 0 24px 54px -34px rgba(var(--primary), 0.56);
+      }
+      .product-row:hover :is(.row-no, .product-title p, .meta small) {
+        color: currentColor;
+        opacity: 0.72;
+      }
+      .product-art {
+        border-radius: 16px;
+        background: var(--theme-page-accent, var(--ink));
+        color: var(--accent-ink);
+      }
+      .row-actions {
+        opacity: 1;
+        transform: none;
+      }
+      .command-dock {
+        border: 1px solid color-mix(in srgb, var(--line) 42%, transparent);
+        border-radius: 20px;
+      }
+      .sheet {
+        border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+        overflow: hidden;
+      }
+      .studio-head,
+      .campaign-stage,
+      .timeline,
+      .archive-list {
+        margin: 20px 2.4vw;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--glass);
+        backdrop-filter: blur(18px) saturate(1.15);
+        box-shadow: 0 22px 58px -44px rgba(var(--primary), 0.54);
+      }
+      .campaign-stage {
+        border-bottom: 1px solid var(--line);
+      }
+      .timeline {
+        padding: 20px 28px 90px;
+      }
+      .archive-list {
+        padding-bottom: 100px;
+      }
+      .matrix {
+        border-radius: var(--radius-md);
+        overflow: hidden;
+      }
+      .timeline-row span,
+      .campaign-item button,
+      .studio-action button,
+      .cell input,
+      .field input,
+      .field select {
+        border-radius: var(--radius-sm);
+      }
+      .field input,
+      .field select {
+        padding-inline: 14px;
+        border: 1px solid var(--line);
+        background: var(--theme-input-bg);
+      }
+      .field input:focus,
+      .field select:focus {
+        border: 1px solid var(--acid);
+        box-shadow: 0 0 0 3px var(--theme-focus-ring);
+      }
+      .theme-picker,
+      .toast {
+        border-radius: var(--radius-md);
+      }
+
+      /* Card view */
+      #productIndex[data-layout="cards"] {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+      #productIndex[data-layout="cards"] .product-row {
+        min-width: 0;
+        min-height: 330px;
+        margin: 0;
+        padding: 16px;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto 1fr auto auto;
+        grid-template-areas:
+          "number state"
+          "title title"
+          "price meta"
+          "actions actions";
+        align-items: start;
+        gap: 14px;
+      }
+      #productIndex[data-layout="cards"] .product-row:hover {
+        min-height: 330px;
+        transform: translateY(-4px);
+      }
+      #productIndex[data-layout="cards"] .product-row:before {
+        width: 100%;
+        height: 0;
+        bottom: auto;
+        transition: height 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      #productIndex[data-layout="cards"] .product-row:hover:before {
+        height: 100%;
+      }
+      #productIndex[data-layout="cards"] .row-no {
+        grid-area: number;
+      }
+      #productIndex[data-layout="cards"] .product-title {
+        grid-area: title;
+        display: grid;
+        grid-template-rows: 148px auto;
+        gap: 16px;
+      }
+      #productIndex[data-layout="cards"] .product-title h3 {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+      #productIndex[data-layout="cards"] .product-art {
+        width: 100%;
+        height: 148px;
+      }
+      #productIndex[data-layout="cards"] .price {
+        grid-area: price;
+      }
+      #productIndex[data-layout="cards"] .meta {
+        grid-area: meta;
+        text-align: end;
+      }
+      #productIndex[data-layout="cards"] .state {
+        grid-area: state;
+        justify-self: end;
+      }
+      #productIndex[data-layout="cards"] .row-actions {
+        grid-area: actions;
+        justify-content: stretch;
+      }
+      #productIndex[data-layout="cards"] .row-actions button {
+        flex: 1;
+      }
+      #productIndex[data-layout="cards"] + * {
+        clear: both;
+      }
+      .editorial-head.layout-hidden {
+        display: none;
+      }
+
+      /* Compact tiles: fast scanning for large menus. */
+      #productIndex[data-layout="compact"] {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      #productIndex[data-layout="compact"] .product-row {
+        min-height: 96px;
+        margin: 0;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 12px;
+        padding: 12px;
+      }
+      #productIndex[data-layout="compact"] .row-no,
+      #productIndex[data-layout="compact"] .meta,
+      #productIndex[data-layout="compact"] .state,
+      #productIndex[data-layout="compact"] .row-actions {
+        display: none;
+      }
+      #productIndex[data-layout="compact"] .product-title {
+        display: contents;
+      }
+      #productIndex[data-layout="compact"] .product-art {
+        width: 42px;
+        height: 64px;
+      }
+      #productIndex[data-layout="compact"] .product-title h3 {
+        font-size: 17px;
+      }
+      #productIndex[data-layout="compact"] .product-title p {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 24ch;
+      }
+      #productIndex[data-layout="compact"] .price {
+        font-size: 16px;
+        align-self: center;
+      }
+      @media (max-width: 1050px) {
+        .mast {
+          grid-template-columns: 1fr auto;
+        }
+        .context {
+          display: none;
+        }
+        .hero {
+          grid-template-columns: 1fr;
+        }
+        .hero-copy {
+          border-inline-end: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .catalog-tools {
+          grid-template-columns: minmax(220px, 1fr) auto;
+        }
+        .catalog-tools .toolset {
+          grid-column: 1 / -1;
+          grid-row: 2;
+          overflow-x: auto;
+          scrollbar-width: thin;
+        }
+        .product-row,
+        .editorial-head {
+          grid-template-columns: 50px 1.4fr 0.7fr 0.6fr 100px;
+        }
+        .product-row > .meta:nth-of-type(2),
+        .editorial-head > *:nth-child(5) {
+          display: none;
+        }
+        #productIndex[data-layout="cards"] {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        #productIndex[data-layout="cards"] .meta {
+          display: block;
+        }
+        .campaign-stage {
+          grid-template-columns: 1fr;
+        }
+        .campaign-feature {
+          border-inline-end: 0;
+          border-bottom: 1px solid var(--ink);
+        }
+      }
+      @media (max-width: 720px) {
+        body {
+          font-size: 16px;
+        }
+        .mast {
+          height: 60px;
+          top: 8px;
+          width: calc(100% - 24px);
+          margin-inline: 12px;
+          padding: 0 14px;
+        }
+        .theme-trigger {
+          min-width: 42px;
+          padding: 0;
+          grid-template-columns: 1fr;
+          border: 0;
+        }
+        .theme-trigger .theme-current,
+        .theme-trigger svg {
+          display: none;
+        }
+        .theme-picker {
+          top: 68px;
+          left: 14px;
+        }
+        .section-index {
+          top: 76px;
+          width: calc(100% - 24px);
+          margin: 14px 12px 0;
+        }
+        .section-index button {
+          height: 54px;
+          padding: 0 10px;
+        }
+        .section-index button span {
+          display: none;
+        }
+        .hero-copy {
+          padding: 32px 18px;
+        }
+        .hero {
+          margin: 14px 12px 0;
+        }
+        .hero h1 {
+          font-size: clamp(42px, 9vw, 58px);
+        }
+        .publish-card {
+          margin: 0 14px 14px;
+        }
+        .category-ribbon button {
+          min-width: 170px;
+        }
+        .category-ribbon {
+          margin-inline: 12px;
+        }
+        .catalog-tools {
+          top: 138px;
+          margin: 12px;
+          padding: 10px;
+          grid-template-columns: 1fr;
+        }
+        .toolset {
+          overflow: auto;
+        }
+        .editorial-head {
+          display: none;
+        }
+        #productIndex {
+          padding: 0 12px 112px;
+        }
+        .product-empty {
+          margin: -92px 12px 112px;
+        }
+        .product-row {
+          grid-template-columns: 36px 1fr auto;
+          min-height: 125px;
+          padding: 0 14px;
+        }
+        .product-row > .meta,
+        .product-row > .state {
+          display: none;
+        }
+        .product-title {
+          gap: 11px;
+        }
+        .product-art {
+          width: 56px;
+          height: 70px;
+        }
+        .price {
+          font-size: 17px;
+        }
+        .row-actions {
+          display: none;
+        }
+        #productIndex[data-layout="cards"],
+        #productIndex[data-layout="compact"] {
+          grid-template-columns: 1fr;
+        }
+        #productIndex[data-layout="cards"] .product-row {
+          min-height: 310px;
+        }
+        #productIndex[data-layout="cards"] .product-row:hover {
+          min-height: 310px;
+          transform: none;
+        }
+        #productIndex[data-layout="cards"] .meta {
+          display: block;
+        }
+        #productIndex[data-layout="cards"] .state {
+          display: flex;
+        }
+        #productIndex[data-layout="cards"] .row-actions {
+          display: flex;
+        }
+        .command-dock {
+          left: 12px;
+          right: 12px;
+          transform: none;
+          bottom: 12px;
+          justify-content: space-between;
+        }
+        .command-dock button {
+          padding: 0 11px;
+        }
+        .command-dock button span {
+          display: none;
+        }
+        .studio-head {
+          grid-template-columns: 1fr;
+        }
+        .studio-head,
+        .campaign-stage,
+        .timeline,
+        .archive-list {
+          margin: 14px 12px;
+          border-radius: 20px;
+        }
+        .studio-title {
+          padding: 32px 20px;
+        }
+        .studio-title {
+          border-inline-end: 0;
+        }
+        .campaign-meta {
+          grid-template-columns: 1fr;
+        }
+        .timeline-row {
+          grid-template-columns: 1fr;
+          gap: 8px;
+          padding: 18px 0;
+        }
+        .matrix {
+          grid-template-columns: 170px repeat(3, 150px);
+          overflow: auto;
+        }
+        .archive-row {
+          grid-template-columns: 55px 1fr auto;
+          padding: 0 14px;
+        }
+        .archive-row > *:nth-child(3),
+        .archive-row > *:nth-child(4) {
+          display: none;
+        }
+        .sheet-body {
+          grid-template-columns: 1fr;
+        }
+        .field.full {
+          grid-column: auto;
+        }
+      }
+      @media (max-width: 480px) {
+        .wordmark {
+          font-size: 0;
+        }
+        .theme-picker {
+          right: 12px;
+          left: 12px;
+          width: auto;
+          max-height: calc(100vh - 90px);
+          overflow: auto;
+        }
+        .theme-grid {
+          grid-template-columns: 1fr;
+        }
+        .hero h1 {
+          font-size: clamp(44px, 15vw, 54px);
+        }
+        .toolset {
+          padding-bottom: 2px;
+        }
+        .view-switch {
+          justify-content: stretch;
+        }
+        .view-switch button {
+          flex: 1;
+          width: auto;
+          min-height: 40px;
+        }
+        #productIndex[data-layout="cards"] .product-title {
+          grid-template-rows: 128px auto;
+        }
+        #productIndex[data-layout="cards"] .product-art {
+          height: 128px;
+        }
+        .command-dock {
+          border-radius: 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      :focus-visible {
+        outline: 3px solid var(--signal);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg
+      aria-hidden="true"
+      style="position: absolute; width: 0; height: 0; overflow: hidden"
+    >
+      <defs>
+        <symbol id="menu" viewBox="0 0 24 24">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </symbol>
+        <symbol id="search" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-4-4" />
+        </symbol>
+        <symbol id="plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path
+            d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"
+          />
+        </symbol>
+        <symbol id="box" viewBox="0 0 24 24">
+          <path d="m4 7 8-4 8 4-8 4ZM4 7v10l8 4 8-4V7M12 11v10" />
+        </symbol>
+        <symbol id="edit" viewBox="0 0 24 24">
+          <path d="m14 5 5 5L9 20H4v-5Z" />
+        </symbol>
+        <symbol id="copy" viewBox="0 0 24 24">
+          <rect x="8" y="8" width="11" height="11" />
+          <path d="M16 8V4H4v12h4" />
+        </symbol>
+        <symbol id="archive" viewBox="0 0 24 24">
+          <path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6" />
+        </symbol>
+        <symbol id="gift" viewBox="0 0 24 24">
+          <path
+            d="M4 10h16v11H4zM3 7h18v3H3zM12 7v14M12 7H8a2 2 0 1 1 2-2c0 2 2 2 2 2Zm0 0h4a2 2 0 1 0-2-2c0 2-2 2-2 2Z"
+          />
+        </symbol>
+        <symbol id="clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </symbol>
+        <symbol id="dollar" viewBox="0 0 24 24">
+          <path
+            d="M12 2v20M17 6c-1-1-3-2-5-2-3 0-5 2-5 4s2 4 5 4 5 2 5 4-2 4-5 4c-2 0-4-1-5-2"
+          />
+        </symbol>
+        <symbol id="filter" viewBox="0 0 24 24">
+          <path d="M4 5h16l-6 7v6l-4 2v-8Z" />
+        </symbol>
+        <symbol id="download" viewBox="0 0 24 24">
+          <path d="M12 3v13m-5-5 5 5 5-5M4 21h16" />
+        </symbol>
+        <symbol id="restore" viewBox="0 0 24 24">
+          <path d="M4 9V4h5M4.5 4.5A9 9 0 1 1 3 13M9 12h6" />
+        </symbol>
+        <symbol id="check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="view-list" viewBox="0 0 24 24">
+          <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+        </symbol>
+        <symbol id="view-cards" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </symbol>
+        <symbol id="view-compact" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="6" rx="1" />
+          <rect x="3" y="14" width="18" height="6" rx="1" />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="shell">
+      <header class="mast">
+        <div class="wordmark latin">
+          <span class="mark"
+            ><svg><use href="#menu" /></svg></span
+          >RESTOFLOW / ATELIER
+        </div>
+        <div class="context">
+          مساحة العمل <b>·</b> القائمة الرئيسية <b>·</b> فرع ستيناق
+        </div>
+        <div class="mast-actions">
+          <button
+            class="icon theme-trigger"
+            id="themePickerToggle"
+            aria-label="اختيار ثيم النظام"
+            aria-controls="themePicker"
+            aria-expanded="false"
+          >
+            <span class="theme-live-dot"></span
+            ><span class="theme-current latin" id="currentThemeName">AERO</span
+            ><svg><use href="#sun" /></svg></button
+          ><button
+            class="icon"
+            data-toast="تم تجهيز ملف التصدير"
+            aria-label="تصدير"
+          >
+            <svg><use href="#download" /></svg>
+          </button>
+        </div>
+      </header>
+      <aside class="theme-picker" id="themePicker" aria-label="ثيمات النظام">
+        <div class="theme-picker-head">
+          <div><b>عاين الثيمات الحية</b><small>V5 THEME ENGINE</small></div>
+          <small class="latin">10 / 10</small>
+        </div>
+        <div class="theme-grid">
+          <button class="theme-option active" data-set-theme="aero">
+            <span
+              class="theme-swatch"
+              style="--sw1: #f0f6fc; --sw2: #0a5c99; --sw3: #2f9fd8"
+            ></span
+            ><span><b>Aero</b><small>هادئ · زجاجي · أزرق</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="citrus">
+            <span
+              class="theme-swatch"
+              style="--sw1: #fff6db; --sw2: #a3d63f; --sw3: #ea580c"
+            ></span
+            ><span><b>Citrus</b><small>مشرق · جريء · مرح</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="porcelain">
+            <span
+              class="theme-swatch"
+              style="--sw1: #f6f3ed; --sw2: #1f1e1c; --sw3: #8b5e34"
+            ></span
+            ><span><b>Porcelain</b><small>تحريري · نقي · رصين</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="blueprint">
+            <span
+              class="theme-swatch"
+              style="--sw1: #eaf2fa; --sw2: #0d4f86; --sw3: #0e7490"
+            ></span
+            ><span><b>Blueprint</b><small>تقني · شبكي · دقيق</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="clay">
+            <span
+              class="theme-swatch"
+              style="--sw1: #f7efe5; --sw2: #a94e2f; --sw3: #b88a4a"
+            ></span
+            ><span><b>Clay</b><small>دافئ · ملموس · حرفي</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="nocturne">
+            <span
+              class="theme-swatch"
+              style="--sw1: #08111e; --sw2: #d4af7a; --sw3: #96a8c2"
+            ></span
+            ><span><b>Nocturne</b><small>ليلي · فاخر · ذهبي</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="foundry">
+            <span
+              class="theme-swatch"
+              style="--sw1: #141414; --sw2: #f97316; --sw3: #a8a29e"
+            ></span
+            ><span><b>Foundry</b><small>صناعي · قوي · حاد</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="neon">
+            <span
+              class="theme-swatch"
+              style="--sw1: #0a050e; --sw2: #ff2e88; --sw3: #22d3ee"
+            ></span
+            ><span><b>Neon Diner</b><small>ليلي · نابض · ريترو</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="slate">
+            <span
+              class="theme-swatch"
+              style="--sw1: #0e1512; --sw2: #5de0a4; --sw3: #3dc288"
+            ></span
+            ><span><b>Slate</b><small>مركز · كثيف · إنتاجي</small></span>
+          </button>
+          <button class="theme-option" data-set-theme="cinema">
+            <span
+              class="theme-swatch"
+              style="--sw1: #09090a; --sw2: #d4af7a; --sw3: #ba844a"
+            ></span
+            ><span><b>Cinema</b><small>سينمائي · درامي · راقٍ</small></span>
+          </button>
+        </div>
+      </aside>
+      <nav class="section-index" aria-label="أقسام المنيو">
+        <button class="active" data-view="catalog">
+          <small>01</small><span>الكتالوج</span></button
+        ><button data-view="offers"><small>02</small><span>العروض</span></button
+        ><button data-view="scheduled">
+          <small>03</small><span>المجدولة</span></button
+        ><button data-view="pricing">
+          <small>04</small><span>التسعير</span></button
+        ><button data-view="archived">
+          <small>05</small><span>الأرشيف</span>
+        </button>
+      </nav>
+
+      <main>
+        <section class="view active" id="catalog">
+          <div class="hero">
+            <div class="hero-copy">
+              <div class="hero-statusline">
+                <span class="live-status"><i></i> القائمة منشورة</span>
+                <span class="scope-label">القائمة الرئيسية · فرع ستيناق</span>
+              </div>
+              <div class="eyebrow latin">Menu workspace</div>
+              <h1>القائمة الرئيسية</h1>
+              <p class="hero-description">
+                أدر الأصناف والأسعار والتوافر من مساحة واحدة واضحة، ثم عاين
+                تجربة العميل قبل النشر.
+              </p>
+              <div class="hero-actions">
+                <button
+                  class="primary-action"
+                  data-toast="تم فتح معاينة المنيو"
+                >
+                  <svg><use href="#menu" /></svg><span>معاينة المنيو</span>
+                </button>
+                <button class="secondary-action" data-toast="فتح إعدادات النشر">
+                  <svg><use href="#check" /></svg><span>إعدادات النشر</span>
+                </button>
+              </div>
+            </div>
+            <aside class="publish-card">
+              <div class="publish-icon">
+                <svg><use href="#check" /></svg>
+              </div>
+              <small>حالة العمل</small>
+              <h2>كل تغييراتك محفوظة.</h2>
+              <p>النسخة الحالية متزامنة ويمكنك متابعة التحرير بأمان.</p>
+              <div class="publish-footer">
+                <span>آخر مزامنة: الآن</span>
+                <button data-toast="فتح سجل النشاط">سجل النشاط</button>
+              </div>
+            </aside>
+          </div>
+          <div class="category-ribbon">
+            <button class="active" data-cat="all">
+              <span><b>كل الأصناف</b><small>الفهرس الكامل</small></span
+              ><strong>24</strong></button
+            ><button data-cat="shawarma">
+              <span><b>شاورما</b><small>8 متاح · 1 متوقف</small></span
+              ><strong>09</strong></button
+            ><button data-cat="meals">
+              <span><b>الوجبات</b><small>كلها متاحة</small></span
+              ><strong>06</strong></button
+            ><button data-cat="drinks">
+              <span><b>المشروبات</b><small>5 متاح · 1 متوقف</small></span
+              ><strong>06</strong></button
+            ><button class="new-cat" data-toast="فتح إنشاء قسم جديد">
+              <svg><use href="#plus" /></svg>&nbsp; قسم جديد
+            </button>
+          </div>
+          <div class="catalog-tools">
+            <div class="search-line">
+              <svg><use href="#search" /></svg
+              ><input
+                id="searchInput"
+                type="search"
+                placeholder="ابحث في الفهرس — اسم، SKU، باركود..."
+                aria-label="بحث في الأصناف"
+              />
+            </div>
+            <div class="toolset">
+              <button class="tool active">الكل</button
+              ><button class="tool">متاح</button
+              ><button class="tool">هامش منخفض</button
+              ><button class="tool">
+                <svg><use href="#filter" /></svg> فلاتر</button
+              ><button class="tool acid" data-open="itemSheet">
+                <svg><use href="#plus" /></svg> صنف جديد
+              </button>
+            </div>
+            <div
+              class="view-switch"
+              role="group"
+              aria-label="طريقة عرض الأصناف"
+            >
+              <button
+                class="active"
+                data-product-layout="list"
+                aria-label="عرض القائمة"
+                aria-pressed="true"
+                title="قائمة"
+              >
+                <svg><use href="#view-list" /></svg></button
+              ><button
+                data-product-layout="cards"
+                aria-label="عرض البطاقات"
+                aria-pressed="false"
+                title="بطاقات"
+              >
+                <svg><use href="#view-cards" /></svg></button
+              ><button
+                data-product-layout="compact"
+                aria-label="عرض مضغوط"
+                aria-pressed="false"
+                title="مضغوط"
+              >
+                <svg><use href="#view-compact" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="editorial-head">
+            <span>No.</span><span>الصنف</span><span>السعر</span
+            ><span>الهامش</span><span>الحالة</span><span>إجراء</span>
+          </div>
+          <div id="productIndex" data-layout="list">
+            <article
+              class="product-row"
+              data-cat="shawarma"
+              data-name="شاورما عربي دجاج SH-001"
+            >
+              <span class="row-no">001</span>
+              <div class="product-title">
+                <div class="product-art">
+                  <svg><use href="#box" /></svg>
+                </div>
+                <div>
+                  <h3>شاورما عربي دجاج</h3>
+                  <p class="latin">SH-001 / CHICKEN / BEST SELLER</p>
+                </div>
+              </div>
+              <span class="price">150 EGP</span>
+              <div class="meta"><b>52%</b><small>هامش ممتاز</small></div>
+              <span class="state">متاح</span>
+              <div class="row-actions">
+                <button title="تعديل" data-toast="فتح تحرير الصنف">
+                  <svg><use href="#edit" /></svg></button
+                ><button title="نسخ" data-toast="تم إنشاء نسخة">
+                  <svg><use href="#copy" /></svg></button
+                ><button title="أرشفة" data-toast="تم نقل الصنف للأرشيف">
+                  <svg><use href="#archive" /></svg>
+                </button>
+              </div>
+            </article>
+            <article
+              class="product-row"
+              data-cat="shawarma"
+              data-name="شاورما فراخ عربي SH-002"
+            >
+              <span class="row-no">002</span>
+              <div class="product-title">
+                <div class="product-art">
+                  <svg><use href="#box" /></svg>
+                </div>
+                <div>
+                  <h3>شاورما فراخ عربي</h3>
+                  <p class="latin">SH-002 / NO PHOTO / 2 SIZES</p>
+                </div>
+              </div>
+              <span class="price">100 EGP</span>
+              <div class="meta"><b>39%</b><small>هامش جيد</small></div>
+              <span class="state">متاح</span>
+              <div class="row-actions">
+                <button>
+                  <svg><use href="#edit" /></svg></button
+                ><button>
+                  <svg><use href="#copy" /></svg></button
+                ><button>
+                  <svg><use href="#archive" /></svg>
+                </button>
+              </div>
+            </article>
+            <article
+              class="product-row"
+              data-cat="meals"
+              data-name="وجبة ميكس جريل ML-011"
+            >
+              <span class="row-no">003</span>
+              <div class="product-title">
+                <div class="product-art">
+                  <svg><use href="#box" /></svg>
+                </div>
+                <div>
+                  <h3>وجبة ميكس جريل</h3>
+                  <p class="latin">ML-011 / 3 SIZES / COST ALERT</p>
+                </div>
+              </div>
+              <span class="price">240 EGP</span>
+              <div class="meta"><b>29%</b><small>يحتاج مراجعة</small></div>
+              <span class="state off">غير متاح</span>
+              <div class="row-actions">
+                <button>
+                  <svg><use href="#edit" /></svg></button
+                ><button>
+                  <svg><use href="#copy" /></svg></button
+                ><button>
+                  <svg><use href="#archive" /></svg>
+                </button>
+              </div>
+            </article>
+            <article
+              class="product-row"
+              data-cat="drinks"
+              data-name="ليمون بالنعناع DR-004"
+            >
+              <span class="row-no">004</span>
+              <div class="product-title">
+                <div class="product-art">
+                  <svg><use href="#box" /></svg>
+                </div>
+                <div>
+                  <h3>ليمون بالنعناع</h3>
+                  <p class="latin">DR-004 / FRESH / VEGAN</p>
+                </div>
+              </div>
+              <span class="price">65 EGP</span>
+              <div class="meta"><b>61%</b><small>هامش ممتاز</small></div>
+              <span class="state">متاح</span>
+              <div class="row-actions">
+                <button>
+                  <svg><use href="#edit" /></svg></button
+                ><button>
+                  <svg><use href="#copy" /></svg></button
+                ><button>
+                  <svg><use href="#archive" /></svg>
+                </button>
+              </div>
+            </article>
+          </div>
+          <div class="product-empty" id="productEmpty" hidden>
+            <h3>لا توجد أصناف مطابقة</h3>
+            <p>جرّب كلمة بحث أخرى أو ارجع إلى كل الأقسام.</p>
+          </div>
+        </section>
+
+        <section class="view" id="offers">
+          <div class="studio-head">
+            <div class="studio-title">
+              <div class="eyebrow latin">Campaign studio / 03 active</div>
+              <h1>
+                العروض،<br /><i
+                  style="font-family: Georgia, serif; font-weight: 400"
+                  >بلا فوضى.</i
+                >
+              </h1>
+              <p>
+                صمّم العرض، حدّد جمهوره وقنواته، راقب أثره، وأوقفه في لحظة.
+                Workflow كامل وليس صفحة فارغة.
+              </p>
+            </div>
+            <div class="studio-action">
+              <b class="latin">NEW CAMPAIGN / FOUR STEPS</b
+              ><button data-open="offerSheet">
+                <span>أنشئ عرضًا جديدًا</span><svg><use href="#plus" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="campaign-stage">
+            <article class="campaign-feature">
+              <div class="huge">20%</div>
+              <h2>خصم الغداء</h2>
+              <p>على قسم الوجبات · كل الفروع · 12:00 — 16:00</p>
+              <div class="campaign-meta">
+                <div><small>الاستخدام</small><b>184</b></div>
+                <div><small>الإيراد</small><b>18.4K</b></div>
+                <div><small>ينتهي</small><b>08 DAYS</b></div>
+              </div>
+            </article>
+            <aside class="campaign-list">
+              <div class="eyebrow latin">LIVE / UPCOMING</div>
+              <div class="campaign-item">
+                <small class="latin">ACTIVE / BUNDLE</small>
+                <h3>اشترِ 2 واحصل على 1</h3>
+                <button>تحرير العرض</button>
+              </div>
+              <div class="campaign-item">
+                <small class="latin">SCHEDULED / 28 OCT</small>
+                <h3>خصم نهاية الأسبوع</h3>
+                <button>مراجعة الجدولة</button>
+              </div>
+              <div class="campaign-item">
+                <small class="latin">DRAFT / INCOMPLETE</small>
+                <h3>قائمة الشتاء</h3>
+                <button>استكمال الإعداد</button>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="scheduled">
+          <div class="studio-head">
+            <div class="studio-title">
+              <div class="eyebrow latin">
+                Editorial calendar / future changes
+              </div>
+              <h1>الخط الزمني.</h1>
+              <p>
+                كل عرض، تغيير سعر، تفعيل أو إخفاء يظهر على خط واحد قابل
+                للمراجعة.
+              </p>
+            </div>
+            <div class="studio-action">
+              <b class="latin">SCHEDULE WITH CONFIDENCE</b
+              ><button data-open="offerSheet">
+                <span>جدولة إجراء</span><svg><use href="#plus" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="timeline">
+            <div class="timeline-row">
+              <time>28 OCT / 10:00</time>
+              <div>
+                <h3>بدء خصم نهاية الأسبوع</h3>
+                <p>15% على الشاورما · كل الفروع</p>
+              </div>
+              <span>جاهز للنشر</span>
+            </div>
+            <div class="timeline-row">
+              <time>01 NOV / 00:00</time>
+              <div>
+                <h3>إطلاق قائمة الشتاء</h3>
+                <p>6 أصناف جديدة · إخفاء 3 أصناف موسمية</p>
+              </div>
+              <span>تحتاج مراجعة</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="pricing">
+          <div class="studio-head">
+            <div class="studio-title">
+              <div class="eyebrow latin">
+                Pricing matrix / branch intelligence
+              </div>
+              <h1>
+                سعر واحد؟<br /><i
+                  style="font-family: Georgia, serif; font-weight: 400"
+                  >أو لكل قناة.</i
+                >
+              </h1>
+              <p>
+                قارن السعر الأساسي والفروع ومنصات التوصيل في لوحة تحرير مباشرة.
+              </p>
+            </div>
+            <div class="studio-action">
+              <b class="latin">3 UNSAVED CHANGES</b
+              ><button data-toast="تم حفظ مصفوفة الأسعار">
+                <span>حفظ التغييرات</span><svg><use href="#download" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="price-board">
+            <div class="matrix">
+              <div class="cell head">الصنف</div>
+              <div class="cell head">الأساسي</div>
+              <div class="cell head">ستيناق</div>
+              <div class="cell head">طلبات</div>
+              <div class="cell"><b>شاورما عربي دجاج</b></div>
+              <div class="cell"><input value="150" /><small>EGP</small></div>
+              <div class="cell"><input value="150" /><small>EGP</small></div>
+              <div class="cell"><input value="165" /><small>EGP</small></div>
+              <div class="cell"><b>وجبة ميكس جريل</b></div>
+              <div class="cell"><input value="240" /><small>EGP</small></div>
+              <div class="cell"><input value="245" /><small>EGP</small></div>
+              <div class="cell"><input value="260" /><small>EGP</small></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="archived">
+          <div class="studio-head">
+            <div class="studio-title">
+              <div class="eyebrow latin">Recovery index / 03 records</div>
+              <h1>
+                لا شيء<br /><i
+                  style="font-family: Georgia, serif; font-weight: 400"
+                  >يضيع.</i
+                >
+              </h1>
+              <p>
+                الأرشيف مساحة استرجاع موثوقة تحتفظ بالأسعار والإضافات والتاريخ
+                والسبب.
+              </p>
+            </div>
+            <div class="studio-action">
+              <b class="latin">SAFE RECOVERY / FULL HISTORY</b
+              ><button data-toast="تم تصدير سجل الأرشيف">
+                <span>تصدير السجل</span><svg><use href="#download" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="archive-list" id="archiveList">
+            <article class="archive-row">
+              <span class="row-no">A01</span>
+              <div>
+                <h3>شاورما كلاسيك قديم</h3>
+                <small>20 أكتوبر · بواسطة Sameh Admin</small>
+              </div>
+              <span>استبدال الوصفة</span><span>شاورما</span
+              ><button class="restore">
+                <svg><use href="#restore" /></svg> استرجاع
+              </button>
+            </article>
+            <article class="archive-row">
+              <span class="row-no">A02</span>
+              <div>
+                <h3>كومبو عائلي 2025</h3>
+                <small>12 أكتوبر · Branch Manager</small>
+              </div>
+              <span>انتهاء الموسم</span><span>العروض</span
+              ><button class="restore">
+                <svg><use href="#restore" /></svg> استرجاع
+              </button>
+            </article>
+            <article class="archive-row">
+              <span class="row-no">A03</span>
+              <div>
+                <h3>عصير مانجو كبير</h3>
+                <small>5 أكتوبر · Sameh Admin</small>
+              </div>
+              <span>عنصر مكرر</span><span>المشروبات</span
+              ><button class="restore">
+                <svg><use href="#restore" /></svg> استرجاع
+              </button>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <div class="command-dock">
+        <button data-toast="اختصار البحث: Ctrl + K">
+          <svg><use href="#search" /></svg><span>بحث</span></button
+        ><button data-toast="تم فتح الاستيراد">
+          <svg><use href="#download" /></svg
+          ><span>استيراد / تصدير</span></button
+        ><span class="dock-divider"></span
+        ><button data-toast="فتح تصميم المنيو">
+          <svg><use href="#menu" /></svg><span>تصميم وطباعة</span></button
+        ><button class="dock-primary" id="dockPrimary" data-open="itemSheet">
+          <svg><use href="#plus" /></svg><span>صنف جديد</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sheet-backdrop" id="itemSheet">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>صنف جديد</h2>
+          <button class="icon" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="field full">
+            <label>اسم الصنف</label
+            ><input placeholder="مثال: شاورما عربي لحم" />
+          </div>
+          <div class="field">
+            <label>القسم</label
+            ><select>
+              <option>شاورما</option>
+              <option>الوجبات</option>
+              <option>المشروبات</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>السعر</label><input type="number" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>التكلفة</label><input type="number" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>SKU</label><input placeholder="SH-003" />
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button data-close>إلغاء</button
+          ><button class="save" data-save="تم إنشاء الصنف">إنشاء الصنف</button>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-backdrop" id="offerSheet">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>حملة جديدة</h2>
+          <button class="icon" data-close>×</button>
+        </div>
+        <div class="sheet-body">
+          <div class="field full">
+            <label>اسم العرض</label><input placeholder="مثال: خصم الغداء" />
+          </div>
+          <div class="field">
+            <label>نوع العرض</label
+            ><select>
+              <option>خصم نسبة</option>
+              <option>اشترِ واحصل</option>
+              <option>باقة</option>
+              <option>سعر ثابت</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>القيمة</label><input type="number" placeholder="20" />
+          </div>
+          <div class="field">
+            <label>بداية العرض</label><input type="datetime-local" />
+          </div>
+          <div class="field">
+            <label>نهاية العرض</label><input type="datetime-local" />
+          </div>
+          <div class="field full">
+            <label>النطاق</label
+            ><select>
+              <option>كل المنيو</option>
+              <option>قسم محدد</option>
+              <option>أصناف محددة</option>
+            </select>
+          </div>
+        </div>
+        <div class="sheet-foot">
+          <button data-close>حفظ كمسودة</button
+          ><button class="save" data-save="تم إنشاء وجدولة العرض">
+            نشر العرض
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script>
+      const $ = (s, p = document) => p.querySelector(s),
+        $$ = (s, p = document) => [...p.querySelectorAll(s)];
+      let activeView = "catalog";
+      function toast(message) {
+        const el = $("#toast");
+        el.textContent = message;
+        el.classList.add("show");
+        clearTimeout(window.t);
+        window.t = setTimeout(() => el.classList.remove("show"), 2200);
+      }
+      function openSheet(id) {
+        $("#" + id).classList.add("open");
+        setTimeout(() => $("#" + id + " input")?.focus(), 80);
+      }
+      function closeSheets() {
+        $$(".sheet-backdrop").forEach((s) => s.classList.remove("open"));
+      }
+      $$(".section-index button").forEach(
+        (btn) =>
+          (btn.onclick = () => {
+            activeView = btn.dataset.view;
+            $$(".section-index button").forEach((b) =>
+              b.classList.toggle("active", b === btn),
+            );
+            $$(".view").forEach((v) =>
+              v.classList.toggle("active", v.id === activeView),
+            );
+            const map = {
+              catalog: ["itemSheet", "صنف جديد"],
+              offers: ["offerSheet", "عرض جديد"],
+              scheduled: ["offerSheet", "جدولة إجراء"],
+              pricing: [null, "حفظ الأسعار"],
+              archived: [null, "استرجاع محدد"],
+            };
+            const [sheet, label] = map[activeView];
+            $("#dockPrimary span").textContent = label;
+            $("#dockPrimary").dataset.open = sheet || "";
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }),
+      );
+      document.addEventListener("click", (e) => {
+        const open = e.target.closest("[data-open]");
+        if (open?.dataset.open) openSheet(open.dataset.open);
+        const close = e.target.closest("[data-close]");
+        if (close) closeSheets();
+        const msg = e.target.closest("[data-toast]")?.dataset.toast;
+        if (msg) toast(msg);
+        const save = e.target.closest("[data-save]");
+        if (save) {
+          closeSheets();
+          toast(save.dataset.save);
+        }
+      });
+      $$(".sheet-backdrop").forEach(
+        (s) =>
+          (s.onclick = (e) => {
+            if (e.target === s) closeSheets();
+          }),
+      );
+      const themeNames = {
+        aero: "AERO",
+        citrus: "CITRUS",
+        porcelain: "PORCELAIN",
+        blueprint: "BLUEPRINT",
+        clay: "CLAY",
+        nocturne: "NOCTURNE",
+        foundry: "FOUNDRY",
+        neon: "NEON DINER",
+        slate: "SLATE",
+        cinema: "CINEMA",
+      };
+      const themePicker = $("#themePicker");
+      const themeToggle = $("#themePickerToggle");
+      function setThemePicker(open) {
+        themePicker.classList.toggle("open", open);
+        themeToggle.setAttribute("aria-expanded", String(open));
+      }
+      themeToggle.onclick = (event) => {
+        event.stopPropagation();
+        setThemePicker(!themePicker.classList.contains("open"));
+      };
+      $$("[data-set-theme]").forEach((button) => {
+        button.onclick = () => {
+          const theme = button.dataset.setTheme;
+          document.documentElement.dataset.theme = theme;
+          $("#currentThemeName").textContent = themeNames[theme];
+          $$("[data-set-theme]").forEach((item) =>
+            item.classList.toggle("active", item === button),
+          );
+          setThemePicker(false);
+          toast(`تم تطبيق ثيم ${themeNames[theme]}`);
+        };
+      });
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest("#themePicker")) setThemePicker(false);
+      });
+      $$("[data-product-layout]").forEach((button) => {
+        button.onclick = () => {
+          const layout = button.dataset.productLayout;
+          $("#productIndex").dataset.layout = layout;
+          $(".editorial-head").classList.toggle(
+            "layout-hidden",
+            layout !== "list",
+          );
+          $$("[data-product-layout]").forEach((item) => {
+            const selected = item === button;
+            item.classList.toggle("active", selected);
+            item.setAttribute("aria-pressed", String(selected));
+          });
+          const labels = {
+            list: "القائمة",
+            cards: "البطاقات",
+            compact: "العرض المضغوط",
+          };
+          toast(`تم تفعيل ${labels[layout]}`);
+        };
+      });
+      let activeCategory = "all";
+      let productQuery = "";
+      function applyProductFilters() {
+        let visibleCount = 0;
+        $$(".product-row").forEach((row) => {
+          const matchesCategory =
+            activeCategory === "all" || row.dataset.cat === activeCategory;
+          const matchesQuery = row.dataset.name
+            .toLowerCase()
+            .includes(productQuery);
+          row.hidden = !matchesCategory || !matchesQuery;
+          if (!row.hidden) visibleCount += 1;
+        });
+        $("#productEmpty").hidden = visibleCount > 0;
+      }
+      $$(".category-ribbon [data-cat]").forEach(
+        (btn) =>
+          (btn.onclick = () => {
+            $$(".category-ribbon [data-cat]").forEach((b) =>
+              b.classList.toggle("active", b === btn),
+            );
+            activeCategory = btn.dataset.cat;
+            applyProductFilters();
+          }),
+      );
+      $("#searchInput").oninput = (e) => {
+        productQuery = e.target.value.trim().toLowerCase();
+        applyProductFilters();
+      };
+      $$(".restore").forEach(
+        (btn) =>
+          (btn.onclick = () => {
+            const row = btn.closest(".archive-row");
+            row.style.opacity = "0";
+            row.style.transform = "translateX(-30px)";
+            setTimeout(() => row.remove(), 250);
+            toast("تم استرجاع الصنف بكل بياناته وأسعاره");
+          }),
+      );
+      document.onkeydown = (e) => {
+        if (e.key === "Escape") {
+          closeSheets();
+          setThemePicker(false);
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+          e.preventDefault();
+          $('.section-index [data-view="catalog"]').click();
+          setTimeout(() => $("#searchInput").focus(), 100);
+        }
+      };
+    </script>
+  </body>
+</html>

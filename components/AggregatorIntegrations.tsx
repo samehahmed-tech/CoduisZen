@@ -4,6 +4,7 @@ import { aggregatorsApi } from '../services/api/platforms';
 import { branchesApi } from '../services/api/branches';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToast } from './common/ToastProvider';
+import IntegrationHealthPanel from './IntegrationHealthPanel';
 
 /**
  * Other aggregators (Elmenus / Mrsool / Fast / Generic).
@@ -90,6 +91,7 @@ const AggregatorIntegrations: React.FC = () => {
                     ? 'فعّل فقط ما تحتاجه. كل منصة لها secret وربط متاجر خاص. أي spec رسمي يصل لاحقا يتربط دون تغيير الواجهة.'
                     : 'Enable only what you need. Each provider has its own secret and store mapping.'}
             </p>
+            <IntegrationHealthPanel />
             <div className="space-y-3">
                 {providers.map((p) => (
                     <div key={p.id} className="rounded-xl border border-border bg-app/60 p-4">

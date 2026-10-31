@@ -1,0 +1,1459 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 33,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 33,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 33,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "services/api/delivery.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 117,
+      "nonEmptyLines": 114,
+      "exports": [
+        {
+          "name": "deliveryApi",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "callCenterSupervisorApi",
+          "line": 75,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/deployment.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 15,
+      "nonEmptyLines": 14,
+      "exports": [
+        {
+          "name": "deploymentApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/finance.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 50,
+      "nonEmptyLines": 49,
+      "exports": [
+        {
+          "name": "financeApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/fiscal.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 20,
+      "exports": [
+        {
+          "name": "fiscalApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/hr.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 66,
+      "nonEmptyLines": 63,
+      "exports": [
+        {
+          "name": "hrApi",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "hrExtendedApi",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "shiftTasksApi",
+          "line": 63,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 3,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/inventory.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 98,
+      "nonEmptyLines": 97,
+      "exports": [
+        {
+          "name": "inventoryApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/inventoryIntelligence.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 20,
+      "nonEmptyLines": 19,
+      "exports": [
+        {
+          "name": "inventoryIntelligenceApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/kds.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 41,
+      "nonEmptyLines": 34,
+      "exports": [
+        {
+          "name": "kdsApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/mail.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 69,
+      "nonEmptyLines": 65,
+      "exports": [
+        {
+          "name": "mailApi",
+          "line": 37,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/menu.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 36,
+      "exports": [
+        {
+          "name": "menuApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/orders.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 74,
+      "nonEmptyLines": 70,
+      "exports": [
+        {
+          "name": "ordersApi",
+          "line": 36,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/platforms.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 40,
+      "nonEmptyLines": 36,
+      "exports": [
+        {
+          "name": "platformsApi",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "aggregatorsApi",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "paymobApi",
+          "line": 17,
+          "isDefault": false
+        },
+        {
+          "name": "talabatApi",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 4,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/printGateway.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 27,
+      "functions": [
+        {
+          "name": "toQuery",
+          "startLine": 3,
+          "endLine": 9,
+          "params": [
+            "params"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "printGatewayApi",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "toQuery",
+          "callee": "Object.entries(params || {}).forEach",
+          "lineNumber": 5
+        },
+        {
+          "caller": "toQuery",
+          "callee": "Object.entries",
+          "lineNumber": 5
+        },
+        {
+          "caller": "toQuery",
+          "callee": "query.set",
+          "lineNumber": 6
+        },
+        {
+          "caller": "toQuery",
+          "callee": "String",
+          "lineNumber": 6
+        },
+        {
+          "caller": "toQuery",
+          "callee": "query.toString",
+          "lineNumber": 8
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/printers.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 12,
+      "exports": [
+        {
+          "name": "printersApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/procurement.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 60,
+      "nonEmptyLines": 57,
+      "exports": [
+        {
+          "name": "suppliersApi",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "purchaseOrdersApi",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "productionApi",
+          "line": 41,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 3,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/recurring.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 40,
+      "nonEmptyLines": 34,
+      "exports": [
+        {
+          "name": "recurringApi",
+          "line": 19,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/refunds.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 28,
+      "exports": [
+        {
+          "name": "refundApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/reports.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 447,
+      "nonEmptyLines": 446,
+      "exports": [
+        {
+          "name": "reportsApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/reservations.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 29,
+      "functions": [
+        {
+          "name": "toQuery",
+          "startLine": 3,
+          "endLine": 9,
+          "params": [
+            "params"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "reservationsApi",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "waitlistApi",
+          "line": 25,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "toQuery",
+          "callee": "Object.entries(params || {}).forEach",
+          "lineNumber": 5
+        },
+        {
+          "caller": "toQuery",
+          "callee": "Object.entries",
+          "lineNumber": 5
+        },
+        {
+          "caller": "toQuery",
+          "callee": "query.set",
+          "lineNumber": 6
+        },
+        {
+          "caller": "toQuery",
+          "callee": "String",
+          "lineNumber": 6
+        },
+        {
+          "caller": "toQuery",
+          "callee": "query.toString",
+          "lineNumber": 8
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/roles.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 73,
+      "nonEmptyLines": 64,
+      "exports": [
+        {
+          "name": "rolesApi",
+          "line": 33,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/settings.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 9,
+      "nonEmptyLines": 8,
+      "exports": [
+        {
+          "name": "settingsApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/setup.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 8,
+      "nonEmptyLines": 7,
+      "exports": [
+        {
+          "name": "setupApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/shifts.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 15,
+      "exports": [
+        {
+          "name": "shiftsApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/tables.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 18,
+      "nonEmptyLines": 17,
+      "exports": [
+        {
+          "name": "tablesApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/treasury.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 75,
+      "nonEmptyLines": 59,
+      "functions": [
+        {
+          "name": "branchQs",
+          "startLine": 3,
+          "endLine": 3,
+          "params": [
+            "branchId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "treasuryApi",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "branchQs",
+          "callee": "encodeURIComponent",
+          "lineNumber": 3
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/users.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 24,
+      "exports": [
+        {
+          "name": "usersApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/wastage.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 11,
+      "nonEmptyLines": 10,
+      "exports": [
+        {
+          "name": "wastageApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/api/whatsapp.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 33,
+      "exports": [
+        {
+          "name": "whatsappApi",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/auditService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 49,
+      "nonEmptyLines": 43,
+      "classes": [
+        {
+          "name": "AuditService",
+          "startLine": 7,
+          "endLine": 47,
+          "methods": [
+            "init",
+            "recordEvent"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "auditService",
+          "line": 49,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "init",
+          "callee": "Object.values(AuditEventType).forEach",
+          "lineNumber": 10
+        },
+        {
+          "caller": "init",
+          "callee": "Object.values",
+          "lineNumber": 10
+        },
+        {
+          "caller": "init",
+          "callee": "eventBus.on",
+          "lineNumber": 11
+        },
+        {
+          "caller": "init",
+          "callee": "this.recordEvent",
+          "lineNumber": 11
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "useAuthStore.getState",
+          "lineNumber": 16
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "Math.random().toString(36).substr(2, 9).toUpperCase",
+          "lineNumber": 37
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "Math.random().toString(36).substr",
+          "lineNumber": 37
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "Math.random().toString",
+          "lineNumber": 37
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "Math.random",
+          "lineNumber": 37
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "auditApi.create",
+          "lineNumber": 42
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "syncService.queue('auditLog', 'CREATE', finalLog).catch",
+          "lineNumber": 44
+        },
+        {
+          "caller": "recordEvent",
+          "callee": "syncService.queue",
+          "lineNumber": 44
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "services/authSync.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 134,
+      "nonEmptyLines": 124,
+      "functions": [
+        {
+          "name": "makeAuthSyncEvent",
+          "startLine": 25,
+          "endLine": 33,
+          "params": [
+            "type",
+            "extra"
+          ]
+        },
+        {
+          "name": "safeParse",
+          "startLine": 35,
+          "endLine": 45,
+          "params": [
+            "raw"
+          ]
+        },
+        {
+          "name": "broadcastAuthEvent",
+          "startLine": 48,
+          "endLine": 63,
+          "params": [
+            "event"
+          ]
+        },
+        {
+          "name": "subscribeAuthEvents",
+          "startLine": 71,
+          "endLine": 134,
+          "params": [
+            "handler"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AUTH_SYNC_CHANNEL",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "AUTH_SYNC_STORAGE_KEY",
+          "line": 19,
+          "isDefault": false
+        },
+        {
+          "name": "makeAuthSyncEvent",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "broadcastAuthEvent",
+          "line": 48,
+          "isDefault": false
+        },
+        {
+          "name": "subscribeAuthEvents",
+          "line": 71,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeAuthSyncEvent",
+          "callee": "Date.now",
+          "lineNumber": 30
+        },
+        {
+          "caller": "makeAuthSyncEvent",
+          "callee": "Date.now().toString",
+          "lineNumber": 31
+        },
+        {
+          "caller": "makeAuthSyncEvent",
+          "callee": "Date.now",
+          "lineNumber": 31
+        },
+        {
+          "caller": "makeAuthSyncEvent",
+          "callee": "Math.floor(Math.random() * 1e9).toString",
+          "lineNumber": 31
+        },
+        {
+          "caller": "makeAuthSyncEvent",
+          "callee": "Math.floor",
+          "lineNumber": 31
+        },
+        {
+          "caller": "makeAuthSyncEvent",
+          "callee": "Math.random",
+          "lineNumber": 31
+        },
+        {
+          "caller": "safeParse",
+          "callee": "JSON.parse",
+          "lineNumber": 38
+        },
+        {
+          "caller": "broadcastAuthEvent",
+          "callee": "new BroadcastChannel(AUTH_SYNC_CHANNEL).postMessage",
+          "lineNumber": 51
+        },
+        {
+          "caller": "broadcastAuthEvent",
+          "callee": "window.localStorage.setItem",
+          "lineNumber": 58
+        },
+        {
+          "caller": "broadcastAuthEvent",
+          "callee": "JSON.stringify",
+          "lineNumber": 58
+        },
+        {
+          "caller": "emit",
+          "callee": "seen.has",
+          "lineNumber": 75
+        },
+        {
+          "caller": "emit",
+          "callee": "seen.add",
+          "lineNumber": 76
+        },
+        {
+          "caller": "emit",
+          "callee": "seen.values().next",
+          "lineNumber": 79
+        },
+        {
+          "caller": "emit",
+          "callee": "seen.values",
+          "lineNumber": 79
+        },
+        {
+          "caller": "emit",
+          "callee": "seen.delete",
+          "lineNumber": 80
+        },
+        {
+          "caller": "emit",
+          "callee": "handler",
+          "lineNumber": 83
+        },
+        {
+          "caller": "onMessage",
+          "callee": "emit",
+          "lineNumber": 94
+        },
+        {
+          "caller": "onMessage",
+          "callee": "safeParse",
+          "lineNumber": 94
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "channel.addEventListener",
+          "lineNumber": 96
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "cleanups.push",
+          "lineNumber": 97
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "channel.removeEventListener",
+          "lineNumber": 99
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "channel.close",
+          "lineNumber": 102
+        },
+        {
+          "caller": "onStorage",
+          "callee": "emit",
+          "lineNumber": 114
+        },
+        {
+          "caller": "onStorage",
+          "callee": "safeParse",
+          "lineNumber": 114
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "window.addEventListener",
+          "lineNumber": 116
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "cleanups.push",
+          "lineNumber": 117
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "window.removeEventListener",
+          "lineNumber": 119
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "cleanups.forEach",
+          "lineNumber": 128
+        },
+        {
+          "caller": "subscribeAuthEvents",
+          "callee": "fn",
+          "lineNumber": 130
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/eventBus.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 40,
+      "nonEmptyLines": 34,
+      "classes": [
+        {
+          "name": "EventBus",
+          "startLine": 5,
+          "endLine": 38,
+          "methods": [
+            "on",
+            "emit"
+          ],
+          "properties": [
+            "listeners"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "eventBus",
+          "line": 40,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "on",
+          "callee": "this.listeners.has",
+          "lineNumber": 12
+        },
+        {
+          "caller": "on",
+          "callee": "this.listeners.set",
+          "lineNumber": 13
+        },
+        {
+          "caller": "on",
+          "callee": "this.listeners.get(event)?.push",
+          "lineNumber": 15
+        },
+        {
+          "caller": "on",
+          "callee": "this.listeners.get",
+          "lineNumber": 15
+        },
+        {
+          "caller": "on",
+          "callee": "this.listeners.get",
+          "lineNumber": 19
+        },
+        {
+          "caller": "on",
+          "callee": "this.listeners.set",
+          "lineNumber": 21
+        },
+        {
+          "caller": "on",
+          "callee": "callbacks.filter",
+          "lineNumber": 21
+        },
+        {
+          "caller": "emit",
+          "callee": "this.listeners.has",
+          "lineNumber": 30
+        },
+        {
+          "caller": "emit",
+          "callee": "this.listeners.get(event)?.forEach",
+          "lineNumber": 31
+        },
+        {
+          "caller": "emit",
+          "callee": "this.listeners.get",
+          "lineNumber": 31
+        },
+        {
+          "caller": "emit",
+          "callee": "callback",
+          "lineNumber": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "services/imageService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 290,
+      "nonEmptyLines": 251,
+      "functions": [
+        {
+          "name": "compressImage",
+          "startLine": 50,
+          "endLine": 158,
+          "params": [
+            "file",
+            "type",
+            "options"
+          ]
+        },
+        {
+          "name": "generateImageSizes",
+          "startLine": 163,
+          "endLine": 177,
+          "params": [
+            "file",
+            "types"
+          ]
+        },
+        {
+          "name": "fileToBase64",
+          "startLine": 186,
+          "endLine": 193,
+          "params": [
+            "file"
+          ]
+        },
+        {
+          "name": "formatFileSize",
+          "startLine": 198,
+          "endLine": 202,
+          "params": [
+            "bytes"
+          ]
+        },
+        {
+          "name": "validateImageFile",
+          "startLine": 207,
+          "endLine": 220,
+          "params": [
+            "file"
+          ]
+        },
+        {
+          "name": "uploadImage",
+          "startLine": 229,
+          "endLine": 254,
+          "params": [
+            "file",
+            "type"
+          ]
+        },
+        {
+          "name": "getImage",
+          "startLine": 259,
+          "endLine": 266,
+          "params": [
+            "id"
+          ]
+        },
+        {
+          "name": "deleteImage",
+          "startLine": 271,
+          "endLine": 278,
+          "params": [
+            "id"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "IMAGE_PRESETS",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "compressImage",
+          "line": 50,
+          "isDefault": false
+        },
+        {
+          "name": "generateImageSizes",
+          "line": 163,
+          "isDefault": false
+        },
+        {
+          "name": "fileToBase64",
+          "line": 186,
+          "isDefault": false
+        },
+        {
+          "name": "formatFileSize",
+          "line": 198,
+          "isDefault": false
+        },
+        {
+          "name": "validateImageFile",
+          "line": 207,
+          "isDefault": false
+        },
+        {
+          "name": "uploadImage",
+          "line": 229,
+          "isDefault": false
+        },
+        {
+          "name": "getImage",
+          "line": 259,
+          "isDefault": false
+        },
+        {
+          "name": "deleteImage",
+          "line": 271,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "compressImage",
+          "callee": "reader.readAsDataURL",
+          "lineNumber": 60
+        },
+        {
+          "caller": "compressImage",
+          "callee": "document.createElement",
+          "lineNumber": 67
+        },
+        {
+          "caller": "compressImage",
+          "callee": "canvas.getContext",
+          "lineNumber": 68
+        },
+        {
+          "caller": "compressImage",
+          "callee": "reject",
+          "lineNumber": 71
+        },
+        {
+          "caller": "compressImage",
+          "callee": "ctx.fillRect",
+          "lineNumber": 110
+        },
+        {
+          "caller": "compressImage",
+          "callee": "ctx.drawImage",
+          "lineNumber": 123
+        },
+        {
+          "caller": "compressImage",
+          "callee": "ctx.drawImage",
+          "lineNumber": 125
+        },
+        {
+          "caller": "compressImage",
+          "callee": "ctx.drawImage",
+          "lineNumber": 127
+        },
+        {
+          "caller": "compressImage",
+          "callee": "canvas.toDataURL",
+          "lineNumber": 132
+        },
+        {
+          "caller": "compressImage",
+          "callee": "webpData.startsWith",
+          "lineNumber": 134
+        },
+        {
+          "caller": "compressImage",
+          "callee": "canvas.toDataURL",
+          "lineNumber": 138
+        },
+        {
+          "caller": "compressImage",
+          "callee": "dataUrl.indexOf",
+          "lineNumber": 142
+        },
+        {
+          "caller": "compressImage",
+          "callee": "Math.round",
+          "lineNumber": 143
+        },
+        {
+          "caller": "compressImage",
+          "callee": "resolve",
+          "lineNumber": 145
+        },
+        {
+          "caller": "compressImage",
+          "callee": "reject",
+          "lineNumber": 153
+        },
+        {
+          "caller": "compressImage",
+          "callee": "reject",
+          "lineNumber": 156
+        },
+        {
+          "caller": "generateImageSizes",
+          "callee": "compressImage",
+          "lineNumber": 171
+        },
+        {
+          "caller": "generateImageSizes",
+          "callee": "results.set",
+          "lineNumber": 172
+        },
+        {
+          "caller": "fileToBase64",
+          "callee": "reader.readAsDataURL",
+          "lineNumber": 189
+        },
+        {
+          "caller": "fileToBase64",
+          "callee": "resolve",
+          "lineNumber": 190
+        },
+        {
+          "caller": "fileToBase64",
+          "callee": "reject",
+          "lineNumber": 191
+        },
+        {
+          "caller": "formatFileSize",
+          "callee": "(bytes / 1024).toFixed",
+          "lineNumber": 200
+        },
+        {
+          "caller": "formatFileSize",
+          "callee": "(bytes / (1024 * 1024)).toFixed",
+          "lineNumber": 201
+        },
+        {
+          "caller": "validateImageFile",
+          "callee": "validTypes.includes",
+          "lineNumber": 211
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "validateImageFile",
+          "lineNumber": 234
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "compressImage",
+          "lineNumber": 239
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "await apiRequest",
+          "lineNumber": 240
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "JSON.stringify",
+          "lineNumber": 242
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Date.now",
+          "lineNumber": 243
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Math.random().toString(36).slice",
+          "lineNumber": 243
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Math.random().toString",
+          "lineNumber": 243
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Math.random",
+          "lineNumber": 243
+        },
+        {
+          "caller": "getImage",
+          "callee": "await apiRequest",
+          "lineNumber": 261
+        },
+        {
+          "caller": "getImage",
+          "callee": "encodeURIComponent",
+          "lineNumber": 261
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "apiRequest",
+          "lineNumber": 273
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "encodeURIComponent",
+          "lineNumber": 273
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 9,
+        "functionCount": 8,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/socketService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3,
+      "nonEmptyLines": 3,
+      "exports": [
+        {
+          "name": "socketService",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "default",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

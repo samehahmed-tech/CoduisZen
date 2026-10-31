@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/recipe-quantity-fix/Apply Recipe Quantity Fix.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/recipe-quantity-fix/Apply Recipe Quantity Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 114,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/recipe-quantity-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 17,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/recipe-quantity-fix/Apply Recipe Quantity Fix.bat": [],
+    "scripts/sameh-installer/recipe-quantity-fix/Apply Recipe Quantity Fix.ps1": [],
+    "scripts/sameh-installer/recipe-quantity-fix/README AR.txt": []
+  }
+}

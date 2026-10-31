@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireRoles } from '../middleware/auth';
+import { enforceBranch } from '../middleware/branchIsolation';
 import {
     getWhatsAppEscalations,
     getWhatsAppAutomationConfig,
@@ -36,8 +37,8 @@ router.put('/automation-config', requireRoles(...whatsappOperators), saveWhatsAp
 router.post('/campaign', requireRoles(...whatsappOperators), sendWhatsAppCampaign);
 router.post('/send-message', requireRoles(...whatsappOperators), sendWhatsAppTest);
 router.post('/send-test', requireRoles(...whatsappOperators), sendWhatsAppTest);
-router.get('/inbox', requireRoles(...whatsappOperators), getWhatsAppInbox);
-router.get('/escalations', requireRoles(...whatsappOperators), getWhatsAppEscalations);
-router.put('/escalations/:id/resolve', requireRoles(...whatsappOperators), resolveWhatsAppEscalation);
+router.get('/inbox', requireRoles(...whatsappOperators), enforceBranch, getWhatsAppInbox);
+router.get('/escalations', requireRoles(...whatsappOperators), enforceBranch, getWhatsAppEscalations);
+router.put('/escalations/:id/resolve', requireRoles(...whatsappOperators), enforceBranch, resolveWhatsAppEscalation);
 
 export default router;

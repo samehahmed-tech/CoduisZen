@@ -887,7 +887,9 @@ export const ItemDrawer: React.FC<Props> = ({
                               update({ branchPricing: current.filter(b => !match(b)) });
                               return;
                             }
-                            const entry = channel ? { branchId: branch.id, channel, price: val } : { branchId: branch.id, price: val };
+                            const entry: NonNullable<MenuItem['branchPricing']>[number] = channel
+                              ? { branchId: branch.id, channel: channel as NonNullable<MenuItem['branchPricing']>[number]['channel'], price: val }
+                              : { branchId: branch.id, price: val };
                             update({
                               branchPricing: current.some(match)
                                 ? current.map(b => match(b) ? { ...b, price: val } : b)

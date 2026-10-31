@@ -1,0 +1,22 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/move-day16-to-day15/Move Profits.bat",
+    "scripts/move-day16-to-day15/Move Profits.ps1",
+    "scripts/move-day16-to-day15/README AR.txt"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

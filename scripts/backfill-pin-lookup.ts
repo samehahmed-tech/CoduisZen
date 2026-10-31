@@ -5,8 +5,8 @@ import { closeDatabase, pool } from '../server/db';
 
 dotenv.config({ path: ['.env.local', '.env'] as any });
 
-const secret = process.env.PIN_LOOKUP_SECRET || process.env.JWT_SECRET;
-if (!secret) throw new Error('PIN_LOOKUP_SECRET or JWT_SECRET is required');
+const secret = process.env.PIN_LOOKUP_SECRET;
+if (!secret) throw new Error('PIN_LOOKUP_SECRET is required');
 
 const buildPinLookupHash = (pin: string) => crypto
     .createHmac('sha256', secret)

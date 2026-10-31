@@ -26,6 +26,12 @@ type Campaign = {
     discount?: string;
 };
 
+type CampaignAutomationConfig = {
+    welcomeRegistration: boolean;
+    dormantRecovery: boolean;
+    birthdayOffer: boolean;
+};
+
 const CampaignHub: React.FC = () => {
     const { settings } = useAuthStore();
     const lang = (settings.language || 'en') as 'en' | 'ar';
@@ -35,6 +41,8 @@ const CampaignHub: React.FC = () => {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [coupons, setCoupons] = useState<ManagedCoupon[]>([]);
     const [stats, setStats] = useState<any>(null);
+    const [automationConfig, setAutomationConfig] = useState<CampaignAutomationConfig>({ welcomeRegistration: true, dormantRecovery: true, birthdayOffer: false });
+    const [updatingAutomationKey, setUpdatingAutomationKey] = useState<keyof CampaignAutomationConfig | null>(null);
     const [creating, setCreating] = useState(false);
     const [dispatchingId, setDispatchingId] = useState<string | null>(null);
     const [platformTab, setPlatformTab] = useState<'whatsapp' | 'facebook' | 'tiktok' | 'sms' | 'chatbot'>('whatsapp');
@@ -65,12 +73,27 @@ const CampaignHub: React.FC = () => {
 
     const loadData = async () => {
         try {
-            const [list, s, couponList] = await Promise.all([campaignsApi.getAll(), campaignsApi.getStats(), couponsApi.getAll()]);
+            const [list, s, couponList, automation] = await Promise.all([campaignsApi.getAll(), campaignsApi.getStats(), couponsApi.getAll(), campaignsApi.getAutomationConfig()]);
             setCampaigns(list);
             setStats(s);
             setCoupons(couponList);
+            setAutomationConfig(automation.config);
         } catch (error) {
             showError(tr('تعذر تحميل الحملات', 'Could not load campaigns'));
+        }
+    };
+
+    const toggleAutomation = async (key: keyof CampaignAutomationConfig) => {
+        const next = { ...automationConfig, [key]: !automationConfig[key] };
+        setUpdatingAutomationKey(key);
+        try {
+            const saved = await campaignsApi.saveAutomationConfig(next);
+            setAutomationConfig(saved.config);
+            success(tr('تم حفظ إعداد الأتمتة', 'Automation setting saved'));
+        } catch (error: any) {
+            showError(error?.message || tr('تعذر حفظ إعداد الأتمتة', 'Could not save automation setting'));
+        } finally {
+            setUpdatingAutomationKey(null);
         }
     };
 
@@ -636,11 +659,11 @@ const CampaignHub: React.FC = () => {
 
                         <div className="space-y-4 relative z-10">
                             {[
-                                { name: tr('ترحيب العملاء الجدد', 'Welcome Registration Core'), icon: Users, delay: tr('فوري', 'Instant / Real-time'), status: true },
-                                { name: tr('استرجاع العملاء الخاملين', 'Dormant Profile Resuscitation'), icon: MessageSquare, delay: tr('30 يوم بدون طلب', '30 Days Inactive'), status: true },
-                                { name: tr('عرض عيد الميلاد', 'Birthday Loyalty Treat'), icon: Percent, delay: tr('سنوي', 'Annual / On Date'), status: false },
-                            ].map((trigger, i) => (
-                                <motion.div whileHover={{ scale: 1.02 }} key={i} className="flex items-center justify-between p-5 bg-card border border-border/50 rounded-2xl transition-all shadow-sm">
+                                { key: 'welcomeRegistration' as const, name: tr('ترحيب العملاء الجدد', 'Welcome Registration Core'), icon: Users, delay: tr('فوري', 'Instant / Real-time'), supported: true },
+                                { key: 'dormantRecovery' as const, name: tr('استرجاع العملاء الخاملين', 'Dormant Profile Resuscitation'), icon: MessageSquare, delay: tr('30 يوم بدون طلب', '30 Days Inactive'), supported: true },
+                                { key: 'birthdayOffer' as const, name: tr('عرض عيد الميلاد', 'Birthday Loyalty Treat'), icon: Percent, delay: tr('في يوم الميلاد', 'On the customer birthday'), supported: true },
+                            ].map((trigger) => (
+                                <motion.div whileHover={{ scale: 1.02 }} key={trigger.key} className="flex items-center justify-between p-5 bg-card border border-border/50 rounded-2xl transition-all shadow-sm">
                                     <div className="flex items-center gap-4">
                                         <div className="p-2.5 rounded-xl bg-elevated text-muted">
                                             <trigger.icon size={16} />
@@ -650,9 +673,9 @@ const CampaignHub: React.FC = () => {
                                             <p className="text-[9px] font-bold text-muted uppercase tracking-widest">{trigger.delay}</p>
                                         </div>
                                     </div>
-                                    <div className={`w-12 h-6 rounded-full relative transition-all shadow-inner border border-border/30 cursor-pointer ${trigger.status ? 'bg-emerald-500' : 'bg-elevated/80'}`}>
-                                        <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-all shadow-sm ${trigger.status ? 'right-1' : 'left-1'}`} />
-                                    </div>
+                                    <button type="button" role="switch" aria-checked={automationConfig[trigger.key]} aria-label={trigger.name} disabled={trigger.supported === false || updatingAutomationKey === trigger.key} onClick={() => void toggleAutomation(trigger.key)} className={`w-12 h-6 rounded-full relative transition-all shadow-inner border border-border/30 cursor-pointer disabled:opacity-50 ${automationConfig[trigger.key] ? 'bg-emerald-500' : 'bg-elevated/80'}`}>
+                                        <span className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-all shadow-sm ${automationConfig[trigger.key] ? 'right-1' : 'left-1'}`} />
+                                    </button>
                                 </motion.div>
                             ))}
                         </div>

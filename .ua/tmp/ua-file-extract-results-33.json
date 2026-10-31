@@ -1,0 +1,261 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 7,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 7,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 7
+    }
+  },
+  "results": [
+    {
+      "path": ".firecrawl/colorlib.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "markdown",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "metadata",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": ".firecrawl/dash-dribbble.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "success",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "data",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "id",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "creditsUsed",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 4
+      }
+    },
+    {
+      "path": ".firecrawl/dash-search.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "success",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "data",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "id",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "creditsUsed",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 4
+      }
+    },
+    {
+      "path": ".firecrawl/dashboard-concept.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 143,
+      "nonEmptyLines": 72,
+      "sections": [
+        {
+          "heading": "Revenue pulseLIVE",
+          "level": 3,
+          "line": 9
+        },
+        {
+          "heading": "↩️ Refunds watch",
+          "level": 3,
+          "line": 17
+        },
+        {
+          "heading": "Payment mix",
+          "level": 3,
+          "line": 59
+        },
+        {
+          "heading": "Live operations",
+          "level": 3,
+          "line": 69
+        },
+        {
+          "heading": "Action inbox",
+          "level": 3,
+          "line": 85
+        },
+        {
+          "heading": "Live order stream",
+          "level": 3,
+          "line": 95
+        },
+        {
+          "heading": "Top items",
+          "level": 3,
+          "line": 99
+        },
+        {
+          "heading": "Branch race",
+          "level": 3,
+          "line": 123
+        },
+        {
+          "heading": "Peak rhythm",
+          "level": 3,
+          "line": 141
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 9
+      }
+    },
+    {
+      "path": ".firecrawl/muzli.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "markdown",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "metadata",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": ".firecrawl/shot1-img.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "markdown",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "screenshot",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "metadata",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": ".firecrawl/shot1.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "markdown",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "metadata",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    }
+  ]
+}

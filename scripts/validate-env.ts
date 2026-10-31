@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { isStrongSecret, resolveConfiguredSecret } from '../server/utils/secretConfig';
 
 /**
  * Environment Validation Script
@@ -26,12 +27,38 @@ const ENV_RULES: EnvRule[] = [
         key: 'JWT_SECRET', required: true, description: 'JWT signing secret (min 32 chars)', category: 'Security',
         validate: (v) => v.length >= 32
     },
+    {
+        key: 'PIN_LOOKUP_SECRET', required: true, description: 'Dedicated PIN lookup HMAC secret (min 32 chars)', category: 'Security',
+        validate: (v) => v.length >= 32
+    },
+    {
+        key: 'TRACK_TOKEN_SECRET', required: true, description: 'Public tracking HMAC secret (min 32 chars)', category: 'Security',
+        validate: (v) => v.length >= 32
+    },
+    {
+        key: 'PUBLIC_QR_SECRET', required: true, description: 'Dedicated public table QR HMAC secret (min 32 chars)', category: 'Security',
+        validate: (v) => v.length >= 32
+    },
+    {
+        key: 'PAYMENT_TOKEN_SECRET', required: true, description: 'Dedicated payment checkout encryption secret (min 32 chars)', category: 'Security',
+        validate: (v) => v.length >= 32
+    },
+    {
+        key: 'PAYMENT_TOKEN_SECRET_PREVIOUS', required: false, description: 'Previous payment encryption secret during key rotation', category: 'Security',
+        validate: (v) => v.length >= 32,
+    },
     { key: 'JWT_EXPIRES_IN', required: false, description: 'JWT token TTL', category: 'Security', defaultValue: '12h' },
     {
         key: 'AUDIT_HMAC_SECRET', required: true, description: 'Audit log HMAC signing key', category: 'Security',
         validate: (v) => v.length >= 16
     },
+    {
+        key: 'AUDIT_HMAC_SECRET_PREVIOUS', required: false, description: 'Previous audit HMAC key during rotation', category: 'Security',
+        validate: (v) => v.length >= 16,
+    },
+    { key: 'AUDIT_HMAC_KEY_VERSION', required: false, description: 'Audit HMAC key version', category: 'Security', defaultValue: '1' },
     { key: 'AI_KEY_ENCRYPTION_SECRET', required: false, description: 'AI API key encryption secret', category: 'Security' },
+    { key: 'AI_KEY_ENCRYPTION_SECRET_PREVIOUS', required: false, description: 'Previous AI key encryption secret during rotation', category: 'Security' },
     { key: 'GROQ_API_KEY', required: false, description: 'Groq API key (gsk_...) for the smart assistant', category: 'AI' },
     {
         key: 'PRINT_GATEWAY_TOKEN', required: false, description: 'Print bridge auth token', category: 'Security',
@@ -40,6 +67,14 @@ const ENV_RULES: EnvRule[] = [
     {
         key: 'PUBLIC_SCREEN_TOKEN', required: false, description: 'KDS/packing public-screen token', category: 'Security',
         validate: (v) => v.length >= 16
+    },
+    {
+        key: 'ADMS_WEBHOOK_SECRET', required: false, description: 'ZKTeco ADMS push shared secret', category: 'Security',
+        validate: value => value.length >= 32,
+    },
+    {
+        key: 'ATTENDANCE_BRIDGE_TOKEN', required: false, description: 'Attendance bridge auth token', category: 'Security',
+        validate: value => value.length >= 32,
     },
 
     // === CORS ===
@@ -129,6 +164,14 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
     // Production-specific checks
     const nodeEnv = env.NODE_ENV || 'development';
     if (nodeEnv === 'production') {
+        const masterKey = resolveConfiguredSecret(env.CODUIS_MASTER_KEY, env.DEALER_SETUP_KEY);
+        if (!masterKey) {
+            errors.push('❌ MISSING REQUIRED: CODUIS_MASTER_KEY — setup master key must be configured in production');
+        } else if (!isStrongSecret(masterKey)) {
+            errors.push('❌ INVALID VALUE: CODUIS_MASTER_KEY — production setup master key must be at least 32 characters');
+        }
+    }
+    if (nodeEnv === 'production') {
         if (!env.CORS_ORIGINS || env.CORS_ORIGINS.trim() === '*') {
             errors.push('❌ CORS_ORIGINS must be set in production');
         }
@@ -143,6 +186,12 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
         }
         if (!env.PRINT_GATEWAY_TOKEN || env.PRINT_GATEWAY_TOKEN.length < 32) {
             errors.push('❌ PRINT_GATEWAY_TOKEN must be a strong secret (≥32 chars) in production');
+        }
+        if (!env.ADMS_WEBHOOK_SECRET || env.ADMS_WEBHOOK_SECRET.length < 32) {
+            errors.push('❌ ADMS_WEBHOOK_SECRET must be a strong secret (≥32 chars) in production');
+        }
+        if (!env.ATTENDANCE_BRIDGE_TOKEN || env.ATTENDANCE_BRIDGE_TOKEN.length < 32) {
+            errors.push('❌ ATTENDANCE_BRIDGE_TOKEN must be a strong secret (≥32 chars) in production');
         }
         if (env.GO_LIVE_REQUIRE_ETA === 'true') {
             const etaRequired = ENV_RULES.filter(rule => rule.category === 'Fiscal').map(rule => rule.key);

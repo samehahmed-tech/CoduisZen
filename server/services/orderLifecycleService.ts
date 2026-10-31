@@ -1,6 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { db, pool } from '../db';
-import { branches, dayCloseReports, drivers, kdsTickets, managerApprovals, orderItems, orderStatusHistory, orders, tables, warehouses, payments } from '../../src/db/schema';
+import { branches, coupons, dayCloseReports, drivers, kdsTickets, managerApprovals, orderItems, orderStatusHistory, orders, tables, warehouses, payments } from '../../src/db/schema';
 import { evaluateOrderStatusUpdate } from './orderStatusPolicy';
 import { emitBranchEvent } from '../utils/socketEmit';
 import { webhookService } from './webhookService';
@@ -12,6 +12,7 @@ import { whatsappAutomationService } from './whatsappAutomationService';
 import { getDateKeyInTimeZone } from '../utils/businessDate';
 import logger from '../utils/logger';
 import { postPosOrderEntry, reverseCogsForOrderEntry } from './financePostingService';
+import { createSignedAuditLog } from './auditService';
 
 type LifecycleUser = {
     role?: string | null;
@@ -38,6 +39,40 @@ type TransitionInput = {
 
 const terminalStatuses = new Set(['DELIVERED', 'COMPLETED', 'CANCELLED']);
 const kitchenReadyStatuses = new Set(['READY', 'SERVED', 'DELIVERED']);
+
+/**
+ * Cancellation releases a coupon claim once, so a failed/voided sale does not
+ * consume the customer's promotion. Refunds deliberately do not release it:
+ * a completed sale was redeemed and needs an explicit commercial exception.
+ */
+const releaseCouponUsageForCancelledOrder = async (order: any) => {
+    const couponCode = String(order?.couponCode || '').trim().toUpperCase();
+    if (!order?.id || !couponCode) return;
+    let released = false;
+    await db.transaction(async (tx) => {
+        const [claimed] = await tx.update(orders)
+            .set({ couponUsageReleasedAt: new Date(), updatedAt: new Date() })
+            .output()
+            .where(and(eq(orders.id, String(order.id)), isNull(orders.couponUsageReleasedAt)));
+        if (!claimed) return;
+        released = true;
+        await tx.update(coupons)
+            .set({ usedCount: sql`case when coalesce(${coupons.usedCount}, 0) > 0 then coalesce(${coupons.usedCount}, 0) - 1 else 0 end` })
+            .where(and(
+                eq(coupons.code, couponCode),
+                order.branchId ? or(isNull(coupons.branchId), eq(coupons.branchId, String(order.branchId))) : isNull(coupons.branchId),
+            ));
+    });
+    if (released) {
+        await createSignedAuditLog({
+            eventType: 'COUPON_USAGE_RELEASED_ON_CANCELLATION',
+            userId: 'system',
+            branchId: order.branchId || null,
+            payload: { orderId: String(order.id), couponCode },
+            reason: 'Coupon usage released after order cancellation',
+        });
+    }
+};
 
 const lifecycleError = (code: string, status: number) => {
     const error: any = new Error(code);
@@ -104,6 +139,9 @@ const runPostTransitionEffects = async (order: any, previousStatus: string, next
                 orderId: order.id,
                 branchId: order.branchId || undefined,
             }).catch(() => undefined);
+            releaseCouponUsageForCancelledOrder(order).catch((error: any) =>
+                logger.warn({ orderId: order.id, err: error?.message || String(error) }, 'Failed to release cancelled order coupon usage'),
+            );
             // Claw back loyalty points awarded for this order (best-effort).
             if ((order as any).customerId) {
                 const { loyaltyService } = await import('./loyaltyService');
@@ -153,7 +191,7 @@ const runPostTransitionEffects = async (order: any, previousStatus: string, next
     if (['DELIVERED', 'COMPLETED'].includes(nextStatus)) {
         analyticsService.recordOrderImpact(order.id).catch(() => {});
         if (order.customerId) {
-            loyaltyService.awardPoints(order.customerId, Number(order.total || 0), order.branchId || undefined).catch(() => {});
+            loyaltyService.awardPoints(order.customerId, Number(order.total || 0), order.branchId || undefined, String(order.id)).catch(() => {});
         }
         setTimeout(() => {
             submitOrderToFiscal(order.id).catch(() => {});
@@ -285,8 +323,10 @@ export const transitionOrderStatus = async ({
         const now = new Date();
         const isDineInSettlement = normalizedStatus === 'COMPLETED' && String(currentOrder.type || '').toUpperCase() === 'DINE_IN';
         if (isDineInSettlement) {
-            const method = String(paymentMethod || '').trim();
-            if (!method) throw lifecycleError('PAYMENT_METHOD_REQUIRED', 400);
+            // POS table close has historically defaulted to cash when the
+            // cashier does not send an explicit tender. Keep the settlement
+            // atomic while avoiding a dead-end close for legacy clients.
+            const method = String(paymentMethod || 'CASH').trim().toUpperCase();
             const rows = Array.isArray(paymentRows) && paymentRows.length > 0
                 ? paymentRows
                 : [{ method, amount: Number(currentOrder.total || 0) }];

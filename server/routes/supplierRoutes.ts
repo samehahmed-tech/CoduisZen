@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as supplierController from '../controllers/supplierController';
 import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
+import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
 
@@ -9,10 +10,10 @@ const procurementAuth = requireRoleOrPermission(
     ['OP_CREATE_PO'],
 );
 
-router.get('/', supplierController.getSuppliers);
-router.get('/:id', supplierController.getSupplierById);
-router.post('/', procurementAuth, supplierController.createSupplier);
-router.put('/:id', procurementAuth, supplierController.updateSupplier);
-router.delete('/:id', procurementAuth, supplierController.deactivateSupplier);
+router.get('/', enforceBranch, supplierController.getSuppliers);
+router.get('/:id', enforceBranch, supplierController.getSupplierById);
+router.post('/', procurementAuth, enforceBranch, supplierController.createSupplier);
+router.put('/:id', procurementAuth, enforceBranch, supplierController.updateSupplier);
+router.delete('/:id', procurementAuth, enforceBranch, supplierController.deactivateSupplier);
 
 export default router;

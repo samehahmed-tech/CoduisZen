@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { managerApprovals, auditLogs, users, journalEntries, financeExceptions, settings } from '../../src/db/schema';
+import { managerApprovals, users, journalEntries, financeExceptions, settings } from '../../src/db/schema';
+import { createSignedAuditLog } from '../services/auditService';
 import { eq, desc, and } from 'drizzle-orm';
 import { GLService } from '../services/glService';
 import { findApproverByPassword, findApproverByPin } from '../services/managerApprovalAuth';
@@ -30,6 +31,7 @@ const backfillPendingExpenseApprovals = async (branchId: string | undefined, use
         .where(and(
             eq(financeExceptions.referenceType, 'EXPENSE'),
             eq(financeExceptions.status, 'PENDING'),
+            eq(financeExceptions.branchId, branchId),
         ));
 
     for (const exception of pendingExpenseExceptions) {
@@ -39,7 +41,14 @@ const backfillPendingExpenseApprovals = async (branchId: string | undefined, use
         const payload = exception.payload as any;
         if (!payload || !Array.isArray(payload.lines)) continue;
 
-        const result = await GLService.postJournalEntry(payload);
+        const result = await GLService.postJournalEntry({
+            ...payload,
+            branchId: exception.branchId || branchId,
+            createdBy: payload.createdBy || userId,
+            actorId: userId,
+            source: payload.source || 'EXPENSE_RETRY',
+            correlationId: `FINANCE_EXCEPTION_RETRY:${exception.id}`,
+        });
         const entryId = typeof result === 'object' && result && 'entryId' in result ? String(result.entryId) : '';
         if (!entryId) continue;
 
@@ -86,7 +95,9 @@ const backfillPendingExpenseApprovals = async (branchId: string | undefined, use
 
 export const createApproval = async (req: Request, res: Response) => {
     try {
-        const { managerId, branchId, actionType, relatedId, reason, details } = req.body;
+        const { managerId, actionType, relatedId, reason, details } = req.body;
+        const branchId = req.effectiveBranchId;
+        if (!branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED' });
 
         const [approval] = await db.insert(managerApprovals).output().values({
             managerId,
@@ -98,14 +109,16 @@ export const createApproval = async (req: Request, res: Response) => {
             createdAt: new Date(),
         });
 
-        // Also log to audit logs for central visibility
-        await db.insert(auditLogs).values({
+        await createSignedAuditLog({
             eventType: `MANAGER_APPROVAL_${actionType}`,
-            userId: managerId,
+            userId: req.user?.id || managerId,
+            userRole: req.user?.role,
             branchId,
-            reason,
-            payload: details,
-            createdAt: new Date(),
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            reason: reason || 'Approval requested',
+            payload: { approvalId: approval.id, actionType, relatedId, hasDetails: Boolean(details) },
+            after: { status: 'PENDING' },
         });
 
         res.status(201).json(normalizeApproval(approval));
@@ -116,8 +129,7 @@ export const createApproval = async (req: Request, res: Response) => {
 
 export const getApprovals = async (req: Request, res: Response) => {
     try {
-        const { branchId } = req.query;
-        const effectiveBranchId = (branchId as string | undefined) || req.user?.branchId || req.user?.allowedBranches?.[0] || undefined;
+        const effectiveBranchId = req.effectiveBranchId;
         await backfillPendingExpenseApprovals(effectiveBranchId, req.user?.id);
         let query = db.select().from(managerApprovals);
 
@@ -173,7 +185,17 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
         const [approval] = approvalId
             ? await db.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, Number(approvalId)))
             : [];
-        const effectiveBranchId = branchId || approval?.branchId;
+        const scopedBranchId = req.effectiveBranchId;
+        if (scopedBranchId && branchId && String(branchId) !== String(scopedBranchId)) {
+            return res.status(403).json({ error: 'BRANCH_SCOPE_VIOLATION' });
+        }
+        if (scopedBranchId && approval?.branchId && String(approval.branchId) !== String(scopedBranchId)) {
+            return res.status(403).json({ error: 'BRANCH_SCOPE_VIOLATION' });
+        }
+        if (approval?.branchId && branchId && String(approval.branchId) !== String(branchId)) {
+            return res.status(403).json({ error: 'APPROVAL_BRANCH_MISMATCH' });
+        }
+        const effectiveBranchId = scopedBranchId || branchId || approval?.branchId;
         const effectiveAction = action || approval?.actionType || 'APPROVAL';
 
         if (!effectiveBranchId) {
@@ -273,15 +295,18 @@ export const verifyManagerPin = async (req: Request, res: Response) => {
                     .output()
                     .where(eq(managerApprovals.id, approval.id));
 
-                await db.insert(auditLogs).values({
+                await createSignedAuditLog({
                     eventType: `MANAGER_APPROVAL_${approval.actionType}`,
                     userId: validManager.id,
                     userName: validManager.name,
                     userRole: validManager.role,
                     branchId: effectiveBranchId,
+                    requestId: req.requestId,
+                    sourceDevice: req.headers['user-agent'],
                     reason: verificationReason,
                     payload: { approvalId: approval.id, relatedId: approval.relatedId, actionType: approval.actionType },
-                    createdAt: new Date(),
+                    before: { status: details.status || 'PENDING' },
+                    after: { status: 'APPROVED' },
                 });
 
                 return res.json({
@@ -331,6 +356,9 @@ export const rejectApproval = async (req: Request, res: Response) => {
 
         const [approval] = await db.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, id));
         if (!approval) return res.status(404).json({ error: 'APPROVAL_NOT_FOUND' });
+        if (req.effectiveBranchId && approval.branchId && String(req.effectiveBranchId) !== String(approval.branchId)) {
+            return res.status(403).json({ error: 'BRANCH_SCOPE_VIOLATION' });
+        }
 
         const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
         if (details.status === 'APPROVED') return res.status(400).json({ error: 'APPROVAL_ALREADY_APPROVED' });
@@ -360,15 +388,18 @@ export const rejectApproval = async (req: Request, res: Response) => {
             .output()
             .where(eq(managerApprovals.id, id));
 
-        await db.insert(auditLogs).values({
+        await createSignedAuditLog({
             eventType: `MANAGER_REJECT_${approval.actionType}`,
             userId: req.user?.id || 'system',
             userName: req.user?.name,
             userRole: req.user?.role,
             branchId: approval.branchId || req.effectiveBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
             reason,
             payload: { approvalId: approval.id, relatedId: approval.relatedId, actionType: approval.actionType },
-            createdAt: new Date(),
+            before: { status: details.status || 'PENDING' },
+            after: { status: 'REJECTED' },
         });
 
         res.json(normalizeApproval(updatedApproval));

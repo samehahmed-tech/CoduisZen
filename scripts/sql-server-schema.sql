@@ -4,6 +4,14 @@
 -- Database: CoduisZen
 -- ============================================================================
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET ARITHABORT ON;
+GO
+
 -- ============================================================================
 -- 1. USERS & AUTHENTICATION
 -- ============================================================================
@@ -132,6 +140,7 @@ CREATE TABLE branches (
     day_close_emails    nvarchar(max)   DEFAULT '[]',
     phone               nvarchar(max),
     email               nvarchar(max),
+    birth_date          datetime2,
     is_active           bit             DEFAULT 1,
     lat                 real            NULL,
     lng                 real            NULL,
@@ -185,6 +194,12 @@ CREATE TABLE customers (
     loyalty_tier        nvarchar(max)   DEFAULT 'Bronze',
     loyalty_points      int             DEFAULT 0,
     source              nvarchar(max)   DEFAULT 'call_center',
+    marketing_opt_in    bit             DEFAULT 1,
+    marketing_opt_out_at datetime2,
+    marketing_email_opt_in bit          DEFAULT 1,
+    marketing_sms_opt_in bit            DEFAULT 1,
+    marketing_whatsapp_opt_in bit       DEFAULT 1,
+    marketing_push_opt_in bit           DEFAULT 1,
     deleted_at          datetime2,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -374,6 +389,7 @@ CREATE TABLE orders (
     daily_order_number      int,
     type                    nvarchar(max)   NOT NULL,
     source                  nvarchar(max)   DEFAULT 'pos',
+    campaign_id             nvarchar(255),
     branch_id               nvarchar(255)   NOT NULL,
     table_id                nvarchar(255),
     customer_id             nvarchar(255),
@@ -391,6 +407,8 @@ CREATE TABLE orders (
     discount                real            DEFAULT 0,
     discount_type           nvarchar(max),
     discount_reason         nvarchar(max),
+    coupon_code             nvarchar(255),
+    coupon_usage_released_at datetime2,
     tax                     real            NOT NULL,
     delivery_fee            real            DEFAULT 0,
     service_charge          real            DEFAULT 0,
@@ -432,6 +450,8 @@ CREATE INDEX idx_orders_status ON orders (status);
 CREATE INDEX idx_orders_customer ON orders (customer_id);
 CREATE INDEX idx_orders_shift ON orders (shift_id);
 
+CREATE INDEX orders_campaign_id_idx ON orders (campaign_id);
+
 CREATE TABLE idempotency_keys (
     id                  int             IDENTITY(1,1) NOT NULL,
     [key]               nvarchar(500)   NOT NULL,
@@ -457,6 +477,10 @@ CREATE TABLE order_items (
     name                nvarchar(max)   NOT NULL,
     name_ar             nvarchar(max),
     price               real            NOT NULL,
+    base_price          real,
+    platform_markup     real            DEFAULT 0,
+    price_source        nvarchar(max),
+    recipe_version_id   nvarchar(255),
     cost                real            DEFAULT 0,
     quantity            int             NOT NULL,
     notes               nvarchar(max),
@@ -508,6 +532,7 @@ CREATE INDEX idx_payments_order ON payments (order_id);
 CREATE TABLE payment_sessions (
     id                  nvarchar(255)   NOT NULL,
     order_id            nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255),
     provider_type       nvarchar(max),
     status              nvarchar(max)   DEFAULT 'initiated',
     amount              real            NOT NULL,
@@ -521,11 +546,15 @@ CREATE TABLE payment_sessions (
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_payment_sessions PRIMARY KEY (id),
     CONSTRAINT fk_payment_sessions_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    CONSTRAINT fk_payment_sessions_branch FOREIGN KEY (branch_id) REFERENCES branches(id),
     CONSTRAINT uq_payment_sessions_idempotency UNIQUE (idempotency_key)
 );
 
 CREATE INDEX idx_payment_sessions_order ON payment_sessions (order_id);
 CREATE INDEX idx_payment_sessions_idempotency ON payment_sessions (idempotency_key);
+CREATE UNIQUE INDEX payment_sessions_provider_reference_uq
+    ON payment_sessions (provider_type, external_reference)
+    WHERE external_reference IS NOT NULL;
 
 CREATE TABLE ledger_entries (
     id                  nvarchar(255)   NOT NULL,
@@ -535,6 +564,10 @@ CREATE TABLE ledger_entries (
     direction           nvarchar(max)   NOT NULL,
     amount              real            NOT NULL,
     currency            nvarchar(max)   DEFAULT 'EGP',
+    branch_id           nvarchar(255),
+    source              nvarchar(100),
+    actor_id            nvarchar(255),
+    correlation_id      nvarchar(255),
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_ledger_entries PRIMARY KEY (id),
     CONSTRAINT fk_ledger_entries_order FOREIGN KEY (order_id) REFERENCES orders(id),
@@ -543,6 +576,7 @@ CREATE TABLE ledger_entries (
 
 CREATE INDEX idx_ledger_entries_order ON ledger_entries (order_id);
 CREATE INDEX idx_ledger_entries_account ON ledger_entries (account);
+CREATE INDEX idx_ledger_entries_branch_correlation ON ledger_entries (branch_id, correlation_id);
 
 -- ============================================================================
 -- 9. SHIFTS
@@ -593,6 +627,8 @@ CREATE TABLE inventory_items (
     sku                 nvarchar(100),
     barcode             nvarchar(255),
     unit                nvarchar(max)   NOT NULL,
+    purchase_unit       nvarchar(max),
+    purchase_unit_factor real           DEFAULT 1,
     category            nvarchar(max),
     threshold           real            DEFAULT 0,
     cost_price          real            DEFAULT 0,
@@ -741,6 +777,7 @@ CREATE TABLE recipes (
     menu_item_id        nvarchar(255),
     inventory_item_id   nvarchar(255),
     yield               real            DEFAULT 1,
+    expected_yield      real            DEFAULT 1,
     size_id             nvarchar(max),
     instructions        nvarchar(max),
     version             int             DEFAULT 1,
@@ -791,6 +828,7 @@ CREATE TABLE recipe_ingredients (
 
 CREATE TABLE suppliers (
     id                  nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255)   NULL,
     name                nvarchar(max)   NOT NULL,
     contact_person      nvarchar(max),
     phone               nvarchar(max),
@@ -957,7 +995,17 @@ CREATE TABLE production_orders (
     branch_id           nvarchar(255)   NOT NULL,
     recipe_id           nvarchar(255),
     menu_item_id        nvarchar(255),
-    quantity            real            NOT NULL,
+    target_item_id      nvarchar(255),
+    quantity            real            DEFAULT 0,
+    batch_number        nvarchar(max),
+    batch_size          real            DEFAULT 1,
+    expected_yield      real,
+    source_qty          real,
+    source_unit         nvarchar(max),
+    actual_yield        real,
+    started_at          datetime2,
+    completed_at        datetime2,
+    warehouse_id        nvarchar(255),
     status              nvarchar(max)   DEFAULT 'PLANNED',
     notes               nvarchar(max),
     created_by          nvarchar(max),
@@ -971,11 +1019,14 @@ CREATE TABLE production_order_items (
     id                  int             IDENTITY(1,1) NOT NULL,
     production_order_id nvarchar(255)   NOT NULL,
     inventory_item_id   nvarchar(255)   NOT NULL,
-    quantity_planned    real            NOT NULL,
+    quantity_planned    real            DEFAULT 0,
+    required_qty        real,
     quantity_used       real            DEFAULT 0,
+    actual_qty          real,
+    unit                nvarchar(max),
     CONSTRAINT pk_production_order_items PRIMARY KEY (id),
     CONSTRAINT fk_production_order_items_po FOREIGN KEY (production_order_id) REFERENCES production_orders(id),
-    CONSTRAINT fk_production_order_items_item FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id)
+    CONSTRAINT fk_production_order_items_item FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
 );
 
 -- ============================================================================
@@ -1135,7 +1186,7 @@ CREATE TABLE cost_centers (
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_cost_centers PRIMARY KEY (id),
     CONSTRAINT uq_cost_centers_code UNIQUE (code),
-    CONSTRAINT fk_cost_centers_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
+    CONSTRAINT fk_cost_centers_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 );
 
 CREATE TABLE fiscal_periods (
@@ -1200,6 +1251,10 @@ CREATE TABLE journal_entries (
     status              nvarchar(50)   NOT NULL DEFAULT 'POSTED',
     fiscal_period_id    nvarchar(255),
     created_by          nvarchar(max),
+    branch_id           nvarchar(255),
+    source              nvarchar(100),
+    actor_id            nvarchar(255),
+    correlation_id      nvarchar(255),
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_journal_entries PRIMARY KEY (id)
 );
@@ -1207,6 +1262,7 @@ CREATE TABLE journal_entries (
 CREATE INDEX idx_je_ref ON journal_entries (reference, reference_type);
 CREATE INDEX idx_je_date_status ON journal_entries (date, status);
 CREATE INDEX idx_je_source ON journal_entries (reference_type);
+CREATE INDEX idx_je_branch_correlation ON journal_entries (branch_id, correlation_id);
 
 CREATE TABLE journal_lines (
     id                  int             IDENTITY(1,1) NOT NULL,
@@ -1384,6 +1440,60 @@ CREATE TABLE settings (
     CONSTRAINT pk_settings PRIMARY KEY ([key])
 );
 
+CREATE TABLE public_api_clients (
+    id                  nvarchar(64)    NOT NULL,
+    name                nvarchar(160)   NOT NULL,
+    key_prefix          nvarchar(32)    NOT NULL,
+    key_hash            nvarchar(64)    NOT NULL,
+    scopes              nvarchar(max)   NOT NULL,
+    branch_ids          nvarchar(max)   NOT NULL,
+    redirect_uris       nvarchar(max),
+    expires_at          datetime2,
+    revoked_at          datetime2,
+    last_used_at        datetime2,
+    created_by          nvarchar(255),
+    created_at          datetime2       DEFAULT GETDATE(),
+    updated_at          datetime2       DEFAULT GETDATE(),
+    CONSTRAINT pk_public_api_clients PRIMARY KEY (id),
+    CONSTRAINT uq_public_api_clients_key_hash UNIQUE (key_hash)
+);
+
+CREATE INDEX idx_public_api_clients_active ON public_api_clients (revoked_at, expires_at);
+
+CREATE TABLE public_api_refresh_tokens (
+    id                  nvarchar(64)    NOT NULL,
+    client_id           nvarchar(64)    NOT NULL,
+    token_hash          nvarchar(64)    NOT NULL,
+    scopes              nvarchar(max)   NOT NULL,
+    branch_ids          nvarchar(max)   NOT NULL,
+    expires_at          datetime2       NOT NULL,
+    consumed_at         datetime2,
+    revoked_at          datetime2,
+    created_at          datetime2       DEFAULT GETDATE(),
+    CONSTRAINT pk_public_api_refresh_tokens PRIMARY KEY (id),
+    CONSTRAINT uq_public_api_refresh_tokens_hash UNIQUE (token_hash)
+);
+
+CREATE INDEX idx_public_api_refresh_client ON public_api_refresh_tokens (client_id, revoked_at, consumed_at);
+
+CREATE TABLE public_api_authorization_codes (
+    id                  nvarchar(64)    NOT NULL,
+    code_hash           nvarchar(64)    NOT NULL,
+    client_id           nvarchar(64)    NOT NULL,
+    user_id             nvarchar(255)   NOT NULL,
+    redirect_uri        nvarchar(2048)  NOT NULL,
+    scopes              nvarchar(max)   NOT NULL,
+    branch_ids          nvarchar(max)   NOT NULL,
+    code_challenge      nvarchar(128)   NOT NULL,
+    expires_at          datetime2       NOT NULL,
+    consumed_at         datetime2,
+    created_at          datetime2       DEFAULT GETDATE(),
+    CONSTRAINT pk_public_api_authorization_codes PRIMARY KEY (id),
+    CONSTRAINT uq_public_api_authorization_codes_hash UNIQUE (code_hash)
+);
+
+CREATE INDEX idx_public_api_auth_codes_client ON public_api_authorization_codes (client_id, expires_at, consumed_at);
+
 -- ============================================================================
 -- 21. IMAGES
 -- ============================================================================
@@ -1464,11 +1574,17 @@ CREATE TABLE day_close_reports (
     id                  nvarchar(255)   NOT NULL,
     branch_id           nvarchar(255)   NOT NULL,
     business_date       date            NOT NULL,
+    shift_id            nvarchar(255),
+    date                date,
     status              nvarchar(max)   DEFAULT 'DRAFT',
     opened_at           datetime2,
     closed_at           datetime2,
+    closed_by           nvarchar(255),
+    approved_by         nvarchar(255),
+    approved_at         datetime2,
     gross_sales         real            DEFAULT 0,
     net_sales           real            DEFAULT 0,
+    total_revenue       real            DEFAULT 0,
     discounts           real            DEFAULT 0,
     void_amount         real            DEFAULT 0,
     refund_amount       real            DEFAULT 0,
@@ -1480,9 +1596,23 @@ CREATE TABLE day_close_reports (
     card_sales          real            DEFAULT 0,
     expected_cash       real            DEFAULT 0,
     actual_cash         real            DEFAULT 0,
+    variance            real            DEFAULT 0,
     cash_difference     real            DEFAULT 0,
     total_transactions  int             DEFAULT 0,
+    total_orders        int             DEFAULT 0,
+    total_refunds       real            DEFAULT 0,
+    total_discounts     real            DEFAULT 0,
+    payment_breakdown   nvarchar(max),
     operational_snapshot nvarchar(max),
+    sales_snapshot      nvarchar(max),
+    orders_snapshot     nvarchar(max),
+    payments_snapshot   nvarchar(max),
+    inventory_snapshot  nvarchar(max),
+    shifts_snapshot     nvarchar(max),
+    fiscal_snapshot     nvarchar(max),
+    finance_snapshot    nvarchar(max),
+    side_effect_snapshot nvarchar(max),
+    audit_snapshot      nvarchar(max),
     notes               nvarchar(max),
     created_by          nvarchar(255),
     created_at          datetime2       DEFAULT GETDATE(),
@@ -1538,6 +1668,8 @@ CREATE TABLE departments (
     name                nvarchar(max)   NOT NULL,
     name_ar             nvarchar(max),
     branch_id           nvarchar(255),
+    manager_id          nvarchar(255),
+    parent_id           nvarchar(255),
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_departments PRIMARY KEY (id),
@@ -1610,14 +1742,22 @@ CREATE INDEX idx_employee_documents_branch_expiry ON employee_documents (branch_
 CREATE TABLE employee_compensation_items (
     id                  nvarchar(255)   NOT NULL,
     employee_id         nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255),
+    code                nvarchar(max),
+    name                nvarchar(max),
+    name_ar             nvarchar(max),
     type                nvarchar(max)   NOT NULL,
+    category            nvarchar(max),
     label               nvarchar(max)   NOT NULL,
     label_ar            nvarchar(max),
     amount              real            NOT NULL DEFAULT 0,
+    currency            nvarchar(max)   DEFAULT 'EGP',
     frequency           nvarchar(max)   NOT NULL DEFAULT 'MONTHLY',
     is_active           bit             DEFAULT 1,
     effective_from      date,
     effective_to        date,
+    is_recurring        bit             DEFAULT 1,
+    notes               nvarchar(max),
     metadata            nvarchar(max)   DEFAULT '{}',
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -1635,6 +1775,8 @@ CREATE TABLE leave_types (
     name_ar             nvarchar(max),
     default_days        int             DEFAULT 0,
     is_paid             bit             DEFAULT 1,
+    days_per_year       real            DEFAULT 0,
+    requires_approval   bit             DEFAULT 1,
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_leave_types PRIMARY KEY (id)
@@ -1649,8 +1791,10 @@ CREATE TABLE leave_requests (
     total_days          int             NOT NULL,
     reason              nvarchar(max),
     status              nvarchar(max)   DEFAULT 'PENDING',
+    requested_by        nvarchar(255),
     approved_by         nvarchar(255),
     approved_at         datetime2,
+    rejection_reason    nvarchar(max),
     notes               nvarchar(max),
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -1665,10 +1809,11 @@ CREATE TABLE leave_balances (
     employee_id         nvarchar(255)   NOT NULL,
     leave_type_id       nvarchar(255)   NOT NULL,
     year                int             NOT NULL,
-    total_days          real            NOT NULL DEFAULT 0,
+    entitled_days       real            NOT NULL DEFAULT 0,
+    carried_forward_days real           NOT NULL DEFAULT 0,
     used_days           real            NOT NULL DEFAULT 0,
     pending_days        real            NOT NULL DEFAULT 0,
-    remaining_days      real            NOT NULL DEFAULT 0,
+    adjustment_days     real            NOT NULL DEFAULT 0,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_leave_balances PRIMARY KEY (id),
@@ -1708,6 +1853,7 @@ CREATE TABLE attendance_policies (
     grace_late_minutes              int             NOT NULL DEFAULT 15,
     early_leave_tolerance_minutes   int             NOT NULL DEFAULT 10,
     overtime_threshold_minutes      int             NOT NULL DEFAULT 30,
+    minimum_rest_minutes             int             NOT NULL DEFAULT 660,
     min_hours_for_present           real            NOT NULL DEFAULT 4,
     attendance_processing_mode      nvarchar(max)   NOT NULL DEFAULT 'AUTO',
     operational_day_start_hour      int             NOT NULL DEFAULT 8,
@@ -1808,6 +1954,7 @@ CREATE TABLE attendance_raw_logs (
     dedupe_hash         nvarchar(255),
     processing_status   nvarchar(max)   DEFAULT 'PENDING',
     processing_notes    nvarchar(max),
+    processed_at        datetime2,
     raw_payload         nvarchar(max)   DEFAULT '{}',
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -1951,11 +2098,13 @@ CREATE TABLE shift_templates (
 CREATE INDEX idx_shift_templates_branch_active ON shift_templates (branch_id, is_active);
 
 CREATE TABLE employee_shift_assignments (
-    id                  nvarchar(255)   NOT NULL,
+    id                  int             IDENTITY(1,1) NOT NULL,
     employee_id         nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255)   NOT NULL,
     shift_template_id   nvarchar(255)   NOT NULL,
     effective_from      date            NOT NULL,
     effective_to        date,
+    is_primary           bit             DEFAULT 1,
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -2029,6 +2178,16 @@ CREATE TABLE payroll_profiles (
     id                  nvarchar(255)   NOT NULL,
     name                nvarchar(max)   NOT NULL,
     branch_id           nvarchar(255),
+    code                nvarchar(max),
+    pay_frequency       nvarchar(max)   DEFAULT 'MONTHLY',
+    salary_mode         nvarchar(max)   DEFAULT 'MONTHLY',
+    currency            nvarchar(max)   DEFAULT 'EGP',
+    default_attendance_policy_id nvarchar(255),
+    default_overtime_rate real          DEFAULT 1.5,
+    late_deduction_mode nvarchar(max)   DEFAULT 'NONE',
+    absence_deduction_mode nvarchar(max) DEFAULT 'DAILY_RATE',
+    auto_post_to_gl     bit             DEFAULT 1,
+    is_default          bit             DEFAULT 0,
     description         nvarchar(max),
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
@@ -2039,13 +2198,24 @@ CREATE TABLE payroll_profiles (
 
 CREATE TABLE payroll_components (
     id                  nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255),
+    code                nvarchar(max),
     name                nvarchar(max)   NOT NULL,
     name_ar             nvarchar(max),
     type                nvarchar(max)   NOT NULL,
-    calculation_method  nvarchar(max)   NOT NULL,
+    category            nvarchar(max),
+    amount_type         nvarchar(max)   DEFAULT 'FIXED',
+    calculation_basis   nvarchar(max)   DEFAULT 'BASE_SALARY',
+    default_value       real            DEFAULT 0,
+    calculation_method  nvarchar(max)   DEFAULT 'FIXED',
     amount              real            DEFAULT 0,
+    sort_order          int             DEFAULT 0,
     rate                real            DEFAULT 0,
     is_taxable          bit             DEFAULT 0,
+    taxable             bit             DEFAULT 0,
+    pensionable         bit             DEFAULT 0,
+    affects_net_pay     bit             DEFAULT 1,
+    notes               nvarchar(max),
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -2054,11 +2224,21 @@ CREATE TABLE payroll_components (
 
 CREATE TABLE payroll_rules (
     id                  nvarchar(255)   NOT NULL,
+    payroll_profile_id  nvarchar(255),
+    branch_id           nvarchar(255),
+    code                nvarchar(max),
     name                nvarchar(max)   NOT NULL,
-    type                nvarchar(max)   NOT NULL,
+    type                nvarchar(max)   DEFAULT 'RULE',
     conditions          nvarchar(max)   DEFAULT '{}',
-    action              nvarchar(max)   NOT NULL,
+    action              nvarchar(max)   DEFAULT 'APPLY',
+    formula             nvarchar(max),
+    component_id        nvarchar(255),
+    operation            nvarchar(max),
+    trigger_type         nvarchar(max),
     value               nvarchar(max),
+    cap_value           real            DEFAULT 0,
+    threshold_value     real            DEFAULT 0,
+    rate_value          real            DEFAULT 0,
     priority            int             DEFAULT 0,
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
@@ -2069,11 +2249,13 @@ CREATE TABLE payroll_rules (
 CREATE TABLE employee_payroll_assignments (
     id                  nvarchar(255)   NOT NULL,
     employee_id         nvarchar(255)   NOT NULL,
+    payroll_profile_id  nvarchar(255),
     profile_id          nvarchar(255),
     basic_salary        real            DEFAULT 0,
     hourly_rate         real            DEFAULT 0,
     effective_from      date            NOT NULL,
     effective_to        date,
+    is_primary           bit             DEFAULT 1,
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -2100,13 +2282,21 @@ CREATE TABLE payroll_cycles (
 CREATE TABLE payroll_runs (
     id                  nvarchar(255)   NOT NULL,
     cycle_id            nvarchar(255)   NOT NULL,
+    branch_id           nvarchar(255),
     status              nvarchar(max)   DEFAULT 'DRAFT',
+    created_by          nvarchar(255),
+    total_employees     int             DEFAULT 0,
+    gross_total         real            DEFAULT 0,
+    deductions_total    real            DEFAULT 0,
+    net_total           real            DEFAULT 0,
     total_gross         real            DEFAULT 0,
     total_deductions    real            DEFAULT 0,
     total_net           real            DEFAULT 0,
     notes               nvarchar(max),
     processed_by        nvarchar(255),
     processed_at        datetime2,
+    closed_by           nvarchar(255),
+    closed_at           datetime2,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_payroll_runs PRIMARY KEY (id),
@@ -2122,6 +2312,7 @@ CREATE TABLE payroll_run_lines (
     total_deductions    real            DEFAULT 0,
     net_pay             real            DEFAULT 0,
     overtime_amount     real            DEFAULT 0,
+    tip_amount          real            DEFAULT 0,
     bonus_amount        real            DEFAULT 0,
     loan_deduction      real            DEFAULT 0,
     tax_amount          real            DEFAULT 0,
@@ -2136,11 +2327,14 @@ CREATE TABLE payroll_run_lines (
 CREATE TABLE payroll_locks (
     id                  nvarchar(255)   NOT NULL,
     branch_id           nvarchar(255)   NOT NULL,
-    employee_id         nvarchar(255)   NOT NULL,
-    period_start        date            NOT NULL,
-    period_end          date            NOT NULL,
-    locked_by           nvarchar(255)   NOT NULL,
+    employee_id         nvarchar(255),
+    period_start        date,
+    period_end          date,
+    locked_by           nvarchar(255),
+    locked_through      datetime2,
     locked_at           datetime2       DEFAULT GETDATE(),
+    created_at          datetime2       DEFAULT GETDATE(),
+    updated_at          datetime2       DEFAULT GETDATE(),
     reason              nvarchar(max),
     CONSTRAINT pk_payroll_locks PRIMARY KEY (id),
     CONSTRAINT fk_payroll_locks_employee FOREIGN KEY (employee_id) REFERENCES employees(id),
@@ -2172,11 +2366,18 @@ CREATE TABLE bonus_penalty_records (
     id                  nvarchar(255)   NOT NULL,
     employee_id         nvarchar(255)   NOT NULL,
     branch_id           nvarchar(255)   NOT NULL,
-    type                nvarchar(max)   NOT NULL,
+    type                nvarchar(max)   DEFAULT 'RULE',
+    category            nvarchar(max),
     amount              real            NOT NULL,
+    coupon_code         nvarchar(255),
+    coupon_discount_amount real DEFAULT 0,
     reason              nvarchar(max)   NOT NULL,
-    date                date            NOT NULL,
+    notes               nvarchar(max),
+    date                date            DEFAULT GETDATE(),
+    effective_date      date,
     status              nvarchar(max)   DEFAULT 'PENDING',
+    payroll_cycle_id    nvarchar(255),
+    requested_by        nvarchar(255),
     approved_by         nvarchar(255),
     approved_at         datetime2,
     created_by          nvarchar(255),
@@ -2192,13 +2393,23 @@ CREATE TABLE employee_loans (
     id                  nvarchar(255)   NOT NULL,
     employee_id         nvarchar(255)   NOT NULL,
     branch_id           nvarchar(255)   NOT NULL,
-    amount              real            NOT NULL,
-    total_installments  int             NOT NULL,
-    remaining_amount    real            NOT NULL,
+    amount              real            DEFAULT 0,
+    type                nvarchar(max)   DEFAULT 'ADVANCE',
+    principal_amount    real,
+    installment_amount  real            DEFAULT 0,
+    installments_count  int             DEFAULT 1,
+    notes               nvarchar(max),
+    requested_by        nvarchar(255),
+    total_installments  int             DEFAULT 1,
+    remaining_amount    real            DEFAULT 0,
+    outstanding_amount  real,
+    effective_from      date,
     reason              nvarchar(max),
     status              nvarchar(max)   DEFAULT 'ACTIVE',
     approved_by         nvarchar(255),
     approved_at         datetime2,
+    disbursed_at        datetime2,
+    requested_at        datetime2       DEFAULT GETDATE(),
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_employee_loans PRIMARY KEY (id),
@@ -2208,34 +2419,39 @@ CREATE TABLE employee_loans (
 );
 
 CREATE TABLE loan_installments (
-    id                  nvarchar(255)   NOT NULL,
+    id                  int             IDENTITY(1,1) NOT NULL,
     loan_id             nvarchar(255)   NOT NULL,
-    installment_number  int             NOT NULL,
+    installment_number  int             DEFAULT 1,
     amount              real            NOT NULL,
     due_date            date            NOT NULL,
     paid_date           date,
+    paid_at             datetime2,
     status              nvarchar(max)   DEFAULT 'PENDING',
+    payroll_cycle_id    nvarchar(255),
     notes               nvarchar(max),
     created_at          datetime2       DEFAULT GETDATE(),
+    updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_loan_installments PRIMARY KEY (id),
     CONSTRAINT fk_loan_installments_loan FOREIGN KEY (loan_id) REFERENCES employee_loans(id)
 );
 
 CREATE TABLE payroll_payouts (
     id                  nvarchar(255)   NOT NULL,
-    run_id              nvarchar(255)   NOT NULL,
+    cycle_id            nvarchar(255),
     employee_id         nvarchar(255)   NOT NULL,
-    amount              real            NOT NULL,
-    payment_method      nvarchar(max),
-    reference           nvarchar(max),
+    basic_salary        real            NOT NULL DEFAULT 0,
+    deductions          real            DEFAULT 0,
+    overtime            real            DEFAULT 0,
+    net_pay             real            NOT NULL DEFAULT 0,
     status              nvarchar(max)   DEFAULT 'PENDING',
+    payroll_cycle_id    nvarchar(255),
     paid_at             datetime2,
     processed_by        nvarchar(255),
     notes               nvarchar(max),
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_payroll_payouts PRIMARY KEY (id),
-    CONSTRAINT fk_payroll_payouts_run FOREIGN KEY (run_id) REFERENCES payroll_runs(id),
+    CONSTRAINT fk_payroll_payouts_cycle FOREIGN KEY (cycle_id) REFERENCES payroll_cycles(id),
     CONSTRAINT fk_payroll_payouts_employee FOREIGN KEY (employee_id) REFERENCES employees(id)
 );
 
@@ -2273,6 +2489,7 @@ CREATE TABLE wallet_transactions (
     amount              real            NOT NULL,
     type                nvarchar(max)   NOT NULL,
     reference           nvarchar(max),
+    operation_key       nvarchar(255),
     description         nvarchar(max),
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_wallet_transactions PRIMARY KEY (id),
@@ -2304,16 +2521,27 @@ CREATE TABLE loyalty_ledger (
     CONSTRAINT fk_loyalty_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
 
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'loyalty_ledger_operation_key_uq' AND object_id = OBJECT_ID(N'loyalty_ledger'))
+    CREATE UNIQUE INDEX loyalty_ledger_operation_key_uq ON loyalty_ledger(operation_key) WHERE operation_key IS NOT NULL;
+
 CREATE TABLE coupons (
     id                  nvarchar(255)   NOT NULL,
     code                nvarchar(max)   NOT NULL,
+    branch_id           nvarchar(255),
+    campaign_id         nvarchar(255),
     type                nvarchar(max)   NOT NULL,
     value               real            NOT NULL,
+    min_order_value     real            DEFAULT 0,
+    max_discount        real,
     min_order           real            DEFAULT 0,
     max_uses            int             DEFAULT 0,
     current_uses        int             DEFAULT 0,
     valid_from          datetime2,
     valid_to            datetime2,
+    start_date          datetime2,
+    end_date            datetime2,
+    usage_limit         int,
+    used_count          int             DEFAULT 0,
     is_active           bit             DEFAULT 1,
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -2350,13 +2578,18 @@ CREATE TABLE campaigns (
     name                nvarchar(max)   NOT NULL,
     type                nvarchar(max)   NOT NULL,
     branch_id           nvarchar(255),
+    content             nvarchar(max),
     start_date          datetime2,
     end_date            datetime2,
+    scheduled_at        datetime2,
     budget              real            DEFAULT 0,
     status              nvarchar(max)   DEFAULT 'DRAFT',
     target_audience     nvarchar(max)   DEFAULT '{}',
     channels            nvarchar(max)   DEFAULT '[]',
     metrics             nvarchar(max)   DEFAULT '{}',
+    reach               int             DEFAULT 0,
+    conversions         int             DEFAULT 0,
+    revenue             real            DEFAULT 0,
     created_by          nvarchar(255),
     created_at          datetime2       DEFAULT GETDATE(),
     updated_at          datetime2       DEFAULT GETDATE(),
@@ -2380,14 +2613,23 @@ CREATE TABLE campaign_logs (
 CREATE TABLE whatsapp_messages (
     id                  nvarchar(255)   NOT NULL,
     customer_id         nvarchar(255),
+    customer_phone      nvarchar(max),
     order_id            nvarchar(255),
     direction           nvarchar(max)   NOT NULL,
     message_type        nvarchar(max)   NOT NULL,
+    template_id         nvarchar(255),
     content             nvarchar(max),
     media_url           nvarchar(max),
     status              nvarchar(max)   DEFAULT 'PENDING',
     provider_message_id nvarchar(max),
+    external_id         nvarchar(max),
+    failure_reason      nvarchar(max),
+    campaign_id         nvarchar(255),
+    sent_at             datetime2,
     created_at          datetime2       DEFAULT GETDATE(),
+    updated_at          datetime2       DEFAULT GETDATE(),
+    delivered_at        datetime2,
+    read_at             datetime2,
     CONSTRAINT pk_whatsapp_messages PRIMARY KEY (id)
 );
 
@@ -2511,13 +2753,18 @@ CREATE TABLE user_daily_performance (
     user_id             nvarchar(255)   NOT NULL,
     branch_id           nvarchar(255),
     business_date       date            NOT NULL,
+    [date]              nvarchar(255)  NULL,
     orders_processed    int             DEFAULT 0,
+    order_count         int             DEFAULT 0,
     total_sales         real            DEFAULT 0,
+    total_points        int             DEFAULT 0,
     avg_order_time      real            DEFAULT 0,
+    avg_processing_time real            DEFAULT 0,
     void_count          int             DEFAULT 0,
     refund_count        int             DEFAULT 0,
     metrics             nvarchar(max)   DEFAULT '{}',
     created_at          datetime2       DEFAULT GETDATE(),
+    updated_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_user_daily_performance PRIMARY KEY (id),
     CONSTRAINT fk_user_daily_performance_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_user_daily_performance_branch FOREIGN KEY (branch_id) REFERENCES branches(id)
@@ -2551,10 +2798,14 @@ CREATE TABLE refund_records (
 CREATE TABLE domain_events (
     id                  nvarchar(255)   NOT NULL,
     type                nvarchar(max)   NOT NULL,
-    aggregate_type      nvarchar(max)   NOT NULL,
-    aggregate_id        nvarchar(max)   NOT NULL,
+    aggregate_type      nvarchar(max),
+    aggregate_id        nvarchar(max),
+    entity_type         nvarchar(max),
+    entity_id           nvarchar(max),
+    branch_id           nvarchar(255),
     payload             nvarchar(max)   NOT NULL,
     status              nvarchar(max)   DEFAULT 'PENDING',
+    processed_at        datetime2,
     published_at        datetime2,
     created_at          datetime2       DEFAULT GETDATE(),
     CONSTRAINT pk_domain_events PRIMARY KEY (id)
@@ -3018,7 +3269,7 @@ CREATE TABLE supplier_invoice_matches (
 GO
 IF OBJECT_ID('tip_pools', 'U') IS NULL
 CREATE TABLE tip_pools (
-    id nvarchar(255) NOT NULL, branch_id nvarchar(255), shift_id nvarchar(255), pooled_amount decimal(14,2), payment_method nvarchar(50),
+    id nvarchar(255) NOT NULL, branch_id nvarchar(255), shift_id nvarchar(255), payroll_cycle_id nvarchar(255), pooled_amount decimal(14,2), payment_method nvarchar(50),
     distribution_method nvarchar(50), status nvarchar(50), paid_out_at datetime2, allocated_by nvarchar(255), created_by nvarchar(255),
     created_at datetime2 DEFAULT GETDATE(), updated_at datetime2 DEFAULT GETDATE(), CONSTRAINT pk_tip_pools PRIMARY KEY (id)
 );

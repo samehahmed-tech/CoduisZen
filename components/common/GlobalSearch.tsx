@@ -39,8 +39,13 @@ const GlobalSearch: React.FC = () => {
 
     useEffect(() => {
         const handler = (event: KeyboardEvent) => {
-            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+            // `event.key` can be an Arabic character when the OS keyboard
+            // layout is Arabic. `event.code` stays physical-key based, so the
+            // shortcut remains reliable in both layouts.
+            const isKKey = event.code === 'KeyK' || event.key.toLowerCase() === 'k';
+            if ((event.metaKey || event.ctrlKey) && isKKey && !event.altKey) {
                 event.preventDefault();
+                event.stopPropagation();
                 setIsOpen((prev) => !prev);
                 return;
             }

@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/ai-copilot-hotfix/Apply AI Copilot Hotfix.bat",
+      "language": "batch",
+      "sizeLines": 5,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/ai-copilot-hotfix/Apply AI Copilot Hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 69,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/ai-copilot-hotfix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 9,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/ai-copilot-hotfix/Apply AI Copilot Hotfix.bat": [],
+    "scripts/sameh-installer/ai-copilot-hotfix/Apply AI Copilot Hotfix.ps1": [],
+    "scripts/sameh-installer/ai-copilot-hotfix/README AR.txt": []
+  }
+}

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth.js';
 import { enqueueJob, listJobs, retryJob, cancelJob, purgeJobs, bridgeConnect, completeJob, failJob, claimBridgeJob, getBridges } from '../controllers/printGatewayController.js';
 import { requirePrintGatewayToken } from '../middleware/printGatewayAuth.js';
+import { scopeBranchQuery } from '../middleware/branchIsolation';
 
 const router = Router();
 
@@ -16,8 +17,8 @@ router.post('/bridge/jobs/:jobId/complete', requirePrintGatewayToken, completeJo
 router.post('/bridge/jobs/:jobId/fail', requirePrintGatewayToken, failJob);
 
 // Protected job management (for web UI)
-router.get('/bridges', authenticateToken, requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), getBridges);
-router.use('/jobs', authenticateToken);
+router.get('/bridges', authenticateToken, requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), scopeBranchQuery, getBridges);
+router.use('/jobs', authenticateToken, scopeBranchQuery);
 router.post('/jobs', requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'CAFE_ADMIN', 'CALL_CENTER_AGENT'), enqueueJob);
 router.get('/jobs', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER', 'MANAGER'), listJobs);
 router.post('/jobs/:jobId/complete', requireRoles('SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER', 'MANAGER', 'CASHIER', 'CAFE_ADMIN'), completeJob);

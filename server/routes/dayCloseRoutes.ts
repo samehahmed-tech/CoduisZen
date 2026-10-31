@@ -14,9 +14,13 @@ import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
+const dayCloseReadAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'CASHIER_MANAGER', 'CAFE_ADMIN', 'ACCOUNTANT', 'FINANCE_DIRECTOR'],
+    ['OP_CLOSE_DAY'],
+);
 
 // Get day close history for a branch
-router.get('/:branchId/history', enforceBranch, getDayCloseHistory);
+router.get('/:branchId/history', dayCloseReadAuth, enforceBranch, getDayCloseHistory);
 router.put('/:branchId/business-date', enforceBranch, requireRoleOrPermission(
     ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
     ['OP_CLOSE_DAY'],
@@ -24,12 +28,12 @@ router.put('/:branchId/business-date', enforceBranch, requireRoleOrPermission(
 
 // Auto-close result banner data — registered BEFORE '/:branchId/:date'
 // so 'auto-close-status' is never swallowed as a date param.
-router.get('/:branchId/auto-close-status', enforceBranch, getAutoCloseStatus);
+router.get('/:branchId/auto-close-status', dayCloseReadAuth, enforceBranch, getAutoCloseStatus);
 
 // Get day close report preview
-router.get('/:branchId/:date/pdf', enforceBranch, downloadDayClosePdf);
-router.get('/:branchId/:date/xlsx', enforceBranch, downloadDayCloseXlsx);
-router.get('/:branchId/:date', enforceBranch, getDayCloseReport);
+router.get('/:branchId/:date/pdf', dayCloseReadAuth, enforceBranch, downloadDayClosePdf);
+router.get('/:branchId/:date/xlsx', dayCloseReadAuth, enforceBranch, downloadDayCloseXlsx);
+router.get('/:branchId/:date', dayCloseReadAuth, enforceBranch, getDayCloseReport);
 
 // Close the day — managers by role, or anyone explicitly granted OP_CLOSE_DAY
 // from the Roles/Permissions screen (the permission lives on the user and

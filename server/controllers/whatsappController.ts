@@ -6,6 +6,8 @@ import { whatsappService, sendWhatsAppText } from '../services/whatsappService';
 import { whatsappAutomationService } from '../services/whatsappAutomationService';
 import { getIO } from '../socket';
 import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
+import { canAccessBranch } from '../middleware/branchIsolation';
+import { createSignedAuditLog } from '../services/auditService';
 
 const WHATSAPP_LAST_EVENT_KEY = 'whatsapp_last_webhook_event';
 const WHATSAPP_INBOX_KEY = 'whatsapp_inbox_v1';
@@ -13,6 +15,18 @@ const WHATSAPP_ESCALATIONS_KEY = 'whatsapp_escalations_v1';
 const WHATSAPP_AUTOMATION_CONFIG_KEY = 'whatsapp_automation_config_v1';
 const MAX_WHATSAPP_INBOX = 2000;
 const MAX_WHATSAPP_ESCALATIONS = 1000;
+
+const auditWhatsAppMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `WhatsApp mutation: ${eventType}`,
+});
 
 type WhatsAppInboxMessage = {
     id: string;
@@ -31,6 +45,7 @@ type WhatsAppEscalation = {
     from: string;
     text: string;
     reason: 'CUSTOMER_COMPLAINT' | 'NEGATIVE_SENTIMENT';
+    branchId?: string | null;
     status: 'OPEN' | 'RESOLVED';
     createdAt: string;
     resolvedAt?: string | null;
@@ -164,18 +179,20 @@ export const getWhatsAppStatus = async (_req: Request, res: Response) => {
     }
 };
 
-export const restartWhatsAppEngine = async (_req: Request, res: Response) => {
+export const restartWhatsAppEngine = async (req: Request, res: Response) => {
     try {
         await whatsappService.restart();
+        await auditWhatsAppMutation(req, 'WHATSAPP_ENGINE_RESTARTED', { resetSession: false }, { status: 'INITIALIZING' });
         res.json({ ok: true, status: 'INITIALIZING' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };
 
-export const resetWhatsAppSession = async (_req: Request, res: Response) => {
+export const resetWhatsAppSession = async (req: Request, res: Response) => {
     try {
         await whatsappService.restart({ resetSession: true });
+        await auditWhatsAppMutation(req, 'WHATSAPP_SESSION_RESET', { resetSession: true }, { status: 'INITIALIZING' });
         // QR needs 10-30s of puppeteer boot — report INITIALIZING truthfully,
         // the client polls aggressively until AWAITING_SCAN with qr arrives.
         res.json({ ok: true, status: 'INITIALIZING' });
@@ -189,6 +206,7 @@ export const requestPairingCode = async (req: Request, res: Response) => {
         const phone = String(req.body?.phone || '').trim();
         if (!phone) return res.status(400).json({ error: 'PHONE_REQUIRED' });
         const pairingCode = await whatsappService.getPairingCode(phone);
+        await auditWhatsAppMutation(req, 'WHATSAPP_PAIRING_CODE_REQUESTED', { phoneProvided: true }, { issued: Boolean(pairingCode) });
         res.json({ ok: true, pairingCode });
     } catch (error: any) {
         res.status(400).json({ error: error.message || 'WHATSAPP_PAIRING_FAILED' });
@@ -227,6 +245,7 @@ export const saveWhatsAppAutomationConfig = async (req: Request, res: Response) 
             category: 'integration',
             updatedBy: req.user?.id || 'system',
         });
+        await auditWhatsAppMutation(req, 'WHATSAPP_AUTOMATION_CONFIG_UPDATED', { changedKeys: Object.keys(config).sort() }, { updated: true });
         res.json({ ok: true, config });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'WHATSAPP_CONFIG_SAVE_FAILED' });
@@ -251,6 +270,7 @@ export const sendWhatsAppCampaign = async (req: Request, res: Response) => {
         for (const to of targets) {
             whatsappService.enqueueMessage({ to, text, isMarketing: Boolean(isMarketing), sessionRole: 'MARKETING' });
         }
+        await auditWhatsAppMutation(req, 'WHATSAPP_CAMPAIGN_QUEUED', { targetCount: targets.length, textLength: String(text).length, isMarketing: Boolean(isMarketing) }, { queued: targets.length });
         res.json({ ok: true, queued: targets.length });
     } catch(err: any) {
         res.status(500).json({ error: err.message });
@@ -272,6 +292,7 @@ export const sendWhatsAppTest = async (req: Request, res: Response) => {
             return res.status(409).json({ error: 'WHATSAPP_NOT_READY', message: 'Link your phone first — scan the QR, then retry.', status: (status as any)?.status });
         }
         const result = await sendWhatsAppText({ to, text });
+        await auditWhatsAppMutation(req, 'WHATSAPP_TEST_MESSAGE_SENT', { recipientProvided: true, textLength: text.length }, { sent: true });
         res.status(201).json({ ok: true, result });
     } catch (error: any) {
         res.status(400).json({ error: error.message || 'WHATSAPP_SEND_FAILED' });
@@ -320,6 +341,7 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response) => {
                         from: item.from,
                         text: item.text,
                         reason: toEscalationReason(item.text),
+                        branchId: item.branchId || null,
                         status: 'OPEN',
                         createdAt: new Date().toISOString(),
                     });
@@ -344,7 +366,7 @@ export const getWhatsAppInbox = async (req: Request, res: Response) => {
     try {
         const limit = Math.max(1, Math.min(Number(req.query.limit || 100), 500));
         const from = normalizePhone(String(req.query.from || ''));
-        const branchId = String(req.query.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.query.branchId || '').trim();
         const inbox = await loadInbox();
         const filtered = inbox.filter((m) => {
             if (from && m.from !== from) return false;
@@ -361,7 +383,7 @@ export const getWhatsAppEscalations = async (req: Request, res: Response) => {
     try {
         const status = String(req.query.status || '').toUpperCase();
         const items = await loadEscalations();
-        const filtered = items.filter((e) => !status || e.status === status);
+        const filtered = items.filter((e) => (!status || e.status === status) && (!req.effectiveBranchId || String((e as any).branchId || '') === String(req.effectiveBranchId)));
         res.json({ ok: true, total: filtered.length, escalations: filtered });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'WHATSAPP_ESCALATIONS_FAILED' });
@@ -377,6 +399,7 @@ export const resolveWhatsAppEscalation = async (req: Request, res: Response) => 
         const items = await loadEscalations();
         const idx = items.findIndex((i) => i.id === id);
         if (idx < 0) return res.status(404).json({ error: 'ESCALATION_NOT_FOUND' });
+        if (req.effectiveBranchId && !canAccessBranch(req.user, (items[idx] as any).branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         if (items[idx].status === 'RESOLVED') return res.json({ ok: true, escalation: items[idx] });
         items[idx] = {
             ...items[idx],
@@ -386,6 +409,7 @@ export const resolveWhatsAppEscalation = async (req: Request, res: Response) => 
             resolutionNotes: notes || null,
         };
         await saveEscalations(items, userId);
+        await auditWhatsAppMutation(req, 'WHATSAPP_ESCALATION_RESOLVED', { escalationId: id, notesLength: notes.length }, { status: 'RESOLVED' });
         res.json({ ok: true, escalation: items[idx] });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'WHATSAPP_ESCALATION_RESOLVE_FAILED' });

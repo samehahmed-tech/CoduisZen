@@ -1,0 +1,3996 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 17,
+  "filesSkipped": [
+    "scripts/sameh-installer/perf-hotfix/Apply-Perf-Hotfix.ps1",
+    "scripts/sameh-installer/prerequisites/msodbcsql.msi",
+    "scripts/sameh-installer/prerequisites/vc_redist.x64.exe",
+    "scripts/sameh-installer/print-bridge-hotfix/Apply Print Bridge Hotfix.bat",
+    "scripts/sameh-installer/print-bridge-hotfix/Apply Print Bridge Hotfix.ps1",
+    "scripts/sameh-installer/print-routing-hotfix/Apply Print Routing Hotfix.bat",
+    "scripts/sameh-installer/print-routing-hotfix/Apply Print Routing Hotfix.ps1",
+    "scripts/sameh-installer/sameh-installer.iss"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 17,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 15,
+      "failed": 0,
+      "skipped": 2
+    }
+  },
+  "results": [
+    {
+      "path": "scripts/sameh-installer/operational-reset/reset-test-operations.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 193,
+      "nonEmptyLines": 174,
+      "functions": [
+        {
+          "name": "readEnv",
+          "startLine": 11,
+          "endLine": 14,
+          "params": []
+        },
+        {
+          "name": "quote",
+          "startLine": 45,
+          "endLine": 45,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 47,
+          "endLine": 188,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readEnv",
+          "callee": "Object.fromEntries",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split(/\\r?\\n/)\r\n  .filter(line => line && !line.startsWith('#') && line.includes('='))\r\n  .map",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split(/\\r?\\n/)\r\n  .filter",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.startsWith",
+          "lineNumber": 13
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.includes",
+          "lineNumber": 13
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 14
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 14
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 14
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 14
+        },
+        {
+          "caller": "quote",
+          "callee": "String(name).replace",
+          "lineNumber": 45
+        },
+        {
+          "caller": "quote",
+          "callee": "String",
+          "lineNumber": 45
+        },
+        {
+          "caller": "main",
+          "callee": "process.argv.includes",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "readEnv",
+          "lineNumber": 49
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 49
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString, requestTimeout: 600000 }).connect",
+          "lineNumber": 53
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 55
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 55
+        },
+        {
+          "caller": "main",
+          "callee": "tableResult.recordset.map",
+          "lineNumber": 56
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 56
+        },
+        {
+          "caller": "main",
+          "callee": "tablesToClear.filter",
+          "lineNumber": 57
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 57
+        },
+        {
+          "caller": "main",
+          "callee": "tablesToClear.filter",
+          "lineNumber": 58
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 58
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 61
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 61
+        },
+        {
+          "caller": "main",
+          "callee": "targets.map",
+          "lineNumber": 66
+        },
+        {
+          "caller": "main",
+          "callee": "targets.map",
+          "lineNumber": 67
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 69
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "targetSet.has",
+          "lineNumber": 71
+        },
+        {
+          "caller": "main",
+          "callee": "targetSet.has",
+          "lineNumber": 71
+        },
+        {
+          "caller": "main",
+          "callee": "edges.get(child).has",
+          "lineNumber": 71
+        },
+        {
+          "caller": "main",
+          "callee": "edges.get",
+          "lineNumber": 71
+        },
+        {
+          "caller": "main",
+          "callee": "edges.get(child).add",
+          "lineNumber": 72
+        },
+        {
+          "caller": "main",
+          "callee": "edges.get",
+          "lineNumber": 72
+        },
+        {
+          "caller": "main",
+          "callee": "incoming.set",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "incoming.get",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "targets.filter",
+          "lineNumber": 75
+        },
+        {
+          "caller": "main",
+          "callee": "incoming.get",
+          "lineNumber": 75
+        },
+        {
+          "caller": "main",
+          "callee": "queue.shift",
+          "lineNumber": 78
+        },
+        {
+          "caller": "main",
+          "callee": "deleteOrder.push",
+          "lineNumber": 79
+        },
+        {
+          "caller": "main",
+          "callee": "edges.get",
+          "lineNumber": 80
+        },
+        {
+          "caller": "main",
+          "callee": "incoming.get",
+          "lineNumber": 81
+        },
+        {
+          "caller": "main",
+          "callee": "incoming.set",
+          "lineNumber": 82
+        },
+        {
+          "caller": "main",
+          "callee": "queue.push",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "targets.filter(table => !deleteOrder.includes(table)).join",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "targets.filter",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "deleteOrder.includes",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "protectedMasterTables.filter",
+          "lineNumber": 90
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 90
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 94
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.begin",
+          "lineNumber": 98
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 101
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "columns.recordset.map",
+          "lineNumber": 105
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 105
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 107
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 107
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 109
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 109
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 110
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.join",
+          "lineNumber": 110
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 114
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 114
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 115
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "identityResult.recordset.map",
+          "lineNumber": 124
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 124
+        },
+        {
+          "caller": "main",
+          "callee": "deleteOrder.filter",
+          "lineNumber": 125
+        },
+        {
+          "caller": "main",
+          "callee": "identityTables.has",
+          "lineNumber": 125
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 126
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 126
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 129
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "stockColumns.recordset.map",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 136
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 136
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 137
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.join",
+          "lineNumber": 137
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 141
+        },
+        {
+          "caller": "main",
+          "callee": "branchColumns.recordset.map",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 147
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 147
+        },
+        {
+          "caller": "main",
+          "callee": "available.has",
+          "lineNumber": 148
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.push",
+          "lineNumber": 148
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 149
+        },
+        {
+          "caller": "main",
+          "callee": "assignments.join",
+          "lineNumber": 149
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 152
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 153
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.Request(transaction).query",
+          "lineNumber": 162
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 162
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 163
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.commit",
+          "lineNumber": 166
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback().catch",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "existing.has",
+          "lineNumber": 172
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "Object.values(deleted).reduce",
+          "lineNumber": 180
+        },
+        {
+          "caller": "main",
+          "callee": "Object.values",
+          "lineNumber": 180
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 186
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/sameh-installer/table-pos-fix/reset-tables.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 64,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "readArg",
+          "startLine": 8,
+          "endLine": 8,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 9,
+          "endLine": 12,
+          "params": []
+        },
+        {
+          "name": "buildAssignments",
+          "startLine": 13,
+          "endLine": 19,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 33,
+          "endLine": 59,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice",
+          "lineNumber": 8
+        },
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find",
+          "lineNumber": 8
+        },
+        {
+          "caller": "readArg",
+          "callee": "arg.startsWith",
+          "lineNumber": 8
+        },
+        {
+          "caller": "readEnv",
+          "callee": "Object.fromEntries",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split(/\\r?\\n/)\r\n  .filter(line => line && !line.trimStart().startsWith('#') && line.includes('='))\r\n  .map",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split(/\\r?\\n/)\r\n  .filter",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.trimStart().startsWith",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.trimStart",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.includes",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice(0, line.indexOf('=')).trim",
+          "lineNumber": 12
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 12
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 12
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice(line.indexOf('=') + 1).trim",
+          "lineNumber": 12
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 12
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 12
+        },
+        {
+          "caller": "buildAssignments",
+          "callee": "columns.has",
+          "lineNumber": 15
+        },
+        {
+          "caller": "buildAssignments",
+          "callee": "assignments.push",
+          "lineNumber": 15
+        },
+        {
+          "caller": "buildAssignments",
+          "callee": "columns.has",
+          "lineNumber": 16
+        },
+        {
+          "caller": "buildAssignments",
+          "callee": "assignments.push",
+          "lineNumber": 16
+        },
+        {
+          "caller": "buildAssignments",
+          "callee": "columns.has",
+          "lineNumber": 17
+        },
+        {
+          "caller": "buildAssignments",
+          "callee": "assignments.push",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "readEnv",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: env.DATABASE_URL, requestTimeout: 600000 }).connect",
+          "lineNumber": 36
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 40
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 40
+        },
+        {
+          "caller": "main",
+          "callee": "columnResult.recordset.map",
+          "lineNumber": 41
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 41
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.begin",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "request.query",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "buildAssignments(columns).join",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "buildAssignments",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "request.query",
+          "lineNumber": 47
+        },
+        {
+          "caller": "main",
+          "callee": "columns.has",
+          "lineNumber": 47
+        },
+        {
+          "caller": "main",
+          "callee": "columns.has",
+          "lineNumber": 47
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.commit",
+          "lineNumber": 50
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 51
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 51
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 51
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback",
+          "lineNumber": 53
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 57
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/test-format.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 25,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 8,
+          "endLine": 28,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 10
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request().query",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 21
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 22
+        },
+        {
+          "caller": "test",
+          "callee": "JSON.stringify",
+          "lineNumber": 22
+        },
+        {
+          "caller": "test",
+          "callee": "result.recordset.slice",
+          "lineNumber": 22
+        },
+        {
+          "caller": "test",
+          "callee": "console.error",
+          "lineNumber": 24
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 27
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/test-orders-query.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 25,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 7,
+          "endLine": 28,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 9
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request().query",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 14
+        },
+        {
+          "caller": "test",
+          "callee": "Object.keys",
+          "lineNumber": 14
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 15
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request().query",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 19
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 21
+        },
+        {
+          "caller": "test",
+          "callee": "JSON.stringify",
+          "lineNumber": 21
+        },
+        {
+          "caller": "test",
+          "callee": "console.error",
+          "lineNumber": 24
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 27
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/test-orders-sql.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 41,
+      "nonEmptyLines": 34,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 6,
+          "endLine": 36,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 9
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request()\r\n            .query",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 15
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request()\r\n            .query",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 20
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request()\r\n            .query",
+          "lineNumber": 23
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 23
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 25
+        },
+        {
+          "caller": "test",
+          "callee": "Object.keys(r3.recordset.columns || {}).join",
+          "lineNumber": 26
+        },
+        {
+          "caller": "test",
+          "callee": "Object.keys",
+          "lineNumber": 26
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 27
+        },
+        {
+          "caller": "test",
+          "callee": "colNames.substring",
+          "lineNumber": 27
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 29
+        },
+        {
+          "caller": "test",
+          "callee": "console.error",
+          "lineNumber": 31
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 34
+        },
+        {
+          "caller": "test",
+          "callee": "process.exit",
+          "lineNumber": 35
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/test-sql-patterns.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 46,
+      "nonEmptyLines": 37,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 6,
+          "endLine": 41,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 8
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request()\r\n            .query",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 20
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request()\r\n            .query",
+          "lineNumber": 23
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 23
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 25
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request()\r\n            .query",
+          "lineNumber": 28
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 28
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 30
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 32
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 33
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 34
+        },
+        {
+          "caller": "test",
+          "callee": "console.error",
+          "lineNumber": 36
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 39
+        },
+        {
+          "caller": "test",
+          "callee": "process.exit",
+          "lineNumber": 40
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/verify-inventory-xlsx.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 10,
+      "nonEmptyLines": 10,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/kdsRouting.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 33,
+      "functions": [
+        {
+          "name": "normalizeKdsStationName",
+          "startLine": 12,
+          "endLine": 19,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "isKitchenRoutingPrinter",
+          "startLine": 21,
+          "endLine": 25,
+          "params": [
+            "printer"
+          ]
+        },
+        {
+          "name": "resolvePrinterRoutingStation",
+          "startLine": 27,
+          "endLine": 37,
+          "params": [
+            "printer"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "normalizeKdsStationName",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "isKitchenRoutingPrinter",
+          "line": 21,
+          "isDefault": false
+        },
+        {
+          "name": "resolvePrinterRoutingStation",
+          "line": 27,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizeKdsStationName",
+          "callee": "String(value || '')\r\n        .trim()\r\n        .toUpperCase()\r\n        .replace(/[^A-Z0-9]+/g, '_')\r\n        .replace",
+          "lineNumber": 13
+        },
+        {
+          "caller": "normalizeKdsStationName",
+          "callee": "String(value || '')\r\n        .trim()\r\n        .toUpperCase()\r\n        .replace",
+          "lineNumber": 13
+        },
+        {
+          "caller": "normalizeKdsStationName",
+          "callee": "String(value || '')\r\n        .trim()\r\n        .toUpperCase",
+          "lineNumber": 13
+        },
+        {
+          "caller": "normalizeKdsStationName",
+          "callee": "String(value || '')\r\n        .trim",
+          "lineNumber": 13
+        },
+        {
+          "caller": "normalizeKdsStationName",
+          "callee": "String",
+          "lineNumber": 13
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "Boolean",
+          "lineNumber": 21
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "(printer.roles || []).some",
+          "lineNumber": 23
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "nonKitchenRoles.has",
+          "lineNumber": 23
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "String(role).toUpperCase",
+          "lineNumber": 23
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "String",
+          "lineNumber": 23
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "nonKitchenRoles.has",
+          "lineNumber": 24
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "String(printer.role).toUpperCase",
+          "lineNumber": 24
+        },
+        {
+          "caller": "isKitchenRoutingPrinter",
+          "callee": "String",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "(printer.roles || []).find",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "nonKitchenRoles.has",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "String(value).toUpperCase",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "String",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "nonKitchenRoles.has",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "String(printer.role).toUpperCase",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "String",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resolvePrinterRoutingStation",
+          "callee": "normalizeKdsStationName",
+          "lineNumber": 30
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/shiftReconciliation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 27,
+      "functions": [
+        {
+          "name": "shiftValidationError",
+          "startLine": 1,
+          "endLine": 6,
+          "params": [
+            "code"
+          ]
+        },
+        {
+          "name": "parseNonNegativeShiftAmount",
+          "startLine": 8,
+          "endLine": 17,
+          "params": [
+            "value",
+            "requiredCode"
+          ]
+        },
+        {
+          "name": "requireShiftVarianceReason",
+          "startLine": 19,
+          "endLine": 29,
+          "params": [
+            "actualBalance",
+            "expectedBalance",
+            "notes"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "parseNonNegativeShiftAmount",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "requireShiftVarianceReason",
+          "line": 19,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "parseNonNegativeShiftAmount",
+          "callee": "shiftValidationError",
+          "lineNumber": 10
+        },
+        {
+          "caller": "parseNonNegativeShiftAmount",
+          "callee": "Number",
+          "lineNumber": 12
+        },
+        {
+          "caller": "parseNonNegativeShiftAmount",
+          "callee": "Number.isFinite",
+          "lineNumber": 13
+        },
+        {
+          "caller": "parseNonNegativeShiftAmount",
+          "callee": "shiftValidationError",
+          "lineNumber": 14
+        },
+        {
+          "caller": "requireShiftVarianceReason",
+          "callee": "Math.abs",
+          "lineNumber": 25
+        },
+        {
+          "caller": "requireShiftVarianceReason",
+          "callee": "String(notes || '').trim",
+          "lineNumber": 25
+        },
+        {
+          "caller": "requireShiftVarianceReason",
+          "callee": "String",
+          "lineNumber": 25
+        },
+        {
+          "caller": "requireShiftVarianceReason",
+          "callee": "shiftValidationError",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/utils/aggregateCache.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 34,
+      "functions": [
+        {
+          "name": "peekAggregate",
+          "startLine": 18,
+          "endLine": 26,
+          "params": [
+            "key",
+            "ttlMs"
+          ]
+        },
+        {
+          "name": "rememberAggregate",
+          "startLine": 28,
+          "endLine": 37,
+          "params": [
+            "key",
+            "value"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "peekAggregate",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "rememberAggregate",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "DASHBOARD_KPI_TTL_MS",
+          "line": 39,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "peekAggregate",
+          "callee": "store.get",
+          "lineNumber": 19
+        },
+        {
+          "caller": "peekAggregate",
+          "callee": "Date.now",
+          "lineNumber": 21
+        },
+        {
+          "caller": "peekAggregate",
+          "callee": "store.delete",
+          "lineNumber": 22
+        },
+        {
+          "caller": "rememberAggregate",
+          "callee": "store.keys().next",
+          "lineNumber": 31
+        },
+        {
+          "caller": "rememberAggregate",
+          "callee": "store.keys",
+          "lineNumber": 31
+        },
+        {
+          "caller": "rememberAggregate",
+          "callee": "store.delete",
+          "lineNumber": 32
+        },
+        {
+          "caller": "rememberAggregate",
+          "callee": "store.delete",
+          "lineNumber": 35
+        },
+        {
+          "caller": "rememberAggregate",
+          "callee": "store.set",
+          "lineNumber": 36
+        },
+        {
+          "caller": "rememberAggregate",
+          "callee": "Date.now",
+          "lineNumber": 36
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/fiscalService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 12,
+      "exports": [
+        {
+          "name": "fiscalService",
+          "line": 5,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/rumService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 89,
+      "functions": [
+        {
+          "name": "send",
+          "startLine": 23,
+          "endLine": 47,
+          "params": [
+            "route"
+          ]
+        },
+        {
+          "name": "initClientRum",
+          "startLine": 49,
+          "endLine": 97,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "initClientRum",
+          "line": 49,
+          "isDefault": false
+        },
+        {
+          "name": "__rumInternals",
+          "line": 99,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "send",
+          "callee": "Math.round",
+          "lineNumber": 27
+        },
+        {
+          "caller": "send",
+          "callee": "Math.round",
+          "lineNumber": 28
+        },
+        {
+          "caller": "send",
+          "callee": "Math.round",
+          "lineNumber": 29
+        },
+        {
+          "caller": "send",
+          "callee": "route.slice",
+          "lineNumber": 30
+        },
+        {
+          "caller": "send",
+          "callee": "JSON.stringify",
+          "lineNumber": 32
+        },
+        {
+          "caller": "send",
+          "callee": "navigator.sendBeacon",
+          "lineNumber": 35
+        },
+        {
+          "caller": "send",
+          "callee": "fetch(RUM_ENDPOINT, {\n                method: 'POST',\n                headers: { 'Content-Type': 'application/json' },\n                body: payload,\n                keepalive: true,\n            }).catch",
+          "lineNumber": 37
+        },
+        {
+          "caller": "send",
+          "callee": "fetch",
+          "lineNumber": 37
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "Math.random",
+          "lineNumber": 53
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "list.getEntries",
+          "lineNumber": 57
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "lcpObs.observe",
+          "lineNumber": 61
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "list.getEntries",
+          "lineNumber": 64
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "clsObs.observe",
+          "lineNumber": 68
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "list.getEntries",
+          "lineNumber": 72
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "evtObs.observe",
+          "lineNumber": 80
+        },
+        {
+          "caller": "flush",
+          "callee": "send",
+          "lineNumber": 85
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "window.addEventListener",
+          "lineNumber": 86
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "window.setInterval",
+          "lineNumber": 88
+        },
+        {
+          "caller": "initClientRum",
+          "callee": "flush",
+          "lineNumber": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/hr/components/HRUserGuide.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 171,
+      "nonEmptyLines": 163,
+      "functions": [
+        {
+          "name": "HRUserGuide",
+          "startLine": 79,
+          "endLine": 171,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "HRUserGuide",
+          "line": 79,
+          "isDefault": true
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "HRUserGuide",
+          "callee": "guideSections.map",
+          "lineNumber": 104
+        },
+        {
+          "caller": "HRUserGuide",
+          "callee": "section.points.map",
+          "lineNumber": 113
+        },
+        {
+          "caller": "HRUserGuide",
+          "callee": "monthlyChecklist.map",
+          "lineNumber": 127
+        },
+        {
+          "caller": "HRUserGuide",
+          "callee": "quickQuestions.map",
+          "lineNumber": 140
+        },
+        {
+          "caller": "HRUserGuide",
+          "callee": "[\r\n                                'حدد تاريخ بداية ونهاية الدورة.',\r\n                                'اضغط دورة جديدة ثم اختارها من الجدول.',\r\n                                'اضغط مزامنة الحضور ثم احتساب.',\r\n                                'راجع مركز مراجعة الرواتب.',\r\n                                'صدر شيت الرواتب الشامل.',\r\n                                'اضغط إغلاق واعتماد بعد انتهاء المراجعة.',\r\n                            ].map",
+          "lineNumber": 152
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/kds/components/TicketCard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 109,
+      "nonEmptyLines": 95,
+      "functions": [
+        {
+          "name": "TicketCard",
+          "startLine": 14,
+          "endLine": 107,
+          "params": [
+            "{ \r\n    orderId, \r\n    items, \r\n    createdAt, \r\n    standardPrepTimeMinutes = 15,\r\n    status,\r\n    onComplete \r\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "TicketCard",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "useEffect",
+          "lineNumber": 24
+        },
+        {
+          "caller": "tick",
+          "callee": "Math.floor",
+          "lineNumber": 29
+        },
+        {
+          "caller": "tick",
+          "callee": "now.getTime",
+          "lineNumber": 29
+        },
+        {
+          "caller": "tick",
+          "callee": "createdAt.getTime",
+          "lineNumber": 29
+        },
+        {
+          "caller": "tick",
+          "callee": "setElapsedSeconds",
+          "lineNumber": 30
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "tick",
+          "lineNumber": 33
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "setInterval",
+          "lineNumber": 34
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "clearInterval",
+          "lineNumber": 35
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "Math.floor",
+          "lineNumber": 65
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "Math.floor",
+          "lineNumber": 66
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "s.toString().padStart",
+          "lineNumber": 67
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "s.toString",
+          "lineNumber": 67
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "orderId.slice",
+          "lineNumber": 77
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "items.map",
+          "lineNumber": 86
+        },
+        {
+          "caller": "TicketCard",
+          "callee": "onComplete",
+          "lineNumber": 98
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/locales/ar/translation.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 190,
+      "nonEmptyLines": 190,
+      "sections": [
+        {
+          "heading": "dashboard",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "pos",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "menu",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "kds",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "inventory",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "finance",
+          "level": 1,
+          "line": 7
+        },
+        {
+          "heading": "crm",
+          "level": 1,
+          "line": 8
+        },
+        {
+          "heading": "reports",
+          "level": 1,
+          "line": 9
+        },
+        {
+          "heading": "ai",
+          "level": 1,
+          "line": 10
+        },
+        {
+          "heading": "settings",
+          "level": 1,
+          "line": 11
+        },
+        {
+          "heading": "sign_out",
+          "level": 1,
+          "line": 12
+        },
+        {
+          "heading": "light_mode",
+          "level": 1,
+          "line": 13
+        },
+        {
+          "heading": "dark_mode",
+          "level": 1,
+          "line": 14
+        },
+        {
+          "heading": "lang",
+          "level": 1,
+          "line": 15
+        },
+        {
+          "heading": "total_rev",
+          "level": 1,
+          "line": 16
+        },
+        {
+          "heading": "orders",
+          "level": 1,
+          "line": 17
+        },
+        {
+          "heading": "tables",
+          "level": 1,
+          "line": 18
+        },
+        {
+          "heading": "growth",
+          "level": 1,
+          "line": 19
+        },
+        {
+          "heading": "confirm",
+          "level": 1,
+          "line": 20
+        },
+        {
+          "heading": "void",
+          "level": 1,
+          "line": 21
+        },
+        {
+          "heading": "place_order",
+          "level": 1,
+          "line": 22
+        },
+        {
+          "heading": "subtotal",
+          "level": 1,
+          "line": 23
+        },
+        {
+          "heading": "tax",
+          "level": 1,
+          "line": 24
+        },
+        {
+          "heading": "total",
+          "level": 1,
+          "line": 25
+        },
+        {
+          "heading": "checkout",
+          "level": 1,
+          "line": 26
+        },
+        {
+          "heading": "payment_method",
+          "level": 1,
+          "line": 27
+        },
+        {
+          "heading": "split_bill",
+          "level": 1,
+          "line": 28
+        },
+        {
+          "heading": "remaining",
+          "level": 1,
+          "line": 29
+        },
+        {
+          "heading": "void_confirm",
+          "level": 1,
+          "line": 30
+        },
+        {
+          "heading": "ai_insights",
+          "level": 1,
+          "line": 31
+        },
+        {
+          "heading": "ai_assistant",
+          "level": 1,
+          "line": 32
+        },
+        {
+          "heading": "security",
+          "level": 1,
+          "line": 33
+        },
+        {
+          "heading": "call_center",
+          "level": 1,
+          "line": 34
+        },
+        {
+          "heading": "forensics",
+          "level": 1,
+          "line": 35
+        },
+        {
+          "heading": "recipes",
+          "level": 1,
+          "line": 36
+        },
+        {
+          "heading": "printers",
+          "level": 1,
+          "line": 37
+        },
+        {
+          "heading": "production",
+          "level": 1,
+          "line": 38
+        },
+        {
+          "heading": "production_order",
+          "level": 1,
+          "line": 39
+        },
+        {
+          "heading": "batch_no",
+          "level": 1,
+          "line": 40
+        },
+        {
+          "heading": "raw_materials",
+          "level": 1,
+          "line": 41
+        },
+        {
+          "heading": "finished_goods",
+          "level": 1,
+          "line": 42
+        },
+        {
+          "heading": "welcome_back",
+          "level": 1,
+          "line": 43
+        },
+        {
+          "heading": "switch_branch",
+          "level": 1,
+          "line": 44
+        },
+        {
+          "heading": "global_view",
+          "level": 1,
+          "line": 45
+        },
+        {
+          "heading": "operating_at",
+          "level": 1,
+          "line": 46
+        },
+        {
+          "heading": "role",
+          "level": 1,
+          "line": 47
+        },
+        {
+          "heading": "branch",
+          "level": 1,
+          "line": 48
+        },
+        {
+          "heading": "all_branches",
+          "level": 1,
+          "line": 49
+        },
+        {
+          "heading": "add_notes",
+          "level": 1,
+          "line": 50
+        },
+        {
+          "heading": "select_table",
+          "level": 1,
+          "line": 51
+        },
+        {
+          "heading": "no_tables",
+          "level": 1,
+          "line": 52
+        },
+        {
+          "heading": "customer_info",
+          "level": 1,
+          "line": 53
+        },
+        {
+          "heading": "apply_discount",
+          "level": 1,
+          "line": 54
+        },
+        {
+          "heading": "search_placeholder",
+          "level": 1,
+          "line": 55
+        },
+        {
+          "heading": "all_items",
+          "level": 1,
+          "line": 56
+        },
+        {
+          "heading": "hold_order",
+          "level": 1,
+          "line": 57
+        },
+        {
+          "heading": "discount",
+          "level": 1,
+          "line": 58
+        },
+        {
+          "heading": "dine_in",
+          "level": 1,
+          "line": 59
+        },
+        {
+          "heading": "takeaway",
+          "level": 1,
+          "line": 60
+        },
+        {
+          "heading": "pickup",
+          "level": 1,
+          "line": 61
+        },
+        {
+          "heading": "delivery",
+          "level": 1,
+          "line": 62
+        },
+        {
+          "heading": "cash",
+          "level": 1,
+          "line": 63
+        },
+        {
+          "heading": "visa",
+          "level": 1,
+          "line": 64
+        },
+        {
+          "heading": "v_cash",
+          "level": 1,
+          "line": 65
+        },
+        {
+          "heading": "insta",
+          "level": 1,
+          "line": 66
+        },
+        {
+          "heading": "split",
+          "level": 1,
+          "line": 67
+        },
+        {
+          "heading": "item_notes",
+          "level": 1,
+          "line": 68
+        },
+        {
+          "heading": "save_note",
+          "level": 1,
+          "line": 69
+        },
+        {
+          "heading": "cancel",
+          "level": 1,
+          "line": 70
+        },
+        {
+          "heading": "select_customer",
+          "level": 1,
+          "line": 71
+        },
+        {
+          "heading": "table",
+          "level": 1,
+          "line": 72
+        },
+        {
+          "heading": "floor_map",
+          "level": 1,
+          "line": 73
+        },
+        {
+          "heading": "all_zones",
+          "level": 1,
+          "line": 74
+        },
+        {
+          "heading": "free",
+          "level": 1,
+          "line": 75
+        },
+        {
+          "heading": "busy",
+          "level": 1,
+          "line": 76
+        },
+        {
+          "heading": "waiting_food",
+          "level": 1,
+          "line": 77
+        },
+        {
+          "heading": "ready_to_pay",
+          "level": 1,
+          "line": 78
+        },
+        {
+          "heading": "reserved",
+          "level": 1,
+          "line": 79
+        },
+        {
+          "heading": "dirty",
+          "level": 1,
+          "line": 80
+        },
+        {
+          "heading": "open_table",
+          "level": 1,
+          "line": 81
+        },
+        {
+          "heading": "resume",
+          "level": 1,
+          "line": 82
+        },
+        {
+          "heading": "temp_short",
+          "level": 1,
+          "line": 83
+        },
+        {
+          "heading": "close_table",
+          "level": 1,
+          "line": 84
+        },
+        {
+          "heading": "merge_tables",
+          "level": 1,
+          "line": 85
+        },
+        {
+          "heading": "currency",
+          "level": 1,
+          "line": 86
+        },
+        {
+          "heading": "bill",
+          "level": 1,
+          "line": 87
+        },
+        {
+          "heading": "empty_cart",
+          "level": 1,
+          "line": 88
+        },
+        {
+          "heading": "quick_order",
+          "level": 1,
+          "line": 89
+        },
+        {
+          "heading": "quick_switch",
+          "level": 1,
+          "line": 90
+        },
+        {
+          "heading": "prev_table",
+          "level": 1,
+          "line": 91
+        },
+        {
+          "heading": "next_table",
+          "level": 1,
+          "line": 92
+        },
+        {
+          "heading": "back_to_tables",
+          "level": 1,
+          "line": 93
+        },
+        {
+          "heading": "mark_table_clean",
+          "level": 1,
+          "line": 94
+        },
+        {
+          "heading": "shift_open_failed",
+          "level": 1,
+          "line": 95
+        },
+        {
+          "heading": "shift_close_failed",
+          "level": 1,
+          "line": 96
+        },
+        {
+          "heading": "approval_required",
+          "level": 1,
+          "line": 97
+        },
+        {
+          "heading": "shift_locked",
+          "level": 1,
+          "line": 98
+        },
+        {
+          "heading": "open_shift_message",
+          "level": 1,
+          "line": 99
+        },
+        {
+          "heading": "starting_balance",
+          "level": 1,
+          "line": 100
+        },
+        {
+          "heading": "open_shift",
+          "level": 1,
+          "line": 101
+        },
+        {
+          "heading": "close_shift",
+          "level": 1,
+          "line": 102
+        },
+        {
+          "heading": "opening",
+          "level": 1,
+          "line": 103
+        },
+        {
+          "heading": "started",
+          "level": 1,
+          "line": 104
+        },
+        {
+          "heading": "counted_cash",
+          "level": 1,
+          "line": 105
+        },
+        {
+          "heading": "confirm_close",
+          "level": 1,
+          "line": 106
+        },
+        {
+          "heading": "order",
+          "level": 1,
+          "line": 107
+        },
+        {
+          "heading": "order_type",
+          "level": 1,
+          "line": 108
+        },
+        {
+          "heading": "order_receipt",
+          "level": 1,
+          "line": 109
+        },
+        {
+          "heading": "final_bill",
+          "level": 1,
+          "line": 110
+        },
+        {
+          "heading": "table_closed",
+          "level": 1,
+          "line": 111
+        },
+        {
+          "heading": "kitchen_ticket",
+          "level": 1,
+          "line": 112
+        },
+        {
+          "heading": "temp_bill",
+          "level": 1,
+          "line": 113
+        },
+        {
+          "heading": "temp_bill_printed",
+          "level": 1,
+          "line": 114
+        },
+        {
+          "heading": "tables_merged",
+          "level": 1,
+          "line": 115
+        },
+        {
+          "heading": "last_update",
+          "level": 1,
+          "line": 116
+        },
+        {
+          "heading": "min_short",
+          "level": 1,
+          "line": 117
+        },
+        {
+          "heading": "split_total_error",
+          "level": 1,
+          "line": 118
+        },
+        {
+          "heading": "send_kitchen",
+          "level": 1,
+          "line": 119
+        },
+        {
+          "heading": "status_pending",
+          "level": 1,
+          "line": 120
+        },
+        {
+          "heading": "status_preparing",
+          "level": 1,
+          "line": 121
+        },
+        {
+          "heading": "status_ready",
+          "level": 1,
+          "line": 122
+        },
+        {
+          "heading": "stock_levels",
+          "level": 1,
+          "line": 123
+        },
+        {
+          "heading": "low_stock",
+          "level": 1,
+          "line": 124
+        },
+        {
+          "heading": "warehouse",
+          "level": 1,
+          "line": 125
+        },
+        {
+          "heading": "move_stock",
+          "level": 1,
+          "line": 126
+        },
+        {
+          "heading": "coa",
+          "level": 1,
+          "line": 127
+        },
+        {
+          "heading": "journal",
+          "level": 1,
+          "line": 128
+        },
+        {
+          "heading": "profit_loss",
+          "level": 1,
+          "line": 129
+        },
+        {
+          "heading": "balance_sheet",
+          "level": 1,
+          "line": 130
+        },
+        {
+          "heading": "people",
+          "level": 1,
+          "line": 131
+        },
+        {
+          "heading": "dispatch",
+          "level": 1,
+          "line": 132
+        },
+        {
+          "heading": "marketing",
+          "level": 1,
+          "line": 133
+        },
+        {
+          "heading": "fiscal",
+          "level": 1,
+          "line": 134
+        },
+        {
+          "heading": "analytics",
+          "level": 1,
+          "line": 135
+        },
+        {
+          "heading": "kiosk_welcome",
+          "level": 1,
+          "line": 136
+        },
+        {
+          "heading": "kiosk_select_category",
+          "level": 1,
+          "line": 137
+        },
+        {
+          "heading": "kiosk_order_summary",
+          "level": 1,
+          "line": 138
+        },
+        {
+          "heading": "kiosk_checkout_success",
+          "level": 1,
+          "line": 139
+        },
+        {
+          "heading": "kiosk_order_number",
+          "level": 1,
+          "line": 140
+        },
+        {
+          "heading": "kiosk_back",
+          "level": 1,
+          "line": 141
+        },
+        {
+          "heading": "kiosk_finish",
+          "level": 1,
+          "line": 142
+        },
+        {
+          "heading": "add_platform_title",
+          "level": 1,
+          "line": 143
+        },
+        {
+          "heading": "platform_name",
+          "level": 1,
+          "line": 144
+        },
+        {
+          "heading": "platform_name_placeholder",
+          "level": 1,
+          "line": 145
+        },
+        {
+          "heading": "api_key_optional",
+          "level": 1,
+          "line": 146
+        },
+        {
+          "heading": "commission_percent",
+          "level": 1,
+          "line": 147
+        },
+        {
+          "heading": "add_platform_btn",
+          "level": 1,
+          "line": 148
+        },
+        {
+          "heading": "add_warehouse_title",
+          "level": 1,
+          "line": 149
+        },
+        {
+          "heading": "warehouse_name",
+          "level": 1,
+          "line": 150
+        },
+        {
+          "heading": "warehouse_name_placeholder",
+          "level": 1,
+          "line": 151
+        },
+        {
+          "heading": "select_branch",
+          "level": 1,
+          "line": 152
+        },
+        {
+          "heading": "warehouse_type",
+          "level": 1,
+          "line": 153
+        },
+        {
+          "heading": "kitchen",
+          "level": 1,
+          "line": 154
+        },
+        {
+          "heading": "add_warehouse_btn",
+          "level": 1,
+          "line": 155
+        },
+        {
+          "heading": "ai_config_saved",
+          "level": 1,
+          "line": 156
+        },
+        {
+          "heading": "ai_config_failed",
+          "level": 1,
+          "line": 157
+        },
+        {
+          "heading": "provision_new_branch",
+          "level": 1,
+          "line": 158
+        },
+        {
+          "heading": "add_app",
+          "level": 1,
+          "line": 159
+        },
+        {
+          "heading": "ai_provider",
+          "level": 1,
+          "line": 160
+        },
+        {
+          "heading": "ai_status_enabled",
+          "level": 1,
+          "line": 161
+        },
+        {
+          "heading": "ai_status_disabled",
+          "level": 1,
+          "line": 162
+        },
+        {
+          "heading": "ai_model_local",
+          "level": 1,
+          "line": 163
+        },
+        {
+          "heading": "ai_note_ollama",
+          "level": 1,
+          "line": 164
+        },
+        {
+          "heading": "default_server_key",
+          "level": 1,
+          "line": 165
+        },
+        {
+          "heading": "encrypted_custom_key",
+          "level": 1,
+          "line": 166
+        },
+        {
+          "heading": "stored",
+          "level": 1,
+          "line": 167
+        },
+        {
+          "heading": "no_custom_key",
+          "level": 1,
+          "line": 168
+        },
+        {
+          "heading": "set_custom_key",
+          "level": 1,
+          "line": 169
+        },
+        {
+          "heading": "ai_encryption_note",
+          "level": 1,
+          "line": 170
+        },
+        {
+          "heading": "ai_model",
+          "level": 1,
+          "line": 171
+        },
+        {
+          "heading": "using_local_ollama",
+          "level": 1,
+          "line": 172
+        },
+        {
+          "heading": "save_ai_config",
+          "level": 1,
+          "line": 173
+        },
+        {
+          "heading": "settings_saved",
+          "level": 1,
+          "line": 174
+        },
+        {
+          "heading": "save_settings",
+          "level": 1,
+          "line": 175
+        },
+        {
+          "heading": "edit_branch",
+          "level": 1,
+          "line": 176
+        },
+        {
+          "heading": "branch_name",
+          "level": 1,
+          "line": 177
+        },
+        {
+          "heading": "location",
+          "level": 1,
+          "line": 178
+        },
+        {
+          "heading": "full_address",
+          "level": 1,
+          "line": 179
+        },
+        {
+          "heading": "timezone",
+          "level": 1,
+          "line": 180
+        },
+        {
+          "heading": "advanced_reporting",
+          "level": 1,
+          "line": 182
+        },
+        {
+          "heading": "server_ip",
+          "level": 1,
+          "line": 183
+        },
+        {
+          "heading": "day_close_emails",
+          "level": 1,
+          "line": 184
+        },
+        {
+          "heading": "day_close_note",
+          "level": 1,
+          "line": 185
+        },
+        {
+          "heading": "hard_delete",
+          "level": 1,
+          "line": 186
+        },
+        {
+          "heading": "archive",
+          "level": 1,
+          "line": 187
+        },
+        {
+          "heading": "save_changes",
+          "level": 1,
+          "line": 188
+        },
+        {
+          "heading": "add_branch",
+          "level": 1,
+          "line": 189
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 187
+      }
+    },
+    {
+      "path": "src/locales/en/translation.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 190,
+      "nonEmptyLines": 190,
+      "sections": [
+        {
+          "heading": "dashboard",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "pos",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "menu",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "kds",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "inventory",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "finance",
+          "level": 1,
+          "line": 7
+        },
+        {
+          "heading": "crm",
+          "level": 1,
+          "line": 8
+        },
+        {
+          "heading": "reports",
+          "level": 1,
+          "line": 9
+        },
+        {
+          "heading": "ai",
+          "level": 1,
+          "line": 10
+        },
+        {
+          "heading": "settings",
+          "level": 1,
+          "line": 11
+        },
+        {
+          "heading": "sign_out",
+          "level": 1,
+          "line": 12
+        },
+        {
+          "heading": "light_mode",
+          "level": 1,
+          "line": 13
+        },
+        {
+          "heading": "dark_mode",
+          "level": 1,
+          "line": 14
+        },
+        {
+          "heading": "lang",
+          "level": 1,
+          "line": 15
+        },
+        {
+          "heading": "total_rev",
+          "level": 1,
+          "line": 16
+        },
+        {
+          "heading": "orders",
+          "level": 1,
+          "line": 17
+        },
+        {
+          "heading": "tables",
+          "level": 1,
+          "line": 18
+        },
+        {
+          "heading": "growth",
+          "level": 1,
+          "line": 19
+        },
+        {
+          "heading": "confirm",
+          "level": 1,
+          "line": 20
+        },
+        {
+          "heading": "void",
+          "level": 1,
+          "line": 21
+        },
+        {
+          "heading": "place_order",
+          "level": 1,
+          "line": 22
+        },
+        {
+          "heading": "subtotal",
+          "level": 1,
+          "line": 23
+        },
+        {
+          "heading": "tax",
+          "level": 1,
+          "line": 24
+        },
+        {
+          "heading": "total",
+          "level": 1,
+          "line": 25
+        },
+        {
+          "heading": "checkout",
+          "level": 1,
+          "line": 26
+        },
+        {
+          "heading": "payment_method",
+          "level": 1,
+          "line": 27
+        },
+        {
+          "heading": "split_bill",
+          "level": 1,
+          "line": 28
+        },
+        {
+          "heading": "remaining",
+          "level": 1,
+          "line": 29
+        },
+        {
+          "heading": "void_confirm",
+          "level": 1,
+          "line": 30
+        },
+        {
+          "heading": "ai_insights",
+          "level": 1,
+          "line": 31
+        },
+        {
+          "heading": "ai_assistant",
+          "level": 1,
+          "line": 32
+        },
+        {
+          "heading": "security",
+          "level": 1,
+          "line": 33
+        },
+        {
+          "heading": "call_center",
+          "level": 1,
+          "line": 34
+        },
+        {
+          "heading": "forensics",
+          "level": 1,
+          "line": 35
+        },
+        {
+          "heading": "recipes",
+          "level": 1,
+          "line": 36
+        },
+        {
+          "heading": "printers",
+          "level": 1,
+          "line": 37
+        },
+        {
+          "heading": "production",
+          "level": 1,
+          "line": 38
+        },
+        {
+          "heading": "production_order",
+          "level": 1,
+          "line": 39
+        },
+        {
+          "heading": "batch_no",
+          "level": 1,
+          "line": 40
+        },
+        {
+          "heading": "raw_materials",
+          "level": 1,
+          "line": 41
+        },
+        {
+          "heading": "finished_goods",
+          "level": 1,
+          "line": 42
+        },
+        {
+          "heading": "welcome_back",
+          "level": 1,
+          "line": 43
+        },
+        {
+          "heading": "switch_branch",
+          "level": 1,
+          "line": 44
+        },
+        {
+          "heading": "global_view",
+          "level": 1,
+          "line": 45
+        },
+        {
+          "heading": "operating_at",
+          "level": 1,
+          "line": 46
+        },
+        {
+          "heading": "role",
+          "level": 1,
+          "line": 47
+        },
+        {
+          "heading": "branch",
+          "level": 1,
+          "line": 48
+        },
+        {
+          "heading": "all_branches",
+          "level": 1,
+          "line": 49
+        },
+        {
+          "heading": "add_notes",
+          "level": 1,
+          "line": 50
+        },
+        {
+          "heading": "select_table",
+          "level": 1,
+          "line": 51
+        },
+        {
+          "heading": "no_tables",
+          "level": 1,
+          "line": 52
+        },
+        {
+          "heading": "customer_info",
+          "level": 1,
+          "line": 53
+        },
+        {
+          "heading": "apply_discount",
+          "level": 1,
+          "line": 54
+        },
+        {
+          "heading": "search_placeholder",
+          "level": 1,
+          "line": 55
+        },
+        {
+          "heading": "all_items",
+          "level": 1,
+          "line": 56
+        },
+        {
+          "heading": "hold_order",
+          "level": 1,
+          "line": 57
+        },
+        {
+          "heading": "discount",
+          "level": 1,
+          "line": 58
+        },
+        {
+          "heading": "dine_in",
+          "level": 1,
+          "line": 59
+        },
+        {
+          "heading": "takeaway",
+          "level": 1,
+          "line": 60
+        },
+        {
+          "heading": "pickup",
+          "level": 1,
+          "line": 61
+        },
+        {
+          "heading": "delivery",
+          "level": 1,
+          "line": 62
+        },
+        {
+          "heading": "cash",
+          "level": 1,
+          "line": 63
+        },
+        {
+          "heading": "visa",
+          "level": 1,
+          "line": 64
+        },
+        {
+          "heading": "v_cash",
+          "level": 1,
+          "line": 65
+        },
+        {
+          "heading": "insta",
+          "level": 1,
+          "line": 66
+        },
+        {
+          "heading": "split",
+          "level": 1,
+          "line": 67
+        },
+        {
+          "heading": "item_notes",
+          "level": 1,
+          "line": 68
+        },
+        {
+          "heading": "save_note",
+          "level": 1,
+          "line": 69
+        },
+        {
+          "heading": "cancel",
+          "level": 1,
+          "line": 70
+        },
+        {
+          "heading": "select_customer",
+          "level": 1,
+          "line": 71
+        },
+        {
+          "heading": "table",
+          "level": 1,
+          "line": 72
+        },
+        {
+          "heading": "floor_map",
+          "level": 1,
+          "line": 73
+        },
+        {
+          "heading": "all_zones",
+          "level": 1,
+          "line": 74
+        },
+        {
+          "heading": "free",
+          "level": 1,
+          "line": 75
+        },
+        {
+          "heading": "busy",
+          "level": 1,
+          "line": 76
+        },
+        {
+          "heading": "waiting_food",
+          "level": 1,
+          "line": 77
+        },
+        {
+          "heading": "ready_to_pay",
+          "level": 1,
+          "line": 78
+        },
+        {
+          "heading": "reserved",
+          "level": 1,
+          "line": 79
+        },
+        {
+          "heading": "dirty",
+          "level": 1,
+          "line": 80
+        },
+        {
+          "heading": "open_table",
+          "level": 1,
+          "line": 81
+        },
+        {
+          "heading": "resume",
+          "level": 1,
+          "line": 82
+        },
+        {
+          "heading": "temp_short",
+          "level": 1,
+          "line": 83
+        },
+        {
+          "heading": "close_table",
+          "level": 1,
+          "line": 84
+        },
+        {
+          "heading": "merge_tables",
+          "level": 1,
+          "line": 85
+        },
+        {
+          "heading": "currency",
+          "level": 1,
+          "line": 86
+        },
+        {
+          "heading": "bill",
+          "level": 1,
+          "line": 87
+        },
+        {
+          "heading": "empty_cart",
+          "level": 1,
+          "line": 88
+        },
+        {
+          "heading": "quick_order",
+          "level": 1,
+          "line": 89
+        },
+        {
+          "heading": "quick_switch",
+          "level": 1,
+          "line": 90
+        },
+        {
+          "heading": "prev_table",
+          "level": 1,
+          "line": 91
+        },
+        {
+          "heading": "next_table",
+          "level": 1,
+          "line": 92
+        },
+        {
+          "heading": "back_to_tables",
+          "level": 1,
+          "line": 93
+        },
+        {
+          "heading": "mark_table_clean",
+          "level": 1,
+          "line": 94
+        },
+        {
+          "heading": "shift_open_failed",
+          "level": 1,
+          "line": 95
+        },
+        {
+          "heading": "shift_close_failed",
+          "level": 1,
+          "line": 96
+        },
+        {
+          "heading": "approval_required",
+          "level": 1,
+          "line": 97
+        },
+        {
+          "heading": "shift_locked",
+          "level": 1,
+          "line": 98
+        },
+        {
+          "heading": "open_shift_message",
+          "level": 1,
+          "line": 99
+        },
+        {
+          "heading": "starting_balance",
+          "level": 1,
+          "line": 100
+        },
+        {
+          "heading": "open_shift",
+          "level": 1,
+          "line": 101
+        },
+        {
+          "heading": "close_shift",
+          "level": 1,
+          "line": 102
+        },
+        {
+          "heading": "opening",
+          "level": 1,
+          "line": 103
+        },
+        {
+          "heading": "started",
+          "level": 1,
+          "line": 104
+        },
+        {
+          "heading": "counted_cash",
+          "level": 1,
+          "line": 105
+        },
+        {
+          "heading": "confirm_close",
+          "level": 1,
+          "line": 106
+        },
+        {
+          "heading": "order",
+          "level": 1,
+          "line": 107
+        },
+        {
+          "heading": "order_type",
+          "level": 1,
+          "line": 108
+        },
+        {
+          "heading": "order_receipt",
+          "level": 1,
+          "line": 109
+        },
+        {
+          "heading": "final_bill",
+          "level": 1,
+          "line": 110
+        },
+        {
+          "heading": "table_closed",
+          "level": 1,
+          "line": 111
+        },
+        {
+          "heading": "kitchen_ticket",
+          "level": 1,
+          "line": 112
+        },
+        {
+          "heading": "temp_bill",
+          "level": 1,
+          "line": 113
+        },
+        {
+          "heading": "temp_bill_printed",
+          "level": 1,
+          "line": 114
+        },
+        {
+          "heading": "tables_merged",
+          "level": 1,
+          "line": 115
+        },
+        {
+          "heading": "last_update",
+          "level": 1,
+          "line": 116
+        },
+        {
+          "heading": "min_short",
+          "level": 1,
+          "line": 117
+        },
+        {
+          "heading": "split_total_error",
+          "level": 1,
+          "line": 118
+        },
+        {
+          "heading": "send_kitchen",
+          "level": 1,
+          "line": 119
+        },
+        {
+          "heading": "status_pending",
+          "level": 1,
+          "line": 120
+        },
+        {
+          "heading": "status_preparing",
+          "level": 1,
+          "line": 121
+        },
+        {
+          "heading": "status_ready",
+          "level": 1,
+          "line": 122
+        },
+        {
+          "heading": "stock_levels",
+          "level": 1,
+          "line": 123
+        },
+        {
+          "heading": "low_stock",
+          "level": 1,
+          "line": 124
+        },
+        {
+          "heading": "warehouse",
+          "level": 1,
+          "line": 125
+        },
+        {
+          "heading": "move_stock",
+          "level": 1,
+          "line": 126
+        },
+        {
+          "heading": "coa",
+          "level": 1,
+          "line": 127
+        },
+        {
+          "heading": "journal",
+          "level": 1,
+          "line": 128
+        },
+        {
+          "heading": "profit_loss",
+          "level": 1,
+          "line": 129
+        },
+        {
+          "heading": "balance_sheet",
+          "level": 1,
+          "line": 130
+        },
+        {
+          "heading": "people",
+          "level": 1,
+          "line": 131
+        },
+        {
+          "heading": "dispatch",
+          "level": 1,
+          "line": 132
+        },
+        {
+          "heading": "marketing",
+          "level": 1,
+          "line": 133
+        },
+        {
+          "heading": "fiscal",
+          "level": 1,
+          "line": 134
+        },
+        {
+          "heading": "analytics",
+          "level": 1,
+          "line": 135
+        },
+        {
+          "heading": "kiosk_welcome",
+          "level": 1,
+          "line": 136
+        },
+        {
+          "heading": "kiosk_select_category",
+          "level": 1,
+          "line": 137
+        },
+        {
+          "heading": "kiosk_order_summary",
+          "level": 1,
+          "line": 138
+        },
+        {
+          "heading": "kiosk_checkout_success",
+          "level": 1,
+          "line": 139
+        },
+        {
+          "heading": "kiosk_order_number",
+          "level": 1,
+          "line": 140
+        },
+        {
+          "heading": "kiosk_back",
+          "level": 1,
+          "line": 141
+        },
+        {
+          "heading": "kiosk_finish",
+          "level": 1,
+          "line": 142
+        },
+        {
+          "heading": "add_platform_title",
+          "level": 1,
+          "line": 143
+        },
+        {
+          "heading": "platform_name",
+          "level": 1,
+          "line": 144
+        },
+        {
+          "heading": "platform_name_placeholder",
+          "level": 1,
+          "line": 145
+        },
+        {
+          "heading": "api_key_optional",
+          "level": 1,
+          "line": 146
+        },
+        {
+          "heading": "commission_percent",
+          "level": 1,
+          "line": 147
+        },
+        {
+          "heading": "add_platform_btn",
+          "level": 1,
+          "line": 148
+        },
+        {
+          "heading": "add_warehouse_title",
+          "level": 1,
+          "line": 149
+        },
+        {
+          "heading": "warehouse_name",
+          "level": 1,
+          "line": 150
+        },
+        {
+          "heading": "warehouse_name_placeholder",
+          "level": 1,
+          "line": 151
+        },
+        {
+          "heading": "select_branch",
+          "level": 1,
+          "line": 152
+        },
+        {
+          "heading": "warehouse_type",
+          "level": 1,
+          "line": 153
+        },
+        {
+          "heading": "kitchen",
+          "level": 1,
+          "line": 154
+        },
+        {
+          "heading": "add_warehouse_btn",
+          "level": 1,
+          "line": 155
+        },
+        {
+          "heading": "ai_config_saved",
+          "level": 1,
+          "line": 156
+        },
+        {
+          "heading": "ai_config_failed",
+          "level": 1,
+          "line": 157
+        },
+        {
+          "heading": "provision_new_branch",
+          "level": 1,
+          "line": 158
+        },
+        {
+          "heading": "add_app",
+          "level": 1,
+          "line": 159
+        },
+        {
+          "heading": "ai_provider",
+          "level": 1,
+          "line": 160
+        },
+        {
+          "heading": "ai_status_enabled",
+          "level": 1,
+          "line": 161
+        },
+        {
+          "heading": "ai_status_disabled",
+          "level": 1,
+          "line": 162
+        },
+        {
+          "heading": "ai_model_local",
+          "level": 1,
+          "line": 163
+        },
+        {
+          "heading": "ai_note_ollama",
+          "level": 1,
+          "line": 164
+        },
+        {
+          "heading": "default_server_key",
+          "level": 1,
+          "line": 165
+        },
+        {
+          "heading": "encrypted_custom_key",
+          "level": 1,
+          "line": 166
+        },
+        {
+          "heading": "stored",
+          "level": 1,
+          "line": 167
+        },
+        {
+          "heading": "no_custom_key",
+          "level": 1,
+          "line": 168
+        },
+        {
+          "heading": "set_custom_key",
+          "level": 1,
+          "line": 169
+        },
+        {
+          "heading": "ai_encryption_note",
+          "level": 1,
+          "line": 170
+        },
+        {
+          "heading": "ai_model",
+          "level": 1,
+          "line": 171
+        },
+        {
+          "heading": "using_local_ollama",
+          "level": 1,
+          "line": 172
+        },
+        {
+          "heading": "save_ai_config",
+          "level": 1,
+          "line": 173
+        },
+        {
+          "heading": "settings_saved",
+          "level": 1,
+          "line": 174
+        },
+        {
+          "heading": "save_settings",
+          "level": 1,
+          "line": 175
+        },
+        {
+          "heading": "edit_branch",
+          "level": 1,
+          "line": 176
+        },
+        {
+          "heading": "branch_name",
+          "level": 1,
+          "line": 177
+        },
+        {
+          "heading": "location",
+          "level": 1,
+          "line": 178
+        },
+        {
+          "heading": "full_address",
+          "level": 1,
+          "line": 179
+        },
+        {
+          "heading": "timezone",
+          "level": 1,
+          "line": 180
+        },
+        {
+          "heading": "advanced_reporting",
+          "level": 1,
+          "line": 182
+        },
+        {
+          "heading": "server_ip",
+          "level": 1,
+          "line": 183
+        },
+        {
+          "heading": "day_close_emails",
+          "level": 1,
+          "line": 184
+        },
+        {
+          "heading": "day_close_note",
+          "level": 1,
+          "line": 185
+        },
+        {
+          "heading": "hard_delete",
+          "level": 1,
+          "line": 186
+        },
+        {
+          "heading": "archive",
+          "level": 1,
+          "line": 187
+        },
+        {
+          "heading": "save_changes",
+          "level": 1,
+          "line": 188
+        },
+        {
+          "heading": "add_branch",
+          "level": 1,
+          "line": 189
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 187
+      }
+    },
+    {
+      "path": "src/services/syncQueueUtils.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 30,
+      "nonEmptyLines": 27,
+      "functions": [
+        {
+          "name": "simpleHash",
+          "startLine": 3,
+          "endLine": 10,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "buildDedupeKey",
+          "startLine": 12,
+          "endLine": 25,
+          "params": [
+            "entity",
+            "action",
+            "payload"
+          ]
+        },
+        {
+          "name": "computeNextAttempt",
+          "startLine": 27,
+          "endLine": 30,
+          "params": [
+            "retryCount",
+            "baseRetryMs"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "simpleHash",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "buildDedupeKey",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "computeNextAttempt",
+          "line": 27,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "simpleHash",
+          "callee": "value.charCodeAt",
+          "lineNumber": 6
+        },
+        {
+          "caller": "simpleHash",
+          "callee": "Math.abs(hash).toString",
+          "lineNumber": 9
+        },
+        {
+          "caller": "simpleHash",
+          "callee": "Math.abs",
+          "lineNumber": 9
+        },
+        {
+          "caller": "buildDedupeKey",
+          "callee": "String(payload.data.status).toUpperCase",
+          "lineNumber": 21
+        },
+        {
+          "caller": "buildDedupeKey",
+          "callee": "String",
+          "lineNumber": 21
+        },
+        {
+          "caller": "buildDedupeKey",
+          "callee": "simpleHash",
+          "lineNumber": 24
+        },
+        {
+          "caller": "buildDedupeKey",
+          "callee": "JSON.stringify",
+          "lineNumber": 24
+        },
+        {
+          "caller": "computeNextAttempt",
+          "callee": "Math.min",
+          "lineNumber": 28
+        },
+        {
+          "caller": "computeNextAttempt",
+          "callee": "Math.pow",
+          "lineNumber": 28
+        },
+        {
+          "caller": "computeNextAttempt",
+          "callee": "Math.max",
+          "lineNumber": 28
+        },
+        {
+          "caller": "computeNextAttempt",
+          "callee": "Date.now",
+          "lineNumber": 29
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    }
+  ]
+}

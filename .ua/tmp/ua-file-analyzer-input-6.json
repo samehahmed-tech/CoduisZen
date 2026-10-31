@@ -1,0 +1,343 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/services/routingService.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/salesIntelligenceService.ts",
+      "language": "typescript",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/scheduledOrderService.ts",
+      "language": "typescript",
+      "sizeLines": 148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/schedulingService.ts",
+      "language": "typescript",
+      "sizeLines": 191,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/shiftTaskService.ts",
+      "language": "typescript",
+      "sizeLines": 84,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/sideEffectTracker.ts",
+      "language": "typescript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/sloService.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/smsService.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/subscriptionService.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/supplierInvoiceMatchingService.ts",
+      "language": "typescript",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/tipPoolService.ts",
+      "language": "typescript",
+      "sizeLines": 140,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/totpService.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/treasuryService.ts",
+      "language": "typescript",
+      "sizeLines": 420,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/unitConversion.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/walletService.ts",
+      "language": "typescript",
+      "sizeLines": 128,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/webhookService.ts",
+      "language": "typescript",
+      "sizeLines": 250,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/whatsappAutomationService.ts",
+      "language": "typescript",
+      "sizeLines": 181,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/whatsappConnection.ts",
+      "language": "typescript",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/whatsappService.ts",
+      "language": "typescript",
+      "sizeLines": 954,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/zktecoAdmsService.ts",
+      "language": "typescript",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/zktecoConnectorService.ts",
+      "language": "typescript",
+      "sizeLines": 1747,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/socket.ts",
+      "language": "typescript",
+      "sizeLines": 158,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/businessDate.ts",
+      "language": "typescript",
+      "sizeLines": 58,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/dbErrors.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/logger.ts",
+      "language": "typescript",
+      "sizeLines": 62,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/orderRevenue.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/request.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/settingsStore.ts",
+      "language": "typescript",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/socketEmit.ts",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/trackToken.ts",
+      "language": "typescript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/transaction.ts",
+      "language": "typescript",
+      "sizeLines": 11,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/workers/checkoutWorker.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/db/index.ts",
+      "language": "typescript",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/db/schema.ts",
+      "language": "typescript",
+      "sizeLines": 3472,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/aggregators.test.ts",
+      "language": "typescript",
+      "sizeLines": 58,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/services/routingService.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/salesIntelligenceService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/scheduledOrderService.ts": [
+      "server/controllers/kdsController.ts",
+      "server/db/index.ts",
+      "server/services/financePostingService.ts",
+      "server/services/inventoryService.ts",
+      "server/services/whatsappAutomationService.ts",
+      "server/utils/logger.ts",
+      "server/utils/socketEmit.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/schedulingService.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/shiftTaskService.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/sideEffectTracker.ts": [
+      "server/services/eventBusService.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/services/sloService.ts": [
+      "server/services/alertService.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/services/smsService.ts": [
+      "server/utils/logger.ts"
+    ],
+    "server/services/subscriptionService.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/supplierInvoiceMatchingService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/tipPoolService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/totpService.ts": [],
+    "server/services/treasuryService.ts": [
+      "server/db/index.ts",
+      "server/services/bankingService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/unitConversion.ts": [],
+    "server/services/walletService.ts": [
+      "server/db/index.ts",
+      "server/services/glService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/webhookService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/whatsappAutomationService.ts": [
+      "server/db/index.ts",
+      "server/services/whatsappService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/whatsappConnection.ts": [],
+    "server/services/whatsappService.ts": [
+      "server/db/index.ts",
+      "server/services/whatsappConnection.ts",
+      "server/socket.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/zktecoAdmsService.ts": [
+      "server/db/index.ts",
+      "server/socket.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/zktecoConnectorService.ts": [
+      "server/db/index.ts",
+      "server/services/attendanceOpsService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/socket.ts": [
+      "server/config/cors.ts",
+      "server/config/env.ts"
+    ],
+    "server/utils/businessDate.ts": [],
+    "server/utils/dbErrors.ts": [],
+    "server/utils/logger.ts": [],
+    "server/utils/orderRevenue.ts": [
+      "src/db/schema.ts"
+    ],
+    "server/utils/request.ts": [],
+    "server/utils/settingsStore.ts": [
+      "server/db/index.ts"
+    ],
+    "server/utils/socketEmit.ts": [
+      "server/socket.ts"
+    ],
+    "server/utils/trackToken.ts": [],
+    "server/utils/transaction.ts": [
+      "server/db/index.ts"
+    ],
+    "server/workers/checkoutWorker.ts": [
+      "server/utils/logger.ts"
+    ],
+    "src/db/index.ts": [
+      "src/db/schema.ts"
+    ],
+    "src/db/schema.ts": [],
+    "tests/aggregators.test.ts": [
+      "server/modules/aggregators/aggregatorTypes.ts"
+    ]
+  }
+}

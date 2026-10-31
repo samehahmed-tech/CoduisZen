@@ -176,6 +176,14 @@ export const reportsApi = {
         const query = new URLSearchParams(params as any).toString();
         return apiRequest<Array<{ customerId: string; customerName: string; phone: string; totalSpent: number; orderCount: number; avgTicket: number; firstOrder: string; lastOrder: string }>>(`/reports/customer-ltv?${query}`);
     },
+    getCustomerRfm: (params?: { branchId?: string; limit?: number }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<Array<{ id: string; customerId: string; branchId: string; recency: number; frequency: number; monetary: number; recencyScore: number; frequencyScore: number; monetaryScore: number; segment: string; lastOrderDate: string | null; updatedAt: string }>>(`/reports/customer-rfm${query ? `?${query}` : ''}`);
+    },
+    refreshCustomerRfm: (params?: { branchId?: string }) => {
+        const query = new URLSearchParams(params as any).toString();
+        return apiRequest<{ refreshed: number }>(`/reports/customer-rfm/refresh${query ? `?${query}` : ''}`, { method: 'POST' });
+    },
     getCampaignROI: () => apiRequest<Array<{ id: string; name: string; type: string; status: string; reach: number; conversions: number; revenue: number; budget: number; roi: number; conversionRate: number; createdAt: string }>>('/reports/campaign-roi'),
     getBranchPerformance: (params: { startDate: string; endDate: string }) => {
         const query = new URLSearchParams(params as any).toString();

@@ -1,0 +1,1067 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 9,
+  "filesSkipped": [
+    ".env.production.example",
+    "github.bat",
+    "import-rosa-cafe-reset.bat",
+    "index.css",
+    "index.html",
+    "restoflow-fix.ps1",
+    "restore-coduiszen.bat",
+    "uat-manual.html"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 9,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 9
+    }
+  },
+  "results": [
+    {
+      "path": ".env.example",
+      "language": "config",
+      "fileCategory": "config",
+      "totalLines": 142,
+      "nonEmptyLines": 132,
+      "definitions": [
+        {
+          "name": "DATABASE_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 2,
+          "endLine": 2
+        },
+        {
+          "name": "API_PORT",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 3,
+          "endLine": 3
+        },
+        {
+          "name": "CORS_ORIGINS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 4,
+          "endLine": 4
+        },
+        {
+          "name": "JWT_SECRET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 7,
+          "endLine": 7
+        },
+        {
+          "name": "JWT_EXPIRES_IN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 8,
+          "endLine": 8
+        },
+        {
+          "name": "AUDIT_HMAC_SECRET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 9,
+          "endLine": 9
+        },
+        {
+          "name": "PUBLIC_SCREEN_TOKEN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 10,
+          "endLine": 10
+        },
+        {
+          "name": "PUBLIC_TRACKING_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 12,
+          "endLine": 12
+        },
+        {
+          "name": "AI_KEY_ENCRYPTION_SECRET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 13,
+          "endLine": 13
+        },
+        {
+          "name": "AUTH_LOGIN_WINDOW_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 14,
+          "endLine": 14
+        },
+        {
+          "name": "AUTH_LOGIN_MAX_IP_ATTEMPTS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 15,
+          "endLine": 15
+        },
+        {
+          "name": "AUTH_LOGIN_MAX_EMAIL_ATTEMPTS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 16,
+          "endLine": 16
+        },
+        {
+          "name": "AUTH_LOGIN_BLOCK_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 17,
+          "endLine": 17
+        },
+        {
+          "name": "AUTH_SESSION_TTL_HOURS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 18,
+          "endLine": 18
+        },
+        {
+          "name": "AUTH_MFA_ISSUER",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 19,
+          "endLine": 19
+        },
+        {
+          "name": "AUTH_MFA_ENFORCE_ADMIN_FINANCE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 20,
+          "endLine": 20
+        },
+        {
+          "name": "PRINT_GATEWAY_TOKEN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 21,
+          "endLine": 21
+        },
+        {
+          "name": "SERVER_AUTO_PRINT_RECEIPT",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 22,
+          "endLine": 22
+        },
+        {
+          "name": "OPENROUTER_API_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 23,
+          "endLine": 23
+        },
+        {
+          "name": "WHATSAPP_PROVIDER",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 25,
+          "endLine": 25
+        },
+        {
+          "name": "ENABLE_WHATSAPP_WEB",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 26,
+          "endLine": 26
+        },
+        {
+          "name": "WHATSAPP_WEB_CLIENT_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 27,
+          "endLine": 27
+        },
+        {
+          "name": "WHATSAPP_HEADLESS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 30,
+          "endLine": 30
+        },
+        {
+          "name": "WHATSAPP_CHROME_PATH",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 31,
+          "endLine": 31
+        },
+        {
+          "name": "WHATSAPP_CHROME_ARGS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 32,
+          "endLine": 32
+        },
+        {
+          "name": "WHATSAPP_TRANSACTIONAL_DELAY_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 33,
+          "endLine": 33
+        },
+        {
+          "name": "WHATSAPP_MARKETING_MIN_DELAY_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 34,
+          "endLine": 34
+        },
+        {
+          "name": "WHATSAPP_MARKETING_MAX_DELAY_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 35,
+          "endLine": 35
+        },
+        {
+          "name": "WHATSAPP_MARKETING_BATCH_SIZE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 36,
+          "endLine": 36
+        },
+        {
+          "name": "WHATSAPP_MARKETING_BATCH_PAUSE_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 37,
+          "endLine": 37
+        },
+        {
+          "name": "OPENWA_API_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 39,
+          "endLine": 39
+        },
+        {
+          "name": "OPENWA_API_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 41,
+          "endLine": 41
+        },
+        {
+          "name": "OPENWA_SESSION_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 42,
+          "endLine": 42
+        },
+        {
+          "name": "OPENWA_SESSION_NAME",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 43,
+          "endLine": 43
+        },
+        {
+          "name": "OPENWA_SESSIONS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 46,
+          "endLine": 46
+        },
+        {
+          "name": "WHATSAPP_AUTOMATION_ENABLED",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 47,
+          "endLine": 47
+        },
+        {
+          "name": "WHATSAPP_FEEDBACK_DELAY_MS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 48,
+          "endLine": 48
+        },
+        {
+          "name": "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 49,
+          "endLine": 49
+        },
+        {
+          "name": "WHATSAPP_WEBHOOK_SECRET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 50,
+          "endLine": 50
+        },
+        {
+          "name": "WHATSAPP_META_APP_SECRET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 51,
+          "endLine": 51
+        },
+        {
+          "name": "WHATSAPP_META_TOKEN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 52,
+          "endLine": 52
+        },
+        {
+          "name": "WHATSAPP_META_PHONE_NUMBER_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 53,
+          "endLine": 53
+        },
+        {
+          "name": "WHATSAPP_TWILIO_ACCOUNT_SID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 54,
+          "endLine": 54
+        },
+        {
+          "name": "WHATSAPP_TWILIO_AUTH_TOKEN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 55,
+          "endLine": 55
+        },
+        {
+          "name": "WHATSAPP_TWILIO_FROM",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 56,
+          "endLine": 56
+        },
+        {
+          "name": "ETA_BASE_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 74,
+          "endLine": 74
+        },
+        {
+          "name": "ETA_TOKEN_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 75,
+          "endLine": 75
+        },
+        {
+          "name": "ETA_CLIENT_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 76,
+          "endLine": 76
+        },
+        {
+          "name": "ETA_CLIENT_SECRET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 77,
+          "endLine": 77
+        },
+        {
+          "name": "ETA_API_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 78,
+          "endLine": 78
+        },
+        {
+          "name": "ETA_PRIVATE_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 79,
+          "endLine": 79
+        },
+        {
+          "name": "ETA_PRIVATE_KEY_PASSPHRASE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 80,
+          "endLine": 80
+        },
+        {
+          "name": "ETA_RIN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 81,
+          "endLine": 81
+        },
+        {
+          "name": "ETA_COMPANY_NAME",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 82,
+          "endLine": 82
+        },
+        {
+          "name": "ETA_BRANCH_CODE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 83,
+          "endLine": 83
+        },
+        {
+          "name": "ETA_COUNTRY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 84,
+          "endLine": 84
+        },
+        {
+          "name": "ETA_GOVERNATE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 85,
+          "endLine": 85
+        },
+        {
+          "name": "ETA_CITY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 86,
+          "endLine": 86
+        },
+        {
+          "name": "ETA_STREET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 87,
+          "endLine": 87
+        },
+        {
+          "name": "ETA_BUILDING",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 88,
+          "endLine": 88
+        },
+        {
+          "name": "SOCKET_REDIS_ENABLED",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 91,
+          "endLine": 91
+        },
+        {
+          "name": "SOCKET_REDIS_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 92,
+          "endLine": 92
+        },
+        {
+          "name": "SMTP_HOST",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 95,
+          "endLine": 95
+        },
+        {
+          "name": "SMTP_PORT",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 96,
+          "endLine": 96
+        },
+        {
+          "name": "SMTP_SECURE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 97,
+          "endLine": 97
+        },
+        {
+          "name": "SMTP_USER",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 98,
+          "endLine": 98
+        },
+        {
+          "name": "SMTP_PASS",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 99,
+          "endLine": 99
+        },
+        {
+          "name": "SMTP_FROM",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 100,
+          "endLine": 100
+        },
+        {
+          "name": "S3_REGION",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 103,
+          "endLine": 103
+        },
+        {
+          "name": "S3_BUCKET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 104,
+          "endLine": 104
+        },
+        {
+          "name": "S3_ENDPOINT",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 105,
+          "endLine": 105
+        },
+        {
+          "name": "S3_ACCESS_KEY_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 106,
+          "endLine": 106
+        },
+        {
+          "name": "S3_SECRET_ACCESS_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 107,
+          "endLine": 107
+        },
+        {
+          "name": "S3_PUBLIC_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 108,
+          "endLine": 108
+        },
+        {
+          "name": "S3_FORCE_PATH_STYLE",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 109,
+          "endLine": 109
+        },
+        {
+          "name": "VITE_API_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 112,
+          "endLine": 112
+        },
+        {
+          "name": "VITE_SOCKET_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 114,
+          "endLine": 114
+        },
+        {
+          "name": "VITE_MAPS_PROVIDER",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 118,
+          "endLine": 118
+        },
+        {
+          "name": "MAPKIT_TEAM_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 120,
+          "endLine": 120
+        },
+        {
+          "name": "MAPKIT_KEY_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 121,
+          "endLine": 121
+        },
+        {
+          "name": "MAPKIT_PRIVATE_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 122,
+          "endLine": 122
+        },
+        {
+          "name": "VITE_MAPTILER_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 123,
+          "endLine": 123
+        },
+        {
+          "name": "VITE_OSM_TILE_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 124,
+          "endLine": 124
+        },
+        {
+          "name": "VITE_NOMINATIM_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 125,
+          "endLine": 125
+        },
+        {
+          "name": "VITE_GOOGLE_MAPS_API_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 126,
+          "endLine": 126
+        },
+        {
+          "name": "VITE_DEFAULT_MAP_LAT",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 127,
+          "endLine": 127
+        },
+        {
+          "name": "VITE_DEFAULT_MAP_LNG",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 128,
+          "endLine": 128
+        },
+        {
+          "name": "OLLAMA_ENABLED",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 132,
+          "endLine": 132
+        },
+        {
+          "name": "OLLAMA_BASE_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 133,
+          "endLine": 133
+        },
+        {
+          "name": "OLLAMA_MODEL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 134,
+          "endLine": 134
+        },
+        {
+          "name": "VITE_FIREBASE_API_KEY",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 137,
+          "endLine": 137
+        },
+        {
+          "name": "VITE_FIREBASE_AUTH_DOMAIN",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 138,
+          "endLine": 138
+        },
+        {
+          "name": "VITE_FIREBASE_PROJECT_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 139,
+          "endLine": 139
+        },
+        {
+          "name": "VITE_FIREBASE_STORAGE_BUCKET",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 140,
+          "endLine": 140
+        },
+        {
+          "name": "VITE_FIREBASE_MESSAGING_SENDER_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 141,
+          "endLine": 141
+        },
+        {
+          "name": "VITE_FIREBASE_APP_ID",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 142,
+          "endLine": 142
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 96
+      }
+    },
+    {
+      "path": "AGENTS.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 18,
+      "nonEmptyLines": 13,
+      "sections": [
+        {
+          "heading": "Frontend Design Skills",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Available Skill Categories",
+          "level": 2,
+          "line": 6
+        },
+        {
+          "heading": "Usage",
+          "level": 2,
+          "line": 15
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "FIX-CHECKLIST.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 97,
+      "nonEmptyLines": 82,
+      "sections": [
+        {
+          "heading": "CoduisZen Fix Checklist — Audit Remediation Tracker",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Part A — Critical 10 (immediate priority)",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "Part B — Sales (POS / tables / kitchen / orders)",
+          "level": 2,
+          "line": 18
+        },
+        {
+          "heading": "Part C — Call center & delivery",
+          "level": 2,
+          "line": 32
+        },
+        {
+          "heading": "Part D — Inventory & production",
+          "level": 2,
+          "line": 47
+        },
+        {
+          "heading": "Part E — Finance & reports",
+          "level": 2,
+          "line": 63
+        },
+        {
+          "heading": "Part F — HR & system",
+          "level": 2,
+          "line": 76
+        },
+        {
+          "heading": "Part G — Cross-cutting",
+          "level": 2,
+          "line": 93
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 8
+      }
+    },
+    {
+      "path": "TEST-CHECKLIST.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 89,
+      "nonEmptyLines": 73,
+      "sections": [
+        {
+          "heading": "0) دخول وصلاحيات",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "1) داشبورد",
+          "level": 2,
+          "line": 12
+        },
+        {
+          "heading": "2) نقطة البيع POS",
+          "level": 2,
+          "line": 19
+        },
+        {
+          "heading": "3) مطبخ KDS + استلام + طاولات + كشك",
+          "level": 2,
+          "line": 30
+        },
+        {
+          "heading": "4) كول سنتر + طلبات + مرتجعات",
+          "level": 2,
+          "line": 36
+        },
+        {
+          "heading": "5) مخزون ومشتريات",
+          "level": 2,
+          "line": 43
+        },
+        {
+          "heading": "6) مالية وخزينة",
+          "level": 2,
+          "line": 53
+        },
+        {
+          "heading": "7) موارد بشرية",
+          "level": 2,
+          "line": 60
+        },
+        {
+          "heading": "8) دليفري وسائقون",
+          "level": 2,
+          "line": 66
+        },
+        {
+          "heading": "9) تقارير وتسويق وتواصل",
+          "level": 2,
+          "line": 71
+        },
+        {
+          "heading": "10) منيو وإعدادات ونظام",
+          "level": 2,
+          "line": 77
+        },
+        {
+          "heading": "11) دخان تقني (أوامر)",
+          "level": 2,
+          "line": 84
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    },
+    {
+      "path": "cleardata.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 113,
+      "nonEmptyLines": 93,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "fixes.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 89,
+      "nonEmptyLines": 76,
+      "sections": [
+        {
+          "heading": "0) إصلاحات منجزة أثناء التدقيق",
+          "level": 2,
+          "line": 4
+        },
+        {
+          "heading": "1) UX حرجة: تدميري بلا تأكيد (أولوية P0)",
+          "level": 2,
+          "line": 8
+        },
+        {
+          "heading": "2) تجاوب RSP: أهداف لمس 44px (P0 — utility عام واحد)",
+          "level": 2,
+          "line": 33
+        },
+        {
+          "heading": "3) مودالات موبايل (P0 — كلاس موحد modal-full-mobile)",
+          "level": 2,
+          "line": 43
+        },
+        {
+          "heading": "4) hover-only مخفي لمس + جداول تفيض",
+          "level": 2,
+          "line": 49
+        },
+        {
+          "heading": "5) RTL ومعالجة اتجاه (P1)",
+          "level": 2,
+          "line": 57
+        },
+        {
+          "heading": "6) محاذاة جداول ALIGN (P1 — قاعدة: أرقام end + tabular-nums, عناوين = خلايا, لا text-left ثابت)",
+          "level": 2,
+          "line": 62
+        },
+        {
+          "heading": "7) داتابيز DB (P0 حرجة أولا)",
+          "level": 2,
+          "line": 69
+        },
+        {
+          "heading": "8) bug أفاتار header (مؤكد + مُصلح)",
+          "level": 2,
+          "line": 80
+        },
+        {
+          "heading": "9) خطة تنفيذ مقترحة",
+          "level": 2,
+          "line": 84
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 10
+      }
+    },
+    {
+      "path": "package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 135,
+      "nonEmptyLines": 135,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "scripts",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 48
+        },
+        {
+          "heading": "devDependencies",
+          "level": 1,
+          "line": 107
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "tsconfig.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 48,
+      "nonEmptyLines": 48,
+      "sections": [
+        {
+          "heading": "compilerOptions",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "exclude",
+          "level": 1,
+          "line": 29
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": "tsconfig.server.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 30,
+      "nonEmptyLines": 30,
+      "sections": [
+        {
+          "heading": "compilerOptions",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "include",
+          "level": 1,
+          "line": 19
+        },
+        {
+          "heading": "exclude",
+          "level": 1,
+          "line": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    }
+  ]
+}

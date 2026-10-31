@@ -1,7 +1,8 @@
 const resolveApiBaseUrl = () => {
     const configured = import.meta.env.VITE_API_URL || '/api';
     if (configured && !configured.startsWith('/')) return configured.replace(/\/+$/, '');
-    if (typeof window !== 'undefined' && import.meta.env.DEV && ['3000', '5173'].includes(window.location.port)) {
+    const port = typeof window !== 'undefined' ? window.location?.port : undefined;
+    if (typeof window !== 'undefined' && import.meta.env.DEV && ['3000', '5173'].includes(port || '')) {
         return `${window.location.protocol}//${window.location.hostname}:3001/api`;
     }
     return configured;
@@ -18,12 +19,33 @@ export type AppApiError = Error & {
     silent?: boolean;
 };
 
+const getApiErrorCode = (payload: any, status?: number): string => {
+    const nested = payload?.error && typeof payload.error === 'object' ? payload.error : null;
+    return String(payload?.code || (typeof payload?.error === 'string' ? payload.error : nested?.code) || (status ? `HTTP_${status}` : 'UNKNOWN_ERROR')).toUpperCase();
+};
+
+const getApiErrorMessage = (payload: any, fallback = 'Request failed'): string => {
+    const nested = payload?.error && typeof payload.error === 'object' ? payload.error : null;
+    return String(payload?.message || (typeof payload?.error === 'string' ? payload.error : nested?.message) || fallback);
+};
+
+const AUTH_FAILURE_CODES = new Set([
+    'AUTH_REQUIRED',
+    'INVALID_TOKEN',
+    'INVALID_TOKEN_SESSION',
+    'SESSION_REVOKED',
+    'SESSION_EXPIRED',
+    'USER_INACTIVE',
+]);
+
+const isAuthenticationFailure = (payload: any): boolean => AUTH_FAILURE_CODES.has(getApiErrorCode(payload));
+
 const toAppApiError = (
     payload: any,
     status: number,
     endpoint: string,
 ): AppApiError => {
-    const code = String(payload?.code || payload?.error || `HTTP_${status}`);
+    const code = getApiErrorCode(payload, status);
     const detailSummary = Array.isArray(payload?.details)
         ? payload.details
             .map((detail: any) => {
@@ -34,7 +56,7 @@ const toAppApiError = (
             .filter(Boolean)
             .join('; ')
         : '';
-    const baseMessage = String(payload?.message || payload?.error || code);
+    const baseMessage = getApiErrorMessage(payload, code);
     const message = detailSummary ? `${baseMessage}: ${detailSummary}` : baseMessage;
     const err = new Error(message) as AppApiError;
     err.status = status;
@@ -50,6 +72,8 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
     const fallback = lang === 'ar' ? 'حدث خطأ غير متوقع. حاول مرة أخرى.' : 'Unexpected error. Please try again.';
     const mapAr: Record<string, string> = {
         DATABASE_UNAVAILABLE: 'السيرفر بيعيد الاتصال بقاعدة البيانات. استنى ثوانٍ وهتتحمل البيانات لوحدها.',
+        NETWORK_UNAVAILABLE: 'الاتصال بالسيرفر انقطع. لم يتم تأكيد العملية؛ افحص الاتصال ثم أعد المحاولة مرة واحدة.',
+        SERVER_DRAINING: 'السيرفر بيعمل تحديثًا آمنًا. لم يتم تأكيد العملية؛ انتظر ثوانٍ ثم أعد المحاولة مرة واحدة.',
         REQUEST_TIMEOUT: 'الطلب أخد وقت أطول من اللازم. حاول مرة أخرى.',
         ORDER_BUSINESS_DAY_CLOSED: 'يوم تشغيل هذا الطلب مغلق. الطلب متاح للمراجعة والطباعة فقط.',
         ORDER_HISTORY_READ_ONLY: 'هذا الطلب تابع ليوم تشغيل سابق ومتاح للمراجعة والطباعة فقط.',
@@ -62,6 +86,8 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
         SHIFT_CLOSED: 'الشيفت المحدد اتقفل. افتح شيفت جديد ثم أعد إرسال الطلب.',
         INVALID_REFERENCE: 'أحد الاختيارات المرتبطة بالطلب غير موجود. حدّث الصفحة وراجع البيانات ثم أعد المحاولة.',
         INSUFFICIENT_INVENTORY: 'المخزون لا يكفي لحفظ الطلب. راجع مخزون مكونات الصنف أو اختر صنفًا آخر.',
+        OFFLINE_NON_CASH_PAYMENT_UNSUPPORTED: 'في الدفع المتعدد، أضف وسيلة دفع واحدة على الأقل ثم حاول مرة أخرى.',
+        DAY_CLOSE_REQUIRES_ONLINE: 'إغلاق اليوم يحتاج اتصالًا مباشرًا بالسيرفر. اتصل أولًا؛ لم يتم إغلاق أي شيء.',
         DUPLICATE_RECORD: 'هذا السجل موجود بالفعل. حدّث الصفحة ثم حاول مرة أخرى.',
         DATABASE_QUERY_FAILED: 'تعذر حفظ الطلب بسبب بيانات مرتبطة غير متناسقة. حدّث الصفحة وراجع العميل والفرع والشيفت.',
         RECORD_HAS_LINKED_DATA: 'لا يمكن حذف هذا السجل لأنه مرتبط ببيانات تشغيل. استخدم الأرشفة أو التعطيل بدل الحذف.',
@@ -114,6 +140,8 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
     };
     const mapEn: Record<string, string> = {
         DATABASE_UNAVAILABLE: 'The server is reconnecting to the database. Data will load automatically in a few seconds.',
+        NETWORK_UNAVAILABLE: 'The server connection was lost. The operation was not confirmed; check the connection and retry once.',
+        SERVER_DRAINING: 'The server is applying a safe update. The operation was not confirmed; wait a few seconds and retry once.',
         REQUEST_TIMEOUT: 'The request took too long. Please retry.',
         ORDER_BUSINESS_DAY_CLOSED: 'This order belongs to a closed business day and is available for review and printing only.',
         ORDER_HISTORY_READ_ONLY: 'This order belongs to a previous business day and is available for review and printing only.',
@@ -156,6 +184,8 @@ export const getActionableErrorMessage = (error: any, lang: 'en' | 'ar' = 'en') 
         INVALID_REFERENCE: 'One selected record is missing. Refresh, review the order data, then retry.',
         INVALID_MENU_ITEM: 'One cart item is not linked to an existing menu item. Remove it and add it again from the menu.',
         INSUFFICIENT_INVENTORY: 'Not enough recipe stock to save this order. Review item ingredients stock or choose another item.',
+        OFFLINE_NON_CASH_PAYMENT_UNSUPPORTED: 'Split payment requires at least one payment leg. Add a payment method and retry.',
+        DAY_CLOSE_REQUIRES_ONLINE: 'Day close requires a live server connection. Reconnect first; nothing was closed.',
         DUPLICATE_RECORD: 'This record already exists. Refresh the page and retry.',
         DATABASE_QUERY_FAILED: 'The order could not be saved because related data is inconsistent. Review customer, branch, and shift.',
         RECORD_HAS_LINKED_DATA: 'This record is linked to operational data. Archive or deactivate it instead of deleting.',
@@ -389,7 +419,7 @@ const maybeProactiveRefresh = (endpoint: string) => {
     }
 };
 
-if (typeof window !== 'undefined' && !(window as any).__coduiszenRefreshPrimer) {
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(window as any).__coduiszenRefreshPrimer) {
     (window as any).__coduiszenRefreshPrimer = true;
     // Sleep/wake, locked PC, throttled tab: revalidate silently on return
     // instead of spraying 401s across every poller.
@@ -415,7 +445,7 @@ if (typeof window !== 'undefined' && !(window as any).__coduiszenRefreshPrimer) 
 // the request-time 401 path remains the sole logout decider. Hidden/minimized
 // tabs still fire (throttled but well within the window).
 const HEARTBEAT_MS = 10 * 60 * 1000;
-if (typeof window !== 'undefined' && !(window as any).__coduiszenHeartbeat) {
+if (typeof window !== 'undefined' && typeof window.setInterval === 'function' && !(window as any).__coduiszenHeartbeat) {
     (window as any).__coduiszenHeartbeat = true;
     window.setInterval(() => {
         try {
@@ -427,16 +457,22 @@ if (typeof window !== 'undefined' && !(window as any).__coduiszenHeartbeat) {
     }, HEARTBEAT_MS);
 }
 
+type ApiRequestOptions = RequestInit & { timeoutMs?: number };
+
 export async function apiRequest<T>(
     endpoint: string,
-    options: RequestInit = {},
+    options: ApiRequestOptions = {},
 ): Promise<T> {
+    const { timeoutMs, ...requestOptions } = options;
+    const requestTimeoutMs = Number.isFinite(timeoutMs)
+        ? Math.min(120_000, Math.max(5_000, Number(timeoutMs)))
+        : REQUEST_TIMEOUT_MS;
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
-    const method = String(options.method || 'GET').toUpperCase();
+    const method = String(requestOptions.method || 'GET').toUpperCase();
     // Renew ahead of expiry so this request (and every poller behind it)
     // rarely meets a dead access token at all.
     maybeProactiveRefresh(endpoint);
-    const cacheable = method === 'GET' && options.cache !== 'no-store';
+    const cacheable = method === 'GET' && requestOptions.cache !== 'no-store';
     const cacheKey = `${url}|${getAuthToken() || ''}`;
     if (cacheable) {
         const cached = getCache.get(cacheKey);
@@ -449,11 +485,14 @@ export async function apiRequest<T>(
 
     const authToken = getAuthToken();
     const config: RequestInit = {
-        ...options,
+        ...requestOptions,
         headers: {
             'Content-Type': 'application/json',
+            ...requestOptions.headers,
+            // Authorization must be last. Some callers retain the token that
+            // was captured before a refresh; allowing caller headers to win
+            // would make the retry send the expired token again.
             ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-            ...options.headers,
         },
     };
 
@@ -461,8 +500,8 @@ export async function apiRequest<T>(
       const attemptRequest = async (attempt: number): Promise<T> => {
       const timedOut = { value: false };
       const timeoutController = new AbortController();
-      const callerSignal = (options as any)?.signal as AbortSignal | undefined;
-      const timer = setTimeout(() => { timedOut.value = true; timeoutController.abort(); }, REQUEST_TIMEOUT_MS);
+      const callerSignal = requestOptions.signal;
+      const timer = setTimeout(() => { timedOut.value = true; timeoutController.abort(); }, requestTimeoutMs);
       if (callerSignal) {
           if (callerSignal.aborted) timeoutController.abort();
           else callerSignal.addEventListener('abort', () => timeoutController.abort(), { once: true });
@@ -495,16 +534,21 @@ export async function apiRequest<T>(
         if (!response.ok) {
             const error = await response.json().catch(() => ({ code: `HTTP_${response.status}`, message: 'Request failed' }));
 
-            if (response.status === 401 && canAttemptTokenRefresh(endpoint)) {
+            // A provider can legitimately return 401 (missing/invalid AI key).
+            // Only refresh the app session for an auth-shaped 401; otherwise
+            // the old behavior logs the user out and masks the provider error.
+            if (response.status === 401 && canAttemptTokenRefresh(endpoint) && isAuthenticationFailure(error)) {
                 const outcome = await tryRefreshToken();
                 if (outcome.token) {
                     const newToken = outcome.token;
                     const retryResponse = await fetch(url, {
-                        ...options,
+                        ...requestOptions,
                         headers: {
                             'Content-Type': 'application/json',
+                            ...requestOptions.headers,
+                            // Always override the original request header with
+                            // the token returned by /auth/refresh.
                             Authorization: `Bearer ${newToken}`,
-                            ...options.headers,
                         },
                     });
                     if (retryResponse.ok) {
@@ -566,8 +610,8 @@ export async function apiRequest<T>(
       } catch (error: any) {
         // Aborted searches (typing fast in POS customer box) are normal —
         // never surface them and never trigger logout flows.
-        if (error?.name === 'AbortError' || (options as any)?.signal?.aborted) {
-            if (timedOut.value && !(options as any)?.signal?.aborted) {
+        if (error?.name === 'AbortError' || requestOptions.signal?.aborted) {
+            if (timedOut.value && !requestOptions.signal?.aborted) {
                 throw toAppApiError({ code: 'REQUEST_TIMEOUT', message: 'Request timed out. Please retry.' }, 408, endpoint);
             }
             const abortErr = new Error('Aborted') as AppApiError;
@@ -581,6 +625,15 @@ export async function apiRequest<T>(
         if (method === 'GET' && attempt < RETRY_DELAYS_MS.length && isNetworkFailure(error)) {
             await sleep(RETRY_DELAYS_MS[attempt]);
             return attemptRequest(attempt + 1);
+        }
+        // A mutation may have reached the server before the transport failed.
+        // Never retry it here: expose a deterministic, actionable error so the
+        // domain idempotency flow or an operator can reconcile it safely.
+        if (isNetworkFailure(error)) {
+            throw toAppApiError({
+                code: 'NETWORK_UNAVAILABLE',
+                message: 'Server connection lost; operation was not confirmed.',
+            }, 503, endpoint);
         }
         throw error;
       } finally {
@@ -609,8 +662,8 @@ export async function apiRequestBlob(
     const config: RequestInit = {
         ...options,
         headers: {
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
             ...options.headers,
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
     };
     const response = await fetch(url, config);

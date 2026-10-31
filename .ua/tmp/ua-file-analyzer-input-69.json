@@ -1,0 +1,187 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/common/Tag.tsx",
+      "language": "typescript",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Timeline.tsx",
+      "language": "typescript",
+      "sizeLines": 57,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Toggle.tsx",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Tooltip.tsx",
+      "language": "typescript",
+      "sizeLines": 62,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/DashboardCharts.tsx",
+      "language": "typescript",
+      "sizeLines": 125,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/MetricSparkline.tsx",
+      "language": "typescript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/WidgetContainer.tsx",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/tiles/ModuleTile.tsx",
+      "language": "typescript",
+      "sizeLines": 126,
+      "fileCategory": "code"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-12-whatsapp-baileys.md",
+      "language": "markdown",
+      "sizeLines": 158,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-14-day-close-auto-close.md",
+      "language": "markdown",
+      "sizeLines": 178,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-12-whatsapp-baileys-design.md",
+      "language": "markdown",
+      "sizeLines": 84,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-14-day-close-auto-close-design.md",
+      "language": "markdown",
+      "sizeLines": 87,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "drizzle.config.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "drizzle/relations.ts",
+      "language": "typescript",
+      "sizeLines": 1333,
+      "fileCategory": "code"
+    },
+    {
+      "path": "eslint.config.cjs",
+      "language": "javascript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hardware-bridge/index.js",
+      "language": "javascript",
+      "sizeLines": 914,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hardware-bridge/png-raster.js",
+      "language": "javascript",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useBeforeUnload.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useClickOutside.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useCopyToClipboard.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useCountUp.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useFaviconBadge.ts",
+      "language": "typescript",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useFetch.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useForm.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useInterval.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/common/Tag.tsx": [],
+    "components/common/Timeline.tsx": [],
+    "components/common/Toggle.tsx": [],
+    "components/common/Tooltip.tsx": [],
+    "components/dashboard/DashboardCharts.tsx": [],
+    "components/dashboard/MetricSparkline.tsx": [],
+    "components/dashboard/WidgetContainer.tsx": [],
+    "components/tiles/ModuleTile.tsx": [
+      "hooks/useTiltEffect.ts"
+    ],
+    "docs/superpowers/plans/2026-10-12-whatsapp-baileys.md": [],
+    "docs/superpowers/plans/2026-10-14-day-close-auto-close.md": [],
+    "docs/superpowers/specs/2026-10-12-whatsapp-baileys-design.md": [],
+    "docs/superpowers/specs/2026-10-14-day-close-auto-close-design.md": [],
+    "drizzle.config.ts": [],
+    "drizzle/relations.ts": [],
+    "eslint.config.cjs": [],
+    "hardware-bridge/index.js": [
+      "hardware-bridge/package.json",
+      "hardware-bridge/png-raster.js"
+    ],
+    "hardware-bridge/png-raster.js": [],
+    "hooks/useBeforeUnload.ts": [],
+    "hooks/useClickOutside.ts": [],
+    "hooks/useCopyToClipboard.ts": [],
+    "hooks/useCountUp.ts": [],
+    "hooks/useFaviconBadge.ts": [],
+    "hooks/useFetch.ts": [],
+    "hooks/useForm.ts": [],
+    "hooks/useInterval.ts": []
+  }
+}

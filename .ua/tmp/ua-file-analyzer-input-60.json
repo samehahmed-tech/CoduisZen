@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/print-bridge-resilience-fix/Apply Print Bridge Resilience Fix.bat",
+      "language": "batch",
+      "sizeLines": 4,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/print-bridge-resilience-fix/Apply Print Bridge Resilience Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 70,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/print-bridge-resilience-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/print-bridge-resilience-fix/Apply Print Bridge Resilience Fix.bat": [],
+    "scripts/sameh-installer/print-bridge-resilience-fix/Apply Print Bridge Resilience Fix.ps1": [],
+    "scripts/sameh-installer/print-bridge-resilience-fix/README AR.txt": []
+  }
+}

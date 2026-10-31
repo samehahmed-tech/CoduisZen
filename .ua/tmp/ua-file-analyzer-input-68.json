@@ -1,0 +1,186 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": ".ua/config.json",
+      "language": "json",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": "Final Update.7z",
+      "language": "7z",
+      "sizeLines": 120575,
+      "fileCategory": "code"
+    },
+    {
+      "path": "Rosa-Cafe-Production-Import/import-rosa-cafe-reset.bat",
+      "language": "batch",
+      "sizeLines": 45,
+      "fileCategory": "script"
+    },
+    {
+      "path": "Rosa-Cafe-Production-Import/import-rosa-cafe-reset.cjs",
+      "language": "javascript",
+      "sizeLines": 378,
+      "fileCategory": "code"
+    },
+    {
+      "path": "Rosa-Cafe-Production-Import/rosa-cafe-catalog-data.cjs",
+      "language": "javascript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "Rosa-Cafe-Production-Import/scripts/import-rosa-cafe-reset.cjs",
+      "language": "javascript",
+      "sizeLines": 378,
+      "fileCategory": "code"
+    },
+    {
+      "path": "Rosa-Cafe-Production-Import/scripts/rosa-cafe-catalog-data.cjs",
+      "language": "javascript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/AdminDashboardCharts.tsx",
+      "language": "typescript",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Badge.tsx",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Button.tsx",
+      "language": "typescript",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Card.tsx",
+      "language": "typescript",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Divider.tsx",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Drawer.tsx",
+      "language": "typescript",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/EmptyState.tsx",
+      "language": "typescript",
+      "sizeLines": 120,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/InputField.tsx",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Kbd.tsx",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/OnlineStatus.tsx",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Responsive.tsx",
+      "language": "typescript",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ScrollToTop.tsx",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/SectionHeader.tsx",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Spinner.tsx",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/StatCard.tsx",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/StatusBadge.tsx",
+      "language": "typescript",
+      "sizeLines": 122,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Stepper.tsx",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Tabs.tsx",
+      "language": "typescript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    ".ua/config.json": [],
+    "Final Update.7z": [],
+    "Rosa-Cafe-Production-Import/import-rosa-cafe-reset.bat": [],
+    "Rosa-Cafe-Production-Import/import-rosa-cafe-reset.cjs": [
+      "Rosa-Cafe-Production-Import/rosa-cafe-catalog-data.cjs"
+    ],
+    "Rosa-Cafe-Production-Import/rosa-cafe-catalog-data.cjs": [],
+    "Rosa-Cafe-Production-Import/scripts/import-rosa-cafe-reset.cjs": [
+      "Rosa-Cafe-Production-Import/scripts/rosa-cafe-catalog-data.cjs"
+    ],
+    "Rosa-Cafe-Production-Import/scripts/rosa-cafe-catalog-data.cjs": [],
+    "components/AdminDashboardCharts.tsx": [],
+    "components/common/Badge.tsx": [],
+    "components/common/Button.tsx": [],
+    "components/common/Card.tsx": [],
+    "components/common/Divider.tsx": [],
+    "components/common/Drawer.tsx": [],
+    "components/common/EmptyState.tsx": [],
+    "components/common/InputField.tsx": [],
+    "components/common/Kbd.tsx": [],
+    "components/common/OnlineStatus.tsx": [],
+    "components/common/Responsive.tsx": [],
+    "components/common/ScrollToTop.tsx": [],
+    "components/common/SectionHeader.tsx": [],
+    "components/common/Spinner.tsx": [],
+    "components/common/StatCard.tsx": [],
+    "components/common/StatusBadge.tsx": [],
+    "components/common/Stepper.tsx": [],
+    "components/common/Tabs.tsx": []
+  }
+}

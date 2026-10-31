@@ -116,6 +116,7 @@ export function useReportsState() {
    const [serviceChargeData, setServiceChargeData] = useState<any>(null);
    const [shiftSummaryData, setShiftSummaryData] = useState<any[]>([]);
     const [actualVsTheoreticalData, setActualVsTheoreticalData] = useState<any[]>([]);
+    const [actualVsTheoreticalSummary, setActualVsTheoreticalSummary] = useState<any>(null);
     const [productionBatchesData, setProductionBatchesData] = useState<any[]>([]);
     const [suppliersData, setSuppliersData] = useState<any[]>([]);
     const [purchaseOrdersData, setPurchaseOrdersData] = useState<any[]>([]);
@@ -265,7 +266,7 @@ export function useReportsState() {
                case 'Waste/Loss Log': { const r = await reportsApi.getWasteLoss(params).catch(() => null); setWasteLoss(r as any); break; }
                case 'Reorder Alerts': { const r = await reportsApi.getReorderAlerts().catch(() => []); setReorderAlerts(r as any || []); break; }
                case 'Expiring Batches': { const r = await reportsApi.getExpiringBatches().catch(() => null); setExpiringBatches(r as any); break; }
-               case 'Actual vs Theoretical': { const r = await reportsApi.getActualVsTheoretical(params).catch(() => []); setActualVsTheoreticalData(r as any || []); break; }
+               case 'Actual vs Theoretical': { const r: any = await reportsApi.getActualVsTheoretical(params).catch(() => []); setActualVsTheoreticalData(Array.isArray(r) ? r : (r?.rows || [])); setActualVsTheoreticalSummary(Array.isArray(r) ? null : (r?.summary || null)); break; }
                 case 'Purchase History': { const r = await reportsApi.getPurchaseHistory(params).catch(() => null); setPurchaseHistoryData(r as any); break; }
                 case 'Production Batches': { const r = await productionApi.getOrders({ branchId: params.branchId }).catch(() => []); setProductionBatchesData(r as any || []); break; }
                 case 'Suppliers': { const r = await suppliersApi.getAll().catch(() => []); setSuppliersData(r as any || []); break; }
@@ -584,7 +585,7 @@ export function useReportsState() {
       slowMovingItems, revenueByWeekday, voidItemsData,
       discountByCashier, voidsByCashier, deadStock, negativeStock, unpaidOrders,
       tipsData, serviceChargeData, shiftSummaryData,
-       actualVsTheoreticalData, purchaseHistoryData, inventoryValuationData,
+       actualVsTheoreticalData, actualVsTheoreticalSummary, purchaseHistoryData, inventoryValuationData,
        productionBatchesData, suppliersData, purchaseOrdersData,
       staffCostData, salesPerLaborData,
       customerRetentionData, newVsReturningData, customerFrequencyData,

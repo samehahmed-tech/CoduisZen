@@ -1,0 +1,310 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/routes/settingsRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/setupRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/shiftRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/subscriptionRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/supplierRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/tableRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/talabatAdminRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/ttsRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/userRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/waitlistRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/warehouseRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/wastageRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/whatsappRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/whatsappWebhookRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/mapkitService.ts",
+      "language": "typescript",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/orderStatusPolicy.ts",
+      "language": "typescript",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/imageStorage.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/operationalRoles.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/branchIsolation.test.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/customPaymentValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/imageStorage.test.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/menuItemValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/operationalRoles.test.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderStatusConflict.test.ts",
+      "language": "typescript",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderStatusPolicy.test.ts",
+      "language": "typescript",
+      "sizeLines": 141,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/perfInfra.test.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/printGatewayAuth.test.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/printGatewayValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/publicScreenSecurity.test.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/refundValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 33,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/whatsappWebhookAuth.test.ts",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/routes/settingsRoutes.ts": [
+      "server/controllers/settingsController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/setupRoutes.ts": [
+      "server/controllers/setupController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/shiftRoutes.ts": [
+      "server/controllers/shiftController.ts",
+      "server/middleware/auth.ts",
+      "server/middleware/branchIsolation.ts",
+      "server/utils/operationalRoles.ts"
+    ],
+    "server/routes/subscriptionRoutes.ts": [
+      "server/services/subscriptionService.ts"
+    ],
+    "server/routes/supplierRoutes.ts": [
+      "server/controllers/supplierController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/tableRoutes.ts": [
+      "server/controllers/tableController.ts",
+      "server/middleware/auth.ts",
+      "server/middleware/branchIsolation.ts",
+      "server/utils/operationalRoles.ts"
+    ],
+    "server/routes/talabatAdminRoutes.ts": [
+      "server/controllers/talabatAdminController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/ttsRoutes.ts": [],
+    "server/routes/userRoutes.ts": [
+      "server/controllers/userController.ts",
+      "server/middleware/auth.ts",
+      "server/middleware/validate.ts",
+      "server/middleware/validation.ts"
+    ],
+    "server/routes/waitlistRoutes.ts": [
+      "server/controllers/waitlistController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/warehouseRoutes.ts": [
+      "server/controllers/warehouseController.ts",
+      "server/middleware/auth.ts",
+      "server/middleware/branchIsolation.ts",
+      "server/utils/operationalRoles.ts"
+    ],
+    "server/routes/wastageRoutes.ts": [
+      "server/controllers/wastageController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/whatsappRoutes.ts": [
+      "server/controllers/whatsappController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/whatsappWebhookRoutes.ts": [
+      "server/controllers/whatsappController.ts",
+      "server/middleware/whatsappWebhookAuth.ts"
+    ],
+    "server/services/mapkitService.ts": [],
+    "server/services/orderStatusPolicy.ts": [],
+    "server/utils/imageStorage.ts": [],
+    "server/utils/operationalRoles.ts": [],
+    "tests/branchIsolation.test.ts": [
+      "server/middleware/branchIsolation.ts"
+    ],
+    "tests/customPaymentValidation.test.ts": [
+      "server/middleware/validation.ts"
+    ],
+    "tests/imageStorage.test.ts": [
+      "server/utils/imageStorage.ts"
+    ],
+    "tests/menuItemValidation.test.ts": [
+      "server/middleware/validation.ts"
+    ],
+    "tests/operationalRoles.test.ts": [
+      "server/middleware/auth.ts",
+      "server/utils/operationalRoles.ts"
+    ],
+    "tests/orderStatusConflict.test.ts": [
+      "server/middleware/validation.ts",
+      "server/services/orderStatusPolicy.ts"
+    ],
+    "tests/orderStatusPolicy.test.ts": [
+      "server/services/orderStatusPolicy.ts"
+    ],
+    "tests/orderValidation.test.ts": [
+      "server/middleware/validation.ts"
+    ],
+    "tests/perfInfra.test.ts": [
+      "server/controllers/rumController.ts",
+      "server/middleware/rateLimit.ts",
+      "server/middleware/requestTiming.ts"
+    ],
+    "tests/printGatewayAuth.test.ts": [
+      "server/middleware/printGatewayAuth.ts",
+      "server/middleware/security.ts"
+    ],
+    "tests/printGatewayValidation.test.ts": [
+      "server/controllers/printGatewayController.ts"
+    ],
+    "tests/publicScreenSecurity.test.ts": [
+      "server/app.ts"
+    ],
+    "tests/refundValidation.test.ts": [
+      "server/middleware/validation.ts"
+    ],
+    "tests/whatsappWebhookAuth.test.ts": [
+      "server/middleware/whatsappWebhookAuth.ts"
+    ]
+  }
+}

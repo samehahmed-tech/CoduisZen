@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as customerController from '../controllers/customerController';
-import { requireRoleOrPermission } from '../middleware/auth';
+import { requireRoleOrPermission, requireRoles } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
 
@@ -9,9 +9,15 @@ const posAuth = requireRoleOrPermission(
     [...POS_FLOOR_ROLES, 'CALL_CENTER', 'CALL_CENTER_MANAGER'],
     ['OP_MANAGE_CUSTOMERS'],
 );
+const mergeAuth = requireRoles('SUPER_ADMIN', 'CALL_CENTER_MANAGER');
 
 router.get('/', posAuth, enforceBranch, customerController.getAllCustomers);
+router.get('/identity-candidates', posAuth, enforceBranch, customerController.getCustomerIdentityCandidates);
+router.get('/identity-duplicates', posAuth, enforceBranch, customerController.getCustomerDuplicateReport);
 router.get('/phone/:phone', posAuth, enforceBranch, customerController.getCustomerByPhone);
+router.post('/:id/merge', mergeAuth, enforceBranch, customerController.mergeCustomer);
+router.patch('/:id/marketing-consent', posAuth, enforceBranch, customerController.updateMarketingConsent);
+router.get('/:id/360', posAuth, enforceBranch, customerController.getCustomer360);
 router.get('/:id', posAuth, enforceBranch, customerController.getCustomerById);
 router.post('/', posAuth, enforceBranch, customerController.createCustomer);
 router.put('/:id', posAuth, enforceBranch, customerController.updateCustomer);

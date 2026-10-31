@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/business-day-reopen-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 18,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/business-day-reopen-fix/Reopen Business Day.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/business-day-reopen-fix/Reopen Business Day.ps1",
+      "language": "powershell",
+      "sizeLines": 109,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/business-day-reopen-fix/README AR.txt": [],
+    "scripts/business-day-reopen-fix/Reopen Business Day.bat": [],
+    "scripts/business-day-reopen-fix/Reopen Business Day.ps1": []
+  }
+}

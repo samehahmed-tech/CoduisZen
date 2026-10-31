@@ -7,6 +7,8 @@ import { submitOrderToFiscal } from '../services/fiscalSubmitService';
 import { etaService } from '../services/etaService';
 import { FISCAL_SELLER_ENV_KEYS } from '../services/fiscalService';
 import { writeDbError } from '../utils/dbErrors';
+import { createSignedAuditLog } from '../services/auditService';
+import { sanitizeEtaDeadLetter } from '../utils/etaDeadLetterSecurity';
 
 const FISCAL_REQUIRED_ENV = [
     'ETA_BASE_URL',
@@ -17,6 +19,18 @@ const FISCAL_REQUIRED_ENV = [
     'ETA_PRIVATE_KEY',
     ...FISCAL_SELLER_ENV_KEYS,
 ];
+
+const auditFiscalMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Fiscal mutation: ${eventType}`,
+});
 
 const getDateRange = (dateFrom?: string, dateTo?: string) => {
     const end = dateTo ? new Date(dateTo) : new Date();
@@ -37,6 +51,7 @@ export const submitReceipt = async (req: Request, res: Response) => {
         if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
         const force = Boolean(req.body?.force);
         const result = await submitOrderToFiscal(orderId, { force, branchId: req.effectiveBranchId });
+        await auditFiscalMutation(req, 'FISCAL_RECEIPT_SUBMITTED', { orderId, force }, { success: true, status: (result as any)?.status || 'SUBMITTED' });
         res.json({ success: true, ...result });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -54,7 +69,7 @@ export const getFiscalLogs = async (req: Request, res: Response) => {
             query = query.where(eq(fiscalLogs.branchId, branchId));
         }
         const rows = await query.orderBy(desc(fiscalLogs.createdAt)).offset(0).fetch(Math.min(200, limit));
-        res.json(rows);
+        res.json(rows.map(sanitizeEtaDeadLetter));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -131,7 +146,7 @@ export const getDeadLetters = async (req: Request, res: Response) => {
             ))
             .orderBy(desc(etaDeadLetters.updatedAt));
 
-        res.json(rows);
+        res.json(rows.map(sanitizeEtaDeadLetter));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -151,9 +166,10 @@ export const retryDeadLetter = async (req: Request, res: Response) => {
         }
 
         const result = await etaService.retryDeadLetter(id);
+        await auditFiscalMutation(req, 'FISCAL_DEAD_LETTER_RETRIED', { deadLetterId: id }, { retried: true });
         res.json({ success: true, result });
     } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        res.status(Number(error?.status) || 500).json({ error: error.message });
     }
 };
 
@@ -175,6 +191,7 @@ export const dismissDeadLetter = async (req: Request, res: Response) => {
         }
 
         await etaService.dismissDeadLetter(id, userId);
+        await auditFiscalMutation(req, 'FISCAL_DEAD_LETTER_DISMISSED', { deadLetterId: id }, { dismissed: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

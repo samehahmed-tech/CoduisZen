@@ -7,16 +7,22 @@ import { eq, notInArray, sql } from 'drizzle-orm';
 import { toSettingValue } from '../utils/settingsStore.js';
 import { validatePassword } from '../services/passwordPolicyService';
 import { AppPermission, UserRole, INITIAL_ROLE_PERMISSIONS } from '../../types';
+import { isStrongSecret, resolveConfiguredSecret } from '../utils/secretConfig';
+import { createSignedAuditLog } from '../services/auditService';
 
-// Coduis Master gate: the setup wizard is a dealer-only tool. The key can be
-// rotated via env without a code change; the fallback is the master password.
-const CODUIS_MASTER_KEY = process.env.CODUIS_MASTER_KEY || process.env.DEALER_SETUP_KEY || 'Chaos@$321';
+// Coduis Master gate: the setup wizard is a dealer-only tool. There is no
+// source-code fallback; a missing/weak production secret must fail closed.
+const getCoduisMasterKey = () => resolveConfiguredSecret(process.env.CODUIS_MASTER_KEY, process.env.DEALER_SETUP_KEY);
 
 const readMasterKey = (body: any): string =>
     String(body?.masterKey ?? body?.dealerKey ?? '').trim();
 
 export const verifyMasterKey = (req: Request, res: Response) => {
-    if (readMasterKey(req.body) && readMasterKey(req.body) === CODUIS_MASTER_KEY) {
+    const configuredKey = getCoduisMasterKey();
+    if (!configuredKey || (process.env.NODE_ENV === 'production' && !isStrongSecret(configuredKey))) {
+        return res.status(503).json({ error: 'MASTER_KEY_NOT_CONFIGURED' });
+    }
+    if (readMasterKey(req.body) && readMasterKey(req.body) === configuredKey) {
         return res.json({ ok: true });
     }
     return res.status(403).json({ error: 'INVALID_MASTER_KEY' });
@@ -159,7 +165,11 @@ export const bootstrapSetup = async (req: Request, res: Response) => {
         const body = req.body || {};
 
         // Coduis-Master-only gate: the wizard must send the master key.
-        if (readMasterKey(body) !== CODUIS_MASTER_KEY) {
+        const configuredKey = getCoduisMasterKey();
+        if (!configuredKey || (process.env.NODE_ENV === 'production' && !isStrongSecret(configuredKey))) {
+            return res.status(503).json({ error: 'MASTER_KEY_NOT_CONFIGURED' });
+        }
+        if (readMasterKey(body) !== configuredKey) {
             return res.status(403).json({ error: 'INVALID_MASTER_KEY' });
         }
 
@@ -405,6 +415,23 @@ export const bootstrapSetup = async (req: Request, res: Response) => {
             console.error('[SETUP] Failed to seed COA:', seedError);
         }
 
+        await createSignedAuditLog({
+            eventType: 'SETUP_BOOTSTRAPPED',
+            userId: req.user?.id || 'system',
+            userRole: adminIdentity.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: {
+                branchId,
+                staffCreated: setupStaff.length,
+                printersConfigured: setupPrinters.length,
+                rolesConfigured: setupRoles.length,
+                tablesConfigured: setupTables.length,
+            },
+            after: { initialized: true },
+            reason: 'Initial setup completed without recording master key or credentials',
+        });
         res.status(201).json({ ok: true, staffCreated: setupStaff.length });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -415,6 +442,17 @@ export const seedCOA = async (req: Request, res: Response) => {
     try {
         const { COASeedService } = await import('../services/coaSeedService');
         await COASeedService.seed();
+        await createSignedAuditLog({
+            eventType: 'SETUP_COA_SEEDED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId || req.user?.branchId || null,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { seeded: true },
+            after: { seeded: true },
+            reason: 'Chart of accounts seeded',
+        });
         res.json({ ok: true, message: 'Chart of Accounts structured and seeded successfully.' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -580,7 +618,7 @@ export const resetTestData = async (req: Request, res: Response) => {
             }
         });
 
-        res.json({
+        const result = {
             ok: true,
             mode: 'OPERATIONAL_HANDOVER_RESET',
             truncated: deleteOrder.length,
@@ -589,7 +627,20 @@ export const resetTestData = async (req: Request, res: Response) => {
             stockReset,
             tableOccupancyReset,
             businessDayReset,
+        };
+        await createSignedAuditLog({
+            eventType: 'SETUP_TEST_DATA_RESET',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId || req.user?.branchId || null,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { mode: result.mode, truncated: result.truncated, skippedCount: result.skipped.length, tables: result.tables },
+            before: { operationalDataPresent: true },
+            after: { operationalDataReset: true },
+            reason: 'Operational handover reset completed',
         });
+        res.json(result);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

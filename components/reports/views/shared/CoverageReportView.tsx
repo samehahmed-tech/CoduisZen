@@ -21,7 +21,7 @@ const pickColumns = (rows: any[]) => {
       return {
          key: k,
          label: k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()),
-         align: (i === 0 ? 'left' : 'right') as const,
+         align: i === 0 ? 'left' as const : 'right' as const,
          sum: numeric && !isPct && i > 0,
          format: (v: any) => {
             if (v == null || v === '') return '—';

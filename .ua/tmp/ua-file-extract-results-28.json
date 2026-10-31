@@ -1,0 +1,1176 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 8,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 8,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 8,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "server/gateway-adapters/fawryAdapter.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 33,
+      "exports": [
+        {
+          "name": "fawryAdapter",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 19
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Object.assign",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Object.assign",
+          "lineNumber": 23
+        },
+        {
+          "caller": "refund",
+          "callee": "String",
+          "lineNumber": 31
+        },
+        {
+          "caller": "refund",
+          "callee": "Object.assign",
+          "lineNumber": 33
+        },
+        {
+          "caller": "refund",
+          "callee": "Object.assign",
+          "lineNumber": 35
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/gateway-adapters/instaPayAdapter.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 36,
+      "nonEmptyLines": 31,
+      "exports": [
+        {
+          "name": "instaPayAdapter",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createCheckout",
+          "callee": "createIntention",
+          "lineNumber": 13
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Number",
+          "lineNumber": 14
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "handleCallback",
+          "lineNumber": 24
+        },
+        {
+          "caller": "refund",
+          "callee": "import",
+          "lineNumber": 31
+        },
+        {
+          "caller": "refund",
+          "callee": "refundTransaction",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/gateway-adapters/paymobAdapter.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 29,
+      "exports": [
+        {
+          "name": "paymobAdapter",
+          "line": 8,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createCheckout",
+          "callee": "createIntention",
+          "lineNumber": 12
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Number",
+          "lineNumber": 13
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "handleCallback",
+          "lineNumber": 23
+        },
+        {
+          "caller": "refund",
+          "callee": "refundTransaction",
+          "lineNumber": 30
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/gateway-adapters/stripeAdapter.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 33,
+      "exports": [
+        {
+          "name": "stripeAdapter",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 19
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Object.assign",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Object.assign",
+          "lineNumber": 23
+        },
+        {
+          "caller": "refund",
+          "callee": "String",
+          "lineNumber": 31
+        },
+        {
+          "caller": "refund",
+          "callee": "Object.assign",
+          "lineNumber": 33
+        },
+        {
+          "caller": "refund",
+          "callee": "Object.assign",
+          "lineNumber": 35
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/gateway-adapters/vodafoneCashAdapter.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 36,
+      "nonEmptyLines": 30,
+      "exports": [
+        {
+          "name": "vodafoneCashAdapter",
+          "line": 12,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Object.assign",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Object.assign",
+          "lineNumber": 20
+        },
+        {
+          "caller": "refund",
+          "callee": "String",
+          "lineNumber": 28
+        },
+        {
+          "caller": "refund",
+          "callee": "Object.assign",
+          "lineNumber": 30
+        },
+        {
+          "caller": "refund",
+          "callee": "Object.assign",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/payments/paymobService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 264,
+      "nonEmptyLines": 242,
+      "functions": [
+        {
+          "name": "getPaymobConfigRaw",
+          "startLine": 37,
+          "endLine": 44,
+          "params": []
+        },
+        {
+          "name": "getPaymobConfig",
+          "startLine": 46,
+          "endLine": 50,
+          "params": []
+        },
+        {
+          "name": "savePaymobConfig",
+          "startLine": 52,
+          "endLine": 65,
+          "params": [
+            "input",
+            "updatedBy"
+          ]
+        },
+        {
+          "name": "toCents",
+          "startLine": 67,
+          "endLine": 67,
+          "params": [
+            "amount"
+          ]
+        },
+        {
+          "name": "buildIframeUrl",
+          "startLine": 69,
+          "endLine": 70,
+          "params": [
+            "base",
+            "iframeId",
+            "paymentKey"
+          ]
+        },
+        {
+          "name": "hmacField",
+          "startLine": 80,
+          "endLine": 84,
+          "params": [
+            "obj",
+            "path"
+          ]
+        },
+        {
+          "name": "safeEqual",
+          "startLine": 86,
+          "endLine": 90,
+          "params": [
+            "a",
+            "b"
+          ]
+        },
+        {
+          "name": "verifyPaymobHmac",
+          "startLine": 93,
+          "endLine": 104,
+          "params": [
+            "obj",
+            "secret"
+          ]
+        },
+        {
+          "name": "baseOf",
+          "startLine": 106,
+          "endLine": 107,
+          "params": [
+            "config"
+          ]
+        },
+        {
+          "name": "requestAuthToken",
+          "startLine": 109,
+          "endLine": 118,
+          "params": [
+            "config"
+          ]
+        },
+        {
+          "name": "defaultBilling",
+          "startLine": 135,
+          "endLine": 149,
+          "params": [
+            "billing"
+          ]
+        },
+        {
+          "name": "createIntention",
+          "startLine": 155,
+          "endLine": 219,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "handleCallback",
+          "startLine": 231,
+          "endLine": 243,
+          "params": [
+            "obj"
+          ]
+        },
+        {
+          "name": "refundTransaction",
+          "startLine": 246,
+          "endLine": 264,
+          "params": [
+            "transactionId",
+            "amountCents"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "PAYMOB_BASE",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "getPaymobConfigRaw",
+          "line": 37,
+          "isDefault": false
+        },
+        {
+          "name": "getPaymobConfig",
+          "line": 46,
+          "isDefault": false
+        },
+        {
+          "name": "savePaymobConfig",
+          "line": 52,
+          "isDefault": false
+        },
+        {
+          "name": "toCents",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "buildIframeUrl",
+          "line": 69,
+          "isDefault": false
+        },
+        {
+          "name": "verifyPaymobHmac",
+          "line": 93,
+          "isDefault": false
+        },
+        {
+          "name": "createIntention",
+          "line": 155,
+          "isDefault": false
+        },
+        {
+          "name": "handleCallback",
+          "line": 231,
+          "isDefault": false
+        },
+        {
+          "name": "refundTransaction",
+          "line": 246,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getPaymobConfigRaw",
+          "callee": "db.select().from(settings).where",
+          "lineNumber": 39
+        },
+        {
+          "caller": "getPaymobConfigRaw",
+          "callee": "db.select().from",
+          "lineNumber": 39
+        },
+        {
+          "caller": "getPaymobConfigRaw",
+          "callee": "db.select",
+          "lineNumber": 39
+        },
+        {
+          "caller": "getPaymobConfigRaw",
+          "callee": "eq",
+          "lineNumber": 39
+        },
+        {
+          "caller": "getPaymobConfigRaw",
+          "callee": "parseSettingJson",
+          "lineNumber": 40
+        },
+        {
+          "caller": "getPaymobConfig",
+          "callee": "getPaymobConfigRaw",
+          "lineNumber": 47
+        },
+        {
+          "caller": "getPaymobConfig",
+          "callee": "Boolean",
+          "lineNumber": 49
+        },
+        {
+          "caller": "getPaymobConfig",
+          "callee": "Boolean",
+          "lineNumber": 49
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "getPaymobConfigRaw",
+          "lineNumber": 53
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "Boolean",
+          "lineNumber": 55
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "String((input as any)[k] || '').trim",
+          "lineNumber": 57
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "String",
+          "lineNumber": 57
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 60
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "(input as any).branchIds.map((b: any) => String(b || '').trim()).filter",
+          "lineNumber": 61
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "(input as any).branchIds.map",
+          "lineNumber": 61
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "String(b || '').trim",
+          "lineNumber": 61
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "String",
+          "lineNumber": 61
+        },
+        {
+          "caller": "savePaymobConfig",
+          "callee": "upsertSetting",
+          "lineNumber": 64
+        },
+        {
+          "caller": "toCents",
+          "callee": "Math.round",
+          "lineNumber": 67
+        },
+        {
+          "caller": "toCents",
+          "callee": "Number",
+          "lineNumber": 67
+        },
+        {
+          "caller": "buildIframeUrl",
+          "callee": "String(base).replace",
+          "lineNumber": 70
+        },
+        {
+          "caller": "buildIframeUrl",
+          "callee": "String",
+          "lineNumber": 70
+        },
+        {
+          "caller": "hmacField",
+          "callee": "String",
+          "lineNumber": 81
+        },
+        {
+          "caller": "hmacField",
+          "callee": "path.startsWith",
+          "lineNumber": 82
+        },
+        {
+          "caller": "hmacField",
+          "callee": "String",
+          "lineNumber": 82
+        },
+        {
+          "caller": "hmacField",
+          "callee": "path.slice",
+          "lineNumber": 82
+        },
+        {
+          "caller": "hmacField",
+          "callee": "String",
+          "lineNumber": 83
+        },
+        {
+          "caller": "safeEqual",
+          "callee": "Buffer.from",
+          "lineNumber": 87
+        },
+        {
+          "caller": "safeEqual",
+          "callee": "Buffer.from",
+          "lineNumber": 88
+        },
+        {
+          "caller": "safeEqual",
+          "callee": "crypto.timingSafeEqual",
+          "lineNumber": 89
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "String(obj?.hmac || '').trim",
+          "lineNumber": 95
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "String",
+          "lineNumber": 95
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "String(secret || '').trim",
+          "lineNumber": 96
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "String",
+          "lineNumber": 96
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "HMAC_ORDER.map((k) => hmacField(obj, k)).join",
+          "lineNumber": 98
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "HMAC_ORDER.map",
+          "lineNumber": 98
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "hmacField",
+          "lineNumber": 98
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "crypto.createHmac('sha512', key).update(concatenated).digest",
+          "lineNumber": 99
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "crypto.createHmac('sha512', key).update",
+          "lineNumber": 99
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "crypto.createHmac",
+          "lineNumber": 99
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "safeEqual",
+          "lineNumber": 100
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "given.toLowerCase",
+          "lineNumber": 100
+        },
+        {
+          "caller": "verifyPaymobHmac",
+          "callee": "expected.toLowerCase",
+          "lineNumber": 100
+        },
+        {
+          "caller": "baseOf",
+          "callee": "String(config.baseUrl || PAYMOB_BASE).replace",
+          "lineNumber": 107
+        },
+        {
+          "caller": "baseOf",
+          "callee": "String",
+          "lineNumber": 107
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "fetch",
+          "lineNumber": 110
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "baseOf",
+          "lineNumber": 110
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "JSON.stringify",
+          "lineNumber": 113
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "res.json().catch",
+          "lineNumber": 115
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "res.json",
+          "lineNumber": 115
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "Object.assign",
+          "lineNumber": 116
+        },
+        {
+          "caller": "requestAuthToken",
+          "callee": "String",
+          "lineNumber": 117
+        },
+        {
+          "caller": "createIntention",
+          "callee": "getPaymobConfigRaw",
+          "lineNumber": 163
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 164
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 165
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Array.isArray",
+          "lineNumber": 166
+        },
+        {
+          "caller": "createIntention",
+          "callee": "config.branchIds.includes",
+          "lineNumber": 166
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 167
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 172
+        },
+        {
+          "caller": "createIntention",
+          "callee": "toCents",
+          "lineNumber": 174
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 175
+        },
+        {
+          "caller": "createIntention",
+          "callee": "requestAuthToken",
+          "lineNumber": 177
+        },
+        {
+          "caller": "createIntention",
+          "callee": "fetch",
+          "lineNumber": 178
+        },
+        {
+          "caller": "createIntention",
+          "callee": "baseOf",
+          "lineNumber": 178
+        },
+        {
+          "caller": "createIntention",
+          "callee": "JSON.stringify",
+          "lineNumber": 181
+        },
+        {
+          "caller": "createIntention",
+          "callee": "orderRes.json().catch",
+          "lineNumber": 190
+        },
+        {
+          "caller": "createIntention",
+          "callee": "orderRes.json",
+          "lineNumber": 190
+        },
+        {
+          "caller": "createIntention",
+          "callee": "log.warn",
+          "lineNumber": 192
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 193
+        },
+        {
+          "caller": "createIntention",
+          "callee": "fetch",
+          "lineNumber": 195
+        },
+        {
+          "caller": "createIntention",
+          "callee": "baseOf",
+          "lineNumber": 195
+        },
+        {
+          "caller": "createIntention",
+          "callee": "JSON.stringify",
+          "lineNumber": 198
+        },
+        {
+          "caller": "createIntention",
+          "callee": "defaultBilling",
+          "lineNumber": 203
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Number",
+          "lineNumber": 205
+        },
+        {
+          "caller": "createIntention",
+          "callee": "keyRes.json().catch",
+          "lineNumber": 208
+        },
+        {
+          "caller": "createIntention",
+          "callee": "keyRes.json",
+          "lineNumber": 208
+        },
+        {
+          "caller": "createIntention",
+          "callee": "log.warn",
+          "lineNumber": 210
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Object.assign",
+          "lineNumber": 211
+        },
+        {
+          "caller": "createIntention",
+          "callee": "buildIframeUrl",
+          "lineNumber": 214
+        },
+        {
+          "caller": "createIntention",
+          "callee": "baseOf",
+          "lineNumber": 214
+        },
+        {
+          "caller": "createIntention",
+          "callee": "String",
+          "lineNumber": 214
+        },
+        {
+          "caller": "createIntention",
+          "callee": "String",
+          "lineNumber": 214
+        },
+        {
+          "caller": "createIntention",
+          "callee": "Number",
+          "lineNumber": 215
+        },
+        {
+          "caller": "createIntention",
+          "callee": "String",
+          "lineNumber": 216
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "getPaymobConfigRaw",
+          "lineNumber": 232
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "verifyPaymobHmac",
+          "lineNumber": 233
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "String",
+          "lineNumber": 233
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "Boolean",
+          "lineNumber": 237
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "Number",
+          "lineNumber": 238
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "Number",
+          "lineNumber": 239
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "Number",
+          "lineNumber": 240
+        },
+        {
+          "caller": "handleCallback",
+          "callee": "String",
+          "lineNumber": 241
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "getPaymobConfigRaw",
+          "lineNumber": 247
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "Object.assign",
+          "lineNumber": 248
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "Object.assign",
+          "lineNumber": 249
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "requestAuthToken",
+          "lineNumber": 250
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "fetch",
+          "lineNumber": 253
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "baseOf",
+          "lineNumber": 253
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "encodeURIComponent",
+          "lineNumber": 253
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "JSON.stringify",
+          "lineNumber": 256
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "res.json().catch",
+          "lineNumber": 258
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "res.json",
+          "lineNumber": 258
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "log.warn",
+          "lineNumber": 260
+        },
+        {
+          "caller": "refundTransaction",
+          "callee": "Object.assign",
+          "lineNumber": 261
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 10,
+        "functionCount": 14,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/paymentGatewayService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 164,
+      "nonEmptyLines": 142,
+      "exports": [
+        {
+          "name": "paymentGatewayService",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "initiatePayment",
+          "callee": "log.info",
+          "lineNumber": 48
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "this.initiateInstaPay",
+          "lineNumber": 55
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "this.initiateVodafoneCash",
+          "lineNumber": 58
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "this.initiateFawry",
+          "lineNumber": 61
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "Date.now",
+          "lineNumber": 64
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "db.insert(auditLogs).values",
+          "lineNumber": 71
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "db.insert",
+          "lineNumber": 71
+        },
+        {
+          "caller": "initiatePayment",
+          "callee": "log.error",
+          "lineNumber": 80
+        },
+        {
+          "caller": "listProviders",
+          "callee": "import",
+          "lineNumber": 106
+        },
+        {
+          "caller": "listProviders",
+          "callee": "getPaymobConfigRaw",
+          "lineNumber": 107
+        },
+        {
+          "caller": "enabledForBranch",
+          "callee": "Boolean",
+          "lineNumber": 109
+        },
+        {
+          "caller": "enabledForBranch",
+          "callee": "Array.isArray",
+          "lineNumber": 109
+        },
+        {
+          "caller": "enabledForBranch",
+          "callee": "cfg.branchIds.includes",
+          "lineNumber": 109
+        },
+        {
+          "caller": "listProviders",
+          "callee": "out.push",
+          "lineNumber": 112
+        },
+        {
+          "caller": "listProviders",
+          "callee": "enabledForBranch",
+          "lineNumber": 114
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "String(input.provider || input.method || 'PAYMOB').toUpperCase",
+          "lineNumber": 125
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 125
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "import",
+          "lineNumber": 127
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "paymobAdapter.createCheckout",
+          "lineNumber": 128
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "import",
+          "lineNumber": 132
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "instaPayAdapter.createCheckout",
+          "lineNumber": 133
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "String(provider || '').toUpperCase",
+          "lineNumber": 140
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "String",
+          "lineNumber": 140
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "import",
+          "lineNumber": 142
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "handleCallback",
+          "lineNumber": 143
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "this.handleGatewayWebhook",
+          "lineNumber": 145
+        },
+        {
+          "caller": "handleGatewayWebhook",
+          "callee": "log.info",
+          "lineNumber": 161
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/paymob.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 42,
+      "functions": [
+        {
+          "name": "get",
+          "startLine": 12,
+          "endLine": 16,
+          "params": [
+            "obj",
+            "path"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "get",
+          "callee": "String",
+          "lineNumber": 13
+        },
+        {
+          "caller": "get",
+          "callee": "path.startsWith",
+          "lineNumber": 14
+        },
+        {
+          "caller": "get",
+          "callee": "String",
+          "lineNumber": 14
+        },
+        {
+          "caller": "get",
+          "callee": "path.slice",
+          "lineNumber": 14
+        },
+        {
+          "caller": "get",
+          "callee": "String",
+          "lineNumber": 15
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    }
+  ]
+}

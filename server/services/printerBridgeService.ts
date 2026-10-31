@@ -15,6 +15,37 @@ const capabilitySnapshots = new Map<string, { hash: string; persistedAt: number 
 
 const ONLINE_WINDOW_SECONDS = 60;
 let printersTableEnsured = false;
+let gatewayTableEnsured = false;
+
+const ensureGatewayTable = async () => {
+    if (gatewayTableEnsured) return;
+    await pool.query(`
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='print_gateways' AND xtype='U')
+        CREATE TABLE print_gateways (
+            gateway_id NVARCHAR(100) PRIMARY KEY,
+            branch_id NVARCHAR(50) NULL,
+            last_seen_at DATETIME2 NOT NULL DEFAULT GETDATE()
+        )
+    `);
+    gatewayTableEnsured = true;
+};
+
+/** Binds a gateway to its first declared branch and rejects later moves. */
+export const validateGatewayBranch = async (gatewayId: string, branchId?: string | null) => {
+    const gateway = String(gatewayId || '').trim();
+    const branch = String(branchId || '').trim();
+    if (!gateway || !branch) return true;
+    await ensureGatewayTable();
+    const { rows } = await pool.query('SELECT TOP (1) gateway_id, branch_id FROM print_gateways WHERE gateway_id = $1', [gateway]);
+    const existing = rows[0];
+    if (existing?.branch_id && String(existing.branch_id) !== branch) return false;
+    if (!existing) {
+        await pool.query('INSERT INTO print_gateways (gateway_id, branch_id, last_seen_at) VALUES ($1, $2, GETDATE())', [gateway, branch]);
+    } else {
+        await pool.query('UPDATE print_gateways SET branch_id = COALESCE(branch_id, $2), last_seen_at = GETDATE() WHERE gateway_id = $1', [gateway, branch]);
+    }
+    return true;
+};
 
 const ensurePrintersTable = async () => {
     if (printersTableEnsured) return;
@@ -43,6 +74,7 @@ const sanitizePrinterName = (value: unknown) => String(value || '').trim().slice
  * USB job ONLY to the machine that actually owns the printer.
  */
 export const markBridgePoll = async (gatewayId: string, branchId: string | undefined, printers?: string[]) => {
+    if (!(await validateGatewayBranch(gatewayId, branchId))) throw new Error('GATEWAY_BRANCH_MISMATCH');
     pollingBridges.set(gatewayId, { id: gatewayId, branchId: branchId || '*', lastSeenAt: new Date() });
     if (!printers || printers.length === 0) return;
     const names = Array.from(new Set(printers.map(sanitizePrinterName).filter(Boolean))).slice(0, 100);
@@ -99,16 +131,17 @@ export const getGatewayForPrinter = async (printerAddress: string | null | undef
 };
 
 /** Full registry for the Printers UI: online state + registered printers per gateway. */
-export const getBridgeRegistry = async () => {
+export const getBridgeRegistry = async (branchId?: string | null) => {
     await ensurePrintersTable();
     const { rows } = await pool.query(`
         SELECT gateway_id, printer_name, branch_id, last_seen_at
         FROM bridge_printers
         WHERE last_seen_at >= DATEADD(DAY, -2, GETDATE())
+          AND ($1 IS NULL OR branch_id = $1)
         ORDER BY gateway_id, printer_name
-    `);
+    `, [branchId || null]);
     const online = new Map<string, { branchId: string | null; lastSeenAt: string; mode: string }>();
-    for (const bridge of getConnectedBridges() as any[]) {
+    for (const bridge of (getConnectedBridges() as any[]).filter((entry) => !branchId || entry.branchId === branchId)) {
         online.set(bridge.id, { branchId: bridge.branchId ?? null, lastSeenAt: new Date(bridge.connectedAt).toISOString(), mode: bridge.mode });
     }
     const grouped = new Map<string, { gatewayId: string; online: boolean; lastSeenAt: string | null; branchId: string | null; printers: string[] }>();

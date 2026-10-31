@@ -283,8 +283,8 @@ const App: React.FC = () => {
       const idleId = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(run, { timeout: 3000 });
       return () => (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(idleId);
     }
-    const timer = window.setTimeout(run, 1500);
-    return () => window.clearTimeout(timer);
+    const timer = globalThis.setTimeout(run, 1500);
+    return () => globalThis.clearTimeout(timer);
   }, []);
 
   // Device-aware quality tier: real hardware/network signals (not just screen
@@ -404,7 +404,7 @@ const App: React.FC = () => {
       socketService.off('security:session-revoked', handleSessionRevoked);
       socketService.offReconnect(handleReconnectCatchUp);
     };
-  }, [activeBranchId, handleOrderCreated, handleOrderStatus, handleReconnectCatchUp, handleSessionRevoked, handleTableStatus, handleTablesRefresh, isAuthenticated, token]);
+  }, [activeBranchId, isAuthenticated, token]);
 
   // The router renders immediately: visitors without a session (the login
   // page, order tracking) never wait behind init. The full LoadingScreen

@@ -1,0 +1,370 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/services/hrExecutiveReportsService.ts",
+      "language": "typescript",
+      "sizeLines": 431,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/hrExtendedService.ts",
+      "language": "typescript",
+      "sizeLines": 1347,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/hrReportExportService.ts",
+      "language": "typescript",
+      "sizeLines": 567,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/hrService.ts",
+      "language": "typescript",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/idempotencyService.ts",
+      "language": "typescript",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/inventoryIntelligence.ts",
+      "language": "typescript",
+      "sizeLines": 489,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/inventoryService.ts",
+      "language": "typescript",
+      "sizeLines": 514,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/ledgerEngine.ts",
+      "language": "typescript",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/loginProtectionService.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/loyaltyService.ts",
+      "language": "typescript",
+      "sizeLines": 192,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/managerApprovalAuth.ts",
+      "language": "typescript",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/marketplaceService.ts",
+      "language": "typescript",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/opexQuery.ts",
+      "language": "typescript",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/orderLifecycleService.ts",
+      "language": "typescript",
+      "sizeLines": 563,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/orderNumberService.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/passwordPolicyService.ts",
+      "language": "typescript",
+      "sizeLines": 153,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/paymentReconciliation.ts",
+      "language": "typescript",
+      "sizeLines": 52,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/paymentSessionService.ts",
+      "language": "typescript",
+      "sizeLines": 188,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/payrollCalculationService.ts",
+      "language": "typescript",
+      "sizeLines": 527,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/payrollCloseService.ts",
+      "language": "typescript",
+      "sizeLines": 499,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/payrollComplianceService.ts",
+      "language": "typescript",
+      "sizeLines": 446,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/payrollGlPostingService.ts",
+      "language": "typescript",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/payrollReopenService.ts",
+      "language": "typescript",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/payslipService.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/pdfService.ts",
+      "language": "typescript",
+      "sizeLines": 831,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/perfIndexService.ts",
+      "language": "typescript",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/pinLookupService.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/postingRuleEngine.ts",
+      "language": "typescript",
+      "sizeLines": 110,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/printQueueService.ts",
+      "language": "typescript",
+      "sizeLines": 338,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/printerBridgeService.ts",
+      "language": "typescript",
+      "sizeLines": 268,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/queueService.ts",
+      "language": "typescript",
+      "sizeLines": 67,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/recipeService.ts",
+      "language": "typescript",
+      "sizeLines": 239,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/refundService.ts",
+      "language": "typescript",
+      "sizeLines": 551,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/reportStyle.ts",
+      "language": "typescript",
+      "sizeLines": 208,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/retentionService.ts",
+      "language": "typescript",
+      "sizeLines": 73,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/services/hrExecutiveReportsService.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/hrExtendedService.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/hrReportExportService.ts": [],
+    "server/services/hrService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/idempotencyService.ts": [],
+    "server/services/inventoryIntelligence.ts": [
+      "server/db/index.ts",
+      "server/services/aiService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/inventoryService.ts": [
+      "server/db/index.ts",
+      "server/services/unitConversion.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/ledgerEngine.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/loginProtectionService.ts": [],
+    "server/services/loyaltyService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/managerApprovalAuth.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts",
+      "types.ts"
+    ],
+    "server/services/marketplaceService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/opexQuery.ts": [
+      "server/db/index.ts"
+    ],
+    "server/services/orderLifecycleService.ts": [
+      "server/db/index.ts",
+      "server/services/analyticsService.ts",
+      "server/services/financePostingService.ts",
+      "server/services/fiscalSubmitService.ts",
+      "server/services/loyaltyService.ts",
+      "server/services/orderStatusPolicy.ts",
+      "server/services/webhookService.ts",
+      "server/services/whatsappAutomationService.ts",
+      "server/services/whatsappService.ts",
+      "server/utils/businessDate.ts",
+      "server/utils/logger.ts",
+      "server/utils/socketEmit.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/orderNumberService.ts": [
+      "src/db/schema.ts"
+    ],
+    "server/services/passwordPolicyService.ts": [],
+    "server/services/paymentReconciliation.ts": [],
+    "server/services/paymentSessionService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/payrollCalculationService.ts": [
+      "server/db/index.ts",
+      "server/services/eventBusService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/payrollCloseService.ts": [
+      "server/db/index.ts",
+      "server/services/eventBusService.ts",
+      "server/services/payrollCalculationService.ts",
+      "server/services/payrollGlPostingService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/payrollComplianceService.ts": [
+      "server/db/index.ts",
+      "server/services/hrReportExportService.ts",
+      "server/services/payrollCalculationService.ts",
+      "server/services/payrollCloseService.ts",
+      "server/services/pdfService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/payrollGlPostingService.ts": [
+      "server/db/index.ts",
+      "server/services/glService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/payrollReopenService.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/services/glService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/payslipService.ts": [
+      "server/db/index.ts",
+      "server/services/pdfService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/pdfService.ts": [],
+    "server/services/perfIndexService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/services/pinLookupService.ts": [
+      "server/config/env.ts"
+    ],
+    "server/services/postingRuleEngine.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/printQueueService.ts": [
+      "server/db/index.ts",
+      "server/services/printerBridgeService.ts"
+    ],
+    "server/services/printerBridgeService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/services/queueService.ts": [
+      "server/utils/logger.ts"
+    ],
+    "server/services/recipeService.ts": [
+      "server/db/index.ts",
+      "server/services/unitConversion.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/refundService.ts": [
+      "server/db/index.ts",
+      "server/services/fiscalSubmitService.ts",
+      "server/services/glService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/reportStyle.ts": [],
+    "server/services/retentionService.ts": [
+      "server/db/index.ts",
+      "server/services/analyticsService.ts",
+      "server/services/whatsappService.ts",
+      "src/db/schema.ts"
+    ]
+  }
+}

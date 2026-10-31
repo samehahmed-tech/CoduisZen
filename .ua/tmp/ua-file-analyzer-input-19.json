@@ -1,0 +1,283 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/DispatchHub.tsx",
+      "language": "typescript",
+      "sizeLines": 576,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/PrinterManager.tsx",
+      "language": "typescript",
+      "sizeLines": 1153,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/AddressMapPicker.tsx",
+      "language": "typescript",
+      "sizeLines": 937,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/DeliveryTrackingMap.tsx",
+      "language": "typescript",
+      "sizeLines": 785,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/appleMaps.ts",
+      "language": "typescript",
+      "sizeLines": 189,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/googleMaps.ts",
+      "language": "typescript",
+      "sizeLines": 89,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/leafletMaps.ts",
+      "language": "typescript",
+      "sizeLines": 135,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/mapRouting.ts",
+      "language": "typescript",
+      "sizeLines": 86,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/driverAssignment.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/driverTicketTemplate.ts",
+      "language": "typescript",
+      "sizeLines": 238,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/kitchenTicketTemplate.ts",
+      "language": "typescript",
+      "sizeLines": 315,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/orderTotals.ts",
+      "language": "typescript",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/posPrintOrchestrator.ts",
+      "language": "typescript",
+      "sizeLines": 445,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/receiptImageRenderer.ts",
+      "language": "typescript",
+      "sizeLines": 300,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/receiptTemplate.ts",
+      "language": "typescript",
+      "sizeLines": 576,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/templateReceiptGenerator.ts",
+      "language": "typescript",
+      "sizeLines": 1182,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/driver/DriverDashboard.tsx",
+      "language": "typescript",
+      "sizeLines": 1095,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/driver/cashCollection.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/services/printService.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/driverAssignment.test.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/driverCashCollection.test.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderTotals.test.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/printServiceCashDrawer.test.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/receiptPrintFailure.test.ts",
+      "language": "typescript",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/receiptVariants.test.ts",
+      "language": "typescript",
+      "sizeLines": 179,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/thermalReceiptGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/DispatchHub.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/DeliveryTrackingMap.tsx",
+      "components/common/googleMaps.ts",
+      "services/api/delivery.ts",
+      "services/driverAssignment.ts",
+      "services/posPrintOrchestrator.ts",
+      "services/socketService.ts",
+      "src/features/driver/cashCollection.ts",
+      "src/utils/idGenerator.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/PrinterManager.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "services/api/printGateway.ts",
+      "services/api/settings.ts",
+      "services/receiptImageRenderer.ts",
+      "services/receiptTemplate.ts",
+      "services/templateReceiptGenerator.ts",
+      "src/services/printService.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/common/AddressMapPicker.tsx": [
+      "components/common/appleMaps.ts",
+      "components/common/googleMaps.ts",
+      "components/common/leafletMaps.ts"
+    ],
+    "components/common/DeliveryTrackingMap.tsx": [
+      "components/common/appleMaps.ts",
+      "components/common/googleMaps.ts",
+      "components/common/leafletMaps.ts",
+      "components/common/mapRouting.ts"
+    ],
+    "components/common/appleMaps.ts": [
+      "services/api/core.ts"
+    ],
+    "components/common/googleMaps.ts": [],
+    "components/common/leafletMaps.ts": [
+      "components/common/googleMaps.ts"
+    ],
+    "components/common/mapRouting.ts": [
+      "components/common/googleMaps.ts"
+    ],
+    "services/driverAssignment.ts": [
+      "components/common/mapRouting.ts"
+    ],
+    "services/driverTicketTemplate.ts": [
+      "src/features/driver/cashCollection.ts",
+      "types.ts"
+    ],
+    "services/kitchenTicketTemplate.ts": [
+      "src/utils/tableDisplay.ts",
+      "types.ts"
+    ],
+    "services/orderTotals.ts": [
+      "types.ts"
+    ],
+    "services/posPrintOrchestrator.ts": [
+      "services/driverTicketTemplate.ts",
+      "services/kitchenTicketTemplate.ts",
+      "services/receiptImageRenderer.ts",
+      "services/receiptTemplate.ts",
+      "services/templateReceiptGenerator.ts",
+      "src/services/printService.ts",
+      "types.ts"
+    ],
+    "services/receiptImageRenderer.ts": [],
+    "services/receiptTemplate.ts": [
+      "services/orderTotals.ts",
+      "services/templateReceiptGenerator.ts",
+      "src/utils/tableDisplay.ts",
+      "types.ts"
+    ],
+    "services/templateReceiptGenerator.ts": [
+      "services/orderTotals.ts",
+      "types.ts"
+    ],
+    "src/features/driver/DriverDashboard.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/DeliveryTrackingMap.tsx",
+      "components/common/googleMaps.ts",
+      "components/common/mapRouting.ts",
+      "services/api.ts",
+      "services/socketService.ts",
+      "src/features/driver/cashCollection.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "src/features/driver/cashCollection.ts": [
+      "types.ts"
+    ],
+    "src/services/printService.ts": [],
+    "tests/driverAssignment.test.ts": [
+      "services/driverAssignment.ts"
+    ],
+    "tests/driverCashCollection.test.ts": [
+      "src/features/driver/cashCollection.ts"
+    ],
+    "tests/orderTotals.test.ts": [
+      "services/orderTotals.ts"
+    ],
+    "tests/printServiceCashDrawer.test.ts": [
+      "src/services/printService.ts"
+    ],
+    "tests/receiptPrintFailure.test.ts": [
+      "server/services/printQueueService.ts",
+      "services/posPrintOrchestrator.ts",
+      "types.ts"
+    ],
+    "tests/receiptVariants.test.ts": [
+      "services/templateReceiptGenerator.ts",
+      "types.ts"
+    ],
+    "tests/thermalReceiptGuard.test.ts": [
+      "services/templateReceiptGenerator.ts",
+      "types.ts"
+    ]
+  }
+}

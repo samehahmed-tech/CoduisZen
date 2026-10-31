@@ -60,6 +60,7 @@ export const ProcurementHub: React.FC<ProcurementHubProps> = ({ lang }) => {
             remainingQty: number;
             receivedQty: number;
             unitPrice: number;
+            actualUnitPrice?: number;
             unit: string;
         }>;
     }>(null);

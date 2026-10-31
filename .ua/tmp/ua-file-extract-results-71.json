@@ -1,0 +1,4564 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 25,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 25,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "scripts/advance-business-date/advance-business-date.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 177,
+      "nonEmptyLines": 160,
+      "functions": [
+        {
+          "name": "readArg",
+          "startLine": 15,
+          "endLine": 15,
+          "params": []
+        },
+        {
+          "name": "validDate",
+          "startLine": 16,
+          "endLine": 21,
+          "params": []
+        },
+        {
+          "name": "stableStringify",
+          "startLine": 22,
+          "endLine": 27,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 28,
+          "endLine": 31,
+          "params": []
+        },
+        {
+          "name": "inspect",
+          "startLine": 47,
+          "endLine": 73,
+          "params": [
+            "pool"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 75,
+          "endLine": 172,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice",
+          "lineNumber": 15
+        },
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find",
+          "lineNumber": 15
+        },
+        {
+          "caller": "readArg",
+          "callee": "arg.startsWith",
+          "lineNumber": 15
+        },
+        {
+          "caller": "validDate",
+          "callee": "Date.parse",
+          "lineNumber": 17
+        },
+        {
+          "caller": "validDate",
+          "callee": "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+          "lineNumber": 18
+        },
+        {
+          "caller": "validDate",
+          "callee": "Number.isFinite",
+          "lineNumber": 19
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString().slice",
+          "lineNumber": 20
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString",
+          "lineNumber": 20
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 24
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Array.isArray",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map(stableStringify).join",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join",
+          "lineNumber": 26
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map",
+          "lineNumber": 26
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort",
+          "lineNumber": 26
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys",
+          "lineNumber": 26
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 26
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "stableStringify",
+          "lineNumber": 26
+        },
+        {
+          "caller": "readEnv",
+          "callee": "Object.fromEntries",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split(/\\r?\\n/)\n  .filter(line => line && !line.startsWith('#') && line.includes('='))\n  .map",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split(/\\r?\\n/)\n  .filter",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.startsWith",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.includes",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 31
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 31
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 31
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 31
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('targetDate', sql.Date, targetDate)\n    .input('targetText', sql.NVarChar(10), targetDate)\n    .query",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('targetDate', sql.Date, targetDate)\n    .input",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "sql.NVarChar",
+          "lineNumber": 50
+        },
+        {
+          "caller": "inspect",
+          "callee": "result.recordset.map",
+          "lineNumber": 63
+        },
+        {
+          "caller": "inspect",
+          "callee": "Number",
+          "lineNumber": 67
+        },
+        {
+          "caller": "inspect",
+          "callee": "Number",
+          "lineNumber": 68
+        },
+        {
+          "caller": "inspect",
+          "callee": "Number",
+          "lineNumber": 69
+        },
+        {
+          "caller": "main",
+          "callee": "validDate",
+          "lineNumber": 76
+        },
+        {
+          "caller": "main",
+          "callee": "readArg",
+          "lineNumber": 77
+        },
+        {
+          "caller": "main",
+          "callee": "readEnv",
+          "lineNumber": 79
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 79
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: env.DATABASE_URL, requestTimeout: 600000 }).connect",
+          "lineNumber": 81
+        },
+        {
+          "caller": "main",
+          "callee": "inspect",
+          "lineNumber": 85
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 86
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 86
+        },
+        {
+          "caller": "main",
+          "callee": "inspect",
+          "lineNumber": 90
+        },
+        {
+          "caller": "main",
+          "callee": "pre.filter",
+          "lineNumber": 91
+        },
+        {
+          "caller": "main",
+          "callee": "pre.filter(r => !r.eligible).map",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "pre.filter",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.begin",
+          "lineNumber": 98
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .query",
+          "lineNumber": 103
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 103
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 103
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 104
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('targetDate', sql.Date, targetDate)\n          .query",
+          "lineNumber": 110
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input",
+          "lineNumber": 110
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 110
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 110
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 111
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 115
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('targetText', sql.NVarChar(10), targetDate)\n          .query",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 119
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 120
+        },
+        {
+          "caller": "main",
+          "callee": "stableStringify",
+          "lineNumber": 128
+        },
+        {
+          "caller": "main",
+          "callee": "createdAt.toISOString",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update(toSign).digest",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n          .input('reason', sql.NVarChar(sql.MAX), reason)\n          .input('signature', sql.NVarChar(sql.MAX), signature)\n          .input('createdAt', sql.DateTime2, createdAt)\n          .query",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n          .input('reason', sql.NVarChar(sql.MAX), reason)\n          .input('signature', sql.NVarChar(sql.MAX), signature)\n          .input",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n          .input('reason', sql.NVarChar(sql.MAX), reason)\n          .input",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n          .input",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 136
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 137
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 137
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 138
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 139
+        },
+        {
+          "caller": "main",
+          "callee": "applied.push",
+          "lineNumber": 148
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.commit",
+          "lineNumber": 150
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input('targetDate', sql.Date, targetDate)\n        .input('targetText', sql.NVarChar(10), targetDate)\n        .query",
+          "lineNumber": 154
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input('targetDate', sql.Date, targetDate)\n        .input",
+          "lineNumber": 154
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input",
+          "lineNumber": 154
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 154
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 156
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 163
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 164
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 164
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback().catch",
+          "lineNumber": 166
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback",
+          "lineNumber": 166
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 170
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/ai-copilot-hotfix/verify-installed.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 31,
+      "functions": [
+        {
+          "name": "requireInstalled",
+          "startLine": 6,
+          "endLine": 6,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 11,
+          "endLine": 32,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "requireInstalled",
+          "callee": "require",
+          "lineNumber": 6
+        },
+        {
+          "caller": "requireInstalled",
+          "callee": "path.join",
+          "lineNumber": 6
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 12
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: env.DATABASE_URL }).connect",
+          "lineNumber": 15
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('id', sql.NVarChar, id).input('email', sql.NVarChar, `${id}@test.local`).query",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('id', sql.NVarChar, id).input",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('sid', sql.NVarChar, sessionId).input('uid', sql.NVarChar, id).input('tid', sql.NVarChar, tokenId).query",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('sid', sql.NVarChar, sessionId).input('uid', sql.NVarChar, id).input",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('sid', sql.NVarChar, sessionId).input",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "jwt.sign",
+          "lineNumber": 19
+        },
+        {
+          "caller": "main",
+          "callee": "fetch",
+          "lineNumber": 20
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 20
+        },
+        {
+          "caller": "main",
+          "callee": "response.json",
+          "lineNumber": 21
+        },
+        {
+          "caller": "main",
+          "callee": "String(body.text || '').includes",
+          "lineNumber": 22
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 22
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 22
+        },
+        {
+          "caller": "main",
+          "callee": "fetch",
+          "lineNumber": 23
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 23
+        },
+        {
+          "caller": "main",
+          "callee": "fallbackResponse.json",
+          "lineNumber": 24
+        },
+        {
+          "caller": "main",
+          "callee": "String(fallbackBody.text || '').includes",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 26
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 26
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('sid', sql.NVarChar, sessionId).query",
+          "lineNumber": 28
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input",
+          "lineNumber": 28
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 28
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input('id', sql.NVarChar, id).query",
+          "lineNumber": 29
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().input",
+          "lineNumber": 29
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 29
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 30
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/audit-sqlserver-columns.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 67,
+      "nonEmptyLines": 59,
+      "functions": [
+        {
+          "name": "toSnakeCase",
+          "startLine": 8,
+          "endLine": 8,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "parseExpectedColumns",
+          "startLine": 10,
+          "endLine": 27,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 29,
+          "endLine": 62,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "toSnakeCase",
+          "callee": "name.replace",
+          "lineNumber": 8
+        },
+        {
+          "caller": "toSnakeCase",
+          "callee": "char.toLowerCase",
+          "lineNumber": 8
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "schemaSource.matchAll",
+          "lineNumber": 12
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "body.split",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "line.match",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "property[2].match",
+          "lineNumber": 21
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "columns.add",
+          "lineNumber": 22
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "toSnakeCase",
+          "lineNumber": 22
+        },
+        {
+          "caller": "parseExpectedColumns",
+          "callee": "expected.set",
+          "lineNumber": 24
+        },
+        {
+          "caller": "main",
+          "callee": "parseExpectedColumns",
+          "lineNumber": 30
+        },
+        {
+          "caller": "main",
+          "callee": "mssql.connect",
+          "lineNumber": 31
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 33
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 33
+        },
+        {
+          "caller": "main",
+          "callee": "actual.has",
+          "lineNumber": 40
+        },
+        {
+          "caller": "main",
+          "callee": "actual.set",
+          "lineNumber": 40
+        },
+        {
+          "caller": "main",
+          "callee": "actual.get(row.TABLE_NAME).add",
+          "lineNumber": 41
+        },
+        {
+          "caller": "main",
+          "callee": "actual.get",
+          "lineNumber": 41
+        },
+        {
+          "caller": "main",
+          "callee": "actual.get",
+          "lineNumber": 47
+        },
+        {
+          "caller": "main",
+          "callee": "actualColumns.has",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "missing.push",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "columns.has",
+          "lineNumber": 49
+        },
+        {
+          "caller": "main",
+          "callee": "extra.push",
+          "lineNumber": 49
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 52
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 52
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 60
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/audit-sqlserver-fks.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 71,
+      "nonEmptyLines": 59,
+      "functions": [
+        {
+          "name": "quote",
+          "startLine": 8,
+          "endLine": 8,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 10,
+          "endLine": 66,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "quote",
+          "callee": "String(name).replace",
+          "lineNumber": 8
+        },
+        {
+          "caller": "quote",
+          "callee": "String",
+          "lineNumber": 8
+        },
+        {
+          "caller": "main",
+          "callee": "sql.connect",
+          "lineNumber": 11
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 12
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 12
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 33
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 33
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 35
+        },
+        {
+          "caller": "main",
+          "callee": "quote",
+          "lineNumber": 36
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 42
+        },
+        {
+          "caller": "main",
+          "callee": "blockers.push",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 53
+        },
+        {
+          "caller": "main",
+          "callee": "orphans.push",
+          "lineNumber": 54
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 54
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 58
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 58
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 64
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/audit-sqlserver-schema-drift.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 54,
+      "nonEmptyLines": 46,
+      "functions": [
+        {
+          "name": "parseSchemaIdentities",
+          "startLine": 11,
+          "endLine": 22,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 24,
+          "endLine": 49,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "parseSchemaIdentities",
+          "callee": "schemaText.matchAll",
+          "lineNumber": 13
+        },
+        {
+          "caller": "parseSchemaIdentities",
+          "callee": "body.matchAll",
+          "lineNumber": 15
+        },
+        {
+          "caller": "parseSchemaIdentities",
+          "callee": "prop.replace",
+          "lineNumber": 17
+        },
+        {
+          "caller": "parseSchemaIdentities",
+          "callee": "char.toLowerCase",
+          "lineNumber": 17
+        },
+        {
+          "caller": "parseSchemaIdentities",
+          "callee": "(match[3] || '').includes",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseSchemaIdentities",
+          "callee": "identities.add",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "sql.connect",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request().query",
+          "lineNumber": 26
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 26
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "actualRows.map",
+          "lineNumber": 36
+        },
+        {
+          "caller": "main",
+          "callee": "parseSchemaIdentities",
+          "lineNumber": 37
+        },
+        {
+          "caller": "main",
+          "callee": "[...actual].filter((key) => !schema.has(key)).sort",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "[...actual].filter",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "schema.has",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "[...schema].filter((key) => !actual.has(key)).sort",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "[...schema].filter",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "actual.has",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 41
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/build-inventory-import-xlsx.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 70,
+      "nonEmptyLines": 64,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/build-server.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 38,
+      "nonEmptyLines": 35,
+      "functions": [
+        {
+          "name": "buildServer",
+          "startLine": 4,
+          "endLine": 36,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "buildServer",
+          "callee": "console.log",
+          "lineNumber": 5
+        },
+        {
+          "caller": "buildServer",
+          "callee": "esbuild.build",
+          "lineNumber": 8
+        },
+        {
+          "caller": "buildServer",
+          "callee": "console.log",
+          "lineNumber": 31
+        },
+        {
+          "caller": "buildServer",
+          "callee": "console.error",
+          "lineNumber": 33
+        },
+        {
+          "caller": "buildServer",
+          "callee": "process.exit",
+          "lineNumber": 34
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/business-day-reopen-fix/reopen-business-day.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 186,
+      "nonEmptyLines": 170,
+      "functions": [
+        {
+          "name": "readArg",
+          "startLine": 9,
+          "endLine": 9,
+          "params": []
+        },
+        {
+          "name": "validDate",
+          "startLine": 10,
+          "endLine": 15,
+          "params": []
+        },
+        {
+          "name": "nextDate",
+          "startLine": 16,
+          "endLine": 20,
+          "params": []
+        },
+        {
+          "name": "stableStringify",
+          "startLine": 21,
+          "endLine": 26,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 27,
+          "endLine": 30,
+          "params": []
+        },
+        {
+          "name": "inspect",
+          "startLine": 47,
+          "endLine": 69,
+          "params": [
+            "pool",
+            "nextBusinessDate"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 71,
+          "endLine": 181,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find",
+          "lineNumber": 9
+        },
+        {
+          "caller": "readArg",
+          "callee": "arg.startsWith",
+          "lineNumber": 9
+        },
+        {
+          "caller": "validDate",
+          "callee": "Date.parse",
+          "lineNumber": 11
+        },
+        {
+          "caller": "validDate",
+          "callee": "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+          "lineNumber": 12
+        },
+        {
+          "caller": "validDate",
+          "callee": "Number.isFinite",
+          "lineNumber": 13
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString().slice",
+          "lineNumber": 14
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString",
+          "lineNumber": 14
+        },
+        {
+          "caller": "nextDate",
+          "callee": "date.setUTCDate",
+          "lineNumber": 18
+        },
+        {
+          "caller": "nextDate",
+          "callee": "date.getUTCDate",
+          "lineNumber": 18
+        },
+        {
+          "caller": "nextDate",
+          "callee": "date.toISOString().slice",
+          "lineNumber": 19
+        },
+        {
+          "caller": "nextDate",
+          "callee": "date.toISOString",
+          "lineNumber": 19
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 23
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Array.isArray",
+          "lineNumber": 24
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map(stableStringify).join",
+          "lineNumber": 24
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map",
+          "lineNumber": 24
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 25
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "stableStringify",
+          "lineNumber": 25
+        },
+        {
+          "caller": "readEnv",
+          "callee": "Object.fromEntries",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split(/\\r?\\n/)\r\n  .filter(line => line && !line.startsWith('#') && line.includes('='))\r\n  .map",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split(/\\r?\\n/)\r\n  .filter",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\r\n  .split",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.startsWith",
+          "lineNumber": 29
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.includes",
+          "lineNumber": 29
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 30
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\r\n    .input('targetDate', sql.Date, targetDate)\r\n    .input('nextDate', sql.Date, nextBusinessDate)\r\n    .input('nextDateText', sql.NVarChar(10), nextBusinessDate)\r\n    .query",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\r\n    .input('targetDate', sql.Date, targetDate)\r\n    .input('nextDate', sql.Date, nextBusinessDate)\r\n    .input",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\r\n    .input('targetDate', sql.Date, targetDate)\r\n    .input",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\r\n    .input",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "sql.NVarChar",
+          "lineNumber": 51
+        },
+        {
+          "caller": "inspect",
+          "callee": "result.recordset.map",
+          "lineNumber": 63
+        },
+        {
+          "caller": "inspect",
+          "callee": "Number",
+          "lineNumber": 65
+        },
+        {
+          "caller": "inspect",
+          "callee": "Number",
+          "lineNumber": 66
+        },
+        {
+          "caller": "inspect",
+          "callee": "Number",
+          "lineNumber": 67
+        },
+        {
+          "caller": "main",
+          "callee": "validDate",
+          "lineNumber": 72
+        },
+        {
+          "caller": "main",
+          "callee": "readArg",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "readEnv",
+          "lineNumber": 76
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 76
+        },
+        {
+          "caller": "main",
+          "callee": "nextDate",
+          "lineNumber": 78
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: env.DATABASE_URL, requestTimeout: 600000 }).connect",
+          "lineNumber": 79
+        },
+        {
+          "caller": "main",
+          "callee": "inspect",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 84
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 84
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.begin",
+          "lineNumber": 90
+        },
+        {
+          "caller": "main",
+          "callee": "request().input('branchId', sql.NVarChar(255), branchId).query",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "request().input",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('targetDate', sql.Date, targetDate)\r\n        .query",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 103
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('nextDate', sql.Date, nextBusinessDate)\r\n        .input('nextDateText', sql.NVarChar(10), nextBusinessDate)\r\n        .query",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('nextDate', sql.Date, nextBusinessDate)\r\n        .input",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 109
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 111
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 117
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('targetDate', sql.Date, targetDate)\r\n        .query",
+          "lineNumber": 124
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input",
+          "lineNumber": 124
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input",
+          "lineNumber": 124
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 124
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 125
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('targetDateText', sql.NVarChar(10), targetDate)\r\n        .query",
+          "lineNumber": 128
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input",
+          "lineNumber": 128
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input",
+          "lineNumber": 128
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 128
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 129
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "stableStringify",
+          "lineNumber": 136
+        },
+        {
+          "caller": "main",
+          "callee": "createdAt.toISOString",
+          "lineNumber": 138
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update(toSign).digest",
+          "lineNumber": 141
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update",
+          "lineNumber": 141
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac",
+          "lineNumber": 141
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\r\n        .input('reason', sql.NVarChar(sql.MAX), reason)\r\n        .input('signature', sql.NVarChar(sql.MAX), signature)\r\n        .input('createdAt', sql.DateTime2, createdAt)\r\n        .query",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\r\n        .input('reason', sql.NVarChar(sql.MAX), reason)\r\n        .input('signature', sql.NVarChar(sql.MAX), signature)\r\n        .input",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\r\n        .input('reason', sql.NVarChar(sql.MAX), reason)\r\n        .input",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\r\n        .input",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "request()\r\n        .input",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 145
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 145
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 147
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.commit",
+          "lineNumber": 156
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('targetDate', sql.Date, targetDate)\r\n        .input('createdAt', sql.DateTime2, createdAt)\r\n        .query",
+          "lineNumber": 159
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input('targetDate', sql.Date, targetDate)\r\n        .input",
+          "lineNumber": 159
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\r\n        .input('branchId', sql.NVarChar(255), branchId)\r\n        .input",
+          "lineNumber": 159
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\r\n        .input",
+          "lineNumber": 159
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 159
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 160
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 170
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 170
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback().catch",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 179
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/cafe-menu-data.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 225,
+      "nonEmptyLines": 218,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/check-orders-columns.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 30,
+      "nonEmptyLines": 29,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 7,
+          "endLine": 29,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 9
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request().query",
+          "lineNumber": 10
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 10
+        },
+        {
+          "caller": "test",
+          "callee": "result.recordset.map",
+          "lineNumber": 11
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 12
+        },
+        {
+          "caller": "test",
+          "callee": "cols.join",
+          "lineNumber": 12
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 13
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 14
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 14
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 15
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 15
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 16
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 16
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 17
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 17
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 18
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 19
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 19
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 20
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 20
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 21
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 21
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 22
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 22
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 23
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 23
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 24
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 24
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 25
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 25
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 26
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 26
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 27
+        },
+        {
+          "caller": "test",
+          "callee": "cols.includes",
+          "lineNumber": 27
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 28
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/check-tables.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 19,
+      "nonEmptyLines": 16,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 7,
+          "endLine": 18,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 9
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request().query",
+          "lineNumber": 11
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 11
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 15
+        },
+        {
+          "caller": "test",
+          "callee": "JSON.stringify",
+          "lineNumber": 15
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/check-users.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 15,
+      "nonEmptyLines": 13,
+      "functions": [
+        {
+          "name": "test",
+          "startLine": 8,
+          "endLine": 14,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "test",
+          "callee": "pool.connect",
+          "lineNumber": 10
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request().query",
+          "lineNumber": 11
+        },
+        {
+          "caller": "test",
+          "callee": "pool.request",
+          "lineNumber": 11
+        },
+        {
+          "caller": "test",
+          "callee": "console.log",
+          "lineNumber": 12
+        },
+        {
+          "caller": "test",
+          "callee": "JSON.stringify",
+          "lineNumber": 12
+        },
+        {
+          "caller": "test",
+          "callee": "pool.close",
+          "lineNumber": 13
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/cleanup-future-days/cleanup-future-days.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 222,
+      "nonEmptyLines": 195,
+      "functions": [
+        {
+          "name": "readArg",
+          "startLine": 17,
+          "endLine": 17,
+          "params": []
+        },
+        {
+          "name": "validDate",
+          "startLine": 18,
+          "endLine": 23,
+          "params": []
+        },
+        {
+          "name": "stableStringify",
+          "startLine": 24,
+          "endLine": 29,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 30,
+          "endLine": 33,
+          "params": []
+        },
+        {
+          "name": "inspect",
+          "startLine": 50,
+          "endLine": 111,
+          "params": [
+            "pool"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 113,
+          "endLine": 217,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice",
+          "lineNumber": 17
+        },
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find",
+          "lineNumber": 17
+        },
+        {
+          "caller": "readArg",
+          "callee": "arg.startsWith",
+          "lineNumber": 17
+        },
+        {
+          "caller": "validDate",
+          "callee": "Date.parse",
+          "lineNumber": 19
+        },
+        {
+          "caller": "validDate",
+          "callee": "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+          "lineNumber": 20
+        },
+        {
+          "caller": "validDate",
+          "callee": "Number.isFinite",
+          "lineNumber": 21
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString().slice",
+          "lineNumber": 22
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString",
+          "lineNumber": 22
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 26
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Array.isArray",
+          "lineNumber": 27
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map(stableStringify).join",
+          "lineNumber": 27
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map",
+          "lineNumber": 27
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join",
+          "lineNumber": 28
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map",
+          "lineNumber": 28
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort",
+          "lineNumber": 28
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys",
+          "lineNumber": 28
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 28
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "stableStringify",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readEnv",
+          "callee": "Object.fromEntries",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split(/\\r?\\n/)\n  .filter(line => line && !line.startsWith('#') && line.includes('='))\n  .map",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split(/\\r?\\n/)\n  .filter",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.startsWith",
+          "lineNumber": 32
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.includes",
+          "lineNumber": 32
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 33
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 33
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 33
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 33
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('fromDate', sql.Date, fromDate)\n    .query",
+          "lineNumber": 52
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 52
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 52
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('fromDate', sql.NVarChar(10), fromDate)\n    .query",
+          "lineNumber": 62
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 62
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 62
+        },
+        {
+          "caller": "inspect",
+          "callee": "sql.NVarChar",
+          "lineNumber": 63
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('fromDate', sql.Date, fromDate)\n    .query",
+          "lineNumber": 73
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 73
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 73
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('fromDate', sql.NVarChar(10), fromDate)\n    .query",
+          "lineNumber": 83
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 83
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 83
+        },
+        {
+          "caller": "inspect",
+          "callee": "sql.NVarChar",
+          "lineNumber": 84
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request().query",
+          "lineNumber": 97
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 97
+        },
+        {
+          "caller": "inspect",
+          "callee": "emptyDays.recordset.map",
+          "lineNumber": 108
+        },
+        {
+          "caller": "inspect",
+          "callee": "r.empty_day.toISOString().split",
+          "lineNumber": 108
+        },
+        {
+          "caller": "inspect",
+          "callee": "r.empty_day.toISOString",
+          "lineNumber": 108
+        },
+        {
+          "caller": "inspect",
+          "callee": "String(r.empty_day).slice",
+          "lineNumber": 108
+        },
+        {
+          "caller": "inspect",
+          "callee": "String",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "validDate",
+          "lineNumber": 114
+        },
+        {
+          "caller": "main",
+          "callee": "validDate",
+          "lineNumber": 115
+        },
+        {
+          "caller": "main",
+          "callee": "readArg",
+          "lineNumber": 116
+        },
+        {
+          "caller": "main",
+          "callee": "readEnv",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: env.DATABASE_URL, requestTimeout: 600000 }).connect",
+          "lineNumber": 120
+        },
+        {
+          "caller": "main",
+          "callee": "inspect",
+          "lineNumber": 123
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 126
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 126
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.begin",
+          "lineNumber": 139
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('fromDate', sql.NVarChar(10), fromDate)\n        .input('dumpDay', sql.NVarChar(10), dumpDay)\n        .query",
+          "lineNumber": 145
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('fromDate', sql.NVarChar(10), fromDate)\n        .input",
+          "lineNumber": 145
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input",
+          "lineNumber": 145
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 145
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 147
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 150
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('fromDate', sql.Date, fromDate)\n        .query",
+          "lineNumber": 153
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input",
+          "lineNumber": 153
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 153
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 156
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('fromDate', sql.Date, fromDate)\n          .query",
+          "lineNumber": 160
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 160
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 160
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 163
+        },
+        {
+          "caller": "main",
+          "callee": "pre.branches.map",
+          "lineNumber": 167
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('targetText', sql.NVarChar(10), targetDate)\n          .query",
+          "lineNumber": 169
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input",
+          "lineNumber": 169
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 169
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 169
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 170
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 171
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "results.branchesUpdated.push",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "stableStringify",
+          "lineNumber": 180
+        },
+        {
+          "caller": "main",
+          "callee": "createdAt.toISOString",
+          "lineNumber": 182
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update(toSign).digest",
+          "lineNumber": 185
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update",
+          "lineNumber": 185
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac",
+          "lineNumber": 185
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input('reason', sql.NVarChar(sql.MAX), reason)\n        .input('signature', sql.NVarChar(sql.MAX), signature)\n        .input('createdAt', sql.DateTime2, createdAt)\n        .query",
+          "lineNumber": 187
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input('reason', sql.NVarChar(sql.MAX), reason)\n        .input('signature', sql.NVarChar(sql.MAX), signature)\n        .input",
+          "lineNumber": 187
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input('reason', sql.NVarChar(sql.MAX), reason)\n        .input",
+          "lineNumber": 187
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input",
+          "lineNumber": 187
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input",
+          "lineNumber": 187
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 187
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 188
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 188
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 189
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 190
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.commit",
+          "lineNumber": 199
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input('fromDate', sql.Date, fromDate)\n        .query",
+          "lineNumber": 203
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input",
+          "lineNumber": 203
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 203
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 206
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 209
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 209
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback().catch",
+          "lineNumber": 211
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback",
+          "lineNumber": 211
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 215
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/close-day-17-open-18/close-day-17-open-18.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 241,
+      "nonEmptyLines": 216,
+      "functions": [
+        {
+          "name": "readArg",
+          "startLine": 27,
+          "endLine": 27,
+          "params": []
+        },
+        {
+          "name": "validDate",
+          "startLine": 28,
+          "endLine": 33,
+          "params": []
+        },
+        {
+          "name": "addDays",
+          "startLine": 34,
+          "endLine": 38,
+          "params": [
+            "value",
+            "days"
+          ]
+        },
+        {
+          "name": "stableStringify",
+          "startLine": 39,
+          "endLine": 44,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 45,
+          "endLine": 48,
+          "params": []
+        },
+        {
+          "name": "inspect",
+          "startLine": 67,
+          "endLine": 124,
+          "params": [
+            "pool"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 126,
+          "endLine": 236,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readArg",
+          "callee": "process.argv.find",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readArg",
+          "callee": "arg.startsWith",
+          "lineNumber": 27
+        },
+        {
+          "caller": "validDate",
+          "callee": "Date.parse",
+          "lineNumber": 29
+        },
+        {
+          "caller": "validDate",
+          "callee": "/^\\d{4}-\\d{2}-\\d{2}$/.test",
+          "lineNumber": 30
+        },
+        {
+          "caller": "validDate",
+          "callee": "Number.isFinite",
+          "lineNumber": 31
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString().slice",
+          "lineNumber": 32
+        },
+        {
+          "caller": "validDate",
+          "callee": "new Date(parsed).toISOString",
+          "lineNumber": 32
+        },
+        {
+          "caller": "addDays",
+          "callee": "d.setUTCDate",
+          "lineNumber": 36
+        },
+        {
+          "caller": "addDays",
+          "callee": "d.getUTCDate",
+          "lineNumber": 36
+        },
+        {
+          "caller": "addDays",
+          "callee": "d.toISOString().slice",
+          "lineNumber": 37
+        },
+        {
+          "caller": "addDays",
+          "callee": "d.toISOString",
+          "lineNumber": 37
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 41
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Array.isArray",
+          "lineNumber": 42
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map(stableStringify).join",
+          "lineNumber": 42
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "value.map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join",
+          "lineNumber": 43
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort().map",
+          "lineNumber": 43
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys(value).sort",
+          "lineNumber": 43
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "Object.keys",
+          "lineNumber": 43
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "JSON.stringify",
+          "lineNumber": 43
+        },
+        {
+          "caller": "stableStringify",
+          "callee": "stableStringify",
+          "lineNumber": 43
+        },
+        {
+          "caller": "readEnv",
+          "callee": "Object.fromEntries",
+          "lineNumber": 45
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split(/\\r?\\n/)\n  .filter(line => line && !line.startsWith('#') && line.includes('='))\n  .map",
+          "lineNumber": 45
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split(/\\r?\\n/)\n  .filter",
+          "lineNumber": 45
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync(file, 'utf8')\n  .split",
+          "lineNumber": 45
+        },
+        {
+          "caller": "readEnv",
+          "callee": "fs.readFileSync",
+          "lineNumber": 45
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.startsWith",
+          "lineNumber": 47
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.includes",
+          "lineNumber": 47
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.slice",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 48
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('targetDate', sql.Date, targetDate)\n    .query",
+          "lineNumber": 68
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 68
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 68
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('fromDate', sql.NVarChar(10), fromDate)\n    .query",
+          "lineNumber": 77
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 77
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 77
+        },
+        {
+          "caller": "inspect",
+          "callee": "sql.NVarChar",
+          "lineNumber": 78
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('targetDate', sql.NVarChar(10), targetDate)\n    .query",
+          "lineNumber": 87
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 87
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 87
+        },
+        {
+          "caller": "inspect",
+          "callee": "sql.NVarChar",
+          "lineNumber": 88
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input('targetDate', sql.Date, targetDate)\n    .query",
+          "lineNumber": 99
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request()\n    .input",
+          "lineNumber": 99
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 99
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request().query",
+          "lineNumber": 108
+        },
+        {
+          "caller": "inspect",
+          "callee": "pool.request",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "validDate",
+          "lineNumber": 127
+        },
+        {
+          "caller": "main",
+          "callee": "validDate",
+          "lineNumber": 128
+        },
+        {
+          "caller": "main",
+          "callee": "readArg",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "readEnv",
+          "lineNumber": 132
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 132
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: env.DATABASE_URL, requestTimeout: 600000 }).connect",
+          "lineNumber": 134
+        },
+        {
+          "caller": "main",
+          "callee": "inspect",
+          "lineNumber": 137
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.begin",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('fromDate', sql.NVarChar(10), fromDate)\n        .input('targetDate', sql.NVarChar(10), targetDate)\n        .query",
+          "lineNumber": 152
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('fromDate', sql.NVarChar(10), fromDate)\n        .input",
+          "lineNumber": 152
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input",
+          "lineNumber": 152
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 152
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 153
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 154
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 157
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('targetDate', sql.Date, targetDate)\n        .query",
+          "lineNumber": 161
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input",
+          "lineNumber": 161
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 161
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 164
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('targetDate', sql.Date, targetDate)\n          .query",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 171
+        },
+        {
+          "caller": "main",
+          "callee": "pre.branches.map",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input('targetText', sql.NVarChar(10), targetDate)\n          .query",
+          "lineNumber": 177
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input('branchId', sql.NVarChar(255), branchId)\n          .input",
+          "lineNumber": 177
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n          .input",
+          "lineNumber": 177
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 177
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 178
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 179
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 181
+        },
+        {
+          "caller": "main",
+          "callee": "results.branchesUpdated.push",
+          "lineNumber": 181
+        },
+        {
+          "caller": "main",
+          "callee": "stableStringify",
+          "lineNumber": 188
+        },
+        {
+          "caller": "main",
+          "callee": "createdAt.toISOString",
+          "lineNumber": 190
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update(toSign).digest",
+          "lineNumber": 193
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac('sha256', env.AUDIT_HMAC_SECRET).update",
+          "lineNumber": 193
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.createHmac",
+          "lineNumber": 193
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input('reason', sql.NVarChar(sql.MAX), reason)\n        .input('signature', sql.NVarChar(sql.MAX), signature)\n        .input('createdAt', sql.DateTime2, createdAt)\n        .query",
+          "lineNumber": 195
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input('reason', sql.NVarChar(sql.MAX), reason)\n        .input('signature', sql.NVarChar(sql.MAX), signature)\n        .input",
+          "lineNumber": 195
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input('reason', sql.NVarChar(sql.MAX), reason)\n        .input",
+          "lineNumber": 195
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input('payload', sql.NVarChar(sql.MAX), JSON.stringify(payload))\n        .input",
+          "lineNumber": 195
+        },
+        {
+          "caller": "main",
+          "callee": "request()\n        .input",
+          "lineNumber": 195
+        },
+        {
+          "caller": "main",
+          "callee": "request",
+          "lineNumber": 195
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 196
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 196
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 197
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 198
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.commit",
+          "lineNumber": 207
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input('targetDate', sql.Date, targetDate)\n        .input('fromDate', sql.NVarChar(10), fromDate)\n        .input('targetText', sql.NVarChar(10), targetDate)\n        .query",
+          "lineNumber": 212
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input('targetDate', sql.Date, targetDate)\n        .input('fromDate', sql.NVarChar(10), fromDate)\n        .input",
+          "lineNumber": 212
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input('targetDate', sql.Date, targetDate)\n        .input",
+          "lineNumber": 212
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request()\n        .input",
+          "lineNumber": 212
+        },
+        {
+          "caller": "main",
+          "callee": "pool.request",
+          "lineNumber": 212
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 214
+        },
+        {
+          "caller": "main",
+          "callee": "sql.NVarChar",
+          "lineNumber": 215
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 224
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 225
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 226
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 228
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 228
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback().catch",
+          "lineNumber": 230
+        },
+        {
+          "caller": "main",
+          "callee": "transaction.rollback",
+          "lineNumber": 230
+        },
+        {
+          "caller": "main",
+          "callee": "pool.close",
+          "lineNumber": 234
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/convert-schema.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 83,
+      "nonEmptyLines": 67,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/core-smoke.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 211,
+      "nonEmptyLines": 188,
+      "functions": [
+        {
+          "name": "pushResult",
+          "startLine": 25,
+          "endLine": 29,
+          "params": [
+            "name",
+            "ok",
+            "level",
+            "detail"
+          ]
+        },
+        {
+          "name": "apiFetch",
+          "startLine": 31,
+          "endLine": 50,
+          "params": [
+            "path",
+            "init"
+          ]
+        },
+        {
+          "name": "ensurePreconditions",
+          "startLine": 52,
+          "endLine": 57,
+          "params": []
+        },
+        {
+          "name": "formatErr",
+          "startLine": 59,
+          "endLine": 64,
+          "params": [
+            "error"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 66,
+          "endLine": 192,
+          "params": []
+        },
+        {
+          "name": "printSummaryAndExit",
+          "startLine": 194,
+          "endLine": 206,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "pushResult",
+          "callee": "console.log",
+          "lineNumber": 27
+        },
+        {
+          "caller": "pushResult",
+          "callee": "results.push",
+          "lineNumber": 28
+        },
+        {
+          "caller": "apiFetch",
+          "callee": "fetch",
+          "lineNumber": 32
+        },
+        {
+          "caller": "apiFetch",
+          "callee": "response.json().catch",
+          "lineNumber": 41
+        },
+        {
+          "caller": "apiFetch",
+          "callee": "response.json",
+          "lineNumber": 41
+        },
+        {
+          "caller": "apiFetch",
+          "callee": "String",
+          "lineNumber": 42
+        },
+        {
+          "caller": "apiFetch",
+          "callee": "response.json",
+          "lineNumber": 49
+        },
+        {
+          "caller": "ensurePreconditions",
+          "callee": "pushResult",
+          "lineNumber": 54
+        },
+        {
+          "caller": "ensurePreconditions",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 55
+        },
+        {
+          "caller": "formatErr",
+          "callee": "[msg, code, requestId].filter(Boolean).join",
+          "lineNumber": 63
+        },
+        {
+          "caller": "formatErr",
+          "callee": "[msg, code, requestId].filter",
+          "lineNumber": 63
+        },
+        {
+          "caller": "main",
+          "callee": "ensurePreconditions",
+          "lineNumber": 67
+        },
+        {
+          "caller": "main",
+          "callee": "apiFetch",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 71
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 74
+        },
+        {
+          "caller": "main",
+          "callee": "apiFetch",
+          "lineNumber": 80
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 80
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 82
+        },
+        {
+          "caller": "main",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 86
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 88
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 88
+        },
+        {
+          "caller": "main",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 89
+        },
+        {
+          "caller": "main",
+          "callee": "Date.now",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "await apiFetch",
+          "lineNumber": 96
+        },
+        {
+          "caller": "main",
+          "callee": "menuItems.find",
+          "lineNumber": 97
+        },
+        {
+          "caller": "main",
+          "callee": "menuItems.find",
+          "lineNumber": 97
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 99
+        },
+        {
+          "caller": "main",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 100
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 103
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 104
+        },
+        {
+          "caller": "main",
+          "callee": "(smokePrice * 0.14).toFixed",
+          "lineNumber": 104
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 105
+        },
+        {
+          "caller": "main",
+          "callee": "(smokePrice + smokeTax).toFixed",
+          "lineNumber": 105
+        },
+        {
+          "caller": "main",
+          "callee": "apiFetch",
+          "lineNumber": 106
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 131
+        },
+        {
+          "caller": "main",
+          "callee": "Boolean",
+          "lineNumber": 131
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 134
+        },
+        {
+          "caller": "main",
+          "callee": "apiFetch",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 142
+        },
+        {
+          "caller": "main",
+          "callee": "apiFetch",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 148
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 150
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 150
+        },
+        {
+          "caller": "main",
+          "callee": "await apiFetch",
+          "lineNumber": 155
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 155
+        },
+        {
+          "caller": "main",
+          "callee": "drivers.find",
+          "lineNumber": 156
+        },
+        {
+          "caller": "main",
+          "callee": "String(driver?.status || '').toUpperCase",
+          "lineNumber": 156
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 156
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 158
+        },
+        {
+          "caller": "main",
+          "callee": "apiFetch",
+          "lineNumber": 160
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 162
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 165
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 168
+        },
+        {
+          "caller": "main",
+          "callee": "await apiFetch",
+          "lineNumber": 172
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 172
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "Boolean",
+          "lineNumber": 173
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 175
+        },
+        {
+          "caller": "main",
+          "callee": "new Date().toISOString().slice",
+          "lineNumber": 179
+        },
+        {
+          "caller": "main",
+          "callee": "new Date().toISOString",
+          "lineNumber": 179
+        },
+        {
+          "caller": "main",
+          "callee": "await apiFetch",
+          "lineNumber": 180
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 180
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 182
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 184
+        },
+        {
+          "caller": "main",
+          "callee": "formatErr",
+          "lineNumber": 184
+        },
+        {
+          "caller": "main",
+          "callee": "pushResult",
+          "lineNumber": 188
+        },
+        {
+          "caller": "main",
+          "callee": "printSummaryAndExit",
+          "lineNumber": 191
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "results.filter",
+          "lineNumber": 195
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "results.filter",
+          "lineNumber": 196
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "console.log",
+          "lineNumber": 198
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "console.log",
+          "lineNumber": 199
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "JSON.stringify",
+          "lineNumber": 199
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "requiredFails.map",
+          "lineNumber": 201
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "recommendedFails.map",
+          "lineNumber": 202
+        },
+        {
+          "caller": "printSummaryAndExit",
+          "callee": "process.exit",
+          "lineNumber": 205
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/dev-env-init.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 81,
+      "nonEmptyLines": 67,
+      "functions": [
+        {
+          "name": "parseEnvFile",
+          "startLine": 10,
+          "endLine": 25,
+          "params": [
+            "content"
+          ]
+        },
+        {
+          "name": "serializeEnv",
+          "startLine": 27,
+          "endLine": 30,
+          "params": [
+            "env"
+          ]
+        },
+        {
+          "name": "genPassword",
+          "startLine": 32,
+          "endLine": 35,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 37,
+          "endLine": 79,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "parseEnvFile",
+          "callee": "content.split",
+          "lineNumber": 12
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "rawLine.trim",
+          "lineNumber": 13
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "line.startsWith",
+          "lineNumber": 14
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "line.indexOf",
+          "lineNumber": 15
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "line.slice(0, idx).trim",
+          "lineNumber": 17
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "line.slice",
+          "lineNumber": 17
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "line.slice(idx + 1).trim",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "line.slice",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "val.startsWith",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "val.endsWith",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "val.startsWith",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "val.endsWith",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseEnvFile",
+          "callee": "val.slice",
+          "lineNumber": 20
+        },
+        {
+          "caller": "serializeEnv",
+          "callee": "Object.keys(env).sort",
+          "lineNumber": 28
+        },
+        {
+          "caller": "serializeEnv",
+          "callee": "Object.keys",
+          "lineNumber": 28
+        },
+        {
+          "caller": "serializeEnv",
+          "callee": "a.localeCompare",
+          "lineNumber": 28
+        },
+        {
+          "caller": "serializeEnv",
+          "callee": "keys.map((k) => `${k}=${env[k]}`).join",
+          "lineNumber": 29
+        },
+        {
+          "caller": "serializeEnv",
+          "callee": "keys.map",
+          "lineNumber": 29
+        },
+        {
+          "caller": "genPassword",
+          "callee": "crypto.randomBytes(12).toString",
+          "lineNumber": 34
+        },
+        {
+          "caller": "genPassword",
+          "callee": "crypto.randomBytes",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "fs.existsSync",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "fs.readFileSync",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "parseEnvFile",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "genPassword",
+          "lineNumber": 42
+        },
+        {
+          "caller": "ensure",
+          "callee": "String(env[k]).trim",
+          "lineNumber": 45
+        },
+        {
+          "caller": "ensure",
+          "callee": "String",
+          "lineNumber": 45
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 49
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 50
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 53
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 54
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 55
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 56
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 59
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 60
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 61
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 62
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 63
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomBytes(32).toString",
+          "lineNumber": 63
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomBytes",
+          "lineNumber": 63
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 64
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomBytes(32).toString",
+          "lineNumber": 64
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomBytes",
+          "lineNumber": 64
+        },
+        {
+          "caller": "main",
+          "callee": "ensure",
+          "lineNumber": 65
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomBytes(32).toString",
+          "lineNumber": 65
+        },
+        {
+          "caller": "main",
+          "callee": "crypto.randomBytes",
+          "lineNumber": 65
+        },
+        {
+          "caller": "main",
+          "callee": "serializeEnv",
+          "lineNumber": 67
+        },
+        {
+          "caller": "main",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 68
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "Object.keys",
+          "lineNumber": 73
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/fix-receipt-css.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 85,
+      "nonEmptyLines": 82,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/fix-record-defaults.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 35,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/fix-schema-closures.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 118,
+      "nonEmptyLines": 100,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/fix-schema-commas.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 78,
+      "nonEmptyLines": 64,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/fix-schema-patterns.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 83,
+      "nonEmptyLines": 69,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/fix-schema-remaining.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 87,
+      "nonEmptyLines": 72,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/gen-track-link.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 58,
+      "nonEmptyLines": 55,
+      "functions": [
+        {
+          "name": "main",
+          "startLine": 8,
+          "endLine": 53,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "main",
+          "callee": "String(process.argv[2] || '').trim",
+          "lineNumber": 9
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 9
+        },
+        {
+          "caller": "main",
+          "callee": "console.error",
+          "lineNumber": 11
+        },
+        {
+          "caller": "main",
+          "callee": "process.exit",
+          "lineNumber": 12
+        },
+        {
+          "caller": "main",
+          "callee": "String(process.env.LH_API_URL || 'http://127.0.0.1:3001/api').replace",
+          "lineNumber": 14
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 14
+        },
+        {
+          "caller": "main",
+          "callee": "String(process.env.DEV_BOOTSTRAP_EMAIL || process.env.LOAD_AUTH_EMAIL || '').trim",
+          "lineNumber": 15
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 15
+        },
+        {
+          "caller": "main",
+          "callee": "String(process.env.DEV_BOOTSTRAP_PASSWORD || process.env.LOAD_AUTH_PASSWORD || '').trim",
+          "lineNumber": 16
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 16
+        },
+        {
+          "caller": "main",
+          "callee": "console.error",
+          "lineNumber": 18
+        },
+        {
+          "caller": "main",
+          "callee": "process.exit",
+          "lineNumber": 19
+        },
+        {
+          "caller": "main",
+          "callee": "fetch",
+          "lineNumber": 21
+        },
+        {
+          "caller": "main",
+          "callee": "JSON.stringify",
+          "lineNumber": 23
+        },
+        {
+          "caller": "main",
+          "callee": "lr.json().catch",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "lr.json",
+          "lineNumber": 25
+        },
+        {
+          "caller": "main",
+          "callee": "console.error",
+          "lineNumber": 27
+        },
+        {
+          "caller": "main",
+          "callee": "process.exit",
+          "lineNumber": 28
+        },
+        {
+          "caller": "main",
+          "callee": "/^\\d+$/.test",
+          "lineNumber": 32
+        },
+        {
+          "caller": "main",
+          "callee": "fetch",
+          "lineNumber": 33
+        },
+        {
+          "caller": "main",
+          "callee": "q.json().catch",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "q.json",
+          "lineNumber": 34
+        },
+        {
+          "caller": "main",
+          "callee": "Array.isArray",
+          "lineNumber": 35
+        },
+        {
+          "caller": "main",
+          "callee": "rows.find",
+          "lineNumber": 36
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 36
+        },
+        {
+          "caller": "main",
+          "callee": "console.error",
+          "lineNumber": 38
+        },
+        {
+          "caller": "main",
+          "callee": "process.exit",
+          "lineNumber": 39
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 41
+        },
+        {
+          "caller": "main",
+          "callee": "fetch",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "encodeURIComponent",
+          "lineNumber": 43
+        },
+        {
+          "caller": "main",
+          "callee": "tr.json().catch",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "tr.json",
+          "lineNumber": 46
+        },
+        {
+          "caller": "main",
+          "callee": "console.error",
+          "lineNumber": 48
+        },
+        {
+          "caller": "main",
+          "callee": "process.exit",
+          "lineNumber": 49
+        },
+        {
+          "caller": "main",
+          "callee": "String(process.env.PUBLIC_TRACKING_URL || '').replace",
+          "lineNumber": 51
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 51
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 52
+        },
+        {
+          "caller": "main",
+          "callee": "body.url.replace",
+          "lineNumber": 52
+        },
+        {
+          "caller": "main",
+          "callee": "body.url.replace",
+          "lineNumber": 52
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/generate-theme-backgrounds.mjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 55,
+      "nonEmptyLines": 50,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

@@ -35,7 +35,7 @@ const ItemGrid: React.FC<ItemGridProps> = React.memo(({
     // Ticket grouping: consecutive category sections with
     // sticky headers, preserving catalog order. Falls back to one group.
     const ticketGroups = useMemo(() => {
-        if (design !== 'ticket') return null;
+        if (density !== 'ticket') return null;
         const groups: { key: string; label: string; items: MenuItem[] }[] = [];
         const fallback = lang === 'ar' ? 'أصناف' : 'Items';
         for (const item of items) {

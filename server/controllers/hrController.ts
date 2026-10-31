@@ -5,6 +5,7 @@ import { count, desc, eq, and, gte, lte, or, sql, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import logger from '../utils/logger';
 import { GLService } from '../services/glService';
+import { createSignedAuditLog } from '../services/auditService';
 
 const likeSearch = (column: any, search: string) => sql`LOWER(${column}) LIKE ${`%${search.toLowerCase()}%`}`;
 
@@ -151,6 +152,16 @@ export const upsertEmployee = async (req: Request, res: Response) => {
                     })
                     .where(eq(users.id, existingEmployee.userId));
             }
+            await createSignedAuditLog({
+                eventType: 'EMPLOYEE_UPDATED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: targetBranchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { employeeId: existingEmployee.id, changedFields: Object.keys(data).filter((key) => !['password', 'pin', 'nationalId', 'bankAccount'].includes(key)) },
+                reason: 'Employee profile updated',
+            });
             res.json(updated[0]);
         } else {
             const id = data.id || nanoid();
@@ -173,6 +184,17 @@ export const upsertEmployee = async (req: Request, res: Response) => {
                     joinedAt: data.joinedAt ? new Date(data.joinedAt) : data.employmentDate ? new Date(data.employmentDate) : new Date(),
                 }) as any[];
             const created = createdRows[0];
+            await createSignedAuditLog({
+                eventType: 'EMPLOYEE_CREATED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: targetBranchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { employeeId: created.id, role: created.role, hasPayrollProfile: Number(created.basicSalary || 0) > 0 || Number(created.hourlyRate || 0) > 0 },
+                after: { active: true },
+                reason: 'Employee created',
+            });
             res.json(created);
         }
     } catch (error: any) {
@@ -205,6 +227,19 @@ export const deleteEmployee = async (req: Request, res: Response) => {
                     .set({ isActive: false, updatedAt: new Date() })
                     .where(eq(users.id, existing.userId));
             }
+        });
+
+        await createSignedAuditLog({
+            eventType: 'EMPLOYEE_DEACTIVATED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: existing.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { employeeId: id, hadLinkedUser: Boolean(existing.userId) },
+            before: { active: true },
+            after: { active: false },
+            reason: 'Employee deactivated',
         });
 
         res.json({ success: true, id });
@@ -269,6 +304,17 @@ export const clockIn = async (req: Request, res: Response) => {
                 clockIn: new Date(),
                 status: 'PRESENT',
             });
+        await createSignedAuditLog({
+            eventType: 'ATTENDANCE_CLOCK_IN',
+            userId: req.user?.id || employeeId || 'system',
+            userRole: req.user?.role,
+            branchId: actualBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { attendanceId: record.id, employeeId },
+            after: { status: 'PRESENT' },
+            reason: 'Employee clocked in',
+        });
         res.json(record);
     } catch (error: any) {
         logger.error({ err: error }, 'Error clocking in');
@@ -306,6 +352,19 @@ export const clockOut = async (req: Request, res: Response) => {
             })
             .output()
             .where(eq(attendance.id, openRecord.id));
+
+        await createSignedAuditLog({
+            eventType: 'ATTENDANCE_CLOCK_OUT',
+            userId: req.user?.id || employeeId || 'system',
+            userRole: req.user?.role,
+            branchId: openRecord.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { attendanceId: openRecord.id, employeeId, totalHours: Number(totalHours.toFixed(2)) },
+            before: { clockedIn: true },
+            after: { clockedIn: false, totalHours: Number(totalHours.toFixed(2)) },
+            reason: 'Employee clocked out',
+        });
 
         res.json(updated);
     } catch (error: any) {

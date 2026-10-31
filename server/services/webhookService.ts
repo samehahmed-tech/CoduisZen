@@ -11,8 +11,13 @@
 import crypto from 'crypto';
 import { db } from '../db';
 import { webhookEndpoints, webhookDeliveries } from '../../src/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNull, lt, or } from 'drizzle-orm';
 import logger from '../utils/logger';
+import { assertSafeWebhookTarget, validateWebhookTargetUrl } from '../utils/webhookTarget';
+import { isWebhookBranchMatch } from '../utils/webhookScope';
+import { sanitizeWebhookDelivery } from '../utils/webhookDeliveryPrivacy';
+import { buildIntegrationIdempotencyKey, classifyIntegrationHttpStatus, computeIntegrationBackoffMs, shouldRetryIntegrationFailure } from '../utils/integrationRuntimePolicy';
+import { sanitizePublicWebhookPayload } from '../utils/publicWebhookPrivacy';
 
 const log = logger.child({ service: 'webhook' });
 
@@ -61,9 +66,7 @@ export const webhookService = {
                 );
 
             // Filter by branch if specified
-            const matching = endpoints.filter(ep =>
-                !ep.branchId || !branchId || ep.branchId === branchId
-            );
+            const matching = endpoints.filter(ep => isWebhookBranchMatch(ep.branchId, branchId));
 
             if (matching.length === 0) return;
 
@@ -86,16 +89,21 @@ export const webhookService = {
         event: WebhookEvent,
         payload: any
     ) {
+        const safeUrl = await assertSafeWebhookTarget(endpoint.url);
+        const startedAt = Date.now();
         const body = JSON.stringify({
             event,
             timestamp: new Date().toISOString(),
-            data: payload,
+            data: String(endpoint.createdBy || '').startsWith('public-api:')
+                ? sanitizePublicWebhookPayload(payload)
+                : payload,
         });
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             'X-Webhook-Event': event,
             'X-Webhook-Id': endpoint.id,
+            'Idempotency-Key': buildIntegrationIdempotencyKey('webhook', endpoint.id, event, payload),
             ...(endpoint.headers as Record<string, string> || {}),
         };
 
@@ -116,7 +124,7 @@ export const webhookService = {
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-                const res = await fetch(endpoint.url, {
+                const res = await fetch(safeUrl, {
                     method: 'POST',
                     headers,
                     body,
@@ -137,15 +145,16 @@ export const webhookService = {
                         httpStatus,
                         responseBody: responseBody?.substring(0, 2000),
                         attempt,
+                        durationMs: Date.now() - startedAt,
+                        nextRetryAt: null,
                         deliveredAt: new Date(),
                     });
-                    return;
+                    return true;
                 }
 
                 lastError = `HTTP ${httpStatus}: ${responseBody?.substring(0, 500)}`;
 
-                // Don't retry on 4xx (client errors) except 429 (rate limit)
-                if (httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429) {
+                if (!shouldRetryIntegrationFailure(classifyIntegrationHttpStatus(httpStatus))) {
                     break;
                 }
             } catch (err: any) {
@@ -154,7 +163,7 @@ export const webhookService = {
 
             // Exponential backoff between retries
             if (attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+                await new Promise(r => setTimeout(r, computeIntegrationBackoffMs(attempt)));
             }
         }
 
@@ -167,30 +176,39 @@ export const webhookService = {
             httpStatus,
             responseBody: responseBody?.substring(0, 2000),
             attempt: maxRetries,
+            durationMs: Date.now() - startedAt,
+            nextRetryAt: null,
             lastError: lastError?.substring(0, 2000),
         });
+        return false;
     },
 
     /**
      * Get delivery history for an endpoint
      */
     async getDeliveries(endpointId: string, limit = 50) {
-        return db.select()
+        const deliveries = await db.select()
             .from(webhookDeliveries)
             .where(eq(webhookDeliveries.endpointId, endpointId))
             .orderBy(sql`${webhookDeliveries.createdAt} DESC`)
             .offset(0).fetch(limit);
+        // Retry processing still uses the raw DB row internally; delivery
+        // history exposed to operators must not reveal customer credentials,
+        // contact data, or gateway response fields.
+        return deliveries.map(sanitizeWebhookDelivery);
     },
 
     /**
      * CRUD for webhook endpoints
      */
     async createEndpoint(data: typeof webhookEndpoints.$inferInsert) {
+        validateWebhookTargetUrl(String(data.url));
         const [endpoint] = await db.insert(webhookEndpoints).output().values(data);
         return endpoint;
     },
 
     async updateEndpoint(id: string, data: Partial<typeof webhookEndpoints.$inferInsert>) {
+        if (data.url !== undefined) validateWebhookTargetUrl(String(data.url));
         const [endpoint] = await db.update(webhookEndpoints)
             .set({ ...data, updatedAt: new Date() })
             .output()
@@ -198,12 +216,20 @@ export const webhookService = {
         return endpoint;
     },
 
+    async getEndpoint(id: string) {
+        const [endpoint] = await db.select().from(webhookEndpoints)
+            .where(eq(webhookEndpoints.id, id)).top(1);
+        return endpoint || null;
+    },
+
     async deleteEndpoint(id: string) {
         await db.delete(webhookEndpoints).where(eq(webhookEndpoints.id, id));
     },
 
-    async getEndpoints() {
-        return db.select().from(webhookEndpoints).orderBy(sql`${webhookEndpoints.createdAt} DESC`);
+    async getEndpoints(branchId?: string) {
+        return db.select().from(webhookEndpoints)
+            .where(branchId ? eq(webhookEndpoints.branchId, branchId) : undefined)
+            .orderBy(sql`${webhookEndpoints.createdAt} DESC`);
     },
 
     /**
@@ -211,9 +237,23 @@ export const webhookService = {
      * Ops can trigger this to re-dispatch any FAILED deliveries.
      */
     async retryFailed(limit = 50) {
+        const now = new Date();
+        const claimLeaseUntil = new Date(Date.now() + 5 * 60 * 1000);
+
+        // A crashed worker must not leave a delivery permanently claimed.
+        await db.update(webhookDeliveries)
+            .set({ status: 'FAILED', nextRetryAt: null })
+            .where(and(
+                eq(webhookDeliveries.status, 'RETRYING'),
+                or(isNull(webhookDeliveries.nextRetryAt), lt(webhookDeliveries.nextRetryAt, now)),
+            ));
+
         const failed = await db.select()
             .from(webhookDeliveries)
-            .where(eq(webhookDeliveries.status, 'FAILED'))
+            .where(and(
+                eq(webhookDeliveries.status, 'FAILED'),
+                or(isNull(webhookDeliveries.nextRetryAt), lt(webhookDeliveries.nextRetryAt, now)),
+            ))
             .orderBy(sql`${webhookDeliveries.createdAt} ASC`)
             .offset(0).fetch(limit);
 
@@ -222,23 +262,41 @@ export const webhookService = {
         let retried = 0;
         for (const delivery of failed) {
             try {
+                const [claimed] = await db.update(webhookDeliveries)
+                    .set({ status: 'RETRYING', nextRetryAt: claimLeaseUntil })
+                    .output()
+                    .where(and(
+                        eq(webhookDeliveries.id, delivery.id),
+                        eq(webhookDeliveries.status, 'FAILED'),
+                        or(isNull(webhookDeliveries.nextRetryAt), lt(webhookDeliveries.nextRetryAt, now)),
+                    ));
+                if (!claimed) continue;
+
                 const [endpoint] = await db.select()
                     .top(1)
                     .from(webhookEndpoints)
                     .where(eq(webhookEndpoints.id, delivery.endpointId));
 
-                if (!endpoint || !endpoint.isActive) continue;
-
                 // Re-dispatch (this will create a new delivery record)
-                await this.deliverToEndpoint(endpoint, delivery.event as WebhookEvent, delivery.payload);
+                if (!endpoint || !endpoint.isActive) {
+                    await db.update(webhookDeliveries)
+                        .set({ status: 'FAILED', nextRetryAt: null, lastError: 'WEBHOOK_ENDPOINT_UNAVAILABLE' })
+                        .where(eq(webhookDeliveries.id, delivery.id));
+                    continue;
+                }
+
+                const delivered = await this.deliverToEndpoint(endpoint, delivery.event as WebhookEvent, delivery.payload);
 
                 // Mark original as retried so it's not picked up again
                 await db.update(webhookDeliveries)
-                    .set({ status: 'RETRIED' })
+                    .set({ status: delivered ? 'RETRIED' : 'FAILED', nextRetryAt: null })
                     .where(eq(webhookDeliveries.id, delivery.id));
 
-                retried++;
+                if (delivered) retried++;
             } catch (err: any) {
+                await db.update(webhookDeliveries)
+                    .set({ status: 'FAILED', nextRetryAt: null, lastError: String(err?.message || err).substring(0, 2000) })
+                    .where(eq(webhookDeliveries.id, delivery.id));
                 log.error({ deliveryId: delivery.id, err: err.message }, 'Webhook retry failed');
             }
         }

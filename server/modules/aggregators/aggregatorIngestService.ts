@@ -21,6 +21,7 @@ import {
     AGGREGATOR_IDEMPOTENCY_SCOPE,
     NormalizedOrder,
     buildAggregatorIdempotencyKey,
+    buildAggregatorPayloadFingerprint,
     mapProviderStatus,
     resolveAggregatorBranch,
 } from './aggregatorTypes';
@@ -51,13 +52,13 @@ const ensureInboundEndpoint = async () => {
     } catch { /* best effort */ }
 };
 
-const logInbound = async (providerId: string, payload: any, status: string, orderId?: string, error?: string) => {
+const logInbound = async (providerId: string, payload: any, status: string, orderId?: string, error?: string, branchId?: string | null) => {
     try {
         await ensureInboundEndpoint();
         await db.insert(webhookDeliveries).values({
             endpointId: 'aggregator-inbound',
             event: 'aggregator.inbound',
-            payload: { provider: providerId, status, orderId, payload },
+            payload: { provider: providerId, status, orderId, branchId: branchId || null, payload },
             status: error ? 'FAILED' : 'SUCCESS',
             httpStatus: error ? 400 : 200,
             lastError: error?.substring(0, 2000),
@@ -71,7 +72,7 @@ export const ingestAggregatorOrder = async (
     providerId: string,
     normalized: NormalizedOrder,
     rawPayload: any,
-): Promise<{ orderId: string; created: boolean; internalStatus: string | null }> => {
+): Promise<{ orderId: string; created: boolean; internalStatus: string | null; branchId?: string | null }> => {
     const provider = String(providerId || '').trim().toLowerCase();
     const internalStatus = mapProviderStatus(provider, normalized.rawStatus);
     const configs = await getAggregatorsConfigRaw();
@@ -92,7 +93,7 @@ export const ingestAggregatorOrder = async (
         throw err;
     }
     if (Array.isArray(config.branchIds) && config.branchIds.length > 0 && !config.branchIds.includes(branchId)) {
-        await logInbound(provider, rawPayload, normalized.rawStatus, normalized.externalId, 'BRANCH_NOT_ENABLED');
+        await logInbound(provider, rawPayload, normalized.rawStatus, normalized.externalId, 'BRANCH_NOT_ENABLED', branchId);
         const err: any = new Error('BRANCH_NOT_ENABLED');
         err.status = 403;
         err.code = err.message;
@@ -100,7 +101,7 @@ export const ingestAggregatorOrder = async (
     }
     const [branch] = await db.select({ id: branches.id }).from(branches).where(eq(branches.id, branchId));
     if (!branch) {
-        await logInbound(provider, rawPayload, normalized.rawStatus, normalized.externalId, 'INVALID_BRANCH_REFERENCE');
+        await logInbound(provider, rawPayload, normalized.rawStatus, normalized.externalId, 'INVALID_BRANCH_REFERENCE', branchId);
         const err: any = new Error('INVALID_BRANCH_REFERENCE');
         err.status = 400;
         err.code = err.message;
@@ -108,12 +109,51 @@ export const ingestAggregatorOrder = async (
     }
 
     const idemKey = buildAggregatorIdempotencyKey(provider, normalized.externalId, normalized.rawStatus);
+    const payloadFingerprint = buildAggregatorPayloadFingerprint(provider, normalized);
     const [claim] = await db.select().from(idempotencyKeys)
         .where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE), gt(idempotencyKeys.expiresAt, new Date())));
-    if (claim?.resourceId) return { orderId: claim.resourceId, created: false, internalStatus };
     if (internalStatus === null) {
         await logInbound(provider, rawPayload, normalized.rawStatus, normalized.externalId);
-        return { orderId: normalized.externalId, created: false, internalStatus: null };
+        return { orderId: normalized.externalId, created: false, internalStatus: null, branchId };
+    }
+
+    const claimRequestHash = String(claim?.requestHash || '');
+    if (claim && claimRequestHash && claimRequestHash !== payloadFingerprint && claimRequestHash !== normalized.externalId) {
+        await logInbound(provider, rawPayload, normalized.rawStatus, claim.resourceId || normalized.externalId, 'AGGREGATOR_ORDER_PAYLOAD_CONFLICT', branchId);
+        const err: any = new Error('AGGREGATOR_ORDER_PAYLOAD_CONFLICT');
+        err.status = 409;
+        err.code = err.message;
+        throw err;
+    }
+    if (claim?.resourceId) return { orderId: claim.resourceId, created: false, internalStatus, branchId };
+    if (claim) {
+        const err: any = new Error('AGGREGATOR_ORDER_IN_PROGRESS');
+        err.status = 409;
+        err.code = err.message;
+        throw err;
+    }
+
+    // Claim before any order-side effects. The unique (key, scope) index makes
+    // concurrent deliveries deterministic: exactly one request proceeds, and
+    // the loser receives an explicit retryable conflict instead of creating a
+    // second order.
+    try {
+        await db.insert(idempotencyKeys).values({
+            key: idemKey,
+            scope: AGGREGATOR_IDEMPOTENCY_SCOPE,
+            requestHash: payloadFingerprint,
+            status: 'IN_PROGRESS',
+            expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS),
+            updatedAt: new Date(),
+        });
+    } catch {
+        const [concurrentClaim] = await db.select().from(idempotencyKeys)
+            .where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE)));
+        if (concurrentClaim?.resourceId) return { orderId: concurrentClaim.resourceId, created: false, internalStatus, branchId };
+        const err: any = new Error('AGGREGATOR_ORDER_IN_PROGRESS');
+        err.status = 409;
+        err.code = err.message;
+        throw err;
     }
 
     if (internalStatus === 'CANCELLED') {
@@ -129,28 +169,43 @@ export const ingestAggregatorOrder = async (
             } catch (e: any) {
                 log.warn({ orderId: existing.id, err: e?.message }, 'Aggregator cancel transition failed');
             }
-            await db.insert(idempotencyKeys).values({
-                key: idemKey, scope: AGGREGATOR_IDEMPOTENCY_SCOPE, requestHash: normalized.externalId,
-                resourceId: existing.id, status: 'COMPLETED', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date(),
-            }).catch(() => undefined);
-            await logInbound(provider, rawPayload, normalized.rawStatus, existing.id);
-            return { orderId: existing.id, created: false, internalStatus: 'CANCELLED' };
+            await db.update(idempotencyKeys).set({
+                resourceId: existing.id, status: 'COMPLETED', updatedAt: new Date(),
+            }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE))).catch(() => undefined);
+            await logInbound(provider, rawPayload, normalized.rawStatus, existing.id, undefined, branchId);
+            return { orderId: existing.id, created: false, internalStatus: 'CANCELLED', branchId };
         }
+        await db.update(idempotencyKeys).set({
+            resourceId: normalized.externalId, status: 'COMPLETED', updatedAt: new Date(),
+        }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE))).catch(() => undefined);
         await logInbound(provider, rawPayload, normalized.rawStatus, normalized.externalId);
-        return { orderId: normalized.externalId, created: false, internalStatus: 'CANCELLED' };
+        return { orderId: normalized.externalId, created: false, internalStatus: 'CANCELLED', branchId };
     }
 
-    const [dup] = await db.select({ id: orders.id }).from(orders).where(and(
+    const [dup] = await db.select({ id: orders.id, branchId: orders.branchId, total: orders.total }).from(orders).where(and(
         eq(orders.deliverySource, provider),
         eq(orders.platformOrderId, normalized.externalId),
         sql`${orders.status} NOT IN ('CANCELLED', 'REFUNDED')`,
     ));
     if (dup) {
-        await db.insert(idempotencyKeys).values({
-            key: idemKey, scope: AGGREGATOR_IDEMPOTENCY_SCOPE, requestHash: normalized.externalId,
-            resourceId: dup.id, status: 'COMPLETED', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date(),
-        }).catch(() => undefined);
-        return { orderId: dup.id, created: false, internalStatus };
+        const sameBranch = String(dup.branchId || '') === String(branchId || '');
+        const sameTotal = Number(dup.total || 0) === Number(normalized.total || 0);
+        if (!sameBranch || !sameTotal) {
+            await logInbound(provider, rawPayload, normalized.rawStatus, dup.id, 'AGGREGATOR_ORDER_PAYLOAD_CONFLICT', branchId);
+            await db.delete(idempotencyKeys).where(and(
+                eq(idempotencyKeys.key, idemKey),
+                eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE),
+                eq(idempotencyKeys.status, 'IN_PROGRESS'),
+            )).catch(() => undefined);
+            const err: any = new Error('AGGREGATOR_ORDER_PAYLOAD_CONFLICT');
+            err.status = 409;
+            err.code = err.message;
+            throw err;
+        }
+        await db.update(idempotencyKeys).set({
+            resourceId: dup.id, status: 'COMPLETED', updatedAt: new Date(),
+        }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE))).catch(() => undefined);
+        return { orderId: dup.id, created: false, internalStatus, branchId };
     }
 
     const skus = Array.from(new Set(normalized.items.map((i) => i.sku).filter(Boolean))) as string[];
@@ -171,7 +226,9 @@ export const ingestAggregatorOrder = async (
     const now = new Date();
     const businessDate = branchRow?.businessDate || now.toISOString().split('T')[0];
 
-    const createdId = await db.transaction(async (tx) => {
+    let createdId: string;
+    try {
+        createdId = await db.transaction(async (tx) => {
         const dailyOrderNumber = await allocateDailyOrderNumber(tx as any, branchId, businessDate);
         const [created] = await tx.insert(orders).output().values({
             id: `${provider.slice(0, 2).toUpperCase()}-${normalized.externalId.slice(0, 8)}-${nanoid(6)}`,
@@ -218,7 +275,15 @@ export const ingestAggregatorOrder = async (
         }
         await tx.insert(orderStatusHistory).values({ orderId: (created as any).id, status: (created as any).status, changedBy: `${provider}-webhook`, createdAt: now } as any);
         return (created as any).id as string;
-    });
+        });
+    } catch (error) {
+        await db.delete(idempotencyKeys).where(and(
+            eq(idempotencyKeys.key, idemKey),
+            eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE),
+            eq(idempotencyKeys.status, 'IN_PROGRESS'),
+        )).catch(() => undefined);
+        throw error;
+    }
 
     try {
         const schema = await import('../../../src/db/schema');
@@ -236,10 +301,9 @@ export const ingestAggregatorOrder = async (
     emitBranchEvent(branchId, 'order:created', { id: createdId, source: provider, platformOrderId: normalized.externalId });
     webhookService.dispatch('order.created', { id: createdId, source: provider, platformOrderId: normalized.externalId, branchId }, branchId).catch(() => {});
 
-    await db.insert(idempotencyKeys).values({
-        key: idemKey, scope: AGGREGATOR_IDEMPOTENCY_SCOPE, requestHash: normalized.externalId,
-        resourceId: createdId, status: 'COMPLETED', expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS), updatedAt: new Date(),
-    }).catch(() => undefined);
-    await logInbound(provider, rawPayload, normalized.rawStatus, createdId);
-    return { orderId: createdId, created: true, internalStatus };
+    await db.update(idempotencyKeys).set({
+        resourceId: createdId, status: 'COMPLETED', updatedAt: new Date(),
+    }).where(and(eq(idempotencyKeys.key, idemKey), eq(idempotencyKeys.scope, AGGREGATOR_IDEMPOTENCY_SCOPE))).catch(() => undefined);
+    await logInbound(provider, rawPayload, normalized.rawStatus, createdId, undefined, branchId);
+    return { orderId: createdId, created: true, internalStatus, branchId };
 };

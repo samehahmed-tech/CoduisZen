@@ -176,6 +176,9 @@ export const financeEngine = {
                 { accountCode: entry.debitAccountCode, debit: Number(entry.amount || 0), credit: 0 },
                 { accountCode: entry.creditAccountCode, debit: 0, credit: Number(entry.amount || 0) },
             ],
+            actorId: entry.updatedBy || 'system',
+            source: 'FINANCE_RECONCILIATION',
+            correlationId: `FINANCE_RECONCILIATION:${entry.referenceId || 'manual'}`,
         });
         if (typeof result === 'string' || !(result as any)?.entryId) throw new Error('FINANCE_POSTING_FAILED');
         return result;

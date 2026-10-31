@@ -1,0 +1,519 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 3,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 3,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "server/controllers/backupController.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 64,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "triggerBackup",
+          "startLine": 7,
+          "endLine": 26,
+          "params": [
+            "_req",
+            "res"
+          ]
+        },
+        {
+          "name": "listBackups",
+          "startLine": 28,
+          "endLine": 49,
+          "params": [
+            "_req",
+            "res"
+          ]
+        },
+        {
+          "name": "downloadBackup",
+          "startLine": 51,
+          "endLine": 64,
+          "params": [
+            "req",
+            "res"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "triggerBackup",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "listBackups",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "downloadBackup",
+          "line": 51,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "triggerBackup",
+          "callee": "createVerifiedDatabaseBackup",
+          "lineNumber": 9
+        },
+        {
+          "caller": "triggerBackup",
+          "callee": "(result.bytes / (1024 * 1024)).toFixed",
+          "lineNumber": 10
+        },
+        {
+          "caller": "triggerBackup",
+          "callee": "logger.info",
+          "lineNumber": 11
+        },
+        {
+          "caller": "triggerBackup",
+          "callee": "res.json",
+          "lineNumber": 12
+        },
+        {
+          "caller": "triggerBackup",
+          "callee": "logger.error",
+          "lineNumber": 20
+        },
+        {
+          "caller": "triggerBackup",
+          "callee": "res.status(500).json",
+          "lineNumber": 21
+        },
+        {
+          "caller": "triggerBackup",
+          "callee": "res.status",
+          "lineNumber": 21
+        },
+        {
+          "caller": "listBackups",
+          "callee": "getDatabaseBackupDirectory",
+          "lineNumber": 30
+        },
+        {
+          "caller": "listBackups",
+          "callee": "fs.existsSync",
+          "lineNumber": 31
+        },
+        {
+          "caller": "listBackups",
+          "callee": "res.json",
+          "lineNumber": 31
+        },
+        {
+          "caller": "listBackups",
+          "callee": "fs.readdirSync(backupDir)\r\n            .filter(filename => filename.toLowerCase().endsWith('.bak'))\r\n            .map(filename => {\r\n                const stats = fs.statSync(path.join(backupDir, filename));\r\n                return {\r\n                    filename,\r\n                    size: `${(stats.size / (1024 * 1024)).toFixed(2)} MB`,\r\n                    createdAt: stats.birthtime.toISOString(),\r\n                };\r\n            })\r\n            .sort",
+          "lineNumber": 33
+        },
+        {
+          "caller": "listBackups",
+          "callee": "fs.readdirSync(backupDir)\r\n            .filter(filename => filename.toLowerCase().endsWith('.bak'))\r\n            .map",
+          "lineNumber": 33
+        },
+        {
+          "caller": "listBackups",
+          "callee": "fs.readdirSync(backupDir)\r\n            .filter",
+          "lineNumber": 33
+        },
+        {
+          "caller": "listBackups",
+          "callee": "fs.readdirSync",
+          "lineNumber": 33
+        },
+        {
+          "caller": "listBackups",
+          "callee": "filename.toLowerCase().endsWith",
+          "lineNumber": 34
+        },
+        {
+          "caller": "listBackups",
+          "callee": "filename.toLowerCase",
+          "lineNumber": 34
+        },
+        {
+          "caller": "listBackups",
+          "callee": "fs.statSync",
+          "lineNumber": 36
+        },
+        {
+          "caller": "listBackups",
+          "callee": "path.join",
+          "lineNumber": 36
+        },
+        {
+          "caller": "listBackups",
+          "callee": "(stats.size / (1024 * 1024)).toFixed",
+          "lineNumber": 39
+        },
+        {
+          "caller": "listBackups",
+          "callee": "stats.birthtime.toISOString",
+          "lineNumber": 40
+        },
+        {
+          "caller": "listBackups",
+          "callee": "b.createdAt.localeCompare",
+          "lineNumber": 43
+        },
+        {
+          "caller": "listBackups",
+          "callee": "res.json",
+          "lineNumber": 45
+        },
+        {
+          "caller": "listBackups",
+          "callee": "res.status(500).json",
+          "lineNumber": 47
+        },
+        {
+          "caller": "listBackups",
+          "callee": "res.status",
+          "lineNumber": 47
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "String",
+          "lineNumber": 53
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "filename.toLowerCase().endsWith",
+          "lineNumber": 54
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "filename.toLowerCase",
+          "lineNumber": 54
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "path.basename",
+          "lineNumber": 54
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.status(400).json",
+          "lineNumber": 55
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.status",
+          "lineNumber": 55
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "path.join",
+          "lineNumber": 58
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "getDatabaseBackupDirectory",
+          "lineNumber": 58
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "fs.existsSync",
+          "lineNumber": 59
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.status(404).json",
+          "lineNumber": 59
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.status",
+          "lineNumber": 59
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.download",
+          "lineNumber": 60
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.status(500).json",
+          "lineNumber": 62
+        },
+        {
+          "caller": "downloadBackup",
+          "callee": "res.status",
+          "lineNumber": 62
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/backupCronService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 31,
+      "nonEmptyLines": 26,
+      "exports": [
+        {
+          "name": "backupCronService",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "startDailyBackup",
+          "callee": "logger.info",
+          "lineNumber": 7
+        },
+        {
+          "caller": "startDailyBackup",
+          "callee": "logger.info",
+          "lineNumber": 12
+        },
+        {
+          "caller": "runIfDue",
+          "callee": "now.toISOString().slice",
+          "lineNumber": 16
+        },
+        {
+          "caller": "runIfDue",
+          "callee": "now.toISOString",
+          "lineNumber": 16
+        },
+        {
+          "caller": "runIfDue",
+          "callee": "now.getHours",
+          "lineNumber": 17
+        },
+        {
+          "caller": "runIfDue",
+          "callee": "createVerifiedDatabaseBackup",
+          "lineNumber": 20
+        },
+        {
+          "caller": "runIfDue",
+          "callee": "logger.info",
+          "lineNumber": 22
+        },
+        {
+          "caller": "runIfDue",
+          "callee": "logger.error",
+          "lineNumber": 24
+        },
+        {
+          "caller": "startDailyBackup",
+          "callee": "runIfDue",
+          "lineNumber": 28
+        },
+        {
+          "caller": "startDailyBackup",
+          "callee": "setInterval",
+          "lineNumber": 29
+        },
+        {
+          "caller": "startDailyBackup",
+          "callee": "runIfDue",
+          "lineNumber": 29
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/databaseBackupService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 57,
+      "nonEmptyLines": 48,
+      "functions": [
+        {
+          "name": "escapeIdentifier",
+          "startLine": 5,
+          "endLine": 5,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "escapeLiteral",
+          "startLine": 6,
+          "endLine": 6,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "createVerifiedDatabaseBackup",
+          "startLine": 16,
+          "endLine": 53,
+          "params": []
+        },
+        {
+          "name": "getDatabaseBackupDirectory",
+          "startLine": 55,
+          "endLine": 57,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "createVerifiedDatabaseBackup",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "getDatabaseBackupDirectory",
+          "line": 55,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "escapeIdentifier",
+          "callee": "value.replace",
+          "lineNumber": 5
+        },
+        {
+          "caller": "escapeLiteral",
+          "callee": "value.replace",
+          "lineNumber": 6
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "connectionString.match(/(?:^|;)Database=([^;]+)/i)?.[1]?.trim",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "connectionString.match",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "path.resolve",
+          "lineNumber": 23
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "process.cwd",
+          "lineNumber": 23
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "new Date().toISOString",
+          "lineNumber": 26
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "timestamp.replace",
+          "lineNumber": 27
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "path.join",
+          "lineNumber": 28
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "connectionString.replace",
+          "lineNumber": 29
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "new sql.ConnectionPool({ connectionString: masterConnection }).connect",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "escapeIdentifier",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "escapeLiteral",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "pool.request().batch",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "pool.request",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "pool.request().batch",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "pool.request",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "fs.rmSync",
+          "lineNumber": 40
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "pool.close",
+          "lineNumber": 43
+        },
+        {
+          "caller": "createVerifiedDatabaseBackup",
+          "callee": "fs.statSync",
+          "lineNumber": 49
+        },
+        {
+          "caller": "getDatabaseBackupDirectory",
+          "callee": "path.resolve",
+          "lineNumber": 56
+        },
+        {
+          "caller": "getDatabaseBackupDirectory",
+          "callee": "process.cwd",
+          "lineNumber": 56
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    }
+  ]
+}

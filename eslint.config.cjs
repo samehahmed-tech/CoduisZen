@@ -1,5 +1,6 @@
 const globals = require('globals');
 const tseslint = require('typescript-eslint');
+const reactHooks = require('eslint-plugin-react-hooks');
 
 module.exports = tseslint.config(
   {
@@ -21,6 +22,12 @@ module.exports = tseslint.config(
       '*.log',
       '*.json',
       'public/**',
+      '.ua/**',
+      'output/**',
+      'backups/**',
+      'prototypes/**',
+      'One Click Builder/**',
+      'scripts/sameh-installer/hotfix/payload/**',
       '**/*.d.ts',
     ],
   },
@@ -39,10 +46,14 @@ module.exports = tseslint.config(
         ...globals.node,
       },
     },
+    plugins: {
+      'react-hooks': reactHooks,
+    },
     rules: {
       'no-debugger': 'error',
       'no-unreachable': 'error',
       'no-constant-binary-expression': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
 );

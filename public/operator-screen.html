@@ -272,13 +272,13 @@
         }
 
         window.screenActionReady = function (id) {
-            api('POST', '/api/public-screens/tickets/' + encodeURIComponent(id) + '/bump?key=' + encodeURIComponent(key), null, function () {
+            api('POST', '/api/public-screens/tickets/' + encodeURIComponent(id) + '/bump?branchId=' + encodeURIComponent(branchId) + '&key=' + encodeURIComponent(key), null, function () {
                 load();
             });
         };
 
         window.screenActionHandover = function (orderId) {
-            api('POST', '/api/public-screens/orders/' + encodeURIComponent(orderId) + '/handover?key=' + encodeURIComponent(key), null, function () {
+            api('POST', '/api/public-screens/orders/' + encodeURIComponent(orderId) + '/handover?branchId=' + encodeURIComponent(branchId) + '&key=' + encodeURIComponent(key), null, function () {
                 load();
             });
         };

@@ -133,7 +133,7 @@ export const useDataInit = (): InitResult => {
                 if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
                     (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(loadMenuSoon, { timeout: 2500 });
                 } else {
-                    window.setTimeout(loadMenuSoon, 800);
+                    globalThis.setTimeout(loadMenuSoon, 800);
                 }
             } catch (err: any) {
                 if (!cancelled) {

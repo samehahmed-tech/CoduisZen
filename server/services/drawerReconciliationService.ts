@@ -280,30 +280,42 @@ export const drawerService = {
         notes?: string;
     }) => {
         const { discrepancyId, resolution, approvedBy, amountPaid, notes } = input;
-        const [disc] = await db.select().from(drawerDiscrepancies)
-            .where(eq(drawerDiscrepancies.id, discrepancyId));
-        if (!disc) throw Object.assign(new Error('DISCREPANCY_NOT_FOUND'), { status: 404, code: 'DISCREPANCY_NOT_FOUND' });
-        if (disc.resolution !== 'PENDING' && disc.resolution !== resolution) {
-            throw Object.assign(new Error('DISCREPANCY_ALREADY_RESOLVED'), { status: 400, code: 'DISCREPANCY_ALREADY_RESOLVED' });
-        }
+        return db.transaction(async (tx) => {
+            const [disc] = await tx.select().from(drawerDiscrepancies)
+                .where(eq(drawerDiscrepancies.id, discrepancyId));
+            if (!disc) throw Object.assign(new Error('DISCREPANCY_NOT_FOUND'), { status: 404, code: 'DISCREPANCY_NOT_FOUND' });
+            if (disc.resolution !== 'PENDING' && disc.resolution !== resolution) {
+                throw Object.assign(new Error('DISCREPANCY_ALREADY_RESOLVED'), { status: 400, code: 'DISCREPANCY_ALREADY_RESOLVED' });
+            }
 
-        await db.update(drawerDiscrepancies).set({
-            resolution,
-            approvedBy,
-            approvedAt: new Date(),
-            amountPaid: amountPaid !== undefined ? String(amountPaid) : (disc.amountPaid ? String(disc.amountPaid) : '0'),
-            notes: [disc.notes, notes].filter(Boolean).join(' | ') || null,
-            resolvedAt: resolution === 'RESOLVED_PAID' ? new Date() : disc.resolvedAt,
-            updatedAt: new Date(),
-        }).where(eq(drawerDiscrepancies.id, discrepancyId));
+            const now = new Date();
+            const finalValues = {
+                resolution,
+                approvedBy,
+                approvedAt: now,
+                amountPaid: amountPaid !== undefined ? String(amountPaid) : (disc.amountPaid ? String(disc.amountPaid) : '0'),
+                notes: [disc.notes, notes].filter(Boolean).join(' | ') || null,
+                resolvedAt: resolution === 'RESOLVED_PAID' ? now : disc.resolvedAt,
+                updatedAt: now,
+            };
 
-        // GL posting for write-offs / approved overages (pure informational posting;
-        // uses GLService only if configured payment/tax mappings exist).
-        if (resolution === 'WRITE_OFF' || resolution === 'APPROVED_OVERAGE') {
-            try {
+            // Financial resolutions must claim first, post GL in this transaction,
+            // and only then become final. Any posting failure rolls the claim back
+            // to PENDING instead of leaving a resolved discrepancy without GL.
+            if (resolution === 'WRITE_OFF' || resolution === 'APPROVED_OVERAGE') {
+                const [claimed] = await tx.update(drawerDiscrepancies).set({
+                    resolution: 'PROCESSING',
+                    approvedBy,
+                    approvedAt: now,
+                    updatedAt: now,
+                }).output().where(and(
+                    eq(drawerDiscrepancies.id, discrepancyId),
+                    eq(drawerDiscrepancies.resolution, 'PENDING'),
+                ));
+                if (!claimed) throw Object.assign(new Error('DISCREPANCY_ALREADY_RESOLVED'), { status: 400, code: 'DISCREPANCY_ALREADY_RESOLVED' });
+
                 const { GLService } = await import('./glService');
-                const accountType = resolution === 'WRITE_OFF' ? 'EXPENSE' : 'REVENUE';
-                await GLService.postJournalEntry({
+                const posting = await GLService.postJournalEntry({
                     reference: `DISC-${disc.id}`,
                     referenceType: 'EXPENSE',
                     description: `Drawer ${resolution === 'WRITE_OFF' ? 'shortage write-off' : 'overage approval'} ${disc.variance} EGP`,
@@ -316,16 +328,22 @@ export const drawerService = {
                         : [
                             { accountCode: '1110', debit: Number(Math.abs(Number(disc.variance))), credit: 0, description: 'Cash on hand correction' },
                             { accountCode: '4300', debit: 0, credit: Number(Math.abs(Number(disc.variance))), description: 'Cash overage miscellaneous income' },
-                        ],
+                    ],
                     createdBy: approvedBy,
-                }).catch(err => logger.warn({ err }, 'drawer: GL posting for discrepancy skipped'));
-            } catch {
-                logger.warn('drawer: GL posting skipped (account not mapped)');
+                    actorId: approvedBy,
+                    source: 'DRAWER_DISCREPANCY',
+                    correlationId: `DRAWER_DISCREPANCY:${disc.id}`,
+                }, tx);
+                if (typeof posting === 'string' || !posting || !('entryId' in posting) || !posting.entryId) {
+                    throw Object.assign(new Error('DRAWER_GL_POSTING_FAILED'), { status: 409, code: 'DRAWER_GL_POSTING_FAILED' });
+                }
             }
-        }
 
-        const [updated] = await db.select().from(drawerDiscrepancies).where(eq(drawerDiscrepancies.id, discrepancyId));
-        return { discrepancy: updated };
+            await tx.update(drawerDiscrepancies).set(finalValues)
+                .where(and(eq(drawerDiscrepancies.id, discrepancyId), eq(drawerDiscrepancies.resolution, resolution === 'WRITE_OFF' || resolution === 'APPROVED_OVERAGE' ? 'PROCESSING' : disc.resolution)));
+            const [updated] = await tx.select().from(drawerDiscrepancies).where(eq(drawerDiscrepancies.id, discrepancyId));
+            return { discrepancy: updated };
+        });
     },
 
     /** Cashier pays back a shortage debt; unblocks future drawer opens. */

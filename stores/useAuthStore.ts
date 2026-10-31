@@ -15,6 +15,7 @@ import { fetchServerAvatarMap, getUserAvatar, resolveAvatar, saveServerAvatar, s
 import { socketService } from '../src/services/socketService';
 import { broadcastAuthEvent, makeAuthSyncEvent } from '../services/authSync';
 import { migrateThemeId } from '../theme/engine/migrate';
+import { THEME_REGISTRY } from '../theme/tokens';
 
 export type LoginMode = 'pin' | 'password';
 
@@ -115,11 +116,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     taxRate: 14,
     serviceCharge: 0,
     language: 'ar',
-    isDarkMode: true,
+    isDarkMode: false,
     isTouchMode: false,
     motionEffects: true,
     layoutMode: 'classic',
-    theme: 'meridian',
+    theme: 'aero',
     accentColor: '#6366f1',
     density: 'comfortable',
     motionLevel: 'full',
@@ -355,43 +356,42 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     if (navigator.onLine) {
                         const data = await branchesApi.getAll();
-                        if (data.length > 0) {
-                            const branches = data.map((b: any) => ({
-                                id: b.id,
-                                name: b.name,
-                                nameAr: b.name_ar || b.nameAr,
-                                location: b.location || b.address,
-                                address: b.address,
-                                phone: b.phone,
-                                email: b.email,
-                                serverIp: b.server_ip || b.serverIp,
-                                dayCloseEmails: b.day_close_emails || b.dayCloseEmails || [],
-                                isActive: b.is_active !== false,
-                                timezone: b.timezone,
-                                currency: b.currency,
-                                taxRate: b.tax_rate ?? b.taxRate,
-                                serviceCharge: b.service_charge ?? b.serviceCharge,
-                                businessDate: b.business_date ?? b.businessDate,
-                            }));
-                            set((state) => {
-                                const currentActive = state.settings.activeBranchId;
-                                const assignedBranchId = state.settings.currentUser?.assignedBranchId;
-                                const activeStillExists = currentActive && branches.some((branch) => branch.id === currentActive);
-                                const fallbackBranchId =
-                                    branches.find((branch) => branch.id === assignedBranchId)?.id ||
-                                    branches.find((branch) => branch.isActive !== false)?.id ||
-                                    branches[0]?.id;
+                        const branches = data.map((b: any) => ({
+                            id: b.id,
+                            name: b.name,
+                            nameAr: b.name_ar || b.nameAr,
+                            location: b.location || b.address,
+                            address: b.address,
+                            phone: b.phone,
+                            email: b.email,
+                            serverIp: b.server_ip || b.serverIp,
+                            dayCloseEmails: b.day_close_emails || b.dayCloseEmails || [],
+                            isActive: b.is_active !== false,
+                            timezone: b.timezone,
+                            currency: b.currency,
+                            taxRate: b.tax_rate ?? b.taxRate,
+                            serviceCharge: b.service_charge ?? b.serviceCharge,
+                            businessDate: b.business_date ?? b.businessDate,
+                        }));
+                        set((state) => {
+                            const currentActive = state.settings.activeBranchId;
+                            const assignedBranchId = state.settings.currentUser?.assignedBranchId;
+                            const activeStillExists = currentActive && branches.some((branch) => branch.id === currentActive);
+                            const fallbackBranchId =
+                                branches.find((branch) => branch.id === assignedBranchId)?.id ||
+                                branches.find((branch) => branch.isActive !== false)?.id ||
+                                branches[0]?.id;
 
-                                return {
-                                    branches,
-                                    settings: {
-                                        ...state.settings,
-                                        activeBranchId: activeStillExists ? currentActive : fallbackBranchId,
-                                    },
-                                };
-                            });
-                            await localDb.branches.bulkPut(branches as any[]);
-                        }
+                            return {
+                                branches,
+                                settings: {
+                                    ...state.settings,
+                                    activeBranchId: activeStillExists ? currentActive : fallbackBranchId,
+                                },
+                            };
+                        });
+                        await localDb.branches.clear();
+                        if (branches.length > 0) await localDb.branches.bulkPut(branches as any[]);
                     } else {
                         const cached = await localDb.branches.toArray();
                         if (cached.length > 0) {
@@ -448,8 +448,16 @@ export const useAuthStore = create<AuthState>()(
                         const src = { ...data, ...blob };
                         return {
                             ...base,
-                            isDarkMode: src.isDarkMode ?? base.isDarkMode ?? true,
+                            isDarkMode: src.isDarkMode ?? base.isDarkMode ?? false,
                             motionEffects: src.motionEffects ?? base.motionEffects ?? true,
+                            motionLevel: src.motionLevel ?? base.motionLevel ?? 'full',
+                            density: src.density ?? base.density,
+                            accentColor: src.accentColor ?? base.accentColor,
+                            colorOverrides: src.colorOverrides ?? base.colorOverrides,
+                            backgroundConfig: src.backgroundConfig ?? base.backgroundConfig,
+                            wallpaper: src.wallpaper ?? base.wallpaper,
+                            wallpaperOpacity: src.wallpaperOpacity ?? base.wallpaperOpacity,
+                            customWallpaperUrl: src.customWallpaperUrl ?? base.customWallpaperUrl,
                             theme: migrateThemeId(src.theme || base.theme),
                             posItemDensity: pickDensity(src.posItemDensity, base.posItemDensity || 'typo'),
                             posCardSize: pickSize(src.posCardSize, base.posCardSize || 'medium'),
@@ -870,6 +878,10 @@ export const useAuthStore = create<AuthState>()(
 
             updateSettings: (newSettings) => {
                 const oldSettings = get().settings;
+                if (newSettings.theme) {
+                    const config = THEME_REGISTRY[migrateThemeId(newSettings.theme)];
+                    if (config) newSettings = { ...newSettings, theme: config.id as AppSettings['theme'], isDarkMode: config.defaultMode === 'dark' };
+                }
                 if (Array.isArray(newSettings.receiptTemplates)) {
                     localStorage.setItem('coduiszen_receipt_templates', JSON.stringify(newSettings.receiptTemplates));
                 }
@@ -886,7 +898,7 @@ export const useAuthStore = create<AuthState>()(
                 // Sync to database in background (global + per-user overlay so
                 // POS view, dark/light, theme follow the user across devices).
                 const userId = get().settings.currentUser?.id;
-                const PERSISTED_PREF_KEYS = ['isDarkMode', 'theme', 'language', 'isTouchMode', 'motionEffects', 'layoutMode', 'posItemDensity', 'posCardSize', 'posMode', 'ccItemDensity', 'ccCardSize', 'ccPosMode'] as const;
+                const PERSISTED_PREF_KEYS = ['isDarkMode', 'theme', 'language', 'isTouchMode', 'motionEffects', 'motionLevel', 'density', 'accentColor', 'colorOverrides', 'backgroundConfig', 'wallpaper', 'wallpaperOpacity', 'customWallpaperUrl', 'layoutMode', 'posItemDensity', 'posCardSize', 'posMode', 'ccItemDensity', 'ccCardSize', 'ccPosMode'] as const;
                 const prefSlice: Record<string, any> = {};
                 for (const k of PERSISTED_PREF_KEYS) {
                     if (k in newSettings) prefSlice[k] = (newSettings as any)[k];
@@ -1152,6 +1164,13 @@ export const useAuthStore = create<AuthState>()(
         }),
         {
             name: 'coduis-zen-auth',
+            // The rail used to restore the hover-collapsed layout. Start the
+            // explicit-toggle layout open once, then preserve future choices.
+            version: 2,
+            migrate: (persistedState: any) => ({
+                ...persistedState,
+                isSidebarCollapsed: false,
+            }),
             partialize: (state) => ({
                 settings: state.settings,
                 isAuthenticated: state.isAuthenticated,

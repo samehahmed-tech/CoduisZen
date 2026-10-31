@@ -1,0 +1,186 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/import-cafe-menu.cjs",
+      "language": "javascript",
+      "sizeLines": 184,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/import-rosa-cafe-reset.cjs",
+      "language": "javascript",
+      "sizeLines": 502,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/init-sqlserver.mjs",
+      "language": "javascript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/lighthouse/report.mjs",
+      "language": "javascript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/lighthouse/routes.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    },
+    {
+      "path": "scripts/lighthouse/run.mjs",
+      "language": "javascript",
+      "sizeLines": 282,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/move-day16-to-day15/move-profits-16-to-15.cjs",
+      "language": "javascript",
+      "sizeLines": 275,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/package-externals.cjs",
+      "language": "javascript",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/repair-missing-sqlserver-columns.cjs",
+      "language": "javascript",
+      "sizeLines": 88,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/repair-missing-sqlserver-tables.cjs",
+      "language": "javascript",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/rosa-cafe-catalog-data.cjs",
+      "language": "javascript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/run-dev-stack.mjs",
+      "language": "javascript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/run-preview-stack.mjs",
+      "language": "javascript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer.iss",
+      "language": "iss",
+      "sizeLines": 318,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/ai-copilot-hotfix/verify-installed.cjs",
+      "language": "javascript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/assets/wizard-image.bmp",
+      "language": "bmp",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/assets/wizard-small.bmp",
+      "language": "bmp",
+      "sizeLines": 0,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/business-day-reopen-fix/reopen-business-day.cjs",
+      "language": "javascript",
+      "sizeLines": 186,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/daily-order-number-fix/migrate-daily-order-number.cjs",
+      "language": "javascript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/daily-order-number-fix/migrate-daily-order-number.sql",
+      "language": "sql",
+      "sizeLines": 24,
+      "fileCategory": "data"
+    },
+    {
+      "path": "scripts/sameh-installer/data-export/export-postgres-catalog-sql.cjs",
+      "language": "javascript",
+      "sizeLines": 189,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/data-maintenance-fix/data-maintenance.cjs",
+      "language": "javascript",
+      "sizeLines": 236,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/day-close-fix/prepare-business-date.cjs",
+      "language": "javascript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/hotfix/create-recovery-admin.cjs",
+      "language": "javascript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/hotfix/repair-client-database.cjs",
+      "language": "javascript",
+      "sizeLines": 58,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "scripts/import-cafe-menu.cjs": [
+      "scripts/cafe-menu-data.cjs"
+    ],
+    "scripts/import-rosa-cafe-reset.cjs": [
+      "scripts/rosa-cafe-catalog-data.cjs"
+    ],
+    "scripts/init-sqlserver.mjs": [],
+    "scripts/lighthouse/report.mjs": [],
+    "scripts/lighthouse/routes.json": [],
+    "scripts/lighthouse/run.mjs": [],
+    "scripts/move-day16-to-day15/move-profits-16-to-15.cjs": [],
+    "scripts/package-externals.cjs": [],
+    "scripts/repair-missing-sqlserver-columns.cjs": [],
+    "scripts/repair-missing-sqlserver-tables.cjs": [],
+    "scripts/rosa-cafe-catalog-data.cjs": [],
+    "scripts/run-dev-stack.mjs": [],
+    "scripts/run-preview-stack.mjs": [],
+    "scripts/sameh-installer.iss": [],
+    "scripts/sameh-installer/ai-copilot-hotfix/verify-installed.cjs": [],
+    "scripts/sameh-installer/assets/wizard-image.bmp": [],
+    "scripts/sameh-installer/assets/wizard-small.bmp": [],
+    "scripts/sameh-installer/business-day-reopen-fix/reopen-business-day.cjs": [],
+    "scripts/sameh-installer/daily-order-number-fix/migrate-daily-order-number.cjs": [],
+    "scripts/sameh-installer/daily-order-number-fix/migrate-daily-order-number.sql": [],
+    "scripts/sameh-installer/data-export/export-postgres-catalog-sql.cjs": [],
+    "scripts/sameh-installer/data-maintenance-fix/data-maintenance.cjs": [],
+    "scripts/sameh-installer/day-close-fix/prepare-business-date.cjs": [],
+    "scripts/sameh-installer/hotfix/create-recovery-admin.cjs": [],
+    "scripts/sameh-installer/hotfix/repair-client-database.cjs": []
+  }
+}

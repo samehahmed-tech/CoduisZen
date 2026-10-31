@@ -2,13 +2,51 @@ SET XACT_ABORT ON;
 SET QUOTED_IDENTIFIER ON;
 BEGIN TRANSACTION;
 
+IF OBJECT_ID(N'dbo.attendance_policies', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.attendance_policies', 'minimum_rest_minutes') IS NULL
+        ALTER TABLE dbo.attendance_policies ADD minimum_rest_minutes int NOT NULL CONSTRAINT df_attendance_policies_minimum_rest_minutes DEFAULT 660;
+    EXEC(N'UPDATE dbo.attendance_policies SET minimum_rest_minutes = 660 WHERE minimum_rest_minutes IS NULL OR minimum_rest_minutes < 660');
+END;
+
+IF OBJECT_ID(N'dbo.public_api_clients', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.public_api_clients (
+        id                  nvarchar(64)    NOT NULL CONSTRAINT pk_public_api_clients PRIMARY KEY,
+        name                nvarchar(160)   NOT NULL,
+        key_prefix          nvarchar(32)    NOT NULL,
+        key_hash            nvarchar(64)    NOT NULL CONSTRAINT uq_public_api_clients_key_hash UNIQUE,
+        scopes              nvarchar(max)   NOT NULL,
+        branch_ids          nvarchar(max)   NOT NULL,
+        expires_at          datetime2,
+        revoked_at          datetime2,
+        last_used_at        datetime2,
+        created_by          nvarchar(255),
+        created_at          datetime2       NOT NULL CONSTRAINT df_public_api_clients_created_at DEFAULT GETDATE(),
+        updated_at          datetime2       NOT NULL CONSTRAINT df_public_api_clients_updated_at DEFAULT GETDATE()
+    );
+    CREATE INDEX idx_public_api_clients_active ON dbo.public_api_clients (revoked_at, expires_at);
+END;
+
+-- Supplier branch provenance: NULL is intentionally retained for legacy
+-- global suppliers; new rows are assigned by the branch-scoped API.
+IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.suppliers', N'branch_id') IS NULL
+    ALTER TABLE dbo.suppliers ADD branch_id nvarchar(255) NULL;
+
 IF OBJECT_ID(N'dbo.inventory_items', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH('dbo.inventory_items', 'purchase_unit') IS NULL
         ALTER TABLE dbo.inventory_items ADD purchase_unit nvarchar(max) NULL;
     IF COL_LENGTH('dbo.inventory_items', 'purchase_unit_factor') IS NULL
         ALTER TABLE dbo.inventory_items ADD purchase_unit_factor real NULL;
-    IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = 'df_inventory_items_purchase_unit_factor')
+    IF COL_LENGTH('dbo.inventory_items', 'purchase_unit_factor') IS NOT NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'dbo.inventory_items')
+             AND name = N'purchase_unit_factor'
+             AND default_object_id <> 0
+       )
         ALTER TABLE dbo.inventory_items ADD CONSTRAINT df_inventory_items_purchase_unit_factor DEFAULT 1 FOR purchase_unit_factor;
     UPDATE dbo.inventory_items SET purchase_unit_factor = 1
     WHERE purchase_unit_factor IS NULL OR purchase_unit_factor <= 0;
@@ -110,6 +148,16 @@ BEGIN
         EXEC(N'CREATE UNIQUE INDEX day_close_branch_date_unique_idx ON dbo.day_close_reports(branch_id, [date]) WHERE [date] IS NOT NULL');
 END;
 
+IF OBJECT_ID(N'dbo.user_daily_performance', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.user_daily_performance', 'date') IS NULL
+        ALTER TABLE dbo.user_daily_performance ADD [date] nvarchar(255) NULL;
+    IF COL_LENGTH('dbo.user_daily_performance', 'business_date') IS NOT NULL
+        EXEC(N'UPDATE dbo.user_daily_performance
+               SET [date] = COALESCE([date], CONVERT(nvarchar(255), business_date, 23))
+               WHERE [date] IS NULL');
+END;
+
 IF OBJECT_ID(N'dbo.whatsapp_messages', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.whatsapp_messages (
@@ -208,7 +256,8 @@ IF OBJECT_ID(N'dbo.employee_shift_assignments', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH('dbo.employee_shift_assignments', 'branch_id') IS NULL ALTER TABLE dbo.employee_shift_assignments ADD branch_id nvarchar(255) NULL;
     IF COL_LENGTH('dbo.employee_shift_assignments', 'is_primary') IS NULL ALTER TABLE dbo.employee_shift_assignments ADD is_primary bit NULL CONSTRAINT df_employee_shift_primary DEFAULT 1;
-    IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.employee_shift_assignments') AND parent_column_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.employee_shift_assignments'), 'id', 'ColumnId'))
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.employee_shift_assignments') AND name = N'id' AND is_identity = 0)
+       AND NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.employee_shift_assignments') AND parent_column_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.employee_shift_assignments'), 'id', 'ColumnId'))
         ALTER TABLE dbo.employee_shift_assignments ADD CONSTRAINT df_employee_shift_id DEFAULT CONVERT(nvarchar(255), NEWID()) FOR id;
 END;
 
@@ -271,7 +320,8 @@ IF OBJECT_ID(N'dbo.loan_installments', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH('dbo.loan_installments', 'updated_at') IS NULL
         ALTER TABLE dbo.loan_installments ADD updated_at datetime2 NULL CONSTRAINT df_loan_installments_updated DEFAULT GETDATE();
-    IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.loan_installments') AND parent_column_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.loan_installments'), 'id', 'ColumnId'))
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.loan_installments') AND name = N'id' AND is_identity = 0)
+       AND NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.loan_installments') AND parent_column_id = COLUMNPROPERTY(OBJECT_ID(N'dbo.loan_installments'), 'id', 'ColumnId'))
         ALTER TABLE dbo.loan_installments ADD CONSTRAINT df_loan_installments_id DEFAULT CONVERT(nvarchar(255), NEWID()) FOR id;
     IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.loan_installments') AND name = N'installment_number' AND is_nullable = 0)
         ALTER TABLE dbo.loan_installments ALTER COLUMN installment_number int NULL;
@@ -336,6 +386,89 @@ BEGIN
     IF COL_LENGTH('dbo.tables', 'notes') IS NULL ALTER TABLE dbo.tables ADD notes nvarchar(max) NULL;
 END;
 
+IF OBJECT_ID(N'dbo.orders', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.orders', N'coupon_code') IS NULL
+    ALTER TABLE dbo.orders ADD coupon_code nvarchar(255) NULL;
+
+IF OBJECT_ID(N'dbo.orders', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.orders', N'coupon_discount_amount') IS NULL
+    ALTER TABLE dbo.orders ADD coupon_discount_amount real NULL CONSTRAINT df_orders_coupon_discount_amount DEFAULT (0);
+
+IF OBJECT_ID(N'dbo.orders', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.orders', N'coupon_usage_released_at') IS NULL
+    ALTER TABLE dbo.orders ADD coupon_usage_released_at datetime2 NULL;
+
+-- CRM consent columns added after the original customer table was deployed.
+IF OBJECT_ID(N'dbo.customers', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.customers', N'birth_date') IS NULL
+        ALTER TABLE dbo.customers ADD birth_date datetime2 NULL;
+    IF COL_LENGTH(N'dbo.customers', N'marketing_email_opt_in') IS NULL
+        ALTER TABLE dbo.customers ADD marketing_email_opt_in bit NULL CONSTRAINT df_customers_marketing_email_opt_in DEFAULT 1;
+    IF COL_LENGTH(N'dbo.customers', N'marketing_sms_opt_in') IS NULL
+        ALTER TABLE dbo.customers ADD marketing_sms_opt_in bit NULL CONSTRAINT df_customers_marketing_sms_opt_in DEFAULT 1;
+    IF COL_LENGTH(N'dbo.customers', N'marketing_whatsapp_opt_in') IS NULL
+        ALTER TABLE dbo.customers ADD marketing_whatsapp_opt_in bit NULL CONSTRAINT df_customers_marketing_whatsapp_opt_in DEFAULT 1;
+    IF COL_LENGTH(N'dbo.customers', N'marketing_push_opt_in') IS NULL
+        ALTER TABLE dbo.customers ADD marketing_push_opt_in bit NULL CONSTRAINT df_customers_marketing_push_opt_in DEFAULT 1;
+END;
+
+IF OBJECT_ID(N'dbo.coupons', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.coupons', 'branch_id') IS NULL
+    ALTER TABLE dbo.coupons ADD branch_id nvarchar(255) NULL;
+
+IF OBJECT_ID(N'dbo.refund_records', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.refund_records', N'coupon_code') IS NULL
+        ALTER TABLE dbo.refund_records ADD coupon_code nvarchar(255) NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'coupon_discount_amount') IS NULL
+        ALTER TABLE dbo.refund_records ADD coupon_discount_amount real NULL CONSTRAINT df_refund_records_coupon_discount_amount DEFAULT (0);
+    IF COL_LENGTH(N'dbo.refund_records', N'rejection_reason') IS NULL
+        ALTER TABLE dbo.refund_records ADD rejection_reason nvarchar(max) NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'refund_method') IS NULL
+        ALTER TABLE dbo.refund_records ADD refund_method nvarchar(100) NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'reason_category') IS NULL
+        ALTER TABLE dbo.refund_records ADD reason_category nvarchar(100) NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'items') IS NULL
+        ALTER TABLE dbo.refund_records ADD items nvarchar(max) NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'requested_by') IS NULL
+        ALTER TABLE dbo.refund_records ADD requested_by nvarchar(255) NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'approved_at') IS NULL
+        ALTER TABLE dbo.refund_records ADD approved_at datetime2 NULL;
+    IF COL_LENGTH(N'dbo.refund_records', N'processed_at') IS NULL
+        ALTER TABLE dbo.refund_records ADD processed_at datetime2 NULL;
+END;
+
+IF OBJECT_ID(N'dbo.overtime_entries', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.overtime_entries', N'regular_hours') IS NULL
+        ALTER TABLE dbo.overtime_entries ADD regular_hours real NULL CONSTRAINT df_overtime_entries_regular_hours DEFAULT (0);
+    IF COL_LENGTH(N'dbo.overtime_entries', N'overtime_hours') IS NULL
+        ALTER TABLE dbo.overtime_entries ADD overtime_hours real NULL CONSTRAINT df_overtime_entries_overtime_hours DEFAULT (0);
+    IF COL_LENGTH(N'dbo.overtime_entries', N'overtime_rate') IS NULL
+        ALTER TABLE dbo.overtime_entries ADD overtime_rate real NULL CONSTRAINT df_overtime_entries_overtime_rate DEFAULT (1.5);
+    IF COL_LENGTH(N'dbo.overtime_entries', N'overtime_amount') IS NULL
+        ALTER TABLE dbo.overtime_entries ADD overtime_amount real NULL CONSTRAINT df_overtime_entries_overtime_amount DEFAULT (0);
+    IF COL_LENGTH(N'dbo.overtime_entries', N'hours') IS NOT NULL
+       AND COL_LENGTH(N'dbo.overtime_entries', N'rate_multiplier') IS NOT NULL
+       AND COL_LENGTH(N'dbo.overtime_entries', N'amount') IS NOT NULL
+        EXEC(N'UPDATE dbo.overtime_entries
+              SET overtime_hours = COALESCE(overtime_hours, hours, 0),
+                  overtime_rate = COALESCE(overtime_rate, rate_multiplier, 1.5),
+                  overtime_amount = COALESCE(overtime_amount, amount, 0)
+              WHERE overtime_hours IS NULL OR overtime_rate IS NULL OR overtime_amount IS NULL');
+    ELSE
+        EXEC(N'UPDATE dbo.overtime_entries
+              SET overtime_hours = COALESCE(overtime_hours, 0),
+                  overtime_rate = COALESCE(overtime_rate, 1.5),
+                  overtime_amount = COALESCE(overtime_amount, 0)
+              WHERE overtime_hours IS NULL OR overtime_rate IS NULL OR overtime_amount IS NULL');
+END;
+
+IF OBJECT_ID(N'dbo.payroll_run_lines', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.payroll_run_lines', N'overtime_amount') IS NULL
+    ALTER TABLE dbo.payroll_run_lines ADD overtime_amount real NULL CONSTRAINT df_payroll_run_lines_overtime_amount DEFAULT (0);
+
 IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL
    AND COL_LENGTH('dbo.purchase_orders', 'target_warehouse_id') IS NULL
     ALTER TABLE dbo.purchase_orders ADD target_warehouse_id nvarchar(255) NULL;
@@ -361,18 +494,104 @@ IF OBJECT_ID(N'dbo.payroll_runs', N'U') IS NOT NULL
         WHERE status = N'CLOSED';
 
 -- High-volume report and FEFO indexes. Safe for existing installations.
-IF OBJECT_ID(N'dbo.stock_movements', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'stock_mov_type_date_idx' AND object_id = OBJECT_ID(N'dbo.stock_movements'))
+IF OBJECT_ID(N'dbo.stock_movements', N'U') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.stock_movements') AND name = N'type' AND max_length BETWEEN 1 AND 900)
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'stock_mov_type_date_idx' AND object_id = OBJECT_ID(N'dbo.stock_movements'))
     CREATE INDEX stock_mov_type_date_idx ON dbo.stock_movements(type, created_at);
-IF OBJECT_ID(N'dbo.stock_movements', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'stock_mov_from_wh_date_idx' AND object_id = OBJECT_ID(N'dbo.stock_movements'))
+IF OBJECT_ID(N'dbo.stock_movements', N'U') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.stock_movements') AND name = N'from_warehouse_id' AND max_length BETWEEN 1 AND 900)
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'stock_mov_from_wh_date_idx' AND object_id = OBJECT_ID(N'dbo.stock_movements'))
     CREATE INDEX stock_mov_from_wh_date_idx ON dbo.stock_movements(from_warehouse_id, created_at);
 IF OBJECT_ID(N'dbo.recipe_ingredients', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'recipe_ingredients_recipe_idx' AND object_id = OBJECT_ID(N'dbo.recipe_ingredients'))
     CREATE INDEX recipe_ingredients_recipe_idx ON dbo.recipe_ingredients(recipe_id);
 IF OBJECT_ID(N'dbo.recipe_ingredients', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'recipe_ingredients_item_idx' AND object_id = OBJECT_ID(N'dbo.recipe_ingredients'))
     CREATE INDEX recipe_ingredients_item_idx ON dbo.recipe_ingredients(inventory_item_id);
-IF OBJECT_ID(N'dbo.production_orders', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'production_orders_warehouse_status_idx' AND object_id = OBJECT_ID(N'dbo.production_orders'))
+IF OBJECT_ID(N'dbo.production_orders', N'U') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.production_orders') AND name = N'warehouse_id' AND max_length BETWEEN 1 AND 900)
+   AND EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.production_orders') AND name = N'status' AND max_length BETWEEN 1 AND 900)
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'production_orders_warehouse_status_idx' AND object_id = OBJECT_ID(N'dbo.production_orders'))
     CREATE INDEX production_orders_warehouse_status_idx ON dbo.production_orders(warehouse_id, status, created_at);
 IF OBJECT_ID(N'dbo.production_order_items', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'production_order_items_order_idx' AND object_id = OBJECT_ID(N'dbo.production_order_items'))
     CREATE INDEX production_order_items_order_idx ON dbo.production_order_items(production_order_id);
+
+-- Payment branch provenance: legacy sessions are backfilled from their order,
+-- while new sessions persist the originating branch for reconciliation scope.
+IF OBJECT_ID(N'dbo.payment_sessions', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.payment_sessions', 'branch_id') IS NULL
+        ALTER TABLE dbo.payment_sessions ADD branch_id nvarchar(255) NULL;
+
+    EXEC(N'UPDATE ps
+           SET branch_id = o.branch_id
+           FROM dbo.payment_sessions ps
+           INNER JOIN dbo.orders o ON o.id = ps.order_id
+           WHERE ps.branch_id IS NULL AND o.branch_id IS NOT NULL');
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.foreign_keys
+        WHERE name = N'fk_payment_sessions_branch'
+          AND parent_object_id = OBJECT_ID(N'dbo.payment_sessions')
+    )
+        ALTER TABLE dbo.payment_sessions
+        ADD CONSTRAINT fk_payment_sessions_branch FOREIGN KEY (branch_id) REFERENCES dbo.branches(id);
+
+    -- Duplicate provider references must be reconciled before this safety
+    -- constraint can be installed; never silently delete or merge payments.
+    IF NOT EXISTS (
+        SELECT provider_type, external_reference
+        FROM dbo.payment_sessions
+        WHERE external_reference IS NOT NULL
+        GROUP BY provider_type, external_reference
+        HAVING COUNT(*) > 1
+    ) AND NOT EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'payment_sessions_provider_reference_uq'
+          AND object_id = OBJECT_ID(N'dbo.payment_sessions')
+    ) AND EXISTS (
+        SELECT 1
+        FROM sys.columns c
+        WHERE c.object_id = OBJECT_ID(N'dbo.payment_sessions')
+          AND c.name IN (N'provider_type', N'external_reference')
+        GROUP BY c.object_id
+        HAVING MIN(CASE WHEN c.max_length BETWEEN 1 AND 900 THEN 1 ELSE 0 END) = 1
+    )
+    BEGIN
+        CREATE UNIQUE INDEX payment_sessions_provider_reference_uq
+            ON dbo.payment_sessions(provider_type, external_reference)
+            WHERE external_reference IS NOT NULL;
+    END
+END;
+
+IF OBJECT_ID(N'dbo.tip_pools', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.tip_pools', 'payroll_cycle_id') IS NULL
+        ALTER TABLE dbo.tip_pools ADD payroll_cycle_id nvarchar(255) NULL;
+END;
+
+IF OBJECT_ID(N'dbo.payroll_run_lines', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH('dbo.payroll_run_lines', 'tip_amount') IS NULL
+        ALTER TABLE dbo.payroll_run_lines ADD tip_amount real NOT NULL CONSTRAINT df_payroll_run_lines_tip_amount DEFAULT 0;
+END;
+
+IF OBJECT_ID(N'dbo.loyalty_ledger', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.loyalty_ledger', N'branch_id') IS NULL
+    ALTER TABLE dbo.loyalty_ledger ADD branch_id nvarchar(255) NULL;
+
+IF OBJECT_ID(N'dbo.wallet_transactions', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.wallet_transactions', N'branch_id') IS NULL
+    ALTER TABLE dbo.wallet_transactions ADD branch_id nvarchar(255) NULL;
+
+IF OBJECT_ID(N'dbo.customer_wallets', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.customer_wallets', N'branch_id') IS NULL
+        ALTER TABLE dbo.customer_wallets ADD branch_id nvarchar(255) NULL;
+
+    IF COL_LENGTH(N'dbo.customer_wallets', N'branch_id') IS NOT NULL
+        EXEC(N'IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N''customer_wallets_customer_branch_uq'' AND object_id = OBJECT_ID(N''dbo.customer_wallets''))
+              AND NOT EXISTS (SELECT customer_id, branch_id FROM dbo.customer_wallets WHERE branch_id IS NOT NULL GROUP BY customer_id, branch_id HAVING COUNT(*) > 1)
+            CREATE UNIQUE INDEX customer_wallets_customer_branch_uq ON dbo.customer_wallets(customer_id, branch_id) WHERE branch_id IS NOT NULL');
+END;
 
 COMMIT TRANSACTION;
 GO

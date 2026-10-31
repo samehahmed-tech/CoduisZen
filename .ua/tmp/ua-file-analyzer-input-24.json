@@ -1,0 +1,202 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/Reports.tsx",
+      "language": "typescript",
+      "sizeLines": 1050,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Pagination.tsx",
+      "language": "typescript",
+      "sizeLines": 57,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/reportConstants.ts",
+      "language": "typescript",
+      "sizeLines": 317,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/AiReports.tsx",
+      "language": "typescript",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/CrmReports.tsx",
+      "language": "typescript",
+      "sizeLines": 311,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/FinanceReports.tsx",
+      "language": "typescript",
+      "sizeLines": 843,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/HrReports.tsx",
+      "language": "typescript",
+      "sizeLines": 644,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/InventoryReports.tsx",
+      "language": "typescript",
+      "sizeLines": 552,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/OpsReports.tsx",
+      "language": "typescript",
+      "sizeLines": 433,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/SalesReports.tsx",
+      "language": "typescript",
+      "sizeLines": 823,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/shared/CoverageReportView.tsx",
+      "language": "typescript",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/reports/views/shared/ReportDataTable.tsx",
+      "language": "typescript",
+      "sizeLines": 295,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/reportBrand.ts",
+      "language": "typescript",
+      "sizeLines": 150,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/reportPdf.ts",
+      "language": "typescript",
+      "sizeLines": 713,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/reportPrintStyles.ts",
+      "language": "typescript",
+      "sizeLines": 361,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/stockCountPrint.ts",
+      "language": "typescript",
+      "sizeLines": 152,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/reportCatalogCoverage.test.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/reportExportSupport.test.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/reportPdfLayout.test.ts",
+      "language": "typescript",
+      "sizeLines": 134,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/stockCountPrint.test.ts",
+      "language": "typescript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/Reports.tsx": [
+      "components/reports/reportConstants.ts",
+      "components/reports/useReportsState.ts",
+      "services/api/reports.ts",
+      "services/reportBrand.ts",
+      "services/reportPdf.ts",
+      "services/reportPrintStyles.ts"
+    ],
+    "components/common/Pagination.tsx": [],
+    "components/reports/reportConstants.ts": [
+      "components/reports/useReportsState.ts"
+    ],
+    "components/reports/views/AiReports.tsx": [
+      "components/reports/views/shared/ReportDataTable.tsx"
+    ],
+    "components/reports/views/CrmReports.tsx": [
+      "components/reports/views/shared/CoverageReportView.tsx",
+      "components/reports/views/shared/ReportDataTable.tsx"
+    ],
+    "components/reports/views/FinanceReports.tsx": [
+      "components/common/ExportButton.tsx",
+      "components/reports/views/shared/CoverageReportView.tsx",
+      "components/reports/views/shared/ReportDataTable.tsx"
+    ],
+    "components/reports/views/HrReports.tsx": [
+      "components/reports/views/shared/CoverageReportView.tsx",
+      "components/reports/views/shared/ReportDataTable.tsx",
+      "stores/useAuthStore.ts"
+    ],
+    "components/reports/views/InventoryReports.tsx": [
+      "components/reports/views/shared/CoverageReportView.tsx",
+      "components/reports/views/shared/ReportDataTable.tsx",
+      "services/api/inventory.ts",
+      "services/stockCountPrint.ts"
+    ],
+    "components/reports/views/OpsReports.tsx": [
+      "components/reports/views/shared/CoverageReportView.tsx",
+      "components/reports/views/shared/ReportDataTable.tsx"
+    ],
+    "components/reports/views/SalesReports.tsx": [
+      "components/reports/reportConstants.ts",
+      "components/reports/views/shared/ReportDataTable.tsx",
+      "services/translations.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/reports/views/shared/CoverageReportView.tsx": [
+      "components/reports/reportConstants.ts",
+      "components/reports/views/shared/ReportDataTable.tsx"
+    ],
+    "components/reports/views/shared/ReportDataTable.tsx": [
+      "components/common/ExportButton.tsx",
+      "components/common/Pagination.tsx",
+      "stores/useAuthStore.ts"
+    ],
+    "services/reportBrand.ts": [],
+    "services/reportPdf.ts": [
+      "services/reportBrand.ts"
+    ],
+    "services/reportPrintStyles.ts": [
+      "services/reportBrand.ts"
+    ],
+    "services/stockCountPrint.ts": [],
+    "tests/reportCatalogCoverage.test.ts": [
+      "components/reports/reportConstants.ts"
+    ],
+    "tests/reportExportSupport.test.ts": [
+      "components/Reports.tsx",
+      "components/reports/reportConstants.ts"
+    ],
+    "tests/reportPdfLayout.test.ts": [
+      "services/reportPdf.ts"
+    ],
+    "tests/stockCountPrint.test.ts": [
+      "services/stockCountPrint.ts"
+    ]
+  }
+}

@@ -22,9 +22,9 @@ export interface ThemePreset {
 }
 
 export const BUILT_IN_PRESETS: ThemePreset[] = [
-    { id: 'preset-ops-night', name: 'Ops Night', themeId: 'obsidian', mode: 'dark', density: 'compact', motionLevel: 'reduced', createdAt: 0, builtIn: true },
-    { id: 'preset-studio-day', name: 'Studio Day', themeId: 'glassline', mode: 'light', density: 'comfortable', motionLevel: 'full', createdAt: 0, builtIn: true },
-    { id: 'preset-pos-rush', name: 'POS Rush', themeId: 'touch', mode: 'light', density: 'spacious', motionLevel: 'reduced', createdAt: 0, builtIn: true },
+    { id: 'preset-ops-night', name: 'Ops Night', themeId: 'slate', mode: 'dark', density: 'compact', motionLevel: 'reduced', createdAt: 0, builtIn: true },
+    { id: 'preset-studio-day', name: 'Studio Day', themeId: 'aero', mode: 'light', density: 'comfortable', motionLevel: 'full', createdAt: 0, builtIn: true },
+    { id: 'preset-pos-rush', name: 'POS Rush', themeId: 'foundry', mode: 'light', density: 'spacious', motionLevel: 'reduced', createdAt: 0, builtIn: true },
 ];
 
 const STORAGE_KEY = 'coduiszen_theme_presets_v1';

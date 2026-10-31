@@ -7,13 +7,14 @@ import {
     Sun, Moon, Monitor, Users, ChevronDown, LayoutGrid, Database, RefreshCw,
     Check, Upload, Download, AlertTriangle, Eye, EyeOff, Hash, CreditCard,
     MapPin, Server, Globe2, Palette as PaletteIcon, Layers, Wifi, Zap,
-    Receipt, BarChart3, Network, BookOpen, FileText, Link2,
+    Receipt, BarChart3, Network, BookOpen, FileText, Link2, Menu,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { AppSettings, Printer as PrinterType, WarehouseType, DEFAULT_DAY_CLOSE_RULES, DayCloseRules } from '../types';
+import { AppPermission, AppSettings, AppTheme, Printer as PrinterType, WarehouseType, DEFAULT_DAY_CLOSE_RULES, DayCloseRules } from '../types';
 import { useToast } from './Toast';
 import { aiApi } from '../services/api/ai';
 import { branchesApi } from '../services/api/branches';
+import { getActionableErrorMessage } from '../services/api/core';
 import { inventoryApi } from '../services/api/inventory';
 import { printersApi } from '../services/api/printers';
 import { settingsApi } from '../services/api/settings';
@@ -28,6 +29,10 @@ import { syncService } from '../src/services/syncService';
 import { useConfirm } from './common/ConfirmProvider';
 import ImageUploader from './common/ImageUploader';
 import { THEME_LIST } from '../theme/tokens';
+import { useTheme } from '../theme/useTheme';
+import PublicApiKeyManager from './PublicApiKeyManager';
+import WebhookManager from './WebhookManager';
+import '../styles/layout/settings-hub.css';
 
 interface MenuGroup {
     label: string;
@@ -55,122 +60,40 @@ const DAYS = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'
 
 const HOME_TAB = '__HOME__';
 
-const GROUP_ACCENTS: Record<string, { from: string; to: string; glow: string }> = {
-    Deployment: { from: '#6366f1', to: '#8b5cf6', glow: 'rgba(99,102,241,0.35)' },
-    General: { from: '#0ea5e9', to: '#22d3ee', glow: 'rgba(14,165,233,0.35)' },
-    Operations: { from: '#8b5cf6', to: '#d946ef', glow: 'rgba(139,92,246,0.35)' },
-    Financial: { from: '#10b981', to: '#34d399', glow: 'rgba(16,185,129,0.35)' },
-    Communications: { from: '#f59e0b', to: '#fb7185', glow: 'rgba(245,158,11,0.35)' },
-    Integrations: { from: '#ec4899', to: '#a855f7', glow: 'rgba(236,72,153,0.35)' },
-    System: { from: '#64748b', to: '#38bdf8', glow: 'rgba(100,116,139,0.35)' },
+const GROUP_DESCRIPTIONS: Record<string, { en: string; ar: string }> = {
+    Deployment: { en: 'Sites, branch pairing and rollout control', ar: 'المواقع وربط الفروع والتحكم في التحديثات' },
+    General: { en: 'Brand identity, language and visual system', ar: 'الهوية واللغة والنظام البصري' },
+    Operations: { en: 'Daily service, locations and physical devices', ar: 'التشغيل اليومي والمواقع والأجهزة' },
+    Financial: { en: 'Money movement, payment rails and accounting', ar: 'حركة الأموال والدفع والحسابات' },
+    Communications: { en: 'Customer channels and operational alerts', ar: 'قنوات العملاء وتنبيهات التشغيل' },
+    Integrations: { en: 'External platforms, automation and intelligence', ar: 'المنصات الخارجية والأتمتة والذكاء' },
+    System: { en: 'Access, audit and system governance', ar: 'الوصول والتدقيق وحوكمة النظام' },
 };
 
-/**
- * 3D tilt settings tile — pointer-tracked rotateX/rotateY written straight
- * to the DOM (no re-renders), with a cursor-following glare and a
- * springy icon pop. Pure CSSux, zero layout shift.
- */
-const SettingsTile3D: React.FC<{
-    title: string; sub: string; icon: any; accent: { from: string; to: string; glow: string };
-    index: number; onClick: () => void;
-}> = ({ title, sub, icon: Icon, accent, index, onClick }) => {
-    const cardRef = React.useRef<HTMLButtonElement>(null);
-    const glareRef = React.useRef<HTMLSpanElement>(null);
-    // rAF-throttled pointer tracking: mousemove only stores normalized coords,
-    // one frame writes transform/box-shadow/glare (same formulas as before —
-    // identical visuals, no per-event layout/style recalc, no React state).
-    const rafId = React.useRef(0);
-    const pending = React.useRef<{ px: number; py: number } | null>(null);
-    const tiltDisabled = React.useRef(false);
-
-    React.useEffect(() => {
-        if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-            tiltDisabled.current =
-                window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-                window.matchMedia('(hover: none)').matches;
-        }
-        return () => {
-            if (rafId.current) cancelAnimationFrame(rafId.current);
-            rafId.current = 0;
-            pending.current = null;
-        };
-    }, []);
-
-    const applyTilt = React.useCallback(() => {
-        rafId.current = 0;
-        const el = cardRef.current;
-        const p = pending.current;
-        pending.current = null;
-        if (!el || !p) return;
-        el.style.transform = `perspective(900px) rotateX(${(-p.py * 12).toFixed(2)}deg) rotateY(${(p.px * 14).toFixed(2)}deg) translateY(-4px)`;
-        el.style.boxShadow = `0 24px 48px -12px ${accent.glow}, 0 4px 12px rgba(0,0,0,0.15)`;
-        if (glareRef.current) {
-            glareRef.current.style.opacity = '1';
-            glareRef.current.style.background = `radial-gradient(circle at ${(p.px + 0.5) * 100}% ${(p.py + 0.5) * 100}%, rgba(255,255,255,0.28), transparent 60%)`;
-        }
-    }, [accent.glow]);
-
-    const handleMove = (e: React.MouseEvent) => {
-        if (tiltDisabled.current) return;
-        const el = cardRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) return;
-        pending.current = {
-            px: Math.max(-0.5, Math.min(0.5, (e.clientX - rect.left) / rect.width - 0.5)),
-            py: Math.max(-0.5, Math.min(0.5, (e.clientY - rect.top) / rect.height - 0.5)),
-        };
-        if (!rafId.current) rafId.current = requestAnimationFrame(applyTilt);
-    };
-    const handleLeave = () => {
-        if (rafId.current) cancelAnimationFrame(rafId.current);
-        rafId.current = 0;
-        pending.current = null;
-        const el = cardRef.current;
-        if (!el) return;
-        el.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0)';
-        el.style.boxShadow = '';
-        if (glareRef.current) glareRef.current.style.opacity = '0';
-    };
-
-    return (
-        <button
-            ref={cardRef}
-            onMouseMove={handleMove}
-            onMouseLeave={handleLeave}
-            onClick={onClick}
-            className="group relative overflow-hidden rounded-[1.75rem] border border-border/25 bg-card/80 backdrop-blur-xl p-5 text-right transition-[box-shadow] duration-200 will-change-transform"
-            style={{ animation: `tile-rise 0.5s cubic-bezier(0.22,1,0.36,1) both`, animationDelay: `${Math.min(index * 45, 600)}ms` }}
-        >
-            <span ref={glareRef} className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200" />
-            <div
-                className="absolute -top-10 -left-10 w-36 h-36 rounded-full blur-3xl opacity-25 transition-opacity duration-300 group-hover:opacity-45"
-                style={{ background: `linear-gradient(135deg, ${accent.from}, ${accent.to})` }}
-            />
-            <div className="relative flex items-start justify-between gap-3">
-                <div
-                    className="w-13 h-13 shrink-0 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6"
-                    style={{ width: 52, height: 52, background: `linear-gradient(135deg, ${accent.from}, ${accent.to})` }}
-                >
-                    <Icon size={24} />
-                </div>
-                <ChevronRight size={16} className="text-muted/50 transition-all duration-300 group-hover:translate-x-1 group-hover:text-main rtl:rotate-180 rtl:group-hover:-translate-x-1" />
-            </div>
-            <div className="relative mt-4">
-                <p className="font-black text-sm text-main leading-snug">{title}</p>
-                <p className="text-[10px] font-bold text-muted uppercase tracking-widest mt-1">{sub}</p>
-            </div>
-            <span
-                className="absolute bottom-0 right-0 left-0 h-1 opacity-80"
-                style={{ background: `linear-gradient(90deg, ${accent.from}, ${accent.to})` }}
-            />
-        </button>
-    );
+const SETTING_DESCRIPTIONS: Record<string, { en: string; ar: string }> = {
+    DEPLOYMENT: { en: 'Pair branches, publish releases and monitor central connectivity.', ar: 'ربط الفروع ونشر الإصدارات ومتابعة الاتصال المركزي.' },
+    IDENTITY: { en: 'Restaurant profile, contact details and receipt assets.', ar: 'بيانات المطعم والتواصل وأصول الفاتورة.' },
+    LOCALIZATION: { en: 'Language, currency, tax identity and regional behavior.', ar: 'اللغة والعملة والهوية الضريبية والسلوك المحلي.' },
+    APPEARANCE: { en: 'Theme, light or dark mode and interface personality.', ar: 'الثيم والوضع الفاتح أو الداكن وشخصية الواجهة.' },
+    BRANCHES: { en: 'Locations, addresses, time zones and branch status.', ar: 'المواقع والعناوين والمناطق الزمنية وحالة الفروع.' },
+    WAREHOUSES: { en: 'Storage topology and branch-level inventory ownership.', ar: 'هيكل التخزين وملكية المخزون على مستوى الفروع.' },
+    PRINTERS: { en: 'Receipt and kitchen routing across every workstation.', ar: 'توجيه طابعات الفواتير والمطبخ لكل محطة.' },
+    OPS: { en: 'Trading hours and service availability by day.', ar: 'ساعات التشغيل وتوافر الخدمة حسب اليوم.' },
+    DAY_CLOSE: { en: 'Closing rules, controls and operational handover.', ar: 'قواعد الإغلاق والضوابط وتسليم التشغيل.' },
+    FINANCE: { en: 'Tax, service charges and financial defaults.', ar: 'الضرائب ورسوم الخدمة والإعدادات المالية الافتراضية.' },
+    PAYMENTS: { en: 'Accepted tenders, gateways and settlement behavior.', ar: 'وسائل الدفع والبوابات وسلوك التسوية.' },
+    ACCOUNTS: { en: 'Account structure and posting destinations.', ar: 'هيكل الحسابات ووجهات الترحيل.' },
+    WHATSAPP: { en: 'Messaging channel, templates and automated events.', ar: 'قناة الرسائل والقوالب والأحداث الآلية.' },
+    NOTIFICATIONS: { en: 'Operational signals, recipients and escalation rules.', ar: 'إشارات التشغيل والمستلمون وقواعد التصعيد.' },
+    INTEGRATIONS: { en: 'Delivery platforms, public APIs and webhooks.', ar: 'منصات التوصيل وواجهات API والـ webhooks.' },
+    AI: { en: 'Model providers, fallback order and assistant policy.', ar: 'مزودو النماذج وترتيب البدائل وسياسة المساعد.' },
+    SECURITY: { en: 'Permissions, sessions, audit and protected access.', ar: 'الصلاحيات والجلسات والتدقيق والوصول المحمي.' },
 };
 
 const SettingsHub: React.FC = () => {
     const navigate = useNavigate();
     const { settings, updateSettings, branches, fetchBranches, printers, fetchPrinters, createPrinterInDB, updatePrinterInDB, deletePrinterFromDB } = useAuthStore();
+    const { setTheme, toggleDark } = useTheme();
     const { platforms, fetchPlatforms, addPlatform } = useMenuStore();
     const { warehouses, fetchWarehouses, updateWarehouse, deleteWarehouse } = useInventoryStore();
     const whatsAppStore = useWhatsAppStore();
@@ -183,6 +106,21 @@ const SettingsHub: React.FC = () => {
     const [activeTab, setActiveTab] = useState(HOME_TAB);
     const [searchQuery, setSearchQuery] = useState('');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+    const [mobileSettingsNavOpen, setMobileSettingsNavOpen] = useState(false);
+    const settingsSearchRef = React.useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const focusSettingsSearch = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            const isTyping = target?.matches('input, textarea, select, [contenteditable="true"]');
+            if (event.key === '/' && !isTyping && activeTab === HOME_TAB) {
+                event.preventDefault();
+                settingsSearchRef.current?.focus();
+            }
+        };
+        window.addEventListener('keydown', focusSettingsSearch);
+        return () => window.removeEventListener('keydown', focusSettingsSearch);
+    }, [activeTab]);
 
     // Modal states
     const [showBranchModal, setShowBranchModal] = useState(false);
@@ -201,8 +139,8 @@ const SettingsHub: React.FC = () => {
     const [maskedCustomAiKey, setMaskedCustomAiKey] = useState<string | null>(null);
     const [hasCustomAiKey, setHasCustomAiKey] = useState(false);
     const [usingDefaultAvailable, setUsingDefaultAvailable] = useState(false);
-    const [aiProvider, setAiProvider] = useState<'SYSTEM' | 'OLLAMA' | 'OPENROUTER' | 'GPT4JS' | 'GROQ'>('SYSTEM');
-    const [providerOptions, setProviderOptions] = useState<Array<{ id: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ'; label: string }>>([]);
+    const [aiProvider, setAiProvider] = useState<'SYSTEM' | 'OLLAMA' | 'OPENROUTER' | 'GPT4JS' | 'GROQ' | 'GEMINI' | 'NVIDIA' | 'OPENAI_COMPATIBLE'>('SYSTEM');
+    const [providerOptions, setProviderOptions] = useState<Array<{ id: 'SYSTEM' | 'OPENROUTER' | 'OLLAMA' | 'GPT4JS' | 'GROQ' | 'GEMINI' | 'NVIDIA' | 'OPENAI_COMPATIBLE'; label: string }>>([]);
     const [ollamaEnabled, setOllamaEnabled] = useState(false);
     const [ollamaBaseUrl, setOllamaBaseUrl] = useState('');
     const [ollamaModel, setOllamaModel] = useState('');
@@ -216,12 +154,24 @@ const SettingsHub: React.FC = () => {
     const [groqUsingDefaultAvailable, setGroqUsingDefaultAvailable] = useState(false);
     const [hasCustomGroqKey, setHasCustomGroqKey] = useState(false);
     const [maskedCustomGroqKey, setMaskedCustomGroqKey] = useState<string | null>(null);
+    const [providerEndpoint, setProviderEndpoint] = useState('');
+    const [providerModel, setProviderModel] = useState('');
+    const [fallbackProviders, setFallbackProviders] = useState<string[]>([]);
+    const [providerEndpoints, setProviderEndpoints] = useState<Record<string, string>>({});
+    const [providerModels, setProviderModels] = useState<Record<string, string>>({});
+    const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
+    const [availableProviderModels, setAvailableProviderModels] = useState<Array<{ id: string; label: string; provider: string }>>([]);
+    const [modelDiscoveryLoading, setModelDiscoveryLoading] = useState(false);
+    const [modelDiscoveryAt, setModelDiscoveryAt] = useState<string | null>(null);
     const [aiConfigLoading, setAiConfigLoading] = useState(false);
     const [aiConfigSaving, setAiConfigSaving] = useState(false);
 
     // Branch form
     const [editingBranch, setEditingBranch] = useState<any>(null);
     const [branchForm, setBranchForm] = useState({ name: '', location: '', address: '', serverIp: '', dayCloseEmailsText: '', timezone: 'Africa/Cairo', currency: 'EGP' });
+    const [archivedBranches, setArchivedBranches] = useState<any[]>([]);
+    const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+    const [showArchivedBranches, setShowArchivedBranches] = useState(false);
     const [platformForm, setPlatformForm] = useState({ name: '', apiKey: '', commissionPercent: 0 });
     const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
     const [warehouseForm, setWarehouseForm] = useState({ name: '', branchId: '', type: 'MAIN' });
@@ -294,6 +244,23 @@ const SettingsHub: React.FC = () => {
                 setGroqUsingDefaultAvailable(Boolean(config.groq?.usingDefaultAvailable));
                 setHasCustomGroqKey(Boolean(config.hasCustomGroqKey));
                 setMaskedCustomGroqKey(config.maskedCustomGroqKey || null);
+                setFallbackProviders(config.fallbackProviders || []);
+                setProviderEndpoints(config.providerEndpoints || {});
+                setProviderModels(config.providerModels || {});
+                setConfiguredProviders(config.configuredProviders || []);
+                setProviderEndpoint(config.providerEndpoints?.[config.provider] || '');
+                setProviderModel(config.providerModels?.[config.provider] || '');
+                if (config.provider !== 'SYSTEM' && (config.provider === 'OLLAMA' || (config.configuredProviders || []).includes(config.provider))) {
+                    try {
+                        const models = await aiApi.getModels({ provider: config.provider, endpoint: config.providerEndpoints?.[config.provider] || undefined });
+                        if (!cancelled) {
+                            setAvailableProviderModels(models.models || []);
+                            setModelDiscoveryAt(models.fetchedAt);
+                        }
+                    } catch {
+                        // Model discovery is optional during settings load. User can retry from the provider card.
+                    }
+                }
             } catch (err: any) {
                 showToast(err?.message || tn('Failed to load AI settings', 'تعذر تحميل إعدادات الذكاء الاصطناعي'), 'error');
             } finally {
@@ -577,51 +544,60 @@ const SettingsHub: React.FC = () => {
         }
     };
 
-    const handleDeactivateBranch = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        const ok = await confirm({
-            title: tn('Deactivate branch', 'تعطيل الفرع'),
-            message: t('confirm_deactivate_branch'),
-            confirmText: tn('Deactivate', 'تعطيل'),
-            cancelText: tn('Cancel', 'إلغاء'),
-            variant: 'warning',
-        });
-        if (!ok) return;
-        setIsSubmitting(true);
-        try {
-            await branchesApi.delete(id);
-            await fetchBranches();
-            showToast(t('branch_deactivated'), 'success');
-            setShowBranchModal(false);
-            setEditingBranch(null);
-        } catch (err: any) {
-            showToast(err.message || 'Error deactivating branch', 'error');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    const loadArchivedBranches = useCallback(async () => {
+        const rows = await branchesApi.getAll(true);
+        setArchivedBranches(rows
+            .filter((b: any) => b.is_active === false || b.isActive === false)
+            .map((b: any) => ({
+                ...b,
+                location: b.location || b.address,
+                serverIp: b.server_ip || b.serverIp,
+                isActive: false,
+            })));
+    }, []);
 
-    const handleHardDeleteBranch = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleDeleteBranches = async (ids: string[], permanent: boolean) => {
+        const uniqueIds = Array.from(new Set(ids));
+        if (uniqueIds.length === 0) return;
+        const activeBranchId = settings.activeBranchId;
+        if (activeBranchId && uniqueIds.includes(activeBranchId)) {
+            showToast(tn('Switch to another branch before deleting the active branch.', 'بدّل لفرع تاني قبل حذف الفرع النشط الحالي.'), 'error');
+            return;
+        }
+        const known = [...branches, ...archivedBranches];
+        const nameOf = (id: string) => known.find(b => b.id === id)?.name || id;
         const ok = await confirm({
-            title: tn('Archive branch', 'أرشفة الفرع'),
-            message: t('confirm_hard_delete_branch'),
-            confirmText: tn('Archive', 'أرشفة'),
+            title: permanent ? tn('Delete permanently', 'حذف نهائي') : tn('Archive branches', 'أرشفة الفروع'),
+            message: permanent
+                ? tn(`Permanently delete ${uniqueIds.length} branch(es)? Branches linked to orders, shifts, or staff cannot be deleted.`, `حذف ${uniqueIds.length} فرع نهائياً؟ الفروع المرتبطة بطلبات أو شيفتات أو موظفين مش هتتحذف.`)
+                : tn(`Archive ${uniqueIds.length} branch(es)?`, `أرشفة ${uniqueIds.length} فرع؟`),
+            confirmText: permanent ? tn('Delete', 'حذف') : tn('Archive', 'أرشفة'),
             cancelText: tn('Cancel', 'إلغاء'),
-            variant: 'warning',
+            variant: 'danger',
         });
         if (!ok) return;
         setIsSubmitting(true);
-        try {
-            await branchesApi.delete(id);
-            await fetchBranches();
-            showToast(t('branch_deactivated'), 'success');
-            setShowBranchModal(false);
-            setEditingBranch(null);
-        } catch (err: any) {
-            showToast(err.message || 'Error deleting branch', 'error');
-        } finally {
-            setIsSubmitting(false);
+        const failed: string[] = [];
+        let done = 0;
+        for (const id of uniqueIds) {
+            try {
+                await branchesApi.delete(id, permanent);
+                done += 1;
+            } catch (err: any) {
+                failed.push(`${nameOf(id)}: ${getActionableErrorMessage(err, lang)}`);
+            }
+        }
+        setSelectedBranchIds(prev => prev.filter(id => !uniqueIds.includes(id)));
+        await fetchBranches();
+        if (showArchivedBranches) await loadArchivedBranches().catch(() => undefined);
+        setShowBranchModal(false);
+        setEditingBranch(null);
+        setIsSubmitting(false);
+        const label = permanent ? tn('Deleted', 'تم حذف') : tn('Archived', 'تم أرشفة');
+        if (failed.length === 0) {
+            showToast(`${label} ${done}`, 'success');
+        } else {
+            showToast(`${label} ${done} · ${tn('failed', 'فشل')} ${failed.length}: ${failed.join(' | ')}`, 'error');
         }
     };
 
@@ -771,17 +747,50 @@ const SettingsHub: React.FC = () => {
     };
 
     // AI config
+    const loadProviderModels = async (provider = aiProvider, apiKey = customAiKey, endpoint = providerEndpoint) => {
+        if (provider === 'SYSTEM') {
+            setAvailableProviderModels([]);
+            return;
+        }
+        setModelDiscoveryLoading(true);
+        try {
+            const result = await aiApi.getModels({
+                provider,
+                apiKey: String(apiKey || '').trim() || undefined,
+                endpoint: endpoint.trim() || undefined,
+            });
+            setAvailableProviderModels(result.models || []);
+            setModelDiscoveryAt(result.fetchedAt);
+            const selected = result.models?.find((model) => model.id === providerModel);
+            if (!providerModel && result.models?.[0]) setProviderModel(result.models[0].id);
+            else if (selected) setProviderModel(selected.id);
+            showToast(tn(`${result.models?.length || 0} models loaded`, `تم تحميل ${result.models?.length || 0} موديل`), 'success');
+        } catch (err: any) {
+            setAvailableProviderModels([]);
+            showToast(err?.message || tn('Could not load provider models', 'تعذر تحميل موديلات المزود'), 'error');
+        } finally {
+            setModelDiscoveryLoading(false);
+        }
+    };
+
+    const isProviderConfigured = (provider: string) => provider === 'OLLAMA' || configuredProviders.includes(provider);
+
     const saveAiKeyConfig = async () => {
         setAiConfigSaving(true);
         try {
             const payload: any = {
-                source: aiProvider === 'OPENROUTER' || aiProvider === 'GROQ' ? aiKeySource : 'DEFAULT',
+                source: !['SYSTEM', 'OLLAMA'].includes(aiProvider) ? aiKeySource : 'DEFAULT',
                 model: aiModel || defaultAiModel || undefined,
                 provider: aiProvider,
             };
             if (aiKeySource === 'CUSTOM' && customAiKey.trim()) payload.customKey = customAiKey.trim();
             if (aiProvider === 'OLLAMA') payload.ollamaModel = (ollamaModel || ollamaModelDefault || '').trim() || undefined;
             if (aiProvider === 'GROQ') payload.groqModel = (groqModel || groqModelDefault || '').trim() || undefined;
+            if (['GEMINI', 'NVIDIA', 'OPENAI_COMPATIBLE'].includes(aiProvider)) {
+                payload.endpoint = providerEndpoint.trim() || undefined;
+                payload.providerModel = providerModel.trim() || undefined;
+                payload.fallbackProviders = fallbackProviders;
+            }
             const config = await aiApi.updateKeyConfig(payload);
             setAiProvider(config.provider || 'SYSTEM');
             setProviderOptions(config.providerOptions || []);
@@ -802,7 +811,19 @@ const SettingsHub: React.FC = () => {
             setGroqUsingDefaultAvailable(Boolean(config.groq?.usingDefaultAvailable));
             setHasCustomGroqKey(Boolean(config.hasCustomGroqKey));
             setMaskedCustomGroqKey(config.maskedCustomGroqKey || null);
+            setFallbackProviders(config.fallbackProviders || []);
+            setProviderEndpoints(config.providerEndpoints || {});
+            setProviderModels(config.providerModels || {});
+            setConfiguredProviders(config.configuredProviders || []);
+            setProviderEndpoint(config.providerEndpoints?.[config.provider] || '');
+            setProviderModel(config.providerModels?.[config.provider] || '');
             setCustomAiKey('');
+            if (config.provider === 'OLLAMA' || (config.configuredProviders || []).includes(config.provider)) {
+                void loadProviderModels(config.provider, undefined, config.providerEndpoints?.[config.provider] || '');
+            } else {
+                setAvailableProviderModels([]);
+                setModelDiscoveryAt(null);
+            }
             showToast(t('ai_config_saved'), 'success');
         } catch (err: any) {
             showToast(err?.message || t('ai_config_failed'), 'error');
@@ -813,7 +834,7 @@ const SettingsHub: React.FC = () => {
 
     // ============ UI State ============
 
-    const groups: MenuGroup[] = [
+    const groups = useMemo<MenuGroup[]>(() => [
         { label: 'Deployment', labelAr: 'الربط الشبكي', items: [
             { id: 'DEPLOYMENT', label: 'Branch Network', labelAr: 'ربط الفروع والإدارة', icon: Network },
         ]},
@@ -845,24 +866,37 @@ const SettingsHub: React.FC = () => {
         { label: 'System', labelAr: 'النظام', items: [
             { id: 'SECURITY', label: 'Security', labelAr: 'الأمان', icon: ShieldCheck },
         ]},
-    ];
+    ], []);
 
-    const flatMenu = useMemo(() => groups.flatMap(g => g.items), []);
-    const activeGroup = useMemo(() => groups.find(g => g.items.some(i => i.id === activeTab)), [activeTab]);
+    const flatMenu = useMemo(() => groups.flatMap(g => g.items), [groups]);
+    const activeGroup = useMemo(() => groups.find(g => g.items.some(i => i.id === activeTab)), [activeTab, groups]);
     const filteredGroups = useMemo(() => {
         if (!searchQuery.trim()) return groups;
         const q = searchQuery.toLowerCase();
         return groups.map(g => ({
             ...g,
-            items: g.items.filter(i => `${i.id} ${i.label} ${i.labelAr}`.toLowerCase().includes(q)),
+            items: g.items.filter(i => {
+                const description = SETTING_DESCRIPTIONS[i.id];
+                return `${i.id} ${i.label} ${i.labelAr} ${description?.en || ''} ${description?.ar || ''}`.toLowerCase().includes(q);
+            }),
         })).filter(g => g.items.length > 0);
-    }, [searchQuery]);
+    }, [groups, searchQuery]);
+
+    const currentTheme = THEME_LIST.find(theme => theme.id === (settings.theme || 'aero')) || THEME_LIST[0];
+    const readinessSignals = [
+        Boolean(settings.restaurantName),
+        Boolean(settings.currencySymbol),
+        branches.length > 0,
+        warehouses.length > 0,
+        printers.length > 0,
+        platforms.length > 0,
+    ];
+    const readinessScore = Math.round((readinessSignals.filter(Boolean).length / readinessSignals.length) * 100);
+    const configuredAssets = branches.length + warehouses.length + printers.length + platforms.length;
 
     const inputClass = "w-full px-5 py-4 bg-elevated/40 border border-border/30 rounded-2xl outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all font-bold text-sm text-main placeholder:text-muted/40";
     const labelClass = "text-[10px] font-black text-muted uppercase tracking-widest mb-1.5 block";
-    const cardClass = "bg-elevated/10 border border-border/20 rounded-3xl p-6 space-y-6";
-    const sectionHeaderClass = "flex items-center gap-3 pb-4 border-b border-border/20 mb-6";
-    const badgeClass = "px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest";
+    const sectionHeaderClass = "settings-section-header flex items-center gap-3 pb-4 border-b border-border/20 mb-6";
 
     const SectionHeader = ({ icon: Icon, title, sub }: { icon: any; title: string; sub?: string }) => (
         <div className={sectionHeaderClass}>
@@ -877,21 +911,9 @@ const SettingsHub: React.FC = () => {
     );
 
     const Toggle = ({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) => (
-        <div onClick={() => onChange(!enabled)} className={`w-12 h-7 ${enabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'} rounded-full relative cursor-pointer transition-all shrink-0`}>
+        <button type="button" role="switch" aria-checked={enabled} onClick={() => onChange(!enabled)} className={`settings-toggle w-12 h-7 ${enabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'} rounded-full relative cursor-pointer transition-all shrink-0`}>
             <div className={`absolute top-0.5 ${enabled ? 'right-0.5' : 'left-0.5'} w-6 h-6 bg-white rounded-full shadow-md transition-all`} />
-        </div>
-    );
-
-    const StatCard = ({ label, value, icon: Icon, color }: { label: string; value: string; icon: any; color: string }) => (
-        <div className="bg-elevated/20 border border-border/20 rounded-2xl p-5 flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0`} style={{ backgroundColor: color + '20', color }}>
-                <Icon size={22} />
-            </div>
-            <div>
-                <p className="text-[9px] font-black text-muted uppercase tracking-widest">{label}</p>
-                <p className="text-lg font-black text-main mt-0.5">{value}</p>
-            </div>
-        </div>
+        </button>
     );
 
     // ============ Tab Content Rendering ============
@@ -1065,7 +1087,7 @@ const SettingsHub: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label className={labelClass}>{tn('Theme', 'السمة')}</label>
-                                <select value={settings.theme || 'meridian'} onChange={e => handleChange('theme', e.target.value)} className={inputClass}>
+                                <select value={settings.theme || 'aero'} onChange={e => setTheme(e.target.value as AppTheme)} className={inputClass}>
                                     {THEME_LIST.map((theme) => (
                                         <option key={theme.id} value={theme.id}>{theme.name}</option>
                                     ))}
@@ -1078,7 +1100,7 @@ const SettingsHub: React.FC = () => {
                                         {settings.isDarkMode ? <Moon size={18} className="text-indigo-500" /> : <Sun size={18} className="text-amber-500" />}
                                         <span className="text-sm font-bold text-main">{settings.isDarkMode ? tn('Dark', 'ليلي') : tn('Light', 'فاتح')}</span>
                                     </div>
-                                    <Toggle enabled={settings.isDarkMode} onChange={v => handleChange('isDarkMode', v)} />
+                                    <Toggle enabled={settings.isDarkMode} onChange={() => toggleDark()} />
                                 </div>
                             </div>
                             <div className="md:col-span-2">
@@ -1109,27 +1131,75 @@ const SettingsHub: React.FC = () => {
                         </div>
                     </div>
                 );
-            case 'BRANCHES':
+            case 'BRANCHES': {
+                const visibleBranches = showArchivedBranches ? [...branches, ...archivedBranches] : branches;
+                const allSelected = visibleBranches.length > 0 && visibleBranches.every(b => selectedBranchIds.includes(b.id));
                 return (
                     <div className="space-y-6">
                         <SectionHeader icon={Store} title={tn('Branch Management', 'إدارة الفروع')} sub={tn('Manage branches & locations', 'إدارة الفروع والمواقع')} />
+                        <div className="flex flex-wrap items-center gap-3 p-3 rounded-2xl bg-elevated/30 border border-border/20">
+                            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={allSelected}
+                                    onChange={() => setSelectedBranchIds(allSelected ? [] : visibleBranches.map(b => b.id))}
+                                    className="w-4 h-4 accent-[var(--primary)] cursor-pointer"
+                                />
+                                {tn('Select all', 'تحديد الكل')}
+                            </label>
+                            <button type="button"
+                                onClick={() => {
+                                    const next = !showArchivedBranches;
+                                    setShowArchivedBranches(next);
+                                    if (next) void loadArchivedBranches().catch(() => undefined);
+                                }}
+                                className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-border/30 text-muted hover:text-main hover:border-primary/30 transition-all"
+                            >
+                                {showArchivedBranches ? tn('Hide archived', 'إخفاء المؤرشف') : tn('Show archived', 'عرض المؤرشف')}
+                            </button>
+                            <div className="flex items-center gap-2 ms-auto">
+                                <span className="text-[10px] font-black text-muted">{selectedBranchIds.length} {tn('selected', 'محدد')}</span>
+                                <button type="button" disabled={!selectedBranchIds.length || isSubmitting} onClick={() => void handleDeleteBranches(selectedBranchIds, false)}
+                                    className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-500/30 text-amber-600 hover:bg-amber-500/10 disabled:opacity-40 transition-all">
+                                    {tn('Archive', 'أرشفة')}
+                                </button>
+                                <button type="button" disabled={!selectedBranchIds.length || isSubmitting} onClick={() => void handleDeleteBranches(selectedBranchIds, true)}
+                                    className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 transition-all">
+                                    {tn('Delete permanently', 'حذف نهائي')}
+                                </button>
+                            </div>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {branches.map(b => (
+                            {visibleBranches.map(b => (
                                 <div key={b.id} onClick={() => { setEditingBranch(b); setBranchForm({ name: b.name || '', location: b.location || '', address: b.address || '', serverIp: b.serverIp || '', dayCloseEmailsText: Array.isArray(b.dayCloseEmails) ? b.dayCloseEmails.join(', ') : '', timezone: b.timezone || 'Africa/Cairo', currency: b.currency || 'EGP' }); setShowBranchModal(true); }}
-                                    className="p-5 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between hover:shadow-xl hover:border-primary/40 transition-all group cursor-pointer relative overflow-hidden"
+                                    className={`p-5 bg-elevated/20 border rounded-3xl flex items-center justify-between gap-3 hover:shadow-xl hover:border-primary/40 transition-all group cursor-pointer relative overflow-hidden ${selectedBranchIds.includes(b.id) ? 'border-primary/50 bg-primary/5' : 'border-border/20'}`}
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg transition-transform group-hover:scale-110 ${!b.isActive ? 'bg-slate-500/10 text-slate-400' : 'bg-primary/10 text-primary'}`}>{b.name.charAt(0)}</div>
-                                        <div>
-                                            <p className={`font-black uppercase text-sm tracking-tight ${!b.isActive ? 'text-slate-400' : 'text-main'}`}>{b.name}</p>
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedBranchIds.includes(b.id)}
+                                            onClick={e => e.stopPropagation()}
+                                            onChange={() => setSelectedBranchIds(prev => prev.includes(b.id) ? prev.filter(id => id !== b.id) : [...prev, b.id])}
+                                            className="w-4 h-4 shrink-0 accent-[var(--primary)] cursor-pointer"
+                                            aria-label={tn('Select branch', 'تحديد الفرع')}
+                                        />
+                                        <div className={`w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center font-black text-lg transition-transform group-hover:scale-110 ${!b.isActive ? 'bg-slate-500/10 text-slate-400' : 'bg-primary/10 text-primary'}`}>{b.name.charAt(0)}</div>
+                                        <div className="min-w-0">
+                                            <p className={`font-black uppercase text-sm tracking-tight truncate ${!b.isActive ? 'text-slate-400' : 'text-main'}`}>{b.name}</p>
                                             <p className="text-[10px] text-muted font-bold mt-1">
                                                 {b.location} {b.serverIp ? <span className="font-mono">• {b.serverIp}</span> : ''}
                                             </p>
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${b.isActive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>
-                                        {b.isActive ? tn('Active', 'نشط') : tn('Archived', 'مؤرشف')}
-                                    </span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${b.isActive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                                            {b.isActive ? tn('Active', 'نشط') : tn('Archived', 'مؤرشف')}
+                                        </span>
+                                        <button type="button" onClick={e => { e.stopPropagation(); void handleDeleteBranches([b.id], true); }} disabled={isSubmitting}
+                                            className="p-2 rounded-xl text-muted hover:text-red-500 hover:bg-red-500/10 disabled:opacity-40 transition-all" title={tn('Delete permanently', 'حذف نهائي')}>
+                                            <X size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                             <button onClick={() => { setEditingBranch(null); setBranchForm({ name: '', location: '', address: '', serverIp: '', dayCloseEmailsText: '', timezone: 'Africa/Cairo', currency: 'EGP' }); setShowBranchModal(true); }}
@@ -1141,6 +1211,7 @@ const SettingsHub: React.FC = () => {
                         </div>
                     </div>
                 );
+            }
             case 'WAREHOUSES':
                 return (
                     <div className="space-y-6">
@@ -1732,7 +1803,7 @@ const SettingsHub: React.FC = () => {
                                             { id: 'SYSTEM', label: 'System Copilot (Free)' },
                                             { id: 'GROQ', label: 'Groq (Fast API)' },
                                         ]).map(p => (
-                                            <button key={p.id} onClick={() => setAiProvider(p.id as any)}
+                                            <button key={p.id} onClick={() => { const nextProvider = p.id as any; const nextEndpoint = providerEndpoints[p.id] || ''; setAiProvider(nextProvider); setProviderEndpoint(nextEndpoint); setProviderModel(providerModels[p.id] || ''); setAvailableProviderModels([]); setModelDiscoveryAt(null); if (isProviderConfigured(nextProvider)) void loadProviderModels(nextProvider, undefined, nextEndpoint); }}
                                                 className={`p-4 rounded-2xl border-2 transition-all text-center ${aiProvider === p.id ? 'border-cyan-500 bg-cyan-500/5 text-cyan-500' : 'border-border/30 text-muted hover:border-cyan-500/30'}`}
                                             >
                                                 <span className="text-[10px] font-black uppercase tracking-widest">{p.label}</span>
@@ -1794,6 +1865,38 @@ const SettingsHub: React.FC = () => {
                                         )}
                                     </div>
                                 )}
+                                {['GEMINI', 'NVIDIA', 'OPENAI_COMPATIBLE'].includes(aiProvider) && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button onClick={() => setAiKeySource('DEFAULT')} className={`p-4 rounded-2xl border-2 text-left transition-all ${aiKeySource === 'DEFAULT' ? 'border-cyan-500 bg-cyan-500/5' : 'border-border/30'}`}>
+                                                <p className="text-[10px] font-black uppercase text-main">{tn('Server Key', 'مفتاح الخادم')}</p>
+                                                <p className="text-[8px] text-muted font-bold uppercase mt-1">{tn('Use environment key', 'استخدم مفتاح البيئة')}</p>
+                                            </button>
+                                            <button onClick={() => setAiKeySource('CUSTOM')} className={`p-4 rounded-2xl border-2 text-left transition-all ${aiKeySource === 'CUSTOM' ? 'border-cyan-500 bg-cyan-500/5' : 'border-border/30'}`}>
+                                                <p className="text-[10px] font-black uppercase text-main">{tn('Custom Key', 'مفتاح مخصص')}</p>
+                                                <p className="text-[8px] text-muted font-bold uppercase mt-1">{tn('Encrypted on server', 'يُشفّر على السيرفر')}</p>
+                                            </button>
+                                        </div>
+                                        {aiKeySource === 'CUSTOM' && <input type="password" value={customAiKey} onChange={e => setCustomAiKey(e.target.value)} placeholder={aiProvider === 'GEMINI' ? 'AIza...' : 'nvapi-...'} className={inputClass} dir="ltr" />}
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <label className={labelClass}>{tn('Available models', 'الموديلات المتاحة')}</label>
+                                                <button type="button" onClick={() => void loadProviderModels()} disabled={modelDiscoveryLoading} className="text-[10px] font-black text-cyan-500 hover:text-cyan-400 disabled:opacity-50">
+                                                    {modelDiscoveryLoading ? tn('Loading…', 'جاري التحميل…') : tn('Refresh models', 'تحديث الموديلات')}
+                                                </button>
+                                            </div>
+                                            <select value={providerModel} onChange={e => setProviderModel(e.target.value)} className={inputClass} dir="ltr" disabled={modelDiscoveryLoading || availableProviderModels.length === 0}>
+                                                {!availableProviderModels.length && <option value="">{tn('Click Refresh models first', 'اضغط تحديث الموديلات أولاً')}</option>}
+                                                {availableProviderModels.map(model => <option key={model.id} value={model.id}>{model.label} · {model.id}</option>)}
+                                            </select>
+                                            {modelDiscoveryAt && <p className="text-[10px] font-bold text-muted mt-1.5">{tn(`Updated ${new Date(modelDiscoveryAt).toLocaleTimeString()}`, `آخر تحديث ${new Date(modelDiscoveryAt).toLocaleTimeString('ar-EG')}`)}</p>}
+                                        </div>
+                                        {aiProvider === 'OPENAI_COMPATIBLE' && <div>
+                                            <label className={labelClass}>{tn('Provider endpoint', 'رابط المزود')}</label>
+                                            <input value={providerEndpoint} onChange={e => setProviderEndpoint(e.target.value)} placeholder="https://api.example.com/v1" className={inputClass} dir="ltr" />
+                                        </div>}
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-6">
                                 {aiProvider === 'SYSTEM' && (
@@ -1828,6 +1931,25 @@ const SettingsHub: React.FC = () => {
                                     </select>
                                 </div>
                                 )}
+                                {['GEMINI', 'NVIDIA', 'OPENAI_COMPATIBLE'].includes(aiProvider) && (
+                                    <div className="space-y-4">
+                                        <div className="p-6 bg-cyan-500/5 border border-cyan-500/20 rounded-3xl">
+                                            <p className="text-sm font-black text-cyan-500">{tn('Smart provider routing', 'توجيه ذكي بين المزودين')}</p>
+                                            <p className="text-xs text-muted font-bold mt-2 leading-6">{tn('Unavailable models are skipped and the next configured provider is tried automatically.', 'لو النموذج غير متاح يتم تخطيه وتجربة المزود التالي المضبوط تلقائياً.')}</p>
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>{tn('Fallback providers', 'المزودون البدلاء')}</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {providerOptions.filter(option => option.id !== aiProvider && option.id !== 'SYSTEM').map(option => (
+                                                    <label key={option.id} className="flex items-center gap-2 text-[10px] font-bold text-muted p-2 rounded-xl border border-border/20">
+                                                        <input type="checkbox" checked={fallbackProviders.includes(option.id)} onChange={event => setFallbackProviders(previous => event.target.checked ? [...new Set([...previous, option.id])] : previous.filter(id => id !== option.id))} />
+                                                        {option.label}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl flex flex-col gap-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center"><ShieldCheck size={18} /></div>
@@ -1846,6 +1968,23 @@ const SettingsHub: React.FC = () => {
                 return (
                     <div className="space-y-6">
                         <SectionHeader icon={ShieldCheck} title={tn('Security', 'الأمان')} sub={tn('Permissions, roles & audit logs', 'الصلاحيات والأدوار وسجل العمليات')} />
+                        <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl">
+                            <PublicApiKeyManager
+                                branches={branches}
+                                lang={lang}
+                                canManage={['SUPER_ADMIN', 'OWNER'].includes(String(settings.currentUser?.role || '').toUpperCase()) || settings.currentUser?.permissions?.includes(AppPermission.CFG_MANAGE_PUBLIC_API_KEYS) === true}
+                                showToast={showToast}
+                                tn={tn}
+                            />
+                        </div>
+                        <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl">
+                            <WebhookManager
+                                branches={branches}
+                                canManage={['SUPER_ADMIN', 'OWNER'].includes(String(settings.currentUser?.role || '').toUpperCase()) || settings.currentUser?.permissions?.includes(AppPermission.CFG_MANAGE_WEBHOOKS) === true}
+                                showToast={showToast}
+                                tn={tn}
+                            />
+                        </div>
                         <div className="space-y-4">
                             <div className="p-6 bg-elevated/20 border border-border/20 rounded-3xl flex items-center justify-between hover:border-slate-500/30 transition-all">
                                 <div className="flex items-center gap-4">
@@ -1894,18 +2033,19 @@ const SettingsHub: React.FC = () => {
     // ============ Main Render ============
 
     return (
-        <div className="min-h-screen bg-app overflow-hidden selection:bg-primary/30">
+        <div className="settings-hub min-h-screen bg-app overflow-hidden selection:bg-primary/30">
             <div className="flex h-screen overflow-hidden">
                 {/* Sidebar */}
-                <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} shrink-0 bg-card/80 backdrop-blur-xl border-r border-border/30 flex flex-col transition-all duration-300 z-20`}>
-                    <div className="p-5 border-b border-border/20 flex items-center gap-3">
+                {mobileSettingsNavOpen && <button type="button" aria-label={tn('Close settings navigation', 'إغلاق قائمة الإعدادات')} className="settings-mobile-nav-backdrop" onClick={() => setMobileSettingsNavOpen(false)} />}
+                <aside className={`settings-hub-sidebar ${sidebarCollapsed ? 'w-20' : 'w-72'} ${mobileSettingsNavOpen ? 'settings-mobile-nav-open' : ''} shrink-0 bg-card/80 backdrop-blur-xl border-r border-border/30 flex flex-col transition-all duration-300 z-20`}>
+                    <div className="settings-hub-sidebar-head p-5 border-b border-border/20 flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
                             <Settings size={22} />
                         </div>
                         {!sidebarCollapsed && (
                             <div>
                                 <h2 className="text-sm font-black text-main uppercase tracking-tight leading-none">{tn('Settings', 'الإعدادات')}</h2>
-                                <p className="text-[8px] font-black text-muted uppercase tracking-widest mt-1">{tn('Control Panel', 'لوحة التحكم')}</p>
+                                <p className="text-[8px] font-black text-muted uppercase tracking-widest mt-1">{tn('System control plane', 'مركز تحكم النظام')}</p>
                             </div>
                         )}
                         <button type="button" aria-label={sidebarCollapsed ? tn('Expand settings sidebar', 'توسيع قائمة الإعدادات') : tn('Collapse settings sidebar', 'طي قائمة الإعدادات')} onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="ml-auto p-1.5 rounded-lg text-muted hover:bg-elevated/60 transition-all">
@@ -1925,15 +2065,15 @@ const SettingsHub: React.FC = () => {
                         </div>
                     )}
 
-                    <nav className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-5">
+                    <nav className="settings-hub-nav flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-5" aria-label={tn('Settings navigation', 'تنقل الإعدادات')}>
                         <div>
                             {!sidebarCollapsed && (
-                                <p className="px-3 pb-1 text-[8px] font-black text-muted uppercase tracking-[0.2em]">
+                                <p className="settings-nav-group-title px-3 pb-1 text-[8px] font-black text-muted uppercase tracking-[0.2em]">
                                     {tn('Overview', 'نظرة عامة')}
                                 </p>
                             )}
                             <button onClick={() => setActiveTab(HOME_TAB)}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all group relative ${activeTab === HOME_TAB ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted hover:text-main hover:bg-elevated/40'}`}
+                                className={`settings-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all group relative ${activeTab === HOME_TAB ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted hover:text-main hover:bg-elevated/40'}`}
                                 title={sidebarCollapsed ? tn('All settings', 'كل الإعدادات') : undefined}
                             >
                                 <LayoutGrid size={18} />
@@ -1944,7 +2084,7 @@ const SettingsHub: React.FC = () => {
                         {filteredGroups.map(group => (
                             <div key={group.label}>
                                 {!sidebarCollapsed && (
-                                    <p className="px-3 pb-1 text-[8px] font-black text-muted uppercase tracking-[0.2em]">
+                                <p className="settings-nav-group-title px-3 pb-1 text-[8px] font-black text-muted uppercase tracking-[0.2em]">
                                         {tn(group.label, group.labelAr)}
                                     </p>
                                 )}
@@ -1953,8 +2093,8 @@ const SettingsHub: React.FC = () => {
                                         const isActive = activeTab === item.id;
                                         const groupItem = groups.flatMap(g => g.items).find(i => i.id === item.id);
                                         return (
-                                            <button key={item.id} onClick={() => setActiveTab(item.id)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all group relative ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted hover:text-main hover:bg-elevated/40'}`}
+                                            <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileSettingsNavOpen(false); }}
+                                                className={`settings-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all group relative ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-muted hover:text-main hover:bg-elevated/40'}`}
                                                 title={sidebarCollapsed ? tn(item.label, item.labelAr) : undefined}
                                             >
                                                 {groupItem && <item.icon size={18} />}
@@ -1969,37 +2109,45 @@ const SettingsHub: React.FC = () => {
                     </nav>
 
                     {!sidebarCollapsed && (
-                        <div className="p-4 border-t border-border/20 space-y-2">
-                            <button onClick={() => navigate('/floor-designer')} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-700 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-indigo-500/20">
-                                {tn('Floor Designer', 'مصمم القاعة')}
+                        <div className="settings-sidebar-tools p-4 border-t border-border/20 space-y-2">
+                            <p>{tn('Design tools', 'أدوات التصميم')}</p>
+                            <button onClick={() => navigate('/floor-designer')}>
+                                <MapPin size={15} aria-hidden="true" />
+                                <span>{tn('Floor Designer', 'مصمم القاعة')}</span>
+                                <ChevronRight size={14} aria-hidden="true" />
                             </button>
-                            <button onClick={() => navigate('/receipt-designer')} className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-amber-500/20">
-                                {tn('Receipt Designer', 'مصمم الفاتورة')}
+                            <button onClick={() => navigate('/receipt-designer')}>
+                                <Receipt size={15} aria-hidden="true" />
+                                <span>{tn('Receipt Designer', 'مصمم الفاتورة')}</span>
+                                <ChevronRight size={14} aria-hidden="true" />
                             </button>
                         </div>
                     )}
                 </aside>
 
                 {/* Main Content */}
-                <main className="flex-1 overflow-y-auto custom-scrollbar">
+                <main className="settings-hub-main flex-1 overflow-y-auto custom-scrollbar">
                     {/* Top Bar */}
-                    <div className="sticky top-0 z-10 bg-app/80 backdrop-blur-xl border-b border-border/20">
-                        <div className="px-8 py-4 flex items-center justify-between gap-6">
+                    <div className="settings-hub-topbar sticky top-0 z-10 bg-app/80 backdrop-blur-xl border-b border-border/20">
+                        <div className="settings-hub-topbar-inner px-8 py-4 flex items-center justify-between gap-6">
                             <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl text-white shadow-lg ${activeGroup ? '' : 'bg-primary'}`} style={activeGroup ? { backgroundColor: 'var(--primary)', opacity: 0.9 } : {}}>
+                                <button type="button" className="settings-mobile-nav-toggle" aria-label={tn('Open settings navigation', 'فتح قائمة الإعدادات')} onClick={() => setMobileSettingsNavOpen(true)}>
+                                    <Menu size={18} aria-hidden="true" />
+                                </button>
+                                <div className="settings-context-mark">
                                     {activeTab === HOME_TAB
-                                        ? <LayoutGrid size={22} />
+                                        ? <Settings size={22} />
                                         : React.createElement(flatMenu.find(i => i.id === activeTab)?.icon || Settings, { size: 22 })}
                                 </div>
                                 <div>
                                     <h1 className="text-xl font-black text-main uppercase tracking-tight leading-none">
                                         {activeTab === HOME_TAB
-                                            ? tn('Control Center', 'لوحة التحكم')
+                                            ? tn('System Configuration', 'تهيئة النظام')
                                             : tn(flatMenu.find(i => i.id === activeTab)?.label || activeTab, flatMenu.find(i => i.id === activeTab)?.labelAr || activeTab)}
                                     </h1>
                                     <p className="text-[9px] font-black text-muted uppercase tracking-[0.2em] mt-1">
                                         {activeTab === HOME_TAB
-                                            ? tn('Pick a tile to configure', 'اختر بطاقة للإعداد')
+                                            ? tn('One source of truth for every operating rule', 'مصدر واحد لكل قواعد تشغيل النظام')
                                             : <>{activeGroup && tn(activeGroup.label, activeGroup.labelAr)} • {tn('Settings', 'الإعدادات')}</>}
                                     </p>
                                 </div>
@@ -2007,8 +2155,8 @@ const SettingsHub: React.FC = () => {
                             <div className="flex items-center gap-3">
                                 {activeTab !== HOME_TAB && (
                                     <button onClick={() => setActiveTab(HOME_TAB)} className="px-5 py-3 bg-elevated/40 border border-border/20 rounded-2xl font-black text-[10px] uppercase tracking-widest text-muted hover:text-main hover:bg-elevated/60 transition-all flex items-center gap-2">
-                                        <LayoutGrid size={14} />
-                                        {tn('Tiles', 'البطاقات')}
+                                        <BookOpen size={14} />
+                                        {tn('Directory', 'الفهرس')}
                                     </button>
                                 )}
                                 <button onClick={() => navigate('/')} className="px-5 py-3 bg-elevated/40 border border-border/20 rounded-2xl font-black text-[10px] uppercase tracking-widest text-muted hover:text-main hover:bg-elevated/60 transition-all">
@@ -2024,56 +2172,113 @@ const SettingsHub: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* System Overview Cards */}
-                    <div className="px-8 pt-6 pb-2">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <StatCard icon={Building2} color="#6366f1" label={tn('Restaurant', 'المطعم')} value={settings.restaurantName || '—'} />
-                            <StatCard icon={Store} color="#7c3aed" label={tn('Branches', 'الفروع')} value={String(branches.length)} />
-                            <StatCard icon={Package} color="#059669" label={tn('Warehouses', 'المخازن')} value={String(warehouses.length)} />
-                            <StatCard icon={Printer} color="#0891b2" label={tn('Printers', 'الطابعات')} value={String(printers.length)} />
-                        </div>
-                    </div>
-
-                    {/* Content — tile dashboard on home, tab panel otherwise */}
+                    {/* Content — configuration atlas on home, focused editor otherwise */}
                     {activeTab === HOME_TAB ? (
-                        <div className="px-8 pb-24">
-                            <style>{`@keyframes tile-rise { from { opacity: 0; transform: translateY(22px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
-                            <div className="space-y-8 mt-4">
-                                {filteredGroups.map(group => {
-                                    const accent = GROUP_ACCENTS[group.label] || GROUP_ACCENTS.System;
-                                    return (
-                                        <section key={group.label}>
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <span className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black" style={{ background: `linear-gradient(135deg, ${accent.from}, ${accent.to})` }}>
-                                                    {group.items.length}
-                                                </span>
-                                                <h2 className="font-black text-sm text-main uppercase tracking-widest">{tn(group.label, group.labelAr)}</h2>
-                                                <span className="flex-1 h-px bg-border/30" />
-                                            </div>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                                                {group.items.map((item, idx) => (
-                                                    <SettingsTile3D
-                                                        key={item.id}
-                                                        title={tn(item.label, item.labelAr)}
-                                                        sub={tn(group.label, group.labelAr)}
-                                                        icon={item.icon}
-                                                        accent={accent}
-                                                        index={idx}
-                                                        onClick={() => setActiveTab(item.id)}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </section>
-                                    );
-                                })}
-                                {filteredGroups.length === 0 && (
-                                    <p className="text-center text-muted font-bold py-16">{tn('No settings match your search', 'لا توجد إعدادات مطابقة للبحث')}</p>
-                                )}
+                        <div className="settings-hub-content settings-atlas px-8 pb-24">
+                            <section className="settings-atlas-masthead" aria-labelledby="settings-atlas-title">
+                                <div className="settings-atlas-kicker">
+                                    <span>RESTOFLOW / CONFIG</span>
+                                    <span>{String(flatMenu.length).padStart(2, '0')} {tn('modules', 'وحدة')}</span>
+                                </div>
+                                <div className="settings-atlas-title-row">
+                                    <div>
+                                        <h2 id="settings-atlas-title">{tn('Shape how the entire operation behaves.', 'شكّل طريقة عمل المنظومة بالكامل.')}</h2>
+                                        <p>{tn('Search, inspect and change every operating rule from one precise command surface.', 'ابحث وراجع وعدّل كل قواعد التشغيل من مساحة تحكم واحدة دقيقة وواضحة.')}</p>
+                                    </div>
+                                    <div className="settings-atlas-score" aria-label={tn(`System readiness ${readinessScore}%`, `جاهزية النظام ${readinessScore}%`)}>
+                                        <strong>{readinessScore}</strong><span>%</span>
+                                        <small>{tn('readiness', 'جاهزية')}</small>
+                                    </div>
+                                </div>
+                                <label className="settings-atlas-search">
+                                    <Search size={20} aria-hidden="true" />
+                                    <span className="sr-only">{tn('Search settings', 'ابحث في الإعدادات')}</span>
+                                    <input ref={settingsSearchRef} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={tn('Find a setting, device, channel or rule…', 'ابحث عن إعداد أو جهاز أو قناة أو قاعدة…')} />
+                                    <kbd>/</kbd>
+                                </label>
+                                <div className="settings-atlas-facts" aria-label={tn('System summary', 'ملخص النظام')}>
+                                    <span><b>{branches.length}</b>{tn('Branches', 'فروع')}</span>
+                                    <span><b>{warehouses.length}</b>{tn('Warehouses', 'مخازن')}</span>
+                                    <span><b>{printers.length}</b>{tn('Printers', 'طابعات')}</span>
+                                    <span><b>{configuredAssets}</b>{tn('Connected assets', 'أصول مرتبطة')}</span>
+                                </div>
+                            </section>
+
+                            <div className="settings-atlas-body">
+                                <div className="settings-directory" aria-live="polite">
+                                    {filteredGroups.map((group, groupIndex) => {
+                                        const groupDescription = GROUP_DESCRIPTIONS[group.label];
+                                        return (
+                                            <section className="settings-directory-group" key={group.label} aria-labelledby={`settings-group-${group.label}`}>
+                                                <header>
+                                                    <span>{String(groupIndex + 1).padStart(2, '0')}</span>
+                                                    <div>
+                                                        <h2 id={`settings-group-${group.label}`}>{tn(group.label, group.labelAr)}</h2>
+                                                        <p>{groupDescription ? tn(groupDescription.en, groupDescription.ar) : ''}</p>
+                                                    </div>
+                                                    <b>{group.items.length}</b>
+                                                </header>
+                                                <div className="settings-directory-list">
+                                                    {group.items.map((item, itemIndex) => {
+                                                        const description = SETTING_DESCRIPTIONS[item.id];
+                                                        return (
+                                                            <button key={item.id} type="button" onClick={() => setActiveTab(item.id)} className="settings-directory-row">
+                                                                <span className="settings-directory-code">{String(groupIndex + 1).padStart(2, '0')}.{String(itemIndex + 1).padStart(2, '0')}</span>
+                                                                <span className="settings-directory-icon"><item.icon size={19} aria-hidden="true" /></span>
+                                                                <span className="settings-directory-copy">
+                                                                    <strong>{tn(item.label, item.labelAr)}</strong>
+                                                                    <small>{description ? tn(description.en, description.ar) : tn('Open configuration', 'فتح الإعداد')}</small>
+                                                                </span>
+                                                                <span className="settings-directory-action">{tn('Configure', 'ضبط')}<ChevronRight size={16} aria-hidden="true" /></span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </section>
+                                        );
+                                    })}
+                                    {filteredGroups.length === 0 && (
+                                        <div className="settings-atlas-empty" role="status">
+                                            <Search size={26} aria-hidden="true" />
+                                            <strong>{tn('Nothing matches this search', 'لا توجد نتائج مطابقة')}</strong>
+                                            <p>{tn('Try a module name, channel, device or operating rule.', 'جرّب اسم وحدة أو قناة أو جهاز أو قاعدة تشغيل.')}</p>
+                                            <button type="button" onClick={() => setSearchQuery('')}>{tn('Clear search', 'مسح البحث')}</button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <aside className="settings-intelligence" aria-label={tn('Configuration intelligence', 'ذكاء الإعدادات')}>
+                                    <section className="settings-intelligence-theme">
+                                        <span>{tn('Active visual system', 'النظام البصري النشط')}</span>
+                                        <strong>{currentTheme?.name || settings.theme}</strong>
+                                        <p>{currentTheme?.description}</p>
+                                        <div>
+                                            <i /><i /><i />
+                                            <b>{settings.isDarkMode ? tn('Dark mode', 'الوضع الداكن') : tn('Light mode', 'الوضع الفاتح')}</b>
+                                        </div>
+                                        <button type="button" onClick={() => setActiveTab('APPEARANCE')}>{tn('Edit appearance', 'تعديل المظهر')}<ChevronRight size={15} aria-hidden="true" /></button>
+                                    </section>
+                                    <section className="settings-intelligence-health">
+                                        <span>{tn('Configuration pulse', 'نبض الإعدادات')}</span>
+                                        <div className="settings-health-meter"><i style={{ width: `${readinessScore}%` }} /></div>
+                                        <dl>
+                                            <div><dt>{tn('Identity', 'الهوية')}</dt><dd>{settings.restaurantName ? tn('Ready', 'جاهزة') : tn('Needs setup', 'تحتاج ضبط')}</dd></div>
+                                            <div><dt>{tn('Infrastructure', 'البنية')}</dt><dd>{branches.length > 0 && warehouses.length > 0 ? tn('Connected', 'مرتبطة') : tn('Incomplete', 'غير مكتملة')}</dd></div>
+                                            <div><dt>{tn('Output devices', 'أجهزة الإخراج')}</dt><dd>{printers.length > 0 ? tn('Online', 'مضافة') : tn('Not configured', 'غير مضبوطة')}</dd></div>
+                                        </dl>
+                                    </section>
+                                    <section className="settings-intelligence-actions">
+                                        <span>{tn('Operational shortcuts', 'اختصارات التشغيل')}</span>
+                                        <button type="button" onClick={() => navigate('/roles')}><ShieldCheck size={17} aria-hidden="true" /><span>{tn('Roles & permissions', 'الأدوار والصلاحيات')}</span><ChevronRight size={15} aria-hidden="true" /></button>
+                                        <button type="button" onClick={() => navigate('/forensics')}><Eye size={17} aria-hidden="true" /><span>{tn('Audit trail', 'سجل التدقيق')}</span><ChevronRight size={15} aria-hidden="true" /></button>
+                                        <button type="button" onClick={() => navigate('/floor-designer')}><MapPin size={17} aria-hidden="true" /><span>{tn('Floor designer', 'مصمم القاعة')}</span><ChevronRight size={15} aria-hidden="true" /></button>
+                                    </section>
+                                </aside>
                             </div>
                         </div>
                     ) : (
-                    <div className="px-8 pb-24">
-                        <div className="bg-elevated/5 border border-border/20 rounded-[2.5rem] p-8 shadow-xl mt-4 min-h-[500px]">
+                    <div className="settings-hub-content px-8 pb-24">
+                        <div className="settings-panel bg-elevated/5 border border-border/20 rounded-[2.5rem] p-8 shadow-xl mt-4 min-h-[500px]">
                             {renderTabContent()}
                         </div>
                     </div>
@@ -2130,9 +2335,14 @@ const SettingsHub: React.FC = () => {
                         </div>
                         <div className="flex gap-4 mt-8">
                             {editingBranch && (
-                                <button onClick={(e) => handleHardDeleteBranch(editingBranch.id, e)} disabled={isSubmitting}
-                                    className="px-8 py-4 bg-app text-red-600 border border-border/30 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:border-red-600 hover:bg-red-600/10 transition-all"
-                                >{tn('Delete', 'حذف')}</button>
+                                <>
+                                    <button type="button" onClick={() => void handleDeleteBranches([editingBranch.id], false)} disabled={isSubmitting}
+                                        className="px-6 py-4 bg-app text-amber-600 border border-border/30 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:border-amber-600 hover:bg-amber-600/10 transition-all"
+                                    >{tn('Archive', 'أرشفة')}</button>
+                                    <button type="button" onClick={() => void handleDeleteBranches([editingBranch.id], true)} disabled={isSubmitting}
+                                        className="px-6 py-4 bg-app text-red-600 border border-border/30 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:border-red-600 hover:bg-red-600/10 transition-all"
+                                    >{tn('Delete permanently', 'حذف نهائي')}</button>
+                                </>
                             )}
                             <button onClick={handleSaveBranch} disabled={isSubmitting}
                                 className="flex-1 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-2xl hover:shadow-primary/30 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3"

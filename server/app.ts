@@ -17,18 +17,21 @@ import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes';
 import talabatWebhookRoutes from './routes/talabatWebhookRoutes';
 import aggregatorWebhookRoutes from './routes/aggregatorWebhookRoutes';
 import { handleWebhook as paymobWebhook } from './controllers/paymobController';
+import { gatewayWebhook as unifiedGatewayWebhook } from './controllers/p1FinanceController';
 import { authenticateToken, requireRoles } from './middleware/auth';
 import { isOriginAllowed } from './config/cors';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { attachRequestId, requestLogger } from './middleware/requestContext';
-import { requestTiming } from './middleware/requestTiming';
+import { getRequestTiming, requestTiming } from './middleware/requestTiming';
 import { errorContractMiddleware } from './middleware/errorContract';
 import { apiCacheHeaders } from './middleware/cacheHeaders';
 import { errorTrackingMiddleware, getRecentErrors, getErrorStats } from './services/errorTrackingService';
-import { apiRateLimiter } from './middleware/rateLimit';
+import { apiRateLimiter, webhookRateLimiter } from './middleware/rateLimit';
 import { enforceHttps, hstsHeader } from './middleware/sslEnforcement';
 import { healthService } from './services/healthService';
 import { ensureUploadsDirectory, uploadsDirectory } from './utils/imageStorage';
+import { mutationAuditMiddleware } from './middleware/mutationAudit';
+import { getSlaHistory } from './services/slaMetricsService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -68,8 +71,8 @@ app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use('/api', apiRateLimiter);
 app.use(inputSanitizer);
 app.use(csrfProtection);
-app.use(auditMiddleware);
 app.use(attachRequestId);
+app.use(auditMiddleware);
 app.use(requestTiming);
 app.use(requestLogger);
 app.use(errorContractMiddleware);
@@ -90,21 +93,27 @@ import printGatewayGatewayRoutes from './routes/printGatewayGatewayRoutes';
 import attendanceBridgeRoutes from './routes/attendanceBridgeRoutes';
 import publicScreenRoutes from './routes/publicScreenRoutes';
 import deploymentRoutes from './routes/deploymentRoutes';
+import publicApiRoutes from './routes/publicApiRoutes';
+import publicApiWebhookRoutes from './routes/publicApiWebhookRoutes';
 
 // Public Routes & Modules
 app.use('/api/auth', authRoutes); // Expose auth globally before token check
 app.use('/api/setup', setupRoutes); // Expose setup globally
-app.use('/api/whatsapp', whatsappWebhookRoutes); // Public WhatsApp webhook only
-app.use('/api/integrations/talabat', talabatWebhookRoutes); // Public Talabat webhook (shared-secret auth)
-app.use('/api/integrations', aggregatorWebhookRoutes); // Public aggregator webhooks (per-provider secret; Talabat handled above)
-app.post('/api/payments/paymob/webhook', paymobWebhook); // Public Paymob callback (HMAC auth)
-app.use('/api/attendance-bridge', attendanceBridgeRoutes); // Expose branch attendance bridge ingest
+app.use('/api/whatsapp', webhookRateLimiter, whatsappWebhookRoutes); // Public WhatsApp webhook only
+app.use('/api/integrations/talabat', webhookRateLimiter, talabatWebhookRoutes); // Public Talabat webhook (shared-secret auth)
+app.use('/api/integrations', webhookRateLimiter, aggregatorWebhookRoutes); // Public aggregator webhooks (per-provider secret; Talabat handled above)
+app.post('/api/payments/paymob/webhook', webhookRateLimiter, paymobWebhook); // Public Paymob callback (HMAC auth)
+app.use('/api/attendance-bridge', webhookRateLimiter, attendanceBridgeRoutes); // Expose branch attendance bridge ingest
 app.use('/api/public-screens', publicScreenRoutes); // Link-only KDS/Packing screens for legacy operator displays
 app.use('/api/deployment', deploymentRoutes);
-app.use('/iclock', admsRoutes); // ADMS Biometric Endpoint (Must be top-level)
+app.use('/api/v1', publicApiRoutes); // Versioned, API-key/scoped public integration surface.
+app.use('/api/v1', publicApiWebhookRoutes); // Partner-managed, key-owned webhook subscriptions.
+app.use('/iclock', webhookRateLimiter, admsRoutes); // ADMS Biometric Endpoint (Must be top-level)
+// External gateway callbacks use provider HMAC verification, not an employee JWT.
+app.post('/api/finance/p1/gateways/webhook/:provider', webhookRateLimiter, unifiedGatewayWebhook);
 
 // Bridge routes — fail closed unless PRINT_GATEWAY_TOKEN is configured and supplied.
-app.use('/api/print-gateway/gateway', printGatewayGatewayRoutes); // SSE bridge connect
+app.use('/api/print-gateway/gateway', webhookRateLimiter, printGatewayGatewayRoutes); // SSE bridge connect
 import printGatewayRoutes from './routes/printGatewayRoutes';
 app.use('/api/print-gateway', printGatewayRoutes); // Bridge polling + complete/fail
 
@@ -118,6 +127,29 @@ app.get('/api/health', async (req, res) => {
     });
 });
 
+// Public status-page snapshot: deliberately coarse and free of route names,
+// provider configuration, error messages, bridge addresses, or metrics data.
+app.get('/api/status', async (_req, res) => {
+    try {
+        const health = await healthService.getStatus();
+        res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+        res.status(health.status === 'UNHEALTHY' ? 503 : 200).json({
+            status: health.status === 'HEALTHY' ? 'operational' : health.status === 'DEGRADED' ? 'degraded' : 'outage',
+            timestamp: new Date().toISOString(),
+            uptimeSeconds: health.services.uptime,
+            components: {
+                database: health.services.database.status === 'CONNECTED' ? 'operational' : 'degraded',
+                messaging: health.services.whatsapp.status === 'ERROR' ? 'degraded' : 'operational',
+                printing: health.services.printing.status === 'DEGRADED' ? 'degraded' : 'operational',
+                integrations: health.services.integrations.status === 'DEGRADED' ? 'degraded' : 'operational',
+            },
+        });
+    } catch {
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(503).json({ status: 'outage', timestamp: new Date().toISOString() });
+    }
+});
+
 // Client-RUM ingest (Public — numeric aggregates only, rate-limited).
 app.post('/api/rum/client', async (req, res) => {
     const { ingestClientRum } = await import('./controllers/rumController');
@@ -126,6 +158,9 @@ app.post('/api/rum/client', async (req, res) => {
 
 // Protected Routes
 app.use('/api', authenticateToken);
+// Authenticated mutation baseline: domain controllers may add richer before/
+// after audit entries, while this guarantees actor/path/outcome coverage.
+app.use('/api', mutationAuditMiddleware);
 
 // Protected Modules
 app.use('/api/core', coreModule); // Backward-compatible core aliases, protected by the global API auth guard.
@@ -174,6 +209,7 @@ import subscriptionRoutes from './routes/subscriptionRoutes';
 import ttsRoutes from './routes/ttsRoutes';
 import mailRoutes from './routes/mailRoutes';
 import mapsRoutes from './routes/mapsRoutes';
+import publicApiKeyRoutes from './routes/publicApiKeyRoutes';
 
 app.use('/api/settings', settingsRoutes);
 app.use('/api/branches', branchRoutes);
@@ -209,6 +245,7 @@ app.use('/api/reservations', reservationRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/mail', mailRoutes);
+app.use('/api/public-api', publicApiKeyRoutes);
 
 // Legacy/Specific Support (to be moved fully in next phase)
 import approvalRoutes from './routes/approvalRoutes';
@@ -223,6 +260,8 @@ import paymobRoutes from './routes/paymobRoutes';
 import rolesRoutes from './routes/rolesRoutes';
 import talabatAdminRoutes from './routes/talabatAdminRoutes';
 import aggregatorAdminRoutes from './routes/aggregatorAdminRoutes';
+import franchiseRoutes from './routes/franchiseRoutes';
+import dataGovernanceRoutes from './routes/dataGovernanceRoutes';
 
 app.use('/api/approvals', approvalRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -237,11 +276,45 @@ app.use('/api/attendance-ops', requireRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANA
 app.use('/api/maps', mapsRoutes);
 app.use('/api/integrations/talabat', talabatAdminRoutes);
 app.use('/api/integrations', aggregatorAdminRoutes);
+app.use('/api/franchise', franchiseRoutes);
+app.use('/api/ops/data-governance', dataGovernanceRoutes);
 
 
 // Error tracking API (ops)
 app.get('/api/ops/errors', requireRoles('SUPER_ADMIN'), (_req, res) => {
     res.json({ errors: getRecentErrors(), stats: getErrorStats() });
+});
+
+// Operational status/SLA view: authenticated administrators only. The public
+// health endpoint stays intentionally small; this view includes route latency
+// and error aggregates that could reveal internal topology.
+app.get('/api/ops/status', requireRoles('SUPER_ADMIN', 'OWNER'), async (_req, res) => {
+    try {
+        const health = await healthService.getStatus();
+        const routes = getRequestTiming();
+        const history = await getSlaHistory();
+        const totalRequests = routes.reduce((sum, route) => sum + route.n, 0);
+        const totalErrors = routes.reduce((sum, route) => sum + route.errors, 0);
+        const p95TargetMs = Math.max(25, Number(process.env.SLA_P95_TARGET_MS || 1000));
+        const errorRate = totalRequests > 0 ? Number((totalErrors / totalRequests).toFixed(4)) : 0;
+        res.status(health.status === 'UNHEALTHY' ? 503 : 200).json({
+            status: health.status,
+            timestamp: new Date().toISOString(),
+            uptimeSeconds: health.services.uptime,
+            services: health.services,
+            sla: {
+                p95TargetMs,
+                totalRequests,
+                totalErrors,
+                errorRate,
+                routesOverTarget: routes.filter((route) => route.p95 > p95TargetMs),
+                routes,
+                history,
+            },
+        });
+    } catch (error: any) {
+        res.status(503).json({ status: 'UNHEALTHY', error: 'STATUS_SNAPSHOT_FAILED', message: error?.message });
+    }
 });
 
 // 404 handler for undefined routes

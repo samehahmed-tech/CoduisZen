@@ -176,6 +176,7 @@ export const customers = mssqlTable('customers', {
     name: nvarchar('name').notNull(),
     phone: nvarchar('phone', { length: 20 }).unique().notNull(),
     email: nvarchar('email'),
+    birthDate: datetime2('birth_date'),
     // Address Details
     address: nvarchar('address'),
     lat: real('lat'),
@@ -198,6 +199,10 @@ export const customers = mssqlTable('customers', {
     source: nvarchar('source').default('call_center'), // call_center, pos, online, app
     marketingOptIn: bit('marketing_opt_in').default(true), // consent for campaigns; false = never contact
     marketingOptOutAt: datetime2('marketing_opt_out_at'),
+    marketingEmailOptIn: bit('marketing_email_opt_in').default(true),
+    marketingSmsOptIn: bit('marketing_sms_opt_in').default(true),
+    marketingWhatsappOptIn: bit('marketing_whatsapp_opt_in').default(true),
+    marketingPushOptIn: bit('marketing_push_opt_in').default(true),
     deletedAt: datetime2('deleted_at'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
@@ -340,6 +345,7 @@ export const orders = mssqlTable('orders', {
     orderNumber: int('daily_order_number'), // Restarts from 1 per branch business date
     type: nvarchar('type').notNull(), // DINE_IN, TAKEAWAY, DELIVERY
     source: nvarchar('source').default('pos'), // pos, call_center, online, app
+    campaignId: nvarchar('campaign_id'), // Explicit marketing attribution for completed-order ROI
     // Branch & Location
     branchId: nvarchar('branch_id').references(() => branches.id).notNull(),
     tableId: nvarchar('table_id'),
@@ -362,6 +368,9 @@ export const orders = mssqlTable('orders', {
     discount: real('discount').default(0),
     discountType: nvarchar('discount_type'), // percentage, fixed
     discountReason: nvarchar('discount_reason'),
+    couponCode: nvarchar('coupon_code'), // Canonical applied coupon for attribution/refund/reporting
+    couponDiscountAmount: real('coupon_discount_amount').default(0),
+    couponUsageReleasedAt: datetime2('coupon_usage_released_at'),
     tax: real('tax').notNull(),
     deliveryFee: real('delivery_fee').default(0),
     serviceCharge: real('service_charge').default(0),
@@ -430,6 +439,7 @@ export const orderItems = mssqlTable('order_items', {
     orderId: nvarchar('order_id').references(() => orders.id, { onDelete: 'cascade' }).notNull(),
     menuItemId: nvarchar('menu_item_id').references(() => menuItems.id),
     sizeId: nvarchar('size_id'), // Selected size variant; ties sold lines to their BOM recipe
+    recipeVersionId: nvarchar('recipe_version_id'), // Immutable recipe snapshot used when the line was sold
     name: nvarchar('name').notNull(),
     nameAr: nvarchar('name_ar'),
     price: real('price').notNull(),
@@ -482,12 +492,16 @@ export const payments = mssqlTable('payments', {
 export const paymentSessions = mssqlTable('payment_sessions', {
     id: nvarchar('id').primaryKey(),
     orderId: nvarchar('order_id').references(() => orders.id, { onDelete: 'cascade' }).notNull(),
+    // Immutable branch provenance for payment and reconciliation scope. Nullable
+    // for legacy rows; new sessions always capture the order branch.
+    branchId: nvarchar('branch_id').references(() => branches.id),
     providerType: nvarchar('provider_type'), // 'manual_cash', 'eft_pos', 'fawry', 'instapay', 'vodafone_cash'
-    status: nvarchar('status').default('initiated'), // initiated, pending, confirmed, failed, cancelled, requires_reconciliation
+    status: nvarchar('status').default('initiated'), // initiated, pending, confirmed, refund_processing, refunded, failed, cancelled, requires_reconciliation
     amount: real('amount').notNull(),
     currency: nvarchar('currency').default('EGP'),
     verified: bit('verified').default(false),
     externalReference: nvarchar('external_reference'),
+    checkoutUrlCiphertext: nvarchar('checkout_url_ciphertext'),
     idempotencyKey: nvarchar('idempotency_key').unique(),
     deviceId: nvarchar('device_id'),
     createdBy: nvarchar('created_by'),
@@ -496,6 +510,11 @@ export const paymentSessions = mssqlTable('payment_sessions', {
 }, (table) => [
     index('payment_sessions_order_idx').on(table.orderId),
     index('payment_sessions_idempotency_idx').on(table.idempotencyKey),
+    // A provider order/reference must resolve to one session. NULL remains
+    // allowed for manual/legacy sessions that have no external reference.
+    uniqueIndex('payment_sessions_provider_reference_uq')
+        .on(table.providerType, table.externalReference)
+        .where(sql`external_reference IS NOT NULL`),
 ]);
 
 export const ledgerEntries = mssqlTable('ledger_entries', {
@@ -506,10 +525,15 @@ export const ledgerEntries = mssqlTable('ledger_entries', {
     direction: nvarchar('direction').notNull(), // 'debit', 'credit'
     amount: real('amount').notNull(),
     currency: nvarchar('currency').default('EGP'),
+    branchId: nvarchar('branch_id').references(() => branches.id),
+    source: nvarchar('source'),
+    actorId: nvarchar('actor_id'),
+    correlationId: nvarchar('correlation_id'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
 }, (table) => [
     index('ledger_entries_order_idx').on(table.orderId),
     index('ledger_entries_account_idx').on(table.account),
+    index('ledger_entries_branch_correlation_idx').on(table.branchId, table.correlationId),
 ]);
 
 // ============================================================================
@@ -689,6 +713,9 @@ export const recipeIngredients = mssqlTable('recipe_ingredients', {
 
 export const suppliers = mssqlTable('suppliers', {
     id: nvarchar('id').primaryKey(),
+    // NULL preserves legacy global suppliers; new branch-created suppliers
+    // carry provenance and are visible only to that branch plus head office.
+    branchId: nvarchar('branch_id').references(() => branches.id),
     name: nvarchar('name').notNull(),
     contactPerson: nvarchar('contact_person'),
     phone: nvarchar('phone'),
@@ -1089,11 +1116,16 @@ export const journalEntries = mssqlTable('journal_entries', {
     status: nvarchar('status').default('POSTED').notNull(), // POSTED, REVERSED
     fiscalPeriodId: nvarchar('fiscal_period_id'), // Removed rigid foreign key to allow flexible period linking if period hasn't been strictly generated yet
     createdBy: nvarchar('created_by'),
+    branchId: nvarchar('branch_id').references(() => branches.id),
+    source: nvarchar('source'),
+    actorId: nvarchar('actor_id'),
+    correlationId: nvarchar('correlation_id'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
 }, (table) => [
     index('je_ref_idx').on(table.reference, table.referenceType),
     index('je_date_status_idx').on(table.date, table.status),
     index('je_source_idx').on(table.referenceType),
+    index('je_branch_correlation_idx').on(table.branchId, table.correlationId),
 ]);
 
 export const journalLines = mssqlTable('journal_lines', {
@@ -1248,7 +1280,7 @@ export const supplierInvoiceMatches = mssqlTable('supplier_invoice_matches', {
 });
 
 export const tipPools = mssqlTable('tip_pools', {
-    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), shiftId: nvarchar('shift_id'), pooledAmount: numeric('pooled_amount', { precision: 14, scale: 2 }),
+    id: nvarchar('id').primaryKey(), branchId: nvarchar('branch_id'), shiftId: nvarchar('shift_id'), payrollCycleId: nvarchar('payroll_cycle_id'), pooledAmount: numeric('pooled_amount', { precision: 14, scale: 2 }),
     paymentMethod: nvarchar('payment_method'), distributionMethod: nvarchar('distribution_method'), status: nvarchar('status'), paidOutAt: datetime2('paid_out_at'), allocatedBy: nvarchar('allocated_by'), createdBy: nvarchar('created_by'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`), updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 });
@@ -1371,6 +1403,41 @@ export const settings = mssqlTable('settings', {
     updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
 });
 
+// Public integration credentials are stored as one-way hashes only. The raw
+// secret is returned once at creation/rotation and is never recoverable from
+// this table.
+export const publicApiClients = mssqlTable('public_api_clients', {
+    id: nvarchar('id', { length: 64 }).primaryKey(),
+    name: nvarchar('name', { length: 160 }).notNull(),
+    keyPrefix: nvarchar('key_prefix', { length: 32 }).notNull(),
+    keyHash: nvarchar('key_hash', { length: 64 }).notNull().unique(),
+    scopes: jsonText('scopes').$type<string[]>().notNull(),
+    branchIds: jsonText('branch_ids').$type<string[]>().notNull(),
+    redirectUris: jsonText('redirect_uris').$type<string[]>().default(sql`'[]'`),
+    expiresAt: datetime2('expires_at'),
+    revokedAt: datetime2('revoked_at'),
+    lastUsedAt: datetime2('last_used_at'),
+    createdBy: nvarchar('created_by', { length: 255 }),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+    updatedAt: datetime2('updated_at').default(sql`GETDATE()`),
+}, (table) => [
+    index('idx_public_api_clients_active').on(table.revokedAt, table.expiresAt),
+]);
+
+export const publicApiRefreshTokens = mssqlTable('public_api_refresh_tokens', {
+    id: nvarchar('id', { length: 64 }).primaryKey(),
+    clientId: nvarchar('client_id', { length: 64 }).notNull(),
+    tokenHash: nvarchar('token_hash', { length: 64 }).notNull().unique(),
+    scopes: jsonText('scopes').$type<string[]>().notNull(),
+    branchIds: jsonText('branch_ids').$type<string[]>().notNull(),
+    expiresAt: datetime2('expires_at').notNull(),
+    consumedAt: datetime2('consumed_at'),
+    revokedAt: datetime2('revoked_at'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+}, (table) => [
+    index('idx_public_api_refresh_client').on(table.clientId, table.revokedAt, table.consumedAt),
+]);
+
 // ============================================================================
 // 🔌 WEBHOOKS & PLUGIN SYSTEM
 // ============================================================================
@@ -1400,6 +1467,8 @@ export const webhookDeliveries = mssqlTable('webhook_deliveries', {
     httpStatus: int('http_status'),
     responseBody: jsonText('response_body'),
     attempt: int('attempt').default(1),
+    durationMs: int('duration_ms'),
+    nextRetryAt: datetime2('next_retry_at'),
     lastError: nvarchar('last_error'),
     deliveredAt: datetime2('delivered_at'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
@@ -1664,7 +1733,8 @@ export const campaigns = mssqlTable('campaigns', {
     id: nvarchar('id').primaryKey(),
     name: nvarchar('name').notNull(),
     type: nvarchar('type').notNull(), // SMS, EMAIL, WHATSAPP, PUSH
-    status: nvarchar('status').default('DRAFT').notNull(), // DRAFT, ACTIVE, SCHEDULED, PAUSED, COMPLETED
+    branchId: nvarchar('branch_id').references(() => branches.id), // null = all branches
+    status: nvarchar('status', { length: 50 }).default('DRAFT').notNull(), // DRAFT, ACTIVE, SCHEDULED, PAUSED, COMPLETED
     targetAudience: nvarchar('target_audience'), // e.g. "ALL", "VIP", "INACTIVE_30_DAYS"
     content: nvarchar('content').notNull(), // Message body
     scheduledAt: datetime2('scheduled_at'),
@@ -1776,6 +1846,7 @@ export const productionOrders = mssqlTable('production_orders', {
     recipeId: nvarchar('recipe_id').references(() => recipes.id),
     batchNumber: nvarchar('batch_number').notNull(),
     batchSize: real('batch_size').notNull().default(1), // Multiplier of recipe yield
+    quantity: real('quantity').notNull().default(1), // Legacy production quantity compatibility
     expectedYield: real('expected_yield').notNull(),
     actualYield: real('actual_yield'),
     status: nvarchar('status').default('PLANNED').notNull(), // PLANNED, IN_PROGRESS, COMPLETED, CANCELLED
@@ -1913,6 +1984,8 @@ export const refundRecords = mssqlTable('refund_records', {
     orderId: nvarchar('order_id').references(() => orders.id).notNull(),
     branchId: nvarchar('branch_id').references(() => branches.id).notNull(),
     amount: real('amount').notNull(),
+    couponCode: nvarchar('coupon_code'),
+    couponDiscountAmount: real('coupon_discount_amount').default(0),
     refundMethod: nvarchar('refund_method').notNull(), // CASH, CREDIT, VOUCHER, ORIGINAL_METHOD
     reason: nvarchar('reason').notNull(),
     reasonCategory: nvarchar('reason_category'), // CUSTOMER_COMPLAINT, WRONG_ORDER, QUALITY, LATE_DELIVERY, OTHER
@@ -2144,6 +2217,7 @@ export const mailMessageRecipients = mssqlTable('mail_message_recipients', {
 export const customerWallets = mssqlTable('customer_wallets', {
     id: nvarchar('id').primaryKey(),
     customerId: nvarchar('customer_id').references(() => customers.id).notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id),
     balance: real('balance').default(0).notNull(),
     currency: nvarchar('currency').default('EGP').notNull(),
     lastUpdated: datetime2('last_updated').default(sql`GETDATE()`),
@@ -2152,6 +2226,7 @@ export const customerWallets = mssqlTable('customer_wallets', {
 export const walletTransactions = mssqlTable('wallet_transactions', {
     id: int('id').identity().primaryKey(),
     walletId: nvarchar('wallet_id').references(() => customerWallets.id).notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id),
     amount: real('amount').notNull(), // positive for deposit, negative for withdrawal
     type: nvarchar('type').notNull(), // DEPOSIT, PAYMENT, REFUND, ADJUSTMENT
     referenceId: nvarchar('reference_id'), // Order ID or Invoice ID
@@ -2174,9 +2249,11 @@ export const loyaltyRewards = mssqlTable('loyalty_rewards', {
 export const loyaltyLedger = mssqlTable('loyalty_ledger', {
     id: int('id').identity().primaryKey(),
     customerId: nvarchar('customer_id').references(() => customers.id).notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id),
     points: int('points').notNull(), // positive for EARNED, negative for REDEEMED
     type: nvarchar('type').notNull(), // EARNED, REDEEMED, ADJUSTMENT, EXPIRED
     referenceId: nvarchar('reference_id'), // Order ID or Reward ID
+    operationKey: nvarchar('operation_key'), // Unique replay key for order award/clawback operations
     notes: nvarchar('notes'),
     createdAt: datetime2('created_at').default(sql`GETDATE()`),
 });
@@ -2184,6 +2261,8 @@ export const loyaltyLedger = mssqlTable('loyalty_ledger', {
 export const coupons = mssqlTable('coupons', {
     id: nvarchar('id').primaryKey(),
     code: nvarchar('code').unique().notNull(),
+    branchId: nvarchar('branch_id').references(() => branches.id), // null = all branches
+    campaignId: nvarchar('campaign_id'), // Optional campaign attribution fallback
     type: nvarchar('type').notNull(), // PERCENTAGE, FIXED_AMOUNT, FREE_SHIPPING
     value: real('value').notNull(),
     minOrderValue: real('min_order_value').default(0),
@@ -2200,6 +2279,7 @@ export const customerComplaints = mssqlTable('customer_complaints', {
     id: nvarchar('id').primaryKey(),
     customerId: nvarchar('customer_id').references(() => customers.id).notNull(),
     orderId: nvarchar('order_id').references(() => orders.id), // Optional link to an order
+    branchId: nvarchar('branch_id').references(() => branches.id),
     subject: nvarchar('subject').notNull(),
     description: nvarchar('description').notNull(),
     status: nvarchar('status').default('OPEN'), // OPEN, IN_PROGRESS, RESOLVED, CLOSED
@@ -2248,10 +2328,11 @@ export type ItemDailySnapshot = typeof itemDailySnapshots.$inferSelect;
 export type CustomerRfmMetric = typeof customerRfmMetrics.$inferSelect;
 
 export const userDailyPerformance = mssqlTable('user_daily_performance', {
-    id: int('id').identity().primaryKey(),
+    id: nvarchar('id').primaryKey(),
     userId: nvarchar('user_id').references(() => users.id).notNull(),
     branchId: nvarchar('branch_id').references(() => branches.id).notNull(),
     date: nvarchar('date').notNull(),
+    businessDate: date('business_date'),
     orderCount: int('order_count').default(0),
     totalSales: real('total_sales').default(0),
     totalPoints: int('total_points').default(0),
@@ -2324,6 +2405,7 @@ export const attendancePolicies = mssqlTable("attendance_policies", {
 	graceLateMinutes: int("grace_late_minutes").default(15).notNull(),
 	earlyLeaveToleranceMinutes: int("early_leave_tolerance_minutes").default(10).notNull(),
 	overtimeThresholdMinutes: int("overtime_threshold_minutes").default(30).notNull(),
+	minimumRestMinutes: int("minimum_rest_minutes").default(660).notNull(),
 	minHoursForPresent: real("min_hours_for_present").default(4).notNull(),
 	attendanceProcessingMode: nvarchar("attendance_processing_mode").default('AUTO').notNull(),
 	operationalDayStartHour: int("operational_day_start_hour").default(8).notNull(),
@@ -2722,6 +2804,22 @@ export const domainEvents = mssqlTable('domain_events', {
 	processedAt: datetime2('processed_at'),
 	createdAt: datetime2('created_at').default(sql`GETDATE()`),
 });
+
+export const publicApiAuthorizationCodes = mssqlTable('public_api_authorization_codes', {
+    id: nvarchar('id', { length: 64 }).primaryKey(),
+    codeHash: nvarchar('code_hash', { length: 64 }).notNull().unique(),
+    clientId: nvarchar('client_id', { length: 64 }).notNull(),
+    userId: nvarchar('user_id', { length: 255 }).notNull(),
+    redirectUri: nvarchar('redirect_uri', { length: 2048 }).notNull(),
+    scopes: jsonText('scopes').$type<string[]>().notNull(),
+    branchIds: jsonText('branch_ids').$type<string[]>().notNull(),
+    codeChallenge: nvarchar('code_challenge', { length: 128 }).notNull(),
+    expiresAt: datetime2('expires_at').notNull(),
+    consumedAt: datetime2('consumed_at'),
+    createdAt: datetime2('created_at').default(sql`GETDATE()`),
+}, (table) => [
+    index('idx_public_api_auth_codes_client').on(table.clientId, table.expiresAt, table.consumedAt),
+]);
 // --- RESTORED attendanceSessions ---
 export const attendanceSessions = mssqlTable("attendance_sessions", {
 	id: nvarchar({ length: 'max' }).primaryKey().notNull(),
@@ -2794,6 +2892,7 @@ export const payrollRunLines = mssqlTable("payroll_run_lines", {
 	employeeId: nvarchar("employee_id").notNull(),
 	baseSalary: real("base_salary").default(0).notNull(),
 	overtime: real().default(0).notNull(),
+	tipAmount: real("tip_amount").default(0).notNull(),
 	bonuses: real().default(0).notNull(),
 	penalties: real().default(0).notNull(),
 	loanDeductions: real("loan_deductions").default(0).notNull(),

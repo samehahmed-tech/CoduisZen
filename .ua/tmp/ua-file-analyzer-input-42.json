@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/client-ops/Fix-Print-Bridge-Claim-Unassigned.bat",
+      "language": "batch",
+      "sizeLines": 26,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/client-ops/README_AR.md",
+      "language": "markdown",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/client-ops/Restart-RestoFlow.bat",
+      "language": "batch",
+      "sizeLines": 11,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/client-ops/Fix-Print-Bridge-Claim-Unassigned.bat": [],
+    "scripts/client-ops/README_AR.md": [],
+    "scripts/client-ops/Restart-RestoFlow.bat": []
+  }
+}

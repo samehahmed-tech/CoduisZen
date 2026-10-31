@@ -6,6 +6,7 @@ import { postProductionCompletionEntry } from '../services/financePostingService
 import { inventoryService } from '../services/inventoryService';
 import { getStringParam } from '../utils/request';
 import { convertQuantity } from '../services/unitConversion';
+import { createSignedAuditLog } from '../services/auditService';
 
 const ensureProductionTables = async () => {
     await db.execute(sql`
@@ -17,6 +18,7 @@ const ensureProductionTables = async () => {
             recipe_id nvarchar(max),
             batch_number nvarchar(max) NOT NULL,
             batch_size real DEFAULT 1 NOT NULL,
+            quantity real DEFAULT 1 NOT NULL,
             expected_yield real NOT NULL,
             actual_yield real,
             status nvarchar(max) DEFAULT 'PLANNED' NOT NULL,
@@ -41,12 +43,16 @@ const ensureProductionTables = async () => {
         )
     `);
     await db.execute(sql`
+        IF COL_LENGTH('dbo.production_orders', 'quantity') IS NULL
+        BEGIN
+            ALTER TABLE dbo.production_orders ADD quantity real NULL;
+        END
         IF COL_LENGTH('dbo.production_orders', 'quantity') IS NOT NULL
         BEGIN
             UPDATE dbo.production_orders
             SET quantity = COALESCE(quantity, expected_yield, batch_size, 1)
             WHERE quantity IS NULL;
-            ALTER TABLE dbo.production_orders ALTER COLUMN quantity real NULL;
+            ALTER TABLE dbo.production_orders ALTER COLUMN quantity real NOT NULL;
         END
     `);
     await db.execute(sql`
@@ -204,6 +210,7 @@ export const createProductionOrder = async (req: Request, res: Response) => {
                 recipeId: linkedRecipe?.id,
                 batchNumber: `B-${Date.now()}`,
                 batchSize: 1, 
+                quantity: qty,
                 expectedYield: qty,
                 status: 'PLANNED', // Mapped to PENDING in UI
                 warehouseId: warehouse.id,
@@ -212,6 +219,18 @@ export const createProductionOrder = async (req: Request, res: Response) => {
             });
 
             await tx.insert(productionOrderItems).values(productionIngredients);
+        });
+
+        await createSignedAuditLog({
+            eventType: 'PRODUCTION_ORDER_CREATED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: warehouse.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { productionOrderId: poId, targetItemId, warehouseId: warehouse.id, quantityRequested: qty, ingredientCount: productionIngredients.length },
+            after: { status: 'PLANNED', expectedYield: qty },
+            reason: 'Production order created',
         });
 
         res.status(201).json({
@@ -265,6 +284,19 @@ export const startProductionOrder = async (req: Request, res: Response) => {
             await tx.update(productionOrders)
                 .set({ status: 'IN_PROGRESS', startedAt: new Date(), updatedAt: new Date() })
                 .where(eq(productionOrders.id, id));
+        });
+
+        await createSignedAuditLog({
+            eventType: 'PRODUCTION_ORDER_STARTED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { productionOrderId: id, warehouseId: order.warehouseId, ingredientCount: items.length },
+            before: { status: order.status },
+            after: { status: 'IN_PROGRESS' },
+            reason: 'Production order started',
         });
 
         res.json({ id, status: 'IN_PROGRESS' });
@@ -433,6 +465,19 @@ export const completeProductionOrder = async (req: Request, res: Response) => {
             userId: actorId,
         });
 
+        await createSignedAuditLog({
+            eventType: 'PRODUCTION_ORDER_COMPLETED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { productionOrderId: id, targetItemId: order.targetItemId, warehouseId: order.warehouseId, financeStatus: finance?.status || 'skipped' },
+            before: { status: order.status },
+            after: { status: 'COMPLETED', actualYield: quantityProduced, consumedCost: totalConsumedCost },
+            reason: 'Production order completed',
+        });
+
         res.json({ id, status: 'COMPLETED', financeStatus: finance?.status || 'skipped' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -495,6 +540,18 @@ export const cancelProductionOrder = async (req: Request, res: Response) => {
         }
         
         await db.update(productionOrders).set({ status: 'CANCELLED', updatedAt: new Date() }).where(eq(productionOrders.id, id));
+        await createSignedAuditLog({
+            eventType: 'PRODUCTION_ORDER_CANCELLED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { productionOrderId: id, warehouseId: order.warehouseId },
+            before: { status: order.status },
+            after: { status: 'CANCELLED' },
+            reason: 'Production order cancelled',
+        });
         res.json({ id, status: 'CANCELLED' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

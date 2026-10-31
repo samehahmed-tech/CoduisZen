@@ -4,6 +4,7 @@ import { db } from '../db';
 import { branches, settings } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { upsertSetting, parseSettingJson } from '../utils/settingsStore';
+import { createSignedAuditLog } from '../services/auditService';
 
 const readSetting = async <T>(key: string, fallback: T): Promise<T> => {
     const [row] = await db.select().top(1).from(settings).where(eq(settings.key, key));
@@ -14,6 +15,18 @@ const deploymentKey = (siteId: string) => `deployment.site.${siteId}`;
 const secretKey = (siteId: string) => `deployment.secret.${siteId}`;
 const commandKey = (siteId: string) => `deployment.commands.${siteId}`;
 const updateReleaseKey = 'deployment.updateRelease';
+
+const auditDeploymentMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Deployment mutation: ${eventType}`,
+});
 
 export const getConfig = async (_req: Request, res: Response) => {
     const mode = await readSetting('deployment.mode', process.env.SITE_MODE || 'CENTRAL');
@@ -58,13 +71,15 @@ export const updateRelease = async (req: Request, res: Response) => {
         publishedBy: req.user?.id || 'system',
     };
     await upsertSetting({ key: updateReleaseKey, value: release, category: 'deployment', updatedBy: req.user?.id || 'system' });
+    await auditDeploymentMutation(req, 'DEPLOYMENT_RELEASE_UPDATED', { version, sha256, enabled, setupUrlHost: new URL(setupUrl).hostname }, { published: true });
     res.json(release);
 };
 
-export const issuePairingToken = async (_req: Request, res: Response) => {
+export const issuePairingToken = async (req: Request, res: Response) => {
     const token = crypto.randomBytes(24).toString('base64url');
     await upsertSetting({ key: 'deployment.mode', value: 'CENTRAL', category: 'deployment' });
     await upsertSetting({ key: 'deployment.pairingToken', value: token, category: 'deployment' });
+    await auditDeploymentMutation(req, 'DEPLOYMENT_PAIRING_TOKEN_ISSUED', { expires: 'one-time until replaced' }, { issued: true });
     res.json({ token, expiresIn: 'one-time until replaced' });
 };
 
@@ -102,6 +117,7 @@ export const registerBranch = async (req: Request, res: Response) => {
     // Pairing tokens are intentionally one-time. The central admin can issue a new one.
     await upsertSetting({ key: 'deployment.pairingToken', value: '', category: 'deployment' });
     const [registered] = await db.select().top(1).from(branches).where(eq(branches.id, branchId));
+    await auditDeploymentMutation(req, 'DEPLOYMENT_BRANCH_REGISTERED', { siteId, branchId, existing: Boolean(existing) }, { registered: true });
     res.status(existing ? 200 : 201).json({ success: true, branch: registered, siteId, branchId, siteToken: newSiteToken, mode: 'BRANCH' });
 };
 
@@ -114,6 +130,7 @@ export const heartbeat = async (req: Request, res: Response) => {
     if (!expectedToken || String(req.body?.siteToken || req.headers['x-site-token'] || '') !== expectedToken) return res.status(403).json({ error: 'INVALID_SITE_TOKEN' });
     const release = await readSetting<any>(updateReleaseKey, null);
     await upsertSetting({ key: `deployment.heartbeat.${siteId}`, value: { siteId, branchId, at: new Date().toISOString(), ip: req.ip, version: req.body?.version || null }, category: 'deployment' });
+    await auditDeploymentMutation(req, 'DEPLOYMENT_HEARTBEAT_RECEIVED', { siteId, branchId, version: req.body?.version || null }, { healthy: true });
     res.json({ ok: true, siteId, branchId, at: new Date().toISOString(), update: release?.enabled !== false ? release : null });
 };
 
@@ -140,6 +157,7 @@ export const queueCommand = async (req: Request, res: Response) => {
         await upsertSetting({ key: commandKey(siteId), value: [...current, command].slice(-500), category: 'deployment' });
         commands.push(command);
     }
+    await auditDeploymentMutation(req, 'DEPLOYMENT_COMMANDS_QUEUED', { targetCount: targets.length, entity, action, payloadKeys: Object.keys(body.payload || {}).sort() }, { queued: commands.length });
     res.status(201).json({ success: true, commands });
 };
 
@@ -159,5 +177,6 @@ export const acknowledgeCommand = async (req: Request, res: Response) => {
     if (!siteId || !expectedToken || siteToken !== expectedToken) return res.status(403).json({ error: 'INVALID_SITE_CREDENTIALS' });
     const current = await readSetting<any[]>(commandKey(siteId), []);
     await upsertSetting({ key: commandKey(siteId), value: current.filter(command => command.id !== commandId), category: 'deployment' });
+    await auditDeploymentMutation(req, 'DEPLOYMENT_COMMAND_ACKNOWLEDGED', { siteId, commandId }, { acknowledged: true });
     res.json({ success: true });
 };

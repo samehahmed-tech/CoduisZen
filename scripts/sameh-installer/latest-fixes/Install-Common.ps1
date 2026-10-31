@@ -279,6 +279,25 @@ function Test-CEnvLaunchGate([hashtable]$Map) {
     if (-not $screen -or $screen.Length -lt 32) { $issues += @{ key = 'PUBLIC_SCREEN_TOKEN'; ok = $false; issue = 'missing or short (production gate needs 32+ chars) — server exits instantly without it' } }
     $gw = & $get 'PRINT_GATEWAY_TOKEN'
     if (-not $gw -or $gw.Length -lt 32) { $issues += @{ key = 'PRINT_GATEWAY_TOKEN'; ok = $false; issue = 'missing or short (production gate needs 32+ chars) — server exits instantly without it' } }
+    # Keep this installer gate aligned with scripts/validate-env.ts. Existing
+    # installations may have an older .env that predates these secrets.
+    foreach ($key in @('PIN_LOOKUP_SECRET', 'TRACK_TOKEN_SECRET', 'PUBLIC_QR_SECRET', 'PAYMENT_TOKEN_SECRET')) {
+        $value = & $get $key
+        if (-not $value -or $value.Length -lt 32) {
+            $issues += @{ key = $key; ok = $false; issue = 'missing or short (production gate needs 32+ chars)' }
+        }
+    }
+    $master = & $get 'CODUIS_MASTER_KEY'
+    if (-not $master) { $master = & $get 'DEALER_SETUP_KEY' }
+    if (-not $master -or $master.Length -lt 32) {
+        $issues += @{ key = 'CODUIS_MASTER_KEY'; ok = $false; issue = 'missing or short (production setup key needs 32+ chars)' }
+    }
+    foreach ($key in @('ADMS_WEBHOOK_SECRET', 'ATTENDANCE_BRIDGE_TOKEN')) {
+        $value = & $get $key
+        if (-not $value -or $value.Length -lt 32) {
+            $issues += @{ key = $key; ok = $false; issue = 'missing or short (production gate needs 32+ chars)' }
+        }
+    }
     return $issues
 }
 
@@ -342,13 +361,37 @@ function Repair-CServerEnv([string]$EnvPath, [string]$BridgeEnvPath = '') {
         Set-CEnvValue $parsed 'PUBLIC_SCREEN_TOKEN' (New-CHexSecret 32)
         $actions += 'PUBLIC_SCREEN_TOKEN generated (KDS screens may need the new link)'
     }
+    foreach ($key in @('PIN_LOOKUP_SECRET', 'TRACK_TOKEN_SECRET', 'PUBLIC_QR_SECRET', 'PAYMENT_TOKEN_SECRET')) {
+        if ($need.ContainsKey($key)) {
+            Set-CEnvValue $parsed $key (New-CBase64UrlSecret 48)
+            $actions += "$key generated"
+        }
+    }
+    if ($need.ContainsKey('CODUIS_MASTER_KEY')) {
+        $dealerKey = ([string]$parsed.Map['DEALER_SETUP_KEY']).Trim()
+        if ($dealerKey -and $dealerKey.Length -ge 32) {
+            Set-CEnvValue $parsed 'CODUIS_MASTER_KEY' $dealerKey
+            $actions += 'CODUIS_MASTER_KEY adopted from existing DEALER_SETUP_KEY'
+        } else {
+            Set-CEnvValue $parsed 'CODUIS_MASTER_KEY' (New-CBase64UrlSecret 48)
+            $actions += 'CODUIS_MASTER_KEY generated'
+        }
+    }
+    foreach ($key in @('ADMS_WEBHOOK_SECRET', 'ATTENDANCE_BRIDGE_TOKEN')) {
+        if ($need.ContainsKey($key)) {
+            Set-CEnvValue $parsed $key (New-CBase64UrlSecret 48)
+            $actions += "$key generated"
+        }
+    }
     if ($need.ContainsKey('CORS_ORIGINS')) {
-        Set-CEnvValue $parsed 'CORS_ORIGINS' 'http://localhost:3001,http://127.0.0.1:3001'
-        $actions += 'CORS_ORIGINS set to local default (was missing/wildcard)'
+        $configuredPort = 3001
+        $candidatePort = 0
+        if ([int]::TryParse(([string]$parsed.Map['API_PORT']).Trim(), [ref]$candidatePort) -and $candidatePort -ge 1 -and $candidatePort -le 65535) { $configuredPort = $candidatePort }
+        Set-CEnvValue $parsed 'CORS_ORIGINS' "http://localhost:$configuredPort,http://127.0.0.1:$configuredPort"
+        $actions += "CORS_ORIGINS set to local API port $configuredPort (was missing/wildcard)"
     }
     Write-CEnvFile $EnvPath $parsed
-    $verify = @(Test-CEnvLaunchGate (Read-CEnvFile $EnvPath).Map | ForEach-Object { $_.Map })
-    $stillBad = @($verify | Where-Object { $_.key -ne 'DATABASE_URL' })
+    $stillBad = @(Test-CEnvLaunchGate (Read-CEnvFile $EnvPath).Map)
     if ($stillBad.Count -gt 0) { throw "env heal incomplete: $(($stillBad | ForEach-Object { "$($_.key): $($_.issue)" }) -join '; ')" }
     return $actions
 }
@@ -415,12 +458,24 @@ function Test-CServerBundleBoot([string]$NodeExe, [string]$BundlePath, [string]$
     return @{ ok = ($listening -and $crashedAt -eq 0); detail = $detail; logTail = $tail }
 }
 
-function Wait-CServerHealthy([int]$Seconds = 90) {
+function Get-CConfiguredPort([string]$EnvPath = '') {
+    $port = 3001
+    if ($EnvPath -and (Test-Path -LiteralPath $EnvPath)) {
+        $parsed = Read-CEnvFile $EnvPath
+        $candidate = 0
+        if ([int]::TryParse(([string]$parsed.Map['API_PORT']).Trim(), [ref]$candidate) -and $candidate -ge 1 -and $candidate -le 65535) {
+            $port = $candidate
+        }
+    }
+    return $port
+}
+
+function Wait-CServerHealthy([int]$Seconds = 90, [int]$Port = 3001) {
     $last = 'no attempt yet'
     for ($attempt = 0; $attempt -lt $Seconds; $attempt += 2) {
         Start-Sleep -Seconds 2
         try {
-            $health = Invoke-RestMethod 'http://127.0.0.1:3001/api/health' -TimeoutSec 3
+            $health = Invoke-RestMethod "http://127.0.0.1:$Port/api/health" -TimeoutSec 3
             $dbStatus = $health.health.services.database.status
             if ($dbStatus -eq 'CONNECTED') { return @{ ok = $true; detail = 'database CONNECTED' } }
             $last = "HTTP ok but database.status='$dbStatus'"
@@ -431,10 +486,10 @@ function Wait-CServerHealthy([int]$Seconds = 90) {
     return @{ ok = $false; detail = $last }
 }
 
-function Wait-CBridgeHealthy([int]$Seconds = 60) {
+function Wait-CBridgeHealthy([int]$Seconds = 60, [int]$ServerPort = 3001) {
     for ($attempt = 0; $attempt -lt $Seconds; $attempt += 2) {
         try {
-            $r = Invoke-WebRequest 'http://127.0.0.1:3002/health' -Headers @{ Origin = 'http://localhost:3001' } -UseBasicParsing -TimeoutSec 3
+            $r = Invoke-WebRequest 'http://127.0.0.1:3002/health' -Headers @{ Origin = "http://localhost:$ServerPort" } -UseBasicParsing -TimeoutSec 3
             if ($r.StatusCode -eq 200) { return @{ ok = $true; detail = 'bridge ok' } }
         } catch { }
         Start-Sleep -Seconds 2

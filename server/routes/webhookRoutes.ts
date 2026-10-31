@@ -6,8 +6,11 @@ import {
     deleteWebhook,
     getWebhookDeliveries,
 } from '../controllers/webhookController';
+import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
+
+router.use(enforceBranch);
 
 router.get('/', getWebhooks);
 router.post('/', createWebhook);

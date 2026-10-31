@@ -104,6 +104,7 @@ export const loaders = {
     OrdersCenter: () => import('./components/OrdersCenter'),
     SelfOrderingKiosk: () => import('./components/kiosk/SelfOrderingKiosk'),
     TrackOrder: () => import('./components/TrackOrder'),
+    CustomerDisplay: () => import('./components/CustomerDisplay'),
     ReservationsHub: () => import('./components/ReservationsHub'),
     ComplaintsInbox: () => import('./components/ComplaintsInbox'),
     InteractionShowcase: () => import('./components/InteractionShowcase'),
@@ -120,6 +121,9 @@ export const loaders = {
     HRUserGuide: () => import('./src/features/hr/components/HRUserGuide'),
     DriverDashboard: () => import('./src/features/driver/DriverDashboard'),
     ThemeLab: () => import('./components/ThemeLab'),
+    OfflineConflictCenter: () => import('./components/OfflineConflictCenter'),
+    PublicStatusPage: () => import('./components/PublicStatusPage'),
+    PublicQrMenu: () => import('./components/PublicQrMenu'),
 };
 
 // Lazy load components using exported loaders
@@ -186,11 +190,15 @@ const HRSettingsManager = lazyRoute(loaders.HRSettingsManager);
 const HRUserGuide = lazyRoute(loaders.HRUserGuide);
 const SelfOrderingKiosk = lazyRoute(loaders.SelfOrderingKiosk);
 const TrackOrder = lazyRoute(loaders.TrackOrder);
+const CustomerDisplay = lazyRoute(loaders.CustomerDisplay);
 const ReservationsHub = lazyRoute(loaders.ReservationsHub);
 const ComplaintsInbox = lazyRoute(loaders.ComplaintsInbox);
 const InteractionShowcase = lazyRoute(loaders.InteractionShowcase);
 const DriverDashboard = lazyRoute(loaders.DriverDashboard);
 const ThemeLab = lazyRoute(loaders.ThemeLab);
+const OfflineConflictCenter = lazyRoute(loaders.OfflineConflictCenter);
+const PublicStatusPage = lazyRoute(loaders.PublicStatusPage);
+const PublicQrMenu = lazyRoute(loaders.PublicQrMenu);
 
 import PageSkeleton from './components/common/PageSkeleton';
 
@@ -289,6 +297,7 @@ export const router = createBrowserRouter([
             { path: 'people', element: <Navigate to="/user-management" replace /> },
             { path: 'fiscal', element: withPermission(AppPermission.NAV_FISCAL, withSafe(FiscalHub)) },
             { path: 'day-close', element: withPermission(AppPermission.OP_CLOSE_DAY, withSafe(DayCloseHub)) },
+            { path: 'offline-conflicts', element: withPermission(AppPermission.CFG_OFFLINE_MODE, withSafe(OfflineConflictCenter)) },
             { path: 'franchise', element: withPermission(AppPermission.NAV_FRANCHISE, withSafe(FranchiseManager)) },
             { path: 'refunds', element: withPermission(AppPermission.NAV_REFUNDS, withSafe(RefundManager)) },
             { path: 'wastage', element: withPermission(AppPermission.NAV_WASTAGE, withSafe(WastageManager)) },
@@ -343,12 +352,43 @@ export const router = createBrowserRouter([
         ),
     },
     {
-        // Public customer order tracking (no login â€” link-only token = order id)
+        path: '/status',
+        element: (
+            <ErrorBoundary>
+                <Suspense fallback={<Loading />}>
+                    <PublicStatusPage />
+                </Suspense>
+            </ErrorBoundary>
+        ),
+    },
+    {
+        path: '/qr/:branchId/:tableId',
+        element: (
+            <ErrorBoundary>
+                <Suspense fallback={<Loading />}>
+                    <PublicQrMenu />
+                </Suspense>
+            </ErrorBoundary>
+        ),
+    },
+    {
+        // Public customer order tracking
         path: '/t/:id',
         element: (
             <ErrorBoundary>
                 <Suspense fallback={<Loading />}>
                     <TrackOrder />
+                </Suspense>
+            </ErrorBoundary>
+        ),
+    },
+    {
+        // Public branch-scoped pickup board; screen key is passed in the URL/header.
+        path: '/customer-display',
+        element: (
+            <ErrorBoundary>
+                <Suspense fallback={<Loading />}>
+                    <CustomerDisplay />
                 </Suspense>
             </ErrorBoundary>
         ),

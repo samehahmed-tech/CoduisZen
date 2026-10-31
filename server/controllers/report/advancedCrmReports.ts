@@ -1,8 +1,97 @@
 import { Request, Response } from 'express';
 import { eq, and, sql, gte, lte, inArray, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, customers, campaigns } from '../../../src/db/schema';
+import { orders, customers, campaigns, customerRfmMetrics } from '../../../src/db/schema';
 import { parseLocalDateRange } from './reportUtils';
+import { analyticsService } from '../../services/analyticsService';
+import { createSignedAuditLog } from '../../services/auditService';
+
+export const refreshCustomerRfm = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId) : undefined);
+        const limit = Math.min(Math.max(Number(req.body?.limit ?? req.query.limit) || 250, 1), 1000);
+        const conditions: any[] = [
+            inArray(orders.status, ['COMPLETED', 'DELIVERED']),
+            sql`${orders.customerId} IS NOT NULL`,
+        ];
+        if (branchId) conditions.push(eq(orders.branchId, branchId));
+
+        const candidates = await db.select({ customerId: orders.customerId })
+            .from(orders)
+            .where(and(...conditions))
+            .groupBy(orders.customerId)
+            .orderBy(desc(sql`MAX(${orders.createdAt})`))
+            .offset(0).fetch(limit);
+
+        let refreshed = 0;
+        let failed = 0;
+        for (const candidate of candidates) {
+            if (!candidate.customerId) continue;
+            if (await analyticsService.updateCustomerRfm(candidate.customerId, branchId)) refreshed += 1;
+            else failed += 1;
+        }
+
+        await createSignedAuditLog({
+            eventType: 'CUSTOMER_RFM_REFRESHED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId || branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { branchId: branchId || null, requested: limit, selected: candidates.length, refreshed, failed },
+            after: { selected: candidates.length, refreshed, failed },
+            reason: 'Customer RFM metrics manually refreshed',
+        });
+
+        return res.json({ ok: failed === 0, branchId: branchId || null, requested: limit, selected: candidates.length, refreshed, failed });
+    } catch (error: any) {
+        return res.status(400).json({ error: 'CUSTOMER_RFM_REFRESH_FAILED', message: error?.message });
+    }
+};
+
+export const getCustomerRfm = async (req: Request, res: Response) => {
+    try {
+        const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
+        const conditions: any[] = [];
+        const branchId = req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId) : undefined);
+        if (branchId) conditions.push(eq(customerRfmMetrics.branchId, branchId));
+        const rows = await db.select({
+            id: customerRfmMetrics.id,
+            customerId: customerRfmMetrics.customerId,
+            customerName: customers.name,
+            branchId: customerRfmMetrics.branchId,
+            recency: customerRfmMetrics.recency,
+            frequency: customerRfmMetrics.frequency,
+            monetary: customerRfmMetrics.monetary,
+            recencyScore: customerRfmMetrics.recencyScore,
+            frequencyScore: customerRfmMetrics.frequencyScore,
+            monetaryScore: customerRfmMetrics.monetaryScore,
+            segment: customerRfmMetrics.rfmSegment,
+            lastOrderDate: customerRfmMetrics.lastOrderDate,
+            updatedAt: customerRfmMetrics.updatedAt,
+        }).from(customerRfmMetrics)
+            .innerJoin(customers, eq(customerRfmMetrics.customerId, customers.id))
+            .where(conditions.length ? and(...conditions) : undefined)
+            .orderBy(desc(customerRfmMetrics.updatedAt)).offset(0).fetch(Math.min(limit * 5, 5000));
+
+        const latestByCustomer = new Map<string, typeof rows[number]>();
+        for (const row of rows) {
+            if (!latestByCustomer.has(row.customerId)) latestByCustomer.set(row.customerId, row);
+        }
+        const data = [...latestByCustomer.values()].slice(0, limit);
+        return res.json({
+            branchId: branchId || null,
+            data,
+            segments: data.reduce<Record<string, number>>((acc, row) => {
+                const segment = String(row.segment || 'UNSEGMENTED');
+                acc[segment] = (acc[segment] || 0) + 1;
+                return acc;
+            }, {}),
+        });
+    } catch (error: any) {
+        return res.status(400).json({ error: 'CUSTOMER_RFM_REPORT_FAILED', message: error?.message });
+    }
+};
 
 export const getCustomerRetention = async (req: Request, res: Response) => {
     try {

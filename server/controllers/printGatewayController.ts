@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { markBridgePoll, registerBridge, getBridgeRegistry } from '../services/printerBridgeService.js';
+import { markBridgePoll, registerBridge, getBridgeRegistry, validateGatewayBranch } from '../services/printerBridgeService.js';
 import {
     enqueuePrintJob,
     completePrintJob,
@@ -11,13 +11,15 @@ import {
     getPrintQueueStats,
     claimNextPrintJob,
 } from '../services/printQueueService.js';
+import { createSignedAuditLog } from '../services/auditService';
 
 const resolveBranchScope = (req: Request): string | null => {
     const requested = String(req.body?.branchId || req.query?.branchId || '').trim();
+    if (req.effectiveBranchId) return req.effectiveBranchId;
     if (req.user?.role === 'SUPER_ADMIN') {
         return requested || req.user?.branchId || null;
     }
-    return req.user?.branchId || requested || null;
+    return req.user?.branchId || null;
 };
 
 export const enqueueJob = async (req: Request, res: Response) => {
@@ -43,6 +45,7 @@ export const enqueueJob = async (req: Request, res: Response) => {
             createdBy: req.user?.id || null,
         });
 
+        await auditPrintMutation(req, 'PRINT_JOB_ENQUEUED', branchId, { jobId: result.id, type, contentType, contentLength: content.length, pushed: result.pushed }, { status: 'QUEUED' });
         return res.status(201).json({ ok: true, jobId: result.id, pushed: result.pushed });
     } catch (error: any) {
         console.error('[printGateway] enqueueJob error:', error?.stack || error?.message || error);
@@ -56,8 +59,11 @@ export const completeJob = async (req: Request, res: Response) => {
         const gatewayId = String(req.body?.gatewayId || req.headers['x-gateway-id'] || '').trim();
         const branchId = String(req.body?.branchId || req.query?.branchId || req.headers['x-branch-id'] || '').trim();
         if (!jobId) return res.status(400).json({ error: 'JOB_ID_REQUIRED' });
+        if (!gatewayId || !branchId) return res.status(400).json({ error: 'GATEWAY_AND_BRANCH_REQUIRED' });
+        if (branchId && !(await validateGatewayBranch(gatewayId, branchId))) return res.status(403).json({ error: 'GATEWAY_BRANCH_MISMATCH' });
         const job = await completePrintJob(jobId, gatewayId, branchId);
         if (!job) return res.status(404).json({ error: 'JOB_NOT_FOUND' });
+        await auditPrintMutation(req, 'PRINT_JOB_COMPLETED', branchId, { jobId, gatewayId }, { status: 'COMPLETED' });
         return res.json({ ok: true, job });
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'PRINT_JOB_COMPLETE_FAILED' });
@@ -71,8 +77,11 @@ export const failJob = async (req: Request, res: Response) => {
         const gatewayId = String(req.body?.gatewayId || req.headers['x-gateway-id'] || '').trim();
         const branchId = String(req.body?.branchId || req.query?.branchId || req.headers['x-branch-id'] || '').trim();
         if (!jobId) return res.status(400).json({ error: 'JOB_ID_REQUIRED' });
+        if (!gatewayId || !branchId) return res.status(400).json({ error: 'GATEWAY_AND_BRANCH_REQUIRED' });
+        if (branchId && !(await validateGatewayBranch(gatewayId, branchId))) return res.status(403).json({ error: 'GATEWAY_BRANCH_MISMATCH' });
         const job = await failPrintJob(jobId, message, gatewayId, branchId);
         if (!job) return res.status(404).json({ error: 'JOB_NOT_FOUND' });
+        await auditPrintMutation(req, 'PRINT_JOB_FAILED', branchId, { jobId, gatewayId }, { status: 'FAILED' });
         return res.json({ ok: true, job });
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'PRINT_JOB_FAIL_FAILED' });
@@ -102,6 +111,7 @@ export const claimBridgeJob = async (req: Request, res: Response) => {
         const claimUnassigned = String(req.query?.claimUnassigned || '').toLowerCase() === 'true';
         const globalClaim = String(req.query?.global || '').toLowerCase() === 'true' || !branchId;
         if (!gatewayId) return res.status(400).json({ error: 'GATEWAY_ID_REQUIRED' });
+        if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         // Capability list: Windows printer names visible to this bridge —
         // enables printer-aware job claiming (USB jobs go to the owning machine).
         const printers = String(req.query?.printers || '')
@@ -111,16 +121,19 @@ export const claimBridgeJob = async (req: Request, res: Response) => {
             .slice(0, 100);
         await markBridgePoll(gatewayId, branchId || undefined, printers);
         const job = await claimNextPrintJob({ branchId: branchId || undefined, gatewayId, claimUnassigned, globalClaim, printers });
+        await auditPrintMutation(req, 'PRINT_JOB_CLAIMED', branchId, { gatewayId, claimed: Boolean(job), capabilityCount: printers.length }, { claimed: Boolean(job) });
         return res.json({ ok: true, jobs: job ? [job] : [] });
     } catch (error: any) {
-        return res.status(500).json({ error: error.message || 'PRINT_JOB_CLAIM_FAILED' });
+        const status = error?.message === 'GATEWAY_BRANCH_MISMATCH' ? 403 : 500;
+        return res.status(status).json({ error: error.message || 'PRINT_JOB_CLAIM_FAILED' });
     }
 };
 
 /** Registry for the Printers UI: which gateways are online and what they can print. */
 export const getBridges = async (req: Request, res: Response) => {
     try {
-        const registry = await getBridgeRegistry();
+        const branchId = req.effectiveBranchId || (req.user?.role === 'SUPER_ADMIN' ? undefined : req.user?.branchId);
+        const registry = await getBridgeRegistry(branchId);
         return res.json(registry);
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'BRIDGE_REGISTRY_FAILED' });
@@ -135,6 +148,7 @@ export const retryJob = async (req: Request, res: Response) => {
         if (!jobId) return res.status(400).json({ error: 'JOB_ID_REQUIRED' });
         const job = await retryPrintJob(jobId, branchId);
         if (!job) return res.status(404).json({ error: 'FAILED_JOB_NOT_FOUND' });
+        await auditPrintMutation(req, 'PRINT_JOB_RETRIED', branchId, { jobId }, { status: 'QUEUED' });
         return res.json({ ok: true, job });
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'PRINT_JOB_RETRY_FAILED' });
@@ -146,6 +160,7 @@ export const purgeJobs = async (req: Request, res: Response) => {
         const branchId = resolveBranchScope(req);
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         const count = await purgePrintJobs(branchId);
+        await auditPrintMutation(req, 'PRINT_JOBS_PURGED', branchId, { count }, { purged: true });
         return res.json({ ok: true, purged: count });
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'PRINT_JOB_PURGE_FAILED' });
@@ -160,6 +175,7 @@ export const cancelJob = async (req: Request, res: Response) => {
         if (!jobId) return res.status(400).json({ error: 'JOB_ID_REQUIRED' });
         const job = await cancelPrintJob(jobId, branchId);
         if (!job) return res.status(404).json({ error: 'JOB_NOT_FOUND_OR_PROCESSING' });
+        await auditPrintMutation(req, 'PRINT_JOB_CANCELLED', branchId, { jobId }, { status: 'CANCELLED' });
         return res.json({ ok: true, job });
     } catch (error: any) {
         return res.status(500).json({ error: error.message || 'PRINT_JOB_CANCEL_FAILED' });
@@ -171,8 +187,22 @@ export const bridgeConnect = async (req: Request, res: Response) => {
     const gatewayId = String(req.query?.gatewayId || req.headers['x-gateway-id'] || '').trim();
     const branchId = String(req.query?.branchId || req.headers['x-branch-id'] || '').trim();
     if (!gatewayId) return res.status(400).json({ error: 'GATEWAY_ID_REQUIRED' });
+    if (branchId && !(await validateGatewayBranch(gatewayId, branchId))) return res.status(403).json({ error: 'GATEWAY_BRANCH_MISMATCH' });
     // A cashier bridge may not know its branch during bootstrap. It can still
     // receive jobs targeted to its gateway; branch-scoped polling remains the
     // fallback for unassigned jobs.
     registerBridge(gatewayId, branchId || '*', res);
+    await auditPrintMutation(req, 'PRINT_BRIDGE_CONNECTED', branchId || null, { gatewayId, branchScoped: Boolean(branchId) }, { connected: true });
 };
+
+const auditPrintMutation = (req: Request, eventType: string, branchId: string | null, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: branchId || req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Print gateway mutation: ${eventType}`,
+});

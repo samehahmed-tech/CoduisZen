@@ -1,27 +1,27 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   SIDEBAR — FIXED THEME RAIL
+﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SIDEBAR â€” FIXED THEME RAIL
    A structural, edge-to-edge rail. Visual personality belongs to the active
    theme; the layout itself stays stable and predictable in every mode.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ── Design Tokens ── */
+/* â”€â”€ Design Tokens â”€â”€ */
 :root {
-    --rail-w-collapsed: clamp(52px, 4.2vw, 60px);
+    --rail-w-collapsed: clamp(64px, 5vw, 72px);
     --rail-w-expanded: clamp(248px, 19vw, 288px);
     --rail-margin: 0px;
     --rail-radius: 0px;
-    --rail-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --rail-ease: cubic-bezier(0.16, 1, 0.3, 1);
     --rail-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --rail-duration: 260ms;
+    --rail-duration: 340ms;
     --rail-item-radius: 13px;
     --rail-blur: 28px;
     --rail-glow-primary: rgba(var(--primary), 0.08);
     --rail-glow-accent: rgba(var(--accent), 0.05);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   RAIL CONTAINER — Floating Island
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   RAIL CONTAINER â€” Floating Island
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .workspace-rail {
     position: fixed !important;
@@ -36,7 +36,7 @@
     overflow: hidden;
     isolation: isolate;
 
-    /* Frosted Glass — enhanced for iOS 18 */
+    /* Frosted Glass â€” enhanced for iOS 18 */
     background:
         linear-gradient(180deg,
             rgba(var(--bg-sidebar), 0.78) 0%,
@@ -45,10 +45,10 @@
     backdrop-filter: blur(var(--rail-blur)) saturate(1.8) !important;
     -webkit-backdrop-filter: blur(var(--rail-blur)) saturate(1.8) !important;
 
-    /* Border — subtle inner glow effect */
+    /* Border â€” subtle inner glow effect */
     border: 1px solid rgba(var(--border-color), 0.06) !important;
 
-    /* Shadow stack — depth + colored ambient glow */
+    /* Shadow stack â€” depth + colored ambient glow */
     box-shadow:
         0 0 0 1px rgba(var(--border-color), 0.03),
         0 4px 16px rgba(0, 0, 0, 0.04),
@@ -68,7 +68,7 @@
     transform: translateZ(0);
 }
 
-/* Animated ambient gradient — iOS Dynamic Island style */
+/* Animated ambient gradient â€” iOS Dynamic Island style */
 .workspace-rail::before {
     content: '';
     position: absolute;
@@ -114,7 +114,7 @@
     mix-blend-mode: overlay;
 }
 
-/* ── Dark mode enhancements — deeper, richer ── */
+/* â”€â”€ Dark mode enhancements â€” deeper, richer â”€â”€ */
 .dark .workspace-rail {
     background:
         linear-gradient(180deg,
@@ -138,67 +138,41 @@
         radial-gradient(ellipse at 50% 60%, rgba(var(--primary), 0.06) 0%, transparent 60%);
 }
 
-/* ── RTL support ── */
+/* â”€â”€ RTL support â”€â”€ */
 [dir='rtl'] .workspace-rail {
     border-right: none;
     border-left: 1px solid rgba(var(--border-color), 0.08);
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SMART HOVER EXPAND — Overlay Mode
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SMART HOVER EXPAND â€” Overlay Mode
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
+/* â”€â”€ Pinned state â”€â”€ */
+.rail-pinned {
+    width: var(--rail-w-expanded);
+}
+/* Expand as a temporary preview while the pointer is inside the rail. */
 @media (min-width: 1024px) {
     .workspace-rail:not(.rail-pinned):hover,
     .workspace-rail:not(.rail-pinned):focus-within {
         width: var(--rail-w-expanded);
-        box-shadow:
-            0 0 0 1px rgba(var(--border-color), 0.06),
-            0 8px 32px rgba(0, 0, 0, 0.08),
-            0 24px 64px rgba(0, 0, 0, 0.06),
-            0 0 80px -10px rgba(var(--primary), 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.06);
         z-index: 60;
     }
-
-    .dark .workspace-rail:not(.rail-pinned):hover,
-    .dark .workspace-rail:not(.rail-pinned):focus-within {
-        box-shadow:
-            0 0 0 1px rgba(var(--border-color), 0.08),
-            0 8px 32px rgba(0, 0, 0, 0.2),
-            0 24px 72px rgba(0, 0, 0, 0.25),
-            0 0 100px -10px rgba(var(--primary), 0.1),
-            inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    }
-
-    [dir='rtl'] .workspace-rail:not(.rail-pinned):hover,
-    [dir='rtl'] .workspace-rail:not(.rail-pinned):focus-within {
-        box-shadow:
-            0 0 0 1px rgba(var(--border-color), 0.06),
-            -8px 0 32px rgba(0, 0, 0, 0.08),
-            -24px 0 64px rgba(0, 0, 0, 0.06),
-            0 0 80px -10px rgba(var(--primary), 0.08),
-            inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    }
-}
-
-/* ── Pinned state ── */
-.rail-pinned {
-    width: var(--rail-w-expanded);
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CONTENT MARGIN OFFSET
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-.workspace-shell>main {
+.workspace-shell:has(> .workspace-rail)>main {
     margin-inline-start: calc(var(--rail-w-collapsed) + var(--rail-margin) * 2);
     transition: margin-inline-start var(--rail-duration) var(--rail-ease);
 }
 
-.workspace-shell:has(.rail-pinned)>main {
+.workspace-shell:has(> .workspace-rail.rail-pinned)>main {
     margin-inline-start: calc(var(--rail-w-expanded) + var(--rail-margin) * 2);
 }
 
@@ -219,25 +193,25 @@
         transform: translateX(110%);
     }
 
-    /* Mobile open state — must override the default translateX */
+    /* Mobile open state â€” must override the default translateX */
     .workspace-rail.rail-mobile-open {
         transform: translateX(0) !important;
         z-index: 80;
     }
 
-    .workspace-shell>main {
+    .workspace-shell:has(> .workspace-rail)>main {
         margin-inline-start: 0;
     }
 
-    .workspace-shell:has(.rail-pinned)>main {
+    .workspace-shell:has(> .workspace-rail.rail-pinned)>main {
         margin-inline-start: 0;
     }
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   INNER ELEMENTS — Fade on expand/collapse
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   INNER ELEMENTS â€” Fade on expand/collapse
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-text-block,
 .sidebar-brand-chip,
@@ -251,18 +225,10 @@
     max-height: 0;
     overflow: hidden;
     white-space: nowrap;
-    transition: opacity 60ms ease, max-height 60ms ease;
+    transition: opacity 160ms ease, max-height 260ms var(--rail-ease);
     pointer-events: none;
 }
 
-.workspace-rail:hover .sidebar-text-block,
-.workspace-rail:hover .sidebar-brand-chip,
-.workspace-rail:hover .sidebar-overview,
-.workspace-rail:hover .sidebar-nav-label,
-.workspace-rail:hover .sidebar-nav-dot,
-.workspace-rail:hover .sidebar-panel,
-.workspace-rail:hover .sidebar-sync-bar,
-.workspace-rail:hover .sidebar-theme-strip,
 .rail-pinned .sidebar-text-block,
 .rail-pinned .sidebar-brand-chip,
 .rail-pinned .sidebar-overview,
@@ -274,13 +240,60 @@
     opacity: 1;
     max-height: 300px;
     pointer-events: auto;
-    transition: opacity 120ms ease 50ms, max-height 150ms ease 30ms;
+    transition: opacity 180ms ease 70ms, max-height 280ms var(--rail-ease);
+}
+
+/* Mobile drawer: opening is explicit, so it must reveal the same readable
+   labels as the pinned desktop rail instead of leaving an icon-only drawer. */
+.rail-mobile-open .sidebar-text-block,
+.rail-mobile-open .sidebar-brand-chip,
+.rail-mobile-open .sidebar-overview,
+.rail-mobile-open .sidebar-nav-label,
+.rail-mobile-open .sidebar-nav-dot,
+.rail-mobile-open .sidebar-panel,
+.rail-mobile-open .sidebar-sync-bar,
+.rail-mobile-open .sidebar-theme-strip {
+    opacity: 1;
+    max-height: 300px;
+    pointer-events: auto;
+    transition: opacity 180ms ease 70ms, max-height 280ms var(--rail-ease);
+}
+
+@media (min-width: 1024px) {
+    .workspace-rail:hover .sidebar-text-block,
+    .workspace-rail.rail-hover-expanded .sidebar-text-block,
+    .workspace-rail:hover .sidebar-brand-chip,
+    .workspace-rail.rail-hover-expanded .sidebar-brand-chip,
+    .workspace-rail:hover .sidebar-overview,
+    .workspace-rail.rail-hover-expanded .sidebar-overview,
+    .workspace-rail:hover .sidebar-nav-label,
+    .workspace-rail.rail-hover-expanded .sidebar-nav-label,
+    .workspace-rail:hover .sidebar-nav-dot,
+    .workspace-rail.rail-hover-expanded .sidebar-nav-dot,
+    .workspace-rail:hover .sidebar-panel,
+    .workspace-rail.rail-hover-expanded .sidebar-panel,
+    .workspace-rail:hover .sidebar-sync-bar,
+    .workspace-rail.rail-hover-expanded .sidebar-sync-bar,
+    .workspace-rail:hover .sidebar-theme-strip {
+        opacity: 1;
+        max-height: 300px;
+        pointer-events: auto;
+        transition: opacity 180ms ease 40ms, max-height 260ms var(--rail-ease);
+    }
+
+    .workspace-rail:hover .sidebar-theme-strip,
+    .workspace-rail:focus-within .sidebar-theme-strip {
+        opacity: 1;
+        max-height: 300px;
+        pointer-events: auto;
+        transition: opacity 180ms ease 40ms, max-height 260ms var(--rail-ease);
+    }
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    HERO / BRAND HEADER
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-hero {
     position: relative;
@@ -288,7 +301,8 @@
     margin: 0.375rem 0.375rem 0.125rem;
     padding: 0.75rem 0.625rem 0.5rem;
     border-radius: calc(var(--rail-radius) - 6px);
-    background: transparent;
+    background: linear-gradient(145deg, rgba(var(--bg-elevated), 0.72), rgba(var(--primary), 0.12));
+    border: 1px solid rgba(var(--primary), 0.2);
 }
 
 .sidebar-hero-top {
@@ -362,9 +376,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   LOGO MARK — Gradient gem with inner glow
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LOGO MARK â€” Gradient gem with inner glow
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-logomark {
     border: 0;
@@ -372,7 +386,7 @@
     width: 100%;
     height: 76px;
     border-radius: 0;
-    /* Frameless: the logo asset is transparent — float it bare, no tile,
+    /* Frameless: the logo asset is transparent â€” float it bare, no tile,
        no border, no sheen. Hover gives the glow. */
     background: transparent;
     display: flex;
@@ -381,7 +395,7 @@
     flex-shrink: 0;
     position: relative;
     overflow: visible;
-    box-shadow: none;
+    box-shadow: 0 8px 20px rgba(var(--primary), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.16);
     transition: transform 0.25s var(--rail-ease-bounce), filter 0.25s ease, width 0.25s ease, height 0.25s ease;
     animation: none;
 }
@@ -423,14 +437,14 @@
 
 .sidebar-logomark:hover {
     transform: scale(1.05);
-    filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.65)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
+    filter: drop-shadow(0 0 18px rgba(var(--primary), 0.5)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
     animation-play-state: paused;
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PIN & COLLAPSE BUTTONS
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-pin-btn {
     width: 24px;
@@ -447,7 +461,7 @@
     opacity: 0;
 }
 
-.workspace-rail:hover .sidebar-pin-btn,
+.sidebar-pin-btn,
 .rail-pinned .sidebar-pin-btn {
     opacity: 1;
 }
@@ -485,9 +499,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SEARCH BUTTON — Frosted pill
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SEARCH BUTTON â€” Frosted pill
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-search-btn {
     display: flex;
@@ -561,17 +575,17 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SECTION TRIGGERS & NAVIGATION STRUCTURE
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-section-label {
-    font-size: 0.6875rem;
-    font-weight: 800;
+    font-size: 0.72rem;
+    font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     line-height: 1.35;
-    color: rgba(var(--text-muted), 0.4);
+    color: rgba(var(--text-muted), 0.62);
     padding: 0.25rem 0.5rem 0.375rem;
 }
 
@@ -590,7 +604,7 @@
     transition: all 0.2s ease;
 }
 
-/* ── Section Icon — Mini badge before section label ── */
+/* â”€â”€ Section Icon â€” Mini badge before section label â”€â”€ */
 .sidebar-section-icon {
     display: inline-flex;
     align-items: center;
@@ -616,7 +630,7 @@
     transform: scale(1.05);
 }
 
-/* ── Scrollable Nav — GPU-accelerated, silky smooth ── */
+/* â”€â”€ Scrollable Nav â€” GPU-accelerated, silky smooth â”€â”€ */
 .sidebar-nav {
     padding-inline: 0.25rem;
     padding-bottom: 0.375rem;
@@ -659,6 +673,8 @@
 
 .sidebar-nav-group {
     position: relative;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Section separator line between groups */
@@ -670,28 +686,63 @@
     background: linear-gradient(90deg, transparent, rgba(var(--border-color), 0.06), transparent);
 }
 
-/* ── Section Trigger — now with icon support ── */
+/* â”€â”€ Section Trigger â€” now with icon support â”€â”€ */
 .sidebar-section-trigger {
-    padding: 0.375rem 0.5rem;
+    position: relative;
+    isolation: isolate;
+    padding: 0.3rem 0.5rem;
     border-radius: 10px;
     transition: all 0.22s ease;
-    font-size: 0.625rem;
-    font-weight: 800;
+    font-size: 0.69rem;
+    font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: rgba(var(--text-main), 0.65);
+    color: rgba(var(--text-main), 0.78);
     border: 1px solid transparent;
 }
 
 .sidebar-section-trigger:hover {
     background: rgba(var(--primary), 0.04);
     border-color: rgba(var(--border-color), 0.04);
-    color: rgba(var(--text-main), 0.9);
+    color: rgb(var(--text-main));
+    font-weight: 900;
+    text-shadow: 0 0 16px rgba(var(--primary), 0.24);
+}
+
+.sidebar-section-trigger::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0.15rem;
+    top: 50%;
+    width: 0.2rem;
+    height: 0;
+    border-radius: 999px;
+    background: rgb(var(--primary));
+    box-shadow: 0 0 0 rgba(var(--primary), 0);
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: height 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
+}
+
+.sidebar-section-trigger:hover::after,
+.sidebar-section-trigger:focus-visible::after,
+.sidebar-section-trigger.has-active-child::after {
+    height: 62%;
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(var(--primary), 0.55);
 }
 
 .sidebar-section-trigger:hover .sidebar-section-count {
     background: rgba(var(--primary), 0.08);
     color: rgba(var(--text-main), 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-section-trigger,
+    .sidebar-section-trigger::after,
+    .sidebar-section-trigger .sidebar-section-count {
+        transition: none;
+    }
 }
 
 /* Active child highlight on section header */
@@ -708,10 +759,14 @@
 
 .sidebar-section-wrap {
     overflow: hidden;
+    width: 100%;
+    min-width: 0;
 }
 
 .sidebar-section-list {
     padding: 0.125rem 0;
+    width: 100%;
+    min-width: 0;
 }
 
 .sidebar-section-divider {
@@ -748,15 +803,15 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   NAV ITEMS — Translucent pill with ambient glow
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   NAV ITEMS â€” Translucent pill with ambient glow
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-nav-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-height: 44px;
+    min-height: 40px;
     padding: 0.45rem 0.55rem;
     border-radius: var(--rail-item-radius);
     color: rgba(var(--text-main), 0.85);
@@ -767,7 +822,7 @@
     position: relative;
     border: 1px solid transparent;
     overflow: hidden;
-    /* Smooth spring-like transitions — GPU only */
+    /* Smooth spring-like transitions â€” GPU only */
     transition:
         background 0.22s ease,
         color 0.18s ease,
@@ -781,7 +836,7 @@
     background: rgba(var(--primary), 0.06);
     border-color: rgba(var(--primary), 0.06);
     color: rgb(var(--text-main));
-    transform: translateX(4px) translateZ(0);
+    transform: none;
     box-shadow: 0 1px 4px rgba(var(--primary), 0.03);
 }
 
@@ -792,10 +847,10 @@
 }
 
 [dir='rtl'] .sidebar-nav-item:hover {
-    transform: translateX(-4px) translateZ(0);
+    transform: none;
 }
 
-/* ── Active state — gradient pill with ambient shadow ── */
+/* â”€â”€ Active state â€” gradient pill with ambient shadow â”€â”€ */
 .sidebar-nav-item-active {
     background:
         linear-gradient(135deg,
@@ -846,7 +901,7 @@
     transform: translateY(-50%) scale(1);
 }
 
-/* Active indicator — gradient accent bar with spring entrance */
+/* Active indicator â€” gradient accent bar with spring entrance */
 .sidebar-nav-item-active::before {
     content: '';
     position: absolute;
@@ -877,7 +932,7 @@
     padding: 0.5rem;
 }
 
-/* ── Staggered entrance animation for items when section expands ── */
+/* â”€â”€ Staggered entrance animation for items when section expands â”€â”€ */
 .sidebar-section-list .sidebar-nav-item {
     animation: item-slide-in 0.28s var(--rail-ease) both;
 }
@@ -908,7 +963,7 @@
     }
 }
 
-/* ── Dark mode: stronger active glow effects ── */
+/* â”€â”€ Dark mode: stronger active glow effects â”€â”€ */
 .dark .sidebar-nav-item-active {
     background:
         linear-gradient(135deg,
@@ -941,39 +996,42 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   NAV ICON — Glassmorphic mini-card
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   NAV ICON â€” Glassmorphic mini-card
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-nav-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(var(--text-main), 0.7);
+    color: rgba(var(--text-main), 0.78);
     flex-shrink: 0;
     transition:
         color 0.22s ease,
         background 0.22s ease,
         box-shadow 0.22s ease,
         transform 0.22s var(--rail-ease);
-    background: rgba(var(--bg-elevated), 0.12);
+    background: linear-gradient(145deg, rgba(var(--bg-elevated), 0.42), rgba(var(--bg-elevated), 0.16));
+    border: 1px solid rgba(var(--border-color), 0.1);
 }
 
 .sidebar-nav-item:hover .sidebar-nav-icon {
     color: rgb(var(--text-main));
-    background: rgba(var(--bg-elevated), 0.28);
-    transform: scale(1.06);
+    background: rgba(var(--primary), 0.13);
+    border-color: rgba(var(--primary), 0.2);
+    transform: scale(1.04);
 }
 
 .sidebar-nav-icon-active,
 .sidebar-nav-item-active .sidebar-nav-icon {
-    background: linear-gradient(135deg, rgba(var(--primary), 0.16), rgba(var(--accent), 0.08));
-    color: rgb(var(--primary));
-    box-shadow: 0 3px 12px rgba(var(--primary), 0.14);
-    transform: scale(1.02);
+    background: linear-gradient(145deg, rgb(var(--primary)), rgba(var(--accent), 0.85));
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow: 0 5px 16px rgba(var(--primary), 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    transform: scale(1.04);
 }
 
 .sidebar-nav-label {
@@ -1001,7 +1059,7 @@
     50% { box-shadow: 0 0 0 6px rgba(var(--primary), 0.04); }
 }
 
-/* ── Nav Hint Arrow ── */
+/* â”€â”€ Nav Hint Arrow â”€â”€ */
 .sidebar-nav-hint {
     margin-inline-start: auto;
     display: inline-flex;
@@ -1031,9 +1089,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    OPERATOR PANEL (Call Center)
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-panel {
     padding: 0.5rem;
@@ -1093,9 +1151,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    THEME QUICK-SWITCH STRIP
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-theme-strip {
     display: grid;
@@ -1134,9 +1192,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   FOOTER — Seamless bottom zone
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   FOOTER â€” Seamless bottom zone
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-footer {
     padding-top: 0.125rem;
@@ -1152,9 +1210,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SYNC STATUS BAR
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-sync-bar {
     display: flex;
@@ -1192,9 +1250,9 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    QUICK ACTION & SHIFT BUTTONS
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-quick-btn {
     display: flex;
@@ -1237,10 +1295,259 @@
     box-shadow: 0 2px 8px rgba(var(--danger), 0.06);
 }
 
+/* Compact shell actions: keep the rail useful without turning the footer into
+   a second navigation panel. Labels remain available through native tooltips
+   and aria-labels while the icons stay discoverable in the collapsed rail. */
+.sidebar-hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   USER CARD — Compact glass card with gradient avatar ring
-   ═══════════════════════════════════════════════════════════════════════════ */
+.sidebar-hero-actions .sidebar-search-btn {
+    width: 2.25rem;
+    min-height: 2.25rem;
+    justify-content: center;
+    padding: 0;
+    border-radius: 0.75rem;
+}
+
+.sidebar-search-kbd {
+    font-size: 0.5rem;
+    line-height: 1;
+    padding: 0.2rem 0.3rem;
+    border-radius: 0.3rem;
+    background: rgba(var(--bg-elevated), 0.45);
+    border: 1px solid rgba(var(--border-color), 0.08);
+    color: rgba(var(--text-muted), 0.65);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.sidebar-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0.35rem 0.5rem 0.55rem;
+}
+
+.sidebar-quick-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0.45rem;
+    border-radius: 0.7rem;
+    color: rgba(var(--text-muted), 0.8);
+    background: rgba(var(--bg-elevated), 0.16);
+    border: 1px solid rgba(var(--border-color), 0.05);
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+}
+
+.sidebar-quick-action:hover,
+.sidebar-quick-action:focus-visible {
+    color: rgb(var(--text-main));
+    background: rgba(var(--primary), 0.08);
+    border-color: rgba(var(--primary), 0.14);
+    transform: translateY(-1px);
+}
+
+.sidebar-quick-action.is-primary {
+    color: rgb(var(--primary));
+    background: rgba(var(--primary), 0.08);
+    border-color: rgba(var(--primary), 0.12);
+}
+
+/* Collapsed rail: keep every control inside the rail instead of squeezing
+   three footer buttons into a single row. */
+@media (min-width: 1024px) {
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav {
+        width: 100%;
+        min-width: 100%;
+        padding-inline: 0.35rem !important;
+    }
+
+    /* Keep the collapsed navigation tree at the rail's full inline size.
+       Without the explicit minimum, the grid can shrink-wrap its children,
+       which makes the icon column appear a few pixels off-center. */
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav-group,
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-section-wrap,
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-section-list {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        inline-size: 100% !important;
+        align-self: stretch;
+        margin-inline: auto;
+    }
+
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav-group,
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-section-wrap {
+        margin-inline: auto;
+    }
+
+    /* The nav has a small inline gutter. Counter it on the shrink-wrapped
+       group so the visible icon column is centered on the rail itself. */
+    [dir='rtl'] .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav-group {
+        transform: translateX(-0.8rem);
+    }
+
+    [dir='ltr'] .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav-group {
+        transform: translateX(0.8rem);
+    }
+
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav-item {
+        justify-content: center;
+        gap: 0;
+        width: 100%;
+        min-height: 44px;
+        padding-inline: 0;
+        transform: none !important;
+    }
+
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-nav-icon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-quick-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.6rem 0 0.75rem;
+    }
+
+    .workspace-rail:not(.rail-pinned):not(.rail-hover-expanded):not(:hover) .sidebar-quick-action {
+        width: 38px;
+        min-width: 38px;
+        height: 38px;
+        min-height: 38px;
+        padding: 0;
+    }
+}
+
+/* Hover should feel like one calm surface transition. Theme-specific rules
+   may add movement to individual links, so keep the rail interaction stable. */
+@media (min-width: 1024px) {
+    .workspace-rail .sidebar-nav-item:hover,
+    .workspace-rail .sidebar-nav-item-active:hover {
+        transform: none !important;
+    }
+}
+
+/* The compact logo is an anchor, not a second oversized header. */
+.sidebar-hero {
+    padding: 0.5rem 0.5rem 0.45rem;
+}
+
+/* Expansion is explicit: the control stays available while collapsed, and
+   the logo remains centered in the narrow rail. */
+.sidebar-hero-top {
+    position: relative;
+    justify-content: center;
+}
+
+@media (min-width: 1024px) {
+    .workspace-rail:hover .sidebar-hero-top {
+        justify-content: flex-start;
+    }
+
+    .workspace-rail:focus-within .sidebar-hero-top {
+        justify-content: flex-start;
+    }
+}
+
+.sidebar-pin-btn {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 0;
+    z-index: 2;
+}
+
+.rail-pinned .sidebar-pin-btn {
+    position: static;
+}
+
+@media (min-width: 1024px) {
+    .workspace-rail:hover .sidebar-pin-btn {
+        position: static;
+    }
+
+    .workspace-rail:focus-within .sidebar-pin-btn {
+        position: static;
+    }
+}
+
+.sidebar-logomark {
+    width: 3.25rem;
+    height: 3.5rem;
+    border-radius: 0.9rem;
+    margin-inline: auto;
+    filter: drop-shadow(0 3px 10px rgba(var(--primary), 0.25));
+}
+
+.rail-pinned .sidebar-logomark,
+.rail-mobile-open .sidebar-logomark {
+    width: 4rem;
+    height: 4rem;
+    padding: 3px;
+    border-radius: 1.1rem;
+    margin-inline: 0;
+}
+
+@media (min-width: 1024px) {
+    .workspace-rail:hover .sidebar-logomark {
+        width: 4rem;
+        height: 4rem;
+        padding: 3px;
+        border-radius: 1.1rem;
+        margin-inline: 0;
+    }
+
+    .workspace-rail:focus-within .sidebar-logomark {
+        width: 4rem;
+        height: 4rem;
+        padding: 3px;
+        border-radius: 1.1rem;
+        margin-inline: 0;
+    }
+}
+
+.sidebar-overview {
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.sidebar-section-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    color: rgba(var(--text-main), 0.78);
+    background: rgba(var(--bg-elevated), 0.3);
+    border: 1px solid rgba(var(--border-color), 0.08);
+}
+
+.sidebar-section-trigger.has-active-child .sidebar-section-icon {
+    color: #fff;
+    background: linear-gradient(145deg, rgb(var(--primary)), rgba(var(--accent), 0.85));
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 4px 12px rgba(var(--primary), 0.25);
+}
+
+@media (max-width: 1023px) {
+    .sidebar-search-kbd {
+        display: none;
+    }
+}
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   USER CARD â€” Compact glass card with gradient avatar ring
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .sidebar-user-card {
     display: flex;
@@ -1304,16 +1611,14 @@
     color: rgb(var(--danger));
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    THEME RAIL SYSTEM
    The rail is always a real, edge-attached layout surface. Themes may change
    its visual language and interaction cues, but never turn it into a floating
    island that shifts the page or obscures the mobile header.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-.workspace-rail,
-.workspace-rail:not(.rail-pinned):hover,
-.workspace-rail:not(.rail-pinned):focus-within {
+.workspace-rail {
     top: 0 !important;
     bottom: 0 !important;
     border-radius: 0 !important;
@@ -1324,9 +1629,7 @@
     box-shadow: 1px 0 0 rgba(var(--border-color), .18), 8px 0 26px rgba(15, 23, 42, .035) !important;
 }
 
-[dir='rtl'] .workspace-rail,
-[dir='rtl'] .workspace-rail:not(.rail-pinned):hover,
-[dir='rtl'] .workspace-rail:not(.rail-pinned):focus-within {
+[dir='rtl'] .workspace-rail {
     box-shadow: -1px 0 0 rgba(var(--border-color), .18), -8px 0 26px rgba(15, 23, 42, .035) !important;
     border-left: 1px solid rgba(var(--border-color), .18) !important;
 }
@@ -1343,11 +1646,18 @@
 }
 
 /* The rail's fixed width is the only thing the shell uses for layout. */
-.workspace-shell > main {
+.workspace-shell:has(> .workspace-rail) > main {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    margin-inline-start: var(--rail-w-collapsed) !important;
+    width: auto !important;
+}
+
+.workspace-shell:has(> .workspace-rail:not(.rail-pinned)) > main {
     margin-inline-start: var(--rail-w-collapsed) !important;
 }
 
-.workspace-shell:has(.rail-pinned) > main {
+.workspace-shell:has(> .workspace-rail.rail-pinned) > main {
     margin-inline-start: var(--rail-w-expanded) !important;
 }
 
@@ -1367,117 +1677,9 @@
        content full-width while the drawer is closed or open. This must be
        after the desktop rail offset rules because the theme system uses
        !important margins for the fixed desktop rail. */
-    .workspace-shell > main,
-    .workspace-shell:has(.rail-pinned) > main {
+    .workspace-shell:has(> .workspace-rail) > main {
         width: 100% !important;
         margin-inline-start: 0 !important;
         margin-inline-end: 0 !important;
     }
-}
-
-/* Meridian — editorial navigation: quiet paper, indigo rule, measured rhythm. */
-html[data-theme="meridian"] .workspace-rail {
-    background: linear-gradient(180deg, var(--theme-rail-bg), var(--theme-card-bg)) !important;
-    border-inline-end: 3px solid rgb(var(--primary)) !important;
-}
-html[data-theme="meridian"] .sidebar-hero { border-bottom: 1px solid rgba(var(--primary), .18); }
-html[data-theme="meridian"] .sidebar-nav-item { border-radius: 8px; }
-html[data-theme="meridian"] .sidebar-nav-item.active { box-shadow: inset 3px 0 0 rgb(var(--primary)); background: rgba(var(--primary), .08); }
-
-/* Command — dense operations console with a readable technical grid. */
-html[data-theme="command"] .workspace-rail {
-    background-color: var(--theme-rail-bg) !important;
-    background-image: linear-gradient(rgba(var(--primary), .045) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--primary), .045) 1px, transparent 1px) !important;
-    background-size: 18px 18px !important;
-    border-inline-end: 1px solid rgba(var(--primary), .35) !important;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-html[data-theme="command"] .sidebar-hero { border-bottom: 1px dashed rgba(var(--primary), .35); }
-html[data-theme="command"] .sidebar-nav-item { border-radius: 3px; border: 1px solid transparent; }
-html[data-theme="command"] .sidebar-nav-item:hover,
-html[data-theme="command"] .sidebar-nav-item.active { border-color: rgba(var(--primary), .38); background: rgba(var(--primary), .12); }
-
-/* Glassline — attached acrylic strip with a luminous active lane. */
-html[data-theme="glassline"] .workspace-rail {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--theme-rail-bg) 92%, transparent), color-mix(in srgb, var(--theme-card-bg) 82%, transparent)) !important;
-    border-inline-end: 1px solid rgba(var(--primary), .28) !important;
-    backdrop-filter: blur(22px) saturate(1.45) !important;
-}
-html[data-theme="glassline"] .sidebar-nav-item { border-radius: 999px; }
-html[data-theme="glassline"] .sidebar-nav-item.active { box-shadow: 0 0 0 1px rgba(var(--primary), .28), 0 0 22px rgba(var(--primary), .16); }
-html[data-theme="glassline"] .sidebar-nav-icon { border-radius: 999px !important; }
-
-/* Canvas — warm, tactile paper with an ink-like vertical register. */
-html[data-theme="canvas"] .workspace-rail {
-    background: var(--theme-rail-bg) !important;
-    border-inline-end: 1px solid rgba(120, 91, 52, .24) !important;
-    box-shadow: 5px 0 0 rgba(120, 91, 52, .035) !important;
-}
-html[data-theme="canvas"] .sidebar-hero { border-bottom: 2px solid rgba(var(--accent), .22); }
-html[data-theme="canvas"] .sidebar-nav-item { border-radius: 4px; }
-html[data-theme="canvas"] .sidebar-nav-item.active { background: rgba(var(--accent), .11); border-inline-start: 4px solid rgb(var(--accent)); }
-
-/* Fluent Pro — compact, precise and familiar to keyboard-heavy operators. */
-html[data-theme="fluent-pro"] .workspace-rail {
-    background: var(--theme-rail-bg) !important;
-    border-inline-end: 1px solid rgba(var(--border-color), .8) !important;
-    box-shadow: 2px 0 12px rgba(0, 0, 0, .06) !important;
-}
-html[data-theme="fluent-pro"] .sidebar-nav-item { border-radius: 2px; min-height: 36px; }
-html[data-theme="fluent-pro"] .sidebar-nav-item.active { background: rgba(var(--primary), .12); border-inline-start: 2px solid rgb(var(--primary)); }
-html[data-theme="fluent-pro"] .sidebar-nav-icon { border-radius: 3px !important; }
-
-/* Material X — elevated surfaces and pill-shaped, gesture-friendly sections. */
-html[data-theme="material-x"] .workspace-rail {
-    background: linear-gradient(180deg, var(--theme-rail-bg), var(--theme-card-bg)) !important;
-    border-inline-end: 0 !important;
-    box-shadow: 5px 0 24px rgba(76, 29, 149, .12) !important;
-}
-html[data-theme="material-x"] .sidebar-hero { margin: .65rem; border-radius: 18px; background: rgba(var(--primary), .06); }
-html[data-theme="material-x"] .sidebar-nav-item { border-radius: 999px; margin-inline: .35rem; }
-html[data-theme="material-x"] .sidebar-nav-item.active { background: rgb(var(--primary)); color: white; box-shadow: 0 8px 18px rgba(var(--primary), .24); }
-
-/* Obsidian — low-light command surface, fine borders and signal glow. */
-html[data-theme="obsidian"] .workspace-rail {
-    background: #0b0d10 !important;
-    border-inline-end: 1px solid rgba(94, 106, 210, .42) !important;
-    box-shadow: 3px 0 24px rgba(0, 0, 0, .34) !important;
-}
-html[data-theme="obsidian"] .sidebar-hero { border-bottom: 1px solid rgba(56, 189, 248, .24); }
-html[data-theme="obsidian"] .sidebar-nav-item { border-radius: 5px; color: rgba(226, 232, 240, .78); }
-html[data-theme="obsidian"] .sidebar-nav-item:hover,
-html[data-theme="obsidian"] .sidebar-nav-item.active { background: rgba(94, 106, 210, .16); box-shadow: inset 2px 0 rgb(56, 189, 248), 0 0 18px rgba(56, 189, 248, .08); }
-
-/* Tiles — modular navigation made of small, obvious blocks. */
-html[data-theme="tiles"] .workspace-rail {
-    background: var(--theme-rail-bg) !important;
-    border-inline-end: 1px solid rgba(var(--primary), .2) !important;
-}
-html[data-theme="tiles"] .sidebar-nav-item { border-radius: 10px 4px 10px 4px; margin-block: 3px; }
-html[data-theme="tiles"] .sidebar-nav-item:nth-child(2n) { border-radius: 4px 10px 4px 10px; }
-html[data-theme="tiles"] .sidebar-nav-item.active { background: linear-gradient(135deg, rgba(var(--primary), .16), rgba(var(--accent), .08)); box-shadow: inset 4px 0 rgb(var(--primary)); }
-
-/* Acrylic — soft layered panel, but still attached to the application frame. */
-html[data-theme="acrylic"] .workspace-rail {
-    background: color-mix(in srgb, var(--theme-rail-bg) 84%, transparent) !important;
-    border-inline-end: 1px solid rgba(255, 255, 255, .32) !important;
-    backdrop-filter: blur(24px) saturate(1.35) !important;
-    box-shadow: 7px 0 30px rgba(15, 23, 42, .09), inset -1px 0 rgba(255, 255, 255, .3) !important;
-}
-html[data-theme="acrylic"] .sidebar-nav-item { border-radius: 14px; }
-html[data-theme="acrylic"] .sidebar-nav-item.active { background: rgba(var(--primary), .11); box-shadow: 0 8px 22px rgba(var(--primary), .1), inset 0 1px rgba(255,255,255,.45); }
-
-/* Touch — large targets and clear states for tablets and touch POS devices. */
-html[data-theme="touch"] .workspace-rail {
-    background: var(--theme-rail-bg) !important;
-    border-inline-end: 2px solid rgba(var(--accent), .28) !important;
-}
-html[data-theme="touch"] .sidebar-nav-item { min-height: 48px; border-radius: 16px; margin-block: 4px; }
-html[data-theme="touch"] .sidebar-nav-item.active { background: rgb(var(--primary)); color: white; box-shadow: 0 7px 16px rgba(var(--primary), .22); }
-html[data-theme="touch"] .sidebar-nav-icon { width: 34px !important; height: 34px !important; border-radius: 12px !important; }
-
-@media (prefers-reduced-motion: reduce) {
-    .workspace-rail,
-    .workspace-rail::before,
-    .sidebar-nav-item { animation: none !important; transition: none !important; }
 }

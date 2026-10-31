@@ -40,7 +40,7 @@ export const createPurchaseReturn = async (req: Request, res: Response) => {
         const items = Array.isArray(body.items) ? body.items : [];
         const reason = String(body.reason || '').trim();
         const creditNoteRef = String(body.creditNoteRef || body.referenceNumber || '').trim();
-        const userId = String((req as any)?.user?.id || body.createdBy || 'system');
+        const userId = String((req as any)?.user?.id || 'system');
         if (!warehouseId || items.length === 0 || reason.length < 3) {
             return res.status(400).json({ error: 'WAREHOUSE_ITEMS_REASON_REQUIRED', code: 'WAREHOUSE_ITEMS_REASON_REQUIRED' });
         }
@@ -53,7 +53,7 @@ export const createPurchaseReturn = async (req: Request, res: Response) => {
         const returned: Array<{ itemId: string; quantity: number; unitPrice: number }> = [];
         const skipped: Array<{ itemId: string; reason: string }> = [];
 
-        await db.transaction(async (tx) => {
+        const glEntryId = await db.transaction(async (tx) => {
             for (const line of items) {
                 const itemId = String(line.itemId || line.inventoryItemId || '').trim();
                 const qty = Number(line.quantity || line.qty || 0);
@@ -93,35 +93,29 @@ export const createPurchaseReturn = async (req: Request, res: Response) => {
             if (returned.length === 0) {
                 throw Object.assign(new Error('NOTHING_RETURNABLE'), { status: 409 });
             }
-        });
 
-        // Supplier credit note (best-effort GL, audited on failure).
-        let glEntryId: string | null = null;
-        try {
             const [apAccount, invAccount] = await Promise.all([
                 resolveSystemAccountCode('PURCHASE_RETURN', 'DEBIT', '2100'),
                 resolveSystemAccountCode('PURCHASE_RETURN', 'CREDIT', '1210'),
             ]);
             const result = await GLService.postJournalEntry({
                 reference: returnId,
-                referenceType: 'MANUAL',
+                referenceType: 'PURCHASE_RETURN',
                 description: `Supplier return ${returnId}${creditNoteRef ? ` / ${creditNoteRef}` : ''} — ${reason}`.slice(0, 200),
                 branchId: (warehouse as any).branchId,
                 createdBy: userId,
+                actorId: userId,
+                source: 'PURCHASE_RETURN',
+                correlationId: `PURCHASE_RETURN:${returnId}`,
                 lines: [
                     { accountCode: apAccount, debit: totalValue, credit: 0 },
                     { accountCode: invAccount, debit: 0, credit: totalValue },
                 ],
-            });
-            glEntryId = typeof result === 'string' ? null : (result as any)?.entryId || null;
-        } catch (error: any) {
-            await createSignedAuditLog({
-                eventType: 'PURCHASE_RETURN_GL_FAILED',
-                userId,
-                branchId: (warehouse as any).branchId,
-                payload: { returnId, totalValue, error: String(error?.message || error) },
-            }).catch(() => undefined);
-        }
+            }, tx);
+            const entryId = typeof result === 'string' ? null : (result as any)?.entryId || null;
+            if (!entryId) throw Object.assign(new Error('PURCHASE_RETURN_GL_FAILED'), { status: 503, code: 'PURCHASE_RETURN_GL_FAILED' });
+            return String(entryId);
+        });
 
         try {
             getIO().to(`branch:${(warehouse as any).branchId}`).emit('stock:updated', { reason: 'PURCHASE_RETURN', referenceId: returnId });
@@ -233,7 +227,9 @@ export const createGRN = async (req: Request, res: Response) => {
     };
 
     try {
-        const { poId, supplierId, branchId, warehouseId, referenceNumber, items, userId, notes } = req.body;
+        const { poId, supplierId, branchId, warehouseId, referenceNumber, items, notes } = req.body;
+        const actorId = req.user?.id || 'system';
+        const databaseActorId = req.user?.id || null;
         // items: { itemId, poItemId, receivedQty, unitPrice, batchNumber, expiryDate }[]
 
         if (!warehouseId || !items || items.length === 0) {
@@ -303,7 +299,7 @@ export const createGRN = async (req: Request, res: Response) => {
             if (poHeader?.targetWarehouseId && poHeader.targetWarehouseId !== warehouseId) {
                 throw new Error('PO_TARGET_WAREHOUSE_MISMATCH');
             }
-            const authoritativeBranchId = poHeader?.branchId || branchId;
+            const authoritativeBranchId = poHeader?.branchId || req.effectiveBranchId || branchId;
             if (authoritativeBranchId && warehouse.branchId && warehouse.branchId !== authoritativeBranchId) {
                 throw new Error('WAREHOUSE_BRANCH_MISMATCH');
             }
@@ -361,7 +357,7 @@ export const createGRN = async (req: Request, res: Response) => {
                 poId,
                 supplierId: poHeader?.supplierId || supplierId,
                 branchId: authoritativeBranchId,
-                receivedBy: userId,
+                receivedBy: databaseActorId,
                 referenceNumber,
                 notes,
                 status: 'RECEIVED'
@@ -414,7 +410,7 @@ export const createGRN = async (req: Request, res: Response) => {
                         type: 'PURCHASE',
                         referenceId: grnId,
                         reason: 'GRN Receipt',
-                        performedBy: userId || 'system',
+                        performedBy: actorId,
                         createdAt: new Date(),
                     });
 
@@ -510,7 +506,8 @@ export const createGRN = async (req: Request, res: Response) => {
  */
 export const createSupplierInvoice = async (req: Request, res: Response) => {
     try {
-        const { supplierId, grnId, invoiceNumber, date, dueDate, subtotal, tax, discount, total, items, userId, notes } = req.body;
+        const { supplierId, grnId, invoiceNumber, date, dueDate, subtotal, tax, discount, total, items, notes } = req.body;
+        const actorId = req.user?.id || 'system';
         // items: { itemId, qty, unitPrice, total }[]
 
         // 3-WAY MATCHING LOGIC (Tolerance: 5%)
@@ -566,7 +563,7 @@ export const createSupplierInvoice = async (req: Request, res: Response) => {
                 tax,
                 discount,
                 total,
-                createdBy: userId,
+                createdBy: actorId,
                 notes
             });
 
@@ -609,7 +606,10 @@ export const createSupplierInvoice = async (req: Request, res: Response) => {
                     referenceType: 'SUPPLIER_INVOICE',
                     description: `AP Bill for Invoice ${invoiceNumber || invoiceId}`,
                     branchId,
-                    createdBy: userId || 'system',
+                    createdBy: actorId,
+                    actorId,
+                    source: 'SUPPLIER_INVOICE',
+                    correlationId: `SUPPLIER_INVOICE:${invoiceId}`,
                     lines,
                 });
             }
@@ -628,7 +628,7 @@ export const approveSupplierInvoice = async (req: Request, res: Response) => {
     try {
         const id = getStringParam(req.params.id);
         if (!id) return res.status(400).json({ error: 'SUPPLIER_INVOICE_ID_REQUIRED' });
-        const { userId } = req.body; // Approved by manager
+        const actorId = req.user?.id || 'system';
         
         const invoice = await db.select().top(1).from(supplierInvoices).where(eq(supplierInvoices.id, id));
         if (!invoice.length) return res.status(404).json({ error: 'Not found' });
@@ -666,17 +666,20 @@ export const approveSupplierInvoice = async (req: Request, res: Response) => {
             referenceType: 'SUPPLIER_INVOICE',
             description: `AP Bill (Manager Approved) ${invoice[0].invoiceNumber}`,
             branchId,
-            createdBy: userId || req.user?.id || 'system',
+            createdBy: actorId,
+            actorId,
+            source: 'SUPPLIER_INVOICE_APPROVAL',
+            correlationId: `SUPPLIER_INVOICE_APPROVAL:${id}`,
             lines: invoiceLines,
         });
 
         await createSignedAuditLog({
             eventType: 'SUPPLIER_INVOICE_APPROVED',
-            userId: userId || 'system',
+            userId: actorId,
             branchId,
             payload: { invoiceId: id, total: invoice[0].total },
             reason: 'Manager approved supplier invoice variance (3-way match exception)',
-            sourceDevice: req.headers['user-agent'] || 'unknown',
+            sourceDevice: req.headers?.['user-agent'] || 'unknown',
             requestId: req.headers['x-request-id'] as string || `req-${Date.now()}`
         });
 

@@ -47,7 +47,7 @@ export const RevenueTrendChart: React.FC<{
           axisLine={false}
           tickLine={false}
           tick={axisTick}
-          tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
+          tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
         />
         <Tooltip
           contentStyle={{
@@ -77,7 +77,7 @@ export const DaypartChart: React.FC<{
         axisLine={false}
         tickLine={false}
         tick={axisTick}
-        tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
+        tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
       />
       <Tooltip contentStyle={tooltipStyle} />
       <Bar dataKey="revenue" name={revenueLabel} radius={[8, 8, 0, 0]}>
@@ -101,7 +101,7 @@ export const HourlyChart: React.FC<{
         axisLine={false}
         tickLine={false}
         tick={axisTick}
-        tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
+        tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
       />
       <Tooltip contentStyle={tooltipStyle} />
       <Area type="monotone" dataKey="revenue" name={revenueLabel} stroke="rgb(var(--primary))" strokeWidth={3} fill="rgb(var(--primary))" fillOpacity={0.15} />

@@ -1,8 +1,8 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback, useTransition } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-    Pin,
-    PinOff,
+    PanelLeftClose,
+    PanelLeftOpen,
     Menu,
     LogOut,
     Wifi,
@@ -11,12 +11,8 @@ import {
     X,
     AlertTriangle,
     CheckCircle,
-    ChevronDown,
     Sparkles,
     ChevronRight,
-    LayoutGrid,
-    Bell,
-    Mail,
     Bot,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -49,6 +45,7 @@ const PATH_LOADER_MAP: Record<string, string> = {
     '/attendance': 'AttendanceManager', '/payroll': 'PayrollManager', '/migration': 'DataMigrationWizard',
     '/biometric-devices': 'BiometricDeviceManager', '/scheduling': 'SchedulingManager', '/shift-tasks': 'TaskChecklistManager',
     '/admin-dashboard': 'AdminDashboardPage', '/roles': 'RolesPermissions', '/settings': 'SettingsHub',
+    '/offline-conflicts': 'OfflineConflictCenter',
 };
 
 interface ContextRailProps { onOpenCommand: () => void; }
@@ -56,7 +53,7 @@ interface ContextRailProps { onOpenCommand: () => void; }
 const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { branches, currentUser, hasPermission, isSidebarCollapsed, language, logout, toggleSidebar, layoutMode, updateSettings } = useAuthStore(
+    const { branches, currentUser, hasPermission, isSidebarCollapsed, language, logout, setSidebarCollapsed, toggleSidebar } = useAuthStore(
         useShallow((state) => ({
             branches: state.branches,
             currentUser: state.settings.currentUser,
@@ -64,9 +61,8 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
             isSidebarCollapsed: state.isSidebarCollapsed,
             language: state.settings.language,
             logout: state.logout,
+            setSidebarCollapsed: state.setSidebarCollapsed,
             toggleSidebar: state.toggleSidebar,
-            layoutMode: state.settings.layoutMode || 'classic',
-            updateSettings: state.updateSettings,
         }))
     );
     const setDiscount = useOrderStore((state) => state.setDiscount);
@@ -82,20 +78,21 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
 
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-    const [showMessagesPanel, setShowMessagesPanel] = useState(false);
-    const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+    const [selectionClosing, setSelectionClosing] = useState(false);
+    const [clickedNavId, setClickedNavId] = useState<string | null>(null);
     const [syncStats, setSyncStats] = useState({ total: 0, pending: 0, failed: 0, synced: 0 });
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-    const navRef = useRef<HTMLElement>(null);
+    const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+    const clickFxTimerRef = useRef<number | null>(null);
+    const clickFxRafRef = useRef<number | null>(null);
     const toggleAssistant = useAIWidgetStore(state => state.toggleAssistant);
 
     // Route changes render heavy lazy pages — run them as a transition so the
-    // rail click (and any typing) stays responsive while the page reconciles.
-    // viewTransition hands the swap to the browser's View Transitions API
-    // (native-feel morph, automatic fallback where unsupported).
+    // rail click stays responsive. Keep the browser document view-transition
+    // off here: it snapshots the fixed rail during navigation and can make
+    // labels flash or freeze while the rail collapses.
     const [, startNavTransition] = useTransition();
     const navigateTransition = useCallback((path: string) => {
-        startNavTransition(() => navigate(path, { viewTransition: true }));
+        startNavTransition(() => navigate(path));
     }, [navigate]);
 
     const isRouteActive = useCallback((path: string) => {
@@ -115,23 +112,23 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
             .filter((section) => section.items.length > 0);
     }, [hasPermission, location.pathname]);
 
-    useEffect(() => {
-        const initialMap: Record<string, boolean> = {};
-        filteredSections.forEach((section) => {
-            initialMap[section.id] = true;
-        });
-        setOpenSections((prev) => (Object.keys(prev).length === 0 ? initialMap : prev));
-    }, [filteredSections]);
-
-    /* Auto-expand the section containing the active route */
-    useEffect(() => {
-        const activeSection = filteredSections.find((section) =>
+    const routeSectionId = useMemo(() => (
+        filteredSections.find((section) =>
             section.items.some((item) => isRouteActive(item.path))
-        );
-        if (activeSection) {
-            setOpenSections((prev) => ({ ...prev, [activeSection.id]: true }));
-        }
-    }, [filteredSections, isRouteActive]);
+        )?.id ?? null
+    ), [filteredSections, isRouteActive]);
+
+    useEffect(() => {
+        setSelectedSectionId((current) => {
+            if (routeSectionId) return routeSectionId;
+            if (current && filteredSections.some((section) => section.id === current)) return current;
+            return filteredSections[0]?.id ?? null;
+        });
+    }, [filteredSections, routeSectionId]);
+
+    const selectedSection = useMemo(() => (
+        filteredSections.find((section) => section.id === selectedSectionId) ?? filteredSections[0]
+    ), [filteredSections, selectedSectionId]);
 
     /* Longest-prefix wins for item highlighting: /inventory must not stay
        lit when /inventory/suppliers is the actual page (both prefix-match).
@@ -147,10 +144,6 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
             })
         );
     }, [filteredSections, isRouteActive]);
-
-    const toggleSection = useCallback((id: string) => {
-        setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
-    }, []);
 
     /* Hover preload — start loading the page component when mouse enters */
     const preloadedRef = useRef<Set<string>>(new Set());
@@ -228,6 +221,76 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
         return () => window.removeEventListener('rf:open-rail', open as EventListener);
     }, []);
 
+    useEffect(() => {
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = mobileOpen ? 'hidden' : previousOverflow;
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [mobileOpen]);
+
+    useEffect(() => {
+        if (!selectionClosing) return;
+        const timeoutId = window.setTimeout(() => setSelectionClosing(false), 420);
+        return () => window.clearTimeout(timeoutId);
+    }, [selectionClosing]);
+
+    useEffect(() => () => {
+        if (clickFxTimerRef.current !== null) window.clearTimeout(clickFxTimerRef.current);
+        if (clickFxRafRef.current !== null) window.cancelAnimationFrame(clickFxRafRef.current);
+    }, []);
+
+    const handleRailPointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        event.currentTarget.style.setProperty('--rail-spot-x', `${event.clientX - rect.left}px`);
+        event.currentTarget.style.setProperty('--rail-spot-y', `${event.clientY - rect.top}px`);
+    }, []);
+
+    const handleRailPointerLeave = useCallback((event: React.PointerEvent<HTMLElement>) => {
+        setSelectionClosing(false);
+        event.currentTarget.style.removeProperty('--rail-spot-x');
+        event.currentTarget.style.removeProperty('--rail-spot-y');
+    }, []);
+
+    const triggerNavClickFx = useCallback((id: string, event: React.PointerEvent<HTMLAnchorElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        event.currentTarget.style.setProperty('--rail-click-x', `${event.clientX - rect.left}px`);
+        event.currentTarget.style.setProperty('--rail-click-y', `${event.clientY - rect.top}px`);
+        if (clickFxTimerRef.current !== null) window.clearTimeout(clickFxTimerRef.current);
+        if (clickFxRafRef.current !== null) window.cancelAnimationFrame(clickFxRafRef.current);
+        setClickedNavId(null);
+        clickFxRafRef.current = window.requestAnimationFrame(() => {
+            setClickedNavId(id);
+            clickFxTimerRef.current = window.setTimeout(() => setClickedNavId(null), 720);
+        });
+    }, []);
+
+    const handleToggleSidebar = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+        if (pinned) {
+            event.currentTarget.blur();
+            setSelectionClosing(true);
+        }
+        toggleSidebar();
+    }, [pinned, toggleSidebar]);
+
+    const closeRailAfterSelection = useCallback(() => {
+        setMobileOpen(false);
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+            setSelectionClosing(true);
+            setSidebarCollapsed(true);
+        }
+    }, [setSidebarCollapsed]);
+
+    const runRailAction = useCallback((action: () => void) => (
+        event: React.MouseEvent<HTMLButtonElement>
+    ) => {
+        // A focused quick-action keeps :focus-within active and visually holds
+        // the rail open; release focus before collapsing it.
+        event.currentTarget.blur();
+        closeRailAfterSelection();
+        action();
+    }, [closeRailAfterSelection]);
+
     const handleLogout = useCallback(() => {
         logout();
         navigate('/login');
@@ -235,21 +298,19 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
 
     const syncHasError = syncStats.failed > 0;
     const syncHasPending = syncStats.pending > 0;
-    const totalNavItems = filteredSections.reduce((sum, section) => sum + section.items.length, 0);
-
     return (
         <>
             {mobileOpen && (
                 <div
-                    className="lg:hidden fixed inset-0 z-[75]"
-                    style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+                    className="xl:hidden fixed inset-0 z-[75]"
+                    style={{ background: 'rgba(2, 8, 23, 0.52)' }}
                     onClick={() => setMobileOpen(false)}
                 />
             )}
 
             <button
                 onClick={() => setMobileOpen(true)}
-                className={`lg:hidden fixed top-3 z-[71] p-2.5 rounded-xl border shadow-lg bg-card/95 text-main border-border/30 ${isRtl ? 'right-3' : 'left-3'}`}
+                className={`xl:hidden fixed top-3 z-[71] p-2.5 rounded-xl border shadow-lg bg-card/95 text-main border-border/30 ${isRtl ? 'right-3' : 'left-3'}`}
                 aria-label={lang === 'ar' ? 'فتح القائمة' : 'Open menu'}
             >
                 <Menu size={18} />
@@ -257,38 +318,47 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
 
             <aside
                 className={`
-                    workspace-rail
+                    workspace-rail workspace-rail-v2
                     ${pinned ? 'rail-pinned' : ''}
                     ${mobileOpen ? 'rail-mobile-open' : ''}
-                    lg:translate-x-0
+                    ${selectionClosing ? 'rail-selection-closing' : ''}
+                    xl:translate-x-0
                 `}
+                onPointerMove={handleRailPointerMove}
+                onPointerLeave={handleRailPointerLeave}
                 style={{
                     fontFamily: isRtl ? 'var(--font-arabic)' : 'var(--font-body)',
                     [isRtl ? 'right' : 'left']: 'var(--rail-margin, 8px)',
                 }}
             >
+                <div className="rail-v2-surface">
                 <div className="sidebar-hero shrink-0">
                     <div className="sidebar-hero-top">
                         <button
                             type="button"
-                            className="sidebar-logomark shrink-0 overflow-hidden"
-                            onClick={() => navigateTransition('/')}
+                            className="sidebar-logomark shrink-0 overflow-visible"
+                            onClick={runRailAction(() => navigateTransition('/'))}
                             aria-label={lang === 'ar' ? 'العودة للوحة القيادة' : 'Go to dashboard'}
                         >
-                            <img src="/logo.png?v=6" alt="Coduis Xen ERP Systems" className="h-full w-full object-contain" style={{ filter: 'drop-shadow(0 2px 10px rgba(0,0,0,0.45))' }} draggable={false} />
+                            <img src="/logo.png?v=6" alt="Coduis Xen ERP Systems" className="h-full w-full object-contain" draggable={false} />
                         </button>
+                        <div className="sidebar-brand-lockup" aria-hidden="true">
+                            <strong>CODUIS XEN</strong>
+                            <span>{lang === 'ar' ? 'نظام تشغيل المطاعم' : 'Restaurant operations'}</span>
+                        </div>
                         <button
-                            onClick={toggleSidebar}
-                            className="sidebar-pin-btn hidden lg:flex shrink-0 ms-auto"
-                            title={pinned ? (lang === 'ar' ? 'إلغاء التثبيت' : 'Unpin sidebar') : (lang === 'ar' ? 'تثبيت السايدبار' : 'Pin sidebar')}
-                            aria-label={pinned ? (lang === 'ar' ? 'إلغاء تثبيت القائمة' : 'Unpin sidebar') : (lang === 'ar' ? 'تثبيت القائمة' : 'Pin sidebar')}
+                            onClick={handleToggleSidebar}
+                            className="sidebar-pin-btn sidebar-collapse-toggle hidden md:flex shrink-0 ms-auto"
+                            title={pinned ? (lang === 'ar' ? 'تصغير القائمة' : 'Collapse sidebar') : (lang === 'ar' ? 'توسيع القائمة' : 'Expand sidebar')}
+                            aria-label={pinned ? (lang === 'ar' ? 'تصغير القائمة' : 'Collapse sidebar') : (lang === 'ar' ? 'توسيع القائمة' : 'Expand sidebar')}
+                            aria-pressed={pinned}
                         >
-                            {pinned ? <PinOff size={12} /> : <Pin size={12} />}
+                            {pinned ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
                         </button>
                         {mobileOpen && (
                             <button
                                 onClick={() => setMobileOpen(false)}
-                                className="lg:hidden sidebar-collapse-btn shrink-0 ms-auto"
+                                className="xl:hidden sidebar-collapse-btn shrink-0 ms-auto"
                                 aria-label={lang === 'ar' ? 'إغلاق القائمة' : 'Close menu'}
                             >
                                 <X size={13} />
@@ -296,38 +366,10 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                         )}
                     </div>
 
-                    <div className="sidebar-text-block sidebar-brand-chip">
-                        <span className={`sidebar-brand-status ${isOnline ? 'is-online' : 'is-offline'}`}>
-                            {isOnline ? (lang === 'ar' ? 'متصل' : 'Online') : (lang === 'ar' ? 'غير متصل' : 'Offline')}
-                        </span>
-                    </div>
-
-                    <div className="space-y-2">
-                        <button
-                            onClick={onOpenCommand}
-                            className="sidebar-search-btn"
-                            title={lang === 'ar' ? 'فتح البحث' : 'Open Search'}
-                            aria-label={lang === 'ar' ? 'فتح البحث السريع (Ctrl K)' : 'Open quick search (Ctrl K)'}
-                        >
-                            <Search size={13} />
-                            <span className="sidebar-nav-label">{lang === 'ar' ? 'بحث سريع' : 'Quick Search'}</span>
-                            <span className="sidebar-kbd ms-auto sidebar-nav-label">Ctrl K</span>
-                        </button>
-                        <div className="sidebar-overview">
-                            <div className="sidebar-overview-pill">
-                                <Sparkles size={10} />
-                                <span>{totalNavItems} {lang === 'ar' ? 'مسار' : 'routes'}</span>
-                            </div>
-                            <div className={`sidebar-overview-pill ${isOnline ? 'is-live' : 'is-offline'}`}>
-                                {isOnline ? <Wifi size={10} /> : <WifiOff size={10} />}
-                                <span>{isOnline ? (lang === 'ar' ? 'متصل' : 'Live') : (lang === 'ar' ? 'غير متصل' : 'Off')}</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {branches.length > 0 && (
-                    <div className="mx-2 mb-2 shrink-0">
+                    <div className="sidebar-branch-context shrink-0">
                         <BranchContextSwitcher variant="sidebar" />
                     </div>
                 )}
@@ -351,43 +393,39 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                     </div>
                 )}
 
-                <nav ref={navRef} className="sidebar-nav sidebar-nav-shell flex-1 overflow-y-auto overflow-x-hidden px-1.5">
+                <nav className="sidebar-nav sidebar-nav-shell sidebar-workspace-tree flex-1" aria-label={lang === 'ar' ? 'التنقل بين أقسام النظام' : 'System navigation'}>
+                    <div className="sidebar-tree-caption sidebar-text-block">
+                        <span>{lang === 'ar' ? 'أقسام النظام' : 'Workspaces'}</span>
+                        <small>{filteredSections.length}</small>
+                    </div>
                     {filteredSections.map((section, idx) => {
-                        const isOpen = openSections[section.id] ?? true;
                         const SectionIcon = section.icon;
-                        const hasActiveChild = section.items.some((item) => isRouteActive(item.path));
+                        const expanded = section.id === selectedSection?.id;
+                        const containsCurrentPage = section.id === routeSectionId;
                         return (
-                            <div key={section.id} className={`sidebar-nav-group ${idx > 0 ? 'mt-2' : 'mt-0.5'}`}>
+                            <section key={section.id} className={`sidebar-workspace-group ${expanded ? 'is-expanded' : ''} ${containsCurrentPage ? 'contains-current-page' : ''}`}>
                                 <button
-                                    onClick={() => toggleSection(section.id)}
-                                    className={`sidebar-text-block sidebar-section-trigger w-full flex items-center gap-2 group ${hasActiveChild ? 'has-active-child' : ''}`}
+                                    type="button"
+                                    id={`workspace-heading-${section.id}`}
+                                    className="sidebar-workspace-trigger"
+                                    aria-expanded={expanded}
+                                    aria-controls={`workspace-pages-${section.id}`}
+                                    title={lang === 'ar' ? section.labelAr : section.label}
+                                    onClick={() => setSelectedSectionId(section.id)}
                                 >
-                                    {SectionIcon && (
-                                        <span className={`sidebar-section-icon ${hasActiveChild ? 'is-active' : ''}`}>
-                                            <SectionIcon size={13} />
-                                        </span>
-                                    )}
-                                    <span className="flex-1 text-start truncate">{lang === 'ar' ? section.labelAr : section.label}</span>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                        <span className="sidebar-section-count">{section.items.length}</span>
-                                        <ChevronDown
-                                            size={12}
-                                            className="text-muted/40 transition-transform duration-250 ease-out"
-                                            style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                                        />
-                                    </div>
+                                    <span className="sidebar-workspace-symbol">{SectionIcon && <SectionIcon size={19} aria-hidden="true" />}</span>
+                                    <span className="sidebar-workspace-name">{lang === 'ar' ? section.labelAr : section.label}</span>
+                                    <span className="sidebar-section-index sidebar-workspace-count" aria-hidden="true">{String(idx + 1).padStart(2, '0')}</span>
+                                    <ChevronRight className="sidebar-workspace-chevron" size={15} aria-hidden="true" />
                                 </button>
-
                                 <div
-                                    className="sidebar-section-wrap grid transition-[grid-template-rows,opacity] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                                    style={{
-                                        gridTemplateRows: isOpen ? '1fr' : '0fr',
-                                        opacity: isOpen ? 1 : 0,
-                                        marginTop: isOpen ? '3px' : '0px',
-                                    }}
+                                    id={`workspace-pages-${section.id}`}
+                                    className="sidebar-workspace-pages"
+                                    hidden={!expanded}
+                                    role="group"
+                                    aria-labelledby={`workspace-heading-${section.id}`}
                                 >
-                                    <div className="sidebar-section-list flex flex-col gap-0.5 overflow-hidden">
-                                        {section.items.map((item, itemIdx) => {
+                                {section.items.map((item, itemIdx) => {
                                             const Icon = item.icon;
                                             const isActive = isBestRouteActive(item.path);
                                             return (
@@ -399,20 +437,25 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                                                         // page render happens in a transition (no frozen click).
                                                         // Modifier/middle clicks keep native new-tab behavior.
                                                         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                                                        event.preventDefault();
-                                                        setMobileOpen(false);
-                                                        navigateTransition(item.path);
+                                                         event.preventDefault();
+                                                         event.currentTarget.blur();
+                                                         closeRailAfterSelection();
+                                                         navigateTransition(item.path);
                                                     }}
                                                     onMouseEnter={() => handlePreload(item.path)}
-                                                    onPointerDown={() => handlePreload(item.path)}
+                                                    onPointerDown={(event) => {
+                                                        handlePreload(item.path);
+                                                        triggerNavClickFx(item.id, event);
+                                                    }}
                                                     onFocus={() => handlePreload(item.path)}
-                                                    className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item-active' : ''}`}
-                                                    style={{ animationDelay: isOpen ? `${itemIdx * 30}ms` : '0ms' }}
+                                                    className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item-active' : ''} ${clickedNavId === item.id ? 'sidebar-nav-item-clicked' : ''}`}
+                                                    style={{ animationDelay: `${itemIdx * 30}ms` }}
                                                     title={lang === 'ar' ? item.labelAr : item.label}
                                                 >
                                                     <span className="sidebar-nav-glow" />
+                                                    <span className="sidebar-nav-ripple" aria-hidden="true" />
                                                     <span className={`sidebar-nav-icon ${isActive ? 'sidebar-nav-icon-active' : ''}`}>
-                                                        <Icon size={15} />
+                                                        <Icon size={17} strokeWidth={2.15} />
                                                     </span>
                                                     <span className="sidebar-nav-label">{lang === 'ar' ? item.labelAr : item.label}</span>
                                                     <span className="sidebar-nav-hint">
@@ -421,15 +464,12 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                                                     {isActive && <span className="sidebar-nav-dot" />}
                                                 </NavLink>
                                             );
-                                        })}
-                                    </div>
+                                })}
                                 </div>
-                            </div>
+                            </section>
                         );
                     })}
-                    <div className="h-3" />
                 </nav>
-
                 <div className="sidebar-footer shrink-0">
                     <div className="sidebar-sync-bar">
                         <div className="flex items-center gap-1.5">
@@ -459,8 +499,8 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
 
                     {activeShift && (
                         <div className="px-2 pb-0.5">
-                            <button
-                                onClick={() => setIsShiftDrawerOpen(true)}
+                             <button
+                                 onClick={runRailAction(() => setIsShiftDrawerOpen(true))}
                                 className="sidebar-close-shift"
                             >
                                 <LogOut size={12} />
@@ -471,37 +511,35 @@ const ContextRail: React.FC<ContextRailProps> = ({ onOpenCommand }) => {
                             </button>
                         </div>
                     )}
-                    <div className="px-2 pb-2 space-y-1">
-                        <button
-                            onClick={() => toggleAssistant()}
-                            className="w-full sidebar-text-block p-1.5 rounded-lg text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-indigo-500/20"
+                    <div className="sidebar-quick-actions" role="group" aria-label={lang === 'ar' ? 'إجراءات سريعة' : 'Quick actions'}>
+                         <button
+                             onClick={runRailAction(onOpenCommand)}
+                            className="sidebar-quick-action"
+                            title={lang === 'ar' ? 'البحث السريع (Ctrl K)' : 'Quick search (Ctrl K)'}
+                            aria-label={lang === 'ar' ? 'فتح البحث السريع (Ctrl K)' : 'Open quick search (Ctrl K)'}
+                        >
+                            <Search size={14} />
+                        </button>
+
+                         <button
+                             onClick={runRailAction(toggleAssistant)}
+                            className="sidebar-quick-action is-primary"
                             title={lang === 'ar' ? 'المساعد الذكي' : 'AI Assistant'}
+                            aria-label={lang === 'ar' ? 'فتح المساعد الذكي' : 'Open AI assistant'}
                         >
                             <Bot size={14} />
-                            <span className="text-xs font-bold uppercase tracking-widest">{lang === 'ar' ? 'المساعد' : 'AI Agent'}</span>
                         </button>
 
-                        <button
-                            onClick={() => {
-                                updateSettings({ layoutMode: layoutMode === 'tiles' ? 'classic' : 'tiles' });
-                                navigateTransition('/');
-                            }}
-                            className="w-full sidebar-text-block p-1.5 rounded-lg text-muted hover:text-main hover:bg-elevated transition-colors flex items-center justify-center gap-2"
-                            title={lang === 'ar' ? 'التبديل لوضع البلاطات' : 'Switch to tiles view'}
-                        >
-                            <LayoutGrid size={14} />
-                            <span className="text-xs font-semibold">{lang === 'ar' ? 'البلاطات' : 'Tiles'}</span>
-                        </button>
-
-                        <button
-                            onClick={() => navigateTransition('/theme-lab')}
-                            className="w-full sidebar-text-block p-1.5 rounded-lg text-muted hover:text-main hover:bg-elevated transition-colors flex items-center justify-center gap-2"
+                         <button
+                             onClick={runRailAction(() => navigateTransition('/theme-lab'))}
+                            className="sidebar-quick-action"
                             title={lang === 'ar' ? 'إعدادات المظهر' : 'Appearance Settings'}
+                            aria-label={lang === 'ar' ? 'إعدادات المظهر' : 'Appearance Settings'}
                         >
                             <Sparkles size={14} />
-                            <span className="text-xs font-semibold">{lang === 'ar' ? 'المظهر' : 'Theme'}</span>
                         </button>
                     </div>
+                </div>
                 </div>
             </aside>
         </>

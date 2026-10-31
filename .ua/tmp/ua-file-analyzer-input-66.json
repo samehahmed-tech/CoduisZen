@@ -1,0 +1,91 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "styles/themes/_base.css",
+      "language": "css",
+      "sizeLines": 108,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/acrylic.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/canvas.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/command.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/dashboard-personalities.css",
+      "language": "css",
+      "sizeLines": 186,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/fluent-pro.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/glassline.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/material-x.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/meridian.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/obsidian.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/tiles.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/themes/touch.css",
+      "language": "css",
+      "sizeLines": 39,
+      "fileCategory": "markup"
+    }
+  ],
+  "batchImportData": {
+    "styles/themes/_base.css": [],
+    "styles/themes/acrylic.css": [],
+    "styles/themes/canvas.css": [],
+    "styles/themes/command.css": [],
+    "styles/themes/dashboard-personalities.css": [],
+    "styles/themes/fluent-pro.css": [],
+    "styles/themes/glassline.css": [],
+    "styles/themes/material-x.css": [],
+    "styles/themes/meridian.css": [],
+    "styles/themes/obsidian.css": [],
+    "styles/themes/tiles.css": [],
+    "styles/themes/touch.css": []
+  }
+}

@@ -76,7 +76,8 @@ export const postPosOrderEntry = async (data: { orderId: string; amount: number;
             order.paymentMethod || 'CASH',
             data.amount,
             order.branchId || '',
-            order.type || 'DINE_IN'
+            order.type || 'DINE_IN',
+            { actorId: data.userId, source: 'POS_ORDER', correlationId: `POS_ORDER:${order.id}` },
         );
 
         if (typeof result === 'string') {
@@ -117,6 +118,9 @@ export const postPurchaseReceiptEntry = async (data: { poId: string; amount: num
             referenceType: 'GRN',
             description: `PO Receipt ${data.poId}`,
             createdBy: data.userId || 'system',
+            actorId: data.userId || 'system',
+            source: 'PURCHASE_RECEIPT',
+            correlationId: `PURCHASE_RECEIPT:${data.poId}`,
             branchId: data.branchId,
             lines: [
                 { accountCode: inventoryAccount, debit: amount, credit: 0 }, // Inventory Asset
@@ -167,6 +171,9 @@ export const postCogsForOrderEntry = async (data: { orderId: string; amount: num
             description: `COGS for Order #${data.orderId}`,
             branchId: data.branchId,
             createdBy: data.userId || 'system',
+            actorId: data.userId || 'system',
+            source: 'COGS',
+            correlationId: `COGS:${data.orderId}`,
             lines: [
                 { accountCode: cogsAccount, debit: amount, credit: 0 },
                 { accountCode: inventoryAccount, debit: 0, credit: amount },
@@ -248,6 +255,9 @@ export const reverseCogsForOrderEntry = async (data: { orderId: string; branchId
             description: `COGS reversal for cancelled Order #${data.orderId}`,
             branchId: data.branchId,
             createdBy: data.userId || 'system',
+            actorId: data.userId || 'system',
+            source: 'COGS_REVERSAL',
+            correlationId: `COGS_REVERSAL:${data.orderId}`,
             lines: [
                 { accountCode: inventoryAccount, debit: amount, credit: 0 },
                 { accountCode: cogsAccount, debit: 0, credit: amount },
@@ -288,6 +298,9 @@ export const postInventoryAdjustmentEntry = async (data: {
         description: `Inventory Adjustment ${data.referenceId}`,
         branchId: data.branchId,
         createdBy: data.userId || 'system',
+        actorId: data.userId || 'system',
+        source: 'INVENTORY_ADJUSTMENT',
+        correlationId: `INVENTORY_ADJUSTMENT:${data.referenceId}`,
         lines: [
             { accountCode: expenseAccount, debit: amount, credit: 0 },
             { accountCode: inventoryAccount, debit: 0, credit: amount }
@@ -316,6 +329,9 @@ export const postInventoryAdjustmentReversalEntry = async (data: {
         description: `Inventory Adjustment Reversal ${data.referenceId}`,
         branchId: data.branchId,
         createdBy: data.userId || 'system',
+        actorId: data.userId || 'system',
+        source: 'INVENTORY_ADJUSTMENT_REVERSAL',
+        correlationId: `INVENTORY_ADJUSTMENT_REVERSAL:${data.referenceId}`,
         lines: [
             { accountCode: inventoryAccount, debit: amount, credit: 0 },
             { accountCode: gainAccount, debit: 0, credit: amount }
@@ -338,6 +354,9 @@ export const postWastageEntry = async (data: { referenceId: string; amount: numb
             referenceType: 'WASTE',
             description: `Wastage: ${data.reason || data.referenceId}`,
             createdBy: data.userId || 'system',
+            actorId: data.userId || 'system',
+            source: 'WASTAGE',
+            correlationId: `WASTAGE:${data.referenceId}`,
             branchId: data.branchId,
             lines: [
                 { accountCode: wastageAccount, debit: amount, credit: 0 }, // Wastage Expense
@@ -377,6 +396,9 @@ export const postProductionCompletionEntry = async (data: {
             description: `Production Completion ${data.productionOrderId}`,
             branchId: data.branchId,
             createdBy: data.userId || 'system',
+            actorId: data.userId || 'system',
+            source: 'PRODUCTION_COMPLETION',
+            correlationId: `PRODUCTION_COMPLETION:${data.productionOrderId}`,
             lines: [
                 { accountCode: finishedGoodsAccount, debit: amount, credit: 0 },
                 { accountCode: inventoryAccount, debit: 0, credit: amount }

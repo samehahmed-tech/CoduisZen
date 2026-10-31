@@ -1017,7 +1017,7 @@ const OrdersCenter: React.FC = () => {
                                 <option value="waiting">{copy.sortWaiting}</option>
                             </select>
                         </div>
-                        <button type="button" aria-label={isAr ? 'تحديث الطلبات' : 'Refresh orders'} onClick={loadOrders} disabled={isLoading} className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-muted transition hover:text-main disabled:opacity-60">
+                        <button type="button" aria-label={isAr ? 'تحديث الطلبات' : 'Refresh orders'} onClick={() => { void loadOrders(); }} disabled={isLoading} className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-muted transition hover:text-main disabled:opacity-60">
                             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                         </button>
                     </div>
@@ -1126,7 +1126,7 @@ const OrdersCenter: React.FC = () => {
             {error && (
                 <div role="alert" className="mx-4 mt-3 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                     <span>{error}</span>
-                    <button type="button" onClick={loadOrders} disabled={isLoading} className="rounded-lg border border-rose-300 px-3 py-1.5 text-[11px] font-black transition hover:bg-rose-100 disabled:opacity-50">
+                    <button type="button" onClick={() => { void loadOrders(); }} disabled={isLoading} className="rounded-lg border border-rose-300 px-3 py-1.5 text-[11px] font-black transition hover:bg-rose-100 disabled:opacity-50">
                         {isAr ? 'إعادة المحاولة' : 'Retry'}
                     </button>
                 </div>

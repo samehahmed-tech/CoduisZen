@@ -11,8 +11,34 @@ import { getMenuCatalogSnapshot, getCatalogJob, getVendorCatalog, getVendorCateg
 import { busyMinutesToClosedUntil, getOutletStatus, setOutletStatus } from '../modules/talabat/talabatOutletService';
 import { buildStrikethroughBody, getPromotionJob, pushPromotion } from '../modules/talabat/talabatPromotionService';
 import logger from '../utils/logger';
+import { createSignedAuditLog } from '../services/auditService';
 
 const log = logger.child({ controller: 'talabat-admin' });
+
+const auditTalabatMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Talabat mutation: ${eventType}`,
+});
+
+const assertVendorBranchScope = async (req: Request, vendorId: string) => {
+    const vendor = String(vendorId || '').trim();
+    if (!vendor || !req.effectiveBranchId) return;
+    const config = await getTalabatConfigRaw();
+    const mappedBranchId = String(config.storeBranchMap?.[vendor] || '').trim();
+    if (!mappedBranchId) {
+        throw Object.assign(new Error('VENDOR_BRANCH_MAPPING_REQUIRED'), { status: 403 });
+    }
+    if (mappedBranchId !== String(req.effectiveBranchId)) {
+        throw Object.assign(new Error('BRANCH_MISMATCH'), { status: 403 });
+    }
+};
 
 export const getConfig = async (_req: Request, res: Response) => {
     res.json(await getTalabatConfig());
@@ -21,7 +47,9 @@ export const getConfig = async (_req: Request, res: Response) => {
 export const updateConfig = async (req: Request, res: Response) => {
     try {
         await saveTalabatConfig(req.body || {}, (req as any).user?.id || 'system');
-        res.json(await getTalabatConfig());
+        const config = await getTalabatConfig();
+        await auditTalabatMutation(req, 'TALABAT_CONFIG_UPDATED', { changedKeys: Object.keys(req.body || {}).sort() }, { updated: true });
+        res.json(config);
     } catch (err: any) {
         log.error({ err: err?.message }, 'Talabat config save failed');
         res.status(500).json({ error: 'TALABAT_CONFIG_SAVE_FAILED' });
@@ -33,9 +61,13 @@ export const syncOrder = async (req: Request, res: Response) => {
     const orderId = String(req.params.orderId || '').trim();
     if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
     try {
-        const [order] = await db.select({ status: orders.status, cancelReason: orders.cancelReason }).from(orders).where(eq(orders.id, orderId));
+        const [order] = await db.select({ status: orders.status, cancelReason: orders.cancelReason }).from(orders).where(and(
+            eq(orders.id, orderId),
+            req.effectiveBranchId ? eq(orders.branchId, req.effectiveBranchId) : undefined,
+        ));
         if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
         const result = await syncTalabatStatus(orderId, String(order.status), { cancellationReason: String((order as any).cancelReason || req.body?.cancellationReason || 'TOO_BUSY') });
+        await auditTalabatMutation(req, 'TALABAT_ORDER_SYNCED', { orderId, status: order.status }, { synced: result.synced });
         res.json({ ok: result.synced, ...result });
     } catch (err: any) {
         res.status(500).json({ error: 'TALABAT_SYNC_FAILED', details: String(err?.message || err) });
@@ -52,11 +84,29 @@ export const getHistory = async (req: Request, res: Response) => {
             id: orders.id, platformOrderId: orders.platformOrderId, status: orders.status,
             total: orders.total, branchId: orders.branchId, createdAt: orders.createdAt, notes: orders.notes,
         }).from(orders)
-            .where(and(eq(orders.deliverySource, 'talabat'), gte(orders.createdAt, start), lte(orders.createdAt, end)))
+            .where(and(
+                eq(orders.deliverySource, 'talabat'),
+                gte(orders.createdAt, start),
+                lte(orders.createdAt, end),
+                req.effectiveBranchId ? eq(orders.branchId, req.effectiveBranchId) : undefined,
+            ))
             .orderBy(desc(orders.createdAt)).limit(limit);
-        const inbound = await db.select().from(webhookDeliveries)
+        const inboundRows = await db.select().from(webhookDeliveries)
             .where(eq(webhookDeliveries.endpointId, 'talabat-inbound'))
             .orderBy(desc(webhookDeliveries.createdAt)).limit(limit);
+        const talabatConfig = req.effectiveBranchId ? await getTalabatConfigRaw() : null;
+        const inbound = req.effectiveBranchId
+            ? inboundRows.filter((row: any) => {
+                let payload: any = row.payload;
+                if (typeof payload === 'string') {
+                    try { payload = JSON.parse(payload); } catch { payload = null; }
+                }
+                const storeId = String(payload?.store_id || payload?.storeId || '').trim();
+                const payloadBranchId = String(payload?.branchId || payload?.branch_id || '').trim();
+                return payloadBranchId === String(req.effectiveBranchId)
+                    || Boolean(storeId && talabatConfig?.storeBranchMap?.[storeId] === req.effectiveBranchId);
+            })
+            : inboundRows;
         res.json({ orders: rows, inbound });
     } catch (err: any) {
         res.status(500).json({ error: 'TALABAT_HISTORY_FAILED' });
@@ -72,6 +122,18 @@ export const fetchRemoteOrder = async (req: Request, res: Response) => {
         if (!config.chainId || !config.clientId || !config.clientSecret) return res.status(400).json({ error: 'TALABAT_NOT_CONFIGURED' });
         const token = await getTalabatToken({ clientId: config.clientId, clientSecret: String(config.clientSecret), tokenUrl: config.tokenUrl });
         const res2 = await talabatGetOrder({ baseUrl: config.baseUrl, chainId: config.chainId, orderId: talabatOrderId, token });
+        if (res2.ok && req.effectiveBranchId) {
+            const remote: any = res2.data || {};
+            const remoteBranchId = String(remote.branchId || remote.branch_id || '').trim();
+            const remoteStoreId = String(remote.store_id || remote.storeId || remote.vendor_id || remote.vendorId || '').trim();
+            if (remoteBranchId && remoteBranchId !== String(req.effectiveBranchId)) {
+                return res.status(403).json({ error: 'BRANCH_MISMATCH' });
+            }
+            if (remoteStoreId) await assertVendorBranchScope(req, remoteStoreId);
+            if (!remoteBranchId && !remoteStoreId) {
+                return res.status(403).json({ error: 'REMOTE_ORDER_BRANCH_UNKNOWN' });
+            }
+        }
         res.status(res2.status).json(res2.data);
     } catch (err: any) {
         res.status(500).json({ error: 'TALABAT_FETCH_FAILED', details: String(err?.message || err) });
@@ -81,8 +143,12 @@ export const fetchRemoteOrder = async (req: Request, res: Response) => {
 /** Local E2E without Talabat: inject a synthetic RECEIVED payload through the real ingest path. */export const injectTestOrder = async (req: Request, res: Response) => {
     try {
         const config = await getTalabatConfigRaw();
-        const storeId = String(req.body?.store_id || Object.keys(config.storeBranchMap || {})[0] || config.defaultBranchId || '').trim();
+        const mappedStoreIds = Object.entries(config.storeBranchMap || {})
+            .filter(([, branchId]) => !req.effectiveBranchId || String(branchId) === String(req.effectiveBranchId))
+            .map(([storeId]) => storeId);
+        const storeId = String(req.body?.store_id || mappedStoreIds[0] || (!req.effectiveBranchId ? config.defaultBranchId : '') || '').trim();
         if (!storeId) return res.status(400).json({ error: 'STORE_ID_REQUIRED', message: 'Map a store in Talabat config first.' });
+        await assertVendorBranchScope(req, storeId);
         const payload = {
             order_id: `TEST-${randomUUID()}`,
             order_code: String(Math.floor(Math.random() * 9000) + 1000),
@@ -98,6 +164,7 @@ export const fetchRemoteOrder = async (req: Request, res: Response) => {
             order_total: Number(req.body?.order_total || 50),
         };
         const result = await ingestTalabatWebhook(payload);
+        await auditTalabatMutation(req, 'TALABAT_TEST_ORDER_INJECTED', { storeId, orderId: payload.order_id, itemCount: payload.items.length, total: payload.order_total }, { ingested: true });
         res.status(201).json({ ok: true, ...result, payload });
     } catch (err: any) {
         const status = Number(err?.status) || 400;
@@ -120,10 +187,12 @@ export const catalogPush = async (req: Request, res: Response) => {
     const vendorId = String(req.body?.vendor_id || req.body?.vendorId || '').trim();
     if (!vendorId) return res.status(400).json({ error: 'VENDOR_ID_REQUIRED' });
     try {
+        await assertVendorBranchScope(req, vendorId);
         const products = Array.isArray(req.body?.products) && req.body.products.length > 0
             ? req.body.products
             : await getMenuCatalogSnapshot();
         const job = await pushCatalogUpdates(vendorId, products);
+        await auditTalabatMutation(req, 'TALABAT_CATALOG_PUSH_REQUESTED', { vendorId, productCount: products.length }, { queued: true });
         res.status(202).json(job);
     } catch (err: any) {
         res.status(Number(err?.status) || 500).json({ error: String(err?.message || 'TALABAT_CATALOG_PUSH_FAILED'), details: (err as any)?.details });
@@ -140,7 +209,9 @@ export const catalogJobStatus = async (req: Request, res: Response) => {
 
 export const vendorCatalog = async (req: Request, res: Response) => {
     try {
-        res.json(await getVendorCatalog(String(req.params.vendorId || ''), {
+        const vendorId = String(req.params.vendorId || '');
+        await assertVendorBranchScope(req, vendorId);
+        res.json(await getVendorCatalog(vendorId, {
             query_term: req.query.query_term ? String(req.query.query_term) : undefined,
             page: req.query.page ? Number(req.query.page) : undefined,
             page_size: req.query.page_size ? Number(req.query.page_size) : undefined,
@@ -153,7 +224,9 @@ export const vendorCatalog = async (req: Request, res: Response) => {
 
 export const vendorCategories = async (req: Request, res: Response) => {
     try {
-        res.json(await getVendorCategories(String(req.params.vendorId || '')));
+        const vendorId = String(req.params.vendorId || '');
+        await assertVendorBranchScope(req, vendorId);
+        res.json(await getVendorCategories(vendorId));
     } catch (err: any) {
         res.status(Number(err?.status) || 500).json({ error: String(err?.message || 'TALABAT_CATEGORIES_FAILED') });
     }
@@ -161,7 +234,9 @@ export const vendorCategories = async (req: Request, res: Response) => {
 
 export const outletStatus = async (req: Request, res: Response) => {
     try {
-        res.json(await getOutletStatus(String(req.params.vendorId || '')));
+        const vendorId = String(req.params.vendorId || '');
+        await assertVendorBranchScope(req, vendorId);
+        res.json(await getOutletStatus(vendorId));
     } catch (err: any) {
         res.status(Number(err?.status) || 500).json({ error: String(err?.message || 'TALABAT_OUTLET_FAILED') });
     }
@@ -170,6 +245,7 @@ export const outletStatus = async (req: Request, res: Response) => {
 /** Body: {status, closed_reason?, closed_until?} or {busyMinutes} shortcut for TOO_BUSY_KITCHEN. */
 export const outletUpdate = async (req: Request, res: Response) => {
     try {
+        await assertVendorBranchScope(req, String(req.params.vendorId || ''));
         const body = req.body || {};
         const input: any = { status: body.status };
         if (body.closed_reason) input.closed_reason = body.closed_reason;
@@ -179,7 +255,9 @@ export const outletUpdate = async (req: Request, res: Response) => {
             input.closed_reason = input.closed_reason || 'TOO_BUSY_KITCHEN';
             input.closed_until = busyMinutesToClosedUntil(Number(body.busyMinutes));
         }
-        res.json(await setOutletStatus(String(req.params.vendorId || ''), input));
+        const result = await setOutletStatus(String(req.params.vendorId || ''), input);
+        await auditTalabatMutation(req, 'TALABAT_OUTLET_STATUS_UPDATED', { vendorId: String(req.params.vendorId || ''), status: input.status }, { updated: true });
+        res.json(result);
     } catch (err: any) {
         res.status(Number(err?.status) || 500).json({ error: String(err?.message || 'TALABAT_OUTLET_UPDATE_FAILED') });
     }
@@ -191,6 +269,7 @@ export const promotionPush = async (req: Request, res: Response) => {
         const b = req.body || {};
         const skus = Array.isArray(b.skus) ? b.skus : String(b.skus || '').split(',').map((s: string) => s.trim()).filter(Boolean);
         const vendors = Array.isArray(b.vendors) ? b.vendors : String(b.vendors || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        for (const vendor of vendors) await assertVendorBranchScope(req, String(vendor));
         const job = await pushPromotion({
             vendors,
             name: String(b.name || ''),
@@ -203,6 +282,7 @@ export const promotionPush = async (req: Request, res: Response) => {
             active: b.active !== false,
             locale: b.locale,
         });
+        await auditTalabatMutation(req, 'TALABAT_PROMOTION_PUSH_REQUESTED', { vendorCount: vendors.length, skuCount: skus.length, active: b.active !== false }, { queued: true });
         res.status(202).json(job);
     } catch (err: any) {
         res.status(Number(err?.status) || 500).json({ error: String(err?.message || 'TALABAT_PROMO_FAILED'), details: (err as any)?.details });

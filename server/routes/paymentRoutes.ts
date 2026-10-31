@@ -5,7 +5,7 @@ import { orders } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import logger from '../utils/logger';
 import { requireRoleOrPermission } from '../middleware/auth';
-import { enforceBranch } from '../middleware/branchIsolation';
+import { canAccessBranch, enforceBranch } from '../middleware/branchIsolation';
 
 const router = express.Router();
 // Reverse = void-like money-out; permission fallback keeps screen grants effective.
@@ -42,8 +42,8 @@ router.post('/sessions/initiate', async (req, res) => {
             return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
         }
 
-        if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'OWNER') {
-            if (user.branchId && user.branchId !== order.branchId) {
+        if (user && !canAccessBranch(user, order.branchId)) {
+            if (order.branchId) {
                 return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
             }
         }
@@ -54,12 +54,13 @@ router.post('/sessions/initiate', async (req, res) => {
             providerType as PaymentProviderType,
             deviceId || 'unknown',
             userId,
-            idempotencyKey
+            idempotencyKey,
+            req.effectiveBranchId,
         );
 
         res.status(201).json(session);
     } catch (error: any) {
-        logger.error({ error }, 'POST /sessions/initiate failed');
+        logger.error({ error: error?.message || String(error), code: error?.code }, 'POST /sessions/initiate failed');
         sendPaymentError(res, error);
     }
 });
@@ -75,21 +76,21 @@ router.post('/sessions/:id/confirm', async (req, res) => {
         const user = (req as any).user;
 
         // Branch Isolation Check
-        if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'OWNER' && user.branchId) {
+        if (user) {
             const sessionData = await db.query.paymentSessions.findFirst({ where: (s, { eq }) => eq(s.id, sessionId) });
             if (!sessionData) return res.status(404).json({ error: 'SESSION_NOT_FOUND' });
             
             const order = await db.query.orders.findFirst({ where: eq(orders.id, sessionData.orderId!) });
-            if (order && order.branchId !== user.branchId) {
+            if (order && !canAccessBranch(user, order.branchId)) {
                 return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
             }
         }
 
-        const session = await PaymentSessionService.confirmPayment(sessionId, externalReference);
+        const session = await PaymentSessionService.confirmPayment(sessionId, externalReference, user?.id || 'system', req.effectiveBranchId);
 
         res.status(200).json(session);
     } catch (error: any) {
-        logger.error({ error, sessionId: req.params.id }, 'POST /sessions/:id/confirm failed');
+        logger.error({ error: error?.message || String(error), code: error?.code, sessionId: req.params.id }, 'POST /sessions/:id/confirm failed');
         sendPaymentError(res, error);
     }
 });
@@ -104,20 +105,20 @@ router.post('/sessions/:id/reverse', async (req, res) => {
         const user = (req as any).user;
 
         // Branch Isolation Check
-        if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'OWNER' && user.branchId) {
+        if (user) {
             const sessionData = await db.query.paymentSessions.findFirst({ where: (s, { eq }) => eq(s.id, sessionId) });
             if (!sessionData) return res.status(404).json({ error: 'SESSION_NOT_FOUND' });
             
             const order = await db.query.orders.findFirst({ where: eq(orders.id, sessionData.orderId!) });
-            if (order && order.branchId !== user.branchId) {
+            if (order && !canAccessBranch(user, order.branchId)) {
                 return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
             }
         }
 
-        const session = await PaymentSessionService.reversePayment(sessionId, reason || 'User voided');
+        const session = await PaymentSessionService.reversePayment(sessionId, reason || 'User voided', user?.id || 'system', req.effectiveBranchId);
         res.status(200).json(session);
     } catch (error: any) {
-        logger.error({ error, sessionId: req.params.id }, 'POST /sessions/:id/reverse failed');
+        logger.error({ error: error?.message || String(error), code: error?.code, sessionId: req.params.id }, 'POST /sessions/:id/reverse failed');
         sendPaymentError(res, error);
     }
 });

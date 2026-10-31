@@ -1,0 +1,293 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "tests/orderVoidApproval.test.ts",
+      "language": "typescript",
+      "sizeLines": 131,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/paginationPolicy.test.ts",
+      "language": "typescript",
+      "sizeLines": 209,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/paymentReconciliation.test.ts",
+      "language": "typescript",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/paymentSessionSafety.test.ts",
+      "language": "typescript",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/payrollCloseIsolation.test.ts",
+      "language": "typescript",
+      "sizeLines": 101,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/payrollCompliance.test.ts",
+      "language": "typescript",
+      "sizeLines": 198,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/payrollWorkRules.test.ts",
+      "language": "typescript",
+      "sizeLines": 302,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/permissionGates.test.ts",
+      "language": "typescript",
+      "sizeLines": 258,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/printCapabilityClaim.test.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/printQueueBranchIsolation.test.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/probeDayCloseExpense.test.ts",
+      "language": "typescript",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/purchaseOrderPartialReceive.test.ts",
+      "language": "typescript",
+      "sizeLines": 201,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/purchaseOrderWarehouseFlow.test.ts",
+      "language": "typescript",
+      "sizeLines": 201,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/refundWorkflow.test.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/setupSecurity.test.ts",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/sqlServerDateParameters.test.ts",
+      "language": "typescript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/stockCountDraft.test.ts",
+      "language": "typescript",
+      "sizeLines": 147,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/stockMovementLogBranchScope.test.ts",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/tableOperationsApi.test.ts",
+      "language": "typescript",
+      "sizeLines": 158,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/tableOrderEdit.test.ts",
+      "language": "typescript",
+      "sizeLines": 270,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/talabatIngest.test.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/unitConversion.test.ts",
+      "language": "typescript",
+      "sizeLines": 6,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/userDeleteAndCopy.test.ts",
+      "language": "typescript",
+      "sizeLines": 140,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/userRouteSecurity.test.ts",
+      "language": "typescript",
+      "sizeLines": 133,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/warehouseStockCountScope.test.ts",
+      "language": "typescript",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/wastageValidation.test.ts",
+      "language": "typescript",
+      "sizeLines": 74,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/whatsappBaileys.test.ts",
+      "language": "typescript",
+      "sizeLines": 174,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/zz-inspect-payroll-ddl.test.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "tests/orderVoidApproval.test.ts": [
+      "server/db/index.ts",
+      "server/services/orderLifecycleService.ts",
+      "server/utils/businessDate.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/paginationPolicy.test.ts": [
+      "server/middleware/pagination.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/paymentReconciliation.test.ts": [
+      "server/services/paymentReconciliation.ts"
+    ],
+    "tests/paymentSessionSafety.test.ts": [
+      "server/db/index.ts",
+      "server/services/paymentSessionService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/payrollCloseIsolation.test.ts": [
+      "server/db/index.ts",
+      "server/services/payrollCloseService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/payrollCompliance.test.ts": [
+      "server/db/index.ts",
+      "server/services/payrollCalculationService.ts",
+      "server/services/payrollComplianceService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/payrollWorkRules.test.ts": [
+      "server/db/index.ts",
+      "server/services/payrollCalculationService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/permissionGates.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/printCapabilityClaim.test.ts": [
+      "server/db/index.ts",
+      "server/services/printQueueService.ts",
+      "server/services/printerBridgeService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/printQueueBranchIsolation.test.ts": [
+      "server/db/index.ts",
+      "server/services/printQueueService.ts"
+    ],
+    "tests/probeDayCloseExpense.test.ts": [
+      "server/db/index.ts",
+      "server/services/dayCloseService.ts",
+      "server/services/glService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/purchaseOrderPartialReceive.test.ts": [
+      "server/controllers/procurementController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/purchaseOrderWarehouseFlow.test.ts": [
+      "server/controllers/procurementController.ts",
+      "server/controllers/purchaseOrderController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/refundWorkflow.test.ts": [
+      "server/db/index.ts",
+      "server/services/refundService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/setupSecurity.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/sqlServerDateParameters.test.ts": [
+      "server/db/index.ts"
+    ],
+    "tests/stockCountDraft.test.ts": [
+      "server/controllers/inventoryCountController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/stockMovementLogBranchScope.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/tableOperationsApi.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/tableOrderEdit.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/talabatIngest.test.ts": [
+      "server/modules/talabat/talabatIngestService.ts"
+    ],
+    "tests/unitConversion.test.ts": [
+      "server/services/unitConversion.ts"
+    ],
+    "tests/userDeleteAndCopy.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/userRouteSecurity.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/warehouseStockCountScope.test.ts": [
+      "server/controllers/inventoryCountController.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/wastageValidation.test.ts": [
+      "src/db/schema.ts"
+    ],
+    "tests/whatsappBaileys.test.ts": [
+      "server/db/index.ts",
+      "server/services/whatsappConnection.ts",
+      "server/services/whatsappService.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/zz-inspect-payroll-ddl.test.ts": [
+      "server/db/index.ts"
+    ]
+  }
+}

@@ -1,0 +1,381 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/backfill-pin-lookup.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/db-inspect-zones.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/dev-bootstrap-auth.ts",
+      "language": "typescript",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-floor-zones.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-orders-schema.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/fix-orders-table.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/repair-delivery-map-columns.ts",
+      "language": "typescript",
+      "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/repair-finance-foundation.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/reset-admin.ts",
+      "language": "typescript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/reset-attendance-and-resync.ts",
+      "language": "typescript",
+      "sizeLines": 128,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/reset-menu-full.ts",
+      "language": "typescript",
+      "sizeLines": 130,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/seed-load-test-catalog.ts",
+      "language": "typescript",
+      "sizeLines": 478,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/seed-roles-permissions.ts",
+      "language": "typescript",
+      "sizeLines": 474,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-drizzle-chains.mjs",
+      "language": "javascript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-drizzle-query.mjs",
+      "language": "javascript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-session-query.mjs",
+      "language": "javascript",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/zero-composite-stock.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/config/cors.ts",
+      "language": "typescript",
+      "sizeLines": 59,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/config/env.ts",
+      "language": "typescript",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/aggregatorAdminController.ts",
+      "language": "typescript",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/aggregatorWebhookController.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/analyticsController.ts",
+      "language": "typescript",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/approvalController.ts",
+      "language": "typescript",
+      "sizeLines": 379,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/auditController.ts",
+      "language": "typescript",
+      "sizeLines": 458,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/authController.ts",
+      "language": "typescript",
+      "sizeLines": 1108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/barcodeLabelController.ts",
+      "language": "typescript",
+      "sizeLines": 285,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/barcodeLookupController.ts",
+      "language": "typescript",
+      "sizeLines": 179,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/branchController.ts",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/budgetController.ts",
+      "language": "typescript",
+      "sizeLines": 272,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/butcheryController.ts",
+      "language": "typescript",
+      "sizeLines": 1062,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/callCenterSupervisorController.ts",
+      "language": "typescript",
+      "sizeLines": 669,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/campaignController.ts",
+      "language": "typescript",
+      "sizeLines": 332,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/coaMappingController.ts",
+      "language": "typescript",
+      "sizeLines": 183,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/customerController.ts",
+      "language": "typescript",
+      "sizeLines": 432,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/dayCloseController.ts",
+      "language": "typescript",
+      "sizeLines": 330,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "scripts/backfill-pin-lookup.ts": [
+      "server/db/index.ts"
+    ],
+    "scripts/db-inspect-zones.ts": [
+      "server/db/index.ts"
+    ],
+    "scripts/dev-bootstrap-auth.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "scripts/fix-floor-zones.ts": [
+      "server/db/index.ts"
+    ],
+    "scripts/fix-orders-schema.ts": [
+      "src/db/index.ts"
+    ],
+    "scripts/fix-orders-table.ts": [
+      "src/db/index.ts"
+    ],
+    "scripts/repair-delivery-map-columns.ts": [
+      "server/db/index.ts"
+    ],
+    "scripts/repair-finance-foundation.ts": [
+      "server/db/index.ts",
+      "server/services/coaSeedService.ts"
+    ],
+    "scripts/reset-admin.ts": [
+      "server/db/index.ts",
+      "server/services/passwordPolicyService.ts"
+    ],
+    "scripts/reset-attendance-and-resync.ts": [
+      "server/db/index.ts",
+      "server/services/attendanceOpsService.ts",
+      "server/services/zktecoConnectorService.ts",
+      "src/db/schema.ts"
+    ],
+    "scripts/reset-menu-full.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "scripts/seed-load-test-catalog.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "scripts/seed-roles-permissions.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "scripts/test-drizzle-chains.mjs": [
+      "src/db/schema.ts"
+    ],
+    "scripts/test-drizzle-query.mjs": [
+      "src/db/schema.ts"
+    ],
+    "scripts/test-session-query.mjs": [
+      "src/db/schema.ts"
+    ],
+    "scripts/zero-composite-stock.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/config/cors.ts": [],
+    "server/config/env.ts": [],
+    "server/controllers/aggregatorAdminController.ts": [
+      "server/db/index.ts",
+      "server/modules/aggregators/aggregatorConfig.ts",
+      "server/modules/aggregators/aggregatorIngestService.ts",
+      "server/modules/aggregators/aggregatorTypes.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/aggregatorWebhookController.ts": [
+      "server/modules/aggregators/aggregatorIngestService.ts",
+      "server/modules/aggregators/aggregatorTypes.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/controllers/analyticsController.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/approvalController.ts": [
+      "server/controllers/wastageController.ts",
+      "server/db/index.ts",
+      "server/services/glService.ts",
+      "server/services/managerApprovalAuth.ts",
+      "server/utils/dbErrors.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/auditController.ts": [
+      "server/config/env.ts",
+      "server/db/index.ts",
+      "server/middleware/pagination.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/authController.ts": [
+      "server/config/env.ts",
+      "server/db/index.ts",
+      "server/services/auditLogService.ts",
+      "server/services/loginProtectionService.ts",
+      "server/services/passwordPolicyService.ts",
+      "server/services/totpService.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts",
+      "types.ts"
+    ],
+    "server/controllers/barcodeLabelController.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/barcodeLookupController.ts": [
+      "server/db/index.ts",
+      "server/utils/request.ts"
+    ],
+    "server/controllers/branchController.ts": [
+      "server/db/index.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/budgetController.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/butcheryController.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/services/butcheryService.ts",
+      "server/services/financePostingService.ts",
+      "server/services/inventoryService.ts",
+      "server/socket.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/callCenterSupervisorController.ts": [
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/campaignController.ts": [
+      "server/db/index.ts",
+      "server/services/smsService.ts",
+      "server/services/whatsappService.ts",
+      "server/utils/logger.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/coaMappingController.ts": [
+      "server/db/index.ts",
+      "server/services/postingRuleEngine.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/customerController.ts": [
+      "server/db/index.ts",
+      "server/middleware/pagination.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/dayCloseController.ts": [
+      "server/services/dayCloseService.ts",
+      "server/services/pdfService.ts"
+    ]
+  }
+}

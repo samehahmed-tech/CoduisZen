@@ -12,7 +12,9 @@ export interface SyncQueueItem {
     action: string;
     payload: any;
     dedupeKey: string;
-    status: 'PENDING' | 'SYNCED' | 'FAILED';
+    /** Branch captured when the offline mutation was created. */
+    branchId: string;
+    status: 'PENDING' | 'SYNCED' | 'FAILED' | 'CONFLICT';
     retryCount: number;
     lastError?: string;
     createdAt: number;
@@ -20,6 +22,12 @@ export interface SyncQueueItem {
     lastAttemptAt?: number;
     nextAttemptAt?: number;
     lockedAt?: number;
+    conflict?: {
+        code: string;
+        message: string;
+        serverState?: any;
+        detectedAt: number;
+    };
 }
 
 export class CoduisZenLocalDb extends Dexie {
@@ -113,6 +121,25 @@ export class CoduisZenLocalDb extends Dexie {
             floorTables: 'id, branchId',
             floorZones: 'id, branchId',
             syncQueue: 'id, status, createdAt, entity, dedupeKey, nextAttemptAt'
+        });
+
+        // Phase 3: bind every offline mutation to the active branch.
+        this.version(6).stores({
+            orders: 'id, status, syncStatus, createdAt',
+            menuCategories: 'id, updatedAt',
+            menuItems: 'id, categoryId, updatedAt',
+            customers: 'id, phone, updatedAt',
+            inventoryItems: 'id, updatedAt',
+            warehouses: 'id, branchId, updatedAt',
+            suppliers: 'id, name',
+            purchaseOrders: 'id, supplierId, status, createdAt',
+            settings: 'key, updatedAt',
+            users: 'id, email',
+            branches: 'id',
+            auditLogs: 'id, createdAt',
+            floorTables: 'id, branchId',
+            floorZones: 'id, branchId',
+            syncQueue: 'id, status, branchId, createdAt, entity, dedupeKey, nextAttemptAt'
         });
     }
 

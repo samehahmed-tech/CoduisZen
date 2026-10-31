@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CODUIS XEN — Sidebar Design Studio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@500;600;700;800&display=swap');
+
+    * { box-sizing: border-box; }
+    :root {
+      --studio-bg: #0b0c0e;
+      --studio-panel: #111317;
+      --studio-line: rgba(255,255,255,.12);
+      --studio-ink: #f3f1eb;
+      --studio-muted: #9299a4;
+      --accent: #f2a900;
+      --rail-w: 78px;
+      --rail-open: 326px;
+      --ease: cubic-bezier(.22,1,.36,1);
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--studio-ink);
+      background:
+        linear-gradient(rgba(255,255,255,.024) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.024) 1px, transparent 1px),
+        var(--studio-bg);
+      background-size: 48px 48px;
+      font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+    body::before {
+      content:""; position:fixed; z-index:-1; inset:-20%; pointer-events:none;
+      background:radial-gradient(circle at 76% 18%, color-mix(in srgb,var(--accent) 9%,transparent), transparent 28%);
+      animation:studioAtmosphere 9s ease-in-out infinite alternate;
+    }
+    button { font: inherit; }
+    .studio { width: min(1500px, calc(100% - 36px)); margin: 0 auto; padding: 26px 0 46px; }
+    .masthead {
+      direction: ltr;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 26px;
+      padding: 0 2px 22px;
+      border-bottom: 1px solid var(--studio-line);
+      animation:studioRise .8s var(--ease) both;
+    }
+    .eyebrow { color: var(--accent); font: 700 11px/1.3 monospace; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { margin: 8px 0 0; font: 800 clamp(25px, 3.3vw, 52px)/.96 "Noto Kufi Arabic", sans-serif; letter-spacing: -.045em; }
+    .mast-copy { direction: rtl; max-width: 470px; color: var(--studio-muted); font-size: 14px; line-height: 1.8; }
+    .edition { align-self: start; border-inline-start: 1px solid var(--studio-line); padding-inline-start: 24px; color: #666e79; font: 600 10px/1.7 monospace; letter-spacing: .12em; }
+
+    .control-deck {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 0;
+      animation:studioRise .8s var(--ease) .12s both;
+    }
+    .directions { direction: rtl; display: flex; gap: 6px; min-width: 0; }
+    .direction {
+      position: relative;
+      display: grid;
+      grid-template-columns: 28px auto;
+      align-items: center;
+      gap: 11px;
+      min-width: 190px;
+      padding: 11px 14px;
+      border: 0;
+      border-bottom: 1px solid var(--studio-line);
+      color: #858d97;
+      background: transparent;
+      text-align: right;
+      cursor: pointer;
+      transition: color .22s ease, background .22s ease;
+    }
+    .direction:hover { color: white; background: rgba(255,255,255,.035); }
+    .direction[aria-selected="true"] { color: white; border-bottom-color: var(--accent); }
+    .direction[aria-selected="true"]::after { content:""; position:absolute; bottom:-1px; inset-inline-start:0; width:42%; height:3px; background:var(--accent); }
+    .dir-no { direction:ltr; color: var(--accent); font: 700 12px monospace; }
+    .dir-title { display:block; font-weight:700; font-size:13px; }
+    .dir-sub { display:block; color:#69717d; font:500 9px monospace; letter-spacing:.06em; text-transform:uppercase; margin-top:3px; }
+    .tools { direction: ltr; display:flex; gap:8px; }
+    .tool {
+      width: 40px; height:40px; display:grid; place-items:center;
+      color:#c4cad2; background:#15181d; border:1px solid var(--studio-line);
+      cursor:pointer; transition:.2s ease;
+    }
+    .tool:hover, .tool.is-on { color:#0c0d0f; background:var(--accent); border-color:var(--accent); }
+    .tool svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; }
+
+    .stage-shell { position:relative; animation:studioRise .9s var(--ease) .22s both; }
+    .stage-meta {
+      direction:ltr; display:flex; justify-content:space-between; align-items:center;
+      padding: 9px 13px; color:#6f7781; border:1px solid var(--studio-line); border-bottom:0;
+      background:#0e1013; font:600 9px monospace; letter-spacing:.09em;
+    }
+    .live-dot { display:inline-flex; align-items:center; gap:8px; }
+    .live-dot::before { content:""; width:6px; height:6px; border-radius:50%; background:#4cd184; box-shadow:0 0 0 4px rgba(76,209,132,.12); }
+    .viewport {
+      --app-bg:#e9edf0; --app-ink:#102134; --app-muted:#6d7b88;
+      position: relative;
+      height: min(760px, calc(100vh - 235px));
+      min-height: 610px;
+      overflow: hidden;
+      color:var(--app-ink);
+      background:var(--app-bg);
+      border:1px solid var(--studio-line);
+      isolation:isolate;
+      transition: width .5s var(--ease), border-radius .5s var(--ease), background .3s ease;
+      view-transition-name:design-canvas;
+    }
+    ::view-transition-old(design-canvas) { animation:viewFoldOut .38s cubic-bezier(.7,0,.84,0) both; transform-origin:right center; }
+    ::view-transition-new(design-canvas) { animation:viewFoldIn .7s cubic-bezier(.16,1,.3,1) both; transform-origin:right center; }
+    .viewport::after {
+      content:""; position:absolute; z-index:30; inset:0; pointer-events:none;
+      background:linear-gradient(112deg, transparent 0 36%, color-mix(in srgb,var(--accent) 78%,white) 48%, transparent 60%);
+      transform:translateX(145%); opacity:0;
+    }
+    .viewport.concept-enter::after { animation:conceptBlade .72s var(--ease) both; }
+    .viewport.motion-flash .mock-content { animation:contentFlash .56s var(--ease); }
+    .viewport.theme-dark { --app-bg:#11161b; --app-ink:#e8edf0; --app-muted:#84909a; }
+    .viewport.is-mobile { width:390px; margin-inline:auto; border-radius:24px; }
+    .viewport.is-mobile .mock-content { right:0; padding:70px 18px 28px; overflow-y:auto; }
+    .viewport.is-mobile .metric-line { grid-template-columns:1fr 1fr; }
+    .viewport.is-mobile .hero-row { grid-template-columns:1fr; }
+    .viewport.is-mobile .order { grid-template-columns:56px 1fr; }
+    .viewport.is-mobile .order span:last-child { grid-column:2; }
+    .viewport.is-mobile .side-rail { width: min(326px, calc(100% - 48px)); clip-path:inset(0); transform:translateX(100%); }
+    .viewport.is-mobile .side-rail.mobile-visible { transform:translateX(0); }
+    .viewport.is-mobile .mobile-fab { display:grid; }
+    .viewport.is-mobile .scrim { display:block; opacity:0; pointer-events:none; }
+    .viewport.is-mobile .side-rail.mobile-visible ~ .scrim { opacity:1; pointer-events:auto; }
+
+    .mock-content {
+      position:absolute; inset:0 var(--rail-w) 0 0;
+      padding:22px 28px 30px;
+      overflow:hidden;
+      transform-origin:left center;
+      transition: right .54s var(--ease), filter .3s ease, transform .68s var(--ease);
+    }
+    .viewport:has(.side-rail:hover):not(.rail-pinned):not(.is-mobile) .mock-content { transform:perspective(1300px) rotateY(-1.15deg) translateX(-10px) scale(.992); filter:saturate(.86) brightness(.95); }
+    .viewport.rail-pinned .mock-content { right:var(--rail-open); }
+    .topline { display:flex; justify-content:space-between; align-items:center; padding-bottom:17px; border-bottom:1px solid color-mix(in srgb, var(--app-ink) 13%, transparent); }
+    .crumb { font-size:12px; font-weight:700; }
+    .avatar { width:34px; height:34px; display:grid; place-items:center; color:white; background:#7c3aed; border-radius:50%; font-size:12px; }
+    .metric-line { display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; margin-top:24px; background:color-mix(in srgb, var(--app-ink) 11%, transparent); border:1px solid color-mix(in srgb, var(--app-ink) 11%, transparent); }
+    .metric { min-height:116px; padding:19px; background:var(--app-bg); }
+    .metric small { color:var(--app-muted); font-size:10px; }
+    .metric strong { display:block; margin-top:17px; font-size:25px; letter-spacing:-.04em; }
+    .hero-row { display:grid; grid-template-columns:1.55fr .75fr; gap:22px; margin-top:22px; }
+    .panel { min-height:230px; padding:24px; border:1px solid color-mix(in srgb, var(--app-ink) 12%, transparent); }
+    .panel h2 { margin:0; font:800 26px/1.25 "Noto Kufi Arabic",sans-serif; }
+    .panel p { max-width:570px; color:var(--app-muted); font-size:12px; line-height:1.9; }
+    .chart { display:flex; align-items:end; gap:9px; height:92px; margin-top:26px; }
+    .bar { flex:1; height:var(--h); background:color-mix(in srgb, var(--accent) 68%, var(--app-ink)); }
+    .orders { margin-top:22px; border-top:3px solid var(--accent); }
+    .order { display:grid; grid-template-columns:80px 1fr 110px; gap:18px; padding:14px 0; border-bottom:1px solid color-mix(in srgb, var(--app-ink) 10%, transparent); font-size:11px; }
+    .order span:last-child { color:var(--app-muted); }
+
+    .side-rail {
+      --rail-bg:#0c1014; --rail-ink:#f6f4ed; --rail-muted:#7d8790; --rail-rule:rgba(255,255,255,.12);
+      position:absolute; z-index:12; top:0; right:0; bottom:0;
+      width:var(--rail-open); color:var(--rail-ink); background:var(--rail-bg);
+      overflow:hidden; box-shadow:-14px 0 38px rgba(0,0,0,.09);
+      clip-path:inset(0 0 0 calc(100% - var(--rail-w)));
+      will-change:clip-path,transform;
+      transition:clip-path .72s cubic-bezier(.16,1,.3,1), transform .62s cubic-bezier(.16,1,.3,1), background .3s ease, box-shadow .45s ease;
+    }
+    .side-rail:hover, .viewport.rail-pinned .side-rail { clip-path:inset(0); box-shadow:-28px 0 70px rgba(0,0,0,.22); }
+    .rail-inner { position:relative; width:var(--rail-open); height:100%; display:flex; flex-direction:column; }
+    .rail-inner::before {
+      content:""; position:absolute; z-index:20; inset-inline:0; top:-12%; height:11%; pointer-events:none; opacity:0;
+      background:linear-gradient(transparent, color-mix(in srgb,var(--accent) 36%,transparent), transparent);
+    }
+    .side-rail:hover .rail-inner::before, .rail-pinned .rail-inner::before, .mobile-visible .rail-inner::before { animation:railScanner 1.05s var(--ease) .05s both; }
+    .rail-inner::after {
+      content:""; position:absolute; z-index:0; inset:0; pointer-events:none; opacity:0;
+      background:radial-gradient(210px circle at var(--spot-x,72%) var(--spot-y,28%), color-mix(in srgb,var(--accent) 19%,transparent), transparent 72%);
+      transition:opacity .35s ease;
+    }
+    .side-rail:hover .rail-inner::after, .rail-pinned .rail-inner::after, .mobile-visible .rail-inner::after { opacity:1; }
+    .rail-inner > * { position:relative; z-index:1; }
+    .brand-zone { flex:0 0 118px; display:flex; align-items:center; position:relative; border-bottom:1px solid var(--rail-rule); }
+    .logo-frame { position:relative; width:var(--rail-w); flex:0 0 var(--rail-w); display:grid; place-items:center; align-self:stretch; }
+    .logo-frame::before {
+      content:""; position:absolute; width:62px; height:62px; border:1px solid color-mix(in srgb,var(--accent) 58%,transparent);
+      opacity:0; transform:scale(.55) rotate(-35deg); transition:opacity .28s ease, transform .85s var(--ease);
+    }
+    .side-rail:hover .logo-frame::before, .rail-pinned .logo-frame::before, .mobile-visible .logo-frame::before { opacity:.78; transform:scale(1) rotate(0); }
+    .logo-frame img { width:57px; height:57px; object-fit:contain; filter:drop-shadow(0 5px 8px rgba(0,0,0,.22)); transform-origin:center; transition:transform .55s var(--ease), filter .45s ease; }
+    .side-rail:hover .logo-frame img, .rail-pinned .logo-frame img, .mobile-visible .logo-frame img { transform:scale(1.12) rotate(-2deg); filter:drop-shadow(0 9px 16px color-mix(in srgb,var(--accent) 30%,transparent)); }
+    .brand-copy { min-width:0; opacity:0; transform:translateX(16px); transition:opacity .22s ease .06s, transform .4s var(--ease) .04s; }
+    .side-rail:hover .brand-copy, .rail-pinned .brand-copy, .mobile-visible .brand-copy { opacity:1; transform:none; }
+    .brand-copy strong { display:block; font:800 20px/1 "Noto Kufi Arabic",sans-serif; letter-spacing:-.05em; white-space:nowrap; }
+    .brand-copy small { display:block; margin-top:8px; color:var(--rail-muted); font:600 8px monospace; letter-spacing:.15em; }
+    .pin {
+      position:absolute; inset-inline-end:10px; inset-block-start:10px; width:25px; height:25px;
+      display:grid; place-items:center; color:var(--rail-muted); background:transparent; border:1px solid var(--rail-rule); cursor:pointer;
+      opacity:0; transition:.2s ease;
+    }
+    .side-rail:hover .pin, .rail-pinned .pin, .mobile-visible .pin { opacity:1; }
+    .pin svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; }
+    .nav-scroll { flex:1; padding:20px 0 16px; overflow:hidden; }
+    .section-mark { display:flex; align-items:center; height:24px; margin-bottom:5px; color:var(--rail-muted); }
+    .section-mark b { width:var(--rail-w); text-align:center; font:700 9px monospace; color:var(--accent); }
+    .section-mark span { opacity:0; font-size:9px; font-weight:700; letter-spacing:.09em; transition:.2s ease; white-space:nowrap; }
+    .side-rail:hover .section-mark span, .rail-pinned .section-mark span, .mobile-visible .section-mark span { opacity:1; }
+    .nav-item {
+      position:relative; width:100%; height:52px; display:flex; align-items:center;
+      color:var(--rail-muted); background:transparent; border:0; padding:0; cursor:pointer; text-align:right;
+    }
+    .nav-item:focus-visible { outline:2px solid var(--accent); outline-offset:-3px; }
+    .nav-item:hover { color:var(--rail-ink); }
+    .nav-icon { position:relative; width:var(--rail-w); flex:0 0 var(--rail-w); height:100%; display:grid; place-items:center; }
+    .nav-icon::after { content:""; position:absolute; width:38px; height:38px; border:1px solid currentColor; border-radius:50%; opacity:0; transform:scale(.35); pointer-events:none; }
+    .nav-item.active-pulse .nav-icon::after { animation:navShockwave .62s cubic-bezier(.1,.8,.2,1); }
+    .nav-icon svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transform-origin:center; transition:transform .38s var(--ease), color .25s ease, filter .25s ease; }
+    .nav-label { opacity:0; clip-path:inset(0 100% 0 0); transform:translateX(22px) skewX(-5deg); font-size:13px; font-weight:600; white-space:nowrap; transition:opacity .24s ease .16s, clip-path .48s var(--ease), transform .52s var(--ease); }
+    .side-rail:hover .nav-label, .rail-pinned .nav-label, .mobile-visible .nav-label { opacity:1; clip-path:inset(0); transform:none; transition-delay:calc(var(--i, 0) * 24ms + 80ms); }
+    .nav-item:hover .nav-icon svg { transform:translateX(-4px) scale(1.16) rotate(-3deg); filter:drop-shadow(0 0 8px color-mix(in srgb,var(--accent) 50%,transparent)); }
+    .nav-item.active-pulse .nav-icon svg { animation:iconConfirm .52s cubic-bezier(.16,1.5,.35,1); }
+    .nav-item.active { color:var(--rail-ink); }
+    .rail-footer { flex:0 0 118px; border-top:1px solid var(--rail-rule); display:flex; flex-direction:column; justify-content:center; }
+    .footer-command { height:48px; display:flex; align-items:center; color:var(--rail-muted); }
+    .keycap { margin-inline-start:auto; margin-inline-end:16px; border:1px solid var(--rail-rule); padding:3px 7px; font:700 8px monospace; opacity:0; }
+    .side-rail:hover .keycap, .rail-pinned .keycap, .mobile-visible .keycap { opacity:1; }
+    .mobile-fab { display:none; position:absolute; z-index:9; right:16px; top:16px; width:44px; height:44px; place-items:center; color:white; background:#10151a; border:0; }
+    .mobile-fab svg { width:19px; fill:none; stroke:currentColor; stroke-width:2; }
+    .scrim { display:none; position:absolute; z-index:10; inset:0; background:rgba(3,6,9,.65); backdrop-filter:blur(3px); transition:.3s ease; }
+
+    /* A — Command Monolith */
+    .viewport[data-concept="a"] .side-rail { --rail-bg:#0b0d10; --rail-ink:#f4f1e8; --rail-muted:#707984; }
+    .viewport[data-concept="a"] .side-rail::before { content:""; position:absolute; inset-block:0; inset-inline-start:0; width:3px; background:var(--accent); }
+    .viewport[data-concept="a"] .nav-item.active { background:var(--accent); color:#11120f; }
+    .viewport[data-concept="a"] .nav-item.active { animation:activeStrike .5s var(--ease) both; }
+    .viewport[data-concept="a"] .nav-item.active::after { content:""; position:absolute; inset-inline-start:0; border-block:26px solid transparent; border-inline-start:10px solid var(--rail-bg); }
+    .viewport[data-concept="a"] .nav-item.active .nav-icon svg { stroke-width:2.25; }
+    .viewport[data-concept="a"] .brand-copy strong { text-transform:uppercase; }
+    .viewport[data-concept="a"] .logo-frame::before { border-radius:0; box-shadow:inset 0 0 0 5px var(--rail-bg), inset 0 0 0 6px color-mix(in srgb,var(--accent) 25%,transparent); }
+    .viewport[data-concept="a"] .side-rail:hover .logo-frame::before, .viewport[data-concept="a"].rail-pinned .logo-frame::before { animation:monolithLock 1.05s steps(4,end) both; }
+
+    /* B — Editorial Ledger */
+    .viewport[data-concept="b"] .side-rail { --rail-bg:#eee6d7; --rail-ink:#241f19; --rail-muted:#7c7165; --rail-rule:rgba(42,32,22,.18); box-shadow:-15px 0 38px rgba(56,38,21,.12); }
+    .viewport[data-concept="b"] .brand-zone { flex-basis:145px; align-items:flex-start; padding-top:24px; }
+    .viewport[data-concept="b"] .logo-frame img { width:50px; height:50px; filter:sepia(.18) contrast(1.08); }
+    .viewport[data-concept="b"] .brand-copy strong { font-size:17px; font-weight:700; }
+    .viewport[data-concept="b"] .brand-copy small { color:#9b5a35; }
+    .viewport[data-concept="b"] .nav-scroll { padding-top:10px; }
+    .viewport[data-concept="b"] .nav-item { height:55px; }
+    .viewport[data-concept="b"] .nav-item::after { content:""; position:absolute; inset-inline-start:var(--rail-w); inset-inline-end:22px; bottom:0; border-bottom:1px solid var(--rail-rule); }
+    .viewport[data-concept="b"] .nav-item.active { color:#8f4c2b; }
+    .viewport[data-concept="b"] .nav-item.active::before { content:""; position:absolute; inset-inline-end:0; top:10px; bottom:10px; width:4px; background:#9b5a35; }
+    .viewport[data-concept="b"] .nav-item.active::before { animation:ruleDraw .48s var(--ease) both; transform-origin:top; }
+    .viewport[data-concept="b"] .nav-item.active .nav-label { font-family:"Noto Kufi Arabic"; font-weight:800; }
+    .viewport[data-concept="b"] .section-mark b { color:#9b5a35; }
+    .viewport[data-concept="b"] .rail-footer { background:#e5dbc9; }
+    .viewport[data-concept="b"] .footer-command:first-child { color:#9b5a35; }
+    .viewport[data-concept="b"] .rail-inner::after { background:radial-gradient(230px circle at var(--spot-x,70%) var(--spot-y,25%), rgba(155,90,53,.18), transparent 74%); mix-blend-mode:multiply; }
+    .viewport[data-concept="b"] .logo-frame::before { width:58px; height:58px; border-color:#9b5a35; border-radius:50%; }
+    .viewport[data-concept="b"] .side-rail:hover .brand-copy strong { animation:inkSettle .65s var(--ease) both; }
+
+    /* C — Signal Ribbon */
+    .viewport[data-concept="c"] .side-rail { --rail-bg:#061a27; --rail-ink:#e8f5f5; --rail-muted:#6d929d; --rail-rule:rgba(133,204,215,.17); }
+    .viewport[data-concept="c"] .side-rail::after { content:""; position:absolute; inset-block:0; inset-inline-start:10px; width:1px; background:linear-gradient(transparent, var(--accent) 30%, transparent 72%); opacity:.7; }
+    .viewport[data-concept="c"] .brand-zone { background:linear-gradient(145deg, rgba(255,255,255,.04), transparent); }
+    .viewport[data-concept="c"] .logo-frame { position:relative; }
+    .viewport[data-concept="c"] .logo-frame::after { content:""; position:absolute; width:44px; height:44px; border:1px solid var(--accent); transform:rotate(45deg); opacity:.45; }
+    .viewport[data-concept="c"] .logo-frame img { width:47px; height:47px; z-index:1; }
+    .viewport[data-concept="c"] .nav-item { margin-block:3px; height:48px; }
+    .viewport[data-concept="c"] .nav-item.active { color:white; }
+    .viewport[data-concept="c"] .nav-item.active::before { content:""; position:absolute; inset-inline-end:12px; inset-inline-start:12px; inset-block:0; background:linear-gradient(90deg, color-mix(in srgb,var(--accent) 28%,transparent), transparent); border-inline-end:2px solid var(--accent); clip-path:polygon(0 0,94% 0,100% 50%,94% 100%,0 100%); }
+    .viewport[data-concept="c"] .nav-item.active::before { animation:signalLock .58s var(--ease) both; }
+    .viewport[data-concept="c"] .nav-item.active > * { position:relative; z-index:1; }
+    .viewport[data-concept="c"] .nav-item.active .nav-icon { color:var(--accent); }
+    .viewport[data-concept="c"] .section-mark b { color:var(--accent); }
+    .viewport[data-concept="c"] .footer-command:first-child { color:var(--accent); }
+    .viewport[data-concept="c"] .logo-frame::before { width:68px; height:68px; border-radius:50%; border-style:dashed; }
+    .viewport[data-concept="c"] .side-rail:hover .logo-frame::before, .viewport[data-concept="c"].rail-pinned .logo-frame::before { animation:signalOrbit 4s linear infinite; }
+    .viewport[data-concept="c"] .nav-item.active .nav-icon::before { content:""; position:absolute; width:5px; height:5px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 65%,transparent); animation:signalBeacon 1.6s ease-out infinite; }
+
+    .concept-notes {
+      direction:rtl; display:grid; grid-template-columns:1fr 1fr 1fr; gap:0;
+      border:1px solid var(--studio-line); border-top:0; background:#0e1013;
+    }
+    .note { padding:17px 20px; border-inline-start:1px solid var(--studio-line); }
+    .note:last-child { border-inline-start:0; }
+    .note small { display:block; color:#606873; font:700 9px monospace; letter-spacing:.1em; }
+    .note strong { display:block; margin-top:7px; color:#d8dce1; font-size:12px; }
+    .note p { margin:5px 0 0; color:#747c87; font-size:10px; line-height:1.7; }
+
+    @keyframes studioRise { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:none; } }
+    @keyframes viewFoldOut { to { opacity:0; transform:perspective(1100px) rotateY(7deg) scale(.975); filter:contrast(1.22); } }
+    @keyframes viewFoldIn { from { opacity:0; transform:perspective(1100px) rotateY(-9deg) scale(1.025); filter:contrast(1.3); } to { opacity:1; transform:none; filter:none; } }
+    @keyframes studioAtmosphere { from { transform:translate3d(-2%,0,0) scale(1); } to { transform:translate3d(3%,2%,0) scale(1.08); } }
+    @keyframes conceptBlade { 0% { opacity:0; transform:translateX(145%); } 32% { opacity:.62; } 100% { opacity:0; transform:translateX(-145%); } }
+    @keyframes contentFlash { 0% { filter:saturate(.55) brightness(.86); transform:scale(.992); } 100% { filter:none; transform:none; } }
+    @keyframes railScanner { 0% { top:-12%; opacity:0; } 24% { opacity:.82; } 100% { top:102%; opacity:0; } }
+    @keyframes iconConfirm { 0% { transform:scale(.72) rotate(9deg); } 58% { transform:scale(1.28) rotate(-5deg); } 100% { transform:none; } }
+    @keyframes navShockwave { 0% { opacity:.65; transform:scale(.3); } 100% { opacity:0; transform:scale(1.65); } }
+    @keyframes activeStrike { 0% { transform:translateX(18px); filter:brightness(1.7); } 100% { transform:none; filter:none; } }
+    @keyframes ruleDraw { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+    @keyframes signalLock { 0% { opacity:0; transform:translateX(24px) scaleX(.78); } 60% { opacity:1; transform:translateX(-3px) scaleX(1.02); } 100% { transform:none; } }
+    @keyframes barsRebuild { from { transform:scaleY(.08); opacity:.25; } to { transform:scaleY(1); opacity:1; } }
+    @keyframes monolithLock { 0% { transform:scale(.55) rotate(-35deg); } 30% { transform:scale(1.08) rotate(6deg); } 58% { transform:scale(.94) rotate(-3deg); } 100% { transform:scale(1) rotate(0); } }
+    @keyframes inkSettle { 0% { letter-spacing:.09em; filter:blur(3px); opacity:.45; } 100% { letter-spacing:-.05em; filter:none; opacity:1; } }
+    @keyframes signalOrbit { to { transform:scale(1) rotate(360deg); } }
+    @keyframes signalBeacon { 0% { box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 65%,transparent); } 100% { box-shadow:0 0 0 15px transparent; } }
+    .viewport.concept-enter .bar { transform-origin:bottom; animation:barsRebuild .7s var(--ease) both; animation-delay:calc(var(--i, 0) * 52ms); }
+
+    @media (max-width:900px) {
+      .studio { width:min(100% - 18px, 1500px); padding-top:14px; }
+      .masthead { grid-template-columns:1fr; }
+      .edition { display:none; }
+      .control-deck { grid-template-columns:1fr; }
+      .directions { overflow-x:auto; padding-bottom:5px; }
+      .direction { min-width:165px; }
+      .tools { justify-content:flex-start; }
+      .metric-line { grid-template-columns:1fr 1fr; }
+      .hero-row { grid-template-columns:1fr; }
+      .concept-notes { grid-template-columns:1fr; }
+      .note { border-inline-start:0; border-bottom:1px solid var(--studio-line); }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      *, *::before, *::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10l2 2 4-4M9 16h6"/></symbol>
+    <symbol id="i-chef" viewBox="0 0 24 24"><path d="M7 11a4 4 0 0 1 1-7 4.5 4.5 0 0 1 8 0 4 4 0 0 1 1 7v7H7zM7 14h10M9 21h6"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 24 24"><path d="M14 6l4-4 4 4-4 4M3 21l8-8M5 3l16 16M3 5l4-2 2 4-2 2"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3zM9 3v15M15 6v15"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v6l4 2"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></symbol>
+    <symbol id="i-mobile" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18h4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3h6l1 6 3 3H5l3-3zM12 12v9"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  </svg>
+
+  <main class="studio">
+    <header class="masthead">
+      <div>
+        <div class="eyebrow">CODUIS XEN / DESIGN EXPLORATION 01</div>
+        <h1>SIDEBAR DESIGN STUDIO</h1>
+      </div>
+      <div class="mast-copy">ثلاث رؤى مختلفة فعلًا، مش نفس التصميم بألوان مختلفة. جرّب الهوفر، ثبّت الشريط، بدّل الثيم، وشوف سلوك الموبايل قبل ما نلمس النظام الحقيقي.</div>
+      <div class="edition">LIVE PROTOTYPE<br>24 OCT 2026<br>RTL / RESPONSIVE</div>
+    </header>
+
+    <section class="control-deck" aria-label="أدوات المقارنة">
+      <div class="directions" role="tablist" aria-label="اتجاهات التصميم">
+        <button class="direction" role="tab" data-concept="a" aria-selected="true"><span class="dir-no">01</span><span><span class="dir-title">مركز القيادة</span><span class="dir-sub">Command Monolith</span></span></button>
+        <button class="direction" role="tab" data-concept="b" aria-selected="false"><span class="dir-no">02</span><span><span class="dir-title">السجل التحريري</span><span class="dir-sub">Editorial Ledger</span></span></button>
+        <button class="direction" role="tab" data-concept="c" aria-selected="false"><span class="dir-no">03</span><span><span class="dir-title">شريط الإشارة</span><span class="dir-sub">Signal Ribbon</span></span></button>
+      </div>
+      <div class="tools">
+        <button class="tool" id="themeToggle" title="تبديل الثيم" aria-label="تبديل الثيم"><svg><use href="#i-theme"/></svg></button>
+        <button class="tool" id="accentToggle" title="تبديل لون الهوية" aria-label="تبديل لون الهوية"><span style="width:13px;height:13px;background:currentColor;border-radius:50%"></span></button>
+        <button class="tool" id="mobileToggle" title="معاينة الموبايل" aria-label="معاينة الموبايل"><svg><use href="#i-mobile"/></svg></button>
+      </div>
+    </section>
+
+    <section class="stage-shell">
+      <div class="stage-meta"><span>1440 × 820 / INTERACTIVE CANVAS</span><span class="live-dot">HOVER READY</span></div>
+      <div class="viewport" id="viewport" data-concept="a">
+        <div class="mock-content">
+          <div class="topline"><div class="crumb">الرئيسية / مركز العمليات</div><div class="avatar">SA</div></div>
+          <div class="metric-line">
+            <div class="metric"><small>صافي مبيعات اليوم</small><strong>56.00 ج.م</strong></div>
+            <div class="metric"><small>الطلبات النشطة</small><strong>08</strong></div>
+            <div class="metric"><small>متوسط التجهيز</small><strong>12:40</strong></div>
+            <div class="metric"><small>حالة الفرع</small><strong>مستقر</strong></div>
+          </div>
+          <div class="hero-row">
+            <div class="panel"><h2>نبض العمليات</h2><p>قراءة مباشرة لحركة الطلبات وأداء المطبخ خلال الوردية الحالية، مصممة لتظهر اتساع مساحة العمل مع طي الشريط.</p><div class="chart"><i class="bar" style="--h:38%"></i><i class="bar" style="--h:58%"></i><i class="bar" style="--h:47%"></i><i class="bar" style="--h:82%"></i><i class="bar" style="--h:64%"></i><i class="bar" style="--h:92%"></i><i class="bar" style="--h:71%"></i><i class="bar" style="--h:54%"></i></div></div>
+            <div class="panel"><h2>جاهزية الفرع</h2><p>المطبخ والكاشير ونقاط البيع متصلة.</p><strong style="display:block;font-size:58px;margin-top:28px">96%</strong></div>
+          </div>
+          <div class="orders"><div class="order"><b>#1048</b><span>طلب صالة — طاولة 12</span><span>قيد التجهيز</span></div><div class="order"><b>#1047</b><span>طلب توصيل — مدينة نصر</span><span>جاهز للتسليم</span></div><div class="order"><b>#1046</b><span>استلام من الفرع</span><span>تم الدفع</span></div></div>
+        </div>
+
+        <aside class="side-rail" aria-label="الشريط الجانبي التجريبي">
+          <div class="rail-inner">
+            <header class="brand-zone">
+              <div class="logo-frame"><img src="../public/logo.png" alt="CODUIS XEN" /></div>
+              <div class="brand-copy"><strong>CODUIS XEN</strong><small>RESTAURANT OPERATING SYSTEM</small></div>
+              <button class="pin" id="pinToggle" aria-label="تثبيت الشريط"><svg><use href="#i-pin"/></svg></button>
+            </header>
+            <nav class="nav-scroll">
+              <div class="section-mark"><b>01</b><span>العمليات اليومية</span></div>
+              <button class="nav-item active"><span class="nav-icon"><svg><use href="#i-grid"/></svg></span><span class="nav-label">مركز العمليات</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-cart"/></svg></span><span class="nav-label">نقطة البيع</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-clip"/></svg></span><span class="nav-label">الطلبات</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-chef"/></svg></span><span class="nav-label">شاشة المطبخ</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-screen"/></svg></span><span class="nav-label">شاشة العميل</span></button>
+              <div class="section-mark" style="margin-top:14px"><b>02</b><span>الإدارة والتحليل</span></div>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-tools"/></svg></span><span class="nav-label">إدارة التشغيل</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-map"/></svg></span><span class="nav-label">الفروع والمخزون</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-history"/></svg></span><span class="nav-label">التقارير والسجل</span></button>
+              <button class="nav-item"><span class="nav-icon"><svg><use href="#i-clock"/></svg></span><span class="nav-label">الورديات والحضور</span></button>
+            </nav>
+            <footer class="rail-footer">
+              <div class="footer-command"><span class="nav-icon"><svg><use href="#i-search"/></svg></span><span class="nav-label">بحث سريع</span><kbd class="keycap">CTRL K</kbd></div>
+              <div class="footer-command"><span class="nav-icon"><svg><use href="#i-theme"/></svg></span><span class="nav-label">المظهر واللغة</span></div>
+            </footer>
+          </div>
+        </aside>
+        <div class="scrim" id="scrim"></div>
+        <button class="mobile-fab" id="mobileMenu" aria-label="فتح القائمة"><svg><use href="#i-menu"/></svg></button>
+      </div>
+      <div class="concept-notes" id="conceptNotes">
+        <div class="note"><small>VISUAL IDEA</small><strong>كتلة قيادة عالية الثقة</strong><p>تباين حاد، تقسيم مرقّم، وحضور قوي للهوية بدون صناديق أيقونات متكررة.</p></div>
+        <div class="note"><small>INTERACTION</small><strong>Rail أولًا، المحتوى دائمًا</strong><p>مطوي افتراضيًا، يتوسع بالهوفر فورًا، ويمكن تثبيته لمن يفضّل التنقل المستمر.</p></div>
+        <div class="note"><small>BEST FOR</small><strong>شاشات التشغيل السريعة</strong><p>أنسب اتجاه للكاشير والمدير الذي يتنقل عشرات المرات خلال الوردية.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const viewport = document.getElementById('viewport');
+    const rail = viewport.querySelector('.side-rail');
+    const directionButtons = [...document.querySelectorAll('.direction')];
+    const pinToggle = document.getElementById('pinToggle');
+    const themeToggle = document.getElementById('themeToggle');
+    const accentToggle = document.getElementById('accentToggle');
+    const mobileToggle = document.getElementById('mobileToggle');
+    const mobileMenu = document.getElementById('mobileMenu');
+    const scrim = document.getElementById('scrim');
+    const notes = document.getElementById('conceptNotes');
+    const accents = ['#f2a900', '#e64f2f', '#43d7c4'];
+    let accentIndex = 0;
+    const copy = {
+      a: [['كتلة قيادة عالية الثقة','تباين حاد، تقسيم مرقّم، وحضور قوي للهوية بدون صناديق أيقونات متكررة.'],['Rail أولًا، المحتوى دائمًا','مطوي افتراضيًا، يتوسع بالهوفر فورًا، ويمكن تثبيته لمن يفضّل التنقل المستمر.'],['شاشات التشغيل السريعة','أنسب اتجاه للكاشير والمدير الذي يتنقل عشرات المرات خلال الوردية.']],
+      b: [['هوية مطعم راقية','ورق دافئ، حبر داكن، وقواعد تحريرية تجعل النظام أقرب لكتاب تشغيل فاخر.'],['وضوح هادئ بدل الصخب','الحالة النشطة تعتمد على الإيقاع الطباعي والخط الجانبي، لا على كارت ملون.'],['الإدارة والتقارير','مناسب للمديرين والـ Back Office وللعلامات ذات الطابع الضيافي الراقي.']],
+      c: [['نظام حيّ يرسل إشارات','أزرق عميق ومسار ضوئي وظيفي يجعل الشريط يبدو كأداة تشغيل متصلة.'],['حركة ذات معنى','السهم الهندسي يحدد المسار النشط، واللون يظهر فقط حيث توجد إشارة فعلية.'],['العمليات متعددة الشاشات','مناسب لبيئة POS / KDS وشاشات المراقبة ذات الإيقاع السريع.']]
+    };
+
+    viewport.querySelectorAll('.nav-item').forEach((item, index) => item.style.setProperty('--i', index));
+    viewport.querySelectorAll('.bar').forEach((bar, index) => bar.style.setProperty('--i', index));
+
+    const replayMotion = (className, duration = 760) => {
+      viewport.classList.remove(className);
+      void viewport.offsetWidth;
+      viewport.classList.add(className);
+      window.setTimeout(() => viewport.classList.remove(className), duration);
+    };
+
+    directionButtons.forEach(button => button.addEventListener('click', () => {
+      const applyConcept = () => {
+        directionButtons.forEach(item => item.setAttribute('aria-selected', String(item === button)));
+        const concept = button.dataset.concept;
+        viewport.dataset.concept = concept;
+        replayMotion('concept-enter');
+        notes.querySelectorAll('.note').forEach((node, index) => {
+          node.querySelector('strong').textContent = copy[concept][index][0];
+          node.querySelector('p').textContent = copy[concept][index][1];
+        });
+      };
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (document.startViewTransition && !reduceMotion) document.startViewTransition(applyConcept);
+      else applyConcept();
+    }));
+
+    rail.addEventListener('pointermove', event => {
+      const rect = rail.getBoundingClientRect();
+      rail.style.setProperty('--spot-x', `${((event.clientX - rect.left) / rect.width) * 100}%`);
+      rail.style.setProperty('--spot-y', `${((event.clientY - rect.top) / rect.height) * 100}%`);
+    });
+    rail.addEventListener('pointerleave', () => {
+      rail.style.setProperty('--spot-x', '72%');
+      rail.style.setProperty('--spot-y', '28%');
+    });
+
+    pinToggle.addEventListener('click', event => {
+      event.stopPropagation();
+      viewport.classList.toggle('rail-pinned');
+      pinToggle.setAttribute('aria-pressed', String(viewport.classList.contains('rail-pinned')));
+    });
+    themeToggle.addEventListener('click', () => {
+      viewport.classList.toggle('theme-dark');
+      themeToggle.classList.toggle('is-on');
+      replayMotion('motion-flash', 600);
+    });
+    accentToggle.addEventListener('click', () => {
+      accentIndex = (accentIndex + 1) % accents.length;
+      document.documentElement.style.setProperty('--accent', accents[accentIndex]);
+      replayMotion('concept-enter');
+    });
+    mobileToggle.addEventListener('click', () => {
+      viewport.classList.toggle('is-mobile');
+      viewport.classList.remove('rail-pinned');
+      rail.classList.remove('mobile-visible');
+      mobileToggle.classList.toggle('is-on');
+    });
+    mobileMenu.addEventListener('click', () => rail.classList.add('mobile-visible'));
+    scrim.addEventListener('click', () => rail.classList.remove('mobile-visible'));
+    viewport.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => {
+      viewport.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+      item.classList.add('active');
+      item.classList.remove('active-pulse');
+      void item.offsetWidth;
+      item.classList.add('active-pulse');
+      if (viewport.classList.contains('is-mobile')) rail.classList.remove('mobile-visible');
+    }));
+    document.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        const search = viewport.querySelector('.footer-command');
+        search.animate([{background:'transparent'},{background:'var(--accent)',color:'#111'},{background:'transparent'}], {duration:700,easing:'ease-out'});
+      }
+      if (event.key === 'Escape') rail.classList.remove('mobile-visible');
+    });
+    window.requestAnimationFrame(() => replayMotion('concept-enter'));
+  </script>
+</body>
+</html>

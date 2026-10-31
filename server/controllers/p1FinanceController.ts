@@ -11,8 +11,11 @@ import { matchingService } from '../services/supplierInvoiceMatchingService';
 import { tipPoolService } from '../services/tipPoolService';
 import { giftCardService } from '../services/giftCardService';
 import { paymentGatewayService } from '../services/paymentGatewayService';
+import { settlePaymobCallback } from '../services/paymobSettlementService';
+import { paymentWebhookRetryService } from '../services/paymentWebhookRetryService';
 import { dailyPnlService } from '../services/dailyPnlService';
 import { getStringParam } from '../utils/request';
+import { canAccessBranch } from '../middleware/branchIsolation';
 
 const getBranchId = (req: Request): string | undefined =>
     getStringParam(req.query.branchId) || req.effectiveBranchId || (req.user as any)?.branchId;
@@ -39,7 +42,7 @@ export const openDrawer = handle(async (req, res) => {
     const branchId = getBranchId(req);
     if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
     const openingCash = Number(req.body?.openingCash || 0);
-    const openedBy = req.user?.id || req.body?.openedBy;
+    const openedBy = req.user?.id || 'system';
     if (!openedBy) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
     const result = await drawerService.openDrawer({ branchId, openingCash, openedBy });
     res.json(result);
@@ -232,6 +235,7 @@ export const createTipPool = handle(async (req, res) => {
         shiftId: req.body?.shiftId,
         pooledAmount: req.body?.pooledAmount,
         paymentMethod: req.body?.paymentMethod,
+        createdBy: req.user?.id,
     });
     res.status(201).json(pool);
 });
@@ -239,14 +243,17 @@ export const createTipPool = handle(async (req, res) => {
 export const allocateTipPool = handle(async (req, res) => {
     const poolId = getStringParam((req.params as any).id);
     if (!poolId) return res.status(400).json({ error: 'POOL_ID_REQUIRED' });
-    const allocations = await tipPoolService.allocatePool(poolId, req.body || {});
+    const allocations = await tipPoolService.allocatePool(poolId, {
+        ...(req.body || {}),
+        allocatedBy: req.user?.id,
+    }, getBranchId(req));
     res.json(allocations);
 });
 
 export const payOutTipPool = handle(async (req, res) => {
     const poolId = getStringParam((req.params as any).id);
     if (!poolId) return res.status(400).json({ error: 'POOL_ID_REQUIRED' });
-    const updated = await tipPoolService.payOut(poolId, req.user?.id);
+    const updated = await tipPoolService.payOut(poolId, req.user?.id, getBranchId(req));
     res.json(updated);
 });
 
@@ -260,7 +267,7 @@ export const listTipPools = handle(async (req, res) => {
 export const getTipPoolDetail = handle(async (req, res) => {
     const poolId = getStringParam((req.params as any).id);
     if (!poolId) return res.status(400).json({ error: 'POOL_ID_REQUIRED' });
-    const detail = await tipPoolService.poolDetail(poolId);
+    const detail = await tipPoolService.poolDetail(poolId, getBranchId(req));
     if (!detail) return res.status(404).json({ error: 'TIP_POOL_NOT_FOUND' });
     res.json(detail);
 });
@@ -329,7 +336,20 @@ export const listGiftCards = handle(async (req, res) => {
 export const configureGatewayProvider = handle(async (req, res) => {
     const branchId = getBranchId(req);
     if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
-    const provider = await paymentGatewayService.configureProvider({ branchId, ...req.body });
+    const configuredBranchIds = Array.isArray(req.body?.branchIds)
+        ? req.body.branchIds.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+        : [branchId];
+    if (configuredBranchIds.some((id: string) => !canAccessBranch(req.user, id))) {
+        return res.status(403).json({ error: 'BRANCH_MISMATCH', message: 'You cannot configure payment providers for another branch.' });
+    }
+    const provider = await paymentGatewayService.configureProvider({
+        ...req.body,
+        // The middleware-resolved branch is authoritative; never let body
+        // merge order replace it after the request has been scoped.
+        branchId,
+        branchIds: configuredBranchIds,
+        updatedBy: req.user?.id || 'system',
+    });
     res.status(201).json(provider);
 });
 
@@ -358,14 +378,53 @@ export const createGatewayCheckout = handle(async (req, res) => {
 export const gatewayWebhook = handle(async (req, res) => {
     const provider = getStringParam((req.params as any).provider);
     if (!provider) return res.status(400).json({ error: 'PROVIDER_REQUIRED' });
-    const result = await paymentGatewayService.handleWebhook(provider, req.body);
-    res.status(200).json(result);
+    const normalizedProvider = provider.toUpperCase();
+    if (normalizedProvider !== 'PAYMOB') {
+        return res.status(503).json({ error: 'PAYMENT_PROVIDER_WEBHOOK_NOT_CONFIGURED' });
+    }
+
+    const payload = (req.body as any)?.obj || req.body;
+    try {
+        const result = await settlePaymobCallback(payload);
+        return res.status(200).json({ ok: true, success: result.success });
+    } catch (error: any) {
+        if (error?.code === 'BAD_HMAC') {
+            return res.status(401).json({ ok: false, error: 'BAD_HMAC' });
+        }
+        if (error?.code === 'STALE_CALLBACK') {
+            return res.status(409).json({ ok: false, error: 'STALE_CALLBACK' });
+        }
+        await paymentWebhookRetryService.recordFailure({
+            provider: 'paymob',
+            payload,
+            reason: String(error?.message || error),
+        });
+        return res.status(202).json({ ok: false, accepted: true, retryQueued: true });
+    }
+});
+
+export const listPaymentWebhookDeadLetters = handle(async (req, res) => {
+    res.json(await paymentWebhookRetryService.listDeadLetters(getBranchId(req), Number(req.query.limit || 50)));
+});
+
+export const replayPaymentWebhookDeadLetter = handle(async (req, res) => {
+    const id = getStringParam((req.params as any).id);
+    if (!id) return res.status(400).json({ error: 'DEAD_LETTER_ID_REQUIRED' });
+    res.json(await paymentWebhookRetryService.replayDeadLetter(id, getBranchId(req)));
 });
 
 export const refundGatewaySession = handle(async (req, res) => {
     const sessionId = getStringParam((req.params as any).id);
     if (!sessionId) return res.status(400).json({ error: 'SESSION_ID_REQUIRED' });
-    const result = await paymentGatewayService.refund(sessionId);
+    const branchId = getBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
+    const requestedBy = req.user?.id;
+    if (!requestedBy) return res.status(401).json({ error: 'USER_ID_REQUIRED' });
+    const result = await paymentGatewayService.refund(sessionId, {
+        branchId,
+        requestedBy,
+        requestedByName: (req.user as any)?.name || (req.user as any)?.email,
+    });
     res.json(result);
 });
 
@@ -374,6 +433,13 @@ export const listGatewaySessions = handle(async (req, res) => {
     if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
     const sessions = await paymentGatewayService.listSessions(branchId);
     res.json(sessions);
+});
+
+export const gatewayRefundReconciliation = handle(async (req, res) => {
+    const branchId = getBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
+    const { gatewayReconciliationService } = await import('../services/gatewayReconciliationService');
+    res.json(await gatewayReconciliationService.getStatus(branchId));
 });
 
 // ---------------------------------------------------------------------------

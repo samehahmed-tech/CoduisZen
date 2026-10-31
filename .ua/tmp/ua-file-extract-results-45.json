@@ -1,0 +1,83 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 1,
+  "filesSkipped": [
+    "scripts/sameh-installer/README AR - Final Setup.txt",
+    "scripts/sameh-installer/build-business-day-reopen-fix.ps1",
+    "scripts/sameh-installer/build-catalog-export.ps1",
+    "scripts/sameh-installer/build-catalog-update.ps1",
+    "scripts/sameh-installer/build-data-maintenance-fix.ps1",
+    "scripts/sameh-installer/build-discount-fix.ps1",
+    "scripts/sameh-installer/build-hotfix.ps1",
+    "scripts/sameh-installer/build-kds-order-fix.ps1",
+    "scripts/sameh-installer/build-local-image-fix.ps1",
+    "scripts/sameh-installer/build-operational-reset.ps1",
+    "scripts/sameh-installer/build-order-save-fix.ps1",
+    "scripts/sameh-installer/build-print-bridge-hotfix.ps1",
+    "scripts/sameh-installer/build-print-routing-hotfix.ps1",
+    "scripts/sameh-installer/build-recipe-quantity-fix.ps1",
+    "scripts/sameh-installer/build-sameh-installer.ps1",
+    "scripts/sameh-installer/build-table-pos-fix.ps1",
+    "scripts/sameh-installer/one-click-builder.ps1"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 1,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 1
+    }
+  },
+  "results": [
+    {
+      "path": "scripts/sameh-installer/README_AR.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 89,
+      "nonEmptyLines": 60,
+      "sections": [
+        {
+          "heading": "Final Setup",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "بناء النسخة الكاملة",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "اختيار الجهاز",
+          "level": 2,
+          "line": 33
+        },
+        {
+          "heading": "الاسترداد التلقائي",
+          "level": 2,
+          "line": 42
+        },
+        {
+          "heading": "النسخ الاحتياطي والاسترجاع",
+          "level": 2,
+          "line": 58
+        },
+        {
+          "heading": "نقل الكتالوج من PostgreSQL القديم",
+          "level": 2,
+          "line": 76
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    }
+  ]
+}

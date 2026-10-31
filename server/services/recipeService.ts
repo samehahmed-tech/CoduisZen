@@ -48,7 +48,7 @@ export const recipeService = {
         const versionId = nanoid();
 
         // Insert version record (nvarchar column — must store JSON, never a raw array)
-        await db.insert(recipeVersions).values({
+        await (db.insert(recipeVersions) as any).values({
             id: versionId,
             recipeId,
             version: newVersion,

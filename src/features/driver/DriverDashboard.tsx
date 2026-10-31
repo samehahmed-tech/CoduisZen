@@ -205,7 +205,7 @@ export const DriverDashboard: React.FC = () => {
             savePendingOps(remaining);
             setPendingCount(remaining.length);
             for (const { op, reason } of dropped) {
-                toast.error(`عملية معلقة سقطت (#${String(op.orderId || '').slice(-6)}): ${reason} — راجع الفرع`, { duration: 9000 });
+                toast.error(`عملية معلقة سقطت (#${String('orderId' in op ? op.orderId : '').slice(-6)}): ${reason} — راجع الفرع`, { duration: 9000 });
             }
             if (remaining.length < ops.length) {
                 fetchAssignments(true);

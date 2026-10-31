@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { isKnownProvider, normalizeAggregatorPayload } from '../modules/aggregators/aggregatorTypes';
 import { ingestAggregatorOrder } from '../modules/aggregators/aggregatorIngestService';
 import logger from '../utils/logger';
+import { createSignedAuditLog } from '../services/auditService';
 
 const log = logger.child({ controller: 'aggregator-webhook' });
 
@@ -16,6 +17,21 @@ export const receiveAggregatorWebhook = async (req: Request, res: Response) => {
         const normalized = normalizeAggregatorPayload(providerId, req.body);
         if (!normalized.ok) return res.status(400).json({ ok: false, error: (normalized as any).code });
         const result = await ingestAggregatorOrder(providerId, (normalized as any).order, req.body);
+        await createSignedAuditLog({
+            eventType: 'AGGREGATOR_WEBHOOK_PROCESSED',
+            branchId: result.branchId || null,
+            userId: null,
+            userName: 'aggregator-webhook',
+            userRole: 'EXTERNAL_INTEGRATION',
+            payload: {
+                providerId,
+                orderId: result.orderId,
+                created: result.created,
+                internalStatus: result.internalStatus,
+            },
+            after: { acknowledged: true },
+            reason: 'Authenticated aggregator webhook',
+        });
         return res.status(200).json({ ok: true, orderId: result.orderId, created: result.created, status: result.internalStatus });
     } catch (err: any) {
         const status = Number(err?.status) || 400;

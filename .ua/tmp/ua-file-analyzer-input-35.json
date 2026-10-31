@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "hardware-bridge/.env.example",
+      "language": "config",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": "hardware-bridge/README.md",
+      "language": "markdown",
+      "sizeLines": 37,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "hardware-bridge/package.json",
+      "language": "json",
+      "sizeLines": 15,
+      "fileCategory": "config"
+    }
+  ],
+  "batchImportData": {
+    "hardware-bridge/.env.example": [],
+    "hardware-bridge/README.md": [],
+    "hardware-bridge/package.json": []
+  }
+}

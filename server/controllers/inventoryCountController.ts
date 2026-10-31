@@ -139,7 +139,8 @@ export const getStockCount = async (req: Request, res: Response) => {
  */
 export const createStockCount = async (req: Request, res: Response) => {
     try {
-        const { warehouseId, type, remarks, userId, scheduledDate, countDate } = req.body;
+        const { warehouseId, type, remarks, scheduledDate, countDate } = req.body;
+        const actorId = req.user?.id || null;
         const branchId = req.effectiveBranchId || req.body.branchId;
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         if (!warehouseId) return res.status(400).json({ error: 'WAREHOUSE_ID_REQUIRED' });
@@ -165,7 +166,7 @@ export const createStockCount = async (req: Request, res: Response) => {
             status: 'DRAFT',
             type: normalizedType,
             remarks,
-            createdBy: userId,
+            createdBy: actorId,
             scheduledDate: scheduledDate ? new Date(scheduledDate) : null
         });
 
@@ -298,7 +299,7 @@ export const postStockCount = async (req: Request, res: Response) => {
     try {
         const id = getStringParam(req.params.id);
         if (!id) return res.status(400).json({ error: 'COUNT_ID_REQUIRED' });
-        const { userId } = req.body;
+        const actorId = req.user?.id || 'system';
         
         const count = await db.select().top(1).from(stockCounts).where(eq(stockCounts.id, id));
         if (!count.length) return res.status(404).json({ error: 'Count not found' });
@@ -351,7 +352,7 @@ export const postStockCount = async (req: Request, res: Response) => {
                         quantity: Math.abs(Number(line.varianceQty || 0)),
                         type: 'ADJUSTMENT',
                         reason: `Stock Count Variance: ${id}`,
-                        performedBy: userId || 'system',
+                        performedBy: actorId,
                         referenceId: id,
                         createdAt: new Date()
                     });
@@ -395,7 +396,7 @@ export const postStockCount = async (req: Request, res: Response) => {
                     // Log Audit
                     await tx.insert(auditLogs).values({
                         eventType: 'INVENTORY_COUNT_ADJUSTMENT',
-                        userId: userId || null,
+                        userId: actorId,
                         branchId: count[0].branchId,
                         payload: {
                             countId: id,
@@ -410,7 +411,7 @@ export const postStockCount = async (req: Request, res: Response) => {
                 }
             }
             
-            await tx.update(stockCounts).set({ status: 'POSTED', postedAt: new Date(), approvedBy: userId }).where(eq(stockCounts.id, id));
+            await tx.update(stockCounts).set({ status: 'POSTED', postedAt: new Date(), approvedBy: actorId }).where(eq(stockCounts.id, id));
         });
 
         // GL Posting for Variances
@@ -418,10 +419,10 @@ export const postStockCount = async (req: Request, res: Response) => {
         // If positive, stock value increased (Inventory Asset DEBIT | Inventory Gain CREDIT)
         if (Math.abs(totalVarianceValue) > 0) {
             if (totalVarianceValue < 0) {
-                const posting = await postWastageEntry({ referenceId: id, amount: Math.abs(totalVarianceValue), branchId: count[0].branchId, userId: userId || 'system', reason: 'Stock count shortage' });
+                const posting = await postWastageEntry({ referenceId: id, amount: Math.abs(totalVarianceValue), branchId: count[0].branchId, userId: actorId, reason: 'Stock count shortage' });
                 if (posting.status === 'failed') throw new Error(`STOCK_COUNT_FINANCE_EXCEPTION|${posting.reason}`);
             } else {
-                await postInventoryAdjustmentReversalEntry({ referenceId: id, amount: Math.abs(totalVarianceValue), branchId: count[0].branchId, userId: userId || 'system', reason: 'Stock count surplus' });
+                await postInventoryAdjustmentReversalEntry({ referenceId: id, amount: Math.abs(totalVarianceValue), branchId: count[0].branchId, userId: actorId, reason: 'Stock count surplus' });
             }
         }
 

@@ -7,6 +7,7 @@ import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
 import logger from '../utils/logger';
 import { writeDbError } from '../utils/dbErrors';
+import { createSignedAuditLog } from '../services/auditService';
 
 let mailSchemaReady = false;
 
@@ -52,13 +53,31 @@ const ensureMailSchema = async () => {
     mailSchemaReady = true;
 };
 
-const BROADCAST_ALL_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'GENERAL_MANAGER', 'BRANCH_MANAGER']);
+const BROADCAST_ALL_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER']);
+const CROSS_BRANCH_MAIL_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER', 'CALL_CENTER', 'CALL_CENTER_MANAGER']);
+
+const auditMailMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Mail mutation: ${eventType}`,
+});
 
 const userBranches = (user: { branchId?: string | null; allowedBranches?: string[] | null }): string[] => {
     const set = new Set<string>();
     if (user.branchId) set.add(user.branchId);
     for (const b of user.allowedBranches || []) if (b) set.add(b);
     return Array.from(set);
+};
+
+const canReachUserFromBranches = (target: { assignedBranchId?: string | null; allowedBranches?: string[] | null }, senderBranches: string[]) => {
+    const targetBranches = [target.assignedBranchId, ...(target.allowedBranches || [])].filter(Boolean).map(String);
+    return targetBranches.some((branchId) => senderBranches.includes(branchId));
 };
 
 const notifyRecipients = (userIds: string[], payload: Record<string, unknown>) => {
@@ -123,11 +142,14 @@ export const sendMail = async (req: Request, res: Response) => {
             assignedBranchId: users.assignedBranchId, allowedBranches: users.allowedBranches, isActive: users.isActive,
         }).from(users);
         const activeUsers = allUsers.filter((u) => u.isActive !== false && u.id !== senderId);
+        const canReachAcrossBranches = CROSS_BRANCH_MAIL_ROLES.has(String(req.user?.role || ''));
 
         const recipientIds = new Set<string>();
         for (const raw of rawIds) {
             const id = String(raw || '').trim();
-            if (id && activeUsers.some((u) => u.id === id)) recipientIds.add(id);
+            if (id && activeUsers.some((u) => u.id === id && (canReachAcrossBranches || canReachUserFromBranches(u, senderBranches)))) {
+                recipientIds.add(id);
+            }
         }
         if (broadcast === 'BRANCH') {
             for (const u of activeUsers) {
@@ -182,6 +204,7 @@ export const sendMail = async (req: Request, res: Response) => {
         notifyRecipients(Array.from(recipientIds), {
             messageId, subject, priority, fromName: sender?.name || senderId,
         });
+        await auditMailMutation(req, 'MAIL_SENT', { messageId, recipientCount: recipientIds.size, broadcast: broadcast || null, priority, bodyLength: body.length }, { sent: true });
         res.status(201).json({ success: true, id: messageId, recipientCount: recipientIds.size });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -344,6 +367,7 @@ export const markMailRead = async (req: Request, res: Response) => {
         await db.update(mailMessageRecipients)
             .set({ isRead: true, readAt: new Date() })
             .where(eq(mailMessageRecipients.id, row.id));
+        await auditMailMutation(req, 'MAIL_MARKED_READ', { messageId: id }, { isRead: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -363,6 +387,7 @@ export const toggleMailStar = async (req: Request, res: Response) => {
         await db.update(mailMessageRecipients)
             .set({ isStarred: starred })
             .where(eq(mailMessageRecipients.id, row.id));
+        await auditMailMutation(req, 'MAIL_STAR_TOGGLED', { messageId: id, starred }, { starred });
         res.json({ success: true, starred });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -382,6 +407,7 @@ export const archiveMail = async (req: Request, res: Response) => {
         await db.update(mailMessageRecipients)
             .set({ isArchived: archived })
             .where(eq(mailMessageRecipients.id, row.id));
+        await auditMailMutation(req, 'MAIL_ARCHIVE_TOGGLED', { messageId: id, archived }, { archived });
         res.json({ success: true, archived });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -496,6 +522,7 @@ export const deleteInboxMail = async (req: Request, res: Response) => {
         const row = await myRecipientRow(id, userId);
         if (!row) return res.status(404).json({ error: 'MESSAGE_NOT_FOUND' });
         await db.delete(mailMessageRecipients).where(eq(mailMessageRecipients.id, row.id));
+        await auditMailMutation(req, 'MAIL_INBOX_COPY_DELETED', { messageId: id }, { deleted: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -517,6 +544,7 @@ export const deleteSentMail = async (req: Request, res: Response) => {
             await tx.delete(mailMessageRecipients).where(eq(mailMessageRecipients.messageId, id));
             await tx.delete(mailMessages).where(eq(mailMessages.id, id));
         });
+        await auditMailMutation(req, 'MAIL_SENT_DELETED', { messageId: id }, { deleted: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

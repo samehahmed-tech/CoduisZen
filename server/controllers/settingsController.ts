@@ -4,6 +4,7 @@ import { settings } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { upsertSetting } from '../utils/settingsStore';
+import { createSignedAuditLog } from '../services/auditService';
 
 const SENSITIVE_SETTINGS_KEYS = new Set([
     'geminiApiKey',
@@ -45,7 +46,7 @@ export const getAllSettings = async (req: Request, res: Response) => {
                 taxRate: 14,
                 serviceCharge: 0,
                 language: 'ar',
-                theme: 'meridian'
+                theme: 'aero'
             });
         }
 
@@ -63,13 +64,25 @@ export const updateSetting = async (req: Request, res: Response) => {
         const key = getStringParam((req.params as any).key);
         if (!key) return res.status(400).json({ error: 'SETTING_KEY_REQUIRED' });
         if (isSensitiveSettingKey(key)) return res.status(403).json({ error: 'SENSITIVE_SETTING_BLOCKED' });
-        const { value, category, updated_by } = req.body;
+        const { value, category } = req.body;
 
         const updated = await upsertSetting({
             key,
             value,
             category: category || 'general',
-            updatedBy: updated_by,
+            updatedBy: req.user?.id || null,
+        });
+
+        await createSignedAuditLog({
+            eventType: 'SETTING_UPDATED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId || req.user?.branchId || null,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { key, category: category || 'general', valueType: typeof value },
+            after: { updated: true },
+            reason: 'Setting updated without recording its value',
         });
 
         res.json(updated);
@@ -91,10 +104,21 @@ export const updateBulkSettings = async (req: Request, res: Response) => {
         }
 
         const operations = Object.entries(updates).map(([key, value]) =>
-            upsertSetting({ key, value }),
+            upsertSetting({ key, value, updatedBy: req.user?.id || null }),
         );
 
         await Promise.all(operations);
+        await createSignedAuditLog({
+            eventType: 'SETTINGS_BULK_UPDATED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: req.effectiveBranchId || req.user?.branchId || null,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { keys: Object.keys(updates).sort(), count: Object.keys(updates).length },
+            after: { updated: true },
+            reason: 'Settings bulk updated without recording values',
+        });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

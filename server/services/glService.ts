@@ -9,10 +9,33 @@ import {
     taxAccounts,
     financeExceptions
 } from '../../src/db/schema';
-import { eq, sql, sum, and } from 'drizzle-orm';
+import { eq, sql, sum, and, isNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { validateJournalLines } from '../utils/ledgerInvariant';
+import { resolveJournalProvenance } from '../utils/financeProvenance';
 
-    export type ReferenceType = 'ORDER' | 'PAYMENT' | 'GRN' | 'WASTE' | 'STOCK_COUNT' | 'MANUAL' | 'EXPENSE' | 'REFUND' | 'VOID' | 'SHIFT_CLOSE' | 'COGS' | 'COGS_REVERSAL' | 'PAYROLL' | 'PAYROLL_REVERSAL' | 'SUPPLIER_INVOICE' | 'RECONCILIATION' | 'WALLET_DEPOSIT' | 'WALLET_PAYMENT' | 'LOYALTY_REDEMPTION';
+let provenanceSchemaPromise: Promise<void> | undefined;
+
+const ensureJournalProvenanceSchema = async () => {
+    if (!provenanceSchemaPromise) {
+        provenanceSchemaPromise = db.execute(sql.raw(`
+            IF COL_LENGTH('dbo.journal_entries', 'branch_id') IS NULL
+                ALTER TABLE dbo.journal_entries ADD branch_id nvarchar(255) NULL;
+            IF COL_LENGTH('dbo.journal_entries', 'source') IS NULL
+                ALTER TABLE dbo.journal_entries ADD source nvarchar(100) NULL;
+            IF COL_LENGTH('dbo.journal_entries', 'actor_id') IS NULL
+                ALTER TABLE dbo.journal_entries ADD actor_id nvarchar(255) NULL;
+            IF COL_LENGTH('dbo.journal_entries', 'correlation_id') IS NULL
+                ALTER TABLE dbo.journal_entries ADD correlation_id nvarchar(255) NULL;
+        `)).then(() => undefined).catch((error) => {
+            provenanceSchemaPromise = undefined;
+            throw error;
+        });
+    }
+    await provenanceSchemaPromise;
+};
+
+    export type ReferenceType = 'ORDER' | 'PAYMENT' | 'GRN' | 'WASTE' | 'STOCK_COUNT' | 'MANUAL' | 'EXPENSE' | 'REFUND' | 'VOID' | 'SHIFT_CLOSE' | 'COGS' | 'COGS_REVERSAL' | 'PAYROLL' | 'PAYROLL_REVERSAL' | 'SUPPLIER_INVOICE' | 'PURCHASE_RETURN' | 'RECONCILIATION' | 'WALLET_DEPOSIT' | 'WALLET_PAYMENT' | 'LOYALTY_REDEMPTION' | 'ROYALTY';
 
 export interface JournalLineInput {
     accountCode?: string;
@@ -32,6 +55,9 @@ export interface JournalEntryInput {
     status?: string;
     createdBy?: string;
     branchId?: string; // Used to derive default cost center if not provided on lines
+    source?: string;
+    actorId?: string;
+    correlationId?: string;
 }
 
 export class GLService {
@@ -73,8 +99,9 @@ export class GLService {
     /**
      * Core method to post a balanced Journal Entry into the General Ledger.
      */
-    static async postJournalEntry(input: JournalEntryInput) {
-        return await db.transaction(async (tx) => {
+    static async postJournalEntry(input: JournalEntryInput, existingTx?: any) {
+        await ensureJournalProvenanceSchema();
+        const execute = async (tx: any) => {
             const pushToExceptionQueue = async (reason: string) => {
                 const id = randomUUID();
                 await tx.insert(financeExceptions).values({
@@ -91,25 +118,35 @@ export class GLService {
             // Operational documents must be idempotent. A retry from a network
             // timeout must never create a second sale, GRN, waste, or COGS entry.
             if (input.reference && input.referenceType !== 'MANUAL') {
+                // The read-before-insert must be serialized. Without a range
+                // lock, two concurrent retries can both observe no entry and
+                // create duplicate financial documents.
+                await tx.execute(sql`
+                    SELECT ${journalEntries.id}
+                    FROM ${journalEntries} WITH (UPDLOCK, HOLDLOCK)
+                    WHERE ${journalEntries.reference} = ${input.reference}
+                      AND ${journalEntries.referenceType} = ${input.referenceType}
+                      AND ${input.branchId
+                        ? sql`${journalEntries.branchId} = ${input.branchId}`
+                        : sql`${journalEntries.branchId} IS NULL`}
+                `);
                 const existing = await tx.select({ id: journalEntries.id, status: journalEntries.status })
                     .from(journalEntries)
                     .where(and(
                         eq(journalEntries.reference, input.reference),
                         eq(journalEntries.referenceType, input.referenceType),
+                        input.branchId
+                            ? eq(journalEntries.branchId, input.branchId)
+                            : isNull(journalEntries.branchId),
                     ))
                     .top(1);
                 if (existing.length) return { entryId: existing[0].id, status: existing[0].status, duplicate: true };
             }
 
-            // 1. Verify Trial Balance Equilibrium
-            if (input.lines.length < 2 || input.lines.some(line => !Number.isFinite(Number(line.debit)) || !Number.isFinite(Number(line.credit)) || Number(line.debit) < 0 || Number(line.credit) < 0)) {
-                return await pushToExceptionQueue('INVALID_JOURNAL_LINES');
-            }
-            const totalDebit = input.lines.reduce((acc, line) => acc + (line.debit || 0), 0);
-            const totalCredit = input.lines.reduce((acc, line) => acc + (line.credit || 0), 0);
-
-            if (totalDebit.toFixed(4) !== totalCredit.toFixed(4)) {
-                return await pushToExceptionQueue(`UNBALANCED_LINES|Debit:${totalDebit}|Credit:${totalCredit}`);
+            // 1. Verify Trial Balance Equilibrium in integer minor units.
+            const invariant = validateJournalLines(input.lines);
+            if (invariant.ok === false) {
+                return await pushToExceptionQueue(invariant.reason);
             }
 
             // 2. Fetch or create Open Fiscal Period
@@ -124,7 +161,7 @@ export class GLService {
 
             const operationalReferences: ReferenceType[] = [
                 'ORDER', 'PAYMENT', 'GRN', 'WASTE', 'STOCK_COUNT', 'EXPENSE',
-                'REFUND', 'VOID', 'SHIFT_CLOSE', 'COGS', 'COGS_REVERSAL', 'PAYROLL', 'PAYROLL_REVERSAL', 'SUPPLIER_INVOICE', 'RECONCILIATION',
+                'REFUND', 'VOID', 'SHIFT_CLOSE', 'COGS', 'COGS_REVERSAL', 'PAYROLL', 'PAYROLL_REVERSAL', 'SUPPLIER_INVOICE', 'PURCHASE_RETURN', 'RECONCILIATION', 'WALLET_DEPOSIT', 'WALLET_PAYMENT', 'LOYALTY_REDEMPTION', 'ROYALTY',
             ];
             if (operationalReferences.includes(input.referenceType) && !input.branchId) {
                 return await pushToExceptionQueue('BRANCH_REQUIRED_FOR_OPERATIONAL_ENTRY');
@@ -176,6 +213,7 @@ export class GLService {
 
             // 5. Insert Entry
             const entryId = randomUUID();
+            const { source, actorId, correlationId } = resolveJournalProvenance(input);
             await tx.insert(journalEntries).values({
                 id: entryId,
                 date: currentDate,
@@ -185,6 +223,10 @@ export class GLService {
                 status: input.status || 'POSTED',
                 fiscalPeriodId: periodId, // Allows nullable now based on schema fallback
                 createdBy: input.createdBy,
+                branchId: input.branchId,
+                source,
+                actorId,
+                correlationId,
             });
 
             // 6. Insert Lines
@@ -200,13 +242,14 @@ export class GLService {
             await tx.insert(journalLines).values(linesToInsert);
 
             return { entryId, status: 'POSTED' };
-        });
+        };
+        return existingTx ? execute(existingTx) : db.transaction(execute);
     }
 
     /**
      * Map Sales (Orders) to GL using PostingRuleEngine
      */
-    static async postSalesOrder(orderId: string, subtotal: number, tax: number, paymentMethod: string, amountPaid: number, branchId: string, orderType: string = 'DINE_IN') {
+    static async postSalesOrder(orderId: string, subtotal: number, tax: number, paymentMethod: string, amountPaid: number, branchId: string, orderType: string = 'DINE_IN', provenance?: Pick<JournalEntryInput, 'actorId' | 'correlationId' | 'source'>) {
         const { PostingRuleEngine } = await import('./postingRuleEngine');
         
         const linesData = await PostingRuleEngine.generateLines('POS_SALE', {
@@ -253,7 +296,8 @@ export class GLService {
             referenceType: 'ORDER',
             description: `Sales Order #${orderId}`,
             lines,
-            branchId
+            branchId,
+            ...provenance,
         });
     }
 
@@ -286,7 +330,10 @@ export class GLService {
                 lines: newLines,
                 createdBy,
                 branchId: branch[0]?.branchId || undefined,
-            });
+                source: 'REVERSAL',
+                actorId: createdBy,
+                correlationId: `REFUND:${reversalReference}`,
+            }, tx);
 
             // Mark original reversed
             await tx.update(journalEntries).set({ status: 'REVERSED' }).where(eq(journalEntries.id, originalEntryId));

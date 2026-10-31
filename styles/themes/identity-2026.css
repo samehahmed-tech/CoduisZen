@@ -1,0 +1,284 @@
+/* RestoFlow 2026 identity layer.
+   Keeps stable theme IDs while giving every theme an independent visual world. */
+
+:root[data-theme] {
+  color-scheme: light;
+  --identity-line: rgba(var(--border-color), .72);
+  --identity-shadow-color: rgba(15, 23, 42, .16);
+}
+
+:root.dark[data-theme] {
+  color-scheme: dark;
+  --identity-line: rgba(var(--border-color), .82);
+  --identity-shadow-color: rgba(0, 0, 0, .52);
+}
+
+:root[data-theme] .workspace-shell,
+:root[data-theme] .neo-ui.workspace-shell {
+  background: var(--theme-page-bg) !important;
+  background-attachment: fixed !important;
+}
+
+:root[data-theme="command"] :is(.workspace-shell, .neo-ui.workspace-shell) {
+  background-size: 24px 24px !important;
+}
+
+:root[data-theme="canvas"] :is(.workspace-shell, .neo-ui.workspace-shell) {
+  background-size: 13px 13px !important;
+}
+
+:root[data-theme="fluent-pro"] :is(.workspace-shell, .neo-ui.workspace-shell) {
+  background-size: 80px 100% !important;
+}
+
+:root[data-theme="touch"] :is(.workspace-shell, .neo-ui.workspace-shell) {
+  background-size: 18px 18px !important;
+}
+
+:root[data-theme] .theme-card,
+:root[data-theme] .card-primary {
+  isolation: isolate;
+  transition: transform var(--motion-normal, 180ms) var(--ease-standard, ease),
+              box-shadow var(--motion-normal, 180ms) var(--ease-standard, ease),
+              border-color var(--motion-fast, 120ms) ease;
+}
+
+/* 01 — SAFFRON LEDGER · luxury hospitality */
+:root[data-theme="meridian"] {
+  --primary: 16, 45, 72; --primary-hover: 24, 62, 96; --secondary: 109, 82, 47; --accent: 181, 132, 48;
+  --bg-app: 244, 239, 228; --bg-card: 255, 252, 245; --bg-sidebar: 13, 39, 63; --bg-elevated: 249, 243, 232; --bg-global: 238, 231, 216;
+  --text-main: 25, 34, 40; --text-muted: 101, 92, 78; --border-color: 211, 197, 170;
+  --success: 36, 120, 88; --warning: 169, 104, 24; --danger: 177, 48, 56; --info: 31, 102, 145;
+  --theme-page-bg: radial-gradient(circle at 12% 0%, rgba(181,132,48,.14), transparent 30%), linear-gradient(135deg, #f7f2e8 0%, #ede4d3 100%);
+  --theme-card-bg: rgba(255,252,245,.95); --theme-card-hover-bg: #fffdf8; --theme-rail-bg: linear-gradient(180deg,#102d48,#0b2137);
+  --theme-topbar-bg: rgba(255,252,245,.88); --theme-table-head-bg: #102d48; --theme-row-hover-bg: rgba(181,132,48,.08);
+  --theme-input-bg: #f7f0e3; --theme-button-bg: linear-gradient(135deg,#102d48,#1f5278); --theme-button-bg-hover: #173f61; --theme-button-text: #fff9ec;
+  --theme-active-bg: rgba(181,132,48,.16); --theme-focus-ring: rgba(181,132,48,.42); --theme-popup-bg: #fffaf1;
+}
+:root.dark[data-theme="meridian"] {
+  --primary: 222, 177, 91; --primary-hover: 239, 201, 124; --secondary: 148, 166, 178; --accent: 222, 177, 91;
+  --bg-app: 8, 22, 35; --bg-card: 14, 34, 52; --bg-sidebar: 5, 18, 30; --bg-elevated: 23, 48, 69; --bg-global: 8, 22, 35;
+  --text-main: 247, 240, 224; --text-muted: 183, 174, 155; --border-color: 55, 71, 81;
+  --theme-page-bg: radial-gradient(circle at 85% 0%, rgba(222,177,91,.12), transparent 28%), linear-gradient(135deg,#081623,#050d16);
+  --theme-card-bg: rgba(14,34,52,.95); --theme-card-hover-bg: #173045; --theme-rail-bg: #05121e; --theme-topbar-bg: rgba(14,34,52,.9);
+  --theme-table-head-bg: #071725; --theme-row-hover-bg: rgba(222,177,91,.08); --theme-input-bg: #173045;
+  --theme-button-bg: linear-gradient(135deg,#c18a32,#e2b15b); --theme-button-bg-hover: #efc97c; --theme-button-text: #081623; --theme-active-bg: rgba(222,177,91,.15); --theme-popup-bg: #173045;
+}
+:root[data-theme="meridian"] :is(h1,h2,h3,.font-display) { font-family: Georgia, "Times New Roman", serif !important; letter-spacing: -.02em; }
+:root[data-theme="meridian"] .theme-card { border: 1px solid rgba(var(--accent),.28) !important; border-top: 3px solid rgb(var(--accent)) !important; box-shadow: 0 14px 36px rgba(58,43,20,.10) !important; }
+:root[data-theme="meridian"] .theme-table th { color: #fff6df !important; letter-spacing: .08em; text-transform: uppercase; }
+
+/* 02 — ORBIT COMMAND · mission control */
+:root[data-theme="command"] {
+  --primary: 24, 91, 219; --primary-hover: 15, 70, 185; --secondary: 51, 73, 94; --accent: 0, 157, 184;
+  --bg-app: 234, 240, 246; --bg-card: 249, 252, 255; --bg-sidebar: 13, 28, 45; --bg-elevated: 240, 246, 251; --bg-global: 228, 236, 244;
+  --text-main: 13, 30, 48; --text-muted: 77, 98, 117; --border-color: 169, 188, 204;
+  --success: 4, 130, 91; --warning: 180, 103, 9; --danger: 190, 36, 52; --info: 0, 126, 160;
+  --theme-page-bg: linear-gradient(rgba(24,91,219,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(24,91,219,.055) 1px,transparent 1px),#edf3f8; background-size: 24px 24px;
+  --theme-card-bg: rgba(249,252,255,.97); --theme-card-hover-bg: #fff; --theme-rail-bg: #0d1c2d; --theme-topbar-bg: rgba(249,252,255,.94);
+  --theme-table-head-bg: #dfe9f2; --theme-row-hover-bg: rgba(24,91,219,.07); --theme-input-bg: #fff;
+  --theme-button-bg: #185bdb; --theme-button-bg-hover: #0f46b9; --theme-button-text: #fff; --theme-active-bg: rgba(0,157,184,.15); --theme-focus-ring: rgba(0,157,184,.48); --theme-popup-bg: #f9fcff;
+}
+:root.dark[data-theme="command"] {
+  --primary: 75, 141, 255; --primary-hover: 111, 166, 255; --secondary: 111, 139, 163; --accent: 42, 220, 233;
+  --bg-app: 5, 13, 23; --bg-card: 10, 23, 38; --bg-sidebar: 4, 11, 20; --bg-elevated: 17, 36, 56; --bg-global: 5, 13, 23;
+  --text-main: 226, 239, 249; --text-muted: 132, 158, 179; --border-color: 42, 67, 88;
+  --theme-page-bg: linear-gradient(rgba(75,141,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(75,141,255,.07) 1px,transparent 1px),#050d17;
+  --theme-card-bg: rgba(10,23,38,.97); --theme-card-hover-bg: #112438; --theme-rail-bg: #040b14; --theme-topbar-bg: rgba(10,23,38,.94);
+  --theme-table-head-bg: #071522; --theme-row-hover-bg: rgba(42,220,233,.07); --theme-input-bg: #112438;
+  --theme-button-bg: #2e75ed; --theme-button-bg-hover: #4b8dff; --theme-button-text: #fff; --theme-active-bg: rgba(42,220,233,.13); --theme-popup-bg: #112438;
+}
+:root[data-theme="command"] :is(.theme-card,.theme-input,.theme-btn,.theme-modal-panel) { border-radius: 2px !important; box-shadow: none !important; }
+:root[data-theme="command"] :is(.theme-table th,.theme-badge,.sidebar-section-trigger) { font-family: ui-monospace, Consolas, monospace !important; letter-spacing: .11em; text-transform: uppercase; }
+:root[data-theme="command"] .theme-card { border-inline-start: 3px solid rgb(var(--accent)) !important; }
+
+/* 03 — AURORA BLOOM · iridescent spatial glass */
+:root[data-theme="glassline"] {
+  --primary: 99, 74, 214; --primary-hover: 78, 54, 188; --secondary: 17, 119, 140; --accent: 224, 76, 143;
+  --bg-app: 238, 241, 255; --bg-card: 255, 255, 255; --bg-sidebar: 242, 242, 255; --bg-elevated: 250, 248, 255; --bg-global: 238, 241, 255;
+  --text-main: 32, 26, 63; --text-muted: 100, 91, 130; --border-color: 202, 196, 231;
+  --theme-page-bg: radial-gradient(circle at 10% 10%,rgba(72,225,211,.38),transparent 32%),radial-gradient(circle at 90% 12%,rgba(245,128,184,.34),transparent 34%),radial-gradient(circle at 52% 90%,rgba(126,97,246,.30),transparent 38%),#eef1ff;
+  --theme-card-bg: rgba(255,255,255,.58); --theme-card-hover-bg: rgba(255,255,255,.74); --theme-rail-bg: rgba(245,244,255,.55); --theme-topbar-bg: rgba(255,255,255,.48);
+  --theme-table-head-bg: rgba(255,255,255,.5); --theme-row-hover-bg: rgba(99,74,214,.07); --theme-input-bg: rgba(255,255,255,.55);
+  --theme-button-bg: linear-gradient(135deg,#634ad6,#df4c8f); --theme-button-bg-hover: linear-gradient(135deg,#5235c5,#c93579); --theme-button-text: #fff; --theme-active-bg: rgba(99,74,214,.13); --theme-focus-ring: rgba(72,225,211,.48); --theme-popup-bg: rgba(252,251,255,.84);
+}
+:root.dark[data-theme="glassline"] {
+  --primary: 172, 150, 255; --primary-hover: 199, 184, 255; --secondary: 101, 226, 215; --accent: 255, 129, 190;
+  --bg-app: 11, 9, 28; --bg-card: 25, 20, 52; --bg-sidebar: 16, 12, 37; --bg-elevated: 38, 31, 72; --bg-global: 11, 9, 28;
+  --text-main: 244, 241, 255; --text-muted: 173, 164, 204; --border-color: 71, 59, 111;
+  --theme-page-bg: radial-gradient(circle at 8% 8%,rgba(52,210,198,.22),transparent 34%),radial-gradient(circle at 92% 10%,rgba(242,91,164,.22),transparent 36%),radial-gradient(circle at 52% 92%,rgba(126,97,246,.25),transparent 40%),#0b091c;
+  --theme-card-bg: rgba(25,20,52,.62); --theme-card-hover-bg: rgba(38,31,72,.76); --theme-rail-bg: rgba(16,12,37,.6); --theme-topbar-bg: rgba(25,20,52,.54);
+  --theme-table-head-bg: rgba(11,9,28,.55); --theme-row-hover-bg: rgba(172,150,255,.08); --theme-input-bg: rgba(38,31,72,.62);
+  --theme-button-bg: linear-gradient(135deg,#8f71f1,#e95caa); --theme-button-bg-hover: linear-gradient(135deg,#aa96ff,#ff81be); --theme-button-text: #100c25; --theme-active-bg: rgba(172,150,255,.15); --theme-popup-bg: rgba(31,25,62,.9);
+}
+:root[data-theme="glassline"] :is(.theme-card,.theme-modal-panel,.workspace-rail,.workspace-topbar) { backdrop-filter: blur(28px) saturate(1.45) !important; border: 1px solid rgba(255,255,255,.42) !important; }
+:root[data-theme="glassline"] .theme-card { box-shadow: 0 22px 60px rgba(72,47,155,.16), inset 0 1px rgba(255,255,255,.55) !important; }
+
+/* 04 — PAPER ATELIER · culinary editorial */
+:root[data-theme="canvas"] {
+  --primary: 90, 21, 32; --primary-hover: 116, 27, 40; --secondary: 40, 63, 94; --accent: 29, 78, 216;
+  --bg-app: 242, 235, 218; --bg-card: 255, 250, 238; --bg-sidebar: 236, 226, 204; --bg-elevated: 248, 241, 225; --bg-global: 242, 235, 218;
+  --text-main: 35, 30, 26; --text-muted: 102, 89, 76; --border-color: 188, 173, 145;
+  --theme-page-bg: radial-gradient(rgba(90,21,32,.08) .7px,transparent .7px),#f2ebda; background-size: 13px 13px;
+  --theme-card-bg: #fffbee; --theme-card-hover-bg: #fffdf6; --theme-rail-bg: #ece2cc; --theme-topbar-bg: rgba(255,250,238,.93);
+  --theme-table-head-bg: #5a1520; --theme-row-hover-bg: rgba(29,78,216,.05); --theme-input-bg: #f3ead6;
+  --theme-button-bg: #5a1520; --theme-button-bg-hover: #741b28; --theme-button-text: #fff8e8; --theme-active-bg: rgba(29,78,216,.1); --theme-focus-ring: rgba(29,78,216,.34); --theme-popup-bg: #fffbee;
+}
+:root.dark[data-theme="canvas"] {
+  --primary: 238, 140, 149; --primary-hover: 248, 170, 177; --secondary: 151, 176, 213; --accent: 111, 154, 255;
+  --bg-app: 22, 18, 16; --bg-card: 31, 25, 22; --bg-sidebar: 25, 20, 18; --bg-elevated: 45, 36, 31; --bg-global: 22, 18, 16;
+  --text-main: 246, 235, 218; --text-muted: 184, 165, 145; --border-color: 75, 62, 51;
+  --theme-page-bg: radial-gradient(rgba(238,140,149,.07) .7px,transparent .7px),#161210;
+  --theme-card-bg: #1f1916; --theme-card-hover-bg: #2d241f; --theme-rail-bg: #191412; --theme-topbar-bg: rgba(31,25,22,.94);
+  --theme-table-head-bg: #511825; --theme-row-hover-bg: rgba(111,154,255,.07); --theme-input-bg: #2d241f;
+  --theme-button-bg: #d87883; --theme-button-bg-hover: #ee8c95; --theme-button-text: #1a1011; --theme-active-bg: rgba(111,154,255,.13); --theme-popup-bg: #2d241f;
+}
+:root[data-theme="canvas"] :is(h1,h2,h3,.font-display) { font-family: Georgia, "Times New Roman", serif !important; }
+:root[data-theme="canvas"] .theme-card { border-radius: 0 18px 0 18px !important; border: 1px solid rgba(var(--text-main),.22) !important; box-shadow: 7px 7px 0 rgba(var(--primary),.11) !important; }
+:root[data-theme="canvas"] .theme-table th { color: #fff6e6 !important; font-family: Georgia,serif; }
+
+/* 05 — CIVIC GRID · Swiss productivity */
+:root[data-theme="fluent-pro"] {
+  --primary: 212, 35, 42; --primary-hover: 174, 24, 31; --secondary: 43, 50, 58; --accent: 0, 88, 255;
+  --bg-app: 241, 241, 238; --bg-card: 255, 255, 252; --bg-sidebar: 27, 29, 31; --bg-elevated: 248, 248, 245; --bg-global: 241, 241, 238;
+  --text-main: 18, 20, 21; --text-muted: 92, 96, 98; --border-color: 187, 189, 187;
+  --theme-page-bg: linear-gradient(90deg,rgba(18,20,21,.045) 1px,transparent 1px),#f1f1ee; background-size: 80px 100%;
+  --theme-card-bg: #fffffc; --theme-card-hover-bg: #fff; --theme-rail-bg: #1b1d1f; --theme-topbar-bg: rgba(255,255,252,.96);
+  --theme-table-head-bg: #1b1d1f; --theme-row-hover-bg: rgba(212,35,42,.055); --theme-input-bg: #fff;
+  --theme-button-bg: #d4232a; --theme-button-bg-hover: #ae181f; --theme-button-text: #fff; --theme-active-bg: rgba(212,35,42,.12); --theme-focus-ring: rgba(0,88,255,.4); --theme-popup-bg: #fffffc;
+}
+:root.dark[data-theme="fluent-pro"] {
+  --primary: 255, 91, 96; --primary-hover: 255, 126, 130; --secondary: 170, 176, 181; --accent: 83, 140, 255;
+  --bg-app: 14, 15, 16; --bg-card: 23, 24, 25; --bg-sidebar: 8, 9, 10; --bg-elevated: 34, 36, 38; --bg-global: 14, 15, 16;
+  --text-main: 245, 245, 240; --text-muted: 160, 163, 162; --border-color: 59, 61, 61;
+  --theme-page-bg: linear-gradient(90deg,rgba(245,245,240,.045) 1px,transparent 1px),#0e0f10;
+  --theme-card-bg: #171819; --theme-card-hover-bg: #222426; --theme-rail-bg: #08090a; --theme-topbar-bg: rgba(23,24,25,.96);
+  --theme-table-head-bg: #08090a; --theme-row-hover-bg: rgba(255,91,96,.065); --theme-input-bg: #222426;
+  --theme-button-bg: #ee4249; --theme-button-bg-hover: #ff5b60; --theme-button-text: #fff; --theme-active-bg: rgba(255,91,96,.13); --theme-popup-bg: #222426;
+}
+:root[data-theme="fluent-pro"] :is(.theme-card,.theme-input,.theme-modal-panel) { border-radius: 0 !important; }
+:root[data-theme="fluent-pro"] .theme-card { border: 1px solid rgb(var(--text-main)) !important; border-top: 4px solid rgb(var(--primary)) !important; box-shadow: none !important; }
+
+/* 06 — POP MATERIAL · neo-Memphis */
+:root[data-theme="material-x"] {
+  --primary: 103, 55, 214; --primary-hover: 81, 39, 183; --secondary: 0, 130, 126; --accent: 236, 96, 33;
+  --bg-app: 255, 245, 204; --bg-card: 255, 255, 255; --bg-sidebar: 39, 25, 76; --bg-elevated: 249, 240, 255; --bg-global: 255, 245, 204;
+  --text-main: 35, 23, 60; --text-muted: 101, 84, 122; --border-color: 183, 160, 213;
+  --theme-page-bg: radial-gradient(circle at 8% 14%,#50d7c7 0 55px,transparent 56px),radial-gradient(circle at 92% 7%,#ff8d4a 0 70px,transparent 71px),linear-gradient(135deg,#fff5cc,#f7eaff);
+  --theme-card-bg: #fff; --theme-card-hover-bg: #fff9ff; --theme-rail-bg: #27194c; --theme-topbar-bg: rgba(255,255,255,.9);
+  --theme-table-head-bg: #6737d6; --theme-row-hover-bg: rgba(103,55,214,.07); --theme-input-bg: #faf2ff;
+  --theme-button-bg: linear-gradient(135deg,#6737d6,#9f48de); --theme-button-bg-hover: #5127b7; --theme-button-text: #fff; --theme-active-bg: rgba(80,215,199,.2); --theme-focus-ring: rgba(236,96,33,.5); --theme-popup-bg: #fff;
+}
+:root.dark[data-theme="material-x"] {
+  --primary: 183, 139, 255; --primary-hover: 205, 176, 255; --secondary: 83, 229, 211; --accent: 255, 148, 84;
+  --bg-app: 18, 10, 35; --bg-card: 31, 18, 55; --bg-sidebar: 12, 7, 25; --bg-elevated: 48, 29, 82; --bg-global: 18, 10, 35;
+  --text-main: 249, 242, 255; --text-muted: 184, 165, 207; --border-color: 78, 54, 111;
+  --theme-page-bg: radial-gradient(circle at 8% 14%,rgba(80,215,199,.24) 0 55px,transparent 56px),radial-gradient(circle at 92% 7%,rgba(255,141,74,.25) 0 70px,transparent 71px),linear-gradient(135deg,#120a23,#21113a);
+  --theme-card-bg: #1f1237; --theme-card-hover-bg: #301d52; --theme-rail-bg: #0c0719; --theme-topbar-bg: rgba(31,18,55,.9);
+  --theme-table-head-bg: #160c2b; --theme-row-hover-bg: rgba(183,139,255,.08); --theme-input-bg: #301d52;
+  --theme-button-bg: linear-gradient(135deg,#9a6bf4,#df66c4); --theme-button-bg-hover: #b78bff; --theme-button-text: #160c2b; --theme-active-bg: rgba(83,229,211,.14); --theme-popup-bg: #301d52;
+}
+:root[data-theme="material-x"] .theme-card { border: 2px solid rgb(var(--text-main)) !important; border-radius: 28px 8px 28px 8px !important; box-shadow: 8px 8px 0 rgb(var(--accent)) !important; }
+:root[data-theme="material-x"] .theme-btn-primary { border: 2px solid rgb(var(--text-main)) !important; box-shadow: 4px 4px 0 rgb(var(--accent)) !important; }
+
+/* 07 — NOCTURNE MONO · gallery monochrome */
+:root[data-theme="obsidian"] {
+  --primary: 19, 19, 20; --primary-hover: 47, 47, 49; --secondary: 95, 95, 99; --accent: 120, 120, 124;
+  --bg-app: 239, 239, 236; --bg-card: 252, 252, 249; --bg-sidebar: 20, 20, 21; --bg-elevated: 245, 245, 242; --bg-global: 239, 239, 236;
+  --text-main: 15, 15, 16; --text-muted: 91, 91, 94; --border-color: 178, 178, 176;
+  --theme-page-bg: linear-gradient(180deg,#f3f3f0,#e7e7e3); --theme-card-bg: #fcfcf9; --theme-card-hover-bg: #fff; --theme-rail-bg: #141415; --theme-topbar-bg: rgba(252,252,249,.96);
+  --theme-table-head-bg: #141415; --theme-row-hover-bg: rgba(19,19,20,.05); --theme-input-bg: #fff; --theme-button-bg: #131314; --theme-button-bg-hover: #2f2f31; --theme-button-text: #fff;
+  --theme-active-bg: rgba(19,19,20,.09); --theme-focus-ring: rgba(19,19,20,.42); --theme-popup-bg: #fcfcf9;
+}
+:root.dark[data-theme="obsidian"] {
+  --primary: 239, 239, 236; --primary-hover: 255, 255, 252; --secondary: 151, 151, 154; --accent: 193, 193, 196;
+  --bg-app: 3, 3, 4; --bg-card: 10, 10, 11; --bg-sidebar: 0, 0, 0; --bg-elevated: 19, 19, 21; --bg-global: 3, 3, 4;
+  --text-main: 246, 246, 243; --text-muted: 143, 143, 146; --border-color: 45, 45, 47;
+  --theme-page-bg: linear-gradient(180deg,#030304,#000); --theme-card-bg: #0a0a0b; --theme-card-hover-bg: #131315; --theme-rail-bg: #000; --theme-topbar-bg: rgba(10,10,11,.96);
+  --theme-table-head-bg: #000; --theme-row-hover-bg: rgba(239,239,236,.055); --theme-input-bg: #131315; --theme-button-bg: #efefec; --theme-button-bg-hover: #fff; --theme-button-text: #050506;
+  --theme-active-bg: rgba(239,239,236,.1); --theme-focus-ring: rgba(239,239,236,.42); --theme-popup-bg: #131315;
+}
+:root[data-theme="obsidian"] :is(.theme-card,.theme-input,.theme-btn,.theme-modal-panel) { border-radius: 0 !important; }
+:root[data-theme="obsidian"] .theme-card { border: 1px solid rgba(var(--text-main),.3) !important; box-shadow: none !important; }
+:root[data-theme="obsidian"] :is(h1,h2,h3) { font-weight: 500 !important; letter-spacing: -.035em; }
+
+/* 08 — CHROMATIC BENTO · bold modular */
+:root[data-theme="tiles"] {
+  --primary: 30, 26, 82; --primary-hover: 43, 36, 112; --secondary: 0, 118, 111; --accent: 222, 37, 122;
+  --bg-app: 229, 241, 255; --bg-card: 255, 255, 255; --bg-sidebar: 30, 26, 82; --bg-elevated: 245, 249, 255; --bg-global: 229, 241, 255;
+  --text-main: 28, 25, 55; --text-muted: 94, 90, 124; --border-color: 169, 174, 211;
+  --theme-page-bg: linear-gradient(135deg,#d8efff 0 50%,#fff2c7 50%); --theme-card-bg: #fff; --theme-card-hover-bg: #fff; --theme-rail-bg: #1e1a52; --theme-topbar-bg: rgba(255,255,255,.92);
+  --theme-table-head-bg: #1e1a52; --theme-row-hover-bg: rgba(222,37,122,.06); --theme-input-bg: #f5f9ff; --theme-button-bg: #de257a; --theme-button-bg-hover: #b91562; --theme-button-text: #fff;
+  --theme-active-bg: rgba(255,201,58,.28); --theme-focus-ring: rgba(222,37,122,.42); --theme-popup-bg: #fff;
+}
+:root.dark[data-theme="tiles"] {
+  --primary: 142, 203, 255; --primary-hover: 178, 220, 255; --secondary: 92, 225, 201; --accent: 255, 102, 176;
+  --bg-app: 14, 11, 34; --bg-card: 25, 21, 52; --bg-sidebar: 8, 6, 24; --bg-elevated: 39, 33, 72; --bg-global: 14, 11, 34;
+  --text-main: 244, 241, 255; --text-muted: 165, 159, 196; --border-color: 62, 55, 96;
+  --theme-page-bg: linear-gradient(135deg,#0e0b22 0 50%,#211033 50%); --theme-card-bg: #191534; --theme-card-hover-bg: #272148; --theme-rail-bg: #080618; --theme-topbar-bg: rgba(25,21,52,.94);
+  --theme-table-head-bg: #080618; --theme-row-hover-bg: rgba(255,102,176,.08); --theme-input-bg: #272148; --theme-button-bg: #ef4ca0; --theme-button-bg-hover: #ff66b0; --theme-button-text: #170a1f;
+  --theme-active-bg: rgba(255,207,72,.16); --theme-popup-bg: #272148;
+}
+:root[data-theme="tiles"] .theme-card { border-radius: 24px 8px 24px 8px !important; border: 2px solid rgb(var(--text-main)) !important; box-shadow: 6px 6px 0 rgba(var(--primary),.24) !important; }
+:root[data-theme="tiles"] .theme-card:nth-child(3n+2) { border-radius: 8px 24px 8px 24px !important; box-shadow: 6px 6px 0 rgba(var(--accent),.25) !important; }
+
+/* 09 — MOSS & MIST · biophilic calm */
+:root[data-theme="acrylic"] {
+  --primary: 37, 99, 76; --primary-hover: 27, 76, 58; --secondary: 91, 112, 86; --accent: 164, 111, 53;
+  --bg-app: 231, 238, 226; --bg-card: 250, 252, 246; --bg-sidebar: 30, 62, 49; --bg-elevated: 241, 246, 236; --bg-global: 231, 238, 226;
+  --text-main: 31, 48, 39; --text-muted: 94, 108, 95; --border-color: 179, 195, 176;
+  --theme-page-bg: radial-gradient(ellipse at 5% 0%,rgba(116,157,111,.25),transparent 36%),radial-gradient(ellipse at 100% 100%,rgba(202,170,110,.18),transparent 38%),#e7eee2;
+  --theme-card-bg: rgba(250,252,246,.86); --theme-card-hover-bg: #fbfdf8; --theme-rail-bg: #1e3e31; --theme-topbar-bg: rgba(250,252,246,.82);
+  --theme-table-head-bg: #dfe9d9; --theme-row-hover-bg: rgba(37,99,76,.06); --theme-input-bg: #f1f6ec; --theme-button-bg: #25634c; --theme-button-bg-hover: #1b4c3a; --theme-button-text: #fff;
+  --theme-active-bg: rgba(116,157,111,.2); --theme-focus-ring: rgba(37,99,76,.38); --theme-popup-bg: rgba(250,252,246,.95);
+}
+:root.dark[data-theme="acrylic"] {
+  --primary: 126, 194, 151; --primary-hover: 157, 216, 177; --secondary: 158, 183, 151; --accent: 220, 168, 98;
+  --bg-app: 10, 24, 18; --bg-card: 18, 38, 29; --bg-sidebar: 6, 18, 13; --bg-elevated: 29, 54, 42; --bg-global: 10, 24, 18;
+  --text-main: 235, 244, 234; --text-muted: 159, 179, 160; --border-color: 54, 78, 62;
+  --theme-page-bg: radial-gradient(ellipse at 5% 0%,rgba(93,151,108,.18),transparent 36%),radial-gradient(ellipse at 100% 100%,rgba(190,137,70,.15),transparent 38%),#0a1812;
+  --theme-card-bg: rgba(18,38,29,.88); --theme-card-hover-bg: #1d362a; --theme-rail-bg: #06120d; --theme-topbar-bg: rgba(18,38,29,.84);
+  --theme-table-head-bg: #0c2018; --theme-row-hover-bg: rgba(126,194,151,.07); --theme-input-bg: #1d362a; --theme-button-bg: #6faf89; --theme-button-bg-hover: #8acba0; --theme-button-text: #07140e;
+  --theme-active-bg: rgba(126,194,151,.14); --theme-popup-bg: rgba(24,45,35,.96);
+}
+:root[data-theme="acrylic"] :is(.theme-card,.theme-modal-panel) { border-radius: 26px 10px 26px 10px !important; backdrop-filter: blur(18px) saturate(1.2) !important; }
+:root[data-theme="acrylic"] .theme-card { border: 1px solid rgba(var(--primary),.25) !important; box-shadow: 0 18px 44px rgba(27,76,58,.13) !important; }
+
+/* 10 — DINER POP · tactile retro POS */
+:root[data-theme="touch"] {
+  --primary: 199, 46, 50; --primary-hover: 161, 31, 36; --secondary: 0, 117, 130; --accent: 240, 174, 35;
+  --bg-app: 248, 237, 210; --bg-card: 255, 250, 232; --bg-sidebar: 0, 73, 82; --bg-elevated: 255, 244, 214; --bg-global: 248, 237, 210;
+  --text-main: 39, 35, 31; --text-muted: 102, 91, 76; --border-color: 87, 73, 61;
+  --theme-page-bg: radial-gradient(circle,rgba(0,117,130,.13) 1.4px,transparent 1.5px),#f8edd2; background-size: 18px 18px;
+  --theme-card-bg: #fffae8; --theme-card-hover-bg: #fffdf4; --theme-rail-bg: #004952; --theme-topbar-bg: rgba(255,250,232,.96);
+  --theme-table-head-bg: #004952; --theme-row-hover-bg: rgba(199,46,50,.07); --theme-input-bg: #fff4d6; --theme-button-bg: #c72e32; --theme-button-bg-hover: #a11f24; --theme-button-text: #fff;
+  --theme-active-bg: rgba(240,174,35,.27); --theme-focus-ring: rgba(0,117,130,.46); --theme-popup-bg: #fffae8;
+}
+:root.dark[data-theme="touch"] {
+  --primary: 255, 103, 105; --primary-hover: 255, 137, 138; --secondary: 71, 201, 210; --accent: 255, 198, 69;
+  --bg-app: 28, 21, 17; --bg-card: 43, 31, 24; --bg-sidebar: 0, 37, 42; --bg-elevated: 59, 43, 32; --bg-global: 28, 21, 17;
+  --text-main: 255, 244, 219; --text-muted: 193, 170, 142; --border-color: 112, 88, 66;
+  --theme-page-bg: radial-gradient(circle,rgba(71,201,210,.1) 1.4px,transparent 1.5px),#1c1511;
+  --theme-card-bg: #2b1f18; --theme-card-hover-bg: #3b2b20; --theme-rail-bg: #00252a; --theme-topbar-bg: rgba(43,31,24,.96);
+  --theme-table-head-bg: #00252a; --theme-row-hover-bg: rgba(255,103,105,.08); --theme-input-bg: #3b2b20; --theme-button-bg: #e94a4e; --theme-button-bg-hover: #ff6769; --theme-button-text: #fff;
+  --theme-active-bg: rgba(255,198,69,.18); --theme-popup-bg: #3b2b20;
+}
+:root[data-theme="touch"] :is(.theme-card,.theme-input,.theme-modal-panel,.theme-btn) { border: 3px solid rgb(var(--text-main)) !important; border-radius: 12px !important; }
+:root[data-theme="touch"] .theme-card { box-shadow: 6px 6px 0 rgb(var(--secondary)) !important; }
+:root[data-theme="touch"] :is(button,.theme-btn,.theme-input) { min-height: 44px; }
+:root[data-theme="touch"] .theme-btn-primary { box-shadow: 4px 4px 0 rgb(var(--accent)) !important; font-weight: 900 !important; text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme] *, :root[data-theme] *::before, :root[data-theme] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+@media (max-width: 767px) {
+  :root[data-theme="material-x"] .theme-card,
+  :root[data-theme="tiles"] .theme-card,
+  :root[data-theme="touch"] .theme-card { box-shadow: 3px 3px 0 rgba(var(--primary),.28) !important; }
+}

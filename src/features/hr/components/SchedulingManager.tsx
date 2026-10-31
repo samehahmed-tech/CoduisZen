@@ -68,6 +68,18 @@ type EmployeeRow = {
     jobTitleId?: string | null;
 };
 
+type AutoSchedulePreview = {
+    planId: string;
+    branchId: string;
+    dataQuality: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
+    confidence: number;
+    source: string;
+    template: { id: string; name: string; startTime: string; endTime: string };
+    readyToPublish: boolean;
+    entries: Array<{ date: string; employeeId: string; employeeName?: string | null; startTime: string; endTime: string }>;
+    blockers: Array<{ date: string; reason: string; requiredHeadcount: number; availableEmployees: number }>;
+};
+
 const STATUS_LABEL: Record<string, string> = {
     DRAFT: 'مسودة',
     PUBLISHED: 'معتمدة',
@@ -137,6 +149,8 @@ export default function SchedulingManager() {
     const [selectedPlan, setSelectedPlan] = useState<ShiftPlan | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
+    const [autoPreview, setAutoPreview] = useState<AutoSchedulePreview | null>(null);
+    const [autoApplyArmed, setAutoApplyArmed] = useState(false);
     const [search, setSearch] = useState('');
     const [selectedCell, setSelectedCell] = useState<{ employeeId: string; date: string } | null>(null);
     const [entryForm, setEntryForm] = useState({
@@ -277,6 +291,46 @@ export default function SchedulingManager() {
             toast.success(status === 'PUBLISHED' ? 'تم اعتماد ونشر الخطة' : 'تم تحديث حالة الخطة');
             setSelectedPlan(updated);
             await loadData();
+        } catch (error: any) {
+            toast.error(getActionableErrorMessage(error, 'ar'));
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const previewAutoSchedule = async () => {
+        if (!selectedPlan) return toast.error('اختار خطة مسودة أولا');
+        if (selectedPlan.status !== 'DRAFT') return toast.error('الجدولة التلقائية تعمل على الخطط المسودة فقط');
+        setSaving('auto-preview');
+        setAutoApplyArmed(false);
+        try {
+            const preview = await apiRequest<AutoSchedulePreview>(`/hr-extended/schedules/plans/${selectedPlan.id}/auto-preview`, {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            setAutoPreview(preview);
+            if (preview.readyToPublish) toast.success(`تم تجهيز ${preview.entries.length} وردية للمراجعة`);
+            else toast.error('توجد عوائق تمنع تطبيق الجدولة التلقائية');
+        } catch (error: any) {
+            toast.error(getActionableErrorMessage(error, 'ar'));
+            setAutoPreview(null);
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    const applyAutoSchedule = async () => {
+        if (!selectedPlan || !autoPreview?.readyToPublish) return;
+        setSaving('auto-apply');
+        try {
+            await apiRequest(`/hr-extended/schedules/plans/${selectedPlan.id}/auto-apply`, {
+                method: 'POST',
+                body: JSON.stringify({ confirm: true }),
+            });
+            toast.success('تم تطبيق الجدولة التلقائية على الخطة المسودة');
+            setAutoPreview(null);
+            setAutoApplyArmed(false);
+            await loadEntries(selectedPlan);
         } catch (error: any) {
             toast.error(getActionableErrorMessage(error, 'ar'));
         } finally {
@@ -546,6 +600,11 @@ export default function SchedulingManager() {
                                         <button onClick={copyFirstEmployeeWeek} disabled={saving === 'copy-week'} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-app px-3 text-xs font-black hover:bg-elevated disabled:opacity-50">
                                             <Copy size={14} /> نسخ النمط
                                         </button>
+                                        {selectedPlan.status === 'DRAFT' && (
+                                            <button onClick={previewAutoSchedule} disabled={saving === 'auto-preview' || saving === 'auto-apply'} className="inline-flex h-10 items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 text-xs font-black text-blue-700 hover:bg-blue-500/15 disabled:opacity-50">
+                                                {saving === 'auto-preview' ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />} جدولة بالذكاء التشغيلي
+                                            </button>
+                                        )}
                                         {selectedPlan.status === 'DRAFT' ? (
                                             <button onClick={() => updatePlanStatus('PUBLISHED')} disabled={saving === 'plan-PUBLISHED'} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white disabled:opacity-50">
                                                 <ShieldCheck size={14} /> اعتماد
@@ -557,6 +616,49 @@ export default function SchedulingManager() {
                                         )}
                                     </div>
                                 </div>
+
+                                {autoPreview && (
+                                    <section className={`mx-4 mt-4 rounded-2xl border p-4 ${autoPreview.readyToPublish ? 'border-emerald-500/25 bg-emerald-500/5' : 'border-amber-500/25 bg-amber-500/5'}`} aria-live="polite">
+                                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h3 className="text-sm font-black">مراجعة الجدولة التلقائية</h3>
+                                                    <span className={`rounded-full border px-2 py-1 text-[10px] font-black ${autoPreview.readyToPublish ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700' : 'border-amber-500/25 bg-amber-500/10 text-amber-700'}`}>
+                                                        {autoPreview.readyToPublish ? 'جاهزة للتطبيق' : 'تحتاج مراجعة'}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 text-xs font-bold leading-6 text-muted">
+                                                    القالب: {autoPreview.template.name} ({compactTime(autoPreview.template.startTime)} - {compactTime(autoPreview.template.endTime)}) • جودة البيانات: {autoPreview.dataQuality} • الثقة: {Math.round(autoPreview.confidence * 100)}%
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {autoPreview.readyToPublish && !autoApplyArmed && (
+                                                    <button onClick={() => setAutoApplyArmed(true)} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white">
+                                                        <ShieldCheck size={14} /> تجهيز التطبيق ({autoPreview.entries.length})
+                                                    </button>
+                                                )}
+                                                {autoPreview.readyToPublish && autoApplyArmed && (
+                                                    <>
+                                                        <button onClick={applyAutoSchedule} disabled={saving === 'auto-apply'} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white disabled:opacity-50">
+                                                            {saving === 'auto-apply' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} تأكيد وتطبيق
+                                                        </button>
+                                                        <button onClick={() => setAutoApplyArmed(false)} disabled={saving === 'auto-apply'} className="h-10 rounded-xl border border-border bg-app px-3 text-xs font-black hover:bg-elevated disabled:opacity-50">إلغاء</button>
+                                                    </>
+                                                )}
+                                                <button onClick={() => { setAutoPreview(null); setAutoApplyArmed(false); }} className="h-10 rounded-xl border border-border bg-app px-3 text-xs font-black hover:bg-elevated">إخفاء</button>
+                                            </div>
+                                        </div>
+                                        {autoPreview.blockers.length > 0 && (
+                                            <div className="mt-3 space-y-2" role="alert">
+                                                {autoPreview.blockers.map((blocker) => (
+                                                    <div key={`${blocker.date}-${blocker.reason}`} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-card px-3 py-2 text-xs font-bold text-amber-800">
+                                                        <AlertTriangle size={14} /> {formatDate(blocker.date)}: {blocker.reason === 'INSUFFICIENT_ACTIVE_EMPLOYEES' ? `الاحتياج ${blocker.requiredHeadcount} مقابل ${blocker.availableEmployees} موظف` : 'تعارض أو راحة غير كافية'}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
 
                                 <div className="overflow-auto">
                                     <div className="min-w-[980px]">

@@ -1,21 +1,37 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { branches, orders, inventoryStock, warehouses, inventoryItems, userDailyPerformance, users } from '../../src/db/schema';
+import { branches, orders, inventoryStock, warehouses, inventoryItems, userDailyPerformance, users, auditLogs, refundRecords, dayCloseReports } from '../../src/db/schema';
 import { sql } from 'drizzle-orm';
 import { and, eq, gte, inArray, desc, lte } from 'drizzle-orm';
+import { detectLatestAnomaly, DetectedAnomaly } from '../utils/anomalyDetection';
+import { METRIC_CATALOG } from '../services/metricCatalog';
+import { resolveBusinessDateRange } from '../utils/businessDateRange';
+import { analyticsService } from '../services/analyticsService';
+import { resolveConsolidatedReportScope } from '../utils/consolidatedReportScope';
+
+export const getMetricCatalog = async (_req: Request, res: Response) => {
+    return res.json({ version: '2026-10-27', metrics: METRIC_CATALOG });
+};
+
+export const getAnalyticsReconciliation = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId).trim() : '');
+        if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
+        const range = resolveBusinessDateRange(req.query.businessDateFrom, req.query.businessDateTo);
+        return res.json(await analyticsService.reconcileBranchSnapshots(branchId, range.from, range.to));
+    } catch (error: any) {
+        return res.status(500).json({ error: 'ANALYTICS_RECONCILIATION_FAILED', detail: error?.message });
+    }
+};
 
 export const getBranchPerformance = async (req: Request, res: Response) => {
     try {
-        const user = req.user;
-        const startDateRaw = req.query.startDate as string | undefined;
-        const endDateRaw = req.query.endDate as string | undefined;
-        const startDate = startDateRaw ? new Date(startDateRaw) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const endDate = endDateRaw ? new Date(endDateRaw) : new Date();
+        const dateRange = resolveBusinessDateRange(req.query.businessDateFrom, req.query.businessDateTo);
+        const startDate = new Date(`${dateRange.from}T00:00:00.000Z`);
+        const endDate = new Date(`${dateRange.to}T23:59:59.999Z`);
         endDate.setHours(23, 59, 59, 999);
 
-        const branchFilterId = req.query.branchId as string | undefined;
-        const roleScopedBranchId = user?.role === 'BRANCH_MANAGER' ? (user.branchId || undefined) : undefined;
-        const effectiveBranchId = roleScopedBranchId || branchFilterId;
+        const effectiveBranchId = req.effectiveBranchId;
 
         const allBranches = effectiveBranchId
             ? await db.select().from(branches).where(eq(branches.id, effectiveBranchId))
@@ -29,6 +45,8 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
                 inArray(orders.branchId, branchIds),
                 gte(orders.createdAt, startDate),
                 lte(orders.createdAt, endDate),
+                gte(orders.businessDate, dateRange.from),
+                lte(orders.businessDate, dateRange.to),
             )
         );
 
@@ -77,9 +95,120 @@ export const getBranchPerformance = async (req: Request, res: Response) => {
     }
 };
 
+/** Head-office report with an explicit branch scope and source/provenance contract. */
+export const getConsolidatedPerformance = async (req: Request, res: Response) => {
+    try {
+        const scope = resolveConsolidatedReportScope({
+            role: req.user?.role,
+            requestedBranchId: req.query.branchId,
+            assignedBranchId: req.user?.branchId,
+            allowedBranches: req.user?.allowedBranches,
+        });
+        if ('reason' in scope) return res.status(403).json({ error: scope.reason });
+
+        const dateRange = resolveBusinessDateRange(req.query.businessDateFrom, req.query.businessDateTo);
+        const branchRows = await db.select({ id: branches.id, name: branches.name, nameAr: branches.nameAr })
+            .from(branches)
+            .where(and(
+                eq(branches.isActive, true),
+                scope.global ? undefined : eq(branches.id, scope.branchId!),
+            ));
+        const branchIds = branchRows.map((branch) => branch.id);
+        if (!branchIds.length) {
+            return res.json({ period: dateRange, scope: { global: scope.global, branchIds: [] }, totals: { orders: 0, revenue: 0, cancelled: 0 }, branches: [] });
+        }
+
+        const orderRows = await db.select({ branchId: orders.branchId, status: orders.status, total: orders.total })
+            .from(orders)
+            .where(and(
+                inArray(orders.branchId, branchIds),
+                gte(orders.businessDate, dateRange.from),
+                lte(orders.businessDate, dateRange.to),
+            ));
+        const rows = branchRows.map((branch) => {
+            const branchOrders = orderRows.filter((order) => order.branchId === branch.id);
+            const cancelled = branchOrders.filter((order) => String(order.status || '').toUpperCase() === 'CANCELLED').length;
+            const valid = branchOrders.filter((order) => String(order.status || '').toUpperCase() !== 'CANCELLED');
+            const revenue = valid.reduce((sum, order) => sum + Number(order.total || 0), 0);
+            return { branchId: branch.id, branchName: branch.name, branchNameAr: branch.nameAr, orders: valid.length, revenue, cancelled };
+        });
+        return res.json({
+            period: dateRange,
+            scope: { global: scope.global, branchIds },
+            source: { entity: 'orders', dateField: 'businessDate', revenueField: 'total', cancelledExcluded: true },
+            totals: rows.reduce((total, row) => ({ orders: total.orders + row.orders, revenue: total.revenue + row.revenue, cancelled: total.cancelled + row.cancelled }), { orders: 0, revenue: 0, cancelled: 0 }),
+            branches: rows,
+        });
+    } catch (error: any) {
+        return res.status(500).json({ error: 'CONSOLIDATED_ANALYTICS_FAILED', detail: error?.message });
+    }
+};
+
+const classifyOrderChannel = (order: any): string => {
+    const deliverySource = String(order.deliverySource || '').trim().toUpperCase();
+    const source = String(order.source || '').trim().toLowerCase();
+    if (deliverySource && deliverySource !== 'RESTAURANT') return `AGGREGATOR:${deliverySource}`;
+    if (source === 'online' || source === 'app') return 'ONLINE';
+    if (source === 'call_center' || order.isCallCenterOrder === true || order.isCallCenterOrder === 1) return 'CALL_CENTER';
+    const type = String(order.type || '').trim().toUpperCase();
+    if (type === 'DINE_IN') return 'DINE_IN';
+    if (type === 'TAKEAWAY' || type === 'PICKUP') return 'TAKEAWAY';
+    return 'POS';
+};
+
+/** Compare revenue and volume by order channel using the same business-date and branch scope as BI. */
+export const getChannelPerformance = async (req: Request, res: Response) => {
+    try {
+        const dateRange = resolveBusinessDateRange(req.query.businessDateFrom, req.query.businessDateTo);
+        const branchId = req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId).trim() : undefined);
+        const rows = await db.select({
+            branchId: orders.branchId,
+            type: orders.type,
+            source: orders.source,
+            isCallCenterOrder: orders.isCallCenterOrder,
+            deliverySource: orders.deliverySource,
+            status: orders.status,
+            total: orders.total,
+        }).from(orders).where(and(
+            branchId ? eq(orders.branchId, branchId) : undefined,
+            gte(orders.businessDate, dateRange.from),
+            lte(orders.businessDate, dateRange.to),
+        ));
+
+        const grouped = new Map<string, { channel: string; orders: number; revenue: number; cancelled: number }>();
+        for (const order of rows) {
+            const channel = classifyOrderChannel(order);
+            const current = grouped.get(channel) || { channel, orders: 0, revenue: 0, cancelled: 0 };
+            if (String(order.status || '').toUpperCase() === 'CANCELLED') {
+                current.cancelled += 1;
+            } else {
+                current.orders += 1;
+                current.revenue += Number(order.total || 0);
+            }
+            grouped.set(channel, current);
+        }
+
+        const channels = Array.from(grouped.values())
+            .sort((a, b) => b.revenue - a.revenue)
+            .map(item => ({ ...item, avgTicket: item.orders > 0 ? Number((item.revenue / item.orders).toFixed(2)) : 0 }));
+        return res.json({
+            branchId: branchId || null,
+            period: dateRange,
+            channels,
+            totals: {
+                orders: channels.reduce((sum, item) => sum + item.orders, 0),
+                revenue: channels.reduce((sum, item) => sum + item.revenue, 0),
+                cancelled: channels.reduce((sum, item) => sum + item.cancelled, 0),
+            },
+        });
+    } catch (error: any) {
+        return res.status(500).json({ error: 'CHANNEL_ANALYTICS_FAILED', detail: error?.message });
+    }
+};
+
 export const getLaborEfficiency = async (req: Request, res: Response) => {
     try {
-        const branchId = req.query.branchId as string;
+        const branchId = req.effectiveBranchId || (req.query.branchId as string | undefined);
         // Native aggregation via raw SQL since it's an analytical query
         const query = sql`
            WITH sales AS (
@@ -111,7 +240,7 @@ export const getLaborEfficiency = async (req: Request, res: Response) => {
 
 export const getUserLeaderboard = async (req: Request, res: Response) => {
     try {
-        const branchId = req.query.branchId as string | undefined;
+        const branchId = req.effectiveBranchId || (req.query.branchId as string | undefined);
         const limit = parseInt(req.query.limit as string) || 5;
 
         // Aggregate points and sales per user for the leaderboard
@@ -133,5 +262,44 @@ export const getUserLeaderboard = async (req: Request, res: Response) => {
         res.json(leaderboard);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+export const getOperationalAnomalies = async (req: Request, res: Response) => {
+    try {
+        const branchId = req.effectiveBranchId || (req.query.branchId as string | undefined);
+        const endDate = new Date();
+        const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const dayExpr = (column: any) => sql<string>`CAST(${column} AS DATE)`;
+        const branchFilter = branchId ? eq(orders.branchId, branchId) : undefined;
+
+        const [discountRows, voidRows, refundRows, cashRows] = await Promise.all([
+            db.select({ date: dayExpr(orders.createdAt), value: sql<number>`COALESCE(SUM(${orders.discount}), 0)` })
+                .from(orders).where(and(gte(orders.createdAt, startDate), lte(orders.createdAt, endDate), branchFilter)).groupBy(dayExpr(orders.createdAt)),
+            db.select({ date: dayExpr(auditLogs.createdAt), value: sql<number>`COUNT(*)` })
+                .from(auditLogs).where(and(gte(auditLogs.createdAt, startDate), lte(auditLogs.createdAt, endDate), branchId ? eq(auditLogs.branchId, branchId) : undefined, sql`${auditLogs.eventType} LIKE '%VOID%'`)).groupBy(dayExpr(auditLogs.createdAt)),
+            db.select({ date: dayExpr(refundRecords.createdAt), value: sql<number>`COALESCE(SUM(${refundRecords.amount}), 0)` })
+                .from(refundRecords).where(and(gte(refundRecords.createdAt, startDate), lte(refundRecords.createdAt, endDate), branchId ? eq(refundRecords.branchId, branchId) : undefined, eq(refundRecords.status, 'PROCESSED'))).groupBy(dayExpr(refundRecords.createdAt)),
+            db.select({ date: dayExpr(dayCloseReports.createdAt), value: sql<number>`COALESCE(SUM(ABS(${dayCloseReports.variance})), 0)` })
+                .from(dayCloseReports).where(and(gte(dayCloseReports.createdAt, startDate), lte(dayCloseReports.createdAt, endDate), branchId ? eq(dayCloseReports.branchId, branchId) : undefined)).groupBy(dayExpr(dayCloseReports.createdAt)),
+        ]);
+
+        const build = (key: string, label: string, rows: Array<{ date: string; value: unknown }>, source: string): DetectedAnomaly | null => {
+            const normalized = rows.map(row => ({ date: String(row.date), value: Number(row.value || 0) })).sort((a, b) => a.date.localeCompare(b.date));
+            const latest = normalized.at(-1);
+            if (!latest) return null;
+            return detectLatestAnomaly({ key, label, date: latest.date, value: latest.value, baseline: normalized.slice(0, -1).map(row => row.value), source });
+        };
+
+        const anomalies = [
+            build('DISCOUNT_SPIKE', 'Discounts', discountRows, 'orders.discount'),
+            build('VOID_SPIKE', 'Voids', voidRows, 'audit_logs.event_type'),
+            build('REFUND_SPIKE', 'Processed refunds', refundRows, 'refund_records.amount'),
+            build('CASH_VARIANCE_SPIKE', 'Cash variance', cashRows, 'day_close_reports.variance'),
+        ].filter((item): item is DetectedAnomaly => Boolean(item));
+
+        return res.json({ branchId: branchId || null, period: { from: startDate.toISOString(), to: endDate.toISOString() }, anomalies });
+    } catch (error: any) {
+        return res.status(500).json({ error: 'ANOMALY_ANALYSIS_FAILED', detail: error?.message });
     }
 };

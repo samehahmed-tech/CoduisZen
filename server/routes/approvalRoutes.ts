@@ -1,9 +1,14 @@
 import { Router } from 'express';
 import * as approvalController from '../controllers/approvalController';
-import { requireRoleOrPermission } from '../middleware/auth';
+import { authenticateToken, requireRoleOrPermission } from '../middleware/auth';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
+import { scopeBranchQuery } from '../middleware/branchIsolation';
 
 const router = Router();
+// Every approval operation is an authenticated workflow. The verifier still
+// checks the manager PIN/password in the body, but anonymous callers must not
+// be able to probe or execute approval actions.
+router.use(authenticateToken, scopeBranchQuery);
 
 // Verification endpoints authenticate via the MANAGER's PIN/password sent in
 // the body — so the caller's own role must NOT gate them. The normal flow is

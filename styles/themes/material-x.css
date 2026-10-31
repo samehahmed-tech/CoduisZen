@@ -1,39 +1,39 @@
-/* THEME · MATERIAL X — expressive tonal surfaces, springy motion */
+/* THEME · MIDNIGHT — deep navy, violet bloom, pink signal glow */
 [data-theme="material-x"] {
-    --primary: 124, 58, 237; --primary-hover: 109, 40, 217;
-    --secondary: 100, 116, 139; --accent: 219, 39, 119;
-    --bg-app: 243, 240, 253; --bg-card: 255, 255, 255; --bg-sidebar: 238, 233, 250;
-    --bg-elevated: 255, 255, 255; --bg-global: 243, 240, 253;
-    --text-main: 40, 25, 80; --text-muted: 125, 115, 160;
-    --border-color: 222, 212, 246; --border-subtle: 124 58 237 / 0.18;
+    --primary: 84, 71, 168; --primary-hover: 69, 57, 143;
+    --secondary: 108, 110, 138; --accent: 219, 39, 119;
+    --bg-app: 245, 245, 252; --bg-card: 255, 255, 255; --bg-sidebar: 249, 249, 254;
+    --bg-elevated: 255, 255, 255; --bg-global: 245, 245, 252;
+    --text-main: 27, 27, 46; --text-muted: 108, 108, 138;
+    --border-color: 226, 226, 240; --border-subtle: 84 71 168 / 0.16;
     --glass-bg: 255 255 255 / 0.75;
     --success: 5, 150, 105; --warning: 217, 119, 6; --danger: 225, 29, 72; --info: 8, 145, 178;
-    --theme-page-bg: radial-gradient(700px 320px at 90% 0%, rgba(219,39,119,0.14), transparent 60%), linear-gradient(180deg, #f3f0fd 0%, #e9e2f9 100%);
-    --theme-card-bg: rgba(255,255,255,0.88); --theme-card-hover-bg: #ffffff;
-    --theme-rail-bg: rgba(238,233,250,0.88); --theme-topbar-bg: rgba(255,255,255,0.8);
-    --theme-table-head-bg: rgba(238,233,250,0.9); --theme-row-hover-bg: rgba(124,58,237,0.06);
-    --theme-input-bg: #f1ebfb; --theme-button-bg: linear-gradient(135deg, #7c3aed, #db2777);
-    --theme-active-bg: rgba(124,58,237,0.1); --theme-focus-ring: rgba(124,58,237,0.35);
+    --theme-page-bg: radial-gradient(760px 340px at 90% 0%, rgba(219,39,119,0.13), transparent 60%), linear-gradient(180deg, #f6f5fd 0%, #eceaf9 100%);
+    --theme-card-bg: rgba(255,255,255,0.9); --theme-card-hover-bg: #ffffff;
+    --theme-rail-bg: rgba(249,249,254,0.9); --theme-topbar-bg: rgba(255,255,255,0.82);
+    --theme-table-head-bg: #f0effa; --theme-row-hover-bg: rgba(84,71,168,0.06);
+    --theme-input-bg: #f5f4fd; --theme-button-bg: linear-gradient(135deg, #5447a8, #7c3aed); --theme-button-text: #ffffff;
+    --theme-active-bg: rgba(84,71,168,0.1); --theme-focus-ring: rgba(84,71,168,0.35);
     --theme-popup-bg: #ffffff;
-    --chart-1: 124, 58, 237; --chart-2: 219, 39, 119; --chart-3: 8, 145, 178; --chart-4: 245, 158, 11; --chart-5: 16, 185, 129;
-    --chart-grid: 124 58 237 / 0.1; --chart-tooltip-bg: rgba(255,255,255,0.96);
+    --chart-1: 84, 71, 168; --chart-2: 219, 39, 119; --chart-3: 8, 145, 178; --chart-4: 245, 158, 11; --chart-5: 16, 185, 129;
+    --chart-grid: 84 71 168 / 0.1; --chart-tooltip-bg: rgba(255,255,255,0.96);
 }
 .dark [data-theme="material-x"], [data-theme="material-x"].dark {
-    --primary: 196, 181, 253; --primary-hover: 221, 214, 254;
-    --secondary: 148, 163, 184; --accent: 249, 168, 212;
-    --bg-app: 19, 12, 34; --bg-card: 30, 20, 54; --bg-sidebar: 23, 15, 42;
-    --bg-elevated: 44, 30, 76; --bg-global: 19, 12, 34;
-    --text-main: 243, 238, 255; --text-muted: 175, 162, 205;
-    --border-color: 70, 50, 115; --border-subtle: 196 181 253 / 0.18;
-    --glass-bg: 30 20 54 / 0.8;
+    --primary: 139, 124, 246; --primary-hover: 167, 155, 255;
+    --secondary: 148, 163, 184; --accent: 244, 114, 182;
+    --bg-app: 8, 12, 26; --bg-card: 16, 21, 40; --bg-sidebar: 12, 16, 32;
+    --bg-elevated: 27, 34, 60; --bg-global: 8, 12, 26;
+    --text-main: 236, 240, 252; --text-muted: 148, 158, 186;
+    --border-color: 38, 48, 74; --border-subtle: 139 124 246 / 0.18;
+    --glass-bg: 16 21 40 / 0.8;
     --success: 52, 211, 153; --warning: 251, 191, 36; --danger: 251, 113, 133; --info: 56, 189, 248;
-    --theme-page-bg: radial-gradient(700px 320px at 90% 0%, rgba(219,39,119,0.16), transparent 60%), linear-gradient(180deg, #130c22 0%, #0d0718 100%);
-    --theme-card-bg: rgba(30,20,54,0.9); --theme-card-hover-bg: rgba(44,30,76,0.94);
-    --theme-rail-bg: rgba(23,15,42,0.9); --theme-topbar-bg: rgba(30,20,54,0.82);
-    --theme-table-head-bg: rgba(19,12,34,0.85); --theme-row-hover-bg: rgba(196,181,253,0.07);
-    --theme-input-bg: #2c1e4e; --theme-button-bg: linear-gradient(135deg, #8b5cf6, #ec4899);
-    --theme-active-bg: rgba(196,181,253,0.12); --theme-focus-ring: rgba(196,181,253,0.4);
-    --theme-popup-bg: #2c1e4e;
-    --chart-1: 196, 181, 253; --chart-2: 249, 168, 212; --chart-3: 34, 211, 238; --chart-4: 253, 224, 71; --chart-5: 110, 231, 183;
-    --chart-grid: 196 181 253 / 0.12; --chart-tooltip-bg: rgba(30,20,54,0.96);
+    --theme-page-bg: radial-gradient(760px 340px at 88% 0%, rgba(244,114,182,0.16), transparent 60%), radial-gradient(700px 320px at 10% 10%, rgba(139,124,246,0.14), transparent 62%), linear-gradient(180deg, #080c1a 0%, #050812 100%);
+    --theme-card-bg: rgba(16,21,40,0.9); --theme-card-hover-bg: rgba(27,34,60,0.94);
+    --theme-rail-bg: rgba(12,16,32,0.9); --theme-topbar-bg: rgba(16,21,40,0.82);
+    --theme-table-head-bg: rgba(8,12,26,0.85); --theme-row-hover-bg: rgba(139,124,246,0.08);
+    --theme-input-bg: #1b2240; --theme-button-bg: linear-gradient(135deg, #7c6cf5, #e0529c); --theme-button-text: #080b16;
+    --theme-active-bg: rgba(139,124,246,0.12); --theme-focus-ring: rgba(139,124,246,0.4);
+    --theme-popup-bg: #1b2240;
+    --chart-1: 139, 124, 246; --chart-2: 244, 114, 182; --chart-3: 34, 211, 238; --chart-4: 253, 224, 71; --chart-5: 110, 231, 183;
+    --chart-grid: 139 124 246 / 0.12; --chart-tooltip-bg: rgba(16,21,40,0.96);
 }

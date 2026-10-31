@@ -30,7 +30,7 @@ router.get('/:id/track-link', orderReadAuth, enforceBranch, (_req, res) => {
     const base = String(process.env.PUBLIC_TRACKING_URL || process.env.FRONTEND_URL || '').replace(/\/+$/, '');
     return res.json({ ok: true, url: `${base || ''}/t/${orderId}?t=${token}` });
 });
-router.post('/coupons/validate', posAuth, orderController.validateCoupon);
+router.post('/coupons/validate', posAuth, enforceBranch, orderController.validateCoupon);
 router.post('/', posAuth, enforceBranch, validate(createOrderSchema), orderController.createOrder);
 router.post('/split', posAuth, enforceBranch, orderController.splitOrder);
 router.put('/:id/customer', posAuth, enforceBranch, orderController.updateOrderCustomer);

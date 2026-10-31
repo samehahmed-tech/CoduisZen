@@ -18,7 +18,8 @@ export const MOVEMENT_TYPES = ['PURCHASE', 'SALE', 'SALE_CONSUMPTION', 'TRANSFER
 
 export const getStockMovementLog = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate, branchId } = req.query;
+        const { startDate, endDate } = req.query;
+        const branchId = req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId) : undefined);
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
 
@@ -90,7 +91,8 @@ export const getStockMovementLog = async (req: Request, res: Response) => {
 
 export const getWasteLossLog = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate, branchId } = req.query;
+        const { startDate, endDate } = req.query;
+        const branchId = req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId) : undefined);
         if (!startDate || !endDate) return res.status(400).json({ error: 'Start and end dates required' });
         const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
 
@@ -136,7 +138,7 @@ export const getWasteLossLog = async (req: Request, res: Response) => {
 
 export const getReorderAlerts = async (req: Request, res: Response) => {
     try {
-        const branchId = typeof req.query.branchId === 'string' ? req.query.branchId.trim() : '';
+        const branchId = req.effectiveBranchId || (typeof req.query.branchId === 'string' ? req.query.branchId.trim() : '');
         // Optional branch scope: only stock sitting in that branch's warehouses
         // counts — otherwise branch-A stockouts hide behind branch-B surplus.
         const stockJoin = branchId
@@ -177,7 +179,7 @@ export const getExpiringBatches = async (req: Request, res: Response) => {
         const now = new Date();
         const thirtyDaysLater = new Date();
         thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-        const branchId = typeof req.query.branchId === 'string' ? req.query.branchId.trim() : '';
+        const branchId = req.effectiveBranchId || (typeof req.query.branchId === 'string' ? req.query.branchId.trim() : '');
 
         const conditions: any[] = [
             lte(inventoryBatches.expiryDate, thirtyDaysLater),

@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { ingestTalabatWebhook } from '../modules/talabat/talabatIngestService';
 import logger from '../utils/logger';
+import { createSignedAuditLog } from '../services/auditService';
 
 const log = logger.child({ controller: 'talabat-webhook' });
 
@@ -12,6 +13,20 @@ const log = logger.child({ controller: 'talabat-webhook' });
 export const receiveTalabatWebhook = async (req: Request, res: Response) => {
     try {
         const result = await ingestTalabatWebhook(req.body);
+        await createSignedAuditLog({
+            eventType: 'TALABAT_WEBHOOK_PROCESSED',
+            branchId: result.branchId || null,
+            userId: null,
+            userName: 'talabat-webhook',
+            userRole: 'EXTERNAL_INTEGRATION',
+            payload: {
+                orderId: result.orderId,
+                created: result.created,
+                internalStatus: result.internalStatus,
+            },
+            after: { acknowledged: true },
+            reason: 'Authenticated Talabat webhook',
+        });
         return res.status(200).json({ ok: true, orderId: result.orderId, created: result.created, status: result.internalStatus });
     } catch (err: any) {
         const status = Number(err?.status) || 400;

@@ -32,7 +32,7 @@ describe('report catalog completion coverage', () => {
   });
 
   it('keeps every report API path matched to a server route', () => {
-    const routePaths = [...routeSource.matchAll(/router\.get\('([^']+)'/g)].map(match => match[1]);
+    const routePaths = [...routeSource.matchAll(/router\.(?:get|post)\('([^']+)'/g)].map(match => match[1]);
     const apiPaths = [...apiSource.matchAll(/`?\/reports(\/[a-z0-9/-]+)/g)].map(match => match[1]);
 
     expect(routePaths.length).toBeGreaterThan(70);

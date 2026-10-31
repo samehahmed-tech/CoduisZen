@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { dayCloseService, isValidDateKey } from '../services/dayCloseService';
 import { generateDayClosePDF, generateDayCloseXlsx } from '../services/pdfService';
+import { createSignedAuditLog } from '../services/auditService';
 
 /**
  * Get day close report preview
@@ -110,7 +111,7 @@ export const closeDay = async (req: Request, res: Response) => {
     try {
         const branchId = req.params.branchId as string;
         const date = req.params.date as string;
-        const userId = (req as any).user?.id || req.body.userId;
+        const userId = req.user?.id;
         const {
             emailConfig,
             notes,
@@ -139,6 +140,18 @@ export const closeDay = async (req: Request, res: Response) => {
             enforceShiftsClosed: Boolean(enforceShiftsClosed),
             autoCloseOpenShifts: Boolean(autoCloseOpenShifts),
             overrideReason,
+        });
+
+        await createSignedAuditLog({
+            eventType: 'BUSINESS_DAY_CLOSED',
+            userId,
+            userRole: req.user?.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { date, enforceShiftsClosed: Boolean(enforceShiftsClosed), autoCloseOpenShifts: Boolean(autoCloseOpenShifts), hasOverride: Boolean(overrideReason) },
+            after: { status: 'CLOSED', date },
+            reason: overrideReason ? 'Business day closed with manager override' : 'Business day closed',
         });
 
         res.json({
@@ -204,6 +217,17 @@ export const updateBusinessDate = async (req: Request, res: Response) => {
         if (!userId) return res.status(401).json({ error: 'AUTH_REQUIRED' });
 
         const updated = await dayCloseService.setBusinessDate(branchId, businessDate, userId);
+        await createSignedAuditLog({
+            eventType: 'BUSINESS_DATE_UPDATED',
+            userId,
+            userRole: req.user?.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { businessDate },
+            after: { businessDate },
+            reason: 'Business date updated',
+        });
         res.json({ success: true, ...updated });
     } catch (error: any) {
         const code = String(error?.message || 'BUSINESS_DATE_UPDATE_FAILED');
@@ -234,6 +258,18 @@ export const reopenDay = async (req: Request, res: Response) => {
         if (reason.length < 3) return res.status(400).json({ error: 'REOPEN_REASON_REQUIRED' });
 
         const result = await dayCloseService.reopenDay(branchId, date, userId, reason);
+        await createSignedAuditLog({
+            eventType: 'BUSINESS_DAY_REOPENED',
+            userId,
+            userRole: req.user?.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { date, reasonLength: reason.length },
+            before: { status: 'CLOSED' },
+            after: { status: 'REOPENED' },
+            reason: 'Business day reopened',
+        });
         res.json({ success: true, message: 'Business day reopened', ...result });
     } catch (error: any) {
         const code = String(error?.message || 'DAY_REOPEN_FAILED');

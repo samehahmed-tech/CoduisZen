@@ -1,8 +1,10 @@
 import { db } from '../db';
 import { orders } from '../../src/db/schema';
-import { eq, and, sql, gte, asc } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, asc } from 'drizzle-orm';
 import { aiService } from './aiService';
 import logger from '../utils/logger';
+import { calculateWalkForwardMape, ForecastAccuracy } from '../utils/forecastAccuracy';
+import { resolveBusinessDateRange } from '../utils/businessDateRange';
 
 const log = logger.child({ service: 'revenueForecast' });
 
@@ -15,7 +17,55 @@ export interface ForecastResult {
     historical: DailyRevenue[];
     forecast: DailyRevenue[];
     confidence: number;
+    confidenceMethod: 'R_SQUARED_WITH_COVERAGE_CAP';
+    dataAsOf: string | null;
+    dataFreshnessHours: number | null;
+    businessDateFrom: string;
+    businessDateTo: string;
+    source: 'ORDERS_TOTAL_30_DAY_LINEAR_REGRESSION';
+    accuracy: ForecastAccuracy;
     insight: string;
+}
+
+function calculateRegressionConfidence(historical: DailyRevenue[]): number {
+    if (historical.length < 5) return 0;
+
+    const mean = historical.reduce((sum, point) => sum + point.revenue, 0) / historical.length;
+    const totalVariance = historical.reduce((sum, point) => sum + ((point.revenue - mean) ** 2), 0);
+    if (totalVariance === 0) return 0.5;
+
+    const n = historical.length;
+    let sumX = 0;
+    let sumY = 0;
+    let sumXY = 0;
+    let sumX2 = 0;
+    historical.forEach((point, index) => {
+        sumX += index;
+        sumY += point.revenue;
+        sumXY += index * point.revenue;
+        sumX2 += index * index;
+    });
+    const denominator = n * sumX2 - sumX * sumX;
+    if (denominator === 0) return 0;
+    const slope = (n * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / n;
+    const residualVariance = historical.reduce((sum, point, index) => {
+        const predicted = slope * index + intercept;
+        return sum + ((point.revenue - predicted) ** 2);
+    }, 0);
+    const rSquared = Math.max(0, Math.min(1, 1 - (residualVariance / totalVariance)));
+    const coverageCap = Math.min(1, historical.length / 30);
+    return Math.round(rSquared * coverageCap * 100) / 100;
+}
+
+function getDataFreshness(historical: DailyRevenue[], now: Date): { dataAsOf: string | null; dataFreshnessHours: number | null } {
+    const dataAsOf = historical.length ? historical[historical.length - 1].date : null;
+    if (!dataAsOf) return { dataAsOf: null, dataFreshnessHours: null };
+    const asOf = new Date(`${dataAsOf}T23:59:59.999Z`);
+    return {
+        dataAsOf,
+        dataFreshnessHours: Math.max(0, Math.round(((now.getTime() - asOf.getTime()) / 3600000) * 100) / 100),
+    };
 }
 
 export const revenueForecastService = {
@@ -24,21 +74,25 @@ export const revenueForecastService = {
      */
     async getRevenueForecast(branchId?: string): Promise<ForecastResult> {
         try {
-            // 1. Fetch last 30 days of revenue
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            // 1. Fetch the same canonical business-date window used by BI.
+            const now = new Date();
+            const fromDate = new Date(now);
+            fromDate.setUTCDate(fromDate.getUTCDate() - 29);
+            const dateRange = resolveBusinessDateRange(fromDate.toISOString().slice(0, 10), now.toISOString().slice(0, 10));
 
             const query = db.select({
-                date: sql<string>`CAST(${orders.createdAt} AS DATE)`,
+                date: orders.businessDate,
                 revenue: sql<number>`SUM(${orders.total})`,
             })
             .from(orders)
             .where(and(
-                gte(orders.createdAt, thirtyDaysAgo),
-                branchId ? eq(orders.branchId, branchId) : sql`1 = 1`
+                gte(orders.businessDate, dateRange.from),
+                lte(orders.businessDate, dateRange.to),
+                sql`${orders.status} NOT IN ('CANCELLED')`,
+                branchId ? eq(orders.branchId, branchId) : undefined,
             ))
-            .groupBy(sql`CAST(${orders.createdAt} AS DATE)`)
-            .orderBy(asc(sql`CAST(${orders.createdAt} AS DATE)`));
+            .groupBy(orders.businessDate)
+            .orderBy(asc(orders.businessDate));
 
             const historicalData = await query;
             const historical = historicalData.map(d => ({
@@ -47,11 +101,18 @@ export const revenueForecastService = {
             }));
 
             if (historical.length < 5) {
+                const freshness = getDataFreshness(historical, new Date());
                 return {
                     historical,
                     forecast: [],
                     confidence: 0,
-                    insight: "Insufficient data for forecasting. Need at least 5 days of history."
+                    confidenceMethod: 'R_SQUARED_WITH_COVERAGE_CAP',
+                    ...freshness,
+                    businessDateFrom: dateRange.from,
+                    businessDateTo: dateRange.to,
+                source: 'ORDERS_TOTAL_30_DAY_LINEAR_REGRESSION',
+                accuracy: calculateWalkForwardMape(historical.map(point => point.revenue)),
+                insight: "Insufficient data for forecasting. Need at least 5 days of history."
                 };
             }
 
@@ -104,10 +165,17 @@ export const revenueForecastService = {
                 log.warn({ err: e }, 'AI insight failed, using fallback');
             }
 
+            const freshness = getDataFreshness(historical, new Date());
             return {
                 historical,
                 forecast,
-                confidence: 0.85, // Static for now, could be r-squared
+                confidence: calculateRegressionConfidence(historical),
+                confidenceMethod: 'R_SQUARED_WITH_COVERAGE_CAP',
+                ...freshness,
+                businessDateFrom: dateRange.from,
+                businessDateTo: dateRange.to,
+                source: 'ORDERS_TOTAL_30_DAY_LINEAR_REGRESSION',
+                accuracy: calculateWalkForwardMape(historical.map(point => point.revenue)),
                 insight
             };
 

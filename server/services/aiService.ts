@@ -9,9 +9,13 @@ import { eq } from 'drizzle-orm';
 import auditService from './auditService';
 import { aiKeyVaultService } from './aiKeyVaultService';
 import { AI_FREE_MODELS, AI_MODEL_SETTING_KEY, DEFAULT_FREE_MODEL, getModelCandidates, normalizeModel } from './aiModelCatalog';
+import { queryProviderWithFallback } from './aiProviderService';
 
 const OLLAMA_BASE_URL = String(process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').trim();
 const OLLAMA_ENABLED = String(process.env.OLLAMA_ENABLED || 'false').trim().toLowerCase() === 'true';
+
+export type AiRouteMetadata = { providerId: string; modelId: string; usedFallback: boolean; latencyMs?: number };
+type AiRouteReporter = (route: AiRouteMetadata) => void;
 
 const querySystemCopilot = (prompt: string) => {
     const total = prompt.match(/Total Revenue:\s*([\d.]+)/i)?.[1];
@@ -103,12 +107,32 @@ export const aiService = {
     /**
      * Core wrapper for OpenRouter requests
      */
-    async queryAI(prompt: string, systemPrompt?: string, useFallback = false, allowGpt4js = true) {
+    async queryAI(prompt: string, systemPrompt?: string, useFallback = false, allowGpt4js = true, reportRoute?: AiRouteReporter) {
         const provider = await aiKeyVaultService.resolveProvider();
-        if (provider === 'SYSTEM') return querySystemCopilot(prompt);
+        if (provider === 'SYSTEM') {
+            reportRoute?.({ providerId: 'SYSTEM', modelId: 'deterministic', usedFallback: false });
+            return querySystemCopilot(prompt);
+        }
+        if (['OPENROUTER', 'GROQ', 'GEMINI', 'NVIDIA', 'OPENAI_COMPATIBLE'].includes(provider)) {
+            const plan = await aiKeyVaultService.resolveProviderPlan();
+            const requests = plan
+                .filter((candidate) => ['OPENROUTER', 'GROQ', 'GEMINI', 'NVIDIA', 'OPENAI_COMPATIBLE'].includes(candidate.providerId))
+                .map((candidate) => ({
+                    ...candidate,
+                    prompt,
+                    systemPrompt,
+                    temperature: 0.3,
+                    maxTokens: 1200,
+                }));
+            const result = await queryProviderWithFallback(requests as any);
+            reportRoute?.({ providerId: result.providerId, modelId: result.modelId, usedFallback: Boolean(result.usedFallback), latencyMs: result.latencyMs });
+            return result.text;
+        }
         if (provider === 'GPT4JS' && allowGpt4js) {
             try {
-                return await queryGpt4js(prompt, systemPrompt);
+                const text = await queryGpt4js(prompt, systemPrompt);
+                reportRoute?.({ providerId: 'GPT4JS', modelId: 'configured', usedFallback: false });
+                return text;
             } catch (error: any) {
                 console.warn('[AI] GPT4js failed; falling back to current provider.', error?.message || error);
                 return this.queryAI(prompt, systemPrompt, useFallback, false);
@@ -119,7 +143,9 @@ export const aiService = {
                 const groqKey = await aiKeyVaultService.resolveGroqKey();
                 if (!groqKey) throw new Error('GROQ_KEY_MISSING');
                 const groqModel = await aiKeyVaultService.resolveGroqModel();
-                return await queryGroq(prompt, systemPrompt, groqModel, groqKey);
+                const text = await queryGroq(prompt, systemPrompt, groqModel, groqKey);
+                reportRoute?.({ providerId: 'GROQ', modelId: groqModel, usedFallback: false });
+                return text;
             } catch (error: any) {
                 console.warn('[AI] Groq failed; trying local Ollama if enabled.', error?.message || error);
                 if (OLLAMA_ENABLED) {
@@ -138,14 +164,18 @@ export const aiService = {
         // Fully free option: local Ollama (works on any client device as long as backend can reach Ollama).
         if (provider === 'OLLAMA') {
             const ollamaModel = await aiKeyVaultService.resolveOllamaModel();
-            return queryOllama(prompt, systemPrompt, ollamaModel);
+            const text = await queryOllama(prompt, systemPrompt, ollamaModel);
+            reportRoute?.({ providerId: 'OLLAMA', modelId: ollamaModel, usedFallback: false });
+            return text;
         }
 
         // If provider is OpenRouter but key is missing, allow Ollama if enabled (dev-friendly).
         if (!activeKey) {
             if (OLLAMA_ENABLED) {
                 const ollamaModel = await aiKeyVaultService.resolveOllamaModel();
-                return queryOllama(prompt, systemPrompt, ollamaModel);
+                const text = await queryOllama(prompt, systemPrompt, ollamaModel);
+                reportRoute?.({ providerId: 'OLLAMA', modelId: ollamaModel, usedFallback: true });
+                return text;
             }
             throw new Error('AI_KEY_MISSING');
         }
@@ -188,7 +218,9 @@ export const aiService = {
                     continue;
                 }
 
-                return data.choices?.[0]?.message?.content || "";
+                const text = data.choices?.[0]?.message?.content || "";
+                reportRoute?.({ providerId: 'OPENROUTER', modelId: model, usedFallback: useFallback || model !== candidates[0] });
+                return text;
             } catch (error: any) {
                 lastError = error;
             }

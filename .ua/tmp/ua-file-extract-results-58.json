@@ -1,0 +1,22 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/sameh-installer/order-save-fix/Fix Order Save.bat",
+    "scripts/sameh-installer/order-save-fix/Fix Order Save.ps1",
+    "scripts/sameh-installer/order-save-fix/README AR.txt"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

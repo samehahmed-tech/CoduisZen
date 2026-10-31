@@ -216,13 +216,8 @@ const MetricCard = React.memo<MetricCardProps>(({ label, value, subValue, icon: 
       className={`dx-metric animate-in fade-in slide-in-from-bottom-6 duration-700 relative group overflow-visible bg-card/60 border border-border/30 rounded-[1.5rem] p-5 h-full transition-all hover:scale-[1.02] hover:bg-card/70 hover:shadow-2xl hover:shadow-black/5 active:scale-[0.98] ${onClick ? 'cursor-pointer' : ''}`}
       style={{ animationFillMode: 'both', animationDelay: `${delay}ms` }}
     >
-      {/* Decorative gradient corner */}
-      <div className={`absolute top-0 right-0 w-28 h-28 bg-gradient-to-br transition-opacity duration-150 opacity-25 group-hover:opacity-40 blur-3xl`} style={{ background: color }} />
-      {/* Per-card color wash (posted-design tinted cards) */}
-      <div className="absolute inset-0 rounded-[inherit] pointer-events-none" style={{ background: `linear-gradient(160deg, ${color}2b, transparent 55%)` }} />
-
       <div className="flex items-start justify-between gap-3 relative z-10">
-        <div className={`p-3.5 rounded-2xl border flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110`} style={{ borderColor: `${color}40`, backgroundColor: `${color}1c`, color, boxShadow: `0 8px 22px ${color}30` }}>
+        <div className={`p-3.5 rounded-2xl border flex items-center justify-center shadow-lg transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110`} style={{ borderColor: `color-mix(in srgb, ${color} 28%, transparent)`, backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, color, boxShadow: `0 8px 22px color-mix(in srgb, ${color} 18%, transparent)` }}>
           <Icon size={24} />
         </div>
         {trend ? (
@@ -651,7 +646,7 @@ const Dashboard: React.FC = () => {
   const waterfall = useMemo(() => {
     const prevRev = num(prevPayload.totals?.revenue);
     const prevAvg = num(prevPayload.totals?.avgTicket);
-    const prevDisc = num(prevPayload.totals?.discount);
+    const prevDisc = num(prevPayload.totals?.discounts);
     const prevCanc = num(prevPayload.totals?.cancelledValue);
     const volumeEffect = (totals.orderCount - num(prevPayload.totals?.orderCount)) * prevAvg;
     const discountEffect = -(totals.discounts - prevDisc);
@@ -762,29 +757,6 @@ const Dashboard: React.FC = () => {
     staleTime: 60_000,
     placeholderData: keepPreviousData,
   });
-
-  // Hero rotating tips (system advice, smooth modern cycle). MUST stay above
-  // the early return — hooks order must not change between renders.
-  const heroTips = useMemo(() => isAr ? [
-    'راجع المرتجعات المعلقة قبل إغلاق اليوم لتسييل نظيف.',
-    'الجرد اليومي المرحّل شرط إقفال اليوم — لا تؤجله.',
-    'معدل الإلغاء فوق 5%؟ راجع المطبخ والكاشير فوراً.',
-    'انسخ نسخة احتياطية قبل أي تحديث للسيستم.',
-    'اربط كل طلب بالعميل لبناء ولاء يعيده إليك.',
-    'ذروة 7–9 مساءً: جهّز طاقمك ومخزونك مبكراً.',
-  ] : [
-    'Review pending refunds before day close for a clean settle.',
-    'A posted daily stock count is required to close the day.',
-    'Cancel rate above 5%? Check kitchen and cashier now.',
-    'Back up before any system update.',
-    'Link every order to its customer to build returning loyalty.',
-    'Peak 7–9 PM: prep staff and stock early.',
-  ], [isAr]);
-  const [heroTip, setHeroTip] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setHeroTip((i) => (i + 1) % heroTips.length), 4500);
-    return () => clearInterval(id);
-  }, [heroTips.length]);
 
   if (isLoading && !data) return <PageSkeleton />;
 
@@ -942,85 +914,86 @@ const Dashboard: React.FC = () => {
             {isAr ? `التشغيل: ${activeBusinessDate}` : `Business date: ${activeBusinessDate}`}
           </span>
           <span className="rounded-full border border-border/30 bg-card/60 px-3 py-1.5 text-muted">
-            {dataUpdatedAt ? (isAr ? `محدّث ${timeAgo(dataUpdatedAt, 'ar')}` : `Updated ${timeAgo(dataUpdatedAt, 'en')}`) : (isAr ? 'جاري التحميل…' : 'Loading…')}
+            {dataUpdatedAt ? (isAr ? `محدّث ${timeAgo(new Date(dataUpdatedAt), 'ar')}` : `Updated ${timeAgo(new Date(dataUpdatedAt), 'en')}`) : (isAr ? 'جاري التحميل…' : 'Loading…')}
           </span>
           <span className={`rounded-full px-3 py-1.5 ${activeShifts.length > 0 ? 'bg-emerald-500/15 text-emerald-600' : 'bg-slate-500/10 text-muted'}`}>
             {isAr ? `${activeShifts.length} شيفت مفتوح` : `${activeShifts.length} open shifts`}
           </span>
         </div>
 
-        {/* HERO v6 — command strip: greeting + today + visual + revenue */}
-        <section className="hx" aria-label={isAr ? 'نبض اليوم' : "Today's pulse"}>
-          <div className="hx-greet">
-            <span className="hx-avatar" aria-hidden="true">{String(settings.currentUser?.name || '★').trim().charAt(0)}</span>
-            <div className="hx-greet-tx">
-              <p className="hx-hello" title={settings.currentUser?.name || ''}>{isAr ? `مرحباً، ${settings.currentUser?.name || ''} 👋` : `Welcome, ${settings.currentUser?.name || ''} 👋`}</p>
-              <p className="hx-wish">{isAr ? 'نتمنى لك يوماً مثمراً' : 'Wishing you a productive day'}</p>
-              <div className="hx-clock">
-                <span className="hx-chiplet tabular-nums" dir="ltr">{new Date(nowTick).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                <span className="hx-chiplet hx-chiplet-biz">{isAr ? `التشغيل ${activeBusinessDate}` : `Biz ${activeBusinessDate}`}</span>
-              </div>
+        {/* Executive pulse — four distinct decisions, backed by Login artwork. */}
+        <section className="hx" aria-label={isAr ? 'ملخص الإدارة' : 'Executive summary'}>
+          <article className="hx-card hx-card-sales">
+            <span className="hx-card-media" aria-hidden="true" />
+            <span className="hx-card-overlay" aria-hidden="true" />
+            <div className="hx-card-topline">
+              <span className="hx-card-kicker"><DollarSign size={15} aria-hidden="true" />{isAr ? 'المبيعات' : 'Sales'}</span>
+              {trends.revenue && <span className={`hx-card-trend ${trends.revenue.up ? 'is-up' : 'is-down'}`}>{trends.revenue.up ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{trends.revenue.val}%</span>}
             </div>
-          </div>
-          <div className="hx-today">
-            <p className="hx-label">{isAr ? 'ملخص اليوم' : "Today's summary"}</p>
-            <div className="hx-rings">
-              {[
-                { label: isAr ? 'إجمالي المبيعات' : 'Revenue', value: totals.revenue, target: targets.revenue, display: `${fmtMoney(totals.revenue)} ${currencySymbol}` },
-                { label: isAr ? 'عدد الطلبات' : 'Orders', value: totals.orderCount, target: targets.orders, display: `${totals.orderCount} ${isAr ? 'طلب' : 'orders'}` },
-              ].map((r) => {
-                const pct = r.target > 0 ? Math.min(100, (r.value / r.target) * 100) : 0;
-                return (
-                  <div className="hx-ring" key={r.label}>
-                    <svg width="76" height="76" viewBox="0 0 96 96" role="img" aria-label={`${r.label} ${Math.round(pct)}%`}>
-                      <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="11" />
-                      <circle cx="48" cy="48" r="40" fill="none" stroke="rgb(var(--primary))" strokeWidth="11" strokeLinecap="round"
-                        strokeDasharray={`${pct * 2.513} 251.4`} transform="rotate(-90 48 48)" className="hx-arc" />
-                      <text x="48" y="55" textAnchor="middle" fontSize="19" fontWeight="800" fill="#fff">{Math.round(pct)}%</text>
-                    </svg>
-                    <span>{r.label}</span>
-                    <b>{r.display}</b>
-                  </div>
-                );
-              })}
+            <div className="hx-card-main">
+              <p>{isAr ? 'صافي الإيراد' : 'Net revenue'}</p>
+              <h2><SensitiveData permission={AppPermission.DATA_VIEW_REVENUE} hasPermission={hasPermission} lang={lang}>{fmtMoney(totals.netRevenue)}</SensitiveData><small>{currencySymbol}</small></h2>
             </div>
-          </div>
-          <div className="hx-visual" aria-hidden="true">
-            <span className="dx-orb dx-orb-a" />
-            <span className="dx-orb dx-orb-b" />
-            <span className="dx-orb dx-orb-c" />
-            <div className="hx-tip">
-              <span className="hx-tip-ic">💡</span>
-              <p key={heroTip} className="hx-tip-tx">{heroTips[heroTip % heroTips.length]}</p>
-              <div className="hx-tip-dots" aria-hidden="true">
-                {heroTips.map((_, i) => (
-                  <i key={i} className={i === heroTip % heroTips.length ? 'on' : ''} />
-                ))}
-              </div>
+            <div className="hx-card-facts">
+              <span><b>{fmtMoney(totals.avgTicket)}</b>{isAr ? 'متوسط الفاتورة' : 'Avg. ticket'}</span>
+              <span><b>{fmtMoney(totals.discounts)}</b>{isAr ? 'خصومات' : 'Discounts'}</span>
             </div>
-          </div>
-          <div className="hx-rev">
-            <p className="hx-label">{isAr ? 'إجمالي الإيرادات' : 'Total revenue'}</p>
-            <h2 className="hx-num">
-              <SensitiveData permission={AppPermission.DATA_VIEW_REVENUE} hasPermission={hasPermission} lang={lang}>
-                {fmtMoney(totals.revenue)}
-              </SensitiveData>
-              <small>{currencySymbol}</small>
-            </h2>
-            {trends.revenue && (
-              <span className={`hx-chip ${trends.revenue.up ? 'up' : 'dn'}`}>
-                {trends.revenue.up ? '▲' : '▼'} {trends.revenue.val}% {translations[lang].vs_prev}
-              </span>
-            )}
-            <div className="hx-ministats">
-              <div><b>{totals.orderCount}</b><span>{isAr ? 'طلب' : 'orders'}</span></div>
-              <div><b>{fmtMoney(totals.avgTicket)}</b><span>{isAr ? 'متوسط الفاتورة' : 'avg ticket'}</span></div>
-              <div><b>{fmtMoney(totals.netProfit)}</b><span>{isAr ? 'صافي الربح' : 'net profit'}</span></div>
+            <button type="button" onClick={goToReports} className="hx-card-action">{isAr ? 'تحليل المبيعات' : 'Sales analysis'}<ArrowUpRight size={15} aria-hidden="true" /></button>
+          </article>
+
+          <article className="hx-card hx-card-orders">
+            <span className="hx-card-media" aria-hidden="true" />
+            <span className="hx-card-overlay" aria-hidden="true" />
+            <div className="hx-card-topline">
+              <span className="hx-card-kicker"><ShoppingBag size={15} aria-hidden="true" />{isAr ? 'حركة الطلبات' : 'Order flow'}</span>
+              <span className={`hx-card-status ${totals.cancelRate > 5 ? 'is-alert' : ''}`}>{isAr ? `إلغاء ${totals.cancelRate.toFixed(1)}%` : `${totals.cancelRate.toFixed(1)}% cancelled`}</span>
             </div>
-            <button type="button" onClick={goToReports} className="hx-btn">
-              {isAr ? 'التقارير التفصيلية' : 'Detailed reports'}
-            </button>
-          </div>
+            <div className="hx-card-main">
+              <p>{isAr ? 'إجمالي الطلبات' : 'Total orders'}</p>
+              <h2>{totals.orderCount}<small>{isAr ? 'طلب' : 'orders'}</small></h2>
+            </div>
+            <div className="hx-card-facts">
+              <span><b>{totals.delivered}</b>{isAr ? 'مكتمل' : 'Delivered'}</span>
+              <span><b>{totals.pending}</b>{isAr ? 'قيد التنفيذ' : 'In progress'}</span>
+            </div>
+            <button type="button" onClick={() => navigate('/pos')} className="hx-card-action">{isAr ? 'متابعة الطلبات' : 'Track orders'}<ArrowUpRight size={15} aria-hidden="true" /></button>
+          </article>
+
+          <article className="hx-card hx-card-profit">
+            <span className="hx-card-media" aria-hidden="true" />
+            <span className="hx-card-overlay" aria-hidden="true" />
+            <div className="hx-card-topline">
+              <span className="hx-card-kicker"><Wallet size={15} aria-hidden="true" />{isAr ? 'الربحية' : 'Profitability'}</span>
+              <span className={`hx-card-status ${totals.netProfit < 0 ? 'is-alert' : ''}`}>{isAr ? 'هامش' : 'Margin'} {totals.netRevenue > 0 ? ((totals.netProfit / totals.netRevenue) * 100).toFixed(1) : '0.0'}%</span>
+            </div>
+            <div className="hx-card-main">
+              <p>{isAr ? 'صافي الربح' : 'Net profit'}</p>
+              <h2><SensitiveData permission={AppPermission.DATA_VIEW_REVENUE} hasPermission={hasPermission} lang={lang}>{fmtMoney(totals.netProfit)}</SensitiveData><small>{currencySymbol}</small></h2>
+            </div>
+            <div className="hx-card-facts">
+              <span><b>{fmtMoney(totals.grossProfit)}</b>{isAr ? 'مجمل الربح' : 'Gross profit'}</span>
+              <span><b>{fmtMoney(totals.expenses)}</b>{isAr ? 'مصروفات' : 'Expenses'}</span>
+            </div>
+            <button type="button" onClick={goToReports} className="hx-card-action">{isAr ? 'تفاصيل الربحية' : 'Profit details'}<ArrowUpRight size={15} aria-hidden="true" /></button>
+          </article>
+
+          <article className={`hx-card hx-card-priority ${criticalAlert ? 'has-alert' : 'is-clear'}`}>
+            <span className="hx-card-media" aria-hidden="true" />
+            <span className="hx-card-overlay" aria-hidden="true" />
+            <div className="hx-card-topline">
+              <span className="hx-card-kicker">{criticalAlert ? <AlertTriangle size={15} aria-hidden="true" /> : <CheckCircle2 size={15} aria-hidden="true" />}{isAr ? 'الأولوية الآن' : 'Priority now'}</span>
+              <span className="hx-card-status">{criticalAlert ? (isAr ? 'تحتاج إجراء' : 'Action needed') : (isAr ? 'مستقر' : 'Stable')}</span>
+            </div>
+            <div className="hx-card-priority-copy">
+              <h2>{criticalAlert ? (isAr ? 'راجع التنبيه قبل الإغلاق' : 'Review before close') : (isAr ? 'التشغيل تحت السيطرة' : 'Operations under control')}</h2>
+              <p>{criticalAlert?.text || (isAr ? 'لا توجد تنبيهات حرجة حالياً. تابع مؤشرات اليوم من التقارير.' : 'No critical alerts right now. Keep tracking today’s performance in reports.')}</p>
+            </div>
+            <div className="hx-card-facts">
+              <span><b>{criticalAlerts.length}</b>{isAr ? 'تنبيهات مخزون' : 'Stock alerts'}</span>
+              <span><b>{activeShifts.length}</b>{isAr ? 'شيفت مفتوح' : 'Open shifts'}</span>
+            </div>
+            <button type="button" onClick={() => navigate(criticalAlert?.to || '/reports')} className="hx-card-action">{criticalAlert ? (isAr ? 'معالجة الآن' : 'Take action') : (isAr ? 'فتح التقارير' : 'Open reports')}<ArrowUpRight size={15} aria-hidden="true" /></button>
+          </article>
         </section>
 
         {/* Status strip: live order mix + refunds shortcut (same data) */}
@@ -1057,13 +1030,13 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Daily briefing — data-driven summary with a real destination CTA. */}
-        <div className="flex animate-in slide-in-from-top-4 fade-in duration-1000 bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-indigo-500/15 border-y border-indigo-500/30 p-5 lg:p-6 items-center gap-5 shadow-[0_0_40px_-10px_rgba(99,102,241,0.2)] rounded-2xl relative overflow-hidden group">
+        <div className="dx-briefing flex animate-in slide-in-from-top-4 fade-in duration-1000 border-y p-5 lg:p-6 items-center gap-5 rounded-2xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
-          <div className="p-4 bg-indigo-500/20 rounded-2xl shadow-inner border border-indigo-500/20">
-            <BrainCircuit className="text-indigo-500 animate-pulse" size={28} />
+          <div className="dx-briefing-icon p-4 rounded-2xl shadow-inner border">
+            <BrainCircuit className="dx-briefing-glyph animate-pulse" size={28} />
           </div>
           <div className="flex-1 relative z-10">
-            <h3 className="text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">{t.autonomous_insight_title}</h3>
+            <h3 className="dx-briefing-title text-xs font-black uppercase tracking-[0.2em]">{t.autonomous_insight_title}</h3>
             <p className="text-sm lg:text-base font-bold text-main mt-2">{briefing.text}</p>
             {criticalAlert && (
               <p className="mt-2 inline-flex items-center gap-2 rounded-lg bg-rose-500/15 border border-rose-500/25 px-3 py-1.5 text-xs font-black text-rose-500">
@@ -1071,7 +1044,7 @@ const Dashboard: React.FC = () => {
               </p>
             )}
           </div>
-          <button className="relative z-10 h-12 px-8 rounded-xl bg-indigo-500 text-white text-[11px] font-black uppercase tracking-widest hover:bg-indigo-400 hover:shadow-[0_0_20px_rgba(99,102,241,0.5)] transition-all active:scale-95 flex items-center gap-2" onClick={() => navigate(briefing.cta.to)}>
+          <button className="dx-briefing-cta relative z-10 h-12 px-8 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2" onClick={() => navigate(briefing.cta.to)}>
             <Sparkles size={16} />
             {criticalAlert ? (isAr ? 'معالجة الآن' : 'Act now') : (isAr ? 'عرض التقارير' : 'View reports')}
           </button>
@@ -1146,7 +1119,7 @@ const Dashboard: React.FC = () => {
             value={fmtMoney(num(totals.taxTotal))}
             subValue={currencySymbol}
             icon={ReceiptText}
-            color="#0ea5e9"
+            color="rgb(var(--info))"
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
@@ -1159,7 +1132,7 @@ const Dashboard: React.FC = () => {
             value={fmtMoney(totals.expenses)}
             subValue={currencySymbol}
             icon={Wallet}
-            color="#f43f5e"
+            color="rgb(var(--danger))"
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}
@@ -1172,7 +1145,7 @@ const Dashboard: React.FC = () => {
             value={fmtMoney(totals.netProfit)}
             subValue={currencySymbol}
             icon={Briefcase}
-            color={totals.netProfit >= 0 ? '#10b981' : '#ef4444'}
+            color={totals.netProfit >= 0 ? 'rgb(var(--success))' : 'rgb(var(--danger))'}
             trend={trends.netProfit}
             lang={lang}
             hasPermission={hasPermission}
@@ -1185,7 +1158,7 @@ const Dashboard: React.FC = () => {
             label={t.order_volume}
             value={totals.orderCount}
             icon={ShoppingBag}
-            color="var(--color-indigo)"
+            color="rgb(var(--secondary))"
             trend={trends.orders}
             target={targets.orders}
             lang={lang}
@@ -1199,7 +1172,7 @@ const Dashboard: React.FC = () => {
             value={fmtMoney(totals.avgTicket)}
             subValue={currencySymbol}
             icon={TrendingUp}
-            color="var(--color-amber)"
+            color="rgb(var(--warning))"
             trend={trends.avgTicket}
             lang={lang}
             hasPermission={hasPermission}
@@ -1212,7 +1185,7 @@ const Dashboard: React.FC = () => {
             value={liveMetrics.activeStaff}
             subValue={`/ ${employees.length}`}
             icon={UserCheck}
-            color="var(--color-pink)"
+            color="rgb(var(--accent))"
             lang={lang}
             hasPermission={hasPermission}
             onClick={goToHR}
@@ -1224,7 +1197,7 @@ const Dashboard: React.FC = () => {
             value={`${totals.cancelled} / ${fmtMoney(totals.cancelledValue)}`}
             subValue={currencySymbol}
             icon={Ban}
-            color="#ef4444"
+            color="rgb(var(--danger))"
             lang={lang}
             hasPermission={hasPermission}
             permission={AppPermission.DATA_VIEW_REVENUE}

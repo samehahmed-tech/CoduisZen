@@ -16,5 +16,5 @@ export const inventoryIntelligenceApi = {
     completeStockCount: (sessionId: string, applyAdjustments?: boolean) =>
         apiRequest<any>(`/inventory-intelligence/stock-count/${sessionId}/complete`, { method: 'POST', body: JSON.stringify({ applyAdjustments }) }),
     getAIForecast: (itemId: string) =>
-        apiRequest<string>(`/inventory-intelligence/forecast/${itemId}`),
+        apiRequest<{ text: string; branchId: string | null; itemId: string; sampleDays: number; dataFrom: string | null; dataAsOf: string | null; dataFreshnessHours: number | null; source: string }>(`/inventory-intelligence/forecast/${itemId}`),
 };

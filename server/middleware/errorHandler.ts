@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { redactLogText } from '../utils/logger';
 
 interface AppErrorLike extends Error {
     statusCode?: number;
@@ -8,12 +9,7 @@ interface AppErrorLike extends Error {
     isOperational?: boolean;
 }
 
-const maskSensitiveText = (value?: string) => {
-    if (!value) return value;
-    return value
-        .replace(/(authorization|token|password|secret|api[_-]?key|client[_-]?secret)\s*[:=]\s*([^\s,;]+)/gi, '$1=[REDACTED]')
-        .replace(/bearer\s+[a-z0-9\-_\.]+/gi, 'Bearer [REDACTED]');
-};
+const maskSensitiveText = (value?: string) => value ? redactLogText(value) : value;
 
 /**
  * Error Dictionary for UX (Item 34)

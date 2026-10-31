@@ -1,0 +1,42 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "public/kdslite.html",
+      "language": "html",
+      "sizeLines": 324,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "public/manifest.json",
+      "language": "json",
+      "sizeLines": 21,
+      "fileCategory": "config"
+    },
+    {
+      "path": "public/operator-screen.html",
+      "language": "html",
+      "sizeLines": 293,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "public/packinglite.html",
+      "language": "html",
+      "sizeLines": 33,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "public/robots.txt",
+      "language": "txt",
+      "sizeLines": 19,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "public/kdslite.html": [],
+    "public/manifest.json": [],
+    "public/operator-screen.html": [],
+    "public/packinglite.html": [],
+    "public/robots.txt": []
+  }
+}

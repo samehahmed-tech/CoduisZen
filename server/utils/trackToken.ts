@@ -4,7 +4,9 @@ import crypto from 'node:crypto';
  * Signed public-tracking tokens (?t=). Order ids are time-based and partly
  * guessable, so the tracking link is an HMAC capability, not a secret id.
  */
-const trackSigningSecret = () => String(process.env.JWT_SECRET || process.env.GATEWAY_TOKEN || '');
+// Public tracking is a separate capability and must not share the JWT trust
+// domain or any bridge/gateway credential.
+const trackSigningSecret = () => String(process.env.TRACK_TOKEN_SECRET || '');
 
 export const signTrackToken = (orderId: string): string | null => {
     const secret = trackSigningSecret();

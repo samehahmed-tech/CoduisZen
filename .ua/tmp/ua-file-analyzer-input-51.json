@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/day-close-fix/Apply Day Close Fix.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/day-close-fix/Apply Day Close Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 129,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/day-close-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 24,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/day-close-fix/Apply Day Close Fix.bat": [],
+    "scripts/sameh-installer/day-close-fix/Apply Day Close Fix.ps1": [],
+    "scripts/sameh-installer/day-close-fix/README AR.txt": []
+  }
+}

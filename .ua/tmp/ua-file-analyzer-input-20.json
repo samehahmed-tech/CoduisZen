@@ -1,0 +1,247 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/InteractionShowcase.tsx",
+      "language": "typescript",
+      "sizeLines": 78,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ThemeLab.tsx",
+      "language": "typescript",
+      "sizeLines": 98,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useMotion.ts",
+      "language": "typescript",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/theme-engine-2.test.ts",
+      "language": "typescript",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/ThemeProvider.tsx",
+      "language": "typescript",
+      "sizeLines": 416,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/background.ts",
+      "language": "typescript",
+      "sizeLines": 118,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/color.ts",
+      "language": "typescript",
+      "sizeLines": 74,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/migrate.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/motion.ts",
+      "language": "typescript",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/presets.ts",
+      "language": "typescript",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/resolve.ts",
+      "language": "typescript",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/validation.ts",
+      "language": "typescript",
+      "sizeLines": 89,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/acrylic.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/canvas.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/command.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/fluent-pro.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/glassline.ts",
+      "language": "typescript",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/material-x.ts",
+      "language": "typescript",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/meridian.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/obsidian.ts",
+      "language": "typescript",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/tiles.ts",
+      "language": "typescript",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/themes/touch.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/tokens.ts",
+      "language": "typescript",
+      "sizeLines": 215,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/useTheme.ts",
+      "language": "typescript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/InteractionShowcase.tsx": [
+      "theme/useTheme.ts"
+    ],
+    "components/ThemeLab.tsx": [
+      "stores/useAuthStore.ts",
+      "theme/engine/background.ts",
+      "theme/tokens.ts",
+      "theme/useTheme.ts"
+    ],
+    "hooks/useMotion.ts": [
+      "theme/tokens.ts",
+      "theme/useTheme.ts"
+    ],
+    "tests/theme-engine-2.test.ts": [
+      "theme/engine/background.ts",
+      "theme/engine/color.ts",
+      "theme/engine/migrate.ts",
+      "theme/engine/motion.ts",
+      "theme/engine/presets.ts",
+      "theme/engine/resolve.ts",
+      "theme/engine/validation.ts",
+      "theme/tokens.ts"
+    ],
+    "theme/ThemeProvider.tsx": [
+      "stores/useAuthStore.ts",
+      "theme/engine/background.ts",
+      "theme/engine/migrate.ts",
+      "theme/engine/resolve.ts",
+      "theme/engine/validation.ts",
+      "theme/tokens.ts",
+      "types.ts"
+    ],
+    "theme/engine/background.ts": [
+      "theme/engine/validation.ts"
+    ],
+    "theme/engine/color.ts": [
+      "theme/engine/validation.ts"
+    ],
+    "theme/engine/migrate.ts": [],
+    "theme/engine/motion.ts": [],
+    "theme/engine/presets.ts": [
+      "theme/engine/background.ts",
+      "theme/engine/validation.ts"
+    ],
+    "theme/engine/resolve.ts": [
+      "theme/engine/color.ts",
+      "theme/engine/validation.ts",
+      "theme/tokens.ts"
+    ],
+    "theme/engine/validation.ts": [],
+    "theme/themes/acrylic.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/canvas.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/command.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/fluent-pro.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/glassline.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/material-x.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/meridian.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/obsidian.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/tiles.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/themes/touch.ts": [
+      "theme/tokens.ts"
+    ],
+    "theme/tokens.ts": [
+      "theme/themes/acrylic.ts",
+      "theme/themes/canvas.ts",
+      "theme/themes/command.ts",
+      "theme/themes/fluent-pro.ts",
+      "theme/themes/glassline.ts",
+      "theme/themes/material-x.ts",
+      "theme/themes/meridian.ts",
+      "theme/themes/obsidian.ts",
+      "theme/themes/tiles.ts",
+      "theme/themes/touch.ts",
+      "types.ts"
+    ],
+    "theme/useTheme.ts": [
+      "theme/ThemeProvider.tsx"
+    ]
+  }
+}

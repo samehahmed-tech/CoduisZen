@@ -1,0 +1,35 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "styles/globals/glass-surfaces.css",
+      "language": "css",
+      "sizeLines": 523,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/globals/premium.css",
+      "language": "css",
+      "sizeLines": 274,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/globals/scrollbar.css",
+      "language": "css",
+      "sizeLines": 155,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/globals/wallpaper.css",
+      "language": "css",
+      "sizeLines": 72,
+      "fileCategory": "markup"
+    }
+  ],
+  "batchImportData": {
+    "styles/globals/glass-surfaces.css": [],
+    "styles/globals/premium.css": [],
+    "styles/globals/scrollbar.css": [],
+    "styles/globals/wallpaper.css": []
+  }
+}

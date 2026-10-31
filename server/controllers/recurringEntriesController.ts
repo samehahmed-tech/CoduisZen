@@ -33,6 +33,7 @@ interface RecurringTemplate {
     isActive: boolean;
     source: string;
     metadata?: Record<string, any>;
+    branchId: string;
     createdBy: string;
     createdAt: string;
     updatedAt: string;
@@ -140,10 +141,13 @@ export const createRecurringTemplate = async (req: Request, res: Response) => {
             isActive: body.isActive !== false,
             source: body.source || 'RECURRING',
             metadata: body.metadata,
+            branchId: String(req.effectiveBranchId || '').trim(),
             createdBy: req.user?.id || 'system',
             createdAt: now,
             updatedAt: now,
         };
+
+        if (!template.branchId) return res.status(400).json({ error: 'BRANCH_REQUIRED_FOR_RECURRING_ENTRY' });
 
         template.nextExecutionAt = computeNextExecution(template);
 
@@ -238,11 +242,16 @@ export const processDueRecurringEntries = async (req: Request, res: Response) =>
             }
 
             try {
+                if (!template.branchId) throw new Error('BRANCH_REQUIRED_FOR_RECURRING_ENTRY');
                 await GLService.postJournalEntry({
                     reference: `REC-${template.id}-${now.toISOString().slice(0, 10)}`,
                     referenceType: 'MANUAL',
                     description: `[Recurring] ${template.name}`,
                     createdBy: template.createdBy,
+                    branchId: template.branchId,
+                    actorId: template.createdBy,
+                    source: 'RECURRING_ENTRY',
+                    correlationId: `RECURRING:${template.id}:${now.toISOString().slice(0, 10)}`,
                     lines: [
                         { accountCode: template.debitAccountCode, debit: template.amount, credit: 0 },
                         { accountCode: template.creditAccountCode, debit: 0, credit: template.amount }

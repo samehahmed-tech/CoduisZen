@@ -1,0 +1,1882 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 28,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 28,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 28,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "tests/orderVoidApproval.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 131,
+      "nonEmptyLines": 120,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/paginationPolicy.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 209,
+      "nonEmptyLines": 191,
+      "callGraph": [
+        {
+          "caller": "freshAuth",
+          "callee": "request(app).post('/api/auth/pin-login').send",
+          "lineNumber": 58
+        },
+        {
+          "caller": "freshAuth",
+          "callee": "request(app).post",
+          "lineNumber": 58
+        },
+        {
+          "caller": "freshAuth",
+          "callee": "request",
+          "lineNumber": 58
+        },
+        {
+          "caller": "freshAuth",
+          "callee": "expect(login.status).toBe",
+          "lineNumber": 59
+        },
+        {
+          "caller": "freshAuth",
+          "callee": "expect",
+          "lineNumber": 59
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/paymentReconciliation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 19,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/paymentSessionSafety.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 71,
+      "nonEmptyLines": 60,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/payrollCloseIsolation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 101,
+      "nonEmptyLines": 94,
+      "functions": [
+        {
+          "name": "id",
+          "startLine": 18,
+          "endLine": 18,
+          "params": [
+            "prefix"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "id",
+          "callee": "randomUUID().slice",
+          "lineNumber": 18
+        },
+        {
+          "caller": "id",
+          "callee": "randomUUID",
+          "lineNumber": 18
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/payrollCompliance.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 198,
+      "nonEmptyLines": 185,
+      "functions": [
+        {
+          "name": "id",
+          "startLine": 15,
+          "endLine": 15,
+          "params": [
+            "prefix"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "id",
+          "callee": "randomUUID().slice",
+          "lineNumber": 15
+        },
+        {
+          "caller": "id",
+          "callee": "randomUUID",
+          "lineNumber": 15
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/payrollWorkRules.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 302,
+      "nonEmptyLines": 287,
+      "functions": [
+        {
+          "name": "id",
+          "startLine": 22,
+          "endLine": 22,
+          "params": [
+            "prefix"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "id",
+          "callee": "randomUUID().slice",
+          "lineNumber": 22
+        },
+        {
+          "caller": "id",
+          "callee": "randomUUID",
+          "lineNumber": 22
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/permissionGates.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 258,
+      "nonEmptyLines": 230,
+      "functions": [
+        {
+          "name": "mkUser",
+          "startLine": 16,
+          "endLine": 22,
+          "params": [
+            "tag",
+            "role",
+            "permissions"
+          ]
+        },
+        {
+          "name": "loginAs",
+          "startLine": 24,
+          "endLine": 28,
+          "params": [
+            "email"
+          ]
+        },
+        {
+          "name": "decodeToken",
+          "startLine": 30,
+          "endLine": 31,
+          "params": [
+            "token"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "loginAs",
+          "callee": "request(app).post('/api/auth/login').send",
+          "lineNumber": 25
+        },
+        {
+          "caller": "loginAs",
+          "callee": "request(app).post",
+          "lineNumber": 25
+        },
+        {
+          "caller": "loginAs",
+          "callee": "request",
+          "lineNumber": 25
+        },
+        {
+          "caller": "loginAs",
+          "callee": "expect(res.status).toBe",
+          "lineNumber": 26
+        },
+        {
+          "caller": "loginAs",
+          "callee": "expect",
+          "lineNumber": 26
+        },
+        {
+          "caller": "decodeToken",
+          "callee": "jwt.verify",
+          "lineNumber": 31
+        },
+        {
+          "caller": "not403",
+          "callee": "(request(app)[method](url) as any)\r\n                .set(auth(token)).send",
+          "lineNumber": 230
+        },
+        {
+          "caller": "not403",
+          "callee": "(request(app)[method](url) as any)\r\n                .set",
+          "lineNumber": 230
+        },
+        {
+          "caller": "not403",
+          "callee": "request(app)[method]",
+          "lineNumber": 230
+        },
+        {
+          "caller": "not403",
+          "callee": "request",
+          "lineNumber": 230
+        },
+        {
+          "caller": "not403",
+          "callee": "auth",
+          "lineNumber": 231
+        },
+        {
+          "caller": "not403",
+          "callee": "expect(`${method} ${url} -> ${res.status}`).not.toContain",
+          "lineNumber": 232
+        },
+        {
+          "caller": "not403",
+          "callee": "expect",
+          "lineNumber": 232
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/printCapabilityClaim.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 82,
+      "functions": [
+        {
+          "name": "cleanup",
+          "startLine": 15,
+          "endLine": 19,
+          "params": []
+        },
+        {
+          "name": "ensureBranch",
+          "startLine": 21,
+          "endLine": 23,
+          "params": []
+        },
+        {
+          "name": "claim",
+          "startLine": 25,
+          "endLine": 26,
+          "params": [
+            "gatewayId",
+            "printers"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cleanup",
+          "callee": "pool.query",
+          "lineNumber": 16
+        },
+        {
+          "caller": "cleanup",
+          "callee": "pool.query",
+          "lineNumber": 17
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(branches).where",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 18
+        },
+        {
+          "caller": "ensureBranch",
+          "callee": "db.insert(branches).values",
+          "lineNumber": 22
+        },
+        {
+          "caller": "ensureBranch",
+          "callee": "db.insert",
+          "lineNumber": 22
+        },
+        {
+          "caller": "claim",
+          "callee": "claimNextPrintJob",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/printQueueBranchIsolation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 88,
+      "functions": [
+        {
+          "name": "ensureTestBranch",
+          "startLine": 23,
+          "endLine": 29,
+          "params": [
+            "id"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ensureTestBranch",
+          "callee": "pool.query",
+          "lineNumber": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/probeDayCloseExpense.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 66,
+      "nonEmptyLines": 62,
+      "functions": [
+        {
+          "name": "localDateKey",
+          "startLine": 14,
+          "endLine": 15,
+          "params": [
+            "d"
+          ]
+        },
+        {
+          "name": "cleanup",
+          "startLine": 17,
+          "endLine": 24,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "localDateKey",
+          "callee": "d.getFullYear",
+          "lineNumber": 15
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String(d.getMonth() + 1).padStart",
+          "lineNumber": 15
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String",
+          "lineNumber": 15
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "d.getMonth",
+          "lineNumber": 15
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String(d.getDate()).padStart",
+          "lineNumber": 15
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String",
+          "lineNumber": 15
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "d.getDate",
+          "lineNumber": 15
+        },
+        {
+          "caller": "cleanup",
+          "callee": "(await db.select({ id: journalEntries.id }).from(journalEntries).where(eq(journalEntries.reference, `EXPENSE-${suffix}`))).map",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select({ id: journalEntries.id }).from(journalEntries).where",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select({ id: journalEntries.id }).from",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 18
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(journalLines).where",
+          "lineNumber": 19
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 19
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 19
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(journalEntries).where",
+          "lineNumber": 20
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 20
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 20
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(costCenters).where",
+          "lineNumber": 21
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 21
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 21
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(users).where",
+          "lineNumber": 22
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 22
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 22
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(branches).where",
+          "lineNumber": 23
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 23
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 23
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/purchaseOrderPartialReceive.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 201,
+      "nonEmptyLines": 184,
+      "functions": [
+        {
+          "name": "createResponse",
+          "startLine": 29,
+          "endLine": 43,
+          "params": []
+        },
+        {
+          "name": "cleanup",
+          "startLine": 45,
+          "endLine": 76,
+          "params": []
+        },
+        {
+          "name": "receive",
+          "startLine": 78,
+          "endLine": 98,
+          "params": [
+            "referenceNumber",
+            "receivedQty"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(idempotencyKeys).where",
+          "lineNumber": 46
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 46
+        },
+        {
+          "caller": "cleanup",
+          "callee": "and",
+          "lineNumber": 46
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 47
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 48
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(idempotencyKeys).where",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "and",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 51
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 52
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select({ id: goodsReceiptNotes.id })\r\n        .from(goodsReceiptNotes)\r\n        .where",
+          "lineNumber": 54
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select({ id: goodsReceiptNotes.id })\r\n        .from",
+          "lineNumber": 54
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select",
+          "lineNumber": 54
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 56
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(grnItems).where",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(stockMovements).where",
+          "lineNumber": 60
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 60
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 60
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryBatches).where",
+          "lineNumber": 61
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 61
+        },
+        {
+          "caller": "cleanup",
+          "callee": "and",
+          "lineNumber": 61
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 62
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 63
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(goodsReceiptNotes).where",
+          "lineNumber": 65
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 65
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 65
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(purchaseOrderItems).where",
+          "lineNumber": 66
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 66
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 66
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(purchaseOrders).where",
+          "lineNumber": 67
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 67
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 67
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryStock).where",
+          "lineNumber": 68
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 68
+        },
+        {
+          "caller": "cleanup",
+          "callee": "and",
+          "lineNumber": 68
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 69
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 70
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryItems).where",
+          "lineNumber": 72
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 72
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 72
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(warehouses).where",
+          "lineNumber": 73
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 73
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 73
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(suppliers).where",
+          "lineNumber": 74
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 74
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 74
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(branches).where",
+          "lineNumber": 75
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 75
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 75
+        },
+        {
+          "caller": "receive",
+          "callee": "db.select().from(purchaseOrderItems).where",
+          "lineNumber": 79
+        },
+        {
+          "caller": "receive",
+          "callee": "db.select().from",
+          "lineNumber": 79
+        },
+        {
+          "caller": "receive",
+          "callee": "db.select",
+          "lineNumber": 79
+        },
+        {
+          "caller": "receive",
+          "callee": "eq",
+          "lineNumber": 79
+        },
+        {
+          "caller": "receive",
+          "callee": "createResponse",
+          "lineNumber": 80
+        },
+        {
+          "caller": "receive",
+          "callee": "createGRN",
+          "lineNumber": 81
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/purchaseOrderWarehouseFlow.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 201,
+      "nonEmptyLines": 188,
+      "functions": [
+        {
+          "name": "createResponse",
+          "startLine": 33,
+          "endLine": 47,
+          "params": []
+        },
+        {
+          "name": "cleanup",
+          "startLine": 49,
+          "endLine": 73,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(idempotencyKeys).where",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "and",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 51
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 52
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select({ id: goodsReceiptNotes.id })\r\n        .from(goodsReceiptNotes)\r\n        .where",
+          "lineNumber": 54
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select({ id: goodsReceiptNotes.id })\r\n        .from",
+          "lineNumber": 54
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.select",
+          "lineNumber": 54
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 56
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(grnItems).where",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "receipts.map",
+          "lineNumber": 58
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(goodsReceiptNotes).where",
+          "lineNumber": 60
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 60
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 60
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(stockMovements).where",
+          "lineNumber": 61
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 61
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 61
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryBatches).where",
+          "lineNumber": 62
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 62
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 62
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(purchaseOrderItems).where",
+          "lineNumber": 63
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 63
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 63
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(purchaseOrders).where",
+          "lineNumber": 64
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 64
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 64
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryStock).where",
+          "lineNumber": 65
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 65
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 65
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryItems).where",
+          "lineNumber": 66
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 66
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 66
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(warehouses).where",
+          "lineNumber": 67
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 67
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 67
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(suppliers).where",
+          "lineNumber": 71
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 71
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 71
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(branches).where",
+          "lineNumber": 72
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 72
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 72
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/refundWorkflow.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 65,
+      "nonEmptyLines": 58,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/setupSecurity.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 106,
+      "nonEmptyLines": 89,
+      "functions": [
+        {
+          "name": "getJwtSecret",
+          "startLine": 19,
+          "endLine": 19,
+          "params": []
+        },
+        {
+          "name": "managerAuthHeader",
+          "startLine": 21,
+          "endLine": 32,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "managerAuthHeader",
+          "callee": "jwt.sign",
+          "lineNumber": 22
+        },
+        {
+          "caller": "managerAuthHeader",
+          "callee": "getJwtSecret",
+          "lineNumber": 30
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/sqlServerDateParameters.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 22,
+      "nonEmptyLines": 19,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/stockCountDraft.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 147,
+      "nonEmptyLines": 131,
+      "functions": [
+        {
+          "name": "createResponse",
+          "startLine": 22,
+          "endLine": 36,
+          "params": []
+        },
+        {
+          "name": "cleanup",
+          "startLine": 38,
+          "endLine": 45,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cleanup",
+          "callee": "db.execute",
+          "lineNumber": 39
+        },
+        {
+          "caller": "cleanup",
+          "callee": "sql",
+          "lineNumber": 39
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.execute",
+          "lineNumber": 40
+        },
+        {
+          "caller": "cleanup",
+          "callee": "sql",
+          "lineNumber": 40
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.execute",
+          "lineNumber": 41
+        },
+        {
+          "caller": "cleanup",
+          "callee": "sql",
+          "lineNumber": 41
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.execute",
+          "lineNumber": 42
+        },
+        {
+          "caller": "cleanup",
+          "callee": "sql",
+          "lineNumber": 42
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.execute",
+          "lineNumber": 43
+        },
+        {
+          "caller": "cleanup",
+          "callee": "sql",
+          "lineNumber": 43
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.execute",
+          "lineNumber": 44
+        },
+        {
+          "caller": "cleanup",
+          "callee": "sql",
+          "lineNumber": 44
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/stockMovementLogBranchScope.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 106,
+      "nonEmptyLines": 96,
+      "functions": [
+        {
+          "name": "jwtSecret",
+          "startLine": 9,
+          "endLine": 9,
+          "params": []
+        },
+        {
+          "name": "createAuth",
+          "startLine": 11,
+          "endLine": 33,
+          "params": [
+            "suffix",
+            "branchId"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createAuth",
+          "callee": "db.insert(users).values",
+          "lineNumber": 15
+        },
+        {
+          "caller": "createAuth",
+          "callee": "db.insert",
+          "lineNumber": 15
+        },
+        {
+          "caller": "createAuth",
+          "callee": "db.insert(userSessions).values",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createAuth",
+          "callee": "db.insert",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createAuth",
+          "callee": "Date.now",
+          "lineNumber": 29
+        },
+        {
+          "caller": "createAuth",
+          "callee": "jwt.sign",
+          "lineNumber": 31
+        },
+        {
+          "caller": "createAuth",
+          "callee": "jwtSecret",
+          "lineNumber": 31
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/tableOperationsApi.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 158,
+      "nonEmptyLines": 146,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/tableOrderEdit.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 270,
+      "nonEmptyLines": 241,
+      "functions": [
+        {
+          "name": "localDateKey",
+          "startLine": 24,
+          "endLine": 25,
+          "params": [
+            "date"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "localDateKey",
+          "callee": "date.getFullYear",
+          "lineNumber": 25
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String(date.getMonth() + 1).padStart",
+          "lineNumber": 25
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String",
+          "lineNumber": 25
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "date.getMonth",
+          "lineNumber": 25
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String(date.getDate()).padStart",
+          "lineNumber": 25
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "String",
+          "lineNumber": 25
+        },
+        {
+          "caller": "localDateKey",
+          "callee": "date.getDate",
+          "lineNumber": 25
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/talabatIngest.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 23,
+      "nonEmptyLines": 21,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/unitConversion.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/userDeleteAndCopy.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 140,
+      "nonEmptyLines": 128,
+      "functions": [
+        {
+          "name": "jwtSecret",
+          "startLine": 10,
+          "endLine": 10,
+          "params": []
+        },
+        {
+          "name": "createSession",
+          "startLine": 12,
+          "endLine": 36,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "makeUser",
+          "startLine": 38,
+          "endLine": 45,
+          "params": [
+            "suffix",
+            "overrides"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createSession",
+          "callee": "db.insert(users).values",
+          "lineNumber": 15
+        },
+        {
+          "caller": "createSession",
+          "callee": "db.insert",
+          "lineNumber": 15
+        },
+        {
+          "caller": "createSession",
+          "callee": "db.insert(userSessions).values",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createSession",
+          "callee": "db.insert",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createSession",
+          "callee": "Date.now",
+          "lineNumber": 29
+        },
+        {
+          "caller": "createSession",
+          "callee": "jwt.sign",
+          "lineNumber": 31
+        },
+        {
+          "caller": "createSession",
+          "callee": "jwtSecret",
+          "lineNumber": 34
+        },
+        {
+          "caller": "makeUser",
+          "callee": "db.insert(users).values",
+          "lineNumber": 40
+        },
+        {
+          "caller": "makeUser",
+          "callee": "db.insert",
+          "lineNumber": 40
+        },
+        {
+          "caller": "freshAdmin",
+          "callee": "createSession",
+          "lineNumber": 63
+        },
+        {
+          "caller": "freshAdmin",
+          "callee": "Date.now",
+          "lineNumber": 64
+        },
+        {
+          "caller": "freshAdmin",
+          "callee": "Math.floor",
+          "lineNumber": 64
+        },
+        {
+          "caller": "freshAdmin",
+          "callee": "Math.random",
+          "lineNumber": 64
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/userRouteSecurity.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 133,
+      "nonEmptyLines": 110,
+      "functions": [
+        {
+          "name": "jwtSecret",
+          "startLine": 9,
+          "endLine": 9,
+          "params": []
+        },
+        {
+          "name": "createSession",
+          "startLine": 11,
+          "endLine": 49,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createSession",
+          "callee": "db.insert(users).values",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createSession",
+          "callee": "db.insert",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createSession",
+          "callee": "db.insert(userSessions).values",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createSession",
+          "callee": "db.insert",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createSession",
+          "callee": "Date.now",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createSession",
+          "callee": "jwt.sign",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createSession",
+          "callee": "jwtSecret",
+          "lineNumber": 46
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/warehouseStockCountScope.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 118,
+      "nonEmptyLines": 108,
+      "functions": [
+        {
+          "name": "createResponse",
+          "startLine": 26,
+          "endLine": 40,
+          "params": []
+        },
+        {
+          "name": "cleanup",
+          "startLine": 42,
+          "endLine": 52,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(stockCountLines).where",
+          "lineNumber": 44
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 44
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 44
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(stockCounts).where",
+          "lineNumber": 45
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 45
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 45
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryStock).where",
+          "lineNumber": 48
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 48
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 48
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(inventoryItems).where",
+          "lineNumber": 49
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 49
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 49
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(warehouses).where",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "inArray",
+          "lineNumber": 50
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete(branches).where",
+          "lineNumber": 51
+        },
+        {
+          "caller": "cleanup",
+          "callee": "db.delete",
+          "lineNumber": 51
+        },
+        {
+          "caller": "cleanup",
+          "callee": "eq",
+          "lineNumber": 51
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/wastageValidation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 74,
+      "nonEmptyLines": 64,
+      "functions": [
+        {
+          "name": "jwtSecret",
+          "startLine": 10,
+          "endLine": 10,
+          "params": []
+        },
+        {
+          "name": "createAuth",
+          "startLine": 12,
+          "endLine": 34,
+          "params": [
+            "suffix",
+            "branchId"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createAuth",
+          "callee": "db.insert(users).values",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createAuth",
+          "callee": "db.insert",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createAuth",
+          "callee": "db.insert(userSessions).values",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createAuth",
+          "callee": "db.insert",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createAuth",
+          "callee": "Date.now",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createAuth",
+          "callee": "jwt.sign",
+          "lineNumber": 32
+        },
+        {
+          "caller": "createAuth",
+          "callee": "jwtSecret",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/whatsappBaileys.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 174,
+      "nonEmptyLines": 157,
+      "callGraph": [
+        {
+          "caller": "on",
+          "callee": "(g.__baileysEv[e] ??= []).push",
+          "lineNumber": 10
+        },
+        {
+          "caller": "mockDbUpdate",
+          "callee": "vi.spyOn(db, 'update').mockImplementation",
+          "lineNumber": 117
+        },
+        {
+          "caller": "mockDbUpdate",
+          "callee": "vi.spyOn",
+          "lineNumber": 117
+        },
+        {
+          "caller": "mockDbUpdate",
+          "callee": "calls.push",
+          "lineNumber": 120
+        },
+        {
+          "caller": "mockDbUpdate",
+          "callee": "spy.mockRestore",
+          "lineNumber": 125
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/zz-inspect-payroll-ddl.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 24,
+      "nonEmptyLines": 23,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

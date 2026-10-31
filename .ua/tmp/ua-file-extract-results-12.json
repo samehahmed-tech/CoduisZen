@@ -1,0 +1,4512 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 33,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 33,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 33,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "server/app.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 301,
+      "nonEmptyLines": 272,
+      "metrics": {
+        "importCount": 81,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/controllers/imageController.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 188,
+      "nonEmptyLines": 172,
+      "functions": [
+        {
+          "name": "buildPublicUrl",
+          "startLine": 42,
+          "endLine": 46,
+          "params": [
+            "key"
+          ]
+        },
+        {
+          "name": "decodeBase64",
+          "startLine": 48,
+          "endLine": 60,
+          "params": [
+            "data"
+          ]
+        },
+        {
+          "name": "uploadImage",
+          "startLine": 62,
+          "endLine": 141,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "getImage",
+          "startLine": 143,
+          "endLine": 162,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "deleteImage",
+          "startLine": 164,
+          "endLine": 188,
+          "params": [
+            "req",
+            "res"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "uploadImage",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "getImage",
+          "line": 143,
+          "isDefault": false
+        },
+        {
+          "name": "deleteImage",
+          "line": 164,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "buildPublicUrl",
+          "callee": "S3_PUBLIC_URL.replace",
+          "lineNumber": 43
+        },
+        {
+          "caller": "buildPublicUrl",
+          "callee": "S3_ENDPOINT.replace",
+          "lineNumber": 44
+        },
+        {
+          "caller": "decodeBase64",
+          "callee": "data.match",
+          "lineNumber": 49
+        },
+        {
+          "caller": "decodeBase64",
+          "callee": "Buffer.from",
+          "lineNumber": 52
+        },
+        {
+          "caller": "decodeBase64",
+          "callee": "Buffer.from",
+          "lineNumber": 57
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "normalizeImageId",
+          "lineNumber": 66
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status(400).json",
+          "lineNumber": 68
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status",
+          "lineNumber": 68
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "decodeBase64",
+          "lineNumber": 71
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status(400).json",
+          "lineNumber": 76
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status",
+          "lineNumber": 76
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status(413).json",
+          "lineNumber": 78
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status",
+          "lineNumber": 78
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "s3.send",
+          "lineNumber": 85
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "buildPublicUrl",
+          "lineNumber": 91
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "ensureUploadsDirectory",
+          "lineNumber": 93
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "localImageKey",
+          "lineNumber": 94
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "resolveLocalImagePath",
+          "lineNumber": 95
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status(400).json",
+          "lineNumber": 96
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status",
+          "lineNumber": 96
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "fs.writeFile",
+          "lineNumber": 98
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "fs.rename",
+          "lineNumber": 99
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "localImageUrl",
+          "lineNumber": 100
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "filename.slice",
+          "lineNumber": 107
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Number.isFinite",
+          "lineNumber": 109
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Number",
+          "lineNumber": 109
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Number",
+          "lineNumber": 109
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Number.isFinite",
+          "lineNumber": 110
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Number",
+          "lineNumber": 110
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "Number",
+          "lineNumber": 110
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.select().top(1).from(images).where",
+          "lineNumber": 114
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.select().top(1).from",
+          "lineNumber": 114
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.select().top",
+          "lineNumber": 114
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.select",
+          "lineNumber": 114
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "eq",
+          "lineNumber": 114
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.update(images)\r\n                .set({\r\n                key,\r\n                url,\r\n                filename,\r\n                contentType: finalContentType,\r\n                width: imageRecord.width,\r\n                height: imageRecord.height,\r\n                size: imageRecord.size,\r\n            })\r\n                .where",
+          "lineNumber": 116
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.update(images)\r\n                .set",
+          "lineNumber": 116
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.update",
+          "lineNumber": 116
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "eq",
+          "lineNumber": 126
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.insert(images).values",
+          "lineNumber": 128
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "db.insert",
+          "lineNumber": 128
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status(201).json",
+          "lineNumber": 131
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status",
+          "lineNumber": 131
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status(500).json",
+          "lineNumber": 139
+        },
+        {
+          "caller": "uploadImage",
+          "callee": "res.status",
+          "lineNumber": 139
+        },
+        {
+          "caller": "getImage",
+          "callee": "getStringParam",
+          "lineNumber": 145
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.status(400).json",
+          "lineNumber": 146
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.status",
+          "lineNumber": 146
+        },
+        {
+          "caller": "getImage",
+          "callee": "db.select().from(images).where",
+          "lineNumber": 147
+        },
+        {
+          "caller": "getImage",
+          "callee": "db.select().from",
+          "lineNumber": 147
+        },
+        {
+          "caller": "getImage",
+          "callee": "db.select",
+          "lineNumber": 147
+        },
+        {
+          "caller": "getImage",
+          "callee": "eq",
+          "lineNumber": 147
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.status(404).json",
+          "lineNumber": 148
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.status",
+          "lineNumber": 148
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.json",
+          "lineNumber": 150
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.status(500).json",
+          "lineNumber": 160
+        },
+        {
+          "caller": "getImage",
+          "callee": "res.status",
+          "lineNumber": 160
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "getStringParam",
+          "lineNumber": 166
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.status(400).json",
+          "lineNumber": 167
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.status",
+          "lineNumber": 167
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "db.select().from(images).where",
+          "lineNumber": 168
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "db.select().from",
+          "lineNumber": 168
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "db.select",
+          "lineNumber": 168
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "eq",
+          "lineNumber": 168
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.status(404).json",
+          "lineNumber": 169
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.status",
+          "lineNumber": 169
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "resolveLocalImagePath",
+          "lineNumber": 171
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "fs.unlink(localPath).catch",
+          "lineNumber": 173
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "fs.unlink",
+          "lineNumber": 173
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "s3.send",
+          "lineNumber": 177
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "db.delete(images).where",
+          "lineNumber": 183
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "db.delete",
+          "lineNumber": 183
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "eq",
+          "lineNumber": 183
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.json",
+          "lineNumber": 184
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.status(500).json",
+          "lineNumber": 186
+        },
+        {
+          "caller": "deleteImage",
+          "callee": "res.status",
+          "lineNumber": 186
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 3,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/controllers/paymobController.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 111,
+      "nonEmptyLines": 105,
+      "functions": [
+        {
+          "name": "getConfig",
+          "startLine": 16,
+          "endLine": 18,
+          "params": [
+            "_req",
+            "res"
+          ]
+        },
+        {
+          "name": "updateConfig",
+          "startLine": 20,
+          "endLine": 27,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "createCheckout",
+          "startLine": 30,
+          "endLine": 58,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "handleWebhook",
+          "startLine": 61,
+          "endLine": 100,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "refund",
+          "startLine": 102,
+          "endLine": 111,
+          "params": [
+            "req",
+            "res"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getConfig",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "updateConfig",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "createCheckout",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "handleWebhook",
+          "line": 61,
+          "isDefault": false
+        },
+        {
+          "name": "refund",
+          "line": 102,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getConfig",
+          "callee": "res.json",
+          "lineNumber": 17
+        },
+        {
+          "caller": "getConfig",
+          "callee": "getPaymobConfig",
+          "lineNumber": 17
+        },
+        {
+          "caller": "updateConfig",
+          "callee": "savePaymobConfig",
+          "lineNumber": 22
+        },
+        {
+          "caller": "updateConfig",
+          "callee": "res.json",
+          "lineNumber": 23
+        },
+        {
+          "caller": "updateConfig",
+          "callee": "getPaymobConfig",
+          "lineNumber": 23
+        },
+        {
+          "caller": "updateConfig",
+          "callee": "res.status(500).json",
+          "lineNumber": 25
+        },
+        {
+          "caller": "updateConfig",
+          "callee": "res.status",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Number",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "res.status(400).json",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "res.status",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "createIntention",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Number",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 36
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "db.insert(payments).values",
+          "lineNumber": 43
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "db.insert",
+          "lineNumber": 43
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 45
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Number",
+          "lineNumber": 47
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 48
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "res.status(201).json",
+          "lineNumber": 54
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "res.status",
+          "lineNumber": 54
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "res.status(Number((err as any)?.status) || 500).json",
+          "lineNumber": 56
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "res.status",
+          "lineNumber": 56
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "Number",
+          "lineNumber": 56
+        },
+        {
+          "caller": "createCheckout",
+          "callee": "String",
+          "lineNumber": 56
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "handleCallback",
+          "lineNumber": 64
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "log.warn",
+          "lineNumber": 66
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "res.status(401).json",
+          "lineNumber": 67
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "res.status",
+          "lineNumber": 67
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.select({ id: payments.id }).from(payments)\n                    .where",
+          "lineNumber": 71
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.select({ id: payments.id }).from",
+          "lineNumber": 71
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.select",
+          "lineNumber": 71
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "eq",
+          "lineNumber": 72
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "String",
+          "lineNumber": 72
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.update(payments)\n                        .set({\n                            status: result.success ? 'COMPLETED' : 'FAILED',\n                            referenceNumber: result.transactionId !== undefined ? String(result.transactionId) : undefined,\n                        } as any)\n                        .where",
+          "lineNumber": 74
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.update(payments)\n                        .set",
+          "lineNumber": 74
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.update",
+          "lineNumber": 74
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "String",
+          "lineNumber": 77
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "eq",
+          "lineNumber": 79
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.insert(payments).values",
+          "lineNumber": 81
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "db.insert",
+          "lineNumber": 81
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "Number",
+          "lineNumber": 85
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "String",
+          "lineNumber": 86
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "String",
+          "lineNumber": 86
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "log.warn",
+          "lineNumber": 94
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "res.status(200).json",
+          "lineNumber": 96
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "res.status",
+          "lineNumber": 96
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "res.status(500).json",
+          "lineNumber": 98
+        },
+        {
+          "caller": "handleWebhook",
+          "callee": "res.status",
+          "lineNumber": 98
+        },
+        {
+          "caller": "refund",
+          "callee": "res.status(400).json",
+          "lineNumber": 105
+        },
+        {
+          "caller": "refund",
+          "callee": "res.status",
+          "lineNumber": 105
+        },
+        {
+          "caller": "refund",
+          "callee": "Math.round",
+          "lineNumber": 106
+        },
+        {
+          "caller": "refund",
+          "callee": "Number",
+          "lineNumber": 106
+        },
+        {
+          "caller": "refund",
+          "callee": "res.json",
+          "lineNumber": 107
+        },
+        {
+          "caller": "refund",
+          "callee": "refundTransaction",
+          "lineNumber": 107
+        },
+        {
+          "caller": "refund",
+          "callee": "res.status(Number((err as any)?.status) || 500).json",
+          "lineNumber": 109
+        },
+        {
+          "caller": "refund",
+          "callee": "res.status",
+          "lineNumber": 109
+        },
+        {
+          "caller": "refund",
+          "callee": "Number",
+          "lineNumber": 109
+        },
+        {
+          "caller": "refund",
+          "callee": "String",
+          "lineNumber": 109
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 5,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/controllers/printGatewayController.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 178,
+      "nonEmptyLines": 165,
+      "functions": [
+        {
+          "name": "resolveBranchScope",
+          "startLine": 15,
+          "endLine": 21,
+          "params": [
+            "req"
+          ]
+        },
+        {
+          "name": "enqueueJob",
+          "startLine": 23,
+          "endLine": 51,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "completeJob",
+          "startLine": 53,
+          "endLine": 65,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "failJob",
+          "startLine": 67,
+          "endLine": 80,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "listJobs",
+          "startLine": 82,
+          "endLine": 96,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "claimBridgeJob",
+          "startLine": 98,
+          "endLine": 118,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "getBridges",
+          "startLine": 121,
+          "endLine": 128,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "retryJob",
+          "startLine": 130,
+          "endLine": 142,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "purgeJobs",
+          "startLine": 144,
+          "endLine": 153,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "cancelJob",
+          "startLine": 155,
+          "endLine": 167,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "bridgeConnect",
+          "startLine": 170,
+          "endLine": 178,
+          "params": [
+            "req",
+            "res"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "enqueueJob",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "completeJob",
+          "line": 53,
+          "isDefault": false
+        },
+        {
+          "name": "failJob",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "listJobs",
+          "line": 82,
+          "isDefault": false
+        },
+        {
+          "name": "claimBridgeJob",
+          "line": 98,
+          "isDefault": false
+        },
+        {
+          "name": "getBridges",
+          "line": 121,
+          "isDefault": false
+        },
+        {
+          "name": "retryJob",
+          "line": 130,
+          "isDefault": false
+        },
+        {
+          "name": "purgeJobs",
+          "line": 144,
+          "isDefault": false
+        },
+        {
+          "name": "cancelJob",
+          "line": 155,
+          "isDefault": false
+        },
+        {
+          "name": "bridgeConnect",
+          "line": 170,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resolveBranchScope",
+          "callee": "String(req.body?.branchId || req.query?.branchId || '').trim",
+          "lineNumber": 16
+        },
+        {
+          "caller": "resolveBranchScope",
+          "callee": "String",
+          "lineNumber": 16
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "resolveBranchScope",
+          "lineNumber": 25
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String(req.body?.type || '').toUpperCase",
+          "lineNumber": 26
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String",
+          "lineNumber": 26
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String",
+          "lineNumber": 27
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String(req.body?.contentType || 'text').toLowerCase",
+          "lineNumber": 28
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String",
+          "lineNumber": 28
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 29
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status",
+          "lineNumber": 29
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "['RECEIPT', 'KITCHEN'].includes",
+          "lineNumber": 30
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 30
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status",
+          "lineNumber": 30
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "content.trim",
+          "lineNumber": 31
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 31
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status",
+          "lineNumber": 31
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "['text', 'image'].includes",
+          "lineNumber": 32
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 32
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status",
+          "lineNumber": 32
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "enqueuePrintJob",
+          "lineNumber": 34
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String(req.body?.printerType || '').toUpperCase",
+          "lineNumber": 41
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "String",
+          "lineNumber": 41
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status(201).json",
+          "lineNumber": 46
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status",
+          "lineNumber": 46
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "console.error",
+          "lineNumber": 48
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status(500).json",
+          "lineNumber": 49
+        },
+        {
+          "caller": "enqueueJob",
+          "callee": "res.status",
+          "lineNumber": 49
+        },
+        {
+          "caller": "completeJob",
+          "callee": "String(req.params?.jobId || '').trim",
+          "lineNumber": 55
+        },
+        {
+          "caller": "completeJob",
+          "callee": "String",
+          "lineNumber": 55
+        },
+        {
+          "caller": "completeJob",
+          "callee": "String(req.body?.gatewayId || req.headers['x-gateway-id'] || '').trim",
+          "lineNumber": 56
+        },
+        {
+          "caller": "completeJob",
+          "callee": "String",
+          "lineNumber": 56
+        },
+        {
+          "caller": "completeJob",
+          "callee": "String(req.body?.branchId || req.query?.branchId || req.headers['x-branch-id'] || '').trim",
+          "lineNumber": 57
+        },
+        {
+          "caller": "completeJob",
+          "callee": "String",
+          "lineNumber": 57
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 58
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.status",
+          "lineNumber": 58
+        },
+        {
+          "caller": "completeJob",
+          "callee": "completePrintJob",
+          "lineNumber": 59
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.status(404).json",
+          "lineNumber": 60
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.status",
+          "lineNumber": 60
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.json",
+          "lineNumber": 61
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.status(500).json",
+          "lineNumber": 63
+        },
+        {
+          "caller": "completeJob",
+          "callee": "res.status",
+          "lineNumber": 63
+        },
+        {
+          "caller": "failJob",
+          "callee": "String(req.params?.jobId || '').trim",
+          "lineNumber": 69
+        },
+        {
+          "caller": "failJob",
+          "callee": "String",
+          "lineNumber": 69
+        },
+        {
+          "caller": "failJob",
+          "callee": "String",
+          "lineNumber": 70
+        },
+        {
+          "caller": "failJob",
+          "callee": "String(req.body?.gatewayId || req.headers['x-gateway-id'] || '').trim",
+          "lineNumber": 71
+        },
+        {
+          "caller": "failJob",
+          "callee": "String",
+          "lineNumber": 71
+        },
+        {
+          "caller": "failJob",
+          "callee": "String(req.body?.branchId || req.query?.branchId || req.headers['x-branch-id'] || '').trim",
+          "lineNumber": 72
+        },
+        {
+          "caller": "failJob",
+          "callee": "String",
+          "lineNumber": 72
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 73
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.status",
+          "lineNumber": 73
+        },
+        {
+          "caller": "failJob",
+          "callee": "failPrintJob",
+          "lineNumber": 74
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.status(404).json",
+          "lineNumber": 75
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.status",
+          "lineNumber": 75
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.json",
+          "lineNumber": 76
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.status(500).json",
+          "lineNumber": 78
+        },
+        {
+          "caller": "failJob",
+          "callee": "res.status",
+          "lineNumber": 78
+        },
+        {
+          "caller": "listJobs",
+          "callee": "String(req.query?.branchId || '').trim",
+          "lineNumber": 84
+        },
+        {
+          "caller": "listJobs",
+          "callee": "String",
+          "lineNumber": 84
+        },
+        {
+          "caller": "listJobs",
+          "callee": "String(req.query?.gatewayId || req.headers['x-gateway-id'] || '').trim",
+          "lineNumber": 85
+        },
+        {
+          "caller": "listJobs",
+          "callee": "String",
+          "lineNumber": 85
+        },
+        {
+          "caller": "listJobs",
+          "callee": "String(req.query?.status || '').toUpperCase",
+          "lineNumber": 89
+        },
+        {
+          "caller": "listJobs",
+          "callee": "String",
+          "lineNumber": 89
+        },
+        {
+          "caller": "listJobs",
+          "callee": "listPrintJobs",
+          "lineNumber": 90
+        },
+        {
+          "caller": "listJobs",
+          "callee": "Number",
+          "lineNumber": 90
+        },
+        {
+          "caller": "listJobs",
+          "callee": "getPrintQueueStats",
+          "lineNumber": 91
+        },
+        {
+          "caller": "listJobs",
+          "callee": "res.json",
+          "lineNumber": 92
+        },
+        {
+          "caller": "listJobs",
+          "callee": "res.status(500).json",
+          "lineNumber": 94
+        },
+        {
+          "caller": "listJobs",
+          "callee": "res.status",
+          "lineNumber": 94
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.branchId || req.headers['x-branch-id'] || '').trim",
+          "lineNumber": 100
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String",
+          "lineNumber": 100
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.gatewayId || req.headers['x-gateway-id'] || '').trim",
+          "lineNumber": 101
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String",
+          "lineNumber": 101
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.claimUnassigned || '').toLowerCase",
+          "lineNumber": 102
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String",
+          "lineNumber": 102
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.global || '').toLowerCase",
+          "lineNumber": 103
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String",
+          "lineNumber": 103
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 104
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "res.status",
+          "lineNumber": 104
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.printers || '')\r\n            .split('|')\r\n            .map(name => name.trim())\r\n            .filter(Boolean)\r\n            .slice",
+          "lineNumber": 107
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.printers || '')\r\n            .split('|')\r\n            .map(name => name.trim())\r\n            .filter",
+          "lineNumber": 107
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.printers || '')\r\n            .split('|')\r\n            .map",
+          "lineNumber": 107
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String(req.query?.printers || '')\r\n            .split",
+          "lineNumber": 107
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "String",
+          "lineNumber": 107
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "name.trim",
+          "lineNumber": 109
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "markBridgePoll",
+          "lineNumber": 112
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "claimNextPrintJob",
+          "lineNumber": 113
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "res.json",
+          "lineNumber": 114
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "res.status(500).json",
+          "lineNumber": 116
+        },
+        {
+          "caller": "claimBridgeJob",
+          "callee": "res.status",
+          "lineNumber": 116
+        },
+        {
+          "caller": "getBridges",
+          "callee": "getBridgeRegistry",
+          "lineNumber": 123
+        },
+        {
+          "caller": "getBridges",
+          "callee": "res.json",
+          "lineNumber": 124
+        },
+        {
+          "caller": "getBridges",
+          "callee": "res.status(500).json",
+          "lineNumber": 126
+        },
+        {
+          "caller": "getBridges",
+          "callee": "res.status",
+          "lineNumber": 126
+        },
+        {
+          "caller": "retryJob",
+          "callee": "resolveBranchScope",
+          "lineNumber": 132
+        },
+        {
+          "caller": "retryJob",
+          "callee": "String(req.params?.jobId || '').trim",
+          "lineNumber": 133
+        },
+        {
+          "caller": "retryJob",
+          "callee": "String",
+          "lineNumber": 133
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 134
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status",
+          "lineNumber": 134
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 135
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status",
+          "lineNumber": 135
+        },
+        {
+          "caller": "retryJob",
+          "callee": "retryPrintJob",
+          "lineNumber": 136
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status(404).json",
+          "lineNumber": 137
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status",
+          "lineNumber": 137
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.json",
+          "lineNumber": 138
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status(500).json",
+          "lineNumber": 140
+        },
+        {
+          "caller": "retryJob",
+          "callee": "res.status",
+          "lineNumber": 140
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "resolveBranchScope",
+          "lineNumber": 146
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "res.status(400).json",
+          "lineNumber": 147
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "res.status",
+          "lineNumber": 147
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "purgePrintJobs",
+          "lineNumber": 148
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "res.json",
+          "lineNumber": 149
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "res.status(500).json",
+          "lineNumber": 151
+        },
+        {
+          "caller": "purgeJobs",
+          "callee": "res.status",
+          "lineNumber": 151
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "resolveBranchScope",
+          "lineNumber": 157
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "String(req.params?.jobId || '').trim",
+          "lineNumber": 158
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "String",
+          "lineNumber": 158
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 159
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status",
+          "lineNumber": 159
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status(400).json",
+          "lineNumber": 160
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status",
+          "lineNumber": 160
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "cancelPrintJob",
+          "lineNumber": 161
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status(404).json",
+          "lineNumber": 162
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status",
+          "lineNumber": 162
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.json",
+          "lineNumber": 163
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status(500).json",
+          "lineNumber": 165
+        },
+        {
+          "caller": "cancelJob",
+          "callee": "res.status",
+          "lineNumber": 165
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "String(req.query?.gatewayId || req.headers['x-gateway-id'] || '').trim",
+          "lineNumber": 171
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "String",
+          "lineNumber": 171
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "String(req.query?.branchId || req.headers['x-branch-id'] || '').trim",
+          "lineNumber": 172
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "String",
+          "lineNumber": 172
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "res.status(400).json",
+          "lineNumber": 173
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "res.status",
+          "lineNumber": 173
+        },
+        {
+          "caller": "bridgeConnect",
+          "callee": "registerBridge",
+          "lineNumber": 177
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 10,
+        "functionCount": 11,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/controllers/rumController.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 61,
+      "nonEmptyLines": 56,
+      "functions": [
+        {
+          "name": "ingestClientRum",
+          "startLine": 20,
+          "endLine": 50,
+          "params": [
+            "req",
+            "res"
+          ]
+        },
+        {
+          "name": "getClientRum",
+          "startLine": 53,
+          "endLine": 61,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ingestClientRum",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "getClientRum",
+          "line": 53,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ingestClientRum",
+          "callee": "Number",
+          "lineNumber": 23
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "Number",
+          "lineNumber": 24
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "Number",
+          "lineNumber": 25
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "String(body.route || '/').slice",
+          "lineNumber": 26
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "String",
+          "lineNumber": 26
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "Number.isFinite",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "Number.isFinite",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "Number.isFinite",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status(400).json",
+          "lineNumber": 31
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status",
+          "lineNumber": 31
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "buckets.get",
+          "lineNumber": 33
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status(200).json",
+          "lineNumber": 35
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status",
+          "lineNumber": 35
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "buckets.set",
+          "lineNumber": 37
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status(200).json",
+          "lineNumber": 46
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status",
+          "lineNumber": 46
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status(200).json",
+          "lineNumber": 48
+        },
+        {
+          "caller": "ingestClientRum",
+          "callee": "res.status",
+          "lineNumber": 48
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "Array.from(buckets.entries()).map",
+          "lineNumber": 54
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "Array.from",
+          "lineNumber": 54
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "buckets.entries",
+          "lineNumber": 54
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "Math.round",
+          "lineNumber": 57
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "Math.round",
+          "lineNumber": 58
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "Math.round",
+          "lineNumber": 59
+        },
+        {
+          "caller": "getClientRum",
+          "callee": "Math.round",
+          "lineNumber": 60
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/auth.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 122,
+      "nonEmptyLines": 108,
+      "functions": [
+        {
+          "name": "getJwtSecret",
+          "startLine": 30,
+          "endLine": 30,
+          "params": []
+        },
+        {
+          "name": "authenticateToken",
+          "startLine": 32,
+          "endLine": 90,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "requireRoles",
+          "startLine": 92,
+          "endLine": 99,
+          "params": [
+            "...roles"
+          ]
+        },
+        {
+          "name": "requirePermission",
+          "startLine": 101,
+          "endLine": 110,
+          "params": [
+            "...perms"
+          ]
+        },
+        {
+          "name": "requireRoleOrPermission",
+          "startLine": 112,
+          "endLine": 122,
+          "params": [
+            "roles",
+            "perms"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "authenticateToken",
+          "line": 32,
+          "isDefault": false
+        },
+        {
+          "name": "requireRoles",
+          "line": 92,
+          "isDefault": false
+        },
+        {
+          "name": "requirePermission",
+          "line": 101,
+          "isDefault": false
+        },
+        {
+          "name": "requireRoleOrPermission",
+          "line": 112,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getJwtSecret",
+          "callee": "requireEnv",
+          "lineNumber": 30
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "authHeader.startsWith",
+          "lineNumber": 34
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "authHeader.slice",
+          "lineNumber": 34
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status(401).json",
+          "lineNumber": 37
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status",
+          "lineNumber": 37
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "jwt.verify",
+          "lineNumber": 41
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "getJwtSecret",
+          "lineNumber": 41
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status(401).json",
+          "lineNumber": 45
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status",
+          "lineNumber": 45
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.select().from(userSessions).where",
+          "lineNumber": 51
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.select().from",
+          "lineNumber": 51
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.select",
+          "lineNumber": 51
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "and",
+          "lineNumber": 51
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "eq",
+          "lineNumber": 52
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "eq",
+          "lineNumber": 53
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "eq",
+          "lineNumber": 54
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "eq",
+          "lineNumber": 55
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status(401).json",
+          "lineNumber": 59
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status",
+          "lineNumber": 59
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "new Date(session.lastSeenAt).getTime",
+          "lineNumber": 63
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "Date.now",
+          "lineNumber": 64
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.update(userSessions)\r\n                .set({ lastSeenAt: new Date(nowMs), updatedAt: new Date(nowMs) })\r\n                .where(eq(userSessions.id, sessionId))\r\n                .catch",
+          "lineNumber": 67
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.update(userSessions)\r\n                .set({ lastSeenAt: new Date(nowMs), updatedAt: new Date(nowMs) })\r\n                .where",
+          "lineNumber": 67
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.update(userSessions)\r\n                .set",
+          "lineNumber": 67
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "db.update",
+          "lineNumber": 67
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "eq",
+          "lineNumber": 69
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "console.error",
+          "lineNumber": 70
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "Array.isArray",
+          "lineNumber": 78
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "next",
+          "lineNumber": 82
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "isDatabaseUnavailableError",
+          "lineNumber": 87
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "writeDatabaseUnavailable",
+          "lineNumber": 87
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status(401).json",
+          "lineNumber": 88
+        },
+        {
+          "caller": "authenticateToken",
+          "callee": "res.status",
+          "lineNumber": 88
+        },
+        {
+          "caller": "requireRoles",
+          "callee": "res.status(401).json",
+          "lineNumber": 95
+        },
+        {
+          "caller": "requireRoles",
+          "callee": "res.status",
+          "lineNumber": 95
+        },
+        {
+          "caller": "requireRoles",
+          "callee": "roles.includes",
+          "lineNumber": 96
+        },
+        {
+          "caller": "requireRoles",
+          "callee": "next",
+          "lineNumber": 96
+        },
+        {
+          "caller": "requireRoles",
+          "callee": "res.status(403).json",
+          "lineNumber": 97
+        },
+        {
+          "caller": "requireRoles",
+          "callee": "res.status",
+          "lineNumber": 97
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "res.status(401).json",
+          "lineNumber": 104
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "res.status",
+          "lineNumber": 104
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "next",
+          "lineNumber": 105
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "user.permissions?.includes",
+          "lineNumber": 106
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "next",
+          "lineNumber": 106
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "perms.some",
+          "lineNumber": 107
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "user.permissions?.includes",
+          "lineNumber": 107
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "next",
+          "lineNumber": 107
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "res.status(403).json",
+          "lineNumber": 108
+        },
+        {
+          "caller": "requirePermission",
+          "callee": "res.status",
+          "lineNumber": 108
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "res.status(401).json",
+          "lineNumber": 115
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "res.status",
+          "lineNumber": 115
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "next",
+          "lineNumber": 116
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "roles.includes",
+          "lineNumber": 117
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "next",
+          "lineNumber": 117
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "user.permissions?.includes",
+          "lineNumber": 118
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "next",
+          "lineNumber": 118
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "perms.some",
+          "lineNumber": 119
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "user.permissions?.includes",
+          "lineNumber": 119
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "next",
+          "lineNumber": 119
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "res.status(403).json",
+          "lineNumber": 120
+        },
+        {
+          "caller": "requireRoleOrPermission",
+          "callee": "res.status",
+          "lineNumber": 120
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 4,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/branchIsolation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 142,
+      "nonEmptyLines": 128,
+      "functions": [
+        {
+          "name": "isCrossBranchMonitor",
+          "startLine": 25,
+          "endLine": 26,
+          "params": [
+            "role"
+          ]
+        },
+        {
+          "name": "enforceBranch",
+          "startLine": 36,
+          "endLine": 91,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "scopeBranchQuery",
+          "startLine": 97,
+          "endLine": 125,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "extractBranch",
+          "startLine": 131,
+          "endLine": 142,
+          "params": [
+            "req",
+            "_res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "isCrossBranchMonitor",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "enforceBranch",
+          "line": 36,
+          "isDefault": false
+        },
+        {
+          "name": "scopeBranchQuery",
+          "line": 97,
+          "isDefault": false
+        },
+        {
+          "name": "extractBranch",
+          "line": 131,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isCrossBranchMonitor",
+          "callee": "['SUPER_ADMIN', 'CALL_CENTER', 'CALL_CENTER_MANAGER'].includes",
+          "lineNumber": 26
+        },
+        {
+          "caller": "isCrossBranchMonitor",
+          "callee": "String",
+          "lineNumber": 26
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "res.status(401).json",
+          "lineNumber": 39
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "res.status",
+          "lineNumber": 39
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "isCrossBranchMonitor",
+          "lineNumber": 43
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "next",
+          "lineNumber": 57
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "allowedBranches.add",
+          "lineNumber": 61
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "allowedBranches.add",
+          "lineNumber": 63
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "res.status(403).json",
+          "lineNumber": 67
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "res.status",
+          "lineNumber": 67
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "allowedBranches.has",
+          "lineNumber": 82
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "res.status(403).json",
+          "lineNumber": 83
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "res.status",
+          "lineNumber": 83
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "Array.from",
+          "lineNumber": 89
+        },
+        {
+          "caller": "enforceBranch",
+          "callee": "next",
+          "lineNumber": 90
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "enforceBranch",
+          "lineNumber": 98
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "isCrossBranchMonitor",
+          "lineNumber": 101
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "next",
+          "lineNumber": 112
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "isCrossBranchMonitor",
+          "lineNumber": 117
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "res.status(403).json",
+          "lineNumber": 118
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "res.status",
+          "lineNumber": 118
+        },
+        {
+          "caller": "scopeBranchQuery",
+          "callee": "next",
+          "lineNumber": 123
+        },
+        {
+          "caller": "extractBranch",
+          "callee": "next",
+          "lineNumber": 141
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/cacheHeaders.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 46,
+      "nonEmptyLines": 39,
+      "functions": [
+        {
+          "name": "apiCacheHeaders",
+          "startLine": 8,
+          "endLine": 43,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "apiCacheHeaders",
+          "line": 8,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "res.setHeader",
+          "lineNumber": 11
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "next",
+          "lineNumber": 12
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "req.path.toLowerCase",
+          "lineNumber": 18
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "path.includes",
+          "lineNumber": 22
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "path.includes",
+          "lineNumber": 23
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "path.includes",
+          "lineNumber": 24
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "res.setHeader",
+          "lineNumber": 26
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "next",
+          "lineNumber": 27
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "path.includes",
+          "lineNumber": 32
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "path.includes",
+          "lineNumber": 33
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "path.includes",
+          "lineNumber": 34
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "res.setHeader",
+          "lineNumber": 36
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "next",
+          "lineNumber": 37
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "res.setHeader",
+          "lineNumber": 41
+        },
+        {
+          "caller": "apiCacheHeaders",
+          "callee": "next",
+          "lineNumber": 42
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/errorHandler.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 166,
+      "nonEmptyLines": 150,
+      "functions": [
+        {
+          "name": "maskSensitiveText",
+          "startLine": 11,
+          "endLine": 16,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "errorHandler",
+          "startLine": 63,
+          "endLine": 125,
+          "params": [
+            "err",
+            "req",
+            "res",
+            "_next"
+          ]
+        },
+        {
+          "name": "asyncHandler",
+          "startLine": 147,
+          "endLine": 153,
+          "params": [
+            "fn"
+          ]
+        },
+        {
+          "name": "notFoundHandler",
+          "startLine": 158,
+          "endLine": 166,
+          "params": [
+            "_req",
+            "res"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "AppError",
+          "startLine": 130,
+          "endLine": 142,
+          "methods": [
+            "constructor"
+          ],
+          "properties": [
+            "statusCode",
+            "code",
+            "isOperational"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "errorHandler",
+          "line": 63,
+          "isDefault": false
+        },
+        {
+          "name": "AppError",
+          "line": 130,
+          "isDefault": false
+        },
+        {
+          "name": "asyncHandler",
+          "line": 147,
+          "isDefault": false
+        },
+        {
+          "name": "notFoundHandler",
+          "line": 158,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "maskSensitiveText",
+          "callee": "value\r\n        .replace(/(authorization|token|password|secret|api[_-]?key|client[_-]?secret)\\s*[:=]\\s*([^\\s,;]+)/gi, '$1=[REDACTED]')\r\n        .replace",
+          "lineNumber": 13
+        },
+        {
+          "caller": "maskSensitiveText",
+          "callee": "value\r\n        .replace",
+          "lineNumber": 13
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "String",
+          "lineNumber": 75
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "['2601', '2627', '547', '1205'].includes",
+          "lineNumber": 79
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "['2601', '2627', '1205'].includes",
+          "lineNumber": 80
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "console.error",
+          "lineNumber": 88
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "maskSensitiveText",
+          "lineNumber": 89
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "maskSensitiveText",
+          "lineNumber": 90
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "res.status(statusCode).json",
+          "lineNumber": 99
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "res.status",
+          "lineNumber": 99
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "res.status(500).json",
+          "lineNumber": 110
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "res.status",
+          "lineNumber": 110
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "res.status(statusCode).json",
+          "lineNumber": 119
+        },
+        {
+          "caller": "errorHandler",
+          "callee": "res.status",
+          "lineNumber": 119
+        },
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 136
+        },
+        {
+          "caller": "constructor",
+          "callee": "Error.captureStackTrace",
+          "lineNumber": 140
+        },
+        {
+          "caller": "asyncHandler",
+          "callee": "Promise.resolve(fn(req, res, next)).catch",
+          "lineNumber": 151
+        },
+        {
+          "caller": "asyncHandler",
+          "callee": "Promise.resolve",
+          "lineNumber": 151
+        },
+        {
+          "caller": "asyncHandler",
+          "callee": "fn",
+          "lineNumber": 151
+        },
+        {
+          "caller": "notFoundHandler",
+          "callee": "res.status(404).json",
+          "lineNumber": 159
+        },
+        {
+          "caller": "notFoundHandler",
+          "callee": "res.status",
+          "lineNumber": 159
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 4,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "server/middleware/printGatewayAuth.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 15,
+      "nonEmptyLines": 13,
+      "functions": [
+        {
+          "name": "requirePrintGatewayToken",
+          "startLine": 4,
+          "endLine": 15,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "requirePrintGatewayToken",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "String(process.env.PRINT_GATEWAY_TOKEN || '').trim",
+          "lineNumber": 5
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "String",
+          "lineNumber": 5
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "res.status(503).json",
+          "lineNumber": 6
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "res.status",
+          "lineNumber": 6
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "String(req.headers['x-gateway-token'] || req.query.token || '').trim",
+          "lineNumber": 8
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "String",
+          "lineNumber": 8
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "Buffer.from",
+          "lineNumber": 9
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "Buffer.from",
+          "lineNumber": 10
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "crypto.timingSafeEqual",
+          "lineNumber": 12
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "res.status(401).json",
+          "lineNumber": 13
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "res.status",
+          "lineNumber": 13
+        },
+        {
+          "caller": "requirePrintGatewayToken",
+          "callee": "next",
+          "lineNumber": 14
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/rateLimit.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 67,
+      "nonEmptyLines": 60,
+      "functions": [
+        {
+          "name": "apiRateLimiter",
+          "startLine": 42,
+          "endLine": 67,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "apiRateLimiter",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "apiRateLimiter",
+          "callee": "EXEMPT_PREFIXES.some",
+          "lineNumber": 45
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "path.startsWith",
+          "lineNumber": 45
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "next",
+          "lineNumber": 45
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "Date.now",
+          "lineNumber": 48
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "buckets.get",
+          "lineNumber": 50
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "buckets.set",
+          "lineNumber": 53
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "stamps.shift",
+          "lineNumber": 55
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "Math.ceil",
+          "lineNumber": 57
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "res.setHeader",
+          "lineNumber": 58
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "String",
+          "lineNumber": 58
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "Math.max",
+          "lineNumber": 58
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "res.status(429).json",
+          "lineNumber": 59
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "res.status",
+          "lineNumber": 59
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "Math.max",
+          "lineNumber": 59
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "stamps.push",
+          "lineNumber": 61
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "next",
+          "lineNumber": 62
+        },
+        {
+          "caller": "apiRateLimiter",
+          "callee": "next",
+          "lineNumber": 65
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/requestContext.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 62,
+      "nonEmptyLines": 51,
+      "functions": [
+        {
+          "name": "redactValue",
+          "startLine": 14,
+          "endLine": 14,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "sanitizePath",
+          "startLine": 16,
+          "endLine": 29,
+          "params": [
+            "inputPath"
+          ]
+        },
+        {
+          "name": "normalizeRequestId",
+          "startLine": 31,
+          "endLine": 35,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "attachRequestId",
+          "startLine": 37,
+          "endLine": 44,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "requestLogger",
+          "startLine": 46,
+          "endLine": 62,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "attachRequestId",
+          "line": 37,
+          "isDefault": false
+        },
+        {
+          "name": "requestLogger",
+          "line": 46,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "sanitizePath",
+          "callee": "parsed.searchParams.keys",
+          "lineNumber": 19
+        },
+        {
+          "caller": "sanitizePath",
+          "callee": "SENSITIVE_KEYS.includes",
+          "lineNumber": 20
+        },
+        {
+          "caller": "sanitizePath",
+          "callee": "key.toLowerCase",
+          "lineNumber": 20
+        },
+        {
+          "caller": "sanitizePath",
+          "callee": "parsed.searchParams.set",
+          "lineNumber": 21
+        },
+        {
+          "caller": "sanitizePath",
+          "callee": "redactValue",
+          "lineNumber": 21
+        },
+        {
+          "caller": "sanitizePath",
+          "callee": "parsed.searchParams.get",
+          "lineNumber": 21
+        },
+        {
+          "caller": "sanitizePath",
+          "callee": "parsed.searchParams.toString",
+          "lineNumber": 24
+        },
+        {
+          "caller": "normalizeRequestId",
+          "callee": "String(value).trim",
+          "lineNumber": 33
+        },
+        {
+          "caller": "normalizeRequestId",
+          "callee": "String",
+          "lineNumber": 33
+        },
+        {
+          "caller": "attachRequestId",
+          "callee": "normalizeRequestId",
+          "lineNumber": 38
+        },
+        {
+          "caller": "attachRequestId",
+          "callee": "req.header",
+          "lineNumber": 38
+        },
+        {
+          "caller": "attachRequestId",
+          "callee": "randomUUID",
+          "lineNumber": 39
+        },
+        {
+          "caller": "attachRequestId",
+          "callee": "Date.now",
+          "lineNumber": 41
+        },
+        {
+          "caller": "attachRequestId",
+          "callee": "res.setHeader",
+          "lineNumber": 42
+        },
+        {
+          "caller": "attachRequestId",
+          "callee": "next",
+          "lineNumber": 43
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "Date.now",
+          "lineNumber": 47
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "sanitizePath",
+          "lineNumber": 50
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "path.includes",
+          "lineNumber": 52
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "path.includes",
+          "lineNumber": 52
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "path.includes",
+          "lineNumber": 52
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "path.includes",
+          "lineNumber": 52
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "console.log",
+          "lineNumber": 54
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "res.on",
+          "lineNumber": 56
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "Date.now",
+          "lineNumber": 57
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "console.log",
+          "lineNumber": 58
+        },
+        {
+          "caller": "requestLogger",
+          "callee": "next",
+          "lineNumber": 61
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/requestTiming.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "normalizePath",
+          "startLine": 23,
+          "endLine": 29,
+          "params": [
+            "p"
+          ]
+        },
+        {
+          "name": "requestTiming",
+          "startLine": 31,
+          "endLine": 59,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "percentile",
+          "startLine": 61,
+          "endLine": 69,
+          "params": [
+            "s",
+            "p"
+          ]
+        },
+        {
+          "name": "getRequestTiming",
+          "startLine": 72,
+          "endLine": 82,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "requestTiming",
+          "line": 31,
+          "isDefault": false
+        },
+        {
+          "name": "getRequestTiming",
+          "line": 72,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizePath",
+          "callee": "p.split",
+          "lineNumber": 24
+        },
+        {
+          "caller": "normalizePath",
+          "callee": "path\n        .replace(/\\/[0-9a-fA-F-]{8,}/g, '/:id')\n        .replace(/\\/\\d+(?=\\/|$)/g, '/:id')\n        .slice",
+          "lineNumber": 25
+        },
+        {
+          "caller": "normalizePath",
+          "callee": "path\n        .replace(/\\/[0-9a-fA-F-]{8,}/g, '/:id')\n        .replace",
+          "lineNumber": 25
+        },
+        {
+          "caller": "normalizePath",
+          "callee": "path\n        .replace",
+          "lineNumber": 25
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "Date.now",
+          "lineNumber": 32
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "res.on",
+          "lineNumber": 33
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "req.path.startsWith",
+          "lineNumber": 35
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "normalizePath",
+          "lineNumber": 36
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "stats.get",
+          "lineNumber": 37
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "BUCKETS.map",
+          "lineNumber": 40
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "stats.set",
+          "lineNumber": 41
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "Date.now",
+          "lineNumber": 43
+        },
+        {
+          "caller": "requestTiming",
+          "callee": "next",
+          "lineNumber": 58
+        },
+        {
+          "caller": "percentile",
+          "callee": "Math.ceil",
+          "lineNumber": 62
+        },
+        {
+          "caller": "getRequestTiming",
+          "callee": "Array.from(stats.entries())\n        .map(([route, s]) => ({\n            route,\n            n: s.n,\n            p50: percentile(s, 50),\n            p95: percentile(s, 95),\n            max: s.max,\n            errors: s.errors,\n        }))\n        .sort",
+          "lineNumber": 73
+        },
+        {
+          "caller": "getRequestTiming",
+          "callee": "Array.from(stats.entries())\n        .map",
+          "lineNumber": 73
+        },
+        {
+          "caller": "getRequestTiming",
+          "callee": "Array.from",
+          "lineNumber": 73
+        },
+        {
+          "caller": "getRequestTiming",
+          "callee": "stats.entries",
+          "lineNumber": 73
+        },
+        {
+          "caller": "getRequestTiming",
+          "callee": "percentile",
+          "lineNumber": 77
+        },
+        {
+          "caller": "getRequestTiming",
+          "callee": "percentile",
+          "lineNumber": 78
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/security.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 204,
+      "nonEmptyLines": 182,
+      "functions": [
+        {
+          "name": "sanitizeValue",
+          "startLine": 58,
+          "endLine": 80,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "inputSanitizer",
+          "startLine": 82,
+          "endLine": 94,
+          "params": [
+            "req",
+            "_res",
+            "next"
+          ]
+        },
+        {
+          "name": "isLocalHost",
+          "startLine": 123,
+          "endLine": 126,
+          "params": [
+            "host"
+          ]
+        },
+        {
+          "name": "shouldBypassCsrf",
+          "startLine": 128,
+          "endLine": 135,
+          "params": [
+            "req"
+          ]
+        },
+        {
+          "name": "csrfProtection",
+          "startLine": 137,
+          "endLine": 186,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "hideErrorDetails",
+          "startLine": 192,
+          "endLine": 204,
+          "params": [
+            "err",
+            "_req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "helmetMiddleware",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "inputSanitizer",
+          "line": 82,
+          "isDefault": false
+        },
+        {
+          "name": "csrfProtection",
+          "line": 137,
+          "isDefault": false
+        },
+        {
+          "name": "hideErrorDetails",
+          "line": 192,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "sanitizeValue",
+          "callee": "pattern.test",
+          "lineNumber": 62
+        },
+        {
+          "caller": "sanitizeValue",
+          "callee": "value.replace",
+          "lineNumber": 63
+        },
+        {
+          "caller": "sanitizeValue",
+          "callee": "value.trim",
+          "lineNumber": 67
+        },
+        {
+          "caller": "sanitizeValue",
+          "callee": "Array.isArray",
+          "lineNumber": 69
+        },
+        {
+          "caller": "sanitizeValue",
+          "callee": "value.map",
+          "lineNumber": 70
+        },
+        {
+          "caller": "sanitizeValue",
+          "callee": "Object.entries",
+          "lineNumber": 74
+        },
+        {
+          "caller": "sanitizeValue",
+          "callee": "sanitizeValue",
+          "lineNumber": 75
+        },
+        {
+          "caller": "inputSanitizer",
+          "callee": "sanitizeValue",
+          "lineNumber": 84
+        },
+        {
+          "caller": "inputSanitizer",
+          "callee": "Object.entries",
+          "lineNumber": 87
+        },
+        {
+          "caller": "inputSanitizer",
+          "callee": "val.trim",
+          "lineNumber": 89
+        },
+        {
+          "caller": "inputSanitizer",
+          "callee": "next",
+          "lineNumber": 93
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String(host || '').split(':')[0].replace(/^\\[|\\]$/g, '').toLowerCase",
+          "lineNumber": 124
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String(host || '').split(':')[0].replace",
+          "lineNumber": 124
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String(host || '').split",
+          "lineNumber": 124
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String",
+          "lineNumber": 124
+        },
+        {
+          "caller": "shouldBypassCsrf",
+          "callee": "CSRF_BYPASS_PREFIXES.some",
+          "lineNumber": 130
+        },
+        {
+          "caller": "shouldBypassCsrf",
+          "callee": "path.startsWith",
+          "lineNumber": 132
+        },
+        {
+          "caller": "shouldBypassCsrf",
+          "callee": "path.startsWith",
+          "lineNumber": 133
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "next",
+          "lineNumber": 139
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "SAFE_METHODS.has",
+          "lineNumber": 142
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "next",
+          "lineNumber": 143
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "shouldBypassCsrf",
+          "lineNumber": 146
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "next",
+          "lineNumber": 147
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "authHeader.startsWith",
+          "lineNumber": 153
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "next",
+          "lineNumber": 154
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "res.status(403).json",
+          "lineNumber": 161
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "res.status",
+          "lineNumber": 161
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "next",
+          "lineNumber": 170
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "isLocalHost",
+          "lineNumber": 172
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "isLocalHost",
+          "lineNumber": 172
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "next",
+          "lineNumber": 173
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "res.status(403).json",
+          "lineNumber": 176
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "res.status",
+          "lineNumber": 176
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "res.status(403).json",
+          "lineNumber": 182
+        },
+        {
+          "caller": "csrfProtection",
+          "callee": "res.status",
+          "lineNumber": 182
+        },
+        {
+          "caller": "hideErrorDetails",
+          "callee": "res.status(status).json",
+          "lineNumber": 201
+        },
+        {
+          "caller": "hideErrorDetails",
+          "callee": "res.status",
+          "lineNumber": 201
+        },
+        {
+          "caller": "hideErrorDetails",
+          "callee": "next",
+          "lineNumber": 203
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/sslEnforcement.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 69,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "isLocalHost",
+          "startLine": 24,
+          "endLine": 27,
+          "params": [
+            "host"
+          ]
+        },
+        {
+          "name": "enforceHttps",
+          "startLine": 33,
+          "endLine": 48,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        },
+        {
+          "name": "hstsHeader",
+          "startLine": 54,
+          "endLine": 64,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "enforceHttps",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "hstsHeader",
+          "line": 54,
+          "isDefault": false
+        },
+        {
+          "name": "sslEnforcement",
+          "line": 69,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isLocalHost",
+          "callee": "String(host || '').split(':')[0].replace(/^\\[|\\]$/g, '').toLowerCase",
+          "lineNumber": 25
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String(host || '').split(':')[0].replace",
+          "lineNumber": 25
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String(host || '').split",
+          "lineNumber": 25
+        },
+        {
+          "caller": "isLocalHost",
+          "callee": "String",
+          "lineNumber": 25
+        },
+        {
+          "caller": "enforceHttps",
+          "callee": "next",
+          "lineNumber": 34
+        },
+        {
+          "caller": "enforceHttps",
+          "callee": "isLocalHost",
+          "lineNumber": 35
+        },
+        {
+          "caller": "enforceHttps",
+          "callee": "isLocalHost",
+          "lineNumber": 35
+        },
+        {
+          "caller": "enforceHttps",
+          "callee": "next",
+          "lineNumber": 35
+        },
+        {
+          "caller": "enforceHttps",
+          "callee": "res.redirect",
+          "lineNumber": 44
+        },
+        {
+          "caller": "enforceHttps",
+          "callee": "next",
+          "lineNumber": 47
+        },
+        {
+          "caller": "hstsHeader",
+          "callee": "next",
+          "lineNumber": 55
+        },
+        {
+          "caller": "hstsHeader",
+          "callee": "isLocalHost",
+          "lineNumber": 56
+        },
+        {
+          "caller": "hstsHeader",
+          "callee": "isLocalHost",
+          "lineNumber": 56
+        },
+        {
+          "caller": "hstsHeader",
+          "callee": "next",
+          "lineNumber": 56
+        },
+        {
+          "caller": "hstsHeader",
+          "callee": "res.setHeader",
+          "lineNumber": 62
+        },
+        {
+          "caller": "hstsHeader",
+          "callee": "next",
+          "lineNumber": 63
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/validate.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 30,
+      "functions": [
+        {
+          "name": "validate",
+          "startLine": 9,
+          "endLine": 32,
+          "params": [
+            "schema"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validate",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "validate",
+          "callee": "schema.parse",
+          "lineNumber": 12
+        },
+        {
+          "caller": "validate",
+          "callee": "next",
+          "lineNumber": 13
+        },
+        {
+          "caller": "validate",
+          "callee": "error.issues.map",
+          "lineNumber": 16
+        },
+        {
+          "caller": "validate",
+          "callee": "e.path.join",
+          "lineNumber": 17
+        },
+        {
+          "caller": "validate",
+          "callee": "res.status(400).json",
+          "lineNumber": 20
+        },
+        {
+          "caller": "validate",
+          "callee": "res.status",
+          "lineNumber": 20
+        },
+        {
+          "caller": "validate",
+          "callee": "res.status(400).json",
+          "lineNumber": 26
+        },
+        {
+          "caller": "validate",
+          "callee": "res.status",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/validation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 443,
+      "nonEmptyLines": 405,
+      "functions": [
+        {
+          "name": "normalizeOrderType",
+          "startLine": 85,
+          "endLine": 105,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "normalizeMenuItemPayload",
+          "startLine": 275,
+          "endLine": 284,
+          "params": [
+            "value"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "anySchema",
+          "line": 52,
+          "isDefault": false
+        },
+        {
+          "name": "loginSchema",
+          "line": 58,
+          "isDefault": false
+        },
+        {
+          "name": "pinLoginSchema",
+          "line": 64,
+          "isDefault": false
+        },
+        {
+          "name": "mfaVerifySchema",
+          "line": 70,
+          "isDefault": false
+        },
+        {
+          "name": "setupPinSchema",
+          "line": 76,
+          "isDefault": false
+        },
+        {
+          "name": "createOrderSchema",
+          "line": 135,
+          "isDefault": false
+        },
+        {
+          "name": "updateOrderStatusSchema",
+          "line": 196,
+          "isDefault": false
+        },
+        {
+          "name": "createMenuItemSchema",
+          "line": 286,
+          "isDefault": false
+        },
+        {
+          "name": "updateMenuItemSchema",
+          "line": 288,
+          "isDefault": false
+        },
+        {
+          "name": "stockUpdateSchema",
+          "line": 297,
+          "isDefault": false
+        },
+        {
+          "name": "stockTransferSchema",
+          "line": 307,
+          "isDefault": false
+        },
+        {
+          "name": "updateSettingSchema",
+          "line": 321,
+          "isDefault": false
+        },
+        {
+          "name": "directStockReceiptSchema",
+          "line": 327,
+          "isDefault": false
+        },
+        {
+          "name": "createUserSchema",
+          "line": 344,
+          "isDefault": false
+        },
+        {
+          "name": "updateUserSchema",
+          "line": 376,
+          "isDefault": false
+        },
+        {
+          "name": "createJournalSchema",
+          "line": 416,
+          "isDefault": false
+        },
+        {
+          "name": "createRefundSchema",
+          "line": 431,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizeOrderType",
+          "callee": "String(value || '').trim().toUpperCase().replace",
+          "lineNumber": 86
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "String(value || '').trim().toUpperCase",
+          "lineNumber": 86
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "String(value || '').trim",
+          "lineNumber": 86
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "String",
+          "lineNumber": 86
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "/تيك|TAKE/.test",
+          "lineNumber": 87
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "/صالة|DINE/.test",
+          "lineNumber": 88
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "/دليفري|ديلفري|DELIVERY/.test",
+          "lineNumber": 89
+        },
+        {
+          "caller": "normalizeOrderType",
+          "callee": "/استلام|PICKUP/.test",
+          "lineNumber": 90
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 17,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/middleware/whatsappWebhookAuth.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 31,
+      "functions": [
+        {
+          "name": "safeEqual",
+          "startLine": 4,
+          "endLine": 9,
+          "params": [
+            "actual",
+            "expected"
+          ]
+        },
+        {
+          "name": "requireWhatsAppWebhookAuth",
+          "startLine": 11,
+          "endLine": 34,
+          "params": [
+            "req",
+            "res",
+            "next"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "requireWhatsAppWebhookAuth",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "safeEqual",
+          "callee": "Buffer.from",
+          "lineNumber": 5
+        },
+        {
+          "caller": "safeEqual",
+          "callee": "Buffer.from",
+          "lineNumber": 6
+        },
+        {
+          "caller": "safeEqual",
+          "callee": "crypto.timingSafeEqual",
+          "lineNumber": 8
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "Array.isArray",
+          "lineNumber": 12
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String(process.env.WHATSAPP_META_APP_SECRET || '').trim",
+          "lineNumber": 14
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String",
+          "lineNumber": 14
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status(503).json",
+          "lineNumber": 15
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status",
+          "lineNumber": 15
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String(req.headers['x-hub-signature-256'] || '').trim",
+          "lineNumber": 17
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String",
+          "lineNumber": 17
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "signature.startsWith",
+          "lineNumber": 18
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status(401).json",
+          "lineNumber": 19
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status",
+          "lineNumber": 19
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "crypto.createHmac('sha256', secret).update(rawBody).digest",
+          "lineNumber": 21
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "crypto.createHmac('sha256', secret).update",
+          "lineNumber": 21
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "crypto.createHmac",
+          "lineNumber": 21
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "safeEqual",
+          "lineNumber": 22
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status(401).json",
+          "lineNumber": 23
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status",
+          "lineNumber": 23
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "next",
+          "lineNumber": 25
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String(process.env.WHATSAPP_WEBHOOK_SECRET || '').trim",
+          "lineNumber": 28
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String",
+          "lineNumber": 28
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status(503).json",
+          "lineNumber": 29
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status",
+          "lineNumber": 29
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String",
+          "lineNumber": 30
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String(req.headers['x-webhook-token'] || (authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7) : '')).trim",
+          "lineNumber": 31
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "String",
+          "lineNumber": 31
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "authorization.toLowerCase().startsWith",
+          "lineNumber": 31
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "authorization.toLowerCase",
+          "lineNumber": 31
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "authorization.slice",
+          "lineNumber": 31
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "safeEqual",
+          "lineNumber": 32
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status(401).json",
+          "lineNumber": 32
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "res.status",
+          "lineNumber": 32
+        },
+        {
+          "caller": "requireWhatsAppWebhookAuth",
+          "callee": "next",
+          "lineNumber": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/core/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 24,
+      "nonEmptyLines": 21,
+      "metrics": {
+        "importCount": 9,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/finance/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 13,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/hr/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 13,
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/intelligence/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 12,
+      "nonEmptyLines": 9,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/inventory/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 28,
+      "nonEmptyLines": 24,
+      "metrics": {
+        "importCount": 10,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/marketing/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 13,
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/modules/pos/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 22,
+      "metrics": {
+        "importCount": 10,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/aggregatorAdminRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 17,
+      "nonEmptyLines": 13,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/aiRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 50,
+      "nonEmptyLines": 40,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/analyticsRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 9,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/approvalRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 21,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/attendanceOpsRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 865,
+      "nonEmptyLines": 788,
+      "functions": [
+        {
+          "name": "parseDateInput",
+          "startLine": 15,
+          "endLine": 22,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "parseSyncOptions",
+          "startLine": 24,
+          "endLine": 50,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "biometricErrorPayload",
+          "startLine": 52,
+          "endLine": 71,
+          "params": [
+            "error"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "parseDateInput",
+          "callee": "String",
+          "lineNumber": 17
+        },
+        {
+          "caller": "parseDateInput",
+          "callee": "Number.isNaN",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseDateInput",
+          "callee": "parsed.getTime",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseDateInput",
+          "callee": "String",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "parseDateInput",
+          "lineNumber": 25
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "parseDateInput",
+          "lineNumber": 26
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "String(input.fetchMode).toUpperCase",
+          "lineNumber": 32
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "String",
+          "lineNumber": 32
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "['AUTO', 'RECENT', 'ALL', 'RANGE'].includes",
+          "lineNumber": 33
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "Array.isArray",
+          "lineNumber": 37
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "input.deviceIds.map((item: unknown) => String(item)).filter",
+          "lineNumber": 38
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "input.deviceIds.map",
+          "lineNumber": 38
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "String",
+          "lineNumber": 38
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "Number",
+          "lineNumber": 45
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "Number",
+          "lineNumber": 46
+        },
+        {
+          "caller": "parseSyncOptions",
+          "callee": "String",
+          "lineNumber": 47
+        },
+        {
+          "caller": "biometricErrorPayload",
+          "callee": "String",
+          "lineNumber": 53
+        },
+        {
+          "caller": "biometricErrorPayload",
+          "callee": "code.startsWith",
+          "lineNumber": 60
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/auditRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 20,
+      "nonEmptyLines": 17,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/authRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 64,
+      "nonEmptyLines": 55,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/barcodeRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 23,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

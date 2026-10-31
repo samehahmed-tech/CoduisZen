@@ -1,0 +1,86 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/gateway-adapters/fawryAdapter.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/gateway-adapters/instaPayAdapter.ts",
+      "language": "typescript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/gateway-adapters/paymobAdapter.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/gateway-adapters/stripeAdapter.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/gateway-adapters/vodafoneCashAdapter.ts",
+      "language": "typescript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/payments/paymobService.ts",
+      "language": "typescript",
+      "sizeLines": 264,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/paymentGatewayService.ts",
+      "language": "typescript",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/paymob.test.ts",
+      "language": "typescript",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/gateway-adapters/fawryAdapter.ts": [
+      "server/services/paymentGatewayService.ts"
+    ],
+    "server/gateway-adapters/instaPayAdapter.ts": [
+      "server/modules/payments/paymobService.ts",
+      "server/services/paymentGatewayService.ts"
+    ],
+    "server/gateway-adapters/paymobAdapter.ts": [
+      "server/modules/payments/paymobService.ts",
+      "server/services/paymentGatewayService.ts"
+    ],
+    "server/gateway-adapters/stripeAdapter.ts": [
+      "server/services/paymentGatewayService.ts"
+    ],
+    "server/gateway-adapters/vodafoneCashAdapter.ts": [
+      "server/services/paymentGatewayService.ts"
+    ],
+    "server/modules/payments/paymobService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/paymentGatewayService.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/paymob.test.ts": [
+      "server/modules/payments/paymobService.ts"
+    ]
+  }
+}

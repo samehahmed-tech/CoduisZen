@@ -32,6 +32,7 @@ const HrReports = React.lazy(() => import('./reports/views/HrReports').then((mod
 const CrmReports = React.lazy(() => import('./reports/views/CrmReports').then((module) => ({ default: module.CrmReports })));
 const OpsReports = React.lazy(() => import('./reports/views/OpsReports').then((module) => ({ default: module.OpsReports })));
 const AiReports = React.lazy(() => import('./reports/views/AiReports').then((module) => ({ default: module.AiReports })));
+const ConsolidatedReport = React.lazy(() => import('./reports/views/ConsolidatedReport').then((module) => ({ default: module.ConsolidatedReport })));
 import { REPORT_CATEGORIES, downloadBlob, getExportReportType, getReportDisplayLabel, isTabularExportSupported } from './reports/reportConstants';
 
 type QuickRange = {
@@ -304,8 +305,8 @@ const Reports: React.FC = () => {
       const restaurantName = brand.restaurant;
       const dateRangeText = brand.rangeText;
       // Wide tables stay landscape; narrow summaries print portrait to save paper.
-      const tableCount = printableRootRef.current?.querySelector('.report-full-print table')?.rows?.[0]?.cells?.length
-         || printableRootRef.current?.querySelectorAll('table')[0]?.rows?.[0]?.cells?.length || 6;
+      const tableCount = (printableRootRef.current?.querySelector('.report-full-print table') as HTMLTableElement | null)?.rows?.[0]?.cells?.length
+         || (printableRootRef.current?.querySelectorAll('table')[0] as HTMLTableElement | undefined)?.rows?.[0]?.cells?.length || 6;
       const printOrientation = tableCount > 5 ? 'landscape' : 'portrait';
       // Print shell carries only the branded cover CSS (no app styles leak,
       // so dark mode can never bleed into the printout).
@@ -466,8 +467,8 @@ const Reports: React.FC = () => {
             rangeEnd: appliedRange.end,
             isArabic,
          });
-         const pdfTableCols = node.querySelector('.report-full-print table')?.rows?.[0]?.cells?.length
-            || node.querySelectorAll('table')[0]?.rows?.[0]?.cells?.length || 6;
+         const pdfTableCols = (node.querySelector('.report-full-print table') as HTMLTableElement | null)?.rows?.[0]?.cells?.length
+            || (node.querySelectorAll('table')[0] as HTMLTableElement | undefined)?.rows?.[0]?.cells?.length || 6;
          await downloadElementPdf(node, {
             filename: getSafeFileName(activeSubReport, appliedRange.start, appliedRange.end, 'pdf'),
             title: displaySubReportLabel,
@@ -948,6 +949,10 @@ const Reports: React.FC = () => {
                      <p className="text-xs font-semibold text-muted">{isArabic ? 'عرض وطباعة وPDF وExcel لكل التقارير' : 'view, print, PDF and Excel for every report'}</p>
                </div>
             </section>
+
+            <React.Suspense fallback={null}>
+               <ConsolidatedReport start={appliedRange.start} end={appliedRange.end} isArabic={isArabic} />
+            </React.Suspense>
 
             <section className="rounded-xl border border-border bg-card shadow-sm">
                <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-5">

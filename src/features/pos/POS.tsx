@@ -55,6 +55,7 @@ import { translations } from '@/services/translations';
 import { getActionableErrorMessage } from '@/services/api';
 import { kdsApi } from '@/services/api/kds';
 import { deliveryApi } from '@/services/api/delivery';
+import { createLocalKdsEvent, publishLocalKdsEvent } from '@/src/services/localKdsHub';
 
 // Stores
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -1756,6 +1757,9 @@ const POS: React.FC = () => {
          }
          (draftOrder as any).clientSubmitKey = submitKey;
          const savedOrder = await placeOrderOptimistically(draftOrder);
+         if (typeof navigator !== 'undefined' && (!navigator.onLine || String((savedOrder as any)?.syncStatus || '').toUpperCase() !== 'SYNCED')) {
+            publishLocalKdsEvent(createLocalKdsEvent('ORDER_UPSERTED', String(savedOrder.branchId || branchId), String(savedOrder.id)));
+         }
          const changedAt = Date.now();
          const changeDetail = { orderId: savedOrder.id, status: savedOrder.status, event: 'created', changedAt };
          window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));
@@ -1824,6 +1828,9 @@ const POS: React.FC = () => {
 
          // 1. Place Order in Store (Syncs with server which now handles inventory)
           const savedOrder = await placeOrderOptimistically(draftOrder);
+         if (typeof navigator !== 'undefined' && (!navigator.onLine || String((savedOrder as any)?.syncStatus || '').toUpperCase() !== 'SYNCED')) {
+            publishLocalKdsEvent(createLocalKdsEvent('ORDER_UPSERTED', String(savedOrder.branchId || branchId), String(savedOrder.id)));
+         }
          const changedAt = Date.now();
          const changeDetail = { orderId: savedOrder.id, status: savedOrder.status, event: 'created', changedAt };
          window.dispatchEvent(new CustomEvent('restoflow:orders-changed', { detail: changeDetail }));

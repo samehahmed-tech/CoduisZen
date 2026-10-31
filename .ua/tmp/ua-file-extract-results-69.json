@@ -1,0 +1,3707 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 25,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 21,
+      "failed": 0,
+      "skipped": 4
+    }
+  },
+  "results": [
+    {
+      "path": "components/common/Tag.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 42,
+      "functions": [
+        {
+          "name": "Tag",
+          "startLine": 30,
+          "endLine": 45,
+          "params": [
+            "{ label, color = 'neutral', onRemove, size = 'md', icon: Icon }"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/Timeline.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 57,
+      "nonEmptyLines": 52,
+      "functions": [
+        {
+          "name": "Timeline",
+          "startLine": 30,
+          "endLine": 55,
+          "params": [
+            "{ items }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "Timeline",
+          "callee": "items.map",
+          "lineNumber": 35
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/Toggle.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 44,
+      "nonEmptyLines": 40,
+      "functions": [
+        {
+          "name": "Toggle",
+          "startLine": 17,
+          "endLine": 42,
+          "params": [
+            "{ checked, onChange, label, description, size = 'md', disabled = false }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "Toggle",
+          "callee": "onChange",
+          "lineNumber": 28
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/Tooltip.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 62,
+      "nonEmptyLines": 53,
+      "functions": [
+        {
+          "name": "Tooltip",
+          "startLine": 34,
+          "endLine": 60,
+          "params": [
+            "{ content, children, position = 'top', delay = 200 }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "Tooltip",
+          "callee": "useState",
+          "lineNumber": 35
+        },
+        {
+          "caller": "Tooltip",
+          "callee": "useRef",
+          "lineNumber": 36
+        },
+        {
+          "caller": "show",
+          "callee": "setTimeout",
+          "lineNumber": 39
+        },
+        {
+          "caller": "show",
+          "callee": "setVisible",
+          "lineNumber": 39
+        },
+        {
+          "caller": "hide",
+          "callee": "clearTimeout",
+          "lineNumber": 43
+        },
+        {
+          "caller": "hide",
+          "callee": "setVisible",
+          "lineNumber": 44
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/DashboardCharts.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 125,
+      "nonEmptyLines": 117,
+      "exports": [
+        {
+          "name": "RevenueTrendChart",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "DaypartChart",
+          "line": 68,
+          "isDefault": false
+        },
+        {
+          "name": "HourlyChart",
+          "line": 92,
+          "isDefault": false
+        },
+        {
+          "name": "OrderSourceChart",
+          "line": 112,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/MetricSparkline.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 36,
+      "nonEmptyLines": 33,
+      "functions": [
+        {
+          "name": "MetricSparkline",
+          "startLine": 15,
+          "endLine": 34,
+          "params": [
+            "{ values, color, gradientId }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "MetricSparkline",
+          "callee": "values.map",
+          "lineNumber": 22
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/WidgetContainer.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 35,
+      "functions": [
+        {
+          "name": "WidgetContainer",
+          "startLine": 13,
+          "endLine": 37,
+          "params": [
+            "{ id, index, className, children, span = 'col-span-12' }"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/tiles/ModuleTile.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 126,
+      "nonEmptyLines": 116,
+      "functions": [
+        {
+          "name": "ModuleTile",
+          "startLine": 42,
+          "endLine": 124,
+          "params": [
+            "{\r\n    icon: Icon,\r\n    title,\r\n    sub,\r\n    label,\r\n    accentKey = 'slate',\r\n    badge = 0,\r\n    live = false,\r\n    count,\r\n    meta,\r\n    variant = 'standard',\r\n    delay = 0,\r\n    isFav = false,\r\n    chevronRtl = false,\r\n    spanClass,\r\n    stretch = false,\r\n    onOpen,\r\n    onToggleFav,\r\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SECTION_HEX",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "ModuleTile",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ModuleTile",
+          "callee": "useTiltEffect",
+          "lineNumber": 62
+        },
+        {
+          "caller": "ModuleTile",
+          "callee": "e.preventDefault",
+          "lineNumber": 73
+        },
+        {
+          "caller": "ModuleTile",
+          "callee": "onOpen",
+          "lineNumber": 73
+        },
+        {
+          "caller": "ModuleTile",
+          "callee": "Math.min",
+          "lineNumber": 79
+        },
+        {
+          "caller": "ModuleTile",
+          "callee": "e.stopPropagation",
+          "lineNumber": 116
+        },
+        {
+          "caller": "ModuleTile",
+          "callee": "onToggleFav",
+          "lineNumber": 116
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-12-whatsapp-baileys.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 158,
+      "nonEmptyLines": 131,
+      "sections": [
+        {
+          "heading": "WhatsApp Baileys Swap Implementation Plan",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Global Constraints",
+          "level": 2,
+          "line": 18
+        },
+        {
+          "heading": "Review Focus",
+          "level": 2,
+          "line": 26
+        },
+        {
+          "heading": "Files",
+          "level": 2,
+          "line": 33
+        },
+        {
+          "heading": "Task 1: Dependency swap",
+          "level": 3,
+          "line": 43
+        },
+        {
+          "heading": "Task 2: Baileys transport (connect, QR, pairing, send)",
+          "level": 3,
+          "line": 68
+        },
+        {
+          "heading": "Task 3: Incoming, receipts, STOP opt-out",
+          "level": 3,
+          "line": 107
+        },
+        {
+          "heading": "Task 4: Hub pairing-code UI + docs",
+          "level": 3,
+          "line": 132
+        },
+        {
+          "heading": "Task 5: Live verification (off-hours, needs human QR scan)",
+          "level": 3,
+          "line": 150
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 9
+      }
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-14-day-close-auto-close.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 179,
+      "nonEmptyLines": 123,
+      "sections": [
+        {
+          "heading": "Day-Close Auto-Close Implementation Plan",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Global Constraints",
+          "level": 2,
+          "line": 13
+        },
+        {
+          "heading": "Review Focus",
+          "level": 2,
+          "line": 21
+        },
+        {
+          "heading": "Task 1: Settings shape and server getter",
+          "level": 3,
+          "line": 31
+        },
+        {
+          "heading": "Task 2: Auto-close scheduler service and wiring",
+          "level": 3,
+          "line": 76
+        },
+        {
+          "heading": "Task 3: Settings UI (switch + time)",
+          "level": 3,
+          "line": 127
+        },
+        {
+          "heading": "Task 4: DayCloseHub result banner and auto-override badges",
+          "level": 3,
+          "line": 154
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-12-whatsapp-baileys-design.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 84,
+      "nonEmptyLines": 71,
+      "sections": [
+        {
+          "heading": "WhatsApp engine swap — design spec (2026-10-12)",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Brief",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Non-goals",
+          "level": 2,
+          "line": 9
+        },
+        {
+          "heading": "Architecture",
+          "level": 2,
+          "line": 14
+        },
+        {
+          "heading": "Session & pairing",
+          "level": 2,
+          "line": 35
+        },
+        {
+          "heading": "Queue & sending (unchanged behavior)",
+          "level": 2,
+          "line": 42
+        },
+        {
+          "heading": "Incoming & AI (unchanged)",
+          "level": 2,
+          "line": 49
+        },
+        {
+          "heading": "Receipts (new)",
+          "level": 2,
+          "line": 54
+        },
+        {
+          "heading": "Errors & reconnect",
+          "level": 2,
+          "line": 58
+        },
+        {
+          "heading": "Files",
+          "level": 2,
+          "line": 65
+        },
+        {
+          "heading": "Rollout",
+          "level": 2,
+          "line": 74
+        },
+        {
+          "heading": "Risks",
+          "level": 2,
+          "line": 80
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-14-day-close-auto-close-design.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 88,
+      "nonEmptyLines": 60,
+      "sections": [
+        {
+          "heading": "Day-Close Auto-Close — Design Spec",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "1. Intent",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "2. Approach (approved: A)",
+          "level": 2,
+          "line": 18
+        },
+        {
+          "heading": "3. Settings model",
+          "level": 2,
+          "line": 27
+        },
+        {
+          "heading": "4. Scheduler service",
+          "level": 2,
+          "line": 39
+        },
+        {
+          "heading": "5. Notifications and smarter display",
+          "level": 2,
+          "line": 50
+        },
+        {
+          "heading": "6. Edge cases",
+          "level": 2,
+          "line": 56
+        },
+        {
+          "heading": "7. Testing",
+          "level": 2,
+          "line": 64
+        },
+        {
+          "heading": "8. Files touched (expected)",
+          "level": 2,
+          "line": 70
+        },
+        {
+          "heading": "9. Self-review",
+          "level": 2,
+          "line": 80
+        },
+        {
+          "heading": "10. Prior production issue (out of scope, tracked separately)",
+          "level": 2,
+          "line": 86
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 11
+      }
+    },
+    {
+      "path": "drizzle.config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 12,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "drizzle/relations.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1334,
+      "nonEmptyLines": 1255,
+      "exports": [
+        {
+          "name": "goodsReceiptNotesRelations",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "branchesRelations",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "purchaseOrdersRelations",
+          "line": 111,
+          "isDefault": false
+        },
+        {
+          "name": "usersRelations",
+          "line": 124,
+          "isDefault": false
+        },
+        {
+          "name": "suppliersRelations",
+          "line": 193,
+          "isDefault": false
+        },
+        {
+          "name": "grnItemsRelations",
+          "line": 199,
+          "isDefault": false
+        },
+        {
+          "name": "inventoryItemsRelations",
+          "line": 214,
+          "isDefault": false
+        },
+        {
+          "name": "purchaseOrderItemsRelations",
+          "line": 224,
+          "isDefault": false
+        },
+        {
+          "name": "supplierInvoicesRelations",
+          "line": 236,
+          "isDefault": false
+        },
+        {
+          "name": "orderItemsRelations",
+          "line": 252,
+          "isDefault": false
+        },
+        {
+          "name": "menuItemsRelations",
+          "line": 263,
+          "isDefault": false
+        },
+        {
+          "name": "ordersRelations",
+          "line": 283,
+          "isDefault": false
+        },
+        {
+          "name": "supplierInvoiceItemsRelations",
+          "line": 297,
+          "isDefault": false
+        },
+        {
+          "name": "modifierOptionsRelations",
+          "line": 308,
+          "isDefault": false
+        },
+        {
+          "name": "modifierGroupsRelations",
+          "line": 315,
+          "isDefault": false
+        },
+        {
+          "name": "recipeVersionsRelations",
+          "line": 320,
+          "isDefault": false
+        },
+        {
+          "name": "recipesRelations",
+          "line": 331,
+          "isDefault": false
+        },
+        {
+          "name": "journalLinesRelations",
+          "line": 340,
+          "isDefault": false
+        },
+        {
+          "name": "chartOfAccountsRelations",
+          "line": 355,
+          "isDefault": false
+        },
+        {
+          "name": "costCentersRelations",
+          "line": 361,
+          "isDefault": false
+        },
+        {
+          "name": "journalEntriesRelations",
+          "line": 369,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceDeviceMappingsRelations",
+          "line": 373,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceDevicesRelations",
+          "line": 396,
+          "isDefault": false
+        },
+        {
+          "name": "employeesRelations",
+          "line": 427,
+          "isDefault": false
+        },
+        {
+          "name": "printersRelations",
+          "line": 483,
+          "isDefault": false
+        },
+        {
+          "name": "menuCategoriesRelations",
+          "line": 490,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceRawLogsRelations",
+          "line": 494,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceSyncRunsRelations",
+          "line": 549,
+          "isDefault": false
+        },
+        {
+          "name": "customerAddressesRelations",
+          "line": 573,
+          "isDefault": false
+        },
+        {
+          "name": "customersRelations",
+          "line": 580,
+          "isDefault": false
+        },
+        {
+          "name": "deliveryZonesRelations",
+          "line": 585,
+          "isDefault": false
+        },
+        {
+          "name": "floorZonesRelations",
+          "line": 592,
+          "isDefault": false
+        },
+        {
+          "name": "warehousesRelations",
+          "line": 600,
+          "isDefault": false
+        },
+        {
+          "name": "driversRelations",
+          "line": 615,
+          "isDefault": false
+        },
+        {
+          "name": "payrollCyclesRelations",
+          "line": 622,
+          "isDefault": false
+        },
+        {
+          "name": "managerApprovalsRelations",
+          "line": 638,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceGeofencesRelations",
+          "line": 649,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceSessionsRelations",
+          "line": 662,
+          "isDefault": false
+        },
+        {
+          "name": "tablesRelations",
+          "line": 717,
+          "isDefault": false
+        },
+        {
+          "name": "userSessionsRelations",
+          "line": 728,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceExceptionsRelations",
+          "line": 735,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceCorrectionsRelations",
+          "line": 798,
+          "isDefault": false
+        },
+        {
+          "name": "fiscalPeriodsRelations",
+          "line": 841,
+          "isDefault": false
+        },
+        {
+          "name": "inventoryBatchesRelations",
+          "line": 848,
+          "isDefault": false
+        },
+        {
+          "name": "attendancePoliciesRelations",
+          "line": 860,
+          "isDefault": false
+        },
+        {
+          "name": "shiftTemplatesRelations",
+          "line": 880,
+          "isDefault": false
+        },
+        {
+          "name": "paymentMethodAccountsRelations",
+          "line": 910,
+          "isDefault": false
+        },
+        {
+          "name": "taxAccountsRelations",
+          "line": 921,
+          "isDefault": false
+        },
+        {
+          "name": "inventoryStockRelations",
+          "line": 928,
+          "isDefault": false
+        },
+        {
+          "name": "employeeShiftAssignmentsRelations",
+          "line": 939,
+          "isDefault": false
+        },
+        {
+          "name": "domainEventsRelations",
+          "line": 972,
+          "isDefault": false
+        },
+        {
+          "name": "employeeLoansRelations",
+          "line": 979,
+          "isDefault": false
+        },
+        {
+          "name": "employeePayrollAssignmentsRelations",
+          "line": 1001,
+          "isDefault": false
+        },
+        {
+          "name": "payrollProfilesRelations",
+          "line": 1012,
+          "isDefault": false
+        },
+        {
+          "name": "leaveBalancesRelations",
+          "line": 1025,
+          "isDefault": false
+        },
+        {
+          "name": "loanInstallmentsRelations",
+          "line": 1032,
+          "isDefault": false
+        },
+        {
+          "name": "bonusPenaltyRecordsRelations",
+          "line": 1043,
+          "isDefault": false
+        },
+        {
+          "name": "shiftsRelations",
+          "line": 1068,
+          "isDefault": false
+        },
+        {
+          "name": "payrollPayoutsRelations",
+          "line": 1080,
+          "isDefault": false
+        },
+        {
+          "name": "payrollComponentsRelations",
+          "line": 1091,
+          "isDefault": false
+        },
+        {
+          "name": "payrollLocksRelations",
+          "line": 1099,
+          "isDefault": false
+        },
+        {
+          "name": "payrollRulesRelations",
+          "line": 1110,
+          "isDefault": false
+        },
+        {
+          "name": "onboardingRecordsRelations",
+          "line": 1125,
+          "isDefault": false
+        },
+        {
+          "name": "payrollRunsRelations",
+          "line": 1132,
+          "isDefault": false
+        },
+        {
+          "name": "payslipsRelations",
+          "line": 1155,
+          "isDefault": false
+        },
+        {
+          "name": "shiftTaskRunsRelations",
+          "line": 1174,
+          "isDefault": false
+        },
+        {
+          "name": "shiftTasksRelations",
+          "line": 1189,
+          "isDefault": false
+        },
+        {
+          "name": "shiftPlansRelations",
+          "line": 1197,
+          "isDefault": false
+        },
+        {
+          "name": "menuItemModifiersRelations",
+          "line": 1215,
+          "isDefault": false
+        },
+        {
+          "name": "orderStatusHistoryRelations",
+          "line": 1226,
+          "isDefault": false
+        },
+        {
+          "name": "paymentsRelations",
+          "line": 1233,
+          "isDefault": false
+        },
+        {
+          "name": "payrollRunLinesRelations",
+          "line": 1240,
+          "isDefault": false
+        },
+        {
+          "name": "shiftPlanEntriesRelations",
+          "line": 1251,
+          "isDefault": false
+        },
+        {
+          "name": "subscriptionsRelations",
+          "line": 1270,
+          "isDefault": false
+        },
+        {
+          "name": "subscriptionPlansRelations",
+          "line": 1281,
+          "isDefault": false
+        },
+        {
+          "name": "recipeIngredientsRelations",
+          "line": 1285,
+          "isDefault": false
+        },
+        {
+          "name": "stockMovementsRelations",
+          "line": 1296,
+          "isDefault": false
+        },
+        {
+          "name": "batchTransactionsRelations",
+          "line": 1314,
+          "isDefault": false
+        },
+        {
+          "name": "attendanceRelations",
+          "line": 1325,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 79,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "eslint.config.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 48,
+      "nonEmptyLines": 47,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hardware-bridge/index.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 914,
+      "nonEmptyLines": 875,
+      "functions": [
+        {
+          "name": "tempToken",
+          "startLine": 52,
+          "endLine": 52,
+          "params": [
+            "prefix"
+          ]
+        },
+        {
+          "name": "log",
+          "startLine": 58,
+          "endLine": 58,
+          "params": [
+            "msg"
+          ]
+        },
+        {
+          "name": "refreshLastError",
+          "startLine": 59,
+          "endLine": 61,
+          "params": []
+        },
+        {
+          "name": "loadPendingReports",
+          "startLine": 62,
+          "endLine": 67,
+          "params": []
+        },
+        {
+          "name": "loadCompletedJobs",
+          "startLine": 69,
+          "endLine": 79,
+          "params": []
+        },
+        {
+          "name": "saveCompletedJobs",
+          "startLine": 81,
+          "endLine": 85,
+          "params": []
+        },
+        {
+          "name": "rememberCompletedJob",
+          "startLine": 86,
+          "endLine": 90,
+          "params": [
+            "jobId"
+          ]
+        },
+        {
+          "name": "savePendingReports",
+          "startLine": 91,
+          "endLine": 95,
+          "params": []
+        },
+        {
+          "name": "fetchJson",
+          "startLine": 102,
+          "endLine": 120,
+          "params": [
+            "url"
+          ]
+        },
+        {
+          "name": "bridgeFetch",
+          "startLine": 122,
+          "endLine": 122,
+          "params": [
+            "path"
+          ]
+        },
+        {
+          "name": "scheduleSseReconnect",
+          "startLine": 131,
+          "endLine": 138,
+          "params": []
+        },
+        {
+          "name": "connectSse",
+          "startLine": 139,
+          "endLine": 216,
+          "params": []
+        },
+        {
+          "name": "removeTempFile",
+          "startLine": 217,
+          "endLine": 219,
+          "params": [
+            "file"
+          ]
+        },
+        {
+          "name": "listWindowsPrinters",
+          "startLine": 222,
+          "endLine": 254,
+          "params": []
+        },
+        {
+          "name": "isPdfPrinterName",
+          "startLine": 257,
+          "endLine": 257,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "ensurePdfOutDir",
+          "startLine": 258,
+          "endLine": 262,
+          "params": []
+        },
+        {
+          "name": "printPngFile",
+          "startLine": 263,
+          "endLine": 315,
+          "params": [
+            "printerName",
+            "pngPath"
+          ]
+        },
+        {
+          "name": "printImage",
+          "startLine": 317,
+          "endLine": 324,
+          "params": [
+            "printerName",
+            "imageBase64"
+          ]
+        },
+        {
+          "name": "renderTextPng",
+          "startLine": 330,
+          "endLine": 378,
+          "params": [
+            "text"
+          ]
+        },
+        {
+          "name": "printTextLegacy",
+          "startLine": 380,
+          "endLine": 398,
+          "params": [
+            "printerName",
+            "text"
+          ]
+        },
+        {
+          "name": "printText",
+          "startLine": 404,
+          "endLine": 416,
+          "params": [
+            "printerName",
+            "text"
+          ]
+        },
+        {
+          "name": "printRawWindows",
+          "startLine": 418,
+          "endLine": 477,
+          "params": [
+            "printerName",
+            "content"
+          ]
+        },
+        {
+          "name": "cutWindowsPaper",
+          "startLine": 479,
+          "endLine": 487,
+          "params": [
+            "printerName"
+          ]
+        },
+        {
+          "name": "renderNetworkRaster",
+          "startLine": 489,
+          "endLine": 593,
+          "params": [
+            "content",
+            "contentType"
+          ]
+        },
+        {
+          "name": "sendTcpPayload",
+          "startLine": 598,
+          "endLine": 640,
+          "params": [
+            "address",
+            "payload"
+          ]
+        },
+        {
+          "name": "printRawTcp",
+          "startLine": 642,
+          "endLine": 647,
+          "params": [
+            "address",
+            "content",
+            "contentType"
+          ]
+        },
+        {
+          "name": "executePrint",
+          "startLine": 649,
+          "endLine": 680,
+          "params": [
+            "job"
+          ]
+        },
+        {
+          "name": "reportJobStatus",
+          "startLine": 685,
+          "endLine": 694,
+          "params": [
+            "job",
+            "outcome"
+          ]
+        },
+        {
+          "name": "flushPendingReports",
+          "startLine": 696,
+          "endLine": 721,
+          "params": []
+        },
+        {
+          "name": "runPrintJob",
+          "startLine": 723,
+          "endLine": 764,
+          "params": [
+            "job"
+          ]
+        },
+        {
+          "name": "dispatchPrintJob",
+          "startLine": 771,
+          "endLine": 787,
+          "params": [
+            "job"
+          ]
+        },
+        {
+          "name": "tick",
+          "startLine": 790,
+          "endLine": 840,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "tempToken",
+          "callee": "Date.now",
+          "lineNumber": 52
+        },
+        {
+          "caller": "tempToken",
+          "callee": "Math.random().toString(36).slice",
+          "lineNumber": 52
+        },
+        {
+          "caller": "tempToken",
+          "callee": "Math.random().toString",
+          "lineNumber": 52
+        },
+        {
+          "caller": "tempToken",
+          "callee": "Math.random",
+          "lineNumber": 52
+        },
+        {
+          "caller": "log",
+          "callee": "new Date().toISOString",
+          "lineNumber": 58
+        },
+        {
+          "caller": "log",
+          "callee": "logStream.write",
+          "lineNumber": 58
+        },
+        {
+          "caller": "log",
+          "callee": "console.log",
+          "lineNumber": 58
+        },
+        {
+          "caller": "log",
+          "callee": "line.trim",
+          "lineNumber": 58
+        },
+        {
+          "caller": "loadPendingReports",
+          "callee": "JSON.parse",
+          "lineNumber": 64
+        },
+        {
+          "caller": "loadPendingReports",
+          "callee": "fs.readFileSync",
+          "lineNumber": 64
+        },
+        {
+          "caller": "loadPendingReports",
+          "callee": "Array.isArray",
+          "lineNumber": 65
+        },
+        {
+          "caller": "loadPendingReports",
+          "callee": "rows.map",
+          "lineNumber": 65
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "JSON.parse",
+          "lineNumber": 71
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "fs.readFileSync",
+          "lineNumber": 71
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "Array.isArray",
+          "lineNumber": 72
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "Date.now",
+          "lineNumber": 73
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "rows\r\n            .filter(row => row && row.id && Number(row.at) >= cutoff)\r\n            .slice(-2000)\r\n            .map",
+          "lineNumber": 74
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "rows\r\n            .filter(row => row && row.id && Number(row.at) >= cutoff)\r\n            .slice",
+          "lineNumber": 74
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "rows\r\n            .filter",
+          "lineNumber": 74
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "Number",
+          "lineNumber": 75
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "String",
+          "lineNumber": 77
+        },
+        {
+          "caller": "loadCompletedJobs",
+          "callee": "Number",
+          "lineNumber": 77
+        },
+        {
+          "caller": "saveCompletedJobs",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 83
+        },
+        {
+          "caller": "saveCompletedJobs",
+          "callee": "JSON.stringify",
+          "lineNumber": 83
+        },
+        {
+          "caller": "saveCompletedJobs",
+          "callee": "[...completedJobs.entries()].map(([id, at]) => ({ id, at })).slice",
+          "lineNumber": 83
+        },
+        {
+          "caller": "saveCompletedJobs",
+          "callee": "[...completedJobs.entries()].map",
+          "lineNumber": 83
+        },
+        {
+          "caller": "saveCompletedJobs",
+          "callee": "completedJobs.entries",
+          "lineNumber": 83
+        },
+        {
+          "caller": "saveCompletedJobs",
+          "callee": "fs.renameSync",
+          "lineNumber": 84
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "completedJobs.set",
+          "lineNumber": 87
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "String",
+          "lineNumber": 87
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "Date.now",
+          "lineNumber": 87
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "completedJobs.delete",
+          "lineNumber": 88
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "completedJobs.keys().next",
+          "lineNumber": 88
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "completedJobs.keys",
+          "lineNumber": 88
+        },
+        {
+          "caller": "rememberCompletedJob",
+          "callee": "saveCompletedJobs",
+          "lineNumber": 89
+        },
+        {
+          "caller": "savePendingReports",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 93
+        },
+        {
+          "caller": "savePendingReports",
+          "callee": "JSON.stringify",
+          "lineNumber": 93
+        },
+        {
+          "caller": "savePendingReports",
+          "callee": "pendingReports.values",
+          "lineNumber": 93
+        },
+        {
+          "caller": "savePendingReports",
+          "callee": "fs.renameSync",
+          "lineNumber": 94
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "setTimeout",
+          "lineNumber": 104
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "controller.abort",
+          "lineNumber": 104
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "fetch",
+          "lineNumber": 106
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "res.text().catch",
+          "lineNumber": 108
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "res.text",
+          "lineNumber": 108
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "text.slice",
+          "lineNumber": 109
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "res.json",
+          "lineNumber": 113
+        },
+        {
+          "caller": "fetchJson",
+          "callee": "clearTimeout",
+          "lineNumber": 118
+        },
+        {
+          "caller": "bridgeFetch",
+          "callee": "fetchJson",
+          "lineNumber": 122
+        },
+        {
+          "caller": "scheduleSseReconnect",
+          "callee": "setTimeout",
+          "lineNumber": 134
+        },
+        {
+          "caller": "scheduleSseReconnect",
+          "callee": "connectSse",
+          "lineNumber": 136
+        },
+        {
+          "caller": "connectSse",
+          "callee": "endpoint.searchParams.set",
+          "lineNumber": 143
+        },
+        {
+          "caller": "connectSse",
+          "callee": "endpoint.searchParams.set",
+          "lineNumber": 144
+        },
+        {
+          "caller": "connectSse",
+          "callee": "require",
+          "lineNumber": 145
+        },
+        {
+          "caller": "connectSse",
+          "callee": "transport.get",
+          "lineNumber": 146
+        },
+        {
+          "caller": "connectSse",
+          "callee": "log",
+          "lineNumber": 156
+        },
+        {
+          "caller": "connectSse",
+          "callee": "response.resume",
+          "lineNumber": 157
+        },
+        {
+          "caller": "connectSse",
+          "callee": "scheduleSseReconnect",
+          "lineNumber": 159
+        },
+        {
+          "caller": "connectSse",
+          "callee": "new Date().toISOString",
+          "lineNumber": 164
+        },
+        {
+          "caller": "connectSse",
+          "callee": "refreshLastError",
+          "lineNumber": 166
+        },
+        {
+          "caller": "connectSse",
+          "callee": "log",
+          "lineNumber": 167
+        },
+        {
+          "caller": "close",
+          "callee": "log",
+          "lineNumber": 176
+        },
+        {
+          "caller": "close",
+          "callee": "scheduleSseReconnect",
+          "lineNumber": 177
+        },
+        {
+          "caller": "connectSse",
+          "callee": "response.setEncoding",
+          "lineNumber": 179
+        },
+        {
+          "caller": "connectSse",
+          "callee": "response.on",
+          "lineNumber": 180
+        },
+        {
+          "caller": "connectSse",
+          "callee": "buffer.indexOf",
+          "lineNumber": 183
+        },
+        {
+          "caller": "connectSse",
+          "callee": "buffer.slice",
+          "lineNumber": 184
+        },
+        {
+          "caller": "connectSse",
+          "callee": "buffer.slice",
+          "lineNumber": 185
+        },
+        {
+          "caller": "connectSse",
+          "callee": "block.split(/\\r?\\n/).find",
+          "lineNumber": 186
+        },
+        {
+          "caller": "connectSse",
+          "callee": "block.split",
+          "lineNumber": 186
+        },
+        {
+          "caller": "connectSse",
+          "callee": "line.startsWith",
+          "lineNumber": 186
+        },
+        {
+          "caller": "connectSse",
+          "callee": "JSON.parse",
+          "lineNumber": 189
+        },
+        {
+          "caller": "connectSse",
+          "callee": "dataLine.slice(5).trim",
+          "lineNumber": 189
+        },
+        {
+          "caller": "connectSse",
+          "callee": "dataLine.slice",
+          "lineNumber": 189
+        },
+        {
+          "caller": "connectSse",
+          "callee": "dispatchPrintJob",
+          "lineNumber": 193
+        },
+        {
+          "caller": "connectSse",
+          "callee": "log",
+          "lineNumber": 196
+        },
+        {
+          "caller": "connectSse",
+          "callee": "response.on",
+          "lineNumber": 200
+        },
+        {
+          "caller": "connectSse",
+          "callee": "response.on",
+          "lineNumber": 201
+        },
+        {
+          "caller": "connectSse",
+          "callee": "request.on",
+          "lineNumber": 204
+        },
+        {
+          "caller": "connectSse",
+          "callee": "request.destroy",
+          "lineNumber": 204
+        },
+        {
+          "caller": "connectSse",
+          "callee": "request.on",
+          "lineNumber": 205
+        },
+        {
+          "caller": "connectSse",
+          "callee": "log",
+          "lineNumber": 207
+        },
+        {
+          "caller": "connectSse",
+          "callee": "refreshLastError",
+          "lineNumber": 209
+        },
+        {
+          "caller": "connectSse",
+          "callee": "scheduleSseReconnect",
+          "lineNumber": 210
+        },
+        {
+          "caller": "connectSse",
+          "callee": "log",
+          "lineNumber": 213
+        },
+        {
+          "caller": "connectSse",
+          "callee": "scheduleSseReconnect",
+          "lineNumber": 214
+        },
+        {
+          "caller": "removeTempFile",
+          "callee": "fs.rm",
+          "lineNumber": 217
+        },
+        {
+          "caller": "removeTempFile",
+          "callee": "log",
+          "lineNumber": 218
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "execFile",
+          "lineNumber": 224
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "refreshLastError",
+          "lineNumber": 227
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "log",
+          "lineNumber": 228
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "resolve",
+          "lineNumber": 229
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "JSON.parse",
+          "lineNumber": 233
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "String(stdout || '[]').trim",
+          "lineNumber": 233
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "String",
+          "lineNumber": 233
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "Array.isArray",
+          "lineNumber": 234
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "rows.filter(Boolean).map",
+          "lineNumber": 235
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "rows.filter",
+          "lineNumber": 235
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "Boolean",
+          "lineNumber": 240
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "refreshLastError",
+          "lineNumber": 245
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "resolve",
+          "lineNumber": 246
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "refreshLastError",
+          "lineNumber": 249
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "log",
+          "lineNumber": 250
+        },
+        {
+          "caller": "listWindowsPrinters",
+          "callee": "resolve",
+          "lineNumber": 251
+        },
+        {
+          "caller": "isPdfPrinterName",
+          "callee": "/pdf|print\\s*to\\s*pdf|save\\s*as\\s*pdf/i.test",
+          "lineNumber": 257
+        },
+        {
+          "caller": "isPdfPrinterName",
+          "callee": "String",
+          "lineNumber": 257
+        },
+        {
+          "caller": "ensurePdfOutDir",
+          "callee": "path.join",
+          "lineNumber": 259
+        },
+        {
+          "caller": "ensurePdfOutDir",
+          "callee": "os.homedir",
+          "lineNumber": 259
+        },
+        {
+          "caller": "ensurePdfOutDir",
+          "callee": "fs.existsSync",
+          "lineNumber": 260
+        },
+        {
+          "caller": "ensurePdfOutDir",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 260
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "isPdfPrinterName",
+          "lineNumber": 268
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "path.join",
+          "lineNumber": 270
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "ensurePdfOutDir",
+          "lineNumber": 270
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "tempToken",
+          "lineNumber": 270
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "execFile",
+          "lineNumber": 304
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "reject",
+          "lineNumber": 309
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "log",
+          "lineNumber": 311
+        },
+        {
+          "caller": "printPngFile",
+          "callee": "resolve",
+          "lineNumber": 312
+        },
+        {
+          "caller": "printImage",
+          "callee": "path.join",
+          "lineNumber": 318
+        },
+        {
+          "caller": "printImage",
+          "callee": "os.tmpdir",
+          "lineNumber": 318
+        },
+        {
+          "caller": "printImage",
+          "callee": "tempToken",
+          "lineNumber": 318
+        },
+        {
+          "caller": "printImage",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 319
+        },
+        {
+          "caller": "printImage",
+          "callee": "Buffer.from",
+          "lineNumber": 319
+        },
+        {
+          "caller": "printImage",
+          "callee": "printPngFile(printerName, tmpFile).then",
+          "lineNumber": 320
+        },
+        {
+          "caller": "printImage",
+          "callee": "printPngFile",
+          "lineNumber": 320
+        },
+        {
+          "caller": "printImage",
+          "callee": "removeTempFile",
+          "lineNumber": 321
+        },
+        {
+          "caller": "printImage",
+          "callee": "removeTempFile",
+          "lineNumber": 322
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "path.join",
+          "lineNumber": 331
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "os.tmpdir",
+          "lineNumber": 331
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "tempToken",
+          "lineNumber": 331
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 333
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "String",
+          "lineNumber": 333
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "execFile",
+          "lineNumber": 369
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "String",
+          "lineNumber": 372
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "String",
+          "lineNumber": 372
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "removeTempFile",
+          "lineNumber": 374
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "removeTempFile",
+          "lineNumber": 375
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "reject",
+          "lineNumber": 375
+        },
+        {
+          "caller": "renderTextPng",
+          "callee": "resolve",
+          "lineNumber": 376
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "path.join",
+          "lineNumber": 382
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "os.tmpdir",
+          "lineNumber": 382
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "tempToken",
+          "lineNumber": 382
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 384
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "execFile",
+          "lineNumber": 386
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "removeTempFile",
+          "lineNumber": 390
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "reject",
+          "lineNumber": 392
+        },
+        {
+          "caller": "printTextLegacy",
+          "callee": "resolve",
+          "lineNumber": 394
+        },
+        {
+          "caller": "printText",
+          "callee": "renderTextPng",
+          "lineNumber": 406
+        },
+        {
+          "caller": "printText",
+          "callee": "printPngFile",
+          "lineNumber": 408
+        },
+        {
+          "caller": "printText",
+          "callee": "removeTempFile",
+          "lineNumber": 410
+        },
+        {
+          "caller": "printText",
+          "callee": "log",
+          "lineNumber": 413
+        },
+        {
+          "caller": "printText",
+          "callee": "printTextLegacy",
+          "lineNumber": 414
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "path.join",
+          "lineNumber": 419
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "os.tmpdir",
+          "lineNumber": 419
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "tempToken",
+          "lineNumber": 419
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 420
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "Buffer.from",
+          "lineNumber": 420
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "execFile",
+          "lineNumber": 469
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "removeTempFile",
+          "lineNumber": 473
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "reject",
+          "lineNumber": 474
+        },
+        {
+          "caller": "printRawWindows",
+          "callee": "resolve",
+          "lineNumber": 475
+        },
+        {
+          "caller": "cutWindowsPaper",
+          "callee": "printRawWindows",
+          "lineNumber": 481
+        },
+        {
+          "caller": "cutWindowsPaper",
+          "callee": "log",
+          "lineNumber": 485
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "String(content).replace",
+          "lineNumber": 491
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "String",
+          "lineNumber": 491
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "Promise.resolve",
+          "lineNumber": 492
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "pngToEscPos",
+          "lineNumber": 492
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "Buffer.from",
+          "lineNumber": 492
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "path.join",
+          "lineNumber": 495
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "os.tmpdir",
+          "lineNumber": 495
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "tempToken",
+          "lineNumber": 495
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "String(content).replace",
+          "lineNumber": 497
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "String",
+          "lineNumber": 497
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "String",
+          "lineNumber": 497
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 498
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "Buffer.from",
+          "lineNumber": 498
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "execFile",
+          "lineNumber": 580
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "removeTempFile",
+          "lineNumber": 585
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "removeTempFile",
+          "lineNumber": 586
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "reject",
+          "lineNumber": 586
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "fs.readFile",
+          "lineNumber": 587
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "removeTempFile",
+          "lineNumber": 588
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "reject",
+          "lineNumber": 589
+        },
+        {
+          "caller": "renderNetworkRaster",
+          "callee": "resolve",
+          "lineNumber": 589
+        },
+        {
+          "caller": "sendTcpPayload",
+          "callee": "String(address).replace",
+          "lineNumber": 599
+        },
+        {
+          "caller": "sendTcpPayload",
+          "callee": "String",
+          "lineNumber": 599
+        },
+        {
+          "caller": "sendTcpPayload",
+          "callee": "target.split",
+          "lineNumber": 600
+        },
+        {
+          "caller": "sendTcpPayload",
+          "callee": "Number",
+          "lineNumber": 601
+        },
+        {
+          "caller": "sendTcpPayload",
+          "callee": "reject",
+          "lineNumber": 602
+        },
+        {
+          "caller": "retryOrReject",
+          "callee": "setTimeout",
+          "lineNumber": 615
+        },
+        {
+          "caller": "retryOrReject",
+          "callee": "reject",
+          "lineNumber": 619
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "net.createConnection",
+          "lineNumber": 621
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "socket.end",
+          "lineNumber": 622
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "socket.on",
+          "lineNumber": 624
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "resolve",
+          "lineNumber": 629
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "retryOrReject",
+          "lineNumber": 632
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "socket.on",
+          "lineNumber": 634
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "socket.destroy",
+          "lineNumber": 634
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "socket.on",
+          "lineNumber": 635
+        },
+        {
+          "caller": "tryOnce",
+          "callee": "retryOrReject",
+          "lineNumber": 636
+        },
+        {
+          "caller": "sendTcpPayload",
+          "callee": "tryOnce",
+          "lineNumber": 639
+        },
+        {
+          "caller": "printRawTcp",
+          "callee": "Buffer.from",
+          "lineNumber": 644
+        },
+        {
+          "caller": "printRawTcp",
+          "callee": "renderNetworkRaster",
+          "lineNumber": 645
+        },
+        {
+          "caller": "printRawTcp",
+          "callee": "sendTcpPayload",
+          "lineNumber": 646
+        },
+        {
+          "caller": "executePrint",
+          "callee": "String(job.contentType || job.content_type || 'text').toLowerCase",
+          "lineNumber": 651
+        },
+        {
+          "caller": "executePrint",
+          "callee": "String",
+          "lineNumber": 651
+        },
+        {
+          "caller": "executePrint",
+          "callee": "String(job.printerType || job.printer_type || '').toUpperCase",
+          "lineNumber": 652
+        },
+        {
+          "caller": "executePrint",
+          "callee": "String",
+          "lineNumber": 652
+        },
+        {
+          "caller": "executePrint",
+          "callee": "listWindowsPrinters",
+          "lineNumber": 654
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printers.find",
+          "lineNumber": 655
+        },
+        {
+          "caller": "executePrint",
+          "callee": "address.startsWith",
+          "lineNumber": 657
+        },
+        {
+          "caller": "executePrint",
+          "callee": "address.slice",
+          "lineNumber": 657
+        },
+        {
+          "caller": "executePrint",
+          "callee": "log",
+          "lineNumber": 659
+        },
+        {
+          "caller": "executePrint",
+          "callee": "address.startsWith",
+          "lineNumber": 661
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printRawTcp",
+          "lineNumber": 661
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printImage",
+          "lineNumber": 663
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printRawWindows",
+          "lineNumber": 665
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printText",
+          "lineNumber": 666
+        },
+        {
+          "caller": "executePrint",
+          "callee": "listWindowsPrinters",
+          "lineNumber": 668
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printers.find",
+          "lineNumber": 669
+        },
+        {
+          "caller": "executePrint",
+          "callee": "fallback.address.replace",
+          "lineNumber": 671
+        },
+        {
+          "caller": "executePrint",
+          "callee": "log",
+          "lineNumber": 672
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printImage",
+          "lineNumber": 674
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printRawWindows",
+          "lineNumber": 676
+        },
+        {
+          "caller": "executePrint",
+          "callee": "printText",
+          "lineNumber": 677
+        },
+        {
+          "caller": "executePrint",
+          "callee": "log",
+          "lineNumber": 679
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "bridgeFetch",
+          "lineNumber": 686
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "encodeURIComponent",
+          "lineNumber": 686
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "JSON.stringify",
+          "lineNumber": 688
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "errorMessage.slice",
+          "lineNumber": 688
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "pendingReports.delete",
+          "lineNumber": 690
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "savePendingReports",
+          "lineNumber": 691
+        },
+        {
+          "caller": "reportJobStatus",
+          "callee": "refreshLastError",
+          "lineNumber": 693
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "pendingReports.values",
+          "lineNumber": 702
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "reportJobStatus",
+          "lineNumber": 704
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "pendingReports.delete",
+          "lineNumber": 707
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "savePendingReports",
+          "lineNumber": 708
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "refreshLastError",
+          "lineNumber": 710
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "log",
+          "lineNumber": 711
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "report.outcome.toUpperCase",
+          "lineNumber": 714
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "refreshLastError",
+          "lineNumber": 715
+        },
+        {
+          "caller": "flushPendingReports",
+          "callee": "log",
+          "lineNumber": 716
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "inFlight.has",
+          "lineNumber": 724
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "inFlight.add",
+          "lineNumber": 725
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "completedJobs.has",
+          "lineNumber": 729
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "String",
+          "lineNumber": 729
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "log",
+          "lineNumber": 730
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "reportJobStatus",
+          "lineNumber": 731
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "executePrint",
+          "lineNumber": 734
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "rememberCompletedJob",
+          "lineNumber": 737
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "refreshLastError",
+          "lineNumber": 740
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "pendingReports.set",
+          "lineNumber": 741
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "savePendingReports",
+          "lineNumber": 742
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "reportJobStatus",
+          "lineNumber": 743
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "refreshLastError",
+          "lineNumber": 745
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "log",
+          "lineNumber": 746
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "refreshLastError",
+          "lineNumber": 751
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "log",
+          "lineNumber": 752
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "pendingReports.set",
+          "lineNumber": 753
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "savePendingReports",
+          "lineNumber": 754
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "reportJobStatus",
+          "lineNumber": 755
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "refreshLastError",
+          "lineNumber": 757
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "log",
+          "lineNumber": 758
+        },
+        {
+          "caller": "runPrintJob",
+          "callee": "inFlight.delete",
+          "lineNumber": 761
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "inFlight.has",
+          "lineNumber": 772
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "pendingPrintJobs.some",
+          "lineNumber": 772
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "pendingPrintJobs.push",
+          "lineNumber": 773
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "(async () => {\r\n        try {\r\n            while (pendingPrintJobs.length) {\r\n                const next = pendingPrintJobs.shift();\r\n                await runPrintJob(next);\r\n            }\r\n        } finally {\r\n            printPumpRunning = false;\r\n            if (pendingPrintJobs.length) dispatchPrintJob(pendingPrintJobs.shift());\r\n        }\r\n    })().catch",
+          "lineNumber": 776
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "(async () => {\r\n        try {\r\n            while (pendingPrintJobs.length) {\r\n                const next = pendingPrintJobs.shift();\r\n                await runPrintJob(next);\r\n            }\r\n        } finally {\r\n            printPumpRunning = false;\r\n            if (pendingPrintJobs.length) dispatchPrintJob(pendingPrintJobs.shift());\r\n        }\r\n    })",
+          "lineNumber": 776
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "pendingPrintJobs.shift",
+          "lineNumber": 779
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "runPrintJob",
+          "lineNumber": 780
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "dispatchPrintJob",
+          "lineNumber": 784
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "pendingPrintJobs.shift",
+          "lineNumber": 784
+        },
+        {
+          "caller": "dispatchPrintJob",
+          "callee": "log",
+          "lineNumber": 786
+        },
+        {
+          "caller": "tick",
+          "callee": "new Date().toISOString",
+          "lineNumber": 793
+        },
+        {
+          "caller": "tick",
+          "callee": "flushPendingReports().catch",
+          "lineNumber": 797
+        },
+        {
+          "caller": "tick",
+          "callee": "flushPendingReports",
+          "lineNumber": 797
+        },
+        {
+          "caller": "tick",
+          "callee": "Date.now",
+          "lineNumber": 800
+        },
+        {
+          "caller": "tick",
+          "callee": "Date.now",
+          "lineNumber": 801
+        },
+        {
+          "caller": "tick",
+          "callee": "listWindowsPrinters",
+          "lineNumber": 802
+        },
+        {
+          "caller": "tick",
+          "callee": "(runtime.printers || [])\r\n            .flatMap(p => [p.name, `windows:${p.name}`])\r\n            .filter",
+          "lineNumber": 804
+        },
+        {
+          "caller": "tick",
+          "callee": "(runtime.printers || [])\r\n            .flatMap",
+          "lineNumber": 804
+        },
+        {
+          "caller": "tick",
+          "callee": "encodeURIComponent",
+          "lineNumber": 808
+        },
+        {
+          "caller": "tick",
+          "callee": "printerNames.slice(0, 100).join",
+          "lineNumber": 808
+        },
+        {
+          "caller": "tick",
+          "callee": "printerNames.slice",
+          "lineNumber": 808
+        },
+        {
+          "caller": "tick",
+          "callee": "Date.now",
+          "lineNumber": 817
+        },
+        {
+          "caller": "tick",
+          "callee": "Date.now",
+          "lineNumber": 818
+        },
+        {
+          "caller": "tick",
+          "callee": "bridgeFetch",
+          "lineNumber": 820
+        },
+        {
+          "caller": "tick",
+          "callee": "encodeURIComponent",
+          "lineNumber": 821
+        },
+        {
+          "caller": "tick",
+          "callee": "new Date().toISOString",
+          "lineNumber": 824
+        },
+        {
+          "caller": "tick",
+          "callee": "refreshLastError",
+          "lineNumber": 826
+        },
+        {
+          "caller": "tick",
+          "callee": "dispatchPrintJob",
+          "lineNumber": 829
+        },
+        {
+          "caller": "tick",
+          "callee": "String(error.message || error).slice",
+          "lineNumber": 833
+        },
+        {
+          "caller": "tick",
+          "callee": "String",
+          "lineNumber": 833
+        },
+        {
+          "caller": "tick",
+          "callee": "log",
+          "lineNumber": 834
+        },
+        {
+          "caller": "tick",
+          "callee": "refreshLastError",
+          "lineNumber": 836
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 32,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hardware-bridge/png-raster.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 97,
+      "nonEmptyLines": 92,
+      "functions": [
+        {
+          "name": "paeth",
+          "startLine": 5,
+          "endLine": 11,
+          "params": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        {
+          "name": "decodePng",
+          "startLine": 13,
+          "endLine": 61,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "pngToEscPos",
+          "startLine": 63,
+          "endLine": 95,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "paeth",
+          "callee": "Math.abs",
+          "lineNumber": 7
+        },
+        {
+          "caller": "paeth",
+          "callee": "Math.abs",
+          "lineNumber": 8
+        },
+        {
+          "caller": "paeth",
+          "callee": "Math.abs",
+          "lineNumber": 9
+        },
+        {
+          "caller": "decodePng",
+          "callee": "input.subarray(0, 8).equals",
+          "lineNumber": 14
+        },
+        {
+          "caller": "decodePng",
+          "callee": "input.subarray",
+          "lineNumber": 14
+        },
+        {
+          "caller": "decodePng",
+          "callee": "input.readUInt32BE",
+          "lineNumber": 19
+        },
+        {
+          "caller": "decodePng",
+          "callee": "input.toString",
+          "lineNumber": 20
+        },
+        {
+          "caller": "decodePng",
+          "callee": "input.subarray",
+          "lineNumber": 21
+        },
+        {
+          "caller": "decodePng",
+          "callee": "chunk.readUInt32BE",
+          "lineNumber": 24
+        },
+        {
+          "caller": "decodePng",
+          "callee": "chunk.readUInt32BE",
+          "lineNumber": 24
+        },
+        {
+          "caller": "decodePng",
+          "callee": "data.push",
+          "lineNumber": 27
+        },
+        {
+          "caller": "decodePng",
+          "callee": "zlib.inflateSync",
+          "lineNumber": 39
+        },
+        {
+          "caller": "decodePng",
+          "callee": "Buffer.concat",
+          "lineNumber": 39
+        },
+        {
+          "caller": "decodePng",
+          "callee": "Buffer.alloc",
+          "lineNumber": 41
+        },
+        {
+          "caller": "decodePng",
+          "callee": "Math.floor",
+          "lineNumber": 54
+        },
+        {
+          "caller": "decodePng",
+          "callee": "paeth",
+          "lineNumber": 55
+        },
+        {
+          "caller": "decodePng",
+          "callee": "Number.isNaN",
+          "lineNumber": 56
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "decodePng",
+          "lineNumber": 64
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.max",
+          "lineNumber": 65
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.min",
+          "lineNumber": 65
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.max",
+          "lineNumber": 66
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.round",
+          "lineNumber": 66
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Buffer.from",
+          "lineNumber": 67
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "chunks.push",
+          "lineNumber": 69
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Buffer.from",
+          "lineNumber": 69
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Buffer.alloc",
+          "lineNumber": 70
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.min",
+          "lineNumber": 72
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.floor",
+          "lineNumber": 72
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.min",
+          "lineNumber": 78
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Math.floor",
+          "lineNumber": 78
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "chunks.push",
+          "lineNumber": 91
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Buffer.from",
+          "lineNumber": 91
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "chunks.push",
+          "lineNumber": 93
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Buffer.from",
+          "lineNumber": 93
+        },
+        {
+          "caller": "pngToEscPos",
+          "callee": "Buffer.concat",
+          "lineNumber": 94
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useBeforeUnload.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 23,
+      "nonEmptyLines": 20,
+      "functions": [
+        {
+          "name": "useBeforeUnload",
+          "startLine": 9,
+          "endLine": 21,
+          "params": [
+            "shouldWarn",
+            "message"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useBeforeUnload",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useBeforeUnload",
+          "callee": "useCallback",
+          "lineNumber": 10
+        },
+        {
+          "caller": "useBeforeUnload",
+          "callee": "e.preventDefault",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useBeforeUnload",
+          "callee": "useEffect",
+          "lineNumber": 17
+        },
+        {
+          "caller": "useBeforeUnload",
+          "callee": "window.addEventListener",
+          "lineNumber": 18
+        },
+        {
+          "caller": "useBeforeUnload",
+          "callee": "window.removeEventListener",
+          "lineNumber": 19
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useClickOutside.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 27,
+      "nonEmptyLines": 23,
+      "functions": [
+        {
+          "name": "useClickOutside",
+          "startLine": 9,
+          "endLine": 25,
+          "params": [
+            "callback"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useClickOutside",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useClickOutside",
+          "callee": "useRef",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useClickOutside",
+          "callee": "useEffect",
+          "lineNumber": 14
+        },
+        {
+          "caller": "handler",
+          "callee": "ref.current.contains",
+          "lineNumber": 16
+        },
+        {
+          "caller": "handler",
+          "callee": "callback",
+          "lineNumber": 17
+        },
+        {
+          "caller": "useClickOutside",
+          "callee": "document.addEventListener",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useClickOutside",
+          "callee": "document.removeEventListener",
+          "lineNumber": 21
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useCopyToClipboard.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 34,
+      "functions": [
+        {
+          "name": "useCopyToClipboard",
+          "startLine": 13,
+          "endLine": 37,
+          "params": [
+            "resetDelay"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useCopyToClipboard",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "useState",
+          "lineNumber": 14
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "useCallback",
+          "lineNumber": 16
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "navigator.clipboard.writeText",
+          "lineNumber": 18
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "setCopied",
+          "lineNumber": 19
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "setTimeout",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "setCopied",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "document.createElement",
+          "lineNumber": 23
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "document.body.appendChild",
+          "lineNumber": 27
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "textarea.select",
+          "lineNumber": 28
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "document.execCommand",
+          "lineNumber": 29
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "document.body.removeChild",
+          "lineNumber": 30
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "setCopied",
+          "lineNumber": 31
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "setTimeout",
+          "lineNumber": 32
+        },
+        {
+          "caller": "useCopyToClipboard",
+          "callee": "setCopied",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useCountUp.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 28,
+      "functions": [
+        {
+          "name": "useCountUp",
+          "startLine": 10,
+          "endLine": 30,
+          "params": [
+            "target",
+            "duration"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useCountUp",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useCountUp",
+          "callee": "useState",
+          "lineNumber": 11
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "useRef",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "useRef",
+          "lineNumber": 13
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "useEffect",
+          "lineNumber": 15
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "Date.now",
+          "lineNumber": 16
+        },
+        {
+          "caller": "animate",
+          "callee": "Date.now",
+          "lineNumber": 18
+        },
+        {
+          "caller": "animate",
+          "callee": "Math.min",
+          "lineNumber": 19
+        },
+        {
+          "caller": "animate",
+          "callee": "Math.pow",
+          "lineNumber": 21
+        },
+        {
+          "caller": "animate",
+          "callee": "setValue",
+          "lineNumber": 22
+        },
+        {
+          "caller": "animate",
+          "callee": "Math.round",
+          "lineNumber": 22
+        },
+        {
+          "caller": "animate",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 23
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 25
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useFaviconBadge.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 56,
+      "nonEmptyLines": 47,
+      "functions": [
+        {
+          "name": "useFaviconBadge",
+          "startLine": 9,
+          "endLine": 54,
+          "params": [
+            "count"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useFaviconBadge",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useFaviconBadge",
+          "callee": "useEffect",
+          "lineNumber": 10
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "document.querySelector",
+          "lineNumber": 11
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "document.createElement",
+          "lineNumber": 19
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "canvas.getContext",
+          "lineNumber": 22
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.drawImage",
+          "lineNumber": 29
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.beginPath",
+          "lineNumber": 33
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.arc",
+          "lineNumber": 34
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.fill",
+          "lineNumber": 35
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.beginPath",
+          "lineNumber": 40
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.arc",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.stroke",
+          "lineNumber": 42
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "ctx.fillText",
+          "lineNumber": 49
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "String",
+          "lineNumber": 49
+        },
+        {
+          "caller": "useFaviconBadge",
+          "callee": "canvas.toDataURL",
+          "lineNumber": 51
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useFetch.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 48,
+      "nonEmptyLines": 41,
+      "functions": [
+        {
+          "name": "useFetch",
+          "startLine": 22,
+          "endLine": 46,
+          "params": [
+            "fetcher",
+            "deps"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useFetch",
+          "line": 22,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useFetch",
+          "callee": "useState",
+          "lineNumber": 26
+        },
+        {
+          "caller": "useFetch",
+          "callee": "useRef",
+          "lineNumber": 27
+        },
+        {
+          "caller": "useFetch",
+          "callee": "useCallback",
+          "lineNumber": 29
+        },
+        {
+          "caller": "useFetch",
+          "callee": "setState",
+          "lineNumber": 30
+        },
+        {
+          "caller": "useFetch",
+          "callee": "fetcher",
+          "lineNumber": 32
+        },
+        {
+          "caller": "useFetch",
+          "callee": "setState",
+          "lineNumber": 33
+        },
+        {
+          "caller": "useFetch",
+          "callee": "setState",
+          "lineNumber": 35
+        },
+        {
+          "caller": "useFetch",
+          "callee": "useEffect",
+          "lineNumber": 39
+        },
+        {
+          "caller": "useFetch",
+          "callee": "fetchData",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useForm.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 87,
+      "functions": [
+        {
+          "name": "useForm",
+          "startLine": 32,
+          "endLine": 97,
+          "params": [
+            "initialValues",
+            "validators"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useForm",
+          "line": 32,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useForm",
+          "callee": "useState",
+          "lineNumber": 36
+        },
+        {
+          "caller": "useForm",
+          "callee": "useState",
+          "lineNumber": 37
+        },
+        {
+          "caller": "useForm",
+          "callee": "useState",
+          "lineNumber": 38
+        },
+        {
+          "caller": "useForm",
+          "callee": "useState",
+          "lineNumber": 39
+        },
+        {
+          "caller": "useForm",
+          "callee": "useCallback",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useForm",
+          "callee": "setValuesState",
+          "lineNumber": 42
+        },
+        {
+          "caller": "useForm",
+          "callee": "validators[field]!",
+          "lineNumber": 46
+        },
+        {
+          "caller": "useForm",
+          "callee": "setErrors",
+          "lineNumber": 47
+        },
+        {
+          "caller": "useForm",
+          "callee": "setIsDirty",
+          "lineNumber": 51
+        },
+        {
+          "caller": "useForm",
+          "callee": "useCallback",
+          "lineNumber": 54
+        },
+        {
+          "caller": "useForm",
+          "callee": "setValuesState",
+          "lineNumber": 55
+        },
+        {
+          "caller": "useForm",
+          "callee": "setIsDirty",
+          "lineNumber": 56
+        },
+        {
+          "caller": "useForm",
+          "callee": "useCallback",
+          "lineNumber": 59
+        },
+        {
+          "caller": "useForm",
+          "callee": "setErrors",
+          "lineNumber": 60
+        },
+        {
+          "caller": "useForm",
+          "callee": "useCallback",
+          "lineNumber": 63
+        },
+        {
+          "caller": "useForm",
+          "callee": "setTouched",
+          "lineNumber": 64
+        },
+        {
+          "caller": "useForm",
+          "callee": "validators[field]!",
+          "lineNumber": 67
+        },
+        {
+          "caller": "useForm",
+          "callee": "setErrors",
+          "lineNumber": 68
+        },
+        {
+          "caller": "useForm",
+          "callee": "useCallback",
+          "lineNumber": 72
+        },
+        {
+          "caller": "useForm",
+          "callee": "Object.keys",
+          "lineNumber": 77
+        },
+        {
+          "caller": "useForm",
+          "callee": "validators[key]!",
+          "lineNumber": 79
+        },
+        {
+          "caller": "useForm",
+          "callee": "setErrors",
+          "lineNumber": 82
+        },
+        {
+          "caller": "useForm",
+          "callee": "setTouched",
+          "lineNumber": 83
+        },
+        {
+          "caller": "useForm",
+          "callee": "useCallback",
+          "lineNumber": 87
+        },
+        {
+          "caller": "useForm",
+          "callee": "setValuesState",
+          "lineNumber": 88
+        },
+        {
+          "caller": "useForm",
+          "callee": "setErrors",
+          "lineNumber": 89
+        },
+        {
+          "caller": "useForm",
+          "callee": "setTouched",
+          "lineNumber": 90
+        },
+        {
+          "caller": "useForm",
+          "callee": "setIsDirty",
+          "lineNumber": 91
+        },
+        {
+          "caller": "useForm",
+          "callee": "Object.values(errors).every",
+          "lineNumber": 94
+        },
+        {
+          "caller": "useForm",
+          "callee": "Object.values",
+          "lineNumber": 94
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useInterval.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 21,
+      "functions": [
+        {
+          "name": "useInterval",
+          "startLine": 11,
+          "endLine": 23,
+          "params": [
+            "callback",
+            "delay"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useInterval",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useInterval",
+          "callee": "useRef",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useInterval",
+          "callee": "useEffect",
+          "lineNumber": 14
+        },
+        {
+          "caller": "useInterval",
+          "callee": "useEffect",
+          "lineNumber": 18
+        },
+        {
+          "caller": "useInterval",
+          "callee": "setInterval",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useInterval",
+          "callee": "savedCallback.current",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useInterval",
+          "callee": "clearInterval",
+          "lineNumber": 21
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    }
+  ]
+}

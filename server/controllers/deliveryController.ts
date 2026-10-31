@@ -7,6 +7,7 @@ import { getIO } from '../socket';
 import { getStringParam } from '../utils/request';
 import { webhookService } from '../services/webhookService';
 import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
+import { createSignedAuditLog } from '../services/auditService';
 
 type DriverTelemetryData = {
     driverId: string;
@@ -215,7 +216,7 @@ export const getAllZones = async (req: Request, res: Response) => {
     try {
         await ensureDeliveryZoneBranchNullable().catch(() => {});
         await ensureDeliveryZoneGeo().catch(() => {});
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = getStringParam(req.effectiveBranchId) || getStringParam(req.query.branchId);
         const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
         const conditions: any[] = [];
         if (!includeInactive) conditions.push(eq(deliveryZones.isActive, true));
@@ -234,7 +235,7 @@ export const getAllZones = async (req: Request, res: Response) => {
 
 export const getAvailableDrivers = async (req: Request, res: Response) => {
     try {
-        const { branchId } = req.query;
+        const branchId = getStringParam(req.effectiveBranchId) || getStringParam(req.query.branchId);
         const conditions: any[] = [eq(drivers.status, 'AVAILABLE'), eq(drivers.isActive, true)];
         if (branchId) conditions.push(eq(drivers.branchId, branchId as string));
         const availableDrivers = await db.select().from(drivers).where(and(...conditions)).orderBy(desc(drivers.createdAt));
@@ -246,7 +247,8 @@ export const getAvailableDrivers = async (req: Request, res: Response) => {
 
 export const getDrivers = async (req: Request, res: Response) => {
     try {
-        const { branchId, status, includeInactive } = req.query;
+        const { status, includeInactive } = req.query;
+        const branchId = getStringParam(req.effectiveBranchId) || getStringParam(req.query.branchId);
         const conditions: any[] = [];
         // Disabled pilots are hidden by default; the roster toggle passes
         // includeInactive=1 so they can be reviewed and re-enabled.
@@ -268,7 +270,7 @@ export const createDriver = async (req: Request, res: Response) => {
         const body = req.body || {};
         const name = String(body.name || '').trim();
         const phone = String(body.phone || '').trim();
-        const branchId = String(body.branchId || req.user?.branchId || '').trim() || null;
+        const branchId = String(req.effectiveBranchId || body.branchId || req.user?.branchId || '').trim() || null;
         const createLogin = Boolean(body.createLogin || body.email || body.password || body.pin);
         const driverId = String(body.id || body.userId || crypto.randomUUID()).trim();
 
@@ -371,7 +373,10 @@ export const updateDriver = async (req: Request, res: Response) => {
         if (req.body?.isActive !== undefined) patch.isActive = Boolean(req.body.isActive);
         if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'NO_DRIVER_CHANGES' });
 
-        const [updated] = await db.update(drivers).set(patch).output().where(eq(drivers.id, id));
+        const [updated] = await db.update(drivers).set(patch).output().where(and(
+            eq(drivers.id, id),
+            req.effectiveBranchId ? eq(drivers.branchId, req.effectiveBranchId) : undefined,
+        ));
         if (!updated) return res.status(404).json({ error: 'DRIVER_NOT_FOUND' });
         emitDriverStatus(updated);
         res.json(updated);
@@ -390,7 +395,10 @@ export const updateDriverStatus = async (req: Request, res: Response) => {
         // Driver app sends the login user id, which may differ from the driver
         // row id (linked via user_id) — resolve either form.
         const [row] = await db.select({ id: drivers.id }).from(drivers)
-            .where(or(eq(drivers.id, id), eq(drivers.userId, id))).top(1);
+            .where(and(
+                or(eq(drivers.id, id), eq(drivers.userId, id)),
+                req.effectiveBranchId ? eq(drivers.branchId, req.effectiveBranchId) : undefined,
+            )).top(1);
         if (!row) return res.status(404).json({ error: 'Driver not found' });
         // Going OFFLINE with live orders strands them — refuse and tell the
         // branch to reassign first.
@@ -422,7 +430,10 @@ export const assignDriver = async (req: Request, res: Response) => {
             // Driver must exist, be active and not offline. BUSY no longer
             // blocks assignment — dispatchers batch multiple orders per pilot,
             // and the pilot confirms each pickup from the driver screen.
-            const [driver] = await tx.select().top(1).from(drivers).where(eq(drivers.id, driverId));
+            const [driver] = await tx.select().top(1).from(drivers).where(and(
+                eq(drivers.id, driverId),
+                req.effectiveBranchId ? eq(drivers.branchId, req.effectiveBranchId) : undefined,
+            ));
             if (!driver) throw new Error('DRIVER_NOT_FOUND');
             if (!driver.isActive || String(driver.status || '').toUpperCase() === 'OFFLINE') throw new Error('DRIVER_NOT_AVAILABLE');
             // HR linkage: a deactivated login or HR employee record blocks
@@ -440,6 +451,9 @@ export const assignDriver = async (req: Request, res: Response) => {
             if (!order) throw new Error('ORDER_NOT_FOUND');
             // Cross-branch dispatch is a data leak — pilots only run their own branch.
             if (driver.branchId && order.branchId && String(driver.branchId) !== String(order.branchId)) {
+                throw new Error('CROSS_BRANCH_ASSIGN');
+            }
+            if (req.effectiveBranchId && String(order.branchId || '') !== String(req.effectiveBranchId)) {
                 throw new Error('CROSS_BRANCH_ASSIGN');
             }
             // Reassign is allowed before pickup; once the pilot is on the road
@@ -472,6 +486,18 @@ export const assignDriver = async (req: Request, res: Response) => {
         } catch {
             // socket optional
         }
+
+        await createSignedAuditLog({
+            eventType: 'DELIVERY_DRIVER_ASSIGNED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: orderBranchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { orderId, driverId },
+            after: { driverId, dispatchState: 'ASSIGNED' },
+            reason: 'Driver assigned to order',
+        });
 
         res.json({ message: 'Driver assigned successfully' });
     } catch (error: any) {
@@ -636,6 +662,18 @@ export const pickupOrder = async (req: Request, res: Response) => {
         try {
             if (order.branchId) getIO().to(`branch:${order.branchId}`).emit('driver:status', { id: driverIds[0], status: 'BUSY' });
         } catch { /* socket optional */ }
+        await createSignedAuditLog({
+            eventType: 'DELIVERY_ORDER_PICKED_UP',
+            userId: userId,
+            userRole: req.user?.role,
+            branchId: order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { orderId, driverId: driverIds[0], otpSent },
+            before: { status: order.status },
+            after: { status: 'OUT_FOR_DELIVERY' },
+            reason: 'Order picked up by driver',
+        });
         // Never return the OTP to the driver app: the pilot must collect it
         // from the customer at handover (sent to the customer by WhatsApp).
         // When delivery failed, say so explicitly so the branch can fall back
@@ -782,6 +820,18 @@ export const deliverOrder = async (req: Request, res: Response) => {
         try {
             if (order.branchId) getIO().to(`branch:${order.branchId}`).emit('driver:status', { id: driverIds[0], status: backStatus });
         } catch { /* socket optional */ }
+        await createSignedAuditLog({
+            eventType: 'DELIVERY_ORDER_DELIVERED',
+            userId: actingAs,
+            userRole: req.user?.role,
+            branchId: order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { orderId, driverId: driverIds[0], cashDue, cashCollected: cashDue > 0 ? cashCollected : 0, managerFallback: skipOtp },
+            before: { status: order.status },
+            after: { status: 'DELIVERED' },
+            reason: 'Order delivered',
+        });
         res.json({ ok: true, status: 'DELIVERED', cashDue, cashCollected: cashDue > 0 ? cashCollected : 0 });
     } catch (error: any) {
         res.status(Number(error?.status) || 500).json({ error: error?.code || error?.message || 'DELIVERY_FAILED' });
@@ -857,6 +907,18 @@ export const failDelivery = async (req: Request, res: Response) => {
         try {
             if (order.branchId) getIO().to(`branch:${order.branchId}`).emit('driver:status', { id: driverIds[0], status: nextStatus });
         } catch { /* socket optional */ }
+        await createSignedAuditLog({
+            eventType: 'DELIVERY_ORDER_FAILED',
+            userId: actingAs,
+            userRole: req.user?.role,
+            branchId: order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { orderId, driverId: driverIds[0], reasonLength: reason.length },
+            before: { status: order.status, driverAssigned: true },
+            after: { status: 'READY', driverAssigned: false, driverStatus: nextStatus },
+            reason: 'Delivery failed and returned to dispatch',
+        });
         res.json({ ok: true, status: 'READY', driverStatus: nextStatus });
     } catch (error: any) {
         res.status(Number(error?.status) || 500).json({ error: error?.code || error?.message || 'FAIL_DELIVERY_FAILED' });
@@ -886,7 +948,10 @@ export const updateDriverLocation = async (req: Request, res: Response) => {
         // row id (linked via user_id) — resolve either form so GPS fixes from
         // the pilot's phone are never dropped with a 404.
         const [driver] = await db.select().top(1).from(drivers)
-            .where(or(eq(drivers.id, driverId), eq(drivers.userId, driverId)));
+            .where(and(
+                or(eq(drivers.id, driverId), eq(drivers.userId, driverId)),
+                req.effectiveBranchId ? eq(drivers.branchId, req.effectiveBranchId) : undefined,
+            ));
         if (!driver) return res.status(404).json({ error: 'DRIVER_NOT_FOUND' });
 
         // 1. Insert into telemetry history (time-series)
@@ -956,7 +1021,7 @@ export const updateDriverLocation = async (req: Request, res: Response) => {
 export const getDriverTelemetry = async (req: Request, res: Response) => {
     try {
         await ensureDeliveryTelemetryTables();
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = (req.effectiveBranchId as string) || getStringParam(req.query.branchId);
 
         // Opportunistic retention: ~10% of reads prune fixes older than 30 days.
         if (Math.random() < 0.1) {
@@ -1106,7 +1171,7 @@ const buildSlaAlerts = async (branchId?: string, delayMinutes = 45, staleLocatio
 
 export const getSlaAlerts = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = (req.effectiveBranchId as string) || getStringParam(req.query.branchId);
         const delayMinutes = Math.max(15, Number(req.query.delayMinutes || 45));
         const staleLocationMinutes = Math.max(3, Number(req.query.staleLocationMinutes || 10));
         const alerts = await buildSlaAlerts(branchId, delayMinutes, staleLocationMinutes);
@@ -1124,7 +1189,9 @@ export const getSlaAlerts = async (req: Request, res: Response) => {
 
 export const autoEscalateSlaAlerts = async (req: Request, res: Response) => {
     try {
-        const branchId = String(req.body?.branchId || req.user?.branchId || '').trim() || undefined;
+        const branchId = (req.effectiveBranchId as string)
+            || String(req.body?.branchId || req.user?.branchId || '').trim()
+            || undefined;
         const delayMinutes = Math.max(15, Number(req.body?.delayMinutes || 45));
         const staleLocationMinutes = Math.max(3, Number(req.body?.staleLocationMinutes || 10));
         const alerts = await buildSlaAlerts(branchId, delayMinutes, staleLocationMinutes);
@@ -1379,6 +1446,18 @@ export const settleDriverCash = async (req: Request, res: Response) => {
             const userRoom = (row as any).userId || row.id;
             io.to(`user:${userRoom}`).emit('driver:cash', { id: row.id, balance: remaining, settled: amount });
         } catch { /* socket optional */ }
+        await createSignedAuditLog({
+            eventType: 'DELIVERY_CASH_SETTLED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: (req.effectiveBranchId as string) || row.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { driverId: row.id, amount, remaining, receiptId: ledgerId },
+            before: { balance },
+            after: { balance: remaining },
+            reason: 'Driver cash settled',
+        });
         res.json({ success: true, settled: amount, remaining, driverId: row.id, driverName: row.name, receiptId: ledgerId });
     } catch (error: any) {
         const msg = String(error?.message || '');

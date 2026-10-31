@@ -44,7 +44,7 @@ const MenuCategoryList: React.FC<MenuCategoryListProps> = memo(({
   return (
     <>
       {categories.map(category => (
-        <div key={category.id} className="relative z-10 pb-10">
+        <div key={category.id} className="menu-manager-section relative z-10 pb-10">
           <div className="flex justify-between items-end mb-8 px-4 border-b border-border/20 pb-6">
             <div className="flex items-center gap-5">
               {category.image ? (

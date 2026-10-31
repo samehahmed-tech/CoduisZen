@@ -98,6 +98,30 @@ export const normalizeTalabatItems = (items: TalabatOrderItem[] | undefined): No
         .filter((x): x is NormalizedTalabatItem => x !== null);
 };
 
+/** Stable business-data fingerprint; status transitions are intentionally excluded. */
+export const buildTalabatPayloadFingerprint = (payload: TalabatWebhookPayload): string => {
+    const totals = getTotals(payload);
+    const customer = getCustomer(payload);
+    const canonical = {
+        orderId: String((payload as any)?.order_id || '').trim(),
+        storeId: getStoreId(payload),
+        externalConfigId: getExternalConfigId(payload),
+        orderType: String((payload as any)?.order_type || '').trim().toUpperCase(),
+        items: normalizeTalabatItems((payload as any)?.items).map((item) => ({
+            sku: String(item.sku || '').trim(),
+            quantity: Number(item.quantity || 0),
+            unitPrice: Number(item.unitPrice || 0),
+            totalPrice: Number(item.totalPrice || 0),
+            status: String(item.status || '').trim().toUpperCase(),
+        })),
+        subtotal: totals.subTotal,
+        total: totals.orderTotal,
+        deliveryFee: totals.deliveryFee,
+        customer: { name: customer.name || '', phone: customer.phone || '', address: customer.address || '' },
+    };
+    return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+};
+
 const safeEqual = (a: string, b: string): boolean => {
     const ab = Buffer.from(a);
     const bb = Buffer.from(b);

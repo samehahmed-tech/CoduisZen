@@ -26,7 +26,7 @@ describe('validation', () => {
     });
     it('accepts a well-formed theme config', () => {
         expect(validateThemeConfig({
-            id: 'meridian', name: 'Meridian', description: 'd', tags: [],
+            id: 'aero', name: 'Aero', description: 'd', tags: [],
             shape: { radius: 'a', radiusSm: 'a', radiusLg: 'a', radiusXl: 'a' },
             motion: { style: 'smooth', duration: '200ms', durationSlow: '400ms' },
             components: { button: { variant: 'solid' }, card: { variant: 'flat' }, sidebar: { variant: 'solid' }, table: { density: 'dense' }, input: { variant: 'outline' }, modal: { variant: 'centered' } },
@@ -91,13 +91,13 @@ describe('presets', () => {
         expect(deletePreset('preset-ops-night', IDS)).toBe(false);
         expect(importPreset('not json', IDS)).toBeNull();
         expect(importPreset(JSON.stringify({ id: 'x', name: 'X', themeId: 'nope', mode: 'dark', density: 'compact', motionLevel: 'full' }), IDS)).toBeNull();
-        const ok = importPreset(JSON.stringify({ id: 'my-preset', name: 'Mine', themeId: 'meridian', mode: 'dark', density: 'compact', motionLevel: 'full', colorOverrides: { primary: '#123456' } }), IDS);
-        expect(ok?.themeId).toBe('meridian');
+        const ok = importPreset(JSON.stringify({ id: 'my-preset', name: 'Mine', themeId: 'clay', mode: 'dark', density: 'compact', motionLevel: 'full', colorOverrides: { primary: '#123456' } }), IDS);
+        expect(ok?.themeId).toBe('clay');
         expect(BUILT_IN_PRESETS.length).toBe(3);
     });
     it('sanitizes oversized and dirty presets', () => {
-        expect(sanitizePreset({ id: 'a'.repeat(100), name: 'N', themeId: 'meridian', mode: 'light', density: 'spacious', motionLevel: 'reduced' }, IDS)).toBeNull();
-        expect(sanitizePreset({ id: 'ok', name: 'Ok', themeId: 'meridian', mode: 'light', density: 'spacious', motionLevel: 'reduced', background: { type: 'warp' } }, IDS)?.background?.type).toBe('theme-native');
+        expect(sanitizePreset({ id: 'a'.repeat(100), name: 'N', themeId: 'clay', mode: 'light', density: 'spacious', motionLevel: 'reduced' }, IDS)).toBeNull();
+        expect(sanitizePreset({ id: 'ok', name: 'Ok', themeId: 'clay', mode: 'light', density: 'spacious', motionLevel: 'reduced', background: { type: 'warp' } }, IDS)?.background?.type).toBe('theme-native');
     });
 });
 
@@ -118,13 +118,13 @@ describe('resolver and migration', () => {
         expect(auditRegistry({ a: { id: 'b' } as any })).toContain('a: config.id mismatch (b)');
     });
     it('migrates every generation', () => {
-        expect(migrateThemeId('meridian')).toBe('meridian');
-        expect(migrateThemeId('glass-prism')).toBe('glassline');
-        expect(migrateThemeId('ember-noir')).toBe('meridian');
-        expect(migrateThemeId('aurora-glass')).toBe('glassline');
-        expect(migrateThemeId('')).toBe('meridian');
-        expect(migrateThemeId(null)).toBe('meridian');
-        expect(migrateThemeId('nope')).toBe('meridian');
+        expect(migrateThemeId('meridian')).toBe('clay');
+        expect(migrateThemeId('glass-prism')).toBe('aero');
+        expect(migrateThemeId('ember-noir')).toBe('clay');
+        expect(migrateThemeId('aurora-glass')).toBe('aero');
+        expect(migrateThemeId('')).toBe('aero');
+        expect(migrateThemeId(null)).toBe('aero');
+        expect(migrateThemeId('nope')).toBe('aero');
         expect(V2_THEME_IDS.length).toBe(10);
     });
     it('covers all ten motion profiles', () => {

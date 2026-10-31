@@ -4,17 +4,20 @@
 
 import { Request, Response } from 'express';
 import { refundService } from '../services/refundService';
+import { paymentGatewayService } from '../services/paymentGatewayService';
 
 const canAccessRefundBranch = (req: Request, branchId?: string | null) => {
-    if (!branchId) return true;
     if (req.user?.role === 'SUPER_ADMIN') return true;
+    // Legacy records without a branch cannot be safely attributed to a
+    // caller's scope; fail closed instead of treating them as global.
+    if (!branchId) return false;
     return req.effectiveBranchId === branchId;
 };
 
 export const getRefunds = async (req: Request, res: Response) => {
     try {
         const refunds = await refundService.getRefunds({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId) : undefined),
             status: req.query.status ? String(req.query.status) : undefined,
             orderId: req.query.orderId ? String(req.query.orderId) : undefined,
             startDate: req.query.startDate ? String(req.query.startDate) : undefined,
@@ -41,11 +44,12 @@ export const getRefundById = async (req: Request, res: Response) => {
 
 export const requestRefund = async (req: Request, res: Response) => {
     try {
+        const actorName = req.user?.name || req.user?.id || 'system';
         const refund = await refundService.requestRefund({
             ...req.body,
             branchId: req.effectiveBranchId,
             requestedBy: req.user?.id || 'system',
-            requestedByName: req.body.requestedByName || 'System',
+            requestedByName: actorName,
         });
         res.status(201).json(refund);
     } catch (error: any) {
@@ -63,7 +67,8 @@ export const approveRefund = async (req: Request, res: Response) => {
         const refund = await refundService.approveRefund(
             String(req.params.id),
             req.user?.id || 'system',
-            req.body.approvedByName || 'System'
+            req.user?.name || req.user?.id || 'system',
+            req.effectiveBranchId
         );
         res.json(refund);
     } catch (error: any) {
@@ -81,7 +86,8 @@ export const rejectRefund = async (req: Request, res: Response) => {
         const refund = await refundService.rejectRefund(
             String(req.params.id),
             req.user?.id || 'system',
-            req.body.reason || 'No reason provided'
+            req.body.reason || 'No reason provided',
+            req.effectiveBranchId
         );
         res.json(refund);
     } catch (error: any) {
@@ -96,7 +102,13 @@ export const processRefund = async (req: Request, res: Response) => {
         if (!canAccessRefundBranch(req, existing.branchId)) {
             return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
         }
-        const refund = await refundService.processRefund(String(req.params.id), req.user?.id || 'system');
+        const processedBy = req.user?.id || 'system';
+        const refund = existing.gatewaySessionId
+            ? await paymentGatewayService.processApprovedRefund(String(req.params.id), {
+                branchId: existing.branchId,
+                processedBy,
+            })
+            : await refundService.processRefund(String(req.params.id), processedBy, req.effectiveBranchId);
         res.json(refund);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -124,7 +136,7 @@ export const updateRefundPolicy = async (req: Request, res: Response) => {
 export const getRefundStats = async (req: Request, res: Response) => {
     try {
         const stats = await refundService.getRefundStats(
-            req.query.branchId ? String(req.query.branchId) : undefined,
+            req.effectiveBranchId || (req.query.branchId ? String(req.query.branchId) : undefined),
             req.query.startDate ? String(req.query.startDate) : undefined,
             req.query.endDate ? String(req.query.endDate) : undefined
         );

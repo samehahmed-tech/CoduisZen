@@ -4,12 +4,34 @@ import { scopeBranchQuery } from '../middleware/branchIsolation';
 import { generateHrAttendancePDF } from '../services/pdfService';
 import { generateHrAttendanceXlsx, streamHrAttendanceXlsx } from '../services/hrReportExportService';
 import zktecoConnectorService, { DeviceSyncOptions } from '../services/zktecoConnectorService';
+import { createSignedAuditLog } from '../services/auditService';
 
 const router = Router();
 
+const auditAttendanceMutation = (req: Request, eventType: string, payload: Record<string, unknown>, before?: Record<string, unknown>, after?: Record<string, unknown>, reason?: string) =>
+    createSignedAuditLog({
+        eventType,
+        userId: req.user?.id || 'system',
+        userRole: req.user?.role,
+        branchId: req.effectiveBranchId || (req.body?.branchId ? String(req.body.branchId) : undefined),
+        requestId: req.requestId,
+        sourceDevice: req.headers['user-agent'],
+        payload,
+        before,
+        after,
+        reason,
+    });
+
 router.use((req: Request, res: Response, next: NextFunction) => {
-    if (['SUPER_ADMIN', 'OWNER'].includes(String(req.user?.role || '').toUpperCase())) return next();
-    return scopeBranchQuery(req, res, next);
+    if (String(req.user?.role || '').toUpperCase() === 'SUPER_ADMIN') return next();
+    return scopeBranchQuery(req, res, () => {
+        // Normalize body branch claims before any attendance mutation sees them.
+        // The service layer still validates entity ownership as a second boundary.
+        if (req.body && typeof req.body === 'object' && req.effectiveBranchId) {
+            req.body.branchId = req.effectiveBranchId;
+        }
+        return next();
+    });
 });
 
 const parseDateInput = (value: unknown) => {
@@ -20,6 +42,12 @@ const parseDateInput = (value: unknown) => {
     }
     return parsed;
 };
+
+// Non-super-admin reads use the branch resolved by middleware. Only the
+// global administrator may intentionally select a cross-branch report.
+const scopedBranchId = (req: Request) => String(req.user?.role || '').toUpperCase() === 'SUPER_ADMIN'
+    ? (req.query.branchId ? String(req.query.branchId) : undefined)
+    : req.effectiveBranchId;
 
 const parseSyncOptions = (input: Record<string, any>): DeviceSyncOptions => {
     const startDate = parseDateInput(input.startDate);
@@ -72,7 +100,7 @@ const biometricErrorPayload = (error: any) => {
 
 router.get('/devices', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.listDevices(req.query.branchId ? String(req.query.branchId) : undefined));
+        res.json(await attendanceOpsService.listDevices(scopedBranchId(req)));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -80,7 +108,9 @@ router.get('/devices', async (req: Request, res: Response) => {
 
 router.post('/devices', async (req: Request, res: Response) => {
     try {
-        res.status(201).json(await attendanceOpsService.upsertDevice(req.body));
+        const result = await attendanceOpsService.upsertDevice(req.body, req.effectiveBranchId);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_UPSERTED', { deviceId: result?.id || req.body?.id, hasIp: Boolean(req.body?.ip || req.body?.ipAddress), branchId: req.body?.branchId || null }, undefined, { active: true }, 'Attendance device upserted');
+        res.status(201).json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -88,7 +118,9 @@ router.post('/devices', async (req: Request, res: Response) => {
 
 router.delete('/devices/:id', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.deleteDevice(String(req.params.id), req.user?.id || 'system'));
+        const result = await attendanceOpsService.deleteDevice(String(req.params.id), req.user?.id || 'system', req.effectiveBranchId);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_DELETED', { deviceId: String(req.params.id) }, { active: true }, { active: false }, 'Attendance device deleted');
+        res.json(result);
     } catch (error: any) {
         const status = error.message === 'DEVICE_NOT_FOUND' ? 404 : 400;
         res.status(status).json({ error: error.message });
@@ -97,7 +129,9 @@ router.delete('/devices/:id', async (req: Request, res: Response) => {
 
 router.post('/devices/mappings', async (req: Request, res: Response) => {
     try {
-        res.status(201).json(await attendanceOpsService.upsertDeviceMapping(req.body));
+        const result = await attendanceOpsService.upsertDeviceMapping(req.body, req.effectiveBranchId);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_MAPPING_UPSERTED', { deviceId: req.body?.deviceId || null, employeeId: req.body?.employeeId || null }, undefined, { active: true }, 'Attendance device mapping upserted');
+        res.status(201).json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -109,14 +143,16 @@ router.post('/devices/mappings/link-unknown', async (req: Request, res: Response
         if (!deviceId || !deviceUserId || !employeeId) {
             return res.status(400).json({ error: 'DEVICE_USER_AND_EMPLOYEE_REQUIRED' });
         }
-        res.status(201).json(await attendanceOpsService.linkUnknownBiometricGroup({
+        const result = await attendanceOpsService.linkUnknownBiometricGroup({
             deviceId: String(deviceId),
             deviceUserId: String(deviceUserId),
             employeeId: String(employeeId),
             exceptionIds: Array.isArray(exceptionIds) ? exceptionIds.map(String) : [],
             resolutionNotes,
-            resolvedBy: req.user?.id || req.body?.resolvedBy || 'system',
-        }));
+            resolvedBy: req.user?.id || 'system',
+        }, req.effectiveBranchId);
+        await auditAttendanceMutation(req, 'ATTENDANCE_UNKNOWN_BIOMETRIC_LINKED', { deviceId: String(deviceId), employeeId: String(employeeId), exceptionCount: Array.isArray(exceptionIds) ? exceptionIds.length : 0 }, undefined, { resolved: true }, 'Unknown biometric group linked');
+        res.status(201).json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -124,11 +160,13 @@ router.post('/devices/mappings/link-unknown', async (req: Request, res: Response
 
 router.post('/devices/mappings/auto-resolve-unknown', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.autoResolveUnknownBiometricMatches({
+        const result = await attendanceOpsService.autoResolveUnknownBiometricMatches({
             branchId: req.body?.branchId ? String(req.body.branchId) : undefined,
-            resolvedBy: req.user?.id || req.body?.resolvedBy || 'system',
+            resolvedBy: req.user?.id || 'system',
             limit: req.body?.limit !== undefined ? Number(req.body.limit) : undefined,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_UNKNOWN_BIOMETRIC_AUTO_RESOLVED', { branchId: req.body?.branchId || null, limit: req.body?.limit || null }, undefined, { resolved: true }, 'Unknown biometric matches auto-resolved');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -144,7 +182,9 @@ router.get('/devices/:deviceId/mappings', async (req: Request, res: Response) =>
 
 router.delete('/devices/mappings/:id', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.deactivateDeviceMapping(Number(req.params.id)));
+        const result = await attendanceOpsService.deactivateDeviceMapping(Number(req.params.id), req.effectiveBranchId);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_MAPPING_DEACTIVATED', { mappingId: Number(req.params.id) }, { active: true }, { active: false }, 'Attendance device mapping deactivated');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -152,7 +192,7 @@ router.delete('/devices/mappings/:id', async (req: Request, res: Response) => {
 
 router.get('/geofences', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.listGeofences(req.query.branchId ? String(req.query.branchId) : undefined));
+        res.json(await attendanceOpsService.listGeofences(scopedBranchId(req)));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -168,7 +208,7 @@ router.post('/geofences', async (req: Request, res: Response) => {
 
 router.get('/raw-logs', async (req: Request, res: Response) => {
     try {
-        const branchId = req.query.branchId ? String(req.query.branchId) : undefined;
+        const branchId = scopedBranchId(req);
         const deviceId = req.query.deviceId ? String(req.query.deviceId) : undefined;
         const limit = req.query.limit ? Number(req.query.limit) : 100;
         res.json(await attendanceOpsService.listRawLogs(branchId, deviceId, limit));
@@ -179,7 +219,7 @@ router.get('/raw-logs', async (req: Request, res: Response) => {
 
 router.get('/bridge-monitor', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.getBridgeMonitor(req.query.branchId ? String(req.query.branchId) : undefined));
+        res.json(await attendanceOpsService.getBridgeMonitor(scopedBranchId(req)));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -188,7 +228,7 @@ router.get('/bridge-monitor', async (req: Request, res: Response) => {
 router.get('/hr-readiness', async (req: Request, res: Response) => {
     try {
         res.json(await attendanceOpsService.getHrOperationalReadiness({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: scopedBranchId(req),
             startDate: req.query.startDate ? String(req.query.startDate) : undefined,
             endDate: req.query.endDate ? String(req.query.endDate) : undefined,
         }));
@@ -201,7 +241,7 @@ router.get('/hr-readiness', async (req: Request, res: Response) => {
 router.get('/reports/attendance.csv', async (req: Request, res: Response) => {
     try {
         const report = await attendanceOpsService.buildHrAttendanceReport({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: scopedBranchId(req),
             employeeId: req.query.employeeId ? String(req.query.employeeId) : undefined,
             startDate: req.query.startDate ? String(req.query.startDate) : undefined,
             endDate: req.query.endDate ? String(req.query.endDate) : undefined,
@@ -217,7 +257,7 @@ router.get('/reports/attendance.csv', async (req: Request, res: Response) => {
 router.get('/reports/attendance.pdf', async (req: Request, res: Response) => {
     try {
         const report = await attendanceOpsService.buildHrAttendanceReport({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: scopedBranchId(req),
             employeeId: req.query.employeeId ? String(req.query.employeeId) : undefined,
             startDate: req.query.startDate ? String(req.query.startDate) : undefined,
             endDate: req.query.endDate ? String(req.query.endDate) : undefined,
@@ -235,7 +275,7 @@ router.get('/reports/attendance.pdf', async (req: Request, res: Response) => {
 router.get('/reports/attendance.xlsx', async (req: Request, res: Response) => {
     try {
         const report = await attendanceOpsService.buildHrAttendanceReport({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: scopedBranchId(req),
             employeeId: req.query.employeeId ? String(req.query.employeeId) : undefined,
             startDate: req.query.startDate ? String(req.query.startDate) : undefined,
             endDate: req.query.endDate ? String(req.query.endDate) : undefined,
@@ -252,7 +292,7 @@ router.get('/reports/attendance.xlsx', async (req: Request, res: Response) => {
         await streamHrAttendanceXlsx(report, res, lang);
     } catch (error: any) {
         console.error('[attendance.xlsx] export failed', {
-            branchId: req.query.branchId,
+            branchId: scopedBranchId(req),
             employeeId: req.query.employeeId,
             startDate: req.query.startDate,
             endDate: req.query.endDate,
@@ -286,16 +326,18 @@ router.post('/manual-punch', async (req: Request, res: Response) => {
         if (!['IN', 'OUT', 'UNKNOWN'].includes(String(eventType))) {
             return res.status(400).json({ error: 'INVALID_EVENT_TYPE' });
         }
-        res.status(201).json(await attendanceOpsService.createManualPunch({
+        const result = await attendanceOpsService.createManualPunch({
             employeeId: String(employeeId),
             branchId: branchId ? String(branchId) : undefined,
             eventType: String(eventType) as 'IN' | 'OUT' | 'UNKNOWN',
             occurredAt,
             reason: String(reason),
-            requestedBy: req.user?.id || req.body?.requestedBy || 'system',
+            requestedBy: req.user?.id || 'system',
             deviceId: deviceId ? String(deviceId) : undefined,
             notes,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_MANUAL_PUNCH_CREATED', { employeeId: String(employeeId), eventType: String(eventType), hasDevice: Boolean(deviceId) }, undefined, { status: 'PENDING' }, 'Manual attendance punch created');
+        res.status(201).json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -312,7 +354,7 @@ router.post('/raw-logs', async (req: Request, res: Response) => {
 router.get('/sessions', async (req: Request, res: Response) => {
     try {
         res.json(await attendanceOpsService.listSessions(
-            req.query.branchId ? String(req.query.branchId) : undefined,
+            scopedBranchId(req),
             req.query.status ? String(req.query.status) : undefined,
             req.query.startDate ? String(req.query.startDate) : undefined,
             req.query.endDate ? String(req.query.endDate) : undefined,
@@ -326,7 +368,7 @@ router.get('/sessions', async (req: Request, res: Response) => {
 router.get('/exceptions', async (req: Request, res: Response) => {
     try {
         res.json(await attendanceOpsService.listExceptions(
-            req.query.branchId ? String(req.query.branchId) : undefined,
+            scopedBranchId(req),
             req.query.status ? String(req.query.status) : undefined,
         ));
     } catch (error: any) {
@@ -337,7 +379,7 @@ router.get('/exceptions', async (req: Request, res: Response) => {
 router.get('/exceptions/queue', async (req: Request, res: Response) => {
     try {
         res.json(await attendanceOpsService.listExceptionQueue({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: scopedBranchId(req),
             status: req.query.status ? String(req.query.status) : undefined,
             assignedTo: req.query.assignedTo ? String(req.query.assignedTo) : undefined,
             limit: req.query.limit ? Number(req.query.limit) : undefined,
@@ -350,7 +392,7 @@ router.get('/exceptions/queue', async (req: Request, res: Response) => {
 router.get('/exceptions/queue-summary', async (req: Request, res: Response) => {
     try {
         res.json(await attendanceOpsService.getExceptionQueueSummary({
-            branchId: req.query.branchId ? String(req.query.branchId) : undefined,
+            branchId: scopedBranchId(req),
             status: req.query.status ? String(req.query.status) : undefined,
         }));
     } catch (error: any) {
@@ -361,7 +403,7 @@ router.get('/exceptions/queue-summary', async (req: Request, res: Response) => {
 router.get('/corrections', async (req: Request, res: Response) => {
     try {
         res.json(await attendanceOpsService.listCorrections(
-            req.query.branchId ? String(req.query.branchId) : undefined,
+            scopedBranchId(req),
             req.query.status ? String(req.query.status) : undefined,
         ));
     } catch (error: any) {
@@ -371,20 +413,22 @@ router.get('/corrections', async (req: Request, res: Response) => {
 
 router.post('/corrections', async (req: Request, res: Response) => {
     try {
-        const requestedBy = req.user?.id || req.body.requestedBy;
+        const requestedBy = req.user?.id || 'system';
         if (!requestedBy) {
             return res.status(401).json({ error: 'REQUESTED_BY_REQUIRED' });
         }
         if (!req.body.sessionId || !req.body.reason) {
             return res.status(400).json({ error: 'SESSION_ID_AND_REASON_REQUIRED' });
         }
-        res.status(201).json(await attendanceOpsService.requestCorrection({
+        const result = await attendanceOpsService.requestCorrection({
             sessionId: String(req.body.sessionId),
             requestedBy,
             requestedClockInAt: req.body.requestedClockInAt,
             requestedClockOutAt: req.body.requestedClockOutAt,
             reason: String(req.body.reason),
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_CORRECTION_REQUESTED', { correctionId: result?.id || null, sessionId: String(req.body.sessionId), reasonLength: String(req.body.reason).length }, undefined, { status: 'PENDING' }, 'Attendance correction requested');
+        res.status(201).json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -392,19 +436,21 @@ router.post('/corrections', async (req: Request, res: Response) => {
 
 router.put('/corrections/:id/approve', async (req: Request, res: Response) => {
     try {
-        const approvedBy = req.user?.id || req.body.approvedBy;
+        const approvedBy = req.user?.id || 'system';
         if (!approvedBy) {
             return res.status(401).json({ error: 'APPROVED_BY_REQUIRED' });
         }
-        res.json(await attendanceOpsService.approveCorrection({
+        const result = await attendanceOpsService.approveCorrection({
             correctionId: String(req.params.id),
             approvedBy,
             approverNotes: req.body.approverNotes,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_CORRECTION_APPROVED', { correctionId: String(req.params.id) }, { status: 'PENDING' }, { status: 'APPROVED' }, 'Attendance correction approved');
+        res.json(result);
         
         // Log manager override metric asynchronously
         import('../services/accountabilityService').then(({ accountabilityService }) => {
-            accountabilityService.logManagerOverride(approvedBy, String(req.query.branchId || req.body.branchId || 'system'), String(req.params.id), req.body.approverNotes || 'Attendance correction approved');
+            accountabilityService.logManagerOverride(approvedBy, String(scopedBranchId(req) || req.body.branchId || 'system'), String(req.params.id), req.body.approverNotes || 'Attendance correction approved');
         });
 
     } catch (error: any) {
@@ -414,15 +460,17 @@ router.put('/corrections/:id/approve', async (req: Request, res: Response) => {
 
 router.put('/corrections/:id/reject', async (req: Request, res: Response) => {
     try {
-        const approvedBy = req.user?.id || req.body.approvedBy;
+        const approvedBy = req.user?.id || 'system';
         if (!approvedBy) {
             return res.status(401).json({ error: 'APPROVED_BY_REQUIRED' });
         }
-        res.json(await attendanceOpsService.rejectCorrection({
+        const result = await attendanceOpsService.rejectCorrection({
             correctionId: String(req.params.id),
             approvedBy,
             approverNotes: req.body.approverNotes,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_CORRECTION_REJECTED', { correctionId: String(req.params.id) }, { status: 'PENDING' }, { status: 'REJECTED' }, 'Attendance correction rejected');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -430,16 +478,18 @@ router.put('/corrections/:id/reject', async (req: Request, res: Response) => {
 
 router.put('/exceptions/bulk/resolve', async (req: Request, res: Response) => {
     try {
-        const resolvedBy = req.user?.id || req.body.resolvedBy || 'system';
+        const resolvedBy = req.user?.id || 'system';
         const ids = Array.isArray(req.body.ids) ? req.body.ids.map((id: unknown) => String(id)).filter(Boolean) : [];
         if (!ids.length) {
             return res.status(400).json({ error: 'EXCEPTION_IDS_REQUIRED' });
         }
-        res.json(await attendanceOpsService.resolveExceptionsBulk({
+        const result = await attendanceOpsService.resolveExceptionsBulk({
             ids,
             resolvedBy,
             resolutionNotes: req.body.resolutionNotes,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_EXCEPTIONS_BULK_RESOLVED', { count: ids.length }, { status: 'OPEN' }, { status: 'RESOLVED' }, 'Attendance exceptions bulk resolved');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -447,15 +497,17 @@ router.put('/exceptions/bulk/resolve', async (req: Request, res: Response) => {
 
 router.put('/exceptions/:id/resolve', async (req: Request, res: Response) => {
     try {
-        const resolvedBy = req.user?.id || req.body.resolvedBy;
+        const resolvedBy = req.user?.id || 'system';
         if (!resolvedBy) {
             return res.status(401).json({ error: 'RESOLVED_BY_REQUIRED' });
         }
-        res.json(await attendanceOpsService.resolveException({
+        const result = await attendanceOpsService.resolveException({
             id: String(req.params.id),
             resolvedBy,
             resolutionNotes: req.body.resolutionNotes,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_EXCEPTION_RESOLVED', { exceptionId: String(req.params.id) }, { status: 'OPEN' }, { status: 'RESOLVED' }, 'Attendance exception resolved');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -467,10 +519,12 @@ router.put('/exceptions/:id/assign', async (req: Request, res: Response) => {
         if (!assignedTo) {
             return res.status(400).json({ error: 'ASSIGNED_TO_REQUIRED' });
         }
-        res.json(await attendanceOpsService.assignException({
+        const result = await attendanceOpsService.assignException({
             id: String(req.params.id),
             assignedTo: String(assignedTo),
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_EXCEPTION_ASSIGNED', { exceptionId: String(req.params.id), assignedTo: String(assignedTo) }, undefined, { assigned: true }, 'Attendance exception assigned');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -478,15 +532,17 @@ router.put('/exceptions/:id/assign', async (req: Request, res: Response) => {
 
 router.put('/exceptions/:id/escalate', async (req: Request, res: Response) => {
     try {
-        const escalatedBy = req.user?.id || req.body.escalatedBy;
+        const escalatedBy = req.user?.id || 'system';
         if (!escalatedBy) {
             return res.status(401).json({ error: 'ESCALATED_BY_REQUIRED' });
         }
-        res.json(await attendanceOpsService.escalateException({
+        const result = await attendanceOpsService.escalateException({
             id: String(req.params.id),
             escalatedBy,
             notes: req.body.notes,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_EXCEPTION_ESCALATED', { exceptionId: String(req.params.id) }, undefined, { escalated: true }, 'Attendance exception escalated');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -558,7 +614,7 @@ router.post('/daily-close', async (req: Request, res: Response) => {
         if (!branchId || !date) {
             return res.status(400).json({ error: 'BRANCH_ID_AND_DATE_REQUIRED' });
         }
-        const closedBy = req.user?.id || req.body.closedBy;
+        const closedBy = req.user?.id || 'system';
         res.json(await attendanceOpsService.dailyCloseAttendance({
             branchId: String(branchId),
             date: String(date),
@@ -577,7 +633,7 @@ router.post('/monthly-close', async (req: Request, res: Response) => {
         if (!branchId || !startDate || !endDate) {
             return res.status(400).json({ error: 'BRANCH_ID_AND_PERIOD_REQUIRED' });
         }
-        const closedBy = req.user?.id || req.body.closedBy;
+        const closedBy = req.user?.id || 'system';
         res.json(await attendanceOpsService.monthlyCloseAttendance({
             branchId: String(branchId),
             startDate: String(startDate),
@@ -619,7 +675,9 @@ router.post('/devices/test-connection', async (req: Request, res: Response) => {
 router.post('/devices/:id/sync', async (req: Request, res: Response) => {
     try {
         const options = parseSyncOptions(req.body || {});
-        res.json(await zktecoConnectorService.syncSingleDevice(String(req.params.id), options));
+        const result = await zktecoConnectorService.syncSingleDevice(String(req.params.id), options);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_SYNCED', { deviceId: String(req.params.id), fetchMode: options.fetchMode || 'AUTO', ingested: result?.logsIngested || 0, skipped: result?.logsSkipped || 0, exceptions: result?.exceptionsRaised || 0 }, undefined, { success: Boolean(result?.success !== false) }, 'Attendance device synchronized');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json(biometricErrorPayload(error));
     }
@@ -638,7 +696,10 @@ router.post('/devices/:id/sync/preview', async (req: Request, res: Response) => 
 // Save only the records approved by the operator from the preview.
 router.post('/devices/:id/sync/commit', async (req: Request, res: Response) => {
     try {
-        res.json(await zktecoConnectorService.commitDevicePreview(String(req.params.id), req.body?.records || []));
+        const records = Array.isArray(req.body?.records) ? req.body.records : [];
+        const result = await zktecoConnectorService.commitDevicePreview(String(req.params.id), records);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_SYNC_COMMITTED', { deviceId: String(req.params.id), recordCount: records.length }, undefined, { committed: true }, 'Attendance device preview committed');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json(biometricErrorPayload(error));
     }
@@ -654,7 +715,9 @@ router.get('/devices/:id/sync-settings', async (req: Request, res: Response) => 
 
 router.put('/devices/:id/sync-settings', async (req: Request, res: Response) => {
     try {
-        res.json(await zktecoConnectorService.updateDeviceSyncSettings(String(req.params.id), req.body || {}));
+        const result = await zktecoConnectorService.updateDeviceSyncSettings(String(req.params.id), req.body || {});
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICE_SYNC_SETTINGS_UPDATED', { deviceId: String(req.params.id), changedFields: Object.keys(req.body || {}) }, undefined, { updated: true }, 'Attendance device sync settings updated');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json(biometricErrorPayload(error));
     }
@@ -662,11 +725,13 @@ router.put('/devices/:id/sync-settings', async (req: Request, res: Response) => 
 
 router.post('/devices/:id/bridge-sync', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.requestBridgeDeviceSync(String(req.params.id), req.user?.id || null, {
+        const result = await attendanceOpsService.requestBridgeDeviceSync(String(req.params.id), req.user?.id || null, {
             startDate: req.body?.startDate ? String(req.body.startDate) : null,
             endDate: req.body?.endDate ? String(req.body.endDate) : null,
             forceFull: req.body?.forceFull === true || req.body?.fullHistory === true,
-        }));
+        });
+        await auditAttendanceMutation(req, 'ATTENDANCE_BRIDGE_SYNC_REQUESTED', { deviceId: String(req.params.id), forceFull: req.body?.forceFull === true || req.body?.fullHistory === true }, undefined, { requested: true }, 'Attendance bridge sync requested');
+        res.json(result);
     } catch (error: any) {
         console.error('[attendance-ops] bridge-sync failed', {
             deviceId: req.params.id,
@@ -694,7 +759,9 @@ router.post('/devices/:id/bridge-test', async (req: Request, res: Response) => {
 
 router.post('/devices/:id/bridge-clear-logs', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.requestBridgeDeviceOperation(String(req.params.id), 'CLEAR_DEVICE_LOGS_WITH_BACKUP', req.user?.id || null));
+        const result = await attendanceOpsService.requestBridgeDeviceOperation(String(req.params.id), 'CLEAR_DEVICE_LOGS_WITH_BACKUP', req.user?.id || null);
+        await auditAttendanceMutation(req, 'ATTENDANCE_BRIDGE_LOGS_CLEARED', { deviceId: String(req.params.id), operation: 'CLEAR_DEVICE_LOGS_WITH_BACKUP' }, undefined, { requested: true }, 'Attendance bridge clear logs requested');
+        res.json(result);
     } catch (error: any) {
         console.error('[attendance-ops] bridge-clear-logs failed', {
             deviceId: req.params.id,
@@ -708,7 +775,9 @@ router.post('/devices/:id/bridge-clear-logs', async (req: Request, res: Response
 
 router.post('/devices/:id/bridge-restart', async (req: Request, res: Response) => {
     try {
-        res.json(await attendanceOpsService.requestBridgeDeviceOperation(String(req.params.id), 'RESTART_DEVICE', req.user?.id || null));
+        const result = await attendanceOpsService.requestBridgeDeviceOperation(String(req.params.id), 'RESTART_DEVICE', req.user?.id || null);
+        await auditAttendanceMutation(req, 'ATTENDANCE_BRIDGE_RESTART_REQUESTED', { deviceId: String(req.params.id), operation: 'RESTART_DEVICE' }, undefined, { requested: true }, 'Attendance bridge restart requested');
+        res.json(result);
     } catch (error: any) {
         console.error('[attendance-ops] bridge-restart failed', {
             deviceId: req.params.id,
@@ -763,6 +832,7 @@ router.post('/sync-all', async (req: Request, res: Response) => {
     try {
         const options = parseSyncOptions(req.body || {});
         const results = await zktecoConnectorService.syncDevices(options);
+        await auditAttendanceMutation(req, 'ATTENDANCE_DEVICES_SYNCED_ALL', { deviceCount: results.length, totalIngested: results.reduce((s, r) => s + r.logsIngested, 0), totalSkipped: results.reduce((s, r) => s + r.logsSkipped, 0), totalExceptions: results.reduce((s, r) => s + r.exceptionsRaised, 0) }, undefined, { completed: true }, 'All attendance devices synchronized');
         res.json({
             totalDevices: results.length,
             successCount: results.filter(r => r.success).length,
@@ -784,7 +854,9 @@ router.post('/import-txt', async (req: Request, res: Response) => {
         if (!content || !branchId) {
             return res.status(400).json({ error: 'CONTENT_AND_BRANCH_ID_REQUIRED' });
         }
-        res.json(await zktecoConnectorService.importTxtFile(content, branchId, deviceId));
+        const result = await zktecoConnectorService.importTxtFile(content, branchId, deviceId);
+        await auditAttendanceMutation(req, 'ATTENDANCE_TXT_IMPORTED', { branchId: String(branchId), deviceId: deviceId || null, contentLength: String(content).length }, undefined, { imported: true }, 'Attendance TXT imported');
+        res.json(result);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -804,6 +876,7 @@ router.post('/auto-sync/start', async (req: Request, res: Response) => {
     try {
         const intervalMinutes = Number(req.body.intervalMinutes) || 15;
         zktecoConnectorService.startAutoSync(intervalMinutes);
+        await auditAttendanceMutation(req, 'ATTENDANCE_AUTO_SYNC_STARTED', { intervalMinutes }, { status: 'STOPPED' }, { status: 'STARTED' }, 'Attendance auto-sync started');
         res.json({ status: 'STARTED', intervalMinutes });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -813,6 +886,7 @@ router.post('/auto-sync/start', async (req: Request, res: Response) => {
 router.post('/auto-sync/stop', async (req: Request, res: Response) => {
     try {
         zktecoConnectorService.stopAutoSync();
+        await auditAttendanceMutation(req, 'ATTENDANCE_AUTO_SYNC_STOPPED', {}, { status: 'STARTED' }, { status: 'STOPPED' }, 'Attendance auto-sync stopped');
         res.json({ status: 'STOPPED' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

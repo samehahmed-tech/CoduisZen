@@ -8,9 +8,10 @@
 
 import { db } from '../db';
 import { fiscalLogs } from '../../src/db/schema';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, lt, isNull, or } from 'drizzle-orm';
 import { etaService } from './etaService';
 import logger from '../utils/logger';
+import { FISCAL_RETRY_LEASE_MS } from '../utils/fiscalRetryPolicy';
 
 const log = logger.child({ service: 'fiscalRetry' });
 
@@ -32,6 +33,15 @@ export const fiscalRetryService = {
     }> {
         const result = { processed: 0, succeeded: 0, failed: 0, skipped: 0, deadLettered: 0, errors: [] as Array<{ logId: string; reason: string }> };
 
+        // Recover a worker that crashed after claiming a failed submission.
+        const staleCutoff = new Date(Date.now() - FISCAL_RETRY_LEASE_MS);
+        await db.update(fiscalLogs)
+            .set({ status: 'FAILED', updatedAt: new Date() })
+            .where(and(
+                eq(fiscalLogs.status, 'PROCESSING'),
+                or(isNull(fiscalLogs.updatedAt), lt(fiscalLogs.updatedAt, staleCutoff)),
+            ));
+
         // Fetch failed fiscal logs that haven't exceeded max retries
         const failedLogs = await db.select()
             .from(fiscalLogs)
@@ -45,8 +55,6 @@ export const fiscalRetryService = {
             .offset(0).fetch(30);
 
         for (const fiscalLog of failedLogs) {
-            result.processed++;
-
             const attempt = Number(fiscalLog.attempt || 0);
 
             // Backoff check
@@ -58,6 +66,20 @@ export const fiscalRetryService = {
                 result.skipped++;
                 continue;
             }
+
+            // Claim before contacting ETA so two schedulers cannot submit twice.
+            const [claimed] = await db.update(fiscalLogs)
+                .set({ status: 'PROCESSING', updatedAt: new Date() })
+                .output()
+                .where(and(
+                    eq(fiscalLogs.id, fiscalLog.id),
+                    eq(fiscalLogs.status, 'FAILED'),
+                ));
+            if (!claimed) {
+                result.skipped++;
+                continue;
+            }
+            result.processed++;
 
             try {
                 // Use existing payload if available, otherwise skip

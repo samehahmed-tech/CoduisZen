@@ -11,7 +11,7 @@ import { db } from '../../db';
 import { menuItems } from '../../../src/db/schema';
 import { and, isNull, sql } from 'drizzle-orm';
 import { getTalabatConfigRaw } from './talabatConfig';
-import { getTalabatToken, TalabatRateLimiter } from './talabatClient';
+import { getTalabatToken, TalabatRateLimiter, talabatRequest } from './talabatClient';
 import { resolvePlatformOverride } from '../../services/pricingService';
 import logger from '../../utils/logger';
 
@@ -100,7 +100,7 @@ export const pushCatalogUpdates = async (vendorId: string, products: CatalogUpda
     if (!built.ok) throw Object.assign(new Error((built as any).code), { status: 400 });
     if (!limiter.tryAcquire(Date.now())) throw Object.assign(new Error('RATE_LIMITED'), { status: 429 });
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/vendors/${vendor}/catalog`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/vendors/${vendor}/catalog`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ products: (built as any).products }),
@@ -115,7 +115,7 @@ export const pushCatalogUpdates = async (vendorId: string, products: CatalogUpda
 
 export const getCatalogJob = async (jobId: string): Promise<any> => {
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/catalog/jobs/${jobId}`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/catalog/jobs/${jobId}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     const data: any = await res.json().catch(() => ({}));
@@ -132,7 +132,7 @@ export const getVendorCatalog = async (vendorId: string, params?: { query_term?:
     if (params?.page) q.set('page', String(params.page));
     if (params?.page_size) q.set('page_size', String(Math.min(params.page_size, 500)));
     if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
-    const res = await fetch(`${base}/chains/${config.chainId}/vendors/${vendor}/catalog?${q.toString()}`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/vendors/${vendor}/catalog?${q.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     const data: any = await res.json().catch(() => ({}));
@@ -144,7 +144,7 @@ export const getVendorCategories = async (vendorId: string): Promise<any> => {
     const vendor = String(vendorId || '').trim();
     if (!vendor) throw Object.assign(new Error('VENDOR_ID_REQUIRED'), { status: 400 });
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/vendors/${vendor}/categories?only_leaves=true`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/vendors/${vendor}/categories?only_leaves=true`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     const data: any = await res.json().catch(() => ({}));

@@ -118,6 +118,8 @@ const PERM_LABELS: Record<string, { en: string; ar: string }> = {
     CFG_MANAGE_PRINTERS: { en: 'Manage Printers', ar: 'إدارة الطابعات' },
     CFG_MANAGE_PLATFORMS: { en: 'Manage Platforms', ar: 'إدارة المنصات' },
     CFG_MANAGE_WAREHOUSES: { en: 'Manage Warehouses', ar: 'إدارة المخازن' },
+    CFG_MANAGE_PUBLIC_API_KEYS: { en: 'Manage Public API Keys', ar: 'إدارة مفاتيح API العامة' },
+    CFG_MANAGE_WEBHOOKS: { en: 'Manage Webhooks', ar: 'إدارة Webhooks' },
 };
 
 // What each permission actually unlocks (shown under every toggle).

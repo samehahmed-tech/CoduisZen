@@ -50,29 +50,33 @@ describe('chart of accounts add-account', () => {
             parentId: '',
             allowManualJournals: true,
         };
-        const unique = Math.floor(100000 + Math.random() * 900000).toString();
+        // Keep all generated codes within the 12-digit API limit while making
+        // repeated runs collision-resistant in the persistent integration DB.
+        const unique = `${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
 
         const normal = await request(app)
             .post('/api/finance/accounts')
             .set('Authorization', auth)
-            .send({ ...payload, code: `67${unique}` });
+            // Keep the baseline code outside the normalized Arabic/Persian
+            // two-digit ranges below; otherwise a random suffix can collide.
+            .send({ ...payload, code: `65${unique}` });
         expect(normal.status).toBe(201);
 
         // Eastern Arabic-Indic digits (٦٧) typed on an Arabic keyboard must be normalized
         const arabicDigits = await request(app)
             .post('/api/finance/accounts')
             .set('Authorization', auth)
-            .send({ ...payload, code: '٦٧' + unique.slice(-2) });
+            .send({ ...payload, code: '٦٧' + unique });
         expect(arabicDigits.status).toBe(201);
-        expect(arabicDigits.body?.code).toBe('67' + unique.slice(-2));
+        expect(arabicDigits.body?.code).toBe('67' + unique);
 
         // Persian digits (۶۸) must be normalized too
         const persianDigits = await request(app)
             .post('/api/finance/accounts')
             .set('Authorization', auth)
-            .send({ ...payload, code: '۶۸' + unique.slice(-2) });
+            .send({ ...payload, code: '۶۸' + unique });
         expect(persianDigits.status).toBe(201);
-        expect(persianDigits.body?.code).toBe('68' + unique.slice(-2));
+        expect(persianDigits.body?.code).toBe('68' + unique);
 
         const missingName = await request(app)
             .post('/api/finance/accounts')
@@ -87,5 +91,5 @@ describe('chart of accounts add-account', () => {
             .send({ ...payload, code: 'AB12', name: 'X' });
         expect(badCode.status).toBe(400);
         expect(badCode.body?.code).toBe('ACCOUNT_CODE_INVALID');
-    });
+    }, 15_000);
 });

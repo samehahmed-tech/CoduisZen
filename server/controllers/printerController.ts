@@ -6,6 +6,8 @@ import { getStringParam } from '../utils/request';
 import { isForeignKeyDeleteError, writeForeignKeyDeleteConflict } from '../utils/dbErrors';
 import net from 'node:net';
 import { pool } from '../db';
+import { createSignedAuditLog } from '../services/auditService';
+import { canAccessBranch } from '../middleware/branchIsolation';
 
 let printerSchemaReady = false;
 
@@ -107,10 +109,37 @@ const normalizePrinterRoles = (body: any) => {
     return Array.isArray(r) ? r : [];
 };
 
+const auditPrinterMutation = (req: Request, eventType: string, branchId: string | null, payload: Record<string, unknown>, before?: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    before,
+    after,
+    reason: `Printer mutation: ${eventType}`,
+});
+
+const printerNetworkAdminRoles = new Set(['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER']);
+const canViewPrinterNetwork = (req: Request) => {
+    const role = String(req.user?.role || '').toUpperCase();
+    return printerNetworkAdminRoles.has(role)
+        || req.user?.permissions?.includes('*')
+        || req.user?.permissions?.includes('CFG_MANAGE_PRINTERS');
+};
+
+const sanitizePrinterForViewer = (printer: any, includeNetwork: boolean) => {
+    if (includeNetwork) return printer;
+    const { address: _address, gatewayId: _gatewayId, ...safePrinter } = printer || {};
+    return safePrinter;
+};
+
 export const getPrinters = async (req: Request, res: Response) => {
     try {
         await ensurePrinterSchema();
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
         const active = getStringParam(req.query.active);
 
         const conditions: any[] = [];
@@ -121,7 +150,7 @@ export const getPrinters = async (req: Request, res: Response) => {
         const query = conditions.length ? base.where(and(...conditions)) : base;
         const all = await query.orderBy(desc(printers.createdAt));
 
-        res.json(all.map(parsePrinterRoles));
+        res.json(all.map(parsePrinterRoles).map((printer) => sanitizePrinterForViewer(printer, canViewPrinterNetwork(req))));
     } catch (error: any) {
         if (isForeignKeyDeleteError(error)) {
             return writeForeignKeyDeleteConflict(res, 'printer', ['print_jobs']);
@@ -139,7 +168,7 @@ export const getPrinterById = async (req: Request, res: Response) => {
         const [printer] = await db.select().from(printers).where(eq(printers.id, id));
         if (!printer) return res.status(404).json({ error: 'Printer not found' });
 
-        res.json(parsePrinterRoles(printer));
+        res.json(sanitizePrinterForViewer(parsePrinterRoles(printer), canViewPrinterNetwork(req)));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -154,7 +183,7 @@ export const createPrinter = async (req: Request, res: Response) => {
         }
 
         const printerId = body.id || `PRN-${Date.now()}`;
-        const branchId = body.branch_id || body.branchId || null;
+        const branchId = req.effectiveBranchId || body.branch_id || body.branchId || null;
         const isPrimaryCashier = body.is_primary_cashier === true || body.isPrimaryCashier === true;
 
         const [created] = await db.insert(printers).output().values({
@@ -180,6 +209,14 @@ export const createPrinter = async (req: Request, res: Response) => {
             await enforceSinglePrimaryCashier(branchId, created.id);
         }
 
+        await auditPrinterMutation(req, 'PRINTER_CREATED', branchId, {
+            printerId: created.id,
+            type: created.type,
+            role: created.role,
+            isPrimaryCashier,
+            hasAddress: Boolean(created.address),
+        }, undefined, { active: created.isActive !== false });
+
         res.status(201).json(parsePrinterRoles(created));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -192,8 +229,11 @@ export const updatePrinter = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'PRINTER_ID_REQUIRED' });
         const body = req.body || {};
+        const [current] = await db.select({ id: printers.id, branchId: printers.branchId, isActive: printers.isActive, type: printers.type }).from(printers).where(eq(printers.id, id));
+        if (!current) return res.status(404).json({ error: 'Printer not found' });
+        if (current.branchId && !canAccessBranch(req.user, current.branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
 
-        const branchId = body.branch_id !== undefined ? (body.branch_id || body.branchId || null) : undefined;
+        const branchId = body.branch_id !== undefined || body.branchId !== undefined ? (req.effectiveBranchId || body.branch_id || body.branchId || null) : undefined;
         const hasPrimaryFlag = Object.prototype.hasOwnProperty.call(body, 'is_primary_cashier') || Object.prototype.hasOwnProperty.call(body, 'isPrimaryCashier');
         const isPrimaryCashier = body.is_primary_cashier === true || body.isPrimaryCashier === true;
 
@@ -240,6 +280,10 @@ export const updatePrinter = async (req: Request, res: Response) => {
         if (hasPrimaryFlag && isPrimaryCashier) {
             await enforceSinglePrimaryCashier(updated.branchId || null, updated.id);
         }
+        await auditPrinterMutation(req, 'PRINTER_UPDATED', updated.branchId || current.branchId || null, {
+            printerId: updated.id,
+            changedKeys: Object.keys(body).filter((key) => !/address|ip|password|secret|token/i.test(key)).sort(),
+        }, { active: current.isActive, type: current.type }, { active: updated.isActive, type: updated.type });
         res.json(parsePrinterRoles(updated));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -252,11 +296,17 @@ export const deletePrinter = async (req: Request, res: Response) => {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'PRINTER_ID_REQUIRED' });
 
+        const [current] = await db.select({ id: printers.id, branchId: printers.branchId, isActive: printers.isActive }).from(printers).where(eq(printers.id, id));
+        if (!current) return res.status(404).json({ error: 'Printer not found' });
+        if (current.branchId && !canAccessBranch(req.user, current.branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
+
         const [deleted] = await db.update(printers)
             .set({ isActive: false, updatedAt: new Date() })
             .output()
             .where(eq(printers.id, id));
         if (!deleted) return res.status(404).json({ error: 'Printer not found' });
+
+        await auditPrinterMutation(req, 'PRINTER_DEACTIVATED', deleted.branchId || null, { printerId: deleted.id }, { active: true }, { active: false });
 
         res.json({ success: true, printer: parsePrinterRoles(deleted) });
     } catch (error: any) {

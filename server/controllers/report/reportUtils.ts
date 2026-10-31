@@ -1,6 +1,8 @@
 import { Request } from 'express';
 import { sql } from 'drizzle-orm';
 import { orders } from '../../../src/db/schema';
+import { normalizeBusinessDate } from '../../utils/businessDateRange';
+import { canAccessBranch } from '../../middleware/branchIsolation';
 
 export type ReportGranularity = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 export type DashboardScope = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ALL';
@@ -8,8 +10,11 @@ export type DashboardScope = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ALL';
 export const DELIVERED_STATUSES = ['DELIVERED', 'COMPLETED'];
 
 export const parseLocalDateRange = (startDate: string, endDate: string) => {
-    const start = new Date(`${startDate}T00:00:00`);
-    const end = new Date(`${endDate}T00:00:00`);
+    const normalizedStart = normalizeBusinessDate(startDate);
+    const normalizedEnd = normalizeBusinessDate(endDate);
+    if (!normalizedStart || !normalizedEnd || normalizedStart > normalizedEnd) throw new Error('INVALID_DATE_RANGE');
+    const start = new Date(`${normalizedStart}T00:00:00`);
+    const end = new Date(`${normalizedEnd}T00:00:00`);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
         throw new Error('INVALID_DATE_RANGE');
     }
@@ -35,7 +40,7 @@ export const parseReportFilters = (req: Request) => {
 
     const { start, end } = parseLocalDateRange(startDate as string, endDate as string);
     return {
-        branchId: branchId ? String(branchId) : undefined,
+        branchId: req.effectiveBranchId || (branchId ? String(branchId) : undefined),
         start,
         end,
         reportType: String(reportType || 'overview').toUpperCase(),
@@ -54,17 +59,13 @@ export const resolveScopedBranchId = (req: Request, requestedBranchId?: string) 
             ? requestedBranchId
             : undefined;
 
-    if (user.role === 'SUPER_ADMIN') {
-        return effectiveRequestedId;
-    }
-
-    if (!user.branchId) {
+    if (user.role === 'SUPER_ADMIN') return req.effectiveBranchId || effectiveRequestedId;
+    if (!req.effectiveBranchId && !user.branchId && !(user.allowedBranches || []).length) {
         throw new Error('BRANCH_SCOPE_REQUIRED');
     }
-
-    if (effectiveRequestedId && effectiveRequestedId !== user.branchId) {
+    const resolved = req.effectiveBranchId || effectiveRequestedId || user.branchId || user.allowedBranches?.[0];
+    if (effectiveRequestedId && !canAccessBranch(user, effectiveRequestedId)) {
         throw new Error('FORBIDDEN_BRANCH_SCOPE');
     }
-
-    return user.branchId;
+    return resolved;
 };

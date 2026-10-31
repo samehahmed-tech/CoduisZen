@@ -1,0 +1,88 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/CallCenterManager.tsx",
+      "language": "typescript",
+      "sizeLines": 224,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/AgentsTab.tsx",
+      "language": "typescript",
+      "sizeLines": 145,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/BranchesTab.tsx",
+      "language": "typescript",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/DailyTab.tsx",
+      "language": "typescript",
+      "sizeLines": 178,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/DeliveryTab.tsx",
+      "language": "typescript",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/DriversTab.tsx",
+      "language": "typescript",
+      "sizeLines": 90,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/EscalationsTab.tsx",
+      "language": "typescript",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/FailedTab.tsx",
+      "language": "typescript",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/OverviewTab.tsx",
+      "language": "typescript",
+      "sizeLines": 231,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/QualityTab.tsx",
+      "language": "typescript",
+      "sizeLines": 92,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/CallCenterManager.tsx": [
+      "components/callcenter/AgentsTab.tsx",
+      "components/callcenter/BranchesTab.tsx",
+      "components/callcenter/DailyTab.tsx",
+      "components/callcenter/DeliveryTab.tsx",
+      "components/callcenter/DriversTab.tsx",
+      "components/callcenter/EscalationsTab.tsx",
+      "components/callcenter/FailedTab.tsx",
+      "components/callcenter/OverviewTab.tsx",
+      "components/callcenter/QualityTab.tsx",
+      "components/callcenter/useCallCenterState.tsx"
+    ],
+    "components/callcenter/AgentsTab.tsx": [],
+    "components/callcenter/BranchesTab.tsx": [],
+    "components/callcenter/DailyTab.tsx": [],
+    "components/callcenter/DeliveryTab.tsx": [],
+    "components/callcenter/DriversTab.tsx": [],
+    "components/callcenter/EscalationsTab.tsx": [],
+    "components/callcenter/FailedTab.tsx": [],
+    "components/callcenter/OverviewTab.tsx": [],
+    "components/callcenter/QualityTab.tsx": []
+  }
+}

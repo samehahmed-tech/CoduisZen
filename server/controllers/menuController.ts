@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { inventoryItems, menuCategories, menuItems, recipeIngredients, recipes } from '../../src/db/schema';
+import { branches, idempotencyKeys, inventoryItems, managerApprovals, menuCategories, menuItems, recipeIngredients, recipes } from '../../src/db/schema';
 import { calculateRecipeCost } from '../../utils/menuCost';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { pool } from '../db';
 import { dbCacheService } from '../services/dbCacheService';
@@ -10,6 +10,9 @@ import { createSignedAuditLog } from '../services/auditService';
 import { randomUUID } from 'node:crypto';
 import { queueTalabatCatalogSync } from '../modules/talabat/talabatCatalogService';
 import { resolvePlatformOverride } from '../services/pricingService';
+import { canAccessBranch } from '../middleware/branchIsolation';
+import { scopeMenuItemsToBranch } from '../utils/menuPricingScope';
+import { buildRequestHash, getIdempotencyKeyFromRequest } from '../services/idempotencyService';
 
 /** Fire-and-forget Talabat price/availability sync for one saved menu row. */
 const syncTalabatCatalogRow = (row: any) => {
@@ -194,6 +197,34 @@ const menuItemSelect = {
     updatedAt: menuItems.updatedAt,
 };
 
+const costViewerRoles = new Set([
+    'SUPER_ADMIN', 'OWNER', 'ACCOUNTANT', 'COST_ACCOUNTANT', 'FINANCE_DIRECTOR', 'PROCUREMENT_MANAGER', 'WAREHOUSE_DIRECTOR',
+]);
+
+const canViewMenuCosts = (req: Request) => {
+    const role = String(req.user?.role || '').toUpperCase();
+    return costViewerRoles.has(role) || req.user?.permissions?.includes('*') || req.user?.permissions?.includes('DATA_VIEW_COSTS');
+};
+
+const sanitizeMenuItemForViewer = (item: any, includeCosts: boolean) => {
+    if (includeCosts) return item;
+    const {
+        cost: _cost,
+        previousPrice: _previousPrice,
+        pendingPrice: _pendingPrice,
+        priceChangeReason: _priceChangeReason,
+        priceApprovedBy: _priceApprovedBy,
+        priceApprovedAt: _priceApprovedAt,
+        platformPricing: _platformPricing,
+        recipe: _recipe,
+        ...safeItem
+    } = item || {};
+    if (Array.isArray(safeItem.sizes)) {
+        safeItem.sizes = safeItem.sizes.map(({ cost: _sizeCost, ...safeSize }: any) => safeSize);
+    }
+    return safeItem;
+};
+
 // --- Categories ---
 export const getAllCategories = async (req: Request, res: Response) => {
     try {
@@ -267,7 +298,8 @@ export const getMenuItems = async (req: Request, res: Response) => {
         const category_id = getStringParam(req.query.category_id);
         const available_only = getStringParam(req.query.available_only);
 
-        const cacheKey = `menu:items:${category_id || 'all'}:${available_only || 'false'}`;
+        const branchId = req.effectiveBranchId;
+        const cacheKey = `menu:items:${branchId || 'ALL'}:${category_id || 'all'}:${available_only || 'false'}`;
 
         const items = await dbCacheService.getOrFetch(cacheKey, async () => {
             const conditions: any[] = [];
@@ -281,7 +313,7 @@ export const getMenuItems = async (req: Request, res: Response) => {
             return await query.orderBy(menuItems.sortOrder, menuItems.name);
         }, { staleWhileRevalidate: true, ttlMs: 15 * 60 * 1000 });
 
-        res.json(items);
+        res.json(scopeMenuItemsToBranch(items as any[], branchId).map((item) => sanitizeMenuItemForViewer(item, canViewMenuCosts(req))));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -343,10 +375,10 @@ const saveRecipeForItem = async (menuItemId: string, recipesData: any) => {
     if (wantedIds.size > 0) {
         const ids = [...wantedIds];
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
-        const found = await pool.query(`select id, is_active, cost_price, unit from inventory_items where id in (${placeholders})`, ids);
+        const found = await pool.query(`select id, is_active, cost_price, unit from inventory_items where id in (${placeholders})`, ids) as any;
         const foundMap = new Map(found.rows.map((r: any) => [String(r.id), r]));
         for (const id of ids) {
-            const row = foundMap.get(id);
+            const row = foundMap.get(id) as any;
             if (!row) throw new Error('RECIPE_INGREDIENT_ITEM_NOT_FOUND');
             if (row.is_active === false || row.is_active === 0) throw new Error('RECIPE_INGREDIENT_ITEM_INACTIVE');
         }
@@ -654,7 +686,8 @@ export const getFullMenu = async (req: Request, res: Response) => {
         const available_only = getStringParam(req.query.available_only);
         const cacheVersion = await getMenuCacheVersion();
 
-        const cacheKey = `menu:full:${available_only || 'false'}:${cacheVersion}`;
+        const branchId = req.effectiveBranchId;
+        const cacheKey = `menu:full:${branchId || 'ALL'}:${available_only || 'false'}:${cacheVersion}`;
 
         const fullMenu = await dbCacheService.getOrFetch(cacheKey, async () => {
             // Get all categories
@@ -727,7 +760,11 @@ export const getFullMenu = async (req: Request, res: Response) => {
             }));
         }, { staleWhileRevalidate: true, ttlMs: 15 * 60 * 1000 });
 
-        res.json(fullMenu);
+        res.json(fullMenu.map((category: any) => ({
+            ...category,
+            items: scopeMenuItemsToBranch(category.items || [], branchId)
+                .map((item) => sanitizeMenuItemForViewer(item, canViewMenuCosts(req))),
+        })));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -889,6 +926,66 @@ export const approvePriceChange = async (req: Request, res: Response) => {
  * Warn-only domain: skips items that already have a target entry unless
  * overwrite=true. Audited per chain pricing accountability.
  */
+export const previewBranchPricingCopy = async (req: Request, res: Response) => {
+    try {
+        const fromBranchId = String(req.body?.fromBranchId || '').trim();
+        const toBranchId = String(req.body?.toBranchId || '').trim();
+        const overwrite = req.body?.overwrite === true;
+        if (!fromBranchId || !toBranchId) {
+            return res.status(400).json({ error: 'BRANCH_IDS_REQUIRED', code: 'BRANCH_IDS_REQUIRED' });
+        }
+        if (fromBranchId === toBranchId) {
+            return res.status(400).json({ error: 'SAME_BRANCH', code: 'SAME_BRANCH' });
+        }
+        if (!canAccessBranch(req.user, fromBranchId) || !canAccessBranch(req.user, toBranchId)) {
+            return res.status(403).json({ error: 'BRANCH_MISMATCH', code: 'BRANCH_MISMATCH' });
+        }
+
+        const existingBranches = await db.select({ id: branches.id }).from(branches)
+            .where(or(eq(branches.id, fromBranchId), eq(branches.id, toBranchId)));
+        const existingBranchIds = new Set(existingBranches.map((branch) => String(branch.id)));
+        if (!existingBranchIds.has(fromBranchId) || !existingBranchIds.has(toBranchId)) {
+            return res.status(404).json({ error: 'BRANCH_NOT_FOUND', code: 'BRANCH_NOT_FOUND' });
+        }
+
+        const items = await db.select({ id: menuItems.id, branchPricing: menuItems.branchPricing }).from(menuItems);
+        const changes: Array<{ itemId: string; copy: number; overwrite: number; skip: number }> = [];
+        let copiedEntries = 0;
+        let skippedEntries = 0;
+        for (const item of items) {
+            const current: any[] = Array.isArray(item.branchPricing) ? item.branchPricing : [];
+            const source = current.filter((entry: any) => String(entry?.branchId ?? entry?.branch_id ?? '') === fromBranchId);
+            if (source.length === 0) continue;
+            let copy = 0;
+            let overwriteCount = 0;
+            let skip = 0;
+            for (const entry of source) {
+                const channel = entry?.channel ? String(entry.channel).toUpperCase() : undefined;
+                const targetExists = current.some((target: any) =>
+                    String(target?.branchId ?? target?.branch_id ?? '') === toBranchId &&
+                    String(target?.channel || '').toUpperCase() === String(channel || '').toUpperCase());
+                if (targetExists && !overwrite) { skip++; skippedEntries++; }
+                else if (targetExists) { overwriteCount++; copiedEntries++; }
+                else { copy++; copiedEntries++; }
+            }
+            if (copy || overwriteCount || skip) changes.push({ itemId: item.id, copy, overwrite: overwriteCount, skip });
+        }
+
+        return res.json({
+            preview: true,
+            fromBranchId,
+            toBranchId,
+            overwrite,
+            itemCount: changes.length,
+            copiedEntries,
+            skippedEntries,
+            changes,
+        });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 export const copyBranchPricing = async (req: Request, res: Response) => {
     try {
         const fromBranchId = String(req.body?.fromBranchId || '').trim();
@@ -900,34 +997,48 @@ export const copyBranchPricing = async (req: Request, res: Response) => {
         if (fromBranchId === toBranchId) {
             return res.status(400).json({ error: 'SAME_BRANCH', code: 'SAME_BRANCH' });
         }
-        const items = await db.select({ id: menuItems.id, branchPricing: menuItems.branchPricing }).from(menuItems);
-        let updatedItems = 0;
-        let copiedEntries = 0;
-        let skippedEntries = 0;
-        for (const item of items) {
-            const current: any[] = Array.isArray(item.branchPricing) ? item.branchPricing : [];
-            const source = current.filter((e: any) => String(e?.branchId ?? e?.branch_id ?? '') === fromBranchId);
-            if (source.length === 0) continue;
-            let next = [...current];
-            let changed = false;
-            for (const entry of source) {
-                const channel = entry?.channel ? String(entry.channel).toUpperCase() : undefined;
-                const idx = next.findIndex((e: any) =>
-                    String(e?.branchId ?? e?.branch_id ?? '') === toBranchId &&
-                    String(e?.channel || '').toUpperCase() === String(channel || '').toUpperCase());
-                const clone: any = { ...entry, branchId: toBranchId };
-                if (idx >= 0) {
-                    if (overwrite) { next[idx] = clone; changed = true; copiedEntries++; }
-                    else skippedEntries++;
-                } else {
-                    next.push(clone); changed = true; copiedEntries++;
+        if (!canAccessBranch(req.user, fromBranchId) || !canAccessBranch(req.user, toBranchId)) {
+            return res.status(403).json({ error: 'BRANCH_MISMATCH', code: 'BRANCH_MISMATCH' });
+        }
+        const existingBranches = await db.select({ id: branches.id }).from(branches)
+            .where(or(eq(branches.id, fromBranchId), eq(branches.id, toBranchId)));
+        const existingBranchIds = new Set(existingBranches.map((branch) => String(branch.id)));
+        if (!existingBranchIds.has(fromBranchId) || !existingBranchIds.has(toBranchId)) {
+            return res.status(404).json({ error: 'BRANCH_NOT_FOUND', code: 'BRANCH_NOT_FOUND' });
+        }
+
+        const result = await db.transaction(async (tx) => {
+            const items = await tx.select({ id: menuItems.id, branchPricing: menuItems.branchPricing }).from(menuItems);
+            let updatedItems = 0;
+            let copiedEntries = 0;
+            let skippedEntries = 0;
+            for (const item of items) {
+                const current: any[] = Array.isArray(item.branchPricing) ? item.branchPricing : [];
+                const source = current.filter((e: any) => String(e?.branchId ?? e?.branch_id ?? '') === fromBranchId);
+                if (source.length === 0) continue;
+                let next = [...current];
+                let changed = false;
+                for (const entry of source) {
+                    const channel = entry?.channel ? String(entry.channel).toUpperCase() : undefined;
+                    const idx = next.findIndex((e: any) =>
+                        String(e?.branchId ?? e?.branch_id ?? '') === toBranchId &&
+                        String(e?.channel || '').toUpperCase() === String(channel || '').toUpperCase());
+                    const clone: any = { ...entry, branchId: toBranchId };
+                    if (idx >= 0) {
+                        if (overwrite) { next[idx] = clone; changed = true; copiedEntries++; }
+                        else skippedEntries++;
+                    } else {
+                        next.push(clone); changed = true; copiedEntries++;
+                    }
+                }
+                if (changed) {
+                    await tx.update(menuItems).set({ branchPricing: next, updatedAt: new Date() }).where(eq(menuItems.id, item.id));
+                    updatedItems++;
                 }
             }
-            if (changed) {
-                await db.update(menuItems).set({ branchPricing: next, updatedAt: new Date() }).where(eq(menuItems.id, item.id));
-                updatedItems++;
-            }
-        }
+            return { updatedItems, copiedEntries, skippedEntries };
+        });
+        const { updatedItems, copiedEntries, skippedEntries } = result;
         const userId = (req as any).user?.id;
         await createSignedAuditLog({
             eventType: 'MENU_BRANCH_PRICING_COPIED',
@@ -942,6 +1053,393 @@ export const copyBranchPricing = async (req: Request, res: Response) => {
         res.json({ updatedItems, copiedEntries, skippedEntries });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+const HEAD_OFFICE_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER']);
+const DISTRIBUTION_APPROVAL_REQUEST_REASON = 'Head-office master data distribution approval requested';
+const DISTRIBUTION_APPROVAL_PROCESSING_REASON = 'Head-office master data distribution approval processing';
+
+const normalizeDistributionTargets = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map((id) => String(id || '').trim()).filter(Boolean))].slice(0, 100);
+};
+
+const assertHeadOfficeDistribution = (req: Request): string | null => {
+    const role = String(req.user?.role || '').toUpperCase();
+    return HEAD_OFFICE_ROLES.has(role) ? null : 'HEAD_OFFICE_SCOPE_REQUIRED';
+};
+
+const loadDistributionBranches = async (sourceBranchId: string, targetBranchIds: string[]) => {
+    const ids = [...new Set([sourceBranchId, ...targetBranchIds])];
+    const rows = await db.select({ id: branches.id }).from(branches).where(inArray(branches.id, ids));
+    const found = new Set(rows.map((branch) => String(branch.id)));
+    return { ids, found };
+};
+
+const buildBranchPricingDistributionPreview = async (
+    sourceBranchId: string,
+    targetBranchIds: string[],
+    overwrite: boolean,
+) => {
+    const items = await db.select({ id: menuItems.id, branchPricing: menuItems.branchPricing }).from(menuItems);
+    const targets = targetBranchIds.map((targetBranchId) => ({
+        targetBranchId,
+        updatedItems: 0,
+        copiedEntries: 0,
+        skippedEntries: 0,
+    }));
+
+    for (const item of items) {
+        const current: any[] = Array.isArray(item.branchPricing) ? item.branchPricing : [];
+        const source = current.filter((entry: any) => String(entry?.branchId ?? entry?.branch_id ?? '') === sourceBranchId);
+        if (source.length === 0) continue;
+        for (const summary of targets) {
+            let changed = false;
+            for (const entry of source) {
+                const channel = String(entry?.channel || '').toUpperCase();
+                const exists = current.some((candidate: any) =>
+                    String(candidate?.branchId ?? candidate?.branch_id ?? '') === summary.targetBranchId
+                    && String(candidate?.channel || '').toUpperCase() === channel,
+                );
+                if (exists && !overwrite) summary.skippedEntries++;
+                else { summary.copiedEntries++; changed = true; }
+            }
+            if (changed) summary.updatedItems++;
+        }
+    }
+    return { sourceBranchId, overwrite, targets };
+};
+
+const applyBranchPricingDistributionInTransaction = async (tx: any, sourceBranchId: string, targetBranchIds: string[], overwrite: boolean) => {
+    const items = await tx.select({ id: menuItems.id, branchPricing: menuItems.branchPricing }).from(menuItems);
+    const summary = targetBranchIds.map((targetBranchId) => ({ targetBranchId, updatedItems: 0, copiedEntries: 0, skippedEntries: 0 }));
+    for (const item of items) {
+        const current: any[] = Array.isArray(item.branchPricing) ? item.branchPricing : [];
+        const source = current.filter((entry: any) => String(entry?.branchId ?? entry?.branch_id ?? '') === sourceBranchId);
+        if (source.length === 0) continue;
+        let next = [...current];
+        let changed = false;
+        for (const target of summary) {
+            let targetChanged = false;
+            for (const entry of source) {
+                const channel = String(entry?.channel || '').toUpperCase();
+                const idx = next.findIndex((candidate: any) =>
+                    String(candidate?.branchId ?? candidate?.branch_id ?? '') === target.targetBranchId
+                    && String(candidate?.channel || '').toUpperCase() === channel,
+                );
+                if (idx >= 0) {
+                    if (!overwrite) { target.skippedEntries++; continue; }
+                    next[idx] = { ...entry, branchId: target.targetBranchId };
+                } else {
+                    next.push({ ...entry, branchId: target.targetBranchId });
+                }
+                target.copiedEntries++;
+                targetChanged = true;
+                changed = true;
+            }
+            if (targetChanged) target.updatedItems++;
+        }
+        if (changed) await tx.update(menuItems).set({ branchPricing: next, updatedAt: new Date() }).where(eq(menuItems.id, item.id));
+    }
+    return summary;
+};
+
+const executeBranchPricingDistribution = async (sourceBranchId: string, targetBranchIds: string[], overwrite: boolean) =>
+    db.transaction((tx) => applyBranchPricingDistributionInTransaction(tx, sourceBranchId, targetBranchIds, overwrite));
+
+/**
+ * Head-office distribution MVP for branch pricing.
+ * Preview is deliberately read-only; apply requires confirm=true and updates
+ * every target inside one transaction so a partial rollout cannot occur.
+ */
+export const previewMasterDataDistribution = async (req: Request, res: Response) => {
+    try {
+        const authError = assertHeadOfficeDistribution(req);
+        if (authError) return res.status(403).json({ error: authError, code: authError });
+        const sourceBranchId = String(req.body?.sourceBranchId || '').trim();
+        const targetBranchIds = normalizeDistributionTargets(req.body?.targetBranchIds)
+            .filter((branchId) => branchId !== sourceBranchId);
+        const overwrite = req.body?.overwrite === true;
+        if (!sourceBranchId || targetBranchIds.length === 0) {
+            return res.status(400).json({ error: 'DISTRIBUTION_BRANCHES_REQUIRED', code: 'DISTRIBUTION_BRANCHES_REQUIRED' });
+        }
+        const { found } = await loadDistributionBranches(sourceBranchId, targetBranchIds);
+        if (found.size !== new Set([sourceBranchId, ...targetBranchIds]).size) {
+            return res.status(404).json({ error: 'BRANCH_NOT_FOUND', code: 'BRANCH_NOT_FOUND' });
+        }
+        return res.json({
+            preview: true,
+            dataset: 'MENU_BRANCH_PRICING',
+            ...(await buildBranchPricingDistributionPreview(sourceBranchId, targetBranchIds, overwrite)),
+        });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const applyMasterDataDistribution = async (req: Request, res: Response) => {
+    try {
+        const authError = assertHeadOfficeDistribution(req);
+        if (authError) return res.status(403).json({ error: authError, code: authError });
+        if (req.body?.confirm !== true) {
+            return res.status(400).json({ error: 'DISTRIBUTION_CONFIRMATION_REQUIRED', code: 'DISTRIBUTION_CONFIRMATION_REQUIRED' });
+        }
+        const sourceBranchId = String(req.body?.sourceBranchId || '').trim();
+        const targetBranchIds = normalizeDistributionTargets(req.body?.targetBranchIds)
+            .filter((branchId) => branchId !== sourceBranchId);
+        const overwrite = req.body?.overwrite === true;
+        if (overwrite) {
+            return res.status(409).json({ error: 'DISTRIBUTION_APPROVAL_REQUIRED', code: 'DISTRIBUTION_APPROVAL_REQUIRED' });
+        }
+        if (!sourceBranchId || targetBranchIds.length === 0) {
+            return res.status(400).json({ error: 'DISTRIBUTION_BRANCHES_REQUIRED', code: 'DISTRIBUTION_BRANCHES_REQUIRED' });
+        }
+        const { found } = await loadDistributionBranches(sourceBranchId, targetBranchIds);
+        if (found.size !== new Set([sourceBranchId, ...targetBranchIds]).size) {
+            return res.status(404).json({ error: 'BRANCH_NOT_FOUND', code: 'BRANCH_NOT_FOUND' });
+        }
+
+        const result = await executeBranchPricingDistribution(sourceBranchId, targetBranchIds, overwrite);
+        const userId = req.user?.id || 'system';
+        await createSignedAuditLog({
+            eventType: 'MASTER_DATA_DISTRIBUTION_APPLIED',
+            userId,
+            branchId: null,
+            payload: { dataset: 'MENU_BRANCH_PRICING', sourceBranchId, targetBranchIds, overwrite, result },
+            reason: 'Head-office master data distribution',
+            sourceDevice: req.headers['user-agent'] || 'unknown',
+            requestId: req.requestId || req.headers['x-request-id'] as string || `req-${Date.now()}`,
+        });
+        dbCacheService.invalidatePattern('menu:');
+        return res.json({ applied: true, dataset: 'MENU_BRANCH_PRICING', sourceBranchId, overwrite, result });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const requestMasterDataDistribution = async (req: Request, res: Response) => {
+    const idempotencyKey = getIdempotencyKeyFromRequest(req);
+    const idempotencyScope = 'MASTER_DATA_DISTRIBUTION_REQUEST';
+    let ownsIdempotencyClaim = false;
+    let approvalCreated = false;
+    let responseBodyForIdempotency: { approvalId: string; status: 'PENDING'; dataset: string; preview?: unknown } | undefined;
+    try {
+        const authError = assertHeadOfficeDistribution(req);
+        if (authError) return res.status(403).json({ error: authError, code: authError });
+        const sourceBranchId = String(req.body?.sourceBranchId || '').trim();
+        const targetBranchIds = normalizeDistributionTargets(req.body?.targetBranchIds).filter((id) => id !== sourceBranchId);
+        const overwrite = req.body?.overwrite === true;
+        if (!sourceBranchId || targetBranchIds.length === 0) return res.status(400).json({ error: 'DISTRIBUTION_BRANCHES_REQUIRED' });
+        const { found } = await loadDistributionBranches(sourceBranchId, targetBranchIds);
+        if (found.size !== new Set([sourceBranchId, ...targetBranchIds]).size) return res.status(404).json({ error: 'BRANCH_NOT_FOUND' });
+        const requestHash = buildRequestHash({ sourceBranchId, targetBranchIds, overwrite });
+        const now = new Date();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        if (idempotencyKey) {
+            const [existing] = await db.select().top(1).from(idempotencyKeys).where(and(
+                eq(idempotencyKeys.key, idempotencyKey),
+                eq(idempotencyKeys.scope, idempotencyScope),
+            ));
+            if (existing && existing.expiresAt <= now) {
+                await db.delete(idempotencyKeys).where(and(
+                    eq(idempotencyKeys.key, idempotencyKey),
+                    eq(idempotencyKeys.scope, idempotencyScope),
+                    lt(idempotencyKeys.expiresAt, now),
+                ));
+            } else if (existing) {
+                if (existing.requestHash !== requestHash) return res.status(409).json({ error: 'IDEMPOTENCY_KEY_PAYLOAD_CONFLICT' });
+                if (existing.status === 'COMPLETED') {
+                    const replay = typeof existing.responseBody === 'string' ? JSON.parse(existing.responseBody) : existing.responseBody;
+                    return res.status(existing.responseCode || 201).json({ ...replay, idempotentReplay: true });
+                }
+                return res.status(409).json({ error: 'IDEMPOTENCY_KEY_IN_PROGRESS' });
+            }
+            try {
+                await db.insert(idempotencyKeys).values({
+                    key: idempotencyKey,
+                    scope: idempotencyScope,
+                    requestHash,
+                    status: 'IN_PROGRESS',
+                    expiresAt,
+                    updatedAt: new Date(),
+                });
+                ownsIdempotencyClaim = true;
+            } catch {
+                return res.status(409).json({ error: 'IDEMPOTENCY_KEY_IN_PROGRESS' });
+            }
+        }
+        const preview = await buildBranchPricingDistributionPreview(sourceBranchId, targetBranchIds, overwrite);
+        const [approval] = await db.insert(managerApprovals).output().values({
+            managerId: req.user?.id || 'system',
+            branchId: sourceBranchId,
+            actionType: 'MASTER_DATA_DISTRIBUTION',
+            relatedId: randomUUID(),
+            reason: DISTRIBUTION_APPROVAL_REQUEST_REASON,
+            details: {
+                status: 'PENDING',
+                dataset: 'MENU_BRANCH_PRICING',
+                sourceBranchId,
+                targetBranchIds,
+                overwrite,
+                preview,
+                requestedBy: req.user?.id || 'system',
+                requestedAt: new Date().toISOString(),
+            },
+            createdAt: new Date(),
+        });
+        approvalCreated = true;
+        const responseBody = { approvalId: String(approval.id), status: 'PENDING' as const, dataset: 'MENU_BRANCH_PRICING', preview };
+        responseBodyForIdempotency = responseBody;
+        if (ownsIdempotencyClaim && idempotencyKey) {
+            await db.update(idempotencyKeys).set({
+                status: 'COMPLETED',
+                resourceId: String(approval.id),
+                responseCode: 201,
+                responseBody,
+                updatedAt: new Date(),
+            }).where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, idempotencyScope)));
+        }
+        await createSignedAuditLog({
+            eventType: 'MASTER_DATA_DISTRIBUTION_REQUESTED',
+            userId: req.user?.id || 'system',
+            branchId: sourceBranchId,
+            payload: { approvalId: approval.id, dataset: 'MENU_BRANCH_PRICING', sourceBranchId, targetBranchIds, overwrite },
+            reason: 'Head-office distribution requires approval',
+            sourceDevice: req.headers['user-agent'] || 'unknown',
+            requestId: req.requestId || randomUUID(),
+        });
+        return res.status(201).json(responseBody);
+    } catch (error: any) {
+        if (ownsIdempotencyClaim && idempotencyKey && !approvalCreated) {
+            await db.delete(idempotencyKeys).where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, idempotencyScope))).catch(() => undefined);
+        } else if (ownsIdempotencyClaim && idempotencyKey && approvalCreated && responseBodyForIdempotency) {
+            // The approval is already durable. Complete the idempotency record
+            // on the recovery path so a transient response/update failure does
+            // not leave the client permanently stuck in IN_PROGRESS.
+            await db.update(idempotencyKeys).set({
+                status: 'COMPLETED',
+                resourceId: responseBodyForIdempotency.approvalId,
+                responseCode: 201,
+                responseBody: responseBodyForIdempotency,
+                updatedAt: new Date(),
+            }).where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, idempotencyScope))).catch(() => undefined);
+        }
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const getMasterDataDistributionApprovals = async (req: Request, res: Response) => {
+    try {
+        const authError = assertHeadOfficeDistribution(req);
+        if (authError) return res.status(403).json({ error: authError, code: authError });
+        const rows = await db.select().from(managerApprovals)
+            .where(eq(managerApprovals.actionType, 'MASTER_DATA_DISTRIBUTION'))
+            .orderBy(desc(managerApprovals.createdAt)).offset(0).fetch(200);
+        return res.json(rows.map((approval) => {
+            const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
+            return {
+                ...approval,
+                id: String(approval.id),
+                type: approval.actionType,
+                referenceId: approval.relatedId,
+                status: details.status || 'PENDING',
+                details,
+                resolvedAt: details.resolvedAt,
+                resolvedBy: details.resolvedBy,
+            };
+        }));
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const approveMasterDataDistribution = async (req: Request, res: Response) => {
+    try {
+        const authError = assertHeadOfficeDistribution(req);
+        if (authError) return res.status(403).json({ error: authError, code: authError });
+        const approvalId = Number(req.params.approvalId);
+        if (!Number.isFinite(approvalId)) return res.status(400).json({ error: 'INVALID_APPROVAL_ID' });
+        const [approval] = await db.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, approvalId));
+        if (!approval || approval.actionType !== 'MASTER_DATA_DISTRIBUTION') return res.status(404).json({ error: 'APPROVAL_NOT_FOUND' });
+        const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
+        if (details.status === 'APPROVED') return res.json({ approvalId: String(approval.id), status: 'APPROVED', replay: true });
+        if (details.status === 'REJECTED') return res.status(409).json({ error: 'APPROVAL_REJECTED' });
+        if (String(details.requestedBy || approval.managerId || '') === String(req.user?.id || '')) {
+            return res.status(403).json({ error: 'APPROVAL_SEPARATION_REQUIRED' });
+        }
+        const sourceBranchId = String(details.sourceBranchId || approval.branchId || '').trim();
+        const targetBranchIds = normalizeDistributionTargets(details.targetBranchIds).filter((id) => id !== sourceBranchId);
+        const overwrite = details.overwrite === true;
+        if (!sourceBranchId || targetBranchIds.length === 0) return res.status(400).json({ error: 'DISTRIBUTION_REQUEST_INVALID' });
+        const { found } = await loadDistributionBranches(sourceBranchId, targetBranchIds);
+        if (found.size !== new Set([sourceBranchId, ...targetBranchIds]).size) return res.status(404).json({ error: 'BRANCH_NOT_FOUND' });
+        const result = await db.transaction(async (tx) => {
+            // Claim the pending request atomically before mutating menu pricing.
+            // The reason predicate acts as a compare-and-swap guard, so a
+            // concurrent approval can never apply the same request twice.
+            const [claimed] = await tx.update(managerApprovals).set({
+                reason: DISTRIBUTION_APPROVAL_PROCESSING_REASON,
+                details: { ...details, status: 'PROCESSING', processingAt: new Date().toISOString(), processingBy: req.user?.id || 'system' },
+            }).output().where(and(
+                eq(managerApprovals.id, approval.id),
+                eq(managerApprovals.reason, DISTRIBUTION_APPROVAL_REQUEST_REASON),
+            ));
+            if (!claimed) {
+                throw new Error('DISTRIBUTION_APPROVAL_ALREADY_CLAIMED');
+            }
+            const applied = await applyBranchPricingDistributionInTransaction(tx, sourceBranchId, targetBranchIds, overwrite);
+            const resolvedDetails = { ...details, status: 'APPROVED', resolvedAt: new Date().toISOString(), resolvedBy: req.user?.id || 'system' };
+            const [updated] = await tx.update(managerApprovals).set({ managerId: req.user?.id || approval.managerId, reason: 'Head-office distribution approved', details: resolvedDetails }).output().where(eq(managerApprovals.id, approval.id));
+            return { applied, updated };
+        });
+        await createSignedAuditLog({
+            eventType: 'MASTER_DATA_DISTRIBUTION_APPROVED',
+            userId: req.user?.id || 'system',
+            branchId: sourceBranchId,
+            payload: { approvalId: approval.id, dataset: 'MENU_BRANCH_PRICING', sourceBranchId, targetBranchIds, overwrite, result: result.applied },
+            reason: 'Head-office distribution approved and applied',
+            sourceDevice: req.headers['user-agent'] || 'unknown',
+            requestId: req.requestId || randomUUID(),
+        });
+        dbCacheService.invalidatePattern('menu:');
+        return res.json({ approvalId: String(approval.id), status: 'APPROVED', applied: result.applied });
+    } catch (error: any) {
+        if (String(error?.message || '') === 'DISTRIBUTION_APPROVAL_ALREADY_CLAIMED') {
+            return res.status(409).json({ error: 'DISTRIBUTION_APPROVAL_ALREADY_CLAIMED', code: 'DISTRIBUTION_APPROVAL_ALREADY_CLAIMED' });
+        }
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const rejectMasterDataDistribution = async (req: Request, res: Response) => {
+    try {
+        const authError = assertHeadOfficeDistribution(req);
+        if (authError) return res.status(403).json({ error: authError, code: authError });
+        const approvalId = Number(req.params.approvalId);
+        const reason = String(req.body?.reason || '').trim() || 'Head-office distribution rejected';
+        if (!Number.isFinite(approvalId)) return res.status(400).json({ error: 'INVALID_APPROVAL_ID' });
+        const [approval] = await db.select().top(1).from(managerApprovals).where(eq(managerApprovals.id, approvalId));
+        if (!approval || approval.actionType !== 'MASTER_DATA_DISTRIBUTION') return res.status(404).json({ error: 'APPROVAL_NOT_FOUND' });
+        const details = (approval.details && typeof approval.details === 'object') ? approval.details as Record<string, any> : {};
+        if (details.status === 'APPROVED') return res.status(409).json({ error: 'APPROVAL_ALREADY_APPROVED' });
+        if (details.status === 'REJECTED') return res.json({ approvalId: String(approval.id), status: 'REJECTED', replay: true });
+        const resolvedDetails = { ...details, status: 'REJECTED', rejectedReason: reason, resolvedAt: new Date().toISOString(), resolvedBy: req.user?.id || 'system' };
+        await db.update(managerApprovals)
+            .set({ managerId: req.user?.id || approval.managerId, reason, details: resolvedDetails })
+            .where(eq(managerApprovals.id, approval.id));
+        await createSignedAuditLog({
+            eventType: 'MASTER_DATA_DISTRIBUTION_REJECTED',
+            userId: req.user?.id || 'system',
+            branchId: approval.branchId,
+            payload: { approvalId: approval.id, dataset: details.dataset || 'MENU_BRANCH_PRICING', sourceBranchId: details.sourceBranchId || approval.branchId, targetBranchIds: details.targetBranchIds || [] },
+            reason,
+            sourceDevice: req.headers['user-agent'] || 'unknown',
+            requestId: req.requestId || randomUUID(),
+        });
+        return res.json({ approvalId: String(approval.id), status: 'REJECTED' });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
     }
 };
 

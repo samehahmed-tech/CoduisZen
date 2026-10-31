@@ -1,0 +1,423 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/controllers/report/predictiveReports.ts",
+      "language": "typescript",
+      "sizeLines": 725,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/reportUtils.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/salesReports.ts",
+      "language": "typescript",
+      "sizeLines": 535,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/strategicReports.ts",
+      "language": "typescript",
+      "sizeLines": 353,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/reportController.ts",
+      "language": "typescript",
+      "sizeLines": 1421,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/reservationController.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/settingsController.ts",
+      "language": "typescript",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/setupController.ts",
+      "language": "typescript",
+      "sizeLines": 596,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/shiftController.ts",
+      "language": "typescript",
+      "sizeLines": 422,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/supplierController.ts",
+      "language": "typescript",
+      "sizeLines": 125,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/tableController.ts",
+      "language": "typescript",
+      "sizeLines": 977,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/treasuryController.ts",
+      "language": "typescript",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/userController.ts",
+      "language": "typescript",
+      "sizeLines": 646,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/waitlistController.ts",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/warehouseController.ts",
+      "language": "typescript",
+      "sizeLines": 98,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/wastageController.ts",
+      "language": "typescript",
+      "sizeLines": 239,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/webhookController.ts",
+      "language": "typescript",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/whatsappController.ts",
+      "language": "typescript",
+      "sizeLines": 415,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/db/index.ts",
+      "language": "typescript",
+      "sizeLines": 229,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/audit.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/errorContract.ts",
+      "language": "typescript",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/pagination.ts",
+      "language": "typescript",
+      "sizeLines": 190,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/aggregators/aggregatorConfig.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/aggregators/aggregatorIngestService.ts",
+      "language": "typescript",
+      "sizeLines": 245,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/aggregators/aggregatorTypes.ts",
+      "language": "typescript",
+      "sizeLines": 163,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/aggregators/aggregatorWebhookAuth.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatIngestService.ts",
+      "language": "typescript",
+      "sizeLines": 260,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/admsRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/aggregatorWebhookRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/attendanceBridgeRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 545,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/callCenterSupervisorRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/hrExtendedRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 1589,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/migrationRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 33,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/publicScreenRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 328,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/webhookRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/controllers/report/predictiveReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/reportUtils.ts": [
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/salesReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/strategicReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/reportController.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/services/hrReportExportService.ts",
+      "server/services/reportStyle.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/reservationController.ts": [
+      "server/db/index.ts",
+      "server/socket.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/settingsController.ts": [
+      "server/db/index.ts",
+      "server/utils/request.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/setupController.ts": [
+      "server/db/index.ts",
+      "server/services/passwordPolicyService.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts",
+      "types.ts"
+    ],
+    "server/controllers/shiftController.ts": [
+      "server/db/index.ts",
+      "server/services/paymentReconciliation.ts",
+      "server/services/shiftReconciliation.ts",
+      "server/utils/orderRevenue.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/supplierController.ts": [
+      "server/db/index.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/tableController.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/services/orderNumberService.ts",
+      "server/socket.ts",
+      "server/utils/logger.ts",
+      "server/utils/request.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/treasuryController.ts": [
+      "server/services/treasuryService.ts",
+      "server/utils/request.ts"
+    ],
+    "server/controllers/userController.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/utils/dbErrors.ts",
+      "src/db/schema.ts",
+      "types.ts"
+    ],
+    "server/controllers/waitlistController.ts": [
+      "server/db/index.ts",
+      "server/socket.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/warehouseController.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/wastageController.ts": [
+      "server/db/index.ts",
+      "server/services/financePostingService.ts",
+      "server/services/inventoryService.ts",
+      "server/socket.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/webhookController.ts": [
+      "server/services/webhookService.ts",
+      "server/utils/logger.ts",
+      "server/utils/request.ts"
+    ],
+    "server/controllers/whatsappController.ts": [
+      "server/db/index.ts",
+      "server/services/whatsappAutomationService.ts",
+      "server/services/whatsappService.ts",
+      "server/socket.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/db/index.ts": [
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/middleware/audit.ts": [
+      "server/utils/logger.ts"
+    ],
+    "server/middleware/errorContract.ts": [
+      "server/utils/dbErrors.ts"
+    ],
+    "server/middleware/pagination.ts": [],
+    "server/modules/aggregators/aggregatorConfig.ts": [
+      "server/db/index.ts",
+      "server/modules/aggregators/aggregatorTypes.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/modules/aggregators/aggregatorIngestService.ts": [
+      "server/controllers/kdsController.ts",
+      "server/db/index.ts",
+      "server/modules/aggregators/aggregatorConfig.ts",
+      "server/modules/aggregators/aggregatorTypes.ts",
+      "server/services/inventoryService.ts",
+      "server/services/orderNumberService.ts",
+      "server/services/webhookService.ts",
+      "server/utils/logger.ts",
+      "server/utils/socketEmit.ts",
+      "src/db/schema.ts"
+    ],
+    "server/modules/aggregators/aggregatorTypes.ts": [
+      "server/modules/talabat/talabatMapper.ts"
+    ],
+    "server/modules/aggregators/aggregatorWebhookAuth.ts": [
+      "server/modules/aggregators/aggregatorConfig.ts",
+      "server/modules/aggregators/aggregatorTypes.ts"
+    ],
+    "server/modules/talabat/talabatIngestService.ts": [
+      "server/controllers/kdsController.ts",
+      "server/db/index.ts",
+      "server/modules/talabat/talabatConfig.ts",
+      "server/modules/talabat/talabatIngestPure.ts",
+      "server/modules/talabat/talabatMapper.ts",
+      "server/services/inventoryService.ts",
+      "server/services/orderNumberService.ts",
+      "server/services/webhookService.ts",
+      "server/utils/logger.ts",
+      "server/utils/socketEmit.ts",
+      "src/db/schema.ts"
+    ],
+    "server/routes/admsRoutes.ts": [
+      "server/services/zktecoAdmsService.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/routes/aggregatorWebhookRoutes.ts": [
+      "server/controllers/aggregatorWebhookController.ts",
+      "server/modules/aggregators/aggregatorWebhookAuth.ts"
+    ],
+    "server/routes/attendanceBridgeRoutes.ts": [
+      "server/db/index.ts",
+      "server/services/attendanceOpsService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/routes/callCenterSupervisorRoutes.ts": [
+      "server/controllers/callCenterSupervisorController.ts"
+    ],
+    "server/routes/hrExtendedRoutes.ts": [
+      "server/db/index.ts",
+      "server/middleware/branchIsolation.ts",
+      "server/services/attendanceOpsService.ts",
+      "server/services/hrExecutiveReportsService.ts",
+      "server/services/hrExtendedService.ts",
+      "server/services/payrollCalculationService.ts",
+      "server/services/payrollCloseService.ts",
+      "server/services/payrollComplianceService.ts",
+      "server/services/payrollReopenService.ts",
+      "server/services/payslipService.ts",
+      "server/services/schedulingService.ts",
+      "server/services/shiftTaskService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/routes/migrationRoutes.ts": [
+      "server/services/csvMigrationService.ts"
+    ],
+    "server/routes/publicScreenRoutes.ts": [
+      "server/db/index.ts",
+      "server/services/orderLifecycleService.ts",
+      "server/socket.ts",
+      "server/utils/trackToken.ts",
+      "src/db/schema.ts"
+    ],
+    "server/routes/webhookRoutes.ts": [
+      "server/controllers/webhookController.ts"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/data-export/Export PostgreSQL Catalog SQL.bat",
+      "language": "batch",
+      "sizeLines": 5,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/data-export/Export PostgreSQL Catalog SQL.ps1",
+      "language": "powershell",
+      "sizeLines": 32,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/data-export/README AR.txt",
+      "language": "txt",
+      "sizeLines": 9,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/data-export/Export PostgreSQL Catalog SQL.bat": [],
+    "scripts/sameh-installer/data-export/Export PostgreSQL Catalog SQL.ps1": [],
+    "scripts/sameh-installer/data-export/README AR.txt": []
+  }
+}

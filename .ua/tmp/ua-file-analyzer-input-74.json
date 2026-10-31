@@ -1,0 +1,148 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "src/utils/kdsPolling.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/financePageGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/installerRuntimeResilience.test.ts",
+      "language": "typescript",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/inventoryPageGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/kdsPolling.test.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/kdsRouting.test.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/mapkitToken.test.ts",
+      "language": "typescript",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/orderStatusGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/printerManagerGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/routeAuthGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 255,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/setup.ts",
+      "language": "typescript",
+      "sizeLines": 167,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/shiftReconciliation.test.ts",
+      "language": "typescript",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/syncQueueUtils.test.ts",
+      "language": "typescript",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/engine/index.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "types/drizzle-mssql-compat.d.ts",
+      "language": "typescript",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/menuImages.ts",
+      "language": "typescript",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "vite-env.d.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "vite.config.ts",
+      "language": "typescript",
+      "sizeLines": 200,
+      "fileCategory": "code"
+    },
+    {
+      "path": "vitest.config.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "src/utils/kdsPolling.ts": [],
+    "tests/financePageGuard.test.ts": [],
+    "tests/installerRuntimeResilience.test.ts": [],
+    "tests/inventoryPageGuard.test.ts": [],
+    "tests/kdsPolling.test.ts": [
+      "src/utils/kdsPolling.ts"
+    ],
+    "tests/kdsRouting.test.ts": [
+      "server/services/kdsRouting.ts"
+    ],
+    "tests/mapkitToken.test.ts": [],
+    "tests/orderStatusGuard.test.ts": [],
+    "tests/printerManagerGuard.test.ts": [],
+    "tests/routeAuthGuard.test.ts": [],
+    "tests/setup.ts": [],
+    "tests/shiftReconciliation.test.ts": [
+      "server/services/shiftReconciliation.ts"
+    ],
+    "tests/syncQueueUtils.test.ts": [
+      "src/services/syncQueueUtils.ts"
+    ],
+    "theme/engine/index.ts": [],
+    "types/drizzle-mssql-compat.d.ts": [],
+    "utils/menuImages.ts": [],
+    "vite-env.d.ts": [],
+    "vite.config.ts": [],
+    "vitest.config.ts": []
+  }
+}

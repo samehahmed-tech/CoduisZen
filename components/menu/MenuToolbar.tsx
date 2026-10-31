@@ -1,7 +1,6 @@
-
 import React from 'react';
 import {
-    Search, Plus, LayoutGrid, List, BarChart3,
+    Search, Plus, LayoutGrid, List, BarChart3, Rows3,
     ArrowUpDown, CheckSquare, Filter, Square,
     Download, Upload, Palette
 } from 'lucide-react';
@@ -53,6 +52,13 @@ const MenuToolbar: React.FC<Props> = ({
     const [showSort, setShowSort] = React.useState(false);
     const [showCategories, setShowCategories] = React.useState(false);
 
+    const quickFilters: { id: FilterTag; labelAr: string; labelEn: string }[] = [
+        { id: 'all', labelAr: 'الكل', labelEn: 'All' },
+        { id: 'active', labelAr: 'متاح', labelEn: 'Available' },
+        { id: 'low-margin', labelAr: 'هامش منخفض', labelEn: 'Low margin' },
+        { id: 'no-image', labelAr: 'بدون صورة', labelEn: 'No photo' },
+    ];
+
     const filterOptions: { id: FilterTag; labelEn: string; labelAr: string }[] = [
         { id: 'all', labelEn: 'All Items', labelAr: 'الكل' },
         { id: 'active', labelEn: 'Active', labelAr: 'نشط' },
@@ -72,206 +78,198 @@ const MenuToolbar: React.FC<Props> = ({
         { id: 'recent', labelEn: 'Recently Edited', labelAr: 'آخر تعديل' },
     ];
 
-    const viewModes: { id: ViewMode; icon: React.ElementType; labelEn: string }[] = [
-        { id: 'grid', icon: LayoutGrid, labelEn: 'Grid' },
-        { id: 'list', icon: List, labelEn: 'List' },
-        { id: 'analytics', icon: BarChart3, labelEn: 'Performance' },
-    ];
+    const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+    const isCompact = viewMode === 'grid' && density === 'compact';
+    const isCards = viewMode === 'grid' && density !== 'compact';
 
     return (
-        <div className="sticky top-0 z-30 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b border-gray-200 dark:border-white/[0.05]">
-            {/* Top Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-5 py-3 gap-3 sm:gap-4">
+        <div className="atelier-tools">
+            <label className="atelier-search">
+                <Search size={18} aria-hidden="true" />
+                <input
+                    id="menu-search-input"
+                    type="search"
+                    placeholder={lang === 'ar' ? 'ابحث في الفهرس — اسم، SKU، باركود...' : 'Search the catalog — name, SKU, barcode...'}
+                    value={searchQuery}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    aria-label={lang === 'ar' ? 'بحث في الأصناف' : 'Search items'}
+                />
+            </label>
 
-                {/* Left: Search */}
-                <div className="relative w-full sm:flex-1 sm:max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-muted/50 w-4 h-4 pointer-events-none" />
-                    <input
-                        id="menu-search-input"
-                        type="text"
-                        placeholder={lang === 'ar' ? 'بحث بالاسم، SKU، باركود، او وسم...' : 'Search by name, SKU, barcode, or tag...'}
-                        value={searchQuery}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className="w-full h-9 pl-10 pr-3 bg-gray-50 dark:bg-elevated/50 border border-gray-200 dark:border-border/30 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-indigo-500/30 focus:border-blue-400 dark:focus:border-indigo-500/50 transition-all text-[13px] text-gray-800 dark:text-main placeholder:text-gray-400 dark:placeholder:text-muted/40"
-                    />
-                </div>
+            <div className="atelier-toolset no-scrollbar">
+                {quickFilters.map((item) => (
+                    <button
+                        key={item.id}
+                        type="button"
+                        className={`atelier-tool ${filterTag === item.id ? 'is-active' : ''}`}
+                        onClick={() => onFilterChange(item.id)}
+                        aria-pressed={filterTag === item.id}
+                    >
+                        {lang === 'ar' ? item.labelAr : item.labelEn}
+                    </button>
+                ))}
 
-                {/* Right: Actions */}
-                <div className="flex w-full sm:w-auto items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
-                    {/* Category Filter Dropdown */}
-                    <div className="relative">
-                        <button
-                            onClick={() => { setShowCategories(!showCategories); setShowFilters(false); setShowSort(false); }}
-                            className={`h-8 flex items-center gap-1.5 px-3 rounded-lg border text-[12px] font-medium transition-colors ${selectedCategoryId !== 'all'
-                                ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400 border-blue-200 dark:border-indigo-500/20'
-                                : 'bg-white dark:bg-elevated border-gray-200 dark:border-border/30 text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-main'
-                                }`}
-                        >
-                            <LayoutGrid size={13} />
-                            <span className="max-w-[100px] truncate">
-                                {selectedCategoryId === 'all'
-                                    ? (lang === 'ar' ? 'المجموعات' : 'Categories')
-                                    : (lang === 'ar' ? categories.find(c => c.id === selectedCategoryId)?.nameAr || 'قسم' : categories.find(c => c.id === selectedCategoryId)?.name || 'Category')}
-                            </span>
-                        </button>
-                        {showCategories && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowCategories(false)} />
-                                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-card border border-gray-200 dark:border-border/30 rounded-lg shadow-lg z-50 p-1 min-w-[160px] max-h-64 overflow-y-auto">
-                                    <button
-                                        onClick={() => { onSelectCategory('all'); setShowCategories(false); }}
-                                        className={`w-full text-left px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${selectedCategoryId === 'all' ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400' : 'text-gray-500 dark:text-muted hover:bg-gray-50 dark:hover:bg-elevated/40'}`}
-                                    >
-                                        {lang === 'ar' ? 'الكل' : 'All'}
+                <div className="relative">
+                    <button
+                        type="button"
+                        className={`atelier-tool ${selectedCategoryId !== 'all' ? 'is-active' : ''}`}
+                        onClick={() => { setShowCategories(!showCategories); setShowFilters(false); setShowSort(false); }}
+                    >
+                        <LayoutGrid size={14} />
+                        <span>{selectedCategoryId === 'all' ? (lang === 'ar' ? 'الأقسام' : 'Sections') : (lang === 'ar' ? (selectedCategory?.nameAr || 'قسم') : (selectedCategory?.name || 'Section'))}</span>
+                    </button>
+                    {showCategories && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowCategories(false)} />
+                            <div className="atelier-menu-pop">
+                                <button type="button" onClick={() => { onSelectCategory('all'); setShowCategories(false); }} className={selectedCategoryId === 'all' ? 'is-active' : ''}>{lang === 'ar' ? 'كل الأصناف' : 'All items'}</button>
+                                {categories.map(c => (
+                                    <button key={c.id} type="button" onClick={() => { onSelectCategory(c.id); setShowCategories(false); }} className={selectedCategoryId === c.id ? 'is-active' : ''}>
+                                        {lang === 'ar' ? (c.nameAr || c.name) : c.name}
                                     </button>
-                                    {categories.map(c => (
-                                        <button
-                                            key={c.id}
-                                            onClick={() => { onSelectCategory(c.id); setShowCategories(false); }}
-                                            className={`w-full text-left px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${selectedCategoryId === c.id ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400' : 'text-gray-500 dark:text-muted hover:bg-gray-50 dark:hover:bg-elevated/40'}`}
-                                        >
-                                            {lang === 'ar' ? (c.nameAr || c.name) : c.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Filter */}
-                    <div className="relative">
-                        <button
-                            onClick={() => { setShowFilters(!showFilters); setShowCategories(false); setShowSort(false); }}
-                            className={`h-8 flex items-center gap-1.5 px-3 rounded-lg border text-[12px] font-medium transition-colors ${filterTag !== 'all'
-                                ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400 border-blue-200 dark:border-indigo-500/20'
-                                : 'bg-white dark:bg-elevated border-gray-200 dark:border-border/30 text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-main'
-                                }`}
-                        >
-                            <Filter size={13} />
-                            <span className="hidden sm:inline">{lang === 'ar' ? 'تصفية' : 'Filter'}</span>
-                        </button>
-                        {showFilters && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
-                                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-card border border-gray-200 dark:border-border/30 rounded-lg shadow-lg z-50 p-1 min-w-[160px]">
-                                    {filterOptions.map(f => (
-                                        <button
-                                            key={f.id}
-                                            onClick={() => { onFilterChange(f.id); setShowFilters(false); }}
-                                            className={`w-full text-left px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${filterTag === f.id ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400' : 'text-gray-500 dark:text-muted hover:bg-gray-50 dark:hover:bg-elevated/40'
-                                                }`}
-                                        >
-                                            {lang === 'ar' ? f.labelAr : f.labelEn}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Sort */}
-                    <div className="relative">
-                        <button
-                            onClick={() => { setShowSort(!showSort); setShowFilters(false); setShowCategories(false); }}
-                            className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-main transition-colors"
-                        >
-                            <ArrowUpDown size={13} />
-                            <span className="hidden sm:inline">{lang === 'ar' ? 'ترتيب' : 'Sort'}</span>
-                        </button>
-                        {showSort && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowSort(false)} />
-                                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-card border border-gray-200 dark:border-border/30 rounded-lg shadow-lg z-50 p-1 min-w-[160px]">
-                                    {sortOptions.map(s => (
-                                        <button
-                                            key={s.id}
-                                            onClick={() => { onSortChange(s.id); setShowSort(false); }}
-                                            className={`w-full text-left px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${sortField === s.id ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400' : 'text-gray-500 dark:text-muted hover:bg-gray-50 dark:hover:bg-elevated/40'
-                                                }`}
-                                        >
-                                            {lang === 'ar' ? s.labelAr : s.labelEn}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* View Modes */}
-                    <div className="flex bg-gray-100 dark:bg-elevated/50 rounded-lg border border-gray-200 dark:border-border/20 p-0.5">
-                        {viewModes.map(v => (
-                            <button
-                                key={v.id}
-                                onClick={() => onViewModeChange(v.id)}
-                                className={`p-1.5 rounded-md transition-colors ${viewMode === v.id
-                                    ? 'bg-white dark:bg-card text-gray-800 dark:text-main shadow-sm'
-                                    : 'text-gray-400 dark:text-muted/60 hover:text-gray-600 dark:hover:text-main'
-                                    }`}
-                                title={v.labelEn}
-                            >
-                                <v.icon size={14} />
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Select Mode */}
-                    <button
-                        onClick={onToggleMultiSelect}
-                        className={`h-8 flex items-center gap-1.5 px-3 rounded-lg border text-[12px] font-medium transition-colors ${multiSelectMode
-                            ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-600 dark:text-indigo-400 border-blue-200 dark:border-indigo-500/20'
-                            : 'bg-white dark:bg-elevated border-gray-200 dark:border-border/30 text-gray-500 dark:text-muted hover:text-gray-700'
-                            }`}
-                    >
-                        {multiSelectMode ? <CheckSquare size={13} /> : <Square size={13} />}
-                        <span className="hidden sm:inline">{multiSelectMode ? `${selectedCount}` : (lang === 'ar' ? 'تحديد' : 'Select')}</span>
-                    </button>
-
-                    {/* Branch Selector */}
-                    {branches.length > 1 && (
-                        <BranchSelector
-                            branches={branches}
-                            selectedBranchId={selectedBranchId}
-                            onSelectBranch={onSelectBranch}
-                            comparisonMode={comparisonMode}
-                            onToggleComparison={onToggleComparison}
-                            lang={lang}
-                        />
+                                ))}
+                            </div>
+                        </>
                     )}
-
-                    {/* Export */}
-                    {onExport && (
-                        <button onClick={onExport} className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-500/30 transition-colors" title={lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}>
-                            <Download size={13} />
-                            <span className="hidden sm:inline">{lang === 'ar' ? 'تصدير' : 'Export'}</span>
-                        </button>
-                    )}
-
-                    {/* Import */}
-                    {onImport && (
-                        <button onClick={onImport} className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-500/30 transition-colors" title={lang === 'ar' ? 'استيراد Excel' : 'Import Excel'}>
-                            <Upload size={13} />
-                            <span className="hidden sm:inline">{lang === 'ar' ? 'استيراد' : 'Import'}</span>
-                        </button>
-                    )}
-
-                    {/* Menu Design */}
-                    {onDesignMenu && (
-                        <button onClick={onDesignMenu} className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-gray-200 dark:border-border/30 bg-white dark:bg-elevated text-[12px] font-medium text-gray-500 dark:text-muted hover:text-purple-600 dark:hover:text-purple-400 hover:border-purple-300 dark:hover:border-purple-500/30 transition-colors" title={lang === 'ar' ? 'تصميم المنيو' : 'Design Menu'}>
-                            <Palette size={13} />
-                            {lang === 'ar' ? 'تصميم' : 'Design'}
-                        </button>
-                    )}
-
-                    {/* Add Item */}
-                    <button
-                        onClick={onNewItem}
-                        className="h-8 flex items-center gap-1.5 bg-blue-600 dark:bg-indigo-500 hover:bg-blue-700 dark:hover:bg-indigo-600 text-white px-4 rounded-lg text-[12px] font-medium transition-colors"
-                    >
-                        <Plus size={14} />
-                        {lang === 'ar' ? 'صنف جديد' : 'Add Item'}
-                    </button>
                 </div>
+
+                <div className="relative">
+                    <button
+                        type="button"
+                        className={`atelier-tool ${filterTag !== 'all' ? 'is-active' : ''}`}
+                        onClick={() => { setShowFilters(!showFilters); setShowCategories(false); setShowSort(false); }}
+                    >
+                        <Filter size={14} />
+                        <span>{lang === 'ar' ? 'فلاتر' : 'Filters'}</span>
+                    </button>
+                    {showFilters && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowFilters(false)} />
+                            <div className="atelier-menu-pop">
+                                {filterOptions.map(f => (
+                                    <button key={f.id} type="button" onClick={() => { onFilterChange(f.id); setShowFilters(false); }} className={filterTag === f.id ? 'is-active' : ''}>
+                                        {lang === 'ar' ? f.labelAr : f.labelEn}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                <div className="relative">
+                    <button
+                        type="button"
+                        className="atelier-tool"
+                        onClick={() => { setShowSort(!showSort); setShowFilters(false); setShowCategories(false); }}
+                    >
+                        <ArrowUpDown size={14} />
+                        <span>{lang === 'ar' ? (sortOptions.find(s => s.id === sortField)?.labelAr || 'ترتيب') : (sortOptions.find(s => s.id === sortField)?.labelEn || 'Sort')}</span>
+                    </button>
+                    {showSort && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setShowSort(false)} />
+                            <div className="atelier-menu-pop">
+                                {sortOptions.map(s => (
+                                    <button key={s.id} type="button" onClick={() => { onSortChange(s.id); setShowSort(false); }} className={sortField === s.id ? 'is-active' : ''}>
+                                        {lang === 'ar' ? s.labelAr : s.labelEn}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {branches.length > 1 && (
+                    <BranchSelector
+                        branches={branches}
+                        selectedBranchId={selectedBranchId}
+                        onSelectBranch={onSelectBranch}
+                        comparisonMode={comparisonMode}
+                        onToggleComparison={onToggleComparison}
+                        lang={lang}
+                    />
+                )}
+
+                <button
+                    type="button"
+                    className={`atelier-tool ${multiSelectMode ? 'is-active' : ''}`}
+                    onClick={onToggleMultiSelect}
+                >
+                    {multiSelectMode ? <CheckSquare size={14} /> : <Square size={14} />}
+                    <span>{multiSelectMode && selectedCount > 0 ? `${selectedCount}` : (lang === 'ar' ? 'تحديد' : 'Select')}</span>
+                </button>
+
+                {onImport && (
+                    <button type="button" className="atelier-tool" onClick={onImport} title={lang === 'ar' ? 'استيراد Excel' : 'Import Excel'}>
+                        <Upload size={14} />
+                        <span>{lang === 'ar' ? 'استيراد' : 'Import'}</span>
+                    </button>
+                )}
+                {onExport && (
+                    <button type="button" className="atelier-tool" onClick={onExport} title={lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}>
+                        <Download size={14} />
+                        <span>{lang === 'ar' ? 'تصدير' : 'Export'}</span>
+                    </button>
+                )}
+                {onDesignMenu && (
+                    <button type="button" className="atelier-tool" onClick={onDesignMenu} title={lang === 'ar' ? 'تصميم المنيو' : 'Design menu'}>
+                        <Palette size={14} />
+                        <span>{lang === 'ar' ? 'تصميم' : 'Design'}</span>
+                    </button>
+                )}
+
+                <button type="button" className="atelier-tool is-acid" onClick={onNewItem}>
+                    <Plus size={15} />
+                    <span>{lang === 'ar' ? 'صنف جديد' : 'New item'}</span>
+                </button>
             </div>
+
+            <div className="atelier-view-switch" role="group" aria-label={lang === 'ar' ? 'طريقة عرض الأصناف' : 'Item layout'}>
+                <button
+                    type="button"
+                    className={viewMode === 'list' ? 'is-active' : ''}
+                    onClick={() => { onViewModeChange('list'); onDensityChange('comfortable'); }}
+                    aria-pressed={viewMode === 'list'}
+                    aria-label={lang === 'ar' ? 'عرض القائمة' : 'List view'}
+                    title={lang === 'ar' ? 'قائمة' : 'List'}
+                >
+                    <List size={17} />
+                </button>
+                <button
+                    type="button"
+                    className={isCards ? 'is-active' : ''}
+                    onClick={() => { onViewModeChange('grid'); onDensityChange('comfortable'); }}
+                    aria-pressed={isCards}
+                    aria-label={lang === 'ar' ? 'عرض البطاقات' : 'Cards view'}
+                    title={lang === 'ar' ? 'بطاقات' : 'Cards'}
+                >
+                    <LayoutGrid size={17} />
+                </button>
+                <button
+                    type="button"
+                    className={isCompact ? 'is-active' : ''}
+                    onClick={() => { onViewModeChange('grid'); onDensityChange('compact'); }}
+                    aria-pressed={isCompact}
+                    aria-label={lang === 'ar' ? 'عرض مضغوط' : 'Compact view'}
+                    title={lang === 'ar' ? 'مضغوط' : 'Compact'}
+                >
+                    <Rows3 size={17} />
+                </button>
+                <button
+                    type="button"
+                    className={viewMode === 'analytics' ? 'is-active' : ''}
+                    onClick={() => onViewModeChange('analytics')}
+                    aria-pressed={viewMode === 'analytics'}
+                    aria-label={lang === 'ar' ? 'التحليلات' : 'Analytics'}
+                    title={lang === 'ar' ? 'التحليلات' : 'Analytics'}
+                >
+                    <BarChart3 size={17} />
+                </button>
+            </div>
+
+            <span className="atelier-result-count" aria-live="polite">
+                {itemCount} {lang === 'ar' ? 'نتيجة' : 'results'}
+            </span>
         </div>
     );
 };

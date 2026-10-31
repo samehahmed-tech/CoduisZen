@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, notInArray } from 'drizzle-orm';
 import { signTrackToken, verifyTrackToken } from '../utils/trackToken';
 import { db } from '../db';
 import { getIO } from '../socket';
 import { transitionOrderStatus } from '../services/orderLifecycleService';
+import { createSignedAuditLog } from '../services/auditService';
 import { kdsTicketItems, kdsTickets, menuItems, orders, orderItems, branches, tables } from '../../src/db/schema';
+import { CUSTOMER_DISPLAY_STATUSES, CUSTOMER_DISPLAY_TYPES, normalizeCustomerDisplayLimit, sanitizeCustomerDisplayOrder } from '../../src/services/customerDisplayPolicy';
 
 const router = Router();
 
@@ -112,7 +114,6 @@ const hydrateTickets = async (tickets: any[]) => {
                     tableId: orders.tableId,
                     tableName: tables.name,
                     customerName: orders.customerName,
-                    customerPhone: orders.customerPhone,
                     kitchenNotes: orders.kitchenNotes,
                     notes: orders.notes,
                     status: orders.status,
@@ -157,7 +158,6 @@ const hydrateTickets = async (tickets: any[]) => {
             tableId: order?.tableId,
             tableName: order?.tableName,
             customerName: order?.customerName,
-            customerPhone: order?.customerPhone,
             kitchenNotes: order?.kitchenNotes,
             notes: order?.notes,
             orderStatus: order?.status,
@@ -191,6 +191,44 @@ const syncOrderReady = async (orderId?: string | null, changedBy = 'public-kds-s
 
 router.use(requireScreenKey);
 
+/**
+ * Public pickup board projection. It is intentionally limited to a branch,
+ * recent ready/handover orders and the minimum fields needed by a customer
+ * display. No customer, address, item, payment or internal order id leaks.
+ */
+router.get('/customer-display', async (req, res) => {
+    try {
+        const branchId = getParam(req.query.branchId);
+        if (!branchId) return res.status(400).json({ ok: false, code: 'BRANCH_ID_REQUIRED' });
+
+        const limit = normalizeCustomerDisplayLimit(req.query.limit);
+        const since = new Date(Date.now() - 15 * 60 * 1000);
+        const rows = await db.select({
+            orderNumber: orders.orderNumber,
+            status: orders.status,
+            updatedAt: orders.updatedAt,
+        })
+            .from(orders)
+            .where(and(
+                eq(orders.branchId, branchId),
+                inArray(orders.type, [...CUSTOMER_DISPLAY_TYPES]),
+                inArray(orders.status, [...CUSTOMER_DISPLAY_STATUSES]),
+                gte(orders.updatedAt, since),
+            ))
+            .orderBy(desc(orders.updatedAt))
+            .limit(limit);
+
+        return res.json({
+            ok: true,
+            branchId,
+            refreshedAt: new Date().toISOString(),
+            orders: rows.map(sanitizeCustomerDisplayOrder),
+        });
+    } catch (error: any) {
+        return res.status(500).json({ ok: false, code: 'CUSTOMER_DISPLAY_FAILED', message: error?.message || 'Failed to load customer display' });
+    }
+});
+
 router.get('/tickets', async (req, res) => {
     try {
         const branchId = getParam(req.query.branchId, process.env.DEFAULT_BRANCH_ID || process.env.BRANCH_ID || 'b1');
@@ -216,8 +254,13 @@ router.get('/tickets', async (req, res) => {
 router.post('/tickets/:id/bump', async (req, res) => {
     try {
         const ticketId = getParam(req.params.id);
+        const requestedBranchId = getParam(req.query.branchId, getParam(req.body?.branchId, getParam(req.headers['x-branch-id'])));
+        if (!requestedBranchId) return res.status(400).json({ ok: false, code: 'BRANCH_ID_REQUIRED' });
         const [ticket] = await db.select().from(kdsTickets).where(eq(kdsTickets.id, ticketId)).limit(1);
         if (!ticket) return res.status(404).json({ ok: false, code: 'TICKET_NOT_FOUND' });
+        if (String(ticket.branchId) !== requestedBranchId) {
+            return res.status(403).json({ ok: false, code: 'BRANCH_MISMATCH' });
+        }
 
         if (ticket.status !== 'READY') {
             await db.update(kdsTickets)
@@ -226,6 +269,16 @@ router.post('/tickets/:id/bump', async (req, res) => {
         }
 
         const allReady = await syncOrderReady(ticket.orderId);
+        await createSignedAuditLog({
+            eventType: 'PUBLIC_SCREEN_TICKET_BUMPED',
+            branchId: ticket.branchId,
+            userId: null,
+            userName: 'public-kds-screen',
+            userRole: 'PUBLIC_SCREEN',
+            payload: { ticketId, orderId: ticket.orderId, previousStatus: ticket.status },
+            after: { status: 'READY', allReady },
+            reason: 'Public operator screen action',
+        });
         emitRefresh(ticket.branchId, { ticketId, orderId: ticket.orderId, status: 'READY' });
         return res.json({ ok: true, allReady });
     } catch (error: any) {
@@ -236,12 +289,17 @@ router.post('/tickets/:id/bump', async (req, res) => {
 router.post('/orders/:orderId/handover', async (req, res) => {
     try {
         const orderId = getParam(req.params.orderId);
+        const requestedBranchId = getParam(req.query.branchId, getParam(req.body?.branchId, getParam(req.headers['x-branch-id'])));
+        if (!requestedBranchId) return res.status(400).json({ ok: false, code: 'BRANCH_ID_REQUIRED' });
         const [order] = await db
             .select({ id: orders.id, branchId: orders.branchId, status: orders.status, type: orders.type })
             .from(orders)
             .where(eq(orders.id, orderId))
             .limit(1);
         if (!order) return res.status(404).json({ ok: false, code: 'ORDER_NOT_FOUND' });
+        if (String(order.branchId) !== requestedBranchId) {
+            return res.status(403).json({ ok: false, code: 'BRANCH_MISMATCH' });
+        }
         if (String(order.status) === 'CANCELLED') return res.status(409).json({ ok: false, code: 'ORDER_CANCELLED' });
         if (['COMPLETED', 'DELIVERED'].includes(String(order.status))) return res.json({ ok: true });
         if (!['TAKEAWAY', 'PICKUP', 'KIOSK'].includes(String(order.type))) {
@@ -256,6 +314,17 @@ router.post('/orders/:orderId/handover', async (req, res) => {
             user: { role: 'SUPER_ADMIN' },
             skipPolicy: true,
             requireKitchenReady: true,
+        });
+
+        await createSignedAuditLog({
+            eventType: 'PUBLIC_SCREEN_ORDER_HANDOVER',
+            branchId: order.branchId,
+            userId: null,
+            userName: 'public-packing-screen',
+            userRole: 'PUBLIC_SCREEN',
+            payload: { orderId, previousStatus: order.status, orderType: order.type },
+            after: { status: 'DELIVERED' },
+            reason: 'Public operator screen action',
         });
 
         emitRefresh(order.branchId, { orderId, status: 'DELIVERED' });

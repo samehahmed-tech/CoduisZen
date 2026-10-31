@@ -10,7 +10,11 @@ export const lookupMenuItemByBarcode = async (req: Request, res: Response) => {
         }
 
         const result = await pool.query(
-            `SELECT TOP 1 mi.*, mc.name as "categoryName", mc.name_ar as "categoryNameAr"
+            `SELECT TOP 1 mi.id, mi.name, mi.name_ar as "nameAr", mi.description,
+                    mi.description_ar as "descriptionAr", mi.price, mi.image,
+                    mi.is_available as "isAvailable", mi.is_active as "isActive",
+                    mi.barcode, mi.sku, mi.category_id as "categoryId",
+                    mc.name as "categoryName", mc.name_ar as "categoryNameAr"
              FROM menu_items mi
              LEFT JOIN menu_categories mc ON mi.category_id = mc.id
              WHERE mi.barcode = $1`,
@@ -22,7 +26,11 @@ export const lookupMenuItemByBarcode = async (req: Request, res: Response) => {
         }
 
         const skuResult = await pool.query(
-            `SELECT TOP 1 mi.*, mc.name as "categoryName", mc.name_ar as "categoryNameAr"
+            `SELECT TOP 1 mi.id, mi.name, mi.name_ar as "nameAr", mi.description,
+                    mi.description_ar as "descriptionAr", mi.price, mi.image,
+                    mi.is_available as "isAvailable", mi.is_active as "isActive",
+                    mi.barcode, mi.sku, mi.category_id as "categoryId",
+                    mc.name as "categoryName", mc.name_ar as "categoryNameAr"
              FROM menu_items mi
              LEFT JOIN menu_categories mc ON mi.category_id = mc.id
              WHERE mi.sku = $1`,
@@ -47,7 +55,8 @@ export const lookupInventoryItemByBarcode = async (req: Request, res: Response) 
         }
 
         const result = await pool.query(
-            `SELECT TOP 1 * FROM inventory_items WHERE barcode = $1`,
+            `SELECT TOP 1 id, name, name_ar as "nameAr", barcode, sku, unit, category, is_active as "isActive"
+             FROM inventory_items WHERE barcode = $1`,
             [code]
         );
 
@@ -56,7 +65,8 @@ export const lookupInventoryItemByBarcode = async (req: Request, res: Response) 
         }
 
         const skuResult = await pool.query(
-            `SELECT TOP 1 * FROM inventory_items WHERE sku = $1`,
+            `SELECT TOP 1 id, name, name_ar as "nameAr", barcode, sku, unit, category, is_active as "isActive"
+             FROM inventory_items WHERE sku = $1`,
             [code]
         );
 
@@ -98,7 +108,7 @@ export const unifiedBarcodeLookup = async (req: Request, res: Response) => {
 
         const invResult = await pool.query(
             `SELECT TOP 1 id, name, name_ar as "nameAr", barcode, sku, unit, category,
-                    cost_price as "costPrice", purchase_price as "purchasePrice"
+                    is_active as "isActive"
              FROM inventory_items
              WHERE barcode = $1 OR sku = $1`,
             [code]

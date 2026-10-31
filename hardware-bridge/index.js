@@ -763,6 +763,35 @@ const runPrintJob = async (job) => {
     }
 };
 
+// Direct local-print path used by the POS when the server is unreachable.
+// It deliberately skips server acknowledgement because no server queue row
+// exists yet; the bridge still serializes the physical write and suppresses
+// duplicate local job ids through the same completed-job ledger.
+const runLocalPrintJob = async (job) => {
+    const jobId = String(job?.id || '').trim();
+    if (!jobId) throw new Error('LOCAL_PRINT_JOB_ID_REQUIRED');
+    if (completedJobs.has(jobId)) return;
+    if (inFlight.has(jobId)) return;
+    inFlight.add(jobId);
+    runtime.activeJob = jobId;
+    runtime.jobsReceived += 1;
+    try {
+        await executePrint(job);
+        rememberCompletedJob(jobId);
+        runtime.printed += 1;
+        runtime.lastPrintError = null;
+        refreshLastError();
+    } catch (error) {
+        runtime.failed += 1;
+        runtime.lastPrintError = String(error?.message || error);
+        refreshLastError();
+        throw error;
+    } finally {
+        inFlight.delete(jobId);
+        runtime.activeJob = null;
+    }
+};
+
 // Keep printer writes serialized. This is faster in practice than flooding
 // the Windows spooler: one order is handed off immediately, while a burst of
 // orders is drained in order without duplicate/concurrent USB writes.
@@ -858,6 +887,28 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, status: runtime.serverConnected ? 'READY' : 'DEGRADED', gatewayId: GATEWAY_ID, serverUrl: SERVER_URL, globalClaim: GLOBAL_CLAIM, ...runtime, ts: new Date().toISOString() }));
+        return;
+    }
+
+    if (url.pathname === '/print' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+            if (body.length < 8_000_000) body += chunk;
+        });
+        req.on('end', async () => {
+            try {
+                const input = JSON.parse(body || '{}');
+                const printerType = String(input.printerType || 'LOCAL').toUpperCase();
+                if (printerType === 'NETWORK' || printerType === 'LAN') throw new Error('LOCAL_PRINT_NETWORK_UNSUPPORTED');
+                if (!input.id || !input.content) throw new Error('LOCAL_PRINT_PAYLOAD_REQUIRED');
+                await runLocalPrintJob({ ...input, printerType });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, id: input.id, mode: 'LOCAL_OFFLINE' }));
+            } catch (error) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: false, error: String(error?.message || error) }));
+            }
+        });
         return;
     }
 

@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/advance-business-date/Advance Business Date.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/advance-business-date/Advance Business Date.ps1",
+      "language": "powershell",
+      "sizeLines": 107,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/advance-business-date/README AR.txt",
+      "language": "txt",
+      "sizeLines": 18,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/advance-business-date/Advance Business Date.bat": [],
+    "scripts/advance-business-date/Advance Business Date.ps1": [],
+    "scripts/advance-business-date/README AR.txt": []
+  }
+}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveTalabatBranch, buildTalabatOrderRow } from '../server/modules/talabat/talabatIngestService';
+import { buildTalabatPayloadFingerprint } from '../server/modules/talabat/talabatMapper';
 
 describe('talabat ingest', () => {
     it('resolves branch via external_partner_config_id then store_id then default', () => {
@@ -19,5 +20,16 @@ describe('talabat ingest', () => {
         expect(row.deliverySource).toBe('talabat');
         expect(row.source).toBe('talabat');
         expect(row.total).toBe(115);
+    });
+
+    it('keeps the payload fingerprint across status transitions and changes it for financial mutations', () => {
+        const base: any = {
+            order_id: 'oid-fingerprint', status: 'RECEIVED', store_id: 'S1', order_type: 'DELIVERY',
+            sub_total: 100, order_total: 115, delivery_fee: 15,
+            customer: { name: 'Guest', phone: '0100', address: 'Cairo' },
+            items: [{ sku: 'SKU-1', pricing: { quantity: 1, unit_price: 100, total_price: 100 }, status: 'IN_CART' }],
+        };
+        expect(buildTalabatPayloadFingerprint(base)).toBe(buildTalabatPayloadFingerprint({ ...base, status: 'DISPATCHED' }));
+        expect(buildTalabatPayloadFingerprint(base)).not.toBe(buildTalabatPayloadFingerprint({ ...base, order_total: 999 }));
     });
 });

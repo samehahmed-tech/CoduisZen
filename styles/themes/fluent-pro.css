@@ -1,39 +1,39 @@
-/* THEME · FLUENT PRO — disciplined enterprise: acrylic, tight geometry, snappy */
+/* THEME · STUDIO — bright neutral workspace, indigo focus, coral accent */
 [data-theme="fluent-pro"] {
-    --primary: 0, 120, 212; --primary-hover: 0, 90, 158;
-    --secondary: 96, 96, 96; --accent: 0, 120, 212;
-    --bg-app: 243, 243, 243; --bg-card: 255, 255, 255; --bg-sidebar: 249, 249, 249;
-    --bg-elevated: 255, 255, 255; --bg-global: 243, 243, 243;
-    --text-main: 27, 27, 27; --text-muted: 96, 96, 96;
-    --border-color: 237, 237, 237; --border-subtle: 0 0 0 / 0.06;
-    --glass-bg: 255 255 255 / 0.72;
-    --success: 16, 124, 16; --warning: 202, 129, 0; --danger: 196, 43, 28; --info: 0, 120, 212;
-    --theme-page-bg: linear-gradient(180deg, #f9f9f9 0%, #efefef 100%);
-    --theme-card-bg: rgba(255,255,255,0.88); --theme-card-hover-bg: rgba(255,255,255,0.96);
-    --theme-rail-bg: rgba(249,249,249,0.88); --theme-topbar-bg: rgba(255,255,255,0.78);
-    --theme-table-head-bg: rgba(243,243,243,0.92); --theme-row-hover-bg: rgba(0,120,212,0.05);
-    --theme-input-bg: rgba(255,255,255,0.92); --theme-button-bg: #0078d4;
-    --theme-active-bg: rgba(0,120,212,0.08); --theme-focus-ring: rgba(0,120,212,0.4);
-    --theme-popup-bg: rgba(252,252,252,0.96);
-    --chart-1: 0, 120, 212; --chart-2: 0, 153, 188; --chart-3: 16, 124, 16; --chart-4: 202, 129, 0; --chart-5: 107, 105, 214;
-    --chart-grid: 0 0 0 / 0.08; --chart-tooltip-bg: rgba(255,255,255,0.97);
+    --primary: 79, 70, 229; --primary-hover: 67, 56, 202;
+    --secondary: 100, 116, 139; --accent: 240, 104, 88;
+    --bg-app: 246, 247, 249; --bg-card: 255, 255, 255; --bg-sidebar: 251, 251, 253;
+    --bg-elevated: 255, 255, 255; --bg-global: 246, 247, 249;
+    --text-main: 22, 24, 34; --text-muted: 103, 110, 126;
+    --border-color: 226, 229, 236; --border-subtle: 22 24 34 / 0.06;
+    --glass-bg: 255 255 255 / 0.82;
+    --success: 16, 124, 16; --warning: 202, 129, 0; --danger: 196, 43, 28; --info: 79, 70, 229;
+    --theme-page-bg: linear-gradient(180deg, #f8f9fb 0%, #eef0f5 100%);
+    --theme-card-bg: rgba(255,255,255,0.92); --theme-card-hover-bg: #ffffff;
+    --theme-rail-bg: rgba(251,251,253,0.9); --theme-topbar-bg: rgba(255,255,255,0.8);
+    --theme-table-head-bg: #f1f3f7; --theme-row-hover-bg: rgba(79,70,229,0.05);
+    --theme-input-bg: #ffffff; --theme-button-bg: #4f46e5; --theme-button-text: #ffffff;
+    --theme-active-bg: rgba(79,70,229,0.09); --theme-focus-ring: rgba(79,70,229,0.35);
+    --theme-popup-bg: rgba(255,255,255,0.97);
+    --chart-1: 79, 70, 229; --chart-2: 240, 104, 88; --chart-3: 14, 165, 233; --chart-4: 16, 124, 16; --chart-5: 202, 129, 0;
+    --chart-grid: 22 24 34 / 0.07; --chart-tooltip-bg: rgba(255,255,255,0.98);
 }
 .dark [data-theme="fluent-pro"], [data-theme="fluent-pro"].dark {
-    --primary: 76, 194, 255; --primary-hover: 120, 210, 255;
-    --secondary: 160, 160, 160; --accent: 76, 194, 255;
-    --bg-app: 32, 32, 32; --bg-card: 44, 44, 44; --bg-sidebar: 36, 36, 36;
-    --bg-elevated: 56, 56, 56; --bg-global: 32, 32, 32;
-    --text-main: 255, 255, 255; --text-muted: 160, 160, 160;
-    --border-color: 60, 60, 60; --border-subtle: 255 255 255 / 0.08;
-    --glass-bg: 44 44 44 / 0.78;
-    --success: 108, 203, 95; --warning: 252, 225, 0; --danger: 255, 153, 164; --info: 76, 194, 255;
-    --theme-page-bg: linear-gradient(180deg, #262626 0%, #1b1b1b 100%);
-    --theme-card-bg: rgba(44,44,44,0.88); --theme-card-hover-bg: rgba(56,56,56,0.92);
-    --theme-rail-bg: rgba(36,36,36,0.88); --theme-topbar-bg: rgba(44,44,44,0.78);
-    --theme-table-head-bg: rgba(32,32,32,0.88); --theme-row-hover-bg: rgba(76,194,255,0.08);
-    --theme-input-bg: rgba(56,56,56,0.92); --theme-button-bg: #4cc2ff;
-    --theme-active-bg: rgba(76,194,255,0.12); --theme-focus-ring: rgba(76,194,255,0.5);
-    --theme-popup-bg: rgba(48,48,48,0.96);
-    --chart-1: 76, 194, 255; --chart-2: 0, 204, 219; --chart-3: 108, 203, 95; --chart-4: 252, 225, 0; --chart-5: 154, 151, 255;
-    --chart-grid: 255 255 255 / 0.08; --chart-tooltip-bg: rgba(44,44,44,0.97);
+    --primary: 165, 180, 252; --primary-hover: 199, 210, 254;
+    --secondary: 148, 163, 184; --accent: 253, 164, 175;
+    --bg-app: 13, 14, 20; --bg-card: 21, 23, 32; --bg-sidebar: 17, 19, 26;
+    --bg-elevated: 31, 34, 46; --bg-global: 13, 14, 20;
+    --text-main: 240, 242, 248; --text-muted: 150, 158, 176;
+    --border-color: 40, 44, 58; --border-subtle: 165 180 252 / 0.14;
+    --glass-bg: 21 23 32 / 0.8;
+    --success: 108, 203, 95; --warning: 252, 225, 0; --danger: 255, 153, 164; --info: 165, 180, 252;
+    --theme-page-bg: linear-gradient(180deg, #0d0e14 0%, #08090d 100%);
+    --theme-card-bg: rgba(21,23,32,0.92); --theme-card-hover-bg: rgba(31,34,46,0.95);
+    --theme-rail-bg: rgba(17,19,26,0.9); --theme-topbar-bg: rgba(21,23,32,0.82);
+    --theme-table-head-bg: rgba(13,14,20,0.9); --theme-row-hover-bg: rgba(165,180,252,0.07);
+    --theme-input-bg: #1f2230; --theme-button-bg: #a5b4fc; --theme-button-text: #1a1b23; --theme-button-bg-hover: #c7d2fe;
+    --theme-active-bg: rgba(165,180,252,0.12); --theme-focus-ring: rgba(165,180,252,0.45);
+    --theme-popup-bg: #1f2230;
+    --chart-1: 165, 180, 252; --chart-2: 253, 164, 175; --chart-3: 125, 211, 252; --chart-4: 108, 203, 95; --chart-5: 252, 225, 0;
+    --chart-grid: 165 180 252 / 0.1; --chart-tooltip-bg: rgba(21,23,32,0.97);
 }

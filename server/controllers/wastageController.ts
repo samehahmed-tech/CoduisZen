@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { db } from '../db';
-import { stockMovements, inventoryItems, warehouses, auditLogs, inventoryStock, managerApprovals } from '../../src/db/schema';
+import { stockMovements, inventoryItems, warehouses, inventoryStock, managerApprovals } from '../../src/db/schema';
 import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
 import { postWastageEntry } from '../services/financePostingService';
 import { inventoryService } from '../services/inventoryService';
 import { getIO } from '../socket';
+import { createSignedAuditLog } from '../services/auditService';
 
 /**
  * Execute approved wastage. Only approval flow calls this.
@@ -48,12 +49,14 @@ export const executeApprovedWastage = async (input: {
         });
     }
 
-    await db.insert(auditLogs).values({
+    await createSignedAuditLog({
         eventType: 'INVENTORY_WASTAGE_APPROVED',
         userId: actorId,
         branchId: warehouse?.branchId || null,
-        payload: { ...input, quantity: qty, movementId: movement?.id, costImpact: amount },
-        createdAt: new Date(),
+        payload: { itemId: input.itemId, warehouseId: input.warehouseId, quantity: qty, movementId: movement?.id, costImpact: amount, approvalId: input.approvalId || null },
+        requestId: input.approvalId ? `approval-${input.approvalId}` : undefined,
+        reason: input.reason,
+        after: { quantity: qty, costImpact: amount },
     });
 
     try {
@@ -123,7 +126,7 @@ export const recordWastage = async (req: Request, res: Response) => {
             createdAt: new Date(),
         });
 
-        await db.insert(auditLogs).values({
+        await createSignedAuditLog({
             eventType: 'INVENTORY_WASTAGE_REQUESTED',
             userId: actorId,
             branchId: warehouse?.branchId || null,
@@ -132,9 +135,12 @@ export const recordWastage = async (req: Request, res: Response) => {
                 warehouseId,
                 quantity: qty,
                 reason,
-                notes: notes || null,
+                approvalId: approval.id,
             },
-            createdAt: new Date(),
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            reason: 'Wastage pending approval',
+            after: { status: 'PENDING', quantity: qty },
         });
 
         res.status(202).json({
@@ -163,6 +169,7 @@ export const getWastageReport = async (req: Request, res: Response) => {
         if (warehouseId) filters.push(eq(stockMovements.fromWarehouseId, String(warehouseId)));
         if (itemId) filters.push(eq(stockMovements.itemId, String(itemId)));
         if (reason) filters.push(eq(stockMovements.reason, String(reason)));
+        if (req.effectiveBranchId) filters.push(eq(warehouses.branchId, req.effectiveBranchId));
 
         let query = db.select({
             itemId: stockMovements.itemId,
@@ -228,7 +235,7 @@ export const getRecentWastage = async (req: Request, res: Response) => {
             .from(stockMovements)
             .innerJoin(inventoryItems, eq(stockMovements.itemId, inventoryItems.id))
             .leftJoin(warehouses, eq(stockMovements.fromWarehouseId, warehouses.id))
-            .where(eq(stockMovements.type, 'WASTE'))
+            .where(req.effectiveBranchId ? and(eq(stockMovements.type, 'WASTE'), eq(warehouses.branchId, req.effectiveBranchId)) : eq(stockMovements.type, 'WASTE'))
             .orderBy(desc(stockMovements.createdAt))
             .offset(0).fetch(Number(limit));
 

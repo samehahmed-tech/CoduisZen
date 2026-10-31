@@ -803,7 +803,8 @@ textarea::placeholder {
     backdrop-filter: none !important;
 }
 [data-theme='command'] .sidebar-nav-item-active {
-    background: rgba(var(--primary), 0.14) !important;
+    background: var(--theme-button-bg) !important;
+    color: var(--theme-button-text);
     border-radius: 4px;
     box-shadow: inset 2px 0 0 rgb(var(--primary));
     font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;

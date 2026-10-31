@@ -3,6 +3,7 @@ import { db } from '../db';
 import { roles, permissionDefinitions } from '../../src/db/schema';
 import { eq, and, sql, inArray, or } from 'drizzle-orm';
 import { AppPermission, UserRole, INITIAL_ROLE_PERMISSIONS } from '../../types';
+import { createSignedAuditLog } from '../services/auditService';
 
 const param = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
 
@@ -27,6 +28,19 @@ const parsePerms = (value: unknown): string[] => {
 const serializePerms = (perms: unknown): string => JSON.stringify(parsePerms(perms));
 
 const mapRoleResponse = (r: any) => r ? { ...r, permissions: parsePerms(r.permissions) } : r;
+
+const auditRoleMutation = (req: Request, eventType: string, payload: Record<string, unknown>, before?: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    before,
+    after,
+    reason: `Role mutation: ${eventType}`,
+});
 
 const PERMISSION_METADATA: { key: AppPermission; name: string; nameAr: string; category: string; categoryAr: string }[] = [
     { key: AppPermission.NAV_DASHBOARD, name: 'Dashboard', nameAr: 'لوحة التحكم', category: 'navigation', categoryAr: 'التنقل' },
@@ -106,6 +120,8 @@ const PERMISSION_METADATA: { key: AppPermission; name: string; nameAr: string; c
     { key: AppPermission.CFG_MANAGE_PRINTERS, name: 'Manage Printers', nameAr: 'إدارة الطابعات', category: 'configuration', categoryAr: 'الإعدادات' },
     { key: AppPermission.CFG_MANAGE_PLATFORMS, name: 'Manage Platforms', nameAr: 'إدارة المنصات', category: 'configuration', categoryAr: 'الإعدادات' },
     { key: AppPermission.CFG_MANAGE_WAREHOUSES, name: 'Manage Warehouses', nameAr: 'إدارة المخازن', category: 'configuration', categoryAr: 'الإعدادات' },
+    { key: AppPermission.CFG_MANAGE_PUBLIC_API_KEYS, name: 'Manage Public API Keys', nameAr: 'إدارة مفاتيح API العامة', category: 'configuration', categoryAr: 'الإعدادات' },
+    { key: AppPermission.CFG_MANAGE_WEBHOOKS, name: 'Manage Webhooks', nameAr: 'إدارة Webhooks', category: 'configuration', categoryAr: 'الإعدادات' },
 ];
 
 async function migrateBuiltInRolePermissions() {
@@ -120,7 +136,7 @@ async function migrateBuiltInRolePermissions() {
             const hasAllDefaults = defaultPerms.every((permission) => currentPerms.includes(permission));
             if (!role.permissions || !isAppPermission(currentPerms) || !hasAllDefaults) {
                 await db.update(roles)
-                    .set({ permissions: serializePerms(mergedPerms), updatedAt: new Date() })
+                    .set({ permissions: serializePerms(mergedPerms), updatedAt: new Date() } as any)
                     .where(eq(roles.id, role.id));
             }
         }
@@ -205,7 +221,7 @@ export const createRole = async (req: Request, res: Response) => {
         if (existing) return res.status(409).json({ error: 'ROLE_ALREADY_EXISTS' });
         try {
             // NOTE: mssql dialect uses .output() (no .returning()); output() chains BEFORE .values() on insert
-            const [created] = await db.insert(roles).output().values({
+            const [created] = await (db.insert(roles) as any).output().values({
             id,
             name,
             nameAr: nameAr || name,
@@ -218,8 +234,12 @@ export const createRole = async (req: Request, res: Response) => {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
-            if (created) return res.status(201).json(mapRoleResponse(created));
+            if (created) {
+                await auditRoleMutation(req, 'ROLE_CREATED', { roleId: created.id, roleName: created.name, permissionCount: parsePerms(created.permissions).length }, undefined, { active: true });
+                return res.status(201).json(mapRoleResponse(created));
+            }
             const [fetched] = await db.select().from(roles).where(eq(roles.id, id));
+            await auditRoleMutation(req, 'ROLE_CREATED', { roleId: fetched?.id || id, roleName: fetched?.name || name, permissionCount: parsePerms(fetched?.permissions).length }, undefined, { active: true });
             return res.status(201).json(mapRoleResponse(fetched));
         } catch (e: any) {
             const msg = String(e?.message || e?.cause?.message || '');
@@ -260,7 +280,7 @@ export const updateRole = async (req: Request, res: Response) => {
                     existing = byNormName;
                 } else {
                     try {
-                        const [created] = await db.insert(roles).output().values({
+                        const [created] = await (db.insert(roles) as any).output().values({
                             id: normId,
                             name: normName,
                             nameAr: nameAr || normName,
@@ -273,11 +293,20 @@ export const updateRole = async (req: Request, res: Response) => {
                             createdAt: new Date(),
                             updatedAt: new Date(),
                         });
-                        if (created) return res.json(mapRoleResponse(created));
+                        if (created) {
+                            await auditRoleMutation(req, 'ROLE_CREATED_BY_UPDATE', { roleId: created.id, roleName: created.name, permissionCount: parsePerms(created.permissions).length }, undefined, { active: true });
+                            return res.json(mapRoleResponse(created));
+                        }
                         const [fetched] = await db.select().from(roles).where(eq(roles.id, normId));
-                        if (fetched) return res.json(mapRoleResponse(fetched));
+                        if (fetched) {
+                            await auditRoleMutation(req, 'ROLE_CREATED_BY_UPDATE', { roleId: fetched.id, roleName: fetched.name, permissionCount: parsePerms(fetched.permissions).length }, undefined, { active: true });
+                            return res.json(mapRoleResponse(fetched));
+                        }
                         const [byName] = await db.select().from(roles).where(eq(roles.name, normName));
-                        if (byName) return res.json(mapRoleResponse(byName));
+                        if (byName) {
+                            await auditRoleMutation(req, 'ROLE_CREATED_BY_UPDATE', { roleId: byName.id, roleName: byName.name, permissionCount: parsePerms(byName.permissions).length }, undefined, { active: true });
+                            return res.json(mapRoleResponse(byName));
+                        }
                         return res.status(500).json({ error: 'ROLE_CREATE_FAILED' });
                     } catch (e: any) {
                         const msg = String(e?.message || e?.cause?.message || '');
@@ -305,11 +334,15 @@ export const updateRole = async (req: Request, res: Response) => {
                 ...(icon !== undefined && { icon }),
                 ...(priority !== undefined && { priority }),
                 updatedAt: new Date(),
-            })
+            } as any)
             .output()
             .where(eq(roles.id, existing.id));
-        if (updated) return res.json(mapRoleResponse(updated));
+        if (updated) {
+            await auditRoleMutation(req, 'ROLE_UPDATED', { roleId: updated.id, changedKeys: Object.keys(req.body || {}).filter((key) => key !== 'permissions').sort(), permissionCount: parsePerms(updated.permissions).length }, { active: existing.isActive }, { active: updated.isActive });
+            return res.json(mapRoleResponse(updated));
+        }
         const [fetched] = await db.select().from(roles).where(eq(roles.id, existing.id));
+        await auditRoleMutation(req, 'ROLE_UPDATED', { roleId: existing.id, changedKeys: Object.keys(req.body || {}).filter((key) => key !== 'permissions').sort(), permissionCount: parsePerms(fetched?.permissions).length }, { active: existing.isActive }, { active: fetched?.isActive });
         res.json(mapRoleResponse(fetched));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -324,6 +357,7 @@ export const deleteRole = async (req: Request, res: Response) => {
         if (!role) return res.status(404).json({ error: 'ROLE_NOT_FOUND' });
         if (role.isSystem) return res.status(403).json({ error: 'CANNOT_DELETE_SYSTEM_ROLE' });
         await db.delete(roles).where(eq(roles.id, role.id));
+        await auditRoleMutation(req, 'ROLE_DELETED', { roleId: role.id, roleName: role.name }, { active: role.isActive }, { deleted: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -340,13 +374,16 @@ export const getPermissionDefinitions = async (_req: Request, res: Response) => 
     }
 };
 
-export const syncPermissions = async (_req: Request, res: Response) => {
+export const syncPermissions = async (req: Request, res: Response) => {
     try {
         await ensurePermissionDefinitions();
         await migrateBuiltInRolePermissions();
         const permCount = await db.select({ count: sql<number>`count(*)` }).from(permissionDefinitions);
         const roleCount = await db.select({ count: sql<number>`count(*)` }).from(roles);
-        res.json({ synced: true, permissionDefinitions: Number(permCount[0]?.count || 0), roles: Number(roleCount[0]?.count || 0) });
+        const permissionDefinitionCount = Number(permCount[0]?.count || 0);
+        const roleCountValue = Number(roleCount[0]?.count || 0);
+        await auditRoleMutation(req, 'ROLE_PERMISSIONS_SYNCED', { permissionDefinitions: permissionDefinitionCount, roles: roleCountValue }, undefined, { synced: true });
+        res.json({ synced: true, permissionDefinitions: permissionDefinitionCount, roles: roleCountValue });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

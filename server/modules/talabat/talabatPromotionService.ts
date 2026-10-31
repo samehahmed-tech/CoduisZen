@@ -6,7 +6,7 @@
  * Reasons: OVERSTOCK|DELISTING|COMPETITIVENESS|EXPIRING_SOON|NMR|TRADING.
  */
 import { getTalabatConfigRaw } from './talabatConfig';
-import { getTalabatToken, TalabatRateLimiter } from './talabatClient';
+import { getTalabatToken, TalabatRateLimiter, talabatRequest } from './talabatClient';
 import { TALABAT_PROD_BASE } from './talabatCatalogService';
 import logger from '../../utils/logger';
 
@@ -77,7 +77,7 @@ export const pushPromotion = async (input: StrikethroughInput): Promise<{ job_id
     if (!built.ok) throw Object.assign(new Error((built as any).code), { status: 400 });
     if (!limiter.tryAcquire(Date.now())) throw Object.assign(new Error('RATE_LIMITED'), { status: 429 });
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/promotion`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/promotion`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify((built as any).body),
@@ -94,7 +94,7 @@ export const getPromotionJob = async (jobId: string): Promise<any> => {
     const id = String(jobId || '').trim();
     if (!id) throw Object.assign(new Error('JOB_ID_REQUIRED'), { status: 400 });
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/promotion/jobs/${id}`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/promotion/jobs/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     const data: any = await res.json().catch(() => ({}));

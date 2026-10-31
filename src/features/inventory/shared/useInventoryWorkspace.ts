@@ -11,6 +11,7 @@ import { socketService } from '@/services/socketService';
 import { prepareInventoryExcelRows } from '@/services/inventoryExcelRows';
 import { printStockCountSession } from '@/services/stockCountPrint';
 import { formatLocalDate } from '@/utils/formatters';
+import { getXlsxCompat } from '../../../utils/excelCompat';
 import { useConfirm } from '@/components/common/ConfirmProvider';
 import { useToast } from '@/components/Toast';
 import { dateOnly, MOVEMENT_TYPE_META } from './inventoryUi';
@@ -387,7 +388,7 @@ export function useInventoryWorkspace() {
 
   const exportInventoryTemplate = async () => {
     try {
-      const XLSX = await import('xlsx');
+      const XLSX = await getXlsxCompat();
       const rows = inventory.flatMap(item => {
         const quantities = item.warehouseQuantities.length
           ? item.warehouseQuantities
@@ -417,7 +418,7 @@ export function useInventoryWorkspace() {
       const book = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows), 'Inventory');
       XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(guide), 'Guide');
-      XLSX.writeFile(book, 'restoflow-inventory-template.xlsx');
+      await XLSX.writeFile(book, 'restoflow-inventory-template.xlsx');
       showToast(lang === 'ar' ? 'تم تنزيل قالب المخزون.' : 'Inventory template downloaded.', 'success');
     } catch (error: any) {
       showToast(error?.message || (lang === 'ar' ? 'تعذر تصدير القالب.' : 'Template export failed.'), 'error');
@@ -425,8 +426,8 @@ export function useInventoryWorkspace() {
   };
 
   const importInventoryTemplate = async (file: File) => {
-    const XLSX = await import('xlsx');
-    const book = XLSX.read(await file.arrayBuffer());
+    const XLSX = await getXlsxCompat();
+    const book = await XLSX.read(await file.arrayBuffer());
     if (!book.SheetNames.length) throw new Error(lang === 'ar' ? 'ملف Excel لا يحتوي على صفحات.' : 'Excel file has no sheets.');
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[book.SheetNames[0]], { defval: '' });
     if (!rows.length) throw new Error(lang === 'ar' ? 'ملف Excel فارغ.' : 'Excel file is empty.');
@@ -656,7 +657,7 @@ export function useInventoryWorkspace() {
     setAiForecasts(prev => ({ ...prev, [itemId]: { text: '', loading: true } }));
     try {
       const forecast = await inventoryIntelligenceApi.getAIForecast(itemId);
-      setAiForecasts(prev => ({ ...prev, [itemId]: { text: forecast, loading: false } }));
+      setAiForecasts(prev => ({ ...prev, [itemId]: { text: forecast.text, loading: false } }));
     } catch (e) {
       setAiForecasts(prev => ({ ...prev, [itemId]: { text: 'Forecast failed.', loading: false } }));
     }
@@ -779,7 +780,7 @@ export function useInventoryWorkspace() {
         ? await inventoryApi.getStockCount(id)
         : countSession;
       if (!count) return;
-      const XLSX = await import('xlsx');
+      const XLSX = await getXlsxCompat();
       const details = (count.items || []).map((item: any) => {
         const systemQty = Number(item.systemQty ?? item.expectedQty ?? 0);
         const countedQty = item.countedQty === null || item.countedQty === undefined ? '' : Number(item.countedQty);
@@ -807,7 +808,7 @@ export function useInventoryWorkspace() {
       const book = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(summary), lang === 'ar' ? 'ملخص الجرد' : 'Summary');
       XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(details), lang === 'ar' ? 'تفاصيل الجرد' : 'Count Details');
-      XLSX.writeFile(book, `stock-count-${count.id}.xlsx`);
+      await XLSX.writeFile(book, `stock-count-${count.id}.xlsx`);
       showToast(lang === 'ar' ? 'تم تصدير تفاصيل الجرد إلى Excel.' : 'Stock count details exported to Excel.', 'success');
     } catch (error: any) {
       setCountError(error?.message || (lang === 'ar' ? 'تعذر تصدير الجرد.' : 'Stock count export failed.'));

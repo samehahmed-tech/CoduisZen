@@ -11,7 +11,6 @@ import { db } from '../db';
 import { bankAccounts, accountTransfers, chartOfAccounts } from '../../src/db/schema';
 import { and, eq, desc, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import logger from '../utils/logger';
 import { randomUUID } from 'crypto';
 
 const DEFAULT_ACCOUNT_MAP: Record<string, string> = {
@@ -136,24 +135,32 @@ export const bankingService = {
     },
 
     settleTransfer: async (transferId: string, status: 'COMPLETED' | 'REJECTED', settledBy: string) => {
-        const [transfer] = await db.select().from(accountTransfers).where(eq(accountTransfers.id, transferId));
-        if (!transfer) throw Object.assign(new Error('TRANSFER_NOT_FOUND'), { status: 404, code: 'TRANSFER_NOT_FOUND' });
-        if (transfer.status !== 'PENDING') {
-            throw Object.assign(new Error('TRANSFER_NOT_PENDING'), { status: 400, code: 'TRANSFER_NOT_PENDING' });
-        }
+        return db.transaction(async (tx) => {
+            const [transfer] = await tx.select().from(accountTransfers).where(eq(accountTransfers.id, transferId));
+            if (!transfer) throw Object.assign(new Error('TRANSFER_NOT_FOUND'), { status: 404, code: 'TRANSFER_NOT_FOUND' });
+            if (transfer.status !== 'PENDING') {
+                throw Object.assign(new Error('TRANSFER_NOT_PENDING'), { status: 400, code: 'TRANSFER_NOT_PENDING' });
+            }
 
-        const now = new Date();
-        await db.update(accountTransfers).set({
-            status,
-            approvedBy: settledBy,
-            completedAt: status === 'COMPLETED' ? now : null,
-            updatedAt: now,
-        }).where(eq(accountTransfers.id, transferId));
+            const now = new Date();
+            if (status === 'REJECTED') {
+                await tx.update(accountTransfers).set({
+                    status,
+                    approvedBy: settledBy,
+                    completedAt: null,
+                    updatedAt: now,
+                }).where(and(eq(accountTransfers.id, transferId), eq(accountTransfers.status, 'PENDING')));
+            } else {
+                // Claim inside the transaction so concurrent approvals cannot post twice.
+                const [claimed] = await tx.update(accountTransfers).set({
+                    status: 'PROCESSING',
+                    approvedBy: settledBy,
+                    updatedAt: now,
+                }).output().where(and(eq(accountTransfers.id, transferId), eq(accountTransfers.status, 'PENDING')));
+                if (!claimed) throw Object.assign(new Error('TRANSFER_NOT_PENDING'), { status: 400, code: 'TRANSFER_NOT_PENDING' });
 
-        if (status === 'COMPLETED') {
-            try {
                 const { GLService } = await import('./glService');
-                await GLService.postJournalEntry({
+                const posting = await GLService.postJournalEntry({
                     reference: `TRF-${transfer.id}`,
                     referenceType: 'WALLET_DEPOSIT',
                     description: `Transfer ${transfer.amount} EGP between accounts`,
@@ -163,14 +170,24 @@ export const bankingService = {
                         { accountCode: '1110', debit: 0, credit: Number(transfer.amount), description: 'Source account credit' },
                     ],
                     createdBy: settledBy,
-                }).catch(err => logger.warn({ err }, 'banking: GL posting for transfer skipped'));
-            } catch {
-                logger.warn('banking: GL posting skipped');
-            }
-        }
+                    actorId: settledBy,
+                    source: 'WALLET_TRANSFER',
+                    correlationId: `WALLET_TRANSFER:${transfer.id}`,
+                }, tx);
+                if (typeof posting === 'string' || !posting || !('entryId' in posting) || !posting.entryId) {
+                    throw Object.assign(new Error('TRANSFER_GL_POSTING_FAILED'), { status: 409, code: 'TRANSFER_GL_POSTING_FAILED' });
+                }
 
-        const [updated] = await db.select().from(accountTransfers).where(eq(accountTransfers.id, transferId));
-        return { transfer: updated };
+                await tx.update(accountTransfers).set({
+                    status: 'COMPLETED',
+                    completedAt: now,
+                    updatedAt: new Date(),
+                }).where(and(eq(accountTransfers.id, transferId), eq(accountTransfers.status, 'PROCESSING')));
+            }
+
+            const [updated] = await tx.select().from(accountTransfers).where(eq(accountTransfers.id, transferId));
+            return { transfer: updated };
+        });
     },
 
     listTransfers: async (branchId: string) => {

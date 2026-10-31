@@ -69,8 +69,8 @@ const DispatchHub: React.FC = () => {
             const list = await deliveryApi.getDrivers(branchId ? { branchId } : undefined);
             setDrivers((list || []).map((d: any) => ({
                 id: String(d.id), name: String(d.name || ''), phone: String(d.phone || ''),
-                status: String(d.status || 'OFFLINE').toUpperCase() === 'BUSY' ? 'ON_DELIVERY' : String(d.status || 'OFFLINE').toUpperCase(),
-                vehicleType: d.vehicleType || d.vehicle_type || 'BIKE',
+                status: (String(d.status || 'OFFLINE').toUpperCase() === 'BUSY' ? 'ON_DELIVERY' : String(d.status || 'OFFLINE').toUpperCase()) as Driver['status'],
+                vehicleType: (d.vehicleType || d.vehicle_type || 'BIKE') as Driver['vehicleType'],
                 branchId: d.branchId || d.branch_id, isActive: d.isActive !== false && d.is_active !== false,
             })));
         } catch { /* drivers picker degrades gracefully */ }
@@ -103,7 +103,7 @@ const DispatchHub: React.FC = () => {
     useEffect(() => {
         const ordersOnly = () => refreshOrders(true);
         const onDriverStatus = (p: { id: string; status: string }) =>
-            setDrivers((prev) => prev.map((d) => (d.id === p.id ? { ...d, status: p.status } : d)));
+            setDrivers((prev) => prev.map((d) => (d.id === p.id ? { ...d, status: p.status as Driver['status'] } : d)));
         // Live GPS: move the pilot marker the moment a fix lands (30s poll stays as fallback).
         const onDriverLocation = (p: { driverId: string; lat: number; lng: number; updatedAt: string; speedKmh?: number; accuracy?: number }) => {
             if (!p || !p.driverId || !Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lng))) return;

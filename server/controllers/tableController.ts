@@ -8,6 +8,7 @@ import { logger } from '../utils/logger';
 import { parseSettingJson, upsertSetting } from '../utils/settingsStore.js';
 import { createSignedAuditLog } from '../services/auditService';
 import { allocateDailyOrderNumber } from '../services/orderNumberService';
+import { signPublicQrToken } from '../utils/publicQrToken';
 
 const tableRefKey = (referenceId: string) => `tableOpRef:${referenceId}`;
 
@@ -90,7 +91,7 @@ const normalizeTableLayout = (table: any, branchId: string) => ({
 
 export const getTables = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
         if (!branchId) return res.status(400).json({ error: 'Branch ID required' });
 
         const allTables = await db.select().from(tables).where(eq(tables.branchId, branchId));
@@ -105,7 +106,7 @@ export const getTables = async (req: Request, res: Response) => {
 
 export const getZones = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
         if (!branchId) return res.status(400).json({ error: 'Branch ID required' });
 
         const allZones = await db.select().from(floorZones).where(eq(floorZones.branchId, branchId));
@@ -231,13 +232,31 @@ export const saveLayout = async (req: Request, res: Response) => {
         }
         res.json(responsePayload);
     } catch (error: any) {
-        logger.error({ err: error, body: req.body, userId: req.user?.id }, 'Failed to save floor layout');
+        logger.error({ err: error?.message || String(error), userId: req.user?.id }, 'Failed to save floor layout');
         res.status(500).json({
             code: 'FLOOR_LAYOUT_SAVE_FAILED',
             error: 'FLOOR_LAYOUT_SAVE_FAILED',
             message: 'Failed to save floor layout. Please review zones and tables data.',
         });
     }
+};
+
+export const getTablePublicQr = async (req: Request, res: Response) => {
+    const tableId = getStringParam((req.params as any).id);
+    const branchId = String(req.effectiveBranchId || req.user?.branchId || '').trim();
+    if (!tableId || !branchId) return res.status(400).json({ error: 'TABLE_AND_BRANCH_REQUIRED' });
+    const [table] = await db.select({ id: tables.id, name: tables.name, branchId: tables.branchId })
+        .from(tables).where(and(eq(tables.id, tableId), eq(tables.branchId, branchId))).limit(1);
+    if (!table) return res.status(404).json({ error: 'TABLE_NOT_FOUND' });
+    const token = signPublicQrToken(branchId, tableId);
+    if (!token) return res.status(503).json({ error: 'PUBLIC_QR_SECRET_REQUIRED' });
+    const base = String(process.env.PUBLIC_ORDER_BASE_URL || process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    return res.json({
+        table: { id: table.id, name: table.name, branchId: table.branchId },
+        token,
+        menuUrl: `${base}/api/v1/qr/branches/${encodeURIComponent(branchId)}/tables/${encodeURIComponent(tableId)}/menu?token=${encodeURIComponent(token)}`,
+        orderUrl: `${base}/api/v1/qr/branches/${encodeURIComponent(branchId)}/tables/${encodeURIComponent(tableId)}/orders`,
+    });
 };
 
 export const updateTableStatus = async (req: Request, res: Response) => {
@@ -411,10 +430,18 @@ const findActiveOrdersByTable = async (tx: any, tableId: string, branchId: strin
         .where(and(eq(tables.id, tableId), eq(tables.branchId, branchId)))
         .top(1);
     if (!table || String(table.status).toUpperCase() === 'AVAILABLE') return [];
+    const [branch] = await tx.select({ businessDate: branches.businessDate })
+        .from(branches)
+        .where(eq(branches.id, branchId))
+        .top(1);
+    const businessDateFilter = branch?.businessDate
+        ? eq(orders.businessDate, branch.businessDate)
+        : undefined;
     const rows = await tx.select().from(orders).where(and(
         eq(orders.tableId, tableId),
         eq(orders.branchId, branchId),
         notInArray(orders.status, TERMINAL_ORDER_STATUSES),
+        ...(businessDateFilter ? [businessDateFilter] : []),
     ));
     rows.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     return rows;

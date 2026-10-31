@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { auditLogs, bonusPenaltyRecords, chartOfAccounts, employeeLoans, journalEntries, journalLines, loanInstallments, payrollCycles, payrollLocks, payrollRuns } from '../../src/db/schema';
+import { auditLogs, bonusPenaltyRecords, chartOfAccounts, employeeLoans, journalEntries, journalLines, loanInstallments, payrollCycles, payrollLocks, payrollRuns, tipPools } from '../../src/db/schema';
 import { createSignedAuditLog } from './auditService';
 import { GLService } from './glService';
 
@@ -26,6 +26,10 @@ export const payrollReopenService = {
             await tx.update(payrollCycles)
                 .set({ status: 'REOPENED', updatedAt: new Date() })
                 .where(eq(payrollCycles.id, input.cycleId));
+
+            await tx.update(tipPools)
+                .set({ payrollCycleId: null, updatedAt: new Date() })
+                .where(eq(tipPools.payrollCycleId, input.cycleId));
 
             await tx.update(payrollLocks)
                 .set({ lockedThrough: cycle.periodStart, updatedAt: new Date() })
@@ -83,6 +87,9 @@ export const payrollReopenService = {
                         referenceType: 'PAYROLL_REVERSAL' as any,
                         description: `Payroll reversal for reopened run ${latestRun.id} (${input.reason || 'no reason'})`,
                         createdBy: input.reopenedBy,
+                        actorId: input.reopenedBy,
+                        source: 'PAYROLL_REVERSAL',
+                        correlationId: `PAYROLL_REVERSAL:${latestRun.id}`,
                         branchId: cycle.branchId,
                         lines: lines.map((l: any) => ({
                             accountCode: codeById.get(String(l.accountId)) || String(l.accountId),

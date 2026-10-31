@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { apiRateLimiter } from '../server/middleware/rateLimit';
+import { apiRateLimiter, oauthRateLimiter, webhookRateLimiter } from '../server/middleware/rateLimit';
 import { getRequestTiming } from '../server/middleware/requestTiming';
 import { ingestClientRum, getClientRum } from '../server/controllers/rumController';
 
@@ -44,6 +44,32 @@ describe('perf infrastructure (no DB)', () => {
                 expect(res.statusCode).toBe(429);
                 expect(res.headers['Retry-After']).toBeTruthy();
             }
+        }
+        expect(blocked).toBeGreaterThan(0);
+    });
+
+    it('webhook limiter applies a dedicated lower ceiling', () => {
+        let blocked = 0;
+        for (let i = 0; i < 260; i++) {
+            const res = mockRes();
+            let nexted = false;
+            webhookRateLimiter(mockReq('/api/payments/paymob/webhook', '10.9.9.4'), res, () => { nexted = true; });
+            if (!nexted) {
+                blocked += 1;
+                expect(res.statusCode).toBe(429);
+                expect(res.headers['Retry-After']).toBeTruthy();
+            }
+        }
+        expect(blocked).toBeGreaterThan(0);
+    });
+
+    it('OAuth limiter has its own bounded ceiling', () => {
+        let blocked = 0;
+        for (let i = 0; i < 65; i++) {
+            const res = mockRes();
+            let nexted = false;
+            oauthRateLimiter(mockReq('/api/v1/oauth/token', '10.9.9.5'), res, () => { nexted = true; });
+            if (!nexted) blocked += 1;
         }
         expect(blocked).toBeGreaterThan(0);
     });

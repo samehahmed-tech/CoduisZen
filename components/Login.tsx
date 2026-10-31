@@ -4,6 +4,8 @@ import { KeyRound, AtSign, Globe, ArrowRight, ShieldCheck, Eye, EyeOff, Sparkles
 import { useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../services/api/auth';
 import { INITIAL_ROLE_PERMISSIONS, User, UserRole } from '../types';
+import { useTheme } from '../theme/useTheme';
+import { HOSPITALITY_BACKGROUNDS } from './hospitalityBackgrounds';
 
 /* ??????????? CSS-in-JS keyframes for the animated gradient ??????????? */
 const gradientKeyframes = `
@@ -65,48 +67,7 @@ const gradientKeyframes = `
   transition: background-color 9999s ease-in-out 0s;
 }
 `;
-/* ??????????? Curated halal-safe restaurant backgrounds ??????????? */
-const LOGIN_BACKGROUNDS = [
-    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2500&auto=format&fit=crop', // elegant restaurant interior
-    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2500&auto=format&fit=crop', // fine dining plate
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2500&auto=format&fit=crop', // modern restaurant
-    'https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?q=80&w=2500&auto=format&fit=crop', // warm cafe interior
-    'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?q=80&w=2500&auto=format&fit=crop', // cozy bistro ambiance
-    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2500&auto=format&fit=crop', // overhead food spread
-    'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?q=80&w=2500&auto=format&fit=crop', // vibrant dish close-up
-    'https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=2500&auto=format&fit=crop', // upscale restaurant setting
-    'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?q=80&w=2500&auto=format&fit=crop', // beautifully plated food
-    'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=2500&auto=format&fit=crop', // restaurant exterior night
-    'https://images.unsplash.com/photo-1590846406792-0adc7f938f1d?q=80&w=2500&auto=format&fit=crop', // warm kitchen glow
-    'https://images.unsplash.com/photo-1551218808-94e220e084d2?q=80&w=2500&auto=format&fit=crop', // chef plating in kitchen
-];
-
-/* Slideshow media pool — halal-safe only (no alcohol): restaurant/cafe
-   interiors, coffee, bakery and desserts. Videos are short muted loops. */
-const LOGIN_MEDIA: { type: 'image' | 'video'; src: string }[] = [
-    // Bundled local media first — guaranteed to work offline / behind strict firewalls.
-    { type: 'video', src: '/login-bg/bg-latte-1.mp4' }, // latte art pour
-    { type: 'video', src: '/login-bg/bg-pour-1.mp4' }, // barista pour
-    // Keep Login and the system wallpaper gallery on the exact same WebP
-    // assets, so the brand scene is consistent and the browser only decodes
-    // one optimized image format.
-    { type: 'image', src: '/wallpapers/webp/midnight.webp' }, // restaurant interior
-    { type: 'image', src: '/wallpapers/webp/violet.webp' }, // coffee art
-    { type: 'image', src: '/wallpapers/webp/copper.webp' }, // baklava
-    // Remote pool for extra variety (same subjects, halal-safe).
-    { type: 'video', src: 'https://videos.pexels.com/video-files/13736555/13736555-hd_720_1280_24fps.mp4' },
-    { type: 'video', src: 'https://videos.pexels.com/video-files/34505177/14619761_720_1280_30fps.mp4' }, // barista pour
-    { type: 'image', src: 'https://images.pexels.com/photos/776538/pexels-photo-776538.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // restaurant interior
-    { type: 'image', src: 'https://images.pexels.com/photos/34077030/pexels-photo-34077030.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // cozy cafe
-    { type: 'image', src: 'https://images.pexels.com/photos/35646560/pexels-photo-35646560.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // cafe wooden tables
-    { type: 'image', src: 'https://images.pexels.com/photos/29517889/pexels-photo-29517889.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // modern cafe warm light
-    { type: 'image', src: 'https://images.pexels.com/photos/29525876/pexels-photo-29525876.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // cafe pendant lights
-    { type: 'image', src: 'https://images.pexels.com/photos/312420/pexels-photo-312420.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // coffee cup at cafe
-    { type: 'image', src: 'https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // coffee art
-    { type: 'image', src: 'https://images.pexels.com/photos/8696281/pexels-photo-8696281.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // baklava
-    { type: 'image', src: 'https://images.pexels.com/photos/18543486/pexels-photo-18543486.jpeg?auto=compress&cs=tinysrgb&w=1920' }, // turkish baklava
-    ...LOGIN_BACKGROUNDS.map(src => ({ type: 'image' as const, src })),
-];
+const LOGIN_MEDIA = HOSPITALITY_BACKGROUNDS.map(({ type, src }) => ({ type, src }));
 
 /* Rotating capability lines shown above the card — short system pitch. */
 const CAPABILITIES = {
@@ -130,6 +91,7 @@ const CAPABILITIES = {
 
 const Login: React.FC = () => {
     const { loginWithPassword, settings, updateSettings } = useAuthStore();
+    const { toggleDark } = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -246,8 +208,8 @@ const Login: React.FC = () => {
                 (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(idleId);
             };
         }
-        const timer = window.setTimeout(warm, 2500);
-        return () => { cancelled = true; window.clearTimeout(timer); };
+        const timer = globalThis.setTimeout(warm, 2500);
+        return () => { cancelled = true; globalThis.clearTimeout(timer); };
     }, []);
 
 
@@ -344,6 +306,13 @@ const Login: React.FC = () => {
     };
 
     const handlePinLogin = async () => {
+        // Keep malformed/empty PIN submissions client-side. The API correctly
+        // rejects them with 400, but they should never leave the login screen
+        // (or create noisy auth errors while another request is settling).
+        if (pin.length !== 6) {
+            setError(t.invalidPin);
+            return;
+        }
         try {
             setError(undefined);
             const result = await authApi.pinLogin(pin);
@@ -473,7 +442,7 @@ const Login: React.FC = () => {
                         {/* Controls */}
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => updateSettings({ isDarkMode: !settings.isDarkMode })}
+                                onClick={() => toggleDark()}
                                 className={`p-2 rounded-xl border transition-all duration-150  ${lt
                                     ? 'bg-white/80 border-slate-200 text-slate-500 hover:text-slate-800 hover:shadow-md shadow-sm'
                                     : 'bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10'

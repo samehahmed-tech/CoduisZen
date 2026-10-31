@@ -1,5 +1,16 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import { mapConnectionUpdate, reconnectDelay } from '../server/services/whatsappConnection';
+
+const previousWhatsAppProvider = vi.hoisted(() => {
+  const previous = process.env.WHATSAPP_PROVIDER;
+  process.env.WHATSAPP_PROVIDER = 'whatsapp-web.js';
+  return previous;
+});
+
+afterAll(() => {
+  if (previousWhatsAppProvider === undefined) delete process.env.WHATSAPP_PROVIDER;
+  else process.env.WHATSAPP_PROVIDER = previousWhatsAppProvider;
+});
 
 vi.mock('@whiskeysockets/baileys', () => ({
   default: () => ({

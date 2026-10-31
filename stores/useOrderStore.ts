@@ -10,6 +10,7 @@ import { translations } from '../services/translations';
 import { branchEntityCacheKey, fromBranchEntityCache, toBranchEntityCache } from '../src/utils/branchEntityCache';
 import { findActiveTableOrder, getActiveTableOrders } from '../utils/tableOrder';
 import { buildOrderDiscountPayload } from '../services/orderTotals';
+import { assertOfflinePaymentPolicy } from '../src/services/syncQueueUtils';
 
 const isClientOnlyItemId = (value: unknown) => {
     const id = String(value || '').trim();
@@ -132,7 +133,7 @@ const INITIAL_TABLES: Table[] = [];
 const INITIAL_ZONES: FloorZone[] = [
     { id: 'MAIN', name: 'Main Hall', color: 'bg-indigo-600', width: 1600, height: 1200 }
 ];
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { eventBus } from '../services/eventBus';
 import { PaymentMethod } from '../types';
 
@@ -146,6 +147,18 @@ const dedupeOrdersById = (orders: Order[]) => {
     }
     return Array.from(byId.values());
 };
+
+// Keep the persistence contract available during SSR/tests where browser
+// localStorage does not exist. The browser still uses real localStorage;
+// server-side consumers get an inert storage instead of losing api.persist.
+const orderPersistStorage = createJSONStorage(() => {
+    if (typeof localStorage !== 'undefined') return localStorage;
+    return {
+        getItem: () => null,
+        setItem: () => undefined,
+        removeItem: () => undefined,
+    };
+});
 
 /**
  * Merge freshly-created server lines with the client cart lines.
@@ -421,6 +434,7 @@ export const useOrderStore = create<OrderState>()(
                     if (navigator.onLine) {
                         savedOrder = await ordersApi.create(payload, { idempotencyKey });
                     } else {
+                        assertOfflinePaymentPolicy(payload);
                         await syncService.queue('order', 'CREATE', payload);
                         savedOrder = { ...order, syncStatus: 'PENDING' };
                     }
@@ -508,10 +522,12 @@ export const useOrderStore = create<OrderState>()(
                         }, { idempotencyKey: `${orderId}:${status}` });
                     } else {
                         if (options?.approvalId) throw new Error('MANAGER_APPROVAL_REQUIRES_ONLINE');
-                        await syncService.queue('orderStatus', 'UPDATE', {
+                        const offlineStatusPayload = {
                             id: orderId,
-                            data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt, paymentMethod: options?.paymentMethod, payments: options?.payments, forceVoid: options?.forceVoid }
-                        });
+                            data: { status, changed_by: changedBy, notes, expected_updated_at: expectedUpdatedAt, paymentMethod: options?.paymentMethod, payments: options?.payments, forceVoid: options?.forceVoid },
+                        };
+                        assertOfflinePaymentPolicy(offlineStatusPayload);
+                        await syncService.queue('orderStatus', 'UPDATE', offlineStatusPayload);
                     }
                     eventBus.emit(AuditEventType.ORDER_STATUS_CHANGE, {
                         orderId,
@@ -1060,6 +1076,6 @@ export const useOrderStore = create<OrderState>()(
                 return { activeCart: [], discount: 0, activeCoupon: null };
             }),
         }),
-        { name: 'order-storage' }
+        { name: 'order-storage', storage: orderPersistStorage }
     )
 );

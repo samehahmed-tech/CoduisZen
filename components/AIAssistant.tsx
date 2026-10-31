@@ -28,6 +28,8 @@ import { useAIWidgetStore } from '../stores/useAIWidgetStore';
 import { translations } from '../services/translations';
 import { GuardedAIAction } from '../services/aiActionGuard';
 import { aiApi } from '../services/api/ai';
+import RestoFlowCopilotAvatar from './ai/RestoFlowCopilotAvatar';
+import '../styles/layout/ai-copilot.css';
 
 interface Message {
   id: string;
@@ -35,7 +37,10 @@ interface Message {
   text: string;
   timestamp: Date;
   suggestion?: { label: string; view: ViewState };
+  route?: { providerId: string; modelId: string; usedFallback: boolean };
 }
+
+const isDestructiveAction = (action: any) => ['DELETE_MENU_ITEM', 'DELETE_MENU_CATEGORY'].includes(String(action?.type || '').toUpperCase());
 
 type QuickPrompt = {
   id: string;
@@ -134,8 +139,13 @@ const AIAssistant: React.FC = () => {
   const t = translations[lang] || translations.en;
 
   const copy = {
-    title: isRtl ? 'المساعد الذكي' : 'AI Assistant',
-    subtitle: isRtl ? 'اسأل، حلّل، أو اطلب مهمة — التنفيذ بعد مراجعتك' : 'Ask, analyze, or request a task — execution waits for your approval',
+    title: 'ZEN AI',
+    subtitle: isRtl ? 'زميل تشغيل ذكي يفهم المطعم ويحوّل البيانات لقرارات قابلة للتنفيذ' : 'An operations companion that turns restaurant signals into clear, reviewable decisions',
+    eyebrow: isRtl ? 'ذكاء الوردية' : 'SHIFT INTELLIGENCE',
+    active: isRtl ? 'متصل بالنظام' : 'SYSTEM LINKED',
+    clear: isRtl ? 'بدء محادثة جديدة' : 'Start a new conversation',
+    close: isRtl ? 'إغلاق المساعد' : 'Close assistant',
+    signalTitle: isRtl ? 'صورة التشغيل الآن' : 'LIVE OPERATING PICTURE',
     quickTitle: isRtl ? 'اختصارات سريعة' : 'Quick prompts',
     contextTitle: isRtl ? 'سياق النظام' : 'System context',
     pendingTitle: isRtl ? 'إجراءات تحتاج موافقة' : 'Actions awaiting approval',
@@ -149,6 +159,7 @@ const AIAssistant: React.FC = () => {
     approve: isRtl ? 'موافقة وتشغيل' : 'Approve and run',
     reason: isRtl ? 'سبب الموافقة أو ملاحظة للمراجعة' : 'Approval reason or audit note',
     goTo: isRtl ? 'افتح' : 'Open',
+    send: isRtl ? 'إرسال الرسالة' : 'Send message',
   };
 
   const quickPrompts = useMemo<QuickPrompt[]>(() => [
@@ -230,13 +241,24 @@ const AIAssistant: React.FC = () => {
   });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [avatarState, setAvatarState] = useState<'idle' | 'thinking' | 'success' | 'error'>('idle');
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [pendingActions, setPendingActions] = useState<GuardedAIAction[]>([]);
   const [actionReason, setActionReason] = useState<Record<string, string>>({});
+  const [adminPassword, setAdminPassword] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping, pendingActions.length]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
 
   useEffect(() => {
     sessionStorage.setItem('restoflow-ai-conversation', JSON.stringify(messages.slice(-30)));
@@ -256,6 +278,7 @@ const AIAssistant: React.FC = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
+    setAvatarState('thinking');
 
     try {
       const response = await aiApi.chat({
@@ -300,18 +323,23 @@ const AIAssistant: React.FC = () => {
           text: response.text,
           timestamp: new Date(),
           suggestion: response.suggestion,
+          route: response.route || undefined,
         },
       ]);
-    } catch {
+      setAvatarState('success');
+      window.setTimeout(() => setAvatarState('idle'), 1200);
+    } catch (error: any) {
       setMessages((prev) => [
         ...prev,
         {
           id: `${Date.now()}-ai-error`,
           sender: 'ai',
-          text: t.generic_error || 'Something went wrong while contacting the assistant.',
+          text: error?.message || t.generic_error || 'Something went wrong while contacting the assistant.',
           timestamp: new Date(),
         },
       ]);
+      setAvatarState('error');
+      window.setTimeout(() => setAvatarState('idle'), 1600);
     } finally {
       setIsTyping(false);
     }
@@ -325,17 +353,16 @@ const AIAssistant: React.FC = () => {
       const response = await aiApi.actionExecute({
         action: guarded.action as any,
         explanation: actionReason[guarded.id] || 'Approved via AI Assistant',
+        confirmation: 'AI_EXECUTE',
+        ...(isDestructiveAction(guarded.action) ? { adminPassword: adminPassword[guarded.id] || '' } : {}),
       });
-      if (String((guarded.action as any)?.type || '').toUpperCase() === 'SHOW_REPORT') {
-        navigate('/reports');
-      }
       setPendingActions((prev) => prev.filter((a) => a.id !== guarded.id));
       setMessages((prev) => [
         ...prev,
         {
           id: `${Date.now()}-exec-ok`,
           sender: 'ai',
-          text: response?.message || t.action_executed || 'Action executed.',
+          text: response?.message || (isRtl ? 'تم التنفيذ والتحقق من النتيجة.' : 'Executed and verified.'),
           timestamp: new Date(),
         },
       ]);
@@ -356,103 +383,124 @@ const AIAssistant: React.FC = () => {
     navigate(pathMap[view] || '/');
   };
 
+  const riskCount = computedInsights.lowStock + computedInsights.pendingOrders + computedInsights.cancelledOrders;
+  const operatingState = isTyping
+    ? (isRtl ? 'تحليل حي' : 'Live analysis')
+    : riskCount > 0
+      ? (isRtl ? `${riskCount} إشارات تحتاج انتباه` : `${riskCount} signals need attention`)
+      : (isRtl ? 'كل الإشارات مستقرة' : 'All signals stable');
+
   return (
     <aside
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-border bg-app text-main shadow-2xl"
+      className="rf-copilot-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-border bg-app text-main"
       dir={isRtl ? 'rtl' : 'ltr'}
+      aria-label={copy.title}
     >
-      <header className="border-b border-border bg-card px-5 py-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
-              <Sparkles size={20} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-base font-black leading-tight text-main">{copy.title}</h2>
-              <p className="mt-1 text-xs font-bold leading-5 text-muted">{copy.subtitle}</p>
+      <header className="rf-copilot-hero">
+        <div className="rf-copilot-hero-tools">
+          <div className="rf-copilot-kicker">
+            <span className="rf-copilot-live-dot" aria-hidden="true" />
+            <span>{copy.active}</span>
+            <span className="rf-copilot-kicker-state">{isTyping ? (isRtl ? 'يحلل الآن' : 'ANALYZING') : (isRtl ? 'جاهز' : 'READY')}</span>
+          </div>
+          <div className="rf-copilot-tool-group">
+            <button
+              onClick={() => {
+                const clean = [{ id: `welcome-${Date.now()}`, sender: 'ai' as const, text: t.ai_greeting || copy.subtitle, timestamp: new Date() }];
+                setMessages(clean);
+                setPendingActions([]);
+                sessionStorage.removeItem('restoflow-ai-conversation');
+              }}
+              className="rf-copilot-tool"
+              aria-label={copy.clear}
+              title={copy.clear}
+            >
+              <Trash2 size={17} aria-hidden="true" />
+            </button>
+            <button
+              onClick={() => toggleAssistant(false)}
+              className="rf-copilot-tool"
+              aria-label={copy.close}
+              title={copy.close}
+            >
+              <X size={19} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="rf-copilot-hero-grid">
+          <div className="rf-copilot-character-stage">
+            <RestoFlowCopilotAvatar
+              state={avatarState}
+              reducedMotion={reducedMotion}
+              label={isRtl ? 'شخصية ZEN AI التفاعلية' : 'ZEN AI interactive character'}
+            />
+          </div>
+          <div className="rf-copilot-identity-copy">
+            <span className="rf-copilot-eyebrow">{copy.eyebrow}</span>
+            <h2 className="rf-copilot-title">ZEN <strong>AI</strong></h2>
+            <p>{copy.subtitle}</p>
+            <div className="rf-copilot-command-strip" aria-live="polite">
+              <div>
+                <span className="rf-copilot-strip-label">{isRtl ? 'الأولوية' : 'PRIORITY SIGNAL'}</span>
+                <strong>{operatingState}</strong>
+              </div>
+              <div className="rf-copilot-strip-meta">
+                <span>{isRtl ? 'تحديث حي' : 'LIVE'}</span>
+                <b>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b>
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => {
-              const clean = [{ id: `welcome-${Date.now()}`, sender: 'ai' as const, text: t.ai_greeting || copy.subtitle, timestamp: new Date() }];
-              setMessages(clean);
-              setPendingActions([]);
-              sessionStorage.removeItem('restoflow-ai-conversation');
-            }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition hover:bg-elevated hover:text-main"
-            aria-label={isRtl ? 'محادثة جديدة' : 'New conversation'}
-            title={isRtl ? 'محادثة جديدة' : 'New conversation'}
-          >
-            <Trash2 size={16} />
-          </button>
-          <button
-            onClick={() => toggleAssistant(false)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border text-muted transition hover:bg-elevated hover:text-rose-500"
-            aria-label="Close assistant"
-          >
-            <X size={18} />
-          </button>
         </div>
       </header>
 
-      <section className="border-b border-border bg-elevated/35 px-5 py-4">
-        <div className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-muted">
-          <Bot size={14} />
-          {copy.contextTitle}
+      <section className="rf-copilot-signal-rail" aria-label={copy.signalTitle}>
+        <div className="rf-copilot-signal-rail-title">
+          <Bot size={14} aria-hidden="true" />
+          <span>{copy.signalTitle}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {contextChips.map((chip) => (
-            <div key={chip.label} className="rounded-xl border border-border bg-card px-3 py-2">
-              <div className="text-[10px] font-bold text-muted">{chip.label}</div>
-              <div className="mt-1 text-sm font-black text-main tabular-nums">{chip.value}</div>
-            </div>
-          ))}
-        </div>
+        {contextChips.map((chip, index) => (
+          <div key={chip.label} className="rf-copilot-context-chip">
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <div><b>{chip.value}</b><small>{chip.label}</small></div>
+          </div>
+        ))}
       </section>
 
       {/* ── Data Analysis Panel ── */}
       {computedInsights.totalRevenue > 0 && (
-        <section className="border-b border-border bg-card/50 px-5 py-4">
-          <div className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-muted">
-            <BarChart3 size={14} />
-            {isRtl ? 'تحليل فوري للبيانات' : 'Real-time Data Analysis'}
+        <section className="rf-copilot-analysis">
+          <div className="rf-copilot-section-heading">
+            <span><BarChart3 size={15} aria-hidden="true" />{isRtl ? 'نبض الوردية' : 'SHIFT PULSE'}</span>
+            <small>{isRtl ? 'قراءة مباشرة' : 'LIVE READ'}</small>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl bg-elevated/40 border border-border/30 px-3 py-2">
-              <div className="text-[8px] font-bold text-muted uppercase">{isRtl ? 'إيراد اليوم' : 'Today Rev'}</div>
-              <div className="text-sm font-black text-emerald-500 tabular-nums">{computedInsights.todayRevenue.toLocaleString()}</div>
+          <div className="rf-copilot-analysis-grid">
+            <div className="rf-copilot-metric rf-copilot-metric--revenue">
+              <span>{isRtl ? 'إيراد اليوم' : 'TODAY REVENUE'}</span>
+              <strong>{computedInsights.todayRevenue.toLocaleString()}</strong>
+              <small>{settings.currency || 'EGP'}</small>
             </div>
-            <div className="rounded-xl bg-elevated/40 border border-border/30 px-3 py-2">
-              <div className="text-[8px] font-bold text-muted uppercase">{isRtl ? 'متوسط الأوردر' : 'Avg Order'}</div>
-              <div className="text-sm font-black text-indigo-500 tabular-nums">{computedInsights.avgOrderValue.toLocaleString()}</div>
+            <div className="rf-copilot-metric rf-copilot-metric--completion">
+              <span>{isRtl ? 'اكتمال الطلبات' : 'COMPLETION'}</span>
+              <strong>{computedInsights.orderCompletionRate}%</strong>
+              <small>{isRtl ? `${computedInsights.completedOrders} مكتمل` : `${computedInsights.completedOrders} complete`}</small>
             </div>
-            <div className="rounded-xl bg-elevated/40 border border-border/30 px-3 py-2">
-              <div className="text-[8px] font-bold text-muted uppercase">{isRtl ? 'الإتمام' : 'Completion'}</div>
-              <div className="text-sm font-black text-cyan-500 tabular-nums">{computedInsights.orderCompletionRate}%</div>
-            </div>
-            <div className="rounded-xl bg-elevated/40 border border-border/30 px-3 py-2">
-              <div className="text-[8px] font-bold text-muted uppercase">{isRtl ? 'معلق' : 'Pending'}</div>
-              <div className="text-sm font-black text-amber-500 tabular-nums">{computedInsights.pendingOrders}</div>
-            </div>
-            <div className="rounded-xl bg-elevated/40 border border-border/30 px-3 py-2">
-              <div className="text-[8px] font-bold text-muted uppercase">{isRtl ? 'نواقص' : 'Low Stock'}</div>
-              <div className="text-sm font-black text-rose-500 tabular-nums">{computedInsights.lowStock} ({computedInsights.lowStockRatio}%)</div>
-            </div>
-            <div className="rounded-xl bg-elevated/40 border border-border/30 px-3 py-2">
-              <div className="text-[8px] font-bold text-muted uppercase">{isRtl ? 'ملغي' : 'Cancelled'}</div>
-              <div className="text-sm font-black text-rose-500 tabular-nums">{computedInsights.cancelledOrders}</div>
+            <div className="rf-copilot-metric rf-copilot-metric--risk">
+              <span>{isRtl ? 'إشارات الانتباه' : 'ATTENTION'}</span>
+              <strong>{riskCount}</strong>
+              <small>{isRtl ? `${computedInsights.lowStock} مخزون · ${computedInsights.pendingOrders} طلب` : `${computedInsights.lowStock} stock · ${computedInsights.pendingOrders} orders`}</small>
             </div>
           </div>
         </section>
       )}
 
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <section className="mb-5">
-          <div className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-muted">
-            <Sparkles size={14} />
-            {copy.quickTitle}
+      <div className="rf-copilot-body flex-1 overflow-y-auto">
+        <section className="rf-copilot-prompts mb-5">
+          <div className="rf-copilot-section-heading">
+            <span><Sparkles size={14} aria-hidden="true" />{copy.quickTitle}</span>
+            <small>{isRtl ? 'اسأل بضغطة' : 'ONE TAP'}</small>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="rf-copilot-prompt-grid">
             {quickPrompts.map((prompt) => {
               const Icon = prompt.icon;
               return (
@@ -460,37 +508,38 @@ const AIAssistant: React.FC = () => {
                   key={prompt.id}
                   onClick={() => requestAssistant(prompt.text)}
                   disabled={isTyping}
-                  className="flex min-h-[68px] items-center gap-3 rounded-2xl border border-border bg-card px-3 py-3 text-start text-xs font-black text-main transition hover:border-indigo-300 hover:bg-indigo-50 disabled:opacity-60 dark:hover:bg-indigo-950/30"
+                  className="rf-copilot-prompt"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                    <Icon size={16} />
+                  <span className="rf-copilot-prompt-index">{String(quickPrompts.indexOf(prompt) + 1).padStart(2, '0')}</span>
+                  <span className="rf-copilot-prompt-icon">
+                    <Icon size={17} aria-hidden="true" />
                   </span>
-                  <span className="leading-5">{prompt.label}</span>
+                  <span>{prompt.label}</span>
                 </button>
               );
             })}
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section className="rf-copilot-thread space-y-4" aria-live="polite" aria-label={isRtl ? 'المحادثة' : 'Conversation'}>
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex items-start gap-3 ${message.sender === 'user' ? (isRtl ? 'flex-row' : 'flex-row-reverse') : ''}`}
+              className={`rf-copilot-message-row flex items-start gap-3 ${message.sender === 'user' ? (isRtl ? 'flex-row' : 'flex-row-reverse') : ''}`}
+              data-sender={message.sender}
             >
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${
-                message.sender === 'ai' ? 'bg-indigo-600 text-white' : 'bg-elevated text-muted'
-              }`}>
-                {message.sender === 'ai' ? <Bot size={17} /> : <User size={17} />}
+              <div className="rf-copilot-message-avatar">
+                {message.sender === 'ai' ? <Bot size={17} aria-hidden="true" /> : <User size={17} aria-hidden="true" />}
               </div>
-              <div className={`max-w-[82%] ${message.sender === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-2`}>
-                <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold leading-6 shadow-sm ${
-                  message.sender === 'ai'
-                    ? 'border-border bg-card text-main'
-                    : 'border-indigo-600 bg-indigo-600 text-white'
-                }`}>
+              <div className={`rf-copilot-message max-w-[82%] ${message.sender === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-2`}>
+                <div className="rf-copilot-message-bubble">
                   <p className="whitespace-pre-wrap">{message.text}</p>
                 </div>
+                {message.sender === 'ai' && message.route && (
+                  <span className="px-1 text-[9px] font-bold text-muted" title={message.route.usedFallback ? (isRtl ? 'تم استخدام مزود بديل' : 'Fallback provider used') : undefined}>
+                    {message.route.providerId} · {message.route.modelId}{message.route.usedFallback ? ` · ${isRtl ? 'بديل' : 'fallback'}` : ''}
+                  </span>
+                )}
                 {message.suggestion && (
                   <button
                     onClick={() => handleSuggestion(message.suggestion!.view)}
@@ -508,7 +557,7 @@ const AIAssistant: React.FC = () => {
           ))}
 
           {pendingActions.length > 0 && (
-            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-950/20">
+            <div className="rf-copilot-approval rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-950/20">
               <div className="mb-3 flex items-center gap-2 text-xs font-black text-amber-800 dark:text-amber-200">
                 <ShieldCheck size={16} />
                 {copy.pendingTitle}
@@ -551,6 +600,17 @@ const AIAssistant: React.FC = () => {
                         className="mt-3 w-full rounded-xl border border-border bg-elevated px-3 py-2 text-xs font-bold outline-none focus:border-indigo-400"
                       />
 
+                      {isDestructiveAction(guarded.action) && (
+                        <input
+                          type="password"
+                          value={adminPassword[guarded.id] || ''}
+                          onChange={(e) => setAdminPassword((prev) => ({ ...prev, [guarded.id]: e.target.value }))}
+                          placeholder={isRtl ? 'كلمة مرور الأدمن مطلوبة للحذف' : 'Admin password required for deletion'}
+                          aria-label={isRtl ? 'كلمة مرور الأدمن' : 'Admin password'}
+                          className="mt-2 w-full rounded-xl border border-rose-300 bg-elevated px-3 py-2 text-xs font-bold outline-none focus:border-rose-500"
+                        />
+                      )}
+
                       <div className="mt-3 flex items-center justify-end gap-2">
                         <button
                           onClick={() => setPendingActions((prev) => prev.filter((a) => a.id !== guarded.id))}
@@ -560,7 +620,7 @@ const AIAssistant: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleApproveAction(guarded)}
-                          disabled={!guarded.canExecute || !permissionOk}
+                          disabled={!guarded.canExecute || !permissionOk || (isDestructiveAction(guarded.action) && !adminPassword[guarded.id]?.trim())}
                           className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700 disabled:opacity-50"
                         >
                           {copy.approve}
@@ -574,8 +634,8 @@ const AIAssistant: React.FC = () => {
           )}
 
           {isTyping && (
-            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-xs font-black text-muted">
-              <Loader2 size={16} className="animate-spin text-indigo-600" />
+            <div className="rf-copilot-thinking flex items-center gap-3" role="status">
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
               {copy.thinking}
             </div>
           )}
@@ -583,9 +643,11 @@ const AIAssistant: React.FC = () => {
         </section>
       </div>
 
-      <footer className="border-t border-border bg-card p-4">
-        <div className="flex items-end gap-2">
+      <footer className="rf-copilot-composer">
+        <label htmlFor="restoflow-copilot-input" className="sr-only">{copy.input}</label>
+        <div className="rf-copilot-composer-row">
           <textarea
+            id="restoflow-copilot-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -596,15 +658,15 @@ const AIAssistant: React.FC = () => {
             }}
             placeholder={copy.input}
             rows={2}
-            className="min-h-[48px] flex-1 resize-none rounded-2xl border border-border bg-elevated px-4 py-3 text-sm font-semibold leading-6 outline-none transition focus:border-indigo-400"
+            className="rf-copilot-input"
           />
           <button
             onClick={() => requestAssistant(input)}
             disabled={!input.trim() || isTyping}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-slate-300 disabled:shadow-none dark:disabled:bg-slate-800"
-            aria-label="Send message"
+            className="rf-copilot-send"
+            aria-label={copy.send}
           >
-            {isTyping ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            {isTyping ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
           </button>
         </div>
       </footer>

@@ -71,10 +71,13 @@ router.get('/gift-cards', p1.listGiftCards);
 // Payment gateway integration (Paymob / Fawry / InstaPay)
 router.post('/gateways/providers', p1.configureGatewayProvider);
 router.get('/gateways/providers', p1.listGatewayProviders);
+router.get('/gateways/webhooks/dead-letters', p1.listPaymentWebhookDeadLetters);
+router.post('/gateways/webhooks/dead-letters/:id/replay', p1.replayPaymentWebhookDeadLetter);
 router.post('/gateways/checkout', p1.createGatewayCheckout);
 router.post('/gateways/webhook/:provider', p1.gatewayWebhook);
 router.post('/gateways/sessions/:id/refund', p1.refundGatewaySession);
 router.get('/gateways/sessions', p1.listGatewaySessions);
+router.get('/gateways/refunds/reconciliation', p1.gatewayRefundReconciliation);
 
 // Daily P&L snapshots (revenue, food cost %, labor cost %)
 router.post('/pnl/compute', p1.computeDailyPnl);

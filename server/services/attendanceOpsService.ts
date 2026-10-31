@@ -28,6 +28,7 @@ import {
     shiftTemplates,
 } from '../../src/db/schema';
 import eventBusService from './eventBusService';
+import { maskIdentifier } from '../utils/privacy';
 
 const makeId = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
 
@@ -504,8 +505,19 @@ export const attendanceOpsService = {
         branchGatewayId?: string;
         notes?: string;
         isActive?: boolean;
-    }) {
+    }, scopeBranchId?: string) {
+        if (scopeBranchId && input.branchId && input.branchId !== scopeBranchId) {
+            throw new Error('BRANCH_MISMATCH');
+        }
         if (input.id) {
+            const [existing] = await db.select({ branchId: attendanceDevices.branchId })
+                .from(attendanceDevices)
+                .where(eq(attendanceDevices.id, input.id))
+                .top(1);
+            if (!existing) throw new Error('DEVICE_NOT_FOUND');
+            if (scopeBranchId && existing.branchId !== scopeBranchId) {
+                throw new Error('BRANCH_MISMATCH');
+            }
             const [updated] = await db.update(attendanceDevices)
                 .set({
                     name: input.name,
@@ -546,10 +558,11 @@ export const attendanceOpsService = {
         return created;
     },
 
-    async deleteDevice(deviceId: string, deletedBy?: string | null) {
+    async deleteDevice(deviceId: string, deletedBy?: string | null, scopeBranchId?: string) {
         const [device] = await db.select().top(1).from(attendanceDevices)
             .where(eq(attendanceDevices.id, deviceId));
         if (!device) throw new Error('DEVICE_NOT_FOUND');
+        if (scopeBranchId && device.branchId !== scopeBranchId) throw new Error('BRANCH_MISMATCH');
 
         const notes = parseDeviceNotes(device.notes) as any;
         const archivedAt = new Date().toISOString();
@@ -899,7 +912,7 @@ getdate()
                     employeeIdentifier: log.employeeIdentifier || undefined,
                 });
             } catch (err: any) {
-                console.warn('[ProfileLoad] Failed to process raw log', log.id, err.message);
+                console.warn('[ProfileLoad] Failed to process raw log', maskIdentifier(log.id), err.message);
             }
         }
 
@@ -2208,9 +2221,17 @@ getdate()
         return updated;
     },
 
-    async upsertDeviceMapping(input: { deviceId: string; employeeId: string; deviceUserId: string }) {
+    async upsertDeviceMapping(input: { deviceId: string; employeeId: string; deviceUserId: string }, scopeBranchId?: string) {
+        const [device] = await db.select({ branchId: attendanceDevices.branchId })
+            .from(attendanceDevices)
+            .where(eq(attendanceDevices.id, input.deviceId))
+            .top(1);
+        if (!device) throw new Error('DEVICE_NOT_FOUND');
+        if (scopeBranchId && device.branchId !== scopeBranchId) throw new Error('BRANCH_MISMATCH');
+
         const [employee] = await db.select().top(1).from(employees).where(eq(employees.id, input.employeeId));
         if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
+        if (scopeBranchId && employee.branchId !== scopeBranchId) throw new Error('BRANCH_MISMATCH');
 
         const existing = await db.select()
             .top(1)
@@ -2250,12 +2271,12 @@ getdate()
         exceptionIds: string[];
         resolvedBy?: string;
         resolutionNotes?: string;
-    }) {
+    }, scopeBranchId?: string) {
         const mapping = await this.upsertDeviceMapping({
             deviceId: input.deviceId,
             deviceUserId: input.deviceUserId,
             employeeId: input.employeeId,
-        });
+        }, scopeBranchId);
 
         const exceptionIds = Array.from(new Set((input.exceptionIds || []).filter(Boolean)));
         const exceptions = exceptionIds.length
@@ -2460,7 +2481,19 @@ getdate()
         return mappings;
     },
 
-    async deactivateDeviceMapping(id: number) {
+    async deactivateDeviceMapping(id: number, scopeBranchId?: string) {
+        const [mapping] = await db.select({ deviceId: attendanceDeviceMappings.deviceId })
+            .from(attendanceDeviceMappings)
+            .where(eq(attendanceDeviceMappings.id, id))
+            .top(1);
+        if (!mapping) throw new Error('MAPPING_NOT_FOUND');
+        if (scopeBranchId) {
+            const [device] = await db.select({ branchId: attendanceDevices.branchId })
+                .from(attendanceDevices)
+                .where(eq(attendanceDevices.id, mapping.deviceId))
+                .top(1);
+            if (!device || device.branchId !== scopeBranchId) throw new Error('BRANCH_MISMATCH');
+        }
         const [updated] = await db.update(attendanceDeviceMappings)
             .set({ isActive: false, updatedAt: new Date() })
             .output()
@@ -2668,7 +2701,7 @@ getdate()
                         employeeId: resolvedEmployeeId,
                         deviceUserId: mappingIdentifier,
                     });
-                    console.log('[AutoLink] Linked biometric ID', mappingIdentifier, 'to employee', resolvedEmployeeId, 'on device', input.deviceId);
+                    console.log('[AutoLink] Linked biometric ID', maskIdentifier(mappingIdentifier), 'to employee', maskIdentifier(resolvedEmployeeId), 'on device', maskIdentifier(input.deviceId));
                 }
             } catch (autoLinkErr: any) {
                 console.warn('[AutoLink] Auto-link mapping failed (non-fatal):', autoLinkErr.message);

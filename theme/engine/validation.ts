@@ -55,7 +55,7 @@ export const validateThemeConfig = (cfg: unknown): string[] => {
     if (!isRecord(motion) || !isOneOf(motion.style, MOTION_STYLES) || !isDuration(motion.duration) || !isDuration(motion.durationSlow)) {
         errors.push('motion {style,duration,durationSlow} invalid');
     }
-    const components = cfg.components as Record<string, any> | undefined;
+    const components = cfg.components as Record<string, Record<string, unknown>> | undefined;
     if (!isRecord(components)) {
         errors.push('components required');
     } else {

@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/price-size-hotfix/Apply Price Size Hotfix.bat",
+      "language": "batch",
+      "sizeLines": 3,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/price-size-hotfix/Apply Price Size Hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 60,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/price-size-hotfix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 8,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/price-size-hotfix/Apply Price Size Hotfix.bat": [],
+    "scripts/sameh-installer/price-size-hotfix/Apply Price Size Hotfix.ps1": [],
+    "scripts/sameh-installer/price-size-hotfix/README AR.txt": []
+  }
+}

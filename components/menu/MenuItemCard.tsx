@@ -28,7 +28,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = memo(({
 
   return (
     <div
-      className={`bg-card/60 rounded-[2.5rem] border border-border/20 p-6 shadow-lg hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:-translate-y-2 hover:border-border/30 transition-all duration-150 group relative flex flex-col h-full overflow-hidden ${isWide ? 'md:col-span-2' : ''}`}
+      className={`menu-manager-item-card bg-card/60 rounded-[2.5rem] border border-border/20 p-6 shadow-lg hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:-translate-y-2 hover:border-border/30 transition-all duration-150 group relative flex flex-col h-full overflow-hidden ${isWide ? 'md:col-span-2' : ''}`}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 420px' }}
     >
       <div className="absolute top-6 left-6 flex gap-2 z-10">

@@ -6,6 +6,7 @@ import { getStringParam } from '../utils/request';
 import { parseNonNegativeShiftAmount, requireShiftVarianceReason } from '../services/shiftReconciliation';
 import { reconcilePaymentRows } from '../services/paymentReconciliation';
 import { revenueEligibleOrder } from '../utils/orderRevenue';
+import { createSignedAuditLog } from '../services/auditService';
 
 const canAccessShiftBranch = (req: Request, branchId: string | null | undefined) => {
     if (!branchId) return false;
@@ -91,7 +92,9 @@ export const openShift = async (req: Request, res: Response) => {
     try {
         const { id, openingBalance, notes } = req.body;
         const branchId = req.effectiveBranchId || getStringParam(req.body?.branchId) || getStringParam(req.body?.branch_id);
-        const userId = getStringParam(req.body?.userId || req.body?.user_id) || req.user?.id;
+        // The drawer owner is always the authenticated actor. Never trust a
+        // client-supplied userId/user_id for financial attribution.
+        const userId = req.user?.id;
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         if (!userId) return res.status(400).json({ error: 'USER_ID_REQUIRED' });
         if (!canAccessShiftBranch(req, branchId)) {
@@ -118,6 +121,18 @@ export const openShift = async (req: Request, res: Response) => {
             status: 'OPEN',
             notes,
             openingTime: new Date(),
+        });
+
+        await createSignedAuditLog({
+            eventType: 'SHIFT_OPENED',
+            userId: req.user?.id || userId,
+            userRole: req.user?.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { shiftId: newShift.id, openingBalance: openingBalanceNum },
+            after: { status: 'OPEN', openingBalance: openingBalanceNum },
+            reason: 'Shift opened',
         });
 
         res.status(201).json(newShift);
@@ -213,6 +228,19 @@ export const closeShift = async (req: Request, res: Response) => {
             .output()
             .where(eq(shifts.id, shiftId));
 
+        await createSignedAuditLog({
+            eventType: 'SHIFT_CLOSED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: shift[0].branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { shiftId, cashReceived: cashTotal, expectedBalance, actualBalance: actualNum, variance, hasDiscrepancy, paymentCount: paymentBreakdown.reduce((sum, row) => sum + Number(row.count || 0), 0) },
+            before: { status: shift[0].status },
+            after: { status: 'CLOSED', variance, hasDiscrepancy },
+            reason: hasDiscrepancy ? 'Shift closed with declared variance' : 'Shift closed',
+        });
+
         res.json({
             ...updatedShift,
             cashReconciliation: {
@@ -236,7 +264,7 @@ export const closeShift = async (req: Request, res: Response) => {
 
 export const getActiveShift = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         const activeShift = await db.select().from(shifts).where(
             and(
@@ -273,7 +301,7 @@ export const getActiveShift = async (req: Request, res: Response) => {
 
 export const getOpenShifts = async (req: Request, res: Response) => {
     try {
-        const branchId = getStringParam(req.query.branchId);
+        const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
         if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         if (!canAccessShiftBranch(req, branchId)) {
             return res.status(403).json({ error: 'FORBIDDEN_BRANCH_SCOPE' });

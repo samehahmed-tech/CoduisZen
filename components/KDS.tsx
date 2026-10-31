@@ -11,12 +11,14 @@ import { getTableDisplayName } from '../src/utils/tableDisplay';
 import { kdsApi } from '../services/api/kds';
 import { useConfirm } from './common/ConfirmProvider';
 import { KDS_FALLBACK_POLL_MS, reconcileKdsPolling } from '../src/utils/kdsPolling';
+import { subscribeLocalKds } from '../src/services/localKdsHub';
 
 type Station = 'ALL' | string;
 type KdsDisplayMode = 'orders' | 'stations';
 
 /** Order types that flow through the packing/pickup handover screen. */
 const HANDOVER_ELIGIBLE_TYPES = new Set(['TAKEAWAY', 'PICKUP', 'KIOSK']);
+const KDS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface StationConfig {
   name: string;
@@ -570,8 +572,9 @@ const columnCopy = (key: keyof typeof COLUMN_THEMES, isArabic: boolean) => {
    ?? KDS — Main Component (Performance Optimized)
    ??????????????????????????????????????????????????? */
 const KDS: React.FC = () => {
-  const { tickets: storeOrders, bumpTicket: updateOrderStatus, fetchTickets: fetchOrders, toggleItemState, recallTicket } = useKdsStore(useShallow((state) => ({
+  const { tickets: storeOrders, error: storeError, bumpTicket: updateOrderStatus, fetchTickets: fetchOrders, toggleItemState, recallTicket } = useKdsStore(useShallow((state) => ({
     tickets: state.tickets,
+    error: state.error,
     bumpTicket: state.bumpTicket,
     fetchTickets: state.fetchTickets,
     toggleItemState: state.toggleItemState,
@@ -788,6 +791,7 @@ const KDS: React.FC = () => {
 
     socketService.on('kds:update', handleKdsUpdate);
     socketService.onConnectionChange(handleConnectionChange);
+    const unsubscribeLocalKds = subscribeLocalKds(activeBranchId || '', () => { void refreshTickets(true); });
     return () => {
        cancelled = true;
        socketService.off('kds:update', handleKdsUpdate);
@@ -796,6 +800,7 @@ const KDS: React.FC = () => {
        // timer) — otherwise every remount leaks another poller that
        // re-fetches and re-announces tickets.
        if (pollingTimer !== null) window.clearInterval(pollingTimer);
+       unsubscribeLocalKds();
     };
   }, [fetchOrders, soundMode, voiceEnabled, activeBranchId, activeStations, markFreshArrivals]);
 
@@ -866,14 +871,13 @@ const KDS: React.FC = () => {
   }, []);
 
   // Filter & sort orders — filter stale orders (>24h)
-  const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
   const activeTicketRows = React.useMemo(() => {
     let base = orders.filter(o =>
       o.status !== OrderStatus.DELIVERED &&
       o.status !== OrderStatus.CANCELLED &&
       o.status !== 'SERVED' &&
       (!activeBranchId || o.branchId === activeBranchId) &&
-      (Date.now() - new Date(o.createdAt).getTime()) < MAX_AGE_MS
+      (nowTick - new Date(o.createdAt).getTime()) < KDS_MAX_AGE_MS
     );
     // Merged multi-station rows ('MULTI') match when ANY of their stations
     // is selected — otherwise filtering by one station hides whole orders.
@@ -1290,6 +1294,17 @@ const KDS: React.FC = () => {
             {kdsText(isArabic,
               `Offline — polling fallback · last sync ${new Date(lastSyncAt).toLocaleTimeString()}`,
               `غير متصل — وضع التحديث الاحتياطي · آخر مزامنة ${new Date(lastSyncAt).toLocaleTimeString()}`)}
+          </span>
+        </div>
+      )}
+      {storeError === 'LOCAL_KDS_MODE' && (
+        <div
+          className="shrink-0 flex items-center justify-center gap-2 px-3 py-1.5 text-center"
+          style={{ background: 'rgba(var(--warning), 0.14)', borderBottom: '1px solid rgba(var(--warning), 0.4)', color: 'rgb(var(--warning))', fontSize: 12, fontWeight: 900 }}
+        >
+          <WifiOff size={14} />
+          <span className="uppercase tracking-widest">
+            {kdsText(isArabic, 'Local kitchen mode — changes will sync when the server returns', 'وضع المطبخ المحلي — ستتم مزامنة التغييرات عند عودة الخادم')}
           </span>
         </div>
       )}

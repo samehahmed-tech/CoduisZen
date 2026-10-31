@@ -1,0 +1,1465 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 10,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 10,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 10,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "components/CallCenterManager.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 224,
+      "nonEmptyLines": 212,
+      "functions": [
+        {
+          "name": "CallCenterManager",
+          "startLine": 25,
+          "endLine": 222,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "CallCenterManager",
+          "callee": "useCallCenterState",
+          "lineNumber": 26
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "useEffect",
+          "lineNumber": 37
+        },
+        {
+          "caller": "onKey",
+          "callee": "setOrderDetailId",
+          "lineNumber": 39
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "window.addEventListener",
+          "lineNumber": 40
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "window.removeEventListener",
+          "lineNumber": 41
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 71
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "timeAgo",
+          "lineNumber": 71
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setAutoRefresh",
+          "lineNumber": 78
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 78
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 78
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setSoundEnabled",
+          "lineNumber": 82
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 82
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 82
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 86
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 86
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 95
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setSelectedBranch",
+          "lineNumber": 97
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 97
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "branches.map",
+          "lineNumber": 99
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setFromDate",
+          "lineNumber": 103
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 103
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setToDate",
+          "lineNumber": 105
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 105
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "load",
+          "lineNumber": 107
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 108
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 117
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tabs.map",
+          "lineNumber": 118
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setActiveTab",
+          "lineNumber": 123
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 167
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getOrderNumber",
+          "lineNumber": 167
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setOrderDetailId",
+          "lineNumber": 167
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 172
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getOrderNumber",
+          "lineNumber": 172
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setOrderDetailId",
+          "lineNumber": 174
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 174
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 179
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 182
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getOrderStatus",
+          "lineNumber": 183
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 186
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getOrderDate(detailOrder).toLocaleTimeString",
+          "lineNumber": 187
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getOrderDate",
+          "lineNumber": 187
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 190
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "fmtMoney",
+          "lineNumber": 191
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getOrderTotal",
+          "lineNumber": 191
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 196
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 199
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getCustomerName",
+          "lineNumber": 200
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 203
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getCustomerPhone",
+          "lineNumber": 204
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 207
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "getDeliveryAddress",
+          "lineNumber": 208
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setOrderDetailId",
+          "lineNumber": 214
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 214
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "createEscalation",
+          "lineNumber": 215
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "setOrderDetailId",
+          "lineNumber": 215
+        },
+        {
+          "caller": "CallCenterManager",
+          "callee": "tr",
+          "lineNumber": 215
+        }
+      ],
+      "metrics": {
+        "importCount": 10,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/AgentsTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 145,
+      "nonEmptyLines": 142,
+      "functions": [
+        {
+          "name": "AgentsTab",
+          "startLine": 11,
+          "endLine": 145,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AgentsTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "AgentsTab",
+          "callee": "agentStats.map",
+          "lineNumber": 54
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "a.name.charAt(0).toUpperCase",
+          "lineNumber": 62
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "a.name.charAt",
+          "lineNumber": 62
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "fmt",
+          "lineNumber": 69
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "fmtMoney",
+          "lineNumber": 70
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "fmt",
+          "lineNumber": 71
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "fmt",
+          "lineNumber": 74
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "cancelRate.toFixed",
+          "lineNumber": 74
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "fmtMoney",
+          "lineNumber": 77
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "fmt",
+          "lineNumber": 84
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "setCoachingAgentId",
+          "lineNumber": 91
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "coachingNotesByAgent.get",
+          "lineNumber": 92
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "coachingNotesByAgent.get",
+          "lineNumber": 92
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "toggleSection",
+          "lineNumber": 106
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "setCoachingAgentId",
+          "lineNumber": 115
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "agentStats.map",
+          "lineNumber": 117
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "setCoachingNoteInput",
+          "lineNumber": 119
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "saveCoachingNote",
+          "lineNumber": 119
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "coachingAgentId.trim",
+          "lineNumber": 120
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "coachingNoteInput.trim",
+          "lineNumber": 120
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "coachingNotes.slice(0, 30).map",
+          "lineNumber": 125
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "coachingNotes.slice",
+          "lineNumber": 125
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "users.find",
+          "lineNumber": 126
+        },
+        {
+          "caller": "AgentsTab",
+          "callee": "new Date(note.createdAt).toLocaleString",
+          "lineNumber": 131
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/BranchesTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 136,
+      "nonEmptyLines": 132,
+      "functions": [
+        {
+          "name": "BranchesTab",
+          "startLine": 11,
+          "endLine": 136,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "BranchesTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "BranchesTab",
+          "callee": "(branchHealthData?.branches || []).map",
+          "lineNumber": 68
+        },
+        {
+          "caller": "BranchesTab",
+          "callee": "new Date(branchHealthData.checkedAt).toLocaleString",
+          "lineNumber": 129
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/DailyTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 178,
+      "nonEmptyLines": 172,
+      "functions": [
+        {
+          "name": "DailyTab",
+          "startLine": 11,
+          "endLine": 178,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DailyTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "DailyTab",
+          "callee": "setDailyReviewDate",
+          "lineNumber": 40
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 53
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMoney",
+          "lineNumber": 57
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 62
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "dailySummary.byStatus?.find",
+          "lineNumber": 62
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 68
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "dailySummary.byStatus?.find",
+          "lineNumber": 68
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "(dailySummary.byStatus || []).map",
+          "lineNumber": 88
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 98
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMoney",
+          "lineNumber": 99
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMoney",
+          "lineNumber": 100
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMoney",
+          "lineNumber": 101
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Array(24).fill(0).map",
+          "lineNumber": 111
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Array(24).fill",
+          "lineNumber": 111
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Array",
+          "lineNumber": 111
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "(dailySummary.hourly || []).find",
+          "lineNumber": 112
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Math.max",
+          "lineNumber": 114
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "(dailySummary.hourly || []).map",
+          "lineNumber": 114
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Math.max",
+          "lineNumber": 120
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "String(i).padStart",
+          "lineNumber": 124
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "String",
+          "lineNumber": 124
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMoney",
+          "lineNumber": 124
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "(dailySummary.agents || []).map",
+          "lineNumber": 146
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "users.find",
+          "lineNumber": 147
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 151
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMoney",
+          "lineNumber": 152
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 153
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmt",
+          "lineNumber": 154
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "fmtMins",
+          "lineNumber": 155
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Math.round",
+          "lineNumber": 155
+        },
+        {
+          "caller": "DailyTab",
+          "callee": "Number",
+          "lineNumber": 155
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/DeliveryTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 102,
+      "nonEmptyLines": 97,
+      "functions": [
+        {
+          "name": "DeliveryTab",
+          "startLine": 9,
+          "endLine": 102,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DeliveryTab",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "DeliveryTab",
+          "callee": "activeDeliveries.filter",
+          "lineNumber": 18
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "activeDeliveries.filter",
+          "lineNumber": 19
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 26
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 30
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 34
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 41
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "setSelectedBranch",
+          "lineNumber": 44
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 45
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "branches.map",
+          "lineNumber": 46
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "load",
+          "lineNumber": 48
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 49
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "activeDeliveries.map",
+          "lineNumber": 55
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "escalatedOrderIds?.has",
+          "lineNumber": 57
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "String",
+          "lineNumber": 57
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "String",
+          "lineNumber": 59
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "getOrderStatus",
+          "lineNumber": 63
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "getOrderNumber",
+          "lineNumber": 66
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "getDeliveryAddress",
+          "lineNumber": 68
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "getCustomerPhone",
+          "lineNumber": 73
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "getCustomerName",
+          "lineNumber": 73
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "fmtMins",
+          "lineNumber": 76
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "fmtMoney",
+          "lineNumber": 79
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "getOrderTotal",
+          "lineNumber": 79
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "setOrderDetailId",
+          "lineNumber": 80
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "String",
+          "lineNumber": 80
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 80
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "createEscalation",
+          "lineNumber": 84
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "String",
+          "lineNumber": 84
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 85
+        },
+        {
+          "caller": "DeliveryTab",
+          "callee": "tr",
+          "lineNumber": 95
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/DriversTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 90,
+      "nonEmptyLines": 88,
+      "functions": [
+        {
+          "name": "DriversTab",
+          "startLine": 11,
+          "endLine": 90,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DriversTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "DriversTab",
+          "callee": "driverStats.map",
+          "lineNumber": 51
+        },
+        {
+          "caller": "DriversTab",
+          "callee": "d.name.charAt(0).toUpperCase",
+          "lineNumber": 56
+        },
+        {
+          "caller": "DriversTab",
+          "callee": "d.name.charAt",
+          "lineNumber": 56
+        },
+        {
+          "caller": "DriversTab",
+          "callee": "fmt",
+          "lineNumber": 69
+        },
+        {
+          "caller": "DriversTab",
+          "callee": "fmt",
+          "lineNumber": 70
+        },
+        {
+          "caller": "DriversTab",
+          "callee": "fmtMins",
+          "lineNumber": 71
+        },
+        {
+          "caller": "DriversTab",
+          "callee": "fmtMins",
+          "lineNumber": 75
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/EscalationsTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 94,
+      "functions": [
+        {
+          "name": "EscalationsTab",
+          "startLine": 11,
+          "endLine": 96,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "EscalationsTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "EscalationsTab",
+          "callee": "escalations.map",
+          "lineNumber": 47
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "orders.find",
+          "lineNumber": 48
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "String",
+          "lineNumber": 48
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "Math.floor",
+          "lineNumber": 49
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "Date.now",
+          "lineNumber": 49
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "getOrderDate(order).getTime",
+          "lineNumber": 49
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "getOrderDate",
+          "lineNumber": 49
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "fmtMins",
+          "lineNumber": 60
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "getCustomerName",
+          "lineNumber": 67
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "getDeliveryAddress",
+          "lineNumber": 67
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "setOrderDetailId",
+          "lineNumber": 73
+        },
+        {
+          "caller": "EscalationsTab",
+          "callee": "resolveEscalation",
+          "lineNumber": 77
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/FailedTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 108,
+      "nonEmptyLines": 104,
+      "functions": [
+        {
+          "name": "FailedTab",
+          "startLine": 11,
+          "endLine": 108,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "FailedTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "FailedTab",
+          "callee": "retryAllFailed",
+          "lineNumber": 44
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "(failedOrdersData?.orders || []).map",
+          "lineNumber": 62
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "branches.find",
+          "lineNumber": 63
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "users.find",
+          "lineNumber": 64
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "Math.floor",
+          "lineNumber": 65
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "Date.now",
+          "lineNumber": 65
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "new Date(o.createdAt || Date.now()).getTime",
+          "lineNumber": 65
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "Date.now",
+          "lineNumber": 65
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "fmtMins",
+          "lineNumber": 74
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "retryOrder",
+          "lineNumber": 77
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "fmtMoney",
+          "lineNumber": 89
+        },
+        {
+          "caller": "FailedTab",
+          "callee": "Number",
+          "lineNumber": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/OverviewTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 231,
+      "nonEmptyLines": 225,
+      "functions": [
+        {
+          "name": "OverviewTab",
+          "startLine": 11,
+          "endLine": 231,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "OverviewTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "OverviewTab",
+          "callee": "kpis.map",
+          "lineNumber": 35
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "hourlyData.map",
+          "lineNumber": 55
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "Math.max",
+          "lineNumber": 56
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "new Date().getHours",
+          "lineNumber": 58
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "Math.max",
+          "lineNumber": 65
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String(i).padStart",
+          "lineNumber": 71
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 71
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "branchComparison.map",
+          "lineNumber": 98
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "fmt",
+          "lineNumber": 101
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "fmtMoney",
+          "lineNumber": 102
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "fmt",
+          "lineNumber": 103
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "fmt",
+          "lineNumber": 104
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "((b.cancelled / b.orders) * 100).toFixed",
+          "lineNumber": 106
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "toggleSection",
+          "lineNumber": 120
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "pendingOrders.map",
+          "lineNumber": 129
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "Math.floor",
+          "lineNumber": 130
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "Date.now",
+          "lineNumber": 130
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderDate(o).getTime",
+          "lineNumber": 130
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderDate",
+          "lineNumber": 130
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "escalatedOrderIds.has",
+          "lineNumber": 131
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 131
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getCustomerPhone",
+          "lineNumber": 133
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 135
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderNumber",
+          "lineNumber": 139
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getCustomerName",
+          "lineNumber": 151
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getDeliveryAddress",
+          "lineNumber": 153
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "fmtMoney",
+          "lineNumber": 156
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderTotal",
+          "lineNumber": 156
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderStatus",
+          "lineNumber": 158
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "setOrderDetailId",
+          "lineNumber": 161
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 161
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "phone.replace",
+          "lineNumber": 165
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "createEscalation",
+          "lineNumber": 170
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 171
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "toggleSection",
+          "lineNumber": 190
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "cancelledOrders.map",
+          "lineNumber": 199
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getCancelReason",
+          "lineNumber": 200
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 202
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderNumber",
+          "lineNumber": 206
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "fmtMoney",
+          "lineNumber": 208
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getOrderTotal",
+          "lineNumber": 208
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "getCustomerName",
+          "lineNumber": 211
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "setOrderDetailId",
+          "lineNumber": 216
+        },
+        {
+          "caller": "OverviewTab",
+          "callee": "String",
+          "lineNumber": 216
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/callcenter/QualityTab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 92,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "QualityTab",
+          "startLine": 11,
+          "endLine": 92,
+          "params": [
+            "{ state }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "QualityTab",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "QualityTab",
+          "callee": "toggleSection",
+          "lineNumber": 36
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "discountViolations.map",
+          "lineNumber": 48
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "users.find",
+          "lineNumber": 49
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "v.discountPercent.toFixed",
+          "lineNumber": 57
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "fmtMoney",
+          "lineNumber": 62
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "fmtMoney",
+          "lineNumber": 64
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "approveDiscountViolation",
+          "lineNumber": 67
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "approveDiscountViolation",
+          "lineNumber": 70
+        },
+        {
+          "caller": "QualityTab",
+          "callee": "setOrderDetailId",
+          "lineNumber": 73
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    }
+  ]
+}

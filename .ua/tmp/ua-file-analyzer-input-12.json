@@ -1,0 +1,423 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/app.ts",
+      "language": "typescript",
+      "sizeLines": 301,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/imageController.ts",
+      "language": "typescript",
+      "sizeLines": 188,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/paymobController.ts",
+      "language": "typescript",
+      "sizeLines": 111,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/printGatewayController.ts",
+      "language": "typescript",
+      "sizeLines": 178,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/rumController.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/auth.ts",
+      "language": "typescript",
+      "sizeLines": 122,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/branchIsolation.ts",
+      "language": "typescript",
+      "sizeLines": 142,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/cacheHeaders.ts",
+      "language": "typescript",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/errorHandler.ts",
+      "language": "typescript",
+      "sizeLines": 166,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/printGatewayAuth.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/rateLimit.ts",
+      "language": "typescript",
+      "sizeLines": 67,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/requestContext.ts",
+      "language": "typescript",
+      "sizeLines": 62,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/requestTiming.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/security.ts",
+      "language": "typescript",
+      "sizeLines": 204,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/sslEnforcement.ts",
+      "language": "typescript",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/validate.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/validation.ts",
+      "language": "typescript",
+      "sizeLines": 443,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/middleware/whatsappWebhookAuth.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/core/index.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/finance/index.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/hr/index.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/intelligence/index.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/inventory/index.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/marketing/index.ts",
+      "language": "typescript",
+      "sizeLines": 16,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/pos/index.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/aggregatorAdminRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/aiRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/analyticsRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/approvalRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/attendanceOpsRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 865,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/auditRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/authRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/barcodeRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/app.ts": [
+      "server/config/cors.ts",
+      "server/controllers/paymobController.ts",
+      "server/middleware/audit.ts",
+      "server/middleware/auth.ts",
+      "server/middleware/cacheHeaders.ts",
+      "server/middleware/errorContract.ts",
+      "server/middleware/errorHandler.ts",
+      "server/middleware/rateLimit.ts",
+      "server/middleware/requestContext.ts",
+      "server/middleware/requestTiming.ts",
+      "server/middleware/security.ts",
+      "server/middleware/sslEnforcement.ts",
+      "server/modules/core/index.ts",
+      "server/modules/finance/index.ts",
+      "server/modules/hr/index.ts",
+      "server/modules/intelligence/index.ts",
+      "server/modules/inventory/index.ts",
+      "server/modules/marketing/index.ts",
+      "server/modules/pos/index.ts",
+      "server/routes/admsRoutes.ts",
+      "server/routes/aggregatorAdminRoutes.ts",
+      "server/routes/aggregatorWebhookRoutes.ts",
+      "server/routes/aiRoutes.ts",
+      "server/routes/analyticsRoutes.ts",
+      "server/routes/approvalRoutes.ts",
+      "server/routes/attendanceBridgeRoutes.ts",
+      "server/routes/attendanceOpsRoutes.ts",
+      "server/routes/auditRoutes.ts",
+      "server/routes/authRoutes.ts",
+      "server/routes/barcodeRoutes.ts",
+      "server/routes/branchRoutes.ts",
+      "server/routes/butcheryRoutes.ts",
+      "server/routes/callCenterSupervisorRoutes.ts",
+      "server/routes/campaignRoutes.ts",
+      "server/routes/customerRoutes.ts",
+      "server/routes/dayCloseRoutes.ts",
+      "server/routes/deliveryRoutes.ts",
+      "server/routes/deploymentRoutes.ts",
+      "server/routes/fiscalRoutes.ts",
+      "server/routes/hrExtendedRoutes.ts",
+      "server/routes/imageRoutes.ts",
+      "server/routes/inventoryIntelligenceRoutes.ts",
+      "server/routes/kdsRoutes.ts",
+      "server/routes/mailRoutes.ts",
+      "server/routes/mapsRoutes.ts",
+      "server/routes/menuRoutes.ts",
+      "server/routes/migrationRoutes.ts",
+      "server/routes/orderRoutes.ts",
+      "server/routes/paymentRoutes.ts",
+      "server/routes/paymobRoutes.ts",
+      "server/routes/platformsRoutes.ts",
+      "server/routes/printGatewayGatewayRoutes.ts",
+      "server/routes/printGatewayRoutes.ts",
+      "server/routes/printerRoutes.ts",
+      "server/routes/productionRoutes.ts",
+      "server/routes/publicScreenRoutes.ts",
+      "server/routes/purchaseOrderRoutes.ts",
+      "server/routes/refundRoutes.ts",
+      "server/routes/reportRoutes.ts",
+      "server/routes/reservationRoutes.ts",
+      "server/routes/rolesRoutes.ts",
+      "server/routes/settingsRoutes.ts",
+      "server/routes/setupRoutes.ts",
+      "server/routes/shiftRoutes.ts",
+      "server/routes/subscriptionRoutes.ts",
+      "server/routes/supplierRoutes.ts",
+      "server/routes/tableRoutes.ts",
+      "server/routes/talabatAdminRoutes.ts",
+      "server/routes/talabatWebhookRoutes.ts",
+      "server/routes/ttsRoutes.ts",
+      "server/routes/userRoutes.ts",
+      "server/routes/waitlistRoutes.ts",
+      "server/routes/warehouseRoutes.ts",
+      "server/routes/wastageRoutes.ts",
+      "server/routes/webhookRoutes.ts",
+      "server/routes/whatsappRoutes.ts",
+      "server/routes/whatsappWebhookRoutes.ts",
+      "server/services/errorTrackingService.ts",
+      "server/services/healthService.ts",
+      "server/utils/imageStorage.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/controllers/imageController.ts": [
+      "server/db/index.ts",
+      "server/utils/imageStorage.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/paymobController.ts": [
+      "server/db/index.ts",
+      "server/modules/payments/paymobService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/printGatewayController.ts": [
+      "server/services/printQueueService.ts",
+      "server/services/printerBridgeService.ts"
+    ],
+    "server/controllers/rumController.ts": [],
+    "server/middleware/auth.ts": [
+      "server/config/env.ts",
+      "server/db/index.ts",
+      "server/utils/dbErrors.ts",
+      "src/db/schema.ts"
+    ],
+    "server/middleware/branchIsolation.ts": [],
+    "server/middleware/cacheHeaders.ts": [],
+    "server/middleware/errorHandler.ts": [],
+    "server/middleware/printGatewayAuth.ts": [],
+    "server/middleware/rateLimit.ts": [],
+    "server/middleware/requestContext.ts": [],
+    "server/middleware/requestTiming.ts": [
+      "server/utils/logger.ts"
+    ],
+    "server/middleware/security.ts": [],
+    "server/middleware/sslEnforcement.ts": [],
+    "server/middleware/validate.ts": [],
+    "server/middleware/validation.ts": [],
+    "server/middleware/whatsappWebhookAuth.ts": [],
+    "server/modules/core/index.ts": [
+      "server/routes/auditRoutes.ts",
+      "server/routes/authRoutes.ts",
+      "server/routes/branchRoutes.ts",
+      "server/routes/imageRoutes.ts",
+      "server/routes/printGatewayRoutes.ts",
+      "server/routes/printerRoutes.ts",
+      "server/routes/settingsRoutes.ts",
+      "server/routes/setupRoutes.ts",
+      "server/routes/subscriptionRoutes.ts"
+    ],
+    "server/modules/finance/index.ts": [
+      "server/routes/budgetRoutes.ts",
+      "server/routes/financeRoutes.ts",
+      "server/routes/fiscalRoutes.ts",
+      "server/routes/p1FinanceRoutes.ts"
+    ],
+    "server/modules/hr/index.ts": [
+      "server/routes/admsRoutes.ts",
+      "server/routes/attendanceOpsRoutes.ts",
+      "server/routes/hrExtendedRoutes.ts",
+      "server/routes/hrRoutes.ts",
+      "server/routes/userRoutes.ts"
+    ],
+    "server/modules/intelligence/index.ts": [
+      "server/routes/aiRoutes.ts",
+      "server/routes/analyticsRoutes.ts",
+      "server/routes/reportRoutes.ts"
+    ],
+    "server/modules/inventory/index.ts": [
+      "server/middleware/auth.ts",
+      "server/routes/barcodeRoutes.ts",
+      "server/routes/butcheryRoutes.ts",
+      "server/routes/inventoryIntelligenceRoutes.ts",
+      "server/routes/inventoryRoutes.ts",
+      "server/routes/productionRoutes.ts",
+      "server/routes/purchaseOrderRoutes.ts",
+      "server/routes/supplierRoutes.ts",
+      "server/routes/warehouseRoutes.ts",
+      "server/routes/wastageRoutes.ts"
+    ],
+    "server/modules/marketing/index.ts": [
+      "server/routes/campaignRoutes.ts",
+      "server/routes/customerRoutes.ts",
+      "server/routes/marketingRoutes.ts",
+      "server/routes/whatsappRoutes.ts",
+      "server/routes/whatsappWebhookRoutes.ts"
+    ],
+    "server/modules/pos/index.ts": [
+      "server/middleware/auth.ts",
+      "server/routes/dayCloseRoutes.ts",
+      "server/routes/deliveryRoutes.ts",
+      "server/routes/kdsRoutes.ts",
+      "server/routes/orderRoutes.ts",
+      "server/routes/platformsRoutes.ts",
+      "server/routes/refundRoutes.ts",
+      "server/routes/shiftRoutes.ts",
+      "server/routes/tableRoutes.ts",
+      "server/routes/waitlistRoutes.ts"
+    ],
+    "server/routes/aggregatorAdminRoutes.ts": [
+      "server/controllers/aggregatorAdminController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/aiRoutes.ts": [
+      "server/controllers/aiController.ts",
+      "server/middleware/auth.ts"
+    ],
+    "server/routes/analyticsRoutes.ts": [
+      "server/controllers/analyticsController.ts",
+      "server/middleware/branchIsolation.ts"
+    ],
+    "server/routes/approvalRoutes.ts": [
+      "server/controllers/approvalController.ts",
+      "server/middleware/auth.ts",
+      "server/utils/operationalRoles.ts"
+    ],
+    "server/routes/attendanceOpsRoutes.ts": [
+      "server/middleware/branchIsolation.ts",
+      "server/services/attendanceOpsService.ts",
+      "server/services/hrReportExportService.ts",
+      "server/services/pdfService.ts",
+      "server/services/zktecoConnectorService.ts"
+    ],
+    "server/routes/auditRoutes.ts": [
+      "server/controllers/auditController.ts"
+    ],
+    "server/routes/authRoutes.ts": [
+      "server/controllers/authController.ts",
+      "server/middleware/auth.ts",
+      "server/middleware/validate.ts",
+      "server/middleware/validation.ts"
+    ],
+    "server/routes/barcodeRoutes.ts": [
+      "server/controllers/barcodeLookupController.ts",
+      "server/middleware/auth.ts",
+      "server/utils/operationalRoles.ts"
+    ]
+  }
+}

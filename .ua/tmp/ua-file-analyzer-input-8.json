@@ -1,0 +1,518 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "App.tsx",
+      "language": "typescript",
+      "sizeLines": 432,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/AIAssistant.tsx",
+      "language": "typescript",
+      "sizeLines": 615,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/AIInsights.tsx",
+      "language": "typescript",
+      "sizeLines": 408,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/AdminDashboard.tsx",
+      "language": "typescript",
+      "sizeLines": 322,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/AdminDashboardPage.tsx",
+      "language": "typescript",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/AggregatorIntegrations.tsx",
+      "language": "typescript",
+      "sizeLines": 191,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ApprovalCenter.tsx",
+      "language": "typescript",
+      "sizeLines": 357,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ButcheryManager.tsx",
+      "language": "typescript",
+      "sizeLines": 544,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/CRM.tsx",
+      "language": "typescript",
+      "sizeLines": 698,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/CallCenter.tsx",
+      "language": "typescript",
+      "sizeLines": 3127,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/CampaignHub.tsx",
+      "language": "typescript",
+      "sizeLines": 699,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ComplaintsInbox.tsx",
+      "language": "typescript",
+      "sizeLines": 247,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/Dashboard.tsx",
+      "language": "typescript",
+      "sizeLines": 1716,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/DayCloseHub.tsx",
+      "language": "typescript",
+      "sizeLines": 1682,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/DriversHub.tsx",
+      "language": "typescript",
+      "sizeLines": 608,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/Expenses.tsx",
+      "language": "typescript",
+      "sizeLines": 634,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/Finance.tsx",
+      "language": "typescript",
+      "sizeLines": 1393,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/FinanceP1Hub.tsx",
+      "language": "typescript",
+      "sizeLines": 762,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/FiscalHub.tsx",
+      "language": "typescript",
+      "sizeLines": 405,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/FloorDesigner.tsx",
+      "language": "typescript",
+      "sizeLines": 923,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ForensicsHub.tsx",
+      "language": "typescript",
+      "sizeLines": 299,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/FranchiseManager.tsx",
+      "language": "typescript",
+      "sizeLines": 417,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/InventoryIntelligence.tsx",
+      "language": "typescript",
+      "sizeLines": 364,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/KDS.tsx",
+      "language": "typescript",
+      "sizeLines": 2599,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/Login.tsx",
+      "language": "typescript",
+      "sizeLines": 799,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/MailHub.tsx",
+      "language": "typescript",
+      "sizeLines": 767,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/MainLayout.tsx",
+      "language": "typescript",
+      "sizeLines": 306,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/MenuManager.tsx",
+      "language": "typescript",
+      "sizeLines": 1433,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/Modal.tsx",
+      "language": "typescript",
+      "sizeLines": 150,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/OrdersCenter.tsx",
+      "language": "typescript",
+      "sizeLines": 1616,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/PaymentIntegrations.tsx",
+      "language": "typescript",
+      "sizeLines": 147,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/PickupScreen.tsx",
+      "language": "typescript",
+      "sizeLines": 908,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/PlatformAggregator.tsx",
+      "language": "typescript",
+      "sizeLines": 747,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "App.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ErrorBoundary.tsx",
+      "components/common/ToastProvider.tsx",
+      "components/common/googleMaps.ts",
+      "hooks/useDataInit.ts",
+      "routes.tsx",
+      "services/aiIntelligenceService.ts",
+      "services/api/setup.ts",
+      "services/auditService.ts",
+      "services/eventBus.ts",
+      "services/socketService.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts",
+      "theme/index.ts",
+      "types.ts"
+    ],
+    "components/AIAssistant.tsx": [
+      "services/aiActionGuard.ts",
+      "services/api/ai.ts",
+      "services/translations.ts",
+      "stores/useAIWidgetStore.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/AIInsights.tsx": [
+      "services/api/ai.ts",
+      "services/api/reports.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts"
+    ],
+    "components/AdminDashboard.tsx": [],
+    "components/AdminDashboardPage.tsx": [
+      "components/AdminDashboard.tsx",
+      "services/api/analytics.ts",
+      "services/socketService.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/AggregatorIntegrations.tsx": [
+      "components/common/ToastProvider.tsx",
+      "services/api/branches.ts",
+      "services/api/platforms.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/ApprovalCenter.tsx": [
+      "components/common/ExportButton.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/approval.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/ButcheryManager.tsx": [
+      "components/common/ToastProvider.tsx",
+      "services/api/butchery.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts"
+    ],
+    "components/CRM.tsx": [
+      "components/common/PagerBar.tsx",
+      "hooks/index.ts",
+      "services/api/customers.ts",
+      "stores/useAuthStore.ts",
+      "stores/useCRMStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/CallCenter.tsx": [
+      "components/Toast.tsx",
+      "components/callcenter/RecipeWarningBanner.tsx",
+      "components/callcenter/useRecipeAvailability.ts",
+      "components/common/AddressMapPicker.tsx",
+      "components/common/DeliveryZonePicker.tsx",
+      "services/api/core.ts",
+      "services/api/customers.ts",
+      "services/api/delivery.ts",
+      "services/platformPricing.ts",
+      "services/posPrintOrchestrator.ts",
+      "services/translations.ts",
+      "src/features/pos/components/CartItem.tsx",
+      "src/features/pos/components/CategoryTabs.tsx",
+      "src/features/pos/components/ItemGrid.tsx",
+      "src/features/pos/components/ItemOptionsModal.tsx",
+      "src/features/pos/components/ManagerApprovalModal.tsx",
+      "src/features/pos/components/NoteModal.tsx",
+      "stores/useAuthStore.ts",
+      "stores/useCRMStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts",
+      "utils/branchPricing.ts"
+    ],
+    "components/CampaignHub.tsx": [
+      "components/common/ToastProvider.tsx",
+      "services/api/campaigns.ts",
+      "stores/useAuthStore.ts",
+      "stores/useWhatsAppStore.ts"
+    ],
+    "components/ComplaintsInbox.tsx": [
+      "components/Toast.tsx",
+      "services/api/complaints.ts",
+      "services/api/core.ts",
+      "services/api/customers.ts",
+      "services/api/orders.ts",
+      "services/api/users.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/Dashboard.tsx": [
+      "components/SensitiveData.tsx",
+      "components/Toast.tsx",
+      "components/common/AnimatedNumber.tsx",
+      "components/common/LiveClock.tsx",
+      "components/common/PageSkeleton.tsx",
+      "components/common/SystemHealth.tsx",
+      "services/api/ai.ts",
+      "services/api/hr.ts",
+      "services/api/orders.ts",
+      "services/api/refunds.ts",
+      "services/api/reports.ts",
+      "services/api/shifts.ts",
+      "services/socketService.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/formatters.ts"
+    ],
+    "components/DayCloseHub.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "services/api/core.ts",
+      "services/api/dayClose.ts",
+      "services/api/settings.ts",
+      "services/api/shifts.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts"
+    ],
+    "components/DriversHub.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/DeliveryTrackingMap.tsx",
+      "services/api/delivery.ts",
+      "services/socketService.ts",
+      "src/features/driver/cashCollection.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/Expenses.tsx": [
+      "components/Toast.tsx",
+      "services/api/finance.ts",
+      "services/api/reports.ts",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/formatters.ts"
+    ],
+    "components/Finance.tsx": [
+      "components/Toast.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ExportButton.tsx",
+      "components/common/PageSkeleton.tsx",
+      "components/common/Skeleton.tsx",
+      "components/finance/ManualJournalModal.tsx",
+      "services/api/core.ts",
+      "services/api/finance.ts",
+      "services/api/recurring.ts",
+      "services/api/reports.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts",
+      "types.ts"
+    ],
+    "components/FinanceP1Hub.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx"
+    ],
+    "components/FiscalHub.tsx": [
+      "services/api/fiscal.ts",
+      "services/api/reports.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/FloorDesigner.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "components/floor/TableVisual.tsx",
+      "db/localDb.ts",
+      "services/api/campaigns.ts",
+      "services/api/tables.ts",
+      "services/syncService.ts",
+      "src/utils/branchEntityCache.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/ForensicsHub.tsx": [
+      "components/common/VirtualList.tsx",
+      "stores/useAuditStore.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/FranchiseManager.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/analytics.ts",
+      "services/api/branches.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/InventoryIntelligence.tsx": [
+      "components/common/ExportButton.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/inventoryIntelligence.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts"
+    ],
+    "components/KDS.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "services/api/kds.ts",
+      "services/socketService.ts",
+      "src/utils/idGenerator.ts",
+      "src/utils/kdsPolling.ts",
+      "src/utils/tableDisplay.ts",
+      "stores/useAuthStore.ts",
+      "stores/useKdsStore.ts",
+      "types.ts"
+    ],
+    "components/Login.tsx": [
+      "services/api/auth.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/MailHub.tsx": [
+      "components/Toast.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "components/common/PageSkeleton.tsx",
+      "services/api/mail.ts",
+      "stores/useAuthStore.ts",
+      "stores/useMailStore.ts"
+    ],
+    "components/MainLayout.tsx": [
+      "components/common/Breadcrumbs.tsx",
+      "components/common/ContextRail.tsx",
+      "hooks/usePageTitle.ts",
+      "stores/useAIWidgetStore.ts",
+      "stores/useAuthStore.ts",
+      "theme/index.ts"
+    ],
+    "components/MenuManager.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ImageUploader.tsx",
+      "components/common/ToastProvider.tsx",
+      "components/menu/MenuCategoryList.tsx",
+      "services/api/menu.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "types.ts"
+    ],
+    "components/Modal.tsx": [],
+    "components/OrdersCenter.tsx": [
+      "components/Toast.tsx",
+      "components/common/PageSkeleton.tsx",
+      "components/common/PagerBar.tsx",
+      "hooks/useDebounce.ts",
+      "services/api/core.ts",
+      "services/api/orders.ts",
+      "services/api/refunds.ts",
+      "services/posPrintOrchestrator.ts",
+      "services/socketService.ts",
+      "services/translations.ts",
+      "src/features/pos/components/ManagerApprovalModal.tsx",
+      "src/utils/idGenerator.ts",
+      "src/utils/tableDisplay.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts",
+      "utils/formatters.ts"
+    ],
+    "components/PaymentIntegrations.tsx": [
+      "components/common/ToastProvider.tsx",
+      "services/api/branches.ts",
+      "services/api/platforms.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/PickupScreen.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/LiveClock.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/core.ts",
+      "services/api/kds.ts",
+      "services/socketService.ts",
+      "src/utils/idGenerator.ts",
+      "src/utils/tableDisplay.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/PlatformAggregator.tsx": [
+      "components/AggregatorIntegrations.tsx",
+      "components/PaymentIntegrations.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ExportButton.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/branches.ts",
+      "services/api/platforms.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ]
+  }
+}

@@ -1,6 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { zktecoAdmsService } from '../services/zktecoAdmsService';
 import logger from '../utils/logger';
+import { requireAdmsWebhookAuth } from '../middleware/admsWebhookAuth';
+import { createSignedAuditLog } from '../services/auditService';
+import { maskIdentifier } from '../utils/privacy';
 
 const router = Router();
 
@@ -36,7 +39,7 @@ router.get('/getrequest', (req: Request, res: Response) => {
  * Format usually: SN=...&table=ATTLOG&...
  * Body format: "uid \t timestamp \t status \t verifyMode"
  */
-router.post('/cdata', rawParser, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/cdata', requireAdmsWebhookAuth, rawParser, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const sn = req.query.SN as string;
         const table = req.query.table as string;
@@ -49,10 +52,22 @@ router.post('/cdata', rawParser, async (req: Request, res: Response, next: NextF
         // We specifically listen for ATTLOG table (Attendance Logs)
         if (table === 'ATTLOG' && rawBody) {
             // Process the raw ADMS payroll lines in service
-            await zktecoAdmsService.processPushPayload(sn, rawBody);
+            const result = await zktecoAdmsService.processPushPayload(sn, rawBody);
+            if (!result) return res.status(404).send('UNKNOWN DEVICE');
+            await createSignedAuditLog({
+                eventType: 'ADMS_ATTENDANCE_PAYLOAD_ACCEPTED',
+                branchId: result.branchId,
+                deviceId: result.deviceId,
+                userId: null,
+                userName: 'adms-device',
+                userRole: 'BIOMETRIC_DEVICE',
+                payload: { table, accepted: result.accepted, payloadLineCount: rawBody.split(/\r?\n/).filter(Boolean).length },
+                after: { queued: result.accepted },
+                reason: 'Authenticated ADMS device push',
+            });
         } else if (table === 'OPERLOG') {
             // Can process operational logs later (enrollment, etc)
-            logger.info(`Received OPERLOG from device ${sn}`);
+            logger.info(`Received OPERLOG from device ${maskIdentifier(sn)}`);
         }
 
         // Must return OK immediately or the device will buffer and retry

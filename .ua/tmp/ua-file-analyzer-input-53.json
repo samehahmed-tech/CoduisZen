@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/hotfix/Fix Installed System.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/hotfix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 28,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/hotfix/fix-installed-system.ps1",
+      "language": "powershell",
+      "sizeLines": 196,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/hotfix/Fix Installed System.bat": [],
+    "scripts/sameh-installer/hotfix/README AR.txt": [],
+    "scripts/sameh-installer/hotfix/fix-installed-system.ps1": []
+  }
+}

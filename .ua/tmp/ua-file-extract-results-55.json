@@ -1,0 +1,26 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/sameh-installer/latest-fixes/Apply Latest Fixes.bat",
+    "scripts/sameh-installer/latest-fixes/Apply Latest Fixes.ps1",
+    "scripts/sameh-installer/latest-fixes/Install-Common.ps1",
+    "scripts/sameh-installer/latest-fixes/README AR.txt",
+    "scripts/sameh-installer/latest-fixes/Repair Installed System.bat",
+    "scripts/sameh-installer/latest-fixes/Repair Installed System.ps1",
+    "scripts/sameh-installer/latest-fixes/VERSION.txt"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

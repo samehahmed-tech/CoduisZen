@@ -10,7 +10,7 @@ import { getStringParam } from '../utils/request';
 export const getReorderAlerts = async (req: Request, res: Response) => {
     try {
         const warehouseId = req.query.warehouseId as string | undefined;
-        const alerts = await inventoryIntelligence.getReorderAlerts(warehouseId);
+        const alerts = await inventoryIntelligence.getReorderAlerts(warehouseId, req.effectiveBranchId);
         res.json(alerts);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -20,7 +20,7 @@ export const getReorderAlerts = async (req: Request, res: Response) => {
 export const getPurchaseSuggestions = async (req: Request, res: Response) => {
     try {
         const warehouseId = req.query.warehouseId as string | undefined;
-        const suggestions = await inventoryIntelligence.getPurchaseSuggestions(warehouseId);
+        const suggestions = await inventoryIntelligence.getPurchaseSuggestions(warehouseId, req.effectiveBranchId);
         res.json(suggestions);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -56,7 +56,7 @@ export const createStockCount = async (req: Request, res: Response) => {
     try {
         const { warehouseId } = req.body;
         if (!warehouseId) return res.status(400).json({ error: 'warehouseId is required' });
-        const session = await inventoryIntelligence.createStockCountSession(warehouseId, req.user?.id || 'system');
+        const session = await inventoryIntelligence.createStockCountSession(warehouseId, req.user?.id || 'system', req.effectiveBranchId);
         res.status(201).json(session);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -68,7 +68,7 @@ export const updateStockCount = async (req: Request, res: Response) => {
         const { sessionId } = req.params;
         const { counts } = req.body;
         if (!sessionId || !counts) return res.status(400).json({ error: 'sessionId and counts are required' });
-        const session = await inventoryIntelligence.updateStockCount(String(sessionId), counts, req.user?.id || 'system');
+        const session = await inventoryIntelligence.updateStockCount(String(sessionId), counts, req.user?.id || 'system', req.effectiveBranchId);
         res.json(session);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -82,7 +82,8 @@ export const completeStockCount = async (req: Request, res: Response) => {
         const session = await inventoryIntelligence.completeStockCount(
             String(sessionId),
             req.user?.id || 'system',
-            applyAdjustments !== false
+            applyAdjustments !== false,
+            req.effectiveBranchId,
         );
         res.json(session);
     } catch (error: any) {
@@ -94,7 +95,7 @@ export const getAIForecast = async (req: Request, res: Response) => {
     try {
         const itemId = getStringParam(req.params.itemId);
         if (!itemId) return res.status(400).json({ error: 'itemId is required' });
-        const forecast = await inventoryIntelligence.getAIForecast(itemId);
+        const forecast = await inventoryIntelligence.getAIForecast(itemId, req.effectiveBranchId);
         res.json(forecast);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

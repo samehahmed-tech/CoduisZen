@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { marketingController } from '../controllers/marketingController';
 import { authenticateToken, requireRoles, requireRoleOrPermission } from '../middleware/auth';
+import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
 
 // Secure all marketing boundaries
 router.use(authenticateToken);
+router.use(enforceBranch);
 
 // Coupons
 router.get('/coupons', marketingController.getCoupons);

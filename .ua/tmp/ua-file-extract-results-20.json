@@ -1,0 +1,3246 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 24,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 24,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 24,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "components/InteractionShowcase.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 78,
+      "nonEmptyLines": 70,
+      "functions": [
+        {
+          "name": "InteractionShowcase",
+          "startLine": 5,
+          "endLine": 76,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "InteractionShowcase",
+          "callee": "useTheme",
+          "lineNumber": 6
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "useState",
+          "lineNumber": 7
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "useState",
+          "lineNumber": 8
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "setSaved",
+          "lineNumber": 27
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "(['pending', 'preparing', 'ready'] as const).map",
+          "lineNumber": 55
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "setStatus",
+          "lineNumber": 56
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "['#1048', '#1049', '#1050'].map",
+          "lineNumber": 71
+        },
+        {
+          "caller": "InteractionShowcase",
+          "callee": "(24 + index * 11).toFixed",
+          "lineNumber": 71
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/ThemeLab.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 98,
+      "nonEmptyLines": 84,
+      "functions": [
+        {
+          "name": "withImage",
+          "startLine": 25,
+          "endLine": 25,
+          "params": [
+            "imageUrl",
+            "opacity"
+          ]
+        },
+        {
+          "name": "ThemeLab",
+          "startLine": 27,
+          "endLine": 96,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ThemeLab",
+          "callee": "useTheme",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "useAuthStore",
+          "lineNumber": 29
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "useState",
+          "lineNumber": 32
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "useState",
+          "lineNumber": 33
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "useRef",
+          "lineNumber": 34
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "sanitizeBackgroundConfig",
+          "lineNumber": 35
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "useMemo",
+          "lineNumber": 37
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "query.trim().toLowerCase",
+          "lineNumber": 38
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "query.trim",
+          "lineNumber": 38
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "THEME_LIST.filter",
+          "lineNumber": 40
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "[item.name, item.description, ...item.tags].join(' ').toLowerCase().includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "[item.name, item.description, ...item.tags].join(' ').toLowerCase",
+          "lineNumber": 40
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "[item.name, item.description, ...item.tags].join",
+          "lineNumber": 40
+        },
+        {
+          "caller": "applyBackground",
+          "callee": "updateSettings",
+          "lineNumber": 44
+        },
+        {
+          "caller": "applyBackground",
+          "callee": "sanitizeBackgroundConfig",
+          "lineNumber": 44
+        },
+        {
+          "caller": "applyBackground",
+          "callee": "setMessage",
+          "lineNumber": 45
+        },
+        {
+          "caller": "applyBackground",
+          "callee": "window.setTimeout",
+          "lineNumber": 46
+        },
+        {
+          "caller": "applyBackground",
+          "callee": "setMessage",
+          "lineNumber": 46
+        },
+        {
+          "caller": "handleUpload",
+          "callee": "file.type.startsWith",
+          "lineNumber": 53
+        },
+        {
+          "caller": "handleUpload",
+          "callee": "setMessage",
+          "lineNumber": 53
+        },
+        {
+          "caller": "handleUpload",
+          "callee": "setMessage",
+          "lineNumber": 54
+        },
+        {
+          "caller": "handleUpload",
+          "callee": "applyBackground",
+          "lineNumber": 56
+        },
+        {
+          "caller": "handleUpload",
+          "callee": "String",
+          "lineNumber": 56
+        },
+        {
+          "caller": "handleUpload",
+          "callee": "reader.readAsDataURL",
+          "lineNumber": 57
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "activeBackground.imageUrl?.startsWith",
+          "lineNumber": 60
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "BACKGROUNDS.find",
+          "lineNumber": 61
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "updateSettings",
+          "lineNumber": 72
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "updateSettings",
+          "lineNumber": 72
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "setQuery",
+          "lineNumber": 76
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "visibleThemes.map",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "setTheme",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "item.tags.slice(0, 3).join",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "item.tags.slice",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "BACKGROUNDS.map",
+          "lineNumber": 85
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "isActiveBackground",
+          "lineNumber": 85
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "applyBackground",
+          "lineNumber": 85
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "withImage",
+          "lineNumber": 85
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "uploadRef.current?.click",
+          "lineNumber": 86
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "handleUpload",
+          "lineNumber": 87
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "applyBackground",
+          "lineNumber": 89
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "Number",
+          "lineNumber": 89
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "Math.round",
+          "lineNumber": 89
+        },
+        {
+          "caller": "ThemeLab",
+          "callee": "applyBackground",
+          "lineNumber": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useMotion.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 45,
+      "nonEmptyLines": 39,
+      "functions": [
+        {
+          "name": "useMotion",
+          "startLine": 23,
+          "endLine": 45,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "useMotion",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useMotion",
+          "callee": "useTheme",
+          "lineNumber": 24
+        },
+        {
+          "caller": "useMotion",
+          "callee": "useMemo",
+          "lineNumber": 27
+        },
+        {
+          "caller": "getTransition",
+          "callee": "properties.map((p) => `${p} ${motion.duration} ${motion.easing}`).join",
+          "lineNumber": 29
+        },
+        {
+          "caller": "getTransition",
+          "callee": "properties.map",
+          "lineNumber": 29
+        },
+        {
+          "caller": "getTransitionSlow",
+          "callee": "properties.map((p) => `${p} ${motion.durationSlow} ${motion.easing}`).join",
+          "lineNumber": 32
+        },
+        {
+          "caller": "getTransitionSlow",
+          "callee": "properties.map",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/theme-engine-2.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 137,
+      "nonEmptyLines": 131,
+      "metrics": {
+        "importCount": 8,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/ThemeProvider.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 416,
+      "nonEmptyLines": 392,
+      "functions": [
+        {
+          "name": "applySemanticTokenLayers",
+          "startLine": 45,
+          "endLine": 120,
+          "params": [
+            "config"
+          ]
+        },
+        {
+          "name": "applyThemeCSSVariables",
+          "startLine": 235,
+          "endLine": 275,
+          "params": [
+            "config"
+          ]
+        },
+        {
+          "name": "applyPOSCardThemeVariables",
+          "startLine": 277,
+          "endLine": 283,
+          "params": [
+            "theme"
+          ]
+        },
+        {
+          "name": "ThemeProvider",
+          "startLine": 285,
+          "endLine": 416,
+          "params": [
+            "{ children }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ThemeContext",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "ThemeProvider",
+          "line": 285,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "Object.entries(semantic).forEach",
+          "lineNumber": 116
+        },
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "Object.entries",
+          "lineNumber": 116
+        },
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "key.replace",
+          "lineNumber": 117
+        },
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "letter.toLowerCase",
+          "lineNumber": 117
+        },
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "Object.entries(values).forEach",
+          "lineNumber": 119
+        },
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "Object.entries",
+          "lineNumber": 119
+        },
+        {
+          "caller": "applySemanticTokenLayers",
+          "callee": "root.style.setProperty",
+          "lineNumber": 119
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 238
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 239
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 240
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 241
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 242
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 243
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "String",
+          "lineNumber": 243
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 244
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 245
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "String",
+          "lineNumber": 245
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 246
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 247
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 248
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 249
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 250
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 251
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 252
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "String",
+          "lineNumber": 252
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 253
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "String",
+          "lineNumber": 253
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 254
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 256
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 257
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "String",
+          "lineNumber": 257
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 258
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 259
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 260
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 262
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 263
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 264
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 265
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 266
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 267
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 268
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 269
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 270
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 271
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 272
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 273
+        },
+        {
+          "caller": "applyThemeCSSVariables",
+          "callee": "applySemanticTokenLayers",
+          "lineNumber": 274
+        },
+        {
+          "caller": "applyPOSCardThemeVariables",
+          "callee": "Object.entries(tokens).forEach",
+          "lineNumber": 280
+        },
+        {
+          "caller": "applyPOSCardThemeVariables",
+          "callee": "Object.entries",
+          "lineNumber": 280
+        },
+        {
+          "caller": "applyPOSCardThemeVariables",
+          "callee": "root.style.setProperty",
+          "lineNumber": 281
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "useAuthStore",
+          "lineNumber": 286
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "useAuthStore",
+          "lineNumber": 287
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "migrateThemeId",
+          "lineNumber": 292
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "useEffect",
+          "lineNumber": 296
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 300
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "body.setAttribute",
+          "lineNumber": 301
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 302
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 305
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 307
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 308
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 309
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.classList.add",
+          "lineNumber": 313
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "body.classList.add",
+          "lineNumber": 314
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.classList.remove",
+          "lineNumber": 316
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "body.classList.remove",
+          "lineNumber": 317
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.style.setProperty",
+          "lineNumber": 321
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 324
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.setAttribute",
+          "lineNumber": 327
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "applyThemeCSSVariables",
+          "lineNumber": 331
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "applyPOSCardThemeVariables",
+          "lineNumber": 332
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "resolveUserOverrides",
+          "lineNumber": 336
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "sanitizeColorOverrides",
+          "lineNumber": 336
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.style.setProperty",
+          "lineNumber": 338
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "root.style.removeProperty",
+          "lineNumber": 339
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "document.querySelector",
+          "lineNumber": 342
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.classList.remove",
+          "lineNumber": 345
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.classList.add",
+          "lineNumber": 346
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.setAttribute",
+          "lineNumber": 347
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.setAttribute",
+          "lineNumber": 351
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.setProperty",
+          "lineNumber": 352
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "String",
+          "lineNumber": 352
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.setProperty",
+          "lineNumber": 354
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 356
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.removeAttribute",
+          "lineNumber": 359
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 360
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 361
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 362
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.removeAttribute",
+          "lineNumber": 364
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.setProperty",
+          "lineNumber": 365
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 366
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "sanitizeBackgroundConfig",
+          "lineNumber": 368
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "buildBackgroundCSS",
+          "lineNumber": 370
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.setProperty",
+          "lineNumber": 371
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.setProperty",
+          "lineNumber": 372
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "String",
+          "lineNumber": 372
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.setProperty",
+          "lineNumber": 373
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 374
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.setAttribute",
+          "lineNumber": 375
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.setAttribute",
+          "lineNumber": 376
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.removeAttribute",
+          "lineNumber": 378
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.removeAttribute",
+          "lineNumber": 379
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 380
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 381
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "shell.style.removeProperty",
+          "lineNumber": 382
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "useEffect",
+          "lineNumber": 388
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "document.getElementById",
+          "lineNumber": 390
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "document.createElement",
+          "lineNumber": 393
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "document.head.appendChild",
+          "lineNumber": 396
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "link.getAttribute",
+          "lineNumber": 399
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "link.setAttribute",
+          "lineNumber": 400
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "useMemo",
+          "lineNumber": 404
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "updateSettings",
+          "lineNumber": 409
+        },
+        {
+          "caller": "ThemeProvider",
+          "callee": "updateSettings",
+          "lineNumber": 410
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 2,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/background.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 118,
+      "nonEmptyLines": 107,
+      "functions": [
+        {
+          "name": "isSafeImageUrl",
+          "startLine": 39,
+          "endLine": 43,
+          "params": [
+            "url"
+          ]
+        },
+        {
+          "name": "validateBackgroundConfig",
+          "startLine": 45,
+          "endLine": 63,
+          "params": [
+            "cfg"
+          ]
+        },
+        {
+          "name": "sanitizeBackgroundConfig",
+          "startLine": 65,
+          "endLine": 81,
+          "params": [
+            "cfg"
+          ]
+        },
+        {
+          "name": "buildBackgroundCSS",
+          "startLine": 86,
+          "endLine": 118,
+          "params": [
+            "cfg"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DEFAULT_BACKGROUND",
+          "line": 35,
+          "isDefault": false
+        },
+        {
+          "name": "validateBackgroundConfig",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "sanitizeBackgroundConfig",
+          "line": 65,
+          "isDefault": false
+        },
+        {
+          "name": "buildBackgroundCSS",
+          "line": 86,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isSafeImageUrl",
+          "callee": "url.startsWith",
+          "lineNumber": 40
+        },
+        {
+          "caller": "isSafeImageUrl",
+          "callee": "url.includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "isSafeImageUrl",
+          "callee": "url.startsWith",
+          "lineNumber": 41
+        },
+        {
+          "caller": "isSafeImageUrl",
+          "callee": "url.includes",
+          "lineNumber": 41
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 47
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "types.includes",
+          "lineNumber": 50
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 52
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "c.colors.every",
+          "lineNumber": 52
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "errors.push",
+          "lineNumber": 52
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "errors.push",
+          "lineNumber": 55
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "['off', 'slow', 'normal'].includes",
+          "lineNumber": 57
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "errors.push",
+          "lineNumber": 57
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "isSafeImageUrl",
+          "lineNumber": 58
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "errors.push",
+          "lineNumber": 59
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "isHexColor",
+          "lineNumber": 61
+        },
+        {
+          "caller": "validateBackgroundConfig",
+          "callee": "errors.push",
+          "lineNumber": 61
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 66
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 71
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "c.colors.filter(isHexColor).slice",
+          "lineNumber": 71
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "c.colors.filter",
+          "lineNumber": 71
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "clampNum",
+          "lineNumber": 72
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "clampNum",
+          "lineNumber": 73
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "clampNum",
+          "lineNumber": 74
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "clampNum",
+          "lineNumber": 75
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "isSafeImageUrl",
+          "lineNumber": 77
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "isHexColor",
+          "lineNumber": 78
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "clampNum",
+          "lineNumber": 79
+        },
+        {
+          "caller": "sanitizeBackgroundConfig",
+          "callee": "validateBackgroundConfig",
+          "lineNumber": 80
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "(cfg.colors?.length ? cfg.colors : ['#6366f1', '#8b5cf6', '#06b6d4']).slice",
+          "lineNumber": 87
+        },
+        {
+          "caller": "a",
+          "callee": "hex.replace",
+          "lineNumber": 91
+        },
+        {
+          "caller": "a",
+          "callee": "parseInt",
+          "lineNumber": 92
+        },
+        {
+          "caller": "a",
+          "callee": "m.slice",
+          "lineNumber": 92
+        },
+        {
+          "caller": "a",
+          "callee": "parseInt",
+          "lineNumber": 92
+        },
+        {
+          "caller": "a",
+          "callee": "m.slice",
+          "lineNumber": 92
+        },
+        {
+          "caller": "a",
+          "callee": "parseInt",
+          "lineNumber": 92
+        },
+        {
+          "caller": "a",
+          "callee": "m.slice",
+          "lineNumber": 92
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "colors.join",
+          "lineNumber": 98
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "colors.join",
+          "lineNumber": 99
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 102
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 102
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 102
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 106
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 106
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 106
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 109
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 110
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 110
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 111
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 111
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 112
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "colors.join",
+          "lineNumber": 113
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 115
+        },
+        {
+          "caller": "buildBackgroundCSS",
+          "callee": "a",
+          "lineNumber": 115
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 4,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/color.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 74,
+      "nonEmptyLines": 62,
+      "functions": [
+        {
+          "name": "hexToRgb",
+          "startLine": 9,
+          "endLine": 13,
+          "params": [
+            "hex"
+          ]
+        },
+        {
+          "name": "rgbToHex",
+          "startLine": 15,
+          "endLine": 16,
+          "params": [
+            "[r, g, b]"
+          ]
+        },
+        {
+          "name": "channel",
+          "startLine": 18,
+          "endLine": 21,
+          "params": [
+            "v"
+          ]
+        },
+        {
+          "name": "luminance",
+          "startLine": 24,
+          "endLine": 25,
+          "params": [
+            "[r, g, b]"
+          ]
+        },
+        {
+          "name": "contrastRatio",
+          "startLine": 28,
+          "endLine": 34,
+          "params": [
+            "a",
+            "b"
+          ]
+        },
+        {
+          "name": "bestTextOn",
+          "startLine": 37,
+          "endLine": 43,
+          "params": [
+            "bgHex"
+          ]
+        },
+        {
+          "name": "mixHex",
+          "startLine": 46,
+          "endLine": 52,
+          "params": [
+            "a",
+            "b",
+            "t",
+            "fallback"
+          ]
+        },
+        {
+          "name": "shadeHex",
+          "startLine": 55,
+          "endLine": 58,
+          "params": [
+            "hex",
+            "amt",
+            "isDark"
+          ]
+        },
+        {
+          "name": "hexToTriplet",
+          "startLine": 61,
+          "endLine": 64,
+          "params": [
+            "hex"
+          ]
+        },
+        {
+          "name": "deriveActionScale",
+          "startLine": 67,
+          "endLine": 74,
+          "params": [
+            "primaryHex",
+            "isDark"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "hexToRgb",
+          "line": 9,
+          "isDefault": false
+        },
+        {
+          "name": "rgbToHex",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "luminance",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "contrastRatio",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "bestTextOn",
+          "line": 37,
+          "isDefault": false
+        },
+        {
+          "name": "mixHex",
+          "line": 46,
+          "isDefault": false
+        },
+        {
+          "name": "shadeHex",
+          "line": 55,
+          "isDefault": false
+        },
+        {
+          "name": "hexToTriplet",
+          "line": 61,
+          "isDefault": false
+        },
+        {
+          "name": "deriveActionScale",
+          "line": 67,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "hexToRgb",
+          "callee": "normalizeHex",
+          "lineNumber": 10
+        },
+        {
+          "caller": "hexToRgb",
+          "callee": "parseInt",
+          "lineNumber": 12
+        },
+        {
+          "caller": "hexToRgb",
+          "callee": "n.slice",
+          "lineNumber": 12
+        },
+        {
+          "caller": "hexToRgb",
+          "callee": "parseInt",
+          "lineNumber": 12
+        },
+        {
+          "caller": "hexToRgb",
+          "callee": "n.slice",
+          "lineNumber": 12
+        },
+        {
+          "caller": "hexToRgb",
+          "callee": "parseInt",
+          "lineNumber": 12
+        },
+        {
+          "caller": "hexToRgb",
+          "callee": "n.slice",
+          "lineNumber": 12
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "[r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join",
+          "lineNumber": 16
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "[r, g, b].map",
+          "lineNumber": 16
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart",
+          "lineNumber": 16
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "Math.round(Math.min(255, Math.max(0, v))).toString",
+          "lineNumber": 16
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "Math.round",
+          "lineNumber": 16
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "Math.min",
+          "lineNumber": 16
+        },
+        {
+          "caller": "rgbToHex",
+          "callee": "Math.max",
+          "lineNumber": 16
+        },
+        {
+          "caller": "channel",
+          "callee": "Math.pow",
+          "lineNumber": 20
+        },
+        {
+          "caller": "luminance",
+          "callee": "channel",
+          "lineNumber": 25
+        },
+        {
+          "caller": "luminance",
+          "callee": "channel",
+          "lineNumber": 25
+        },
+        {
+          "caller": "luminance",
+          "callee": "channel",
+          "lineNumber": 25
+        },
+        {
+          "caller": "contrastRatio",
+          "callee": "hexToRgb",
+          "lineNumber": 29
+        },
+        {
+          "caller": "contrastRatio",
+          "callee": "hexToRgb",
+          "lineNumber": 30
+        },
+        {
+          "caller": "contrastRatio",
+          "callee": "[luminance(ra), luminance(rb)].sort",
+          "lineNumber": 32
+        },
+        {
+          "caller": "contrastRatio",
+          "callee": "luminance",
+          "lineNumber": 32
+        },
+        {
+          "caller": "contrastRatio",
+          "callee": "luminance",
+          "lineNumber": 32
+        },
+        {
+          "caller": "bestTextOn",
+          "callee": "contrastRatio",
+          "lineNumber": 38
+        },
+        {
+          "caller": "bestTextOn",
+          "callee": "contrastRatio",
+          "lineNumber": 39
+        },
+        {
+          "caller": "mixHex",
+          "callee": "hexToRgb",
+          "lineNumber": 47
+        },
+        {
+          "caller": "mixHex",
+          "callee": "hexToRgb",
+          "lineNumber": 48
+        },
+        {
+          "caller": "mixHex",
+          "callee": "Math.min",
+          "lineNumber": 50
+        },
+        {
+          "caller": "mixHex",
+          "callee": "Math.max",
+          "lineNumber": 50
+        },
+        {
+          "caller": "mixHex",
+          "callee": "rgbToHex",
+          "lineNumber": 51
+        },
+        {
+          "caller": "shadeHex",
+          "callee": "mixHex",
+          "lineNumber": 57
+        },
+        {
+          "caller": "shadeHex",
+          "callee": "Math.abs",
+          "lineNumber": 57
+        },
+        {
+          "caller": "shadeHex",
+          "callee": "Math.min",
+          "lineNumber": 57
+        },
+        {
+          "caller": "shadeHex",
+          "callee": "Math.max",
+          "lineNumber": 57
+        },
+        {
+          "caller": "hexToTriplet",
+          "callee": "hexToRgb",
+          "lineNumber": 62
+        },
+        {
+          "caller": "deriveActionScale",
+          "callee": "normalizeHex",
+          "lineNumber": 68
+        },
+        {
+          "caller": "deriveActionScale",
+          "callee": "shadeHex",
+          "lineNumber": 70
+        },
+        {
+          "caller": "deriveActionScale",
+          "callee": "shadeHex",
+          "lineNumber": 71
+        },
+        {
+          "caller": "deriveActionScale",
+          "callee": "mixHex",
+          "lineNumber": 72
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 9,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/migrate.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 64,
+      "nonEmptyLines": 59,
+      "functions": [
+        {
+          "name": "migrateThemeId",
+          "startLine": 60,
+          "endLine": 64,
+          "params": [
+            "stored"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "V2_THEME_IDS",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "FALLBACK_V2",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "migrateThemeId",
+          "line": 60,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "migrateThemeId",
+          "callee": "(V2_THEME_IDS as readonly string[]).includes",
+          "lineNumber": 62
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/motion.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 155,
+      "nonEmptyLines": 143,
+      "functions": [
+        {
+          "name": "motionAllowed",
+          "startLine": 40,
+          "endLine": 46,
+          "params": []
+        },
+        {
+          "name": "directionKey",
+          "startLine": 50,
+          "endLine": 56,
+          "params": [
+            "ev",
+            "rect"
+          ]
+        },
+        {
+          "name": "useDirectionHover",
+          "startLine": 62,
+          "endLine": 93,
+          "params": [
+            "enabled"
+          ]
+        },
+        {
+          "name": "useTilt",
+          "startLine": 96,
+          "endLine": 131,
+          "params": [
+            "enabled",
+            "maxDeg"
+          ]
+        },
+        {
+          "name": "easeOutCubic",
+          "startLine": 133,
+          "endLine": 133,
+          "params": [
+            "t"
+          ]
+        },
+        {
+          "name": "useCountUp",
+          "startLine": 139,
+          "endLine": 155,
+          "params": [
+            "target",
+            "duration",
+            "formatter"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "MOTION_PROFILES",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "DEFAULT_MOTION_PROFILE",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "useDirectionHover",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "useTilt",
+          "line": 96,
+          "isDefault": false
+        },
+        {
+          "name": "useCountUp",
+          "line": 139,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "motionAllowed",
+          "callee": "window.matchMedia",
+          "lineNumber": 43
+        },
+        {
+          "caller": "motionAllowed",
+          "callee": "window.matchMedia",
+          "lineNumber": 44
+        },
+        {
+          "caller": "directionKey",
+          "callee": "Math.round",
+          "lineNumber": 55
+        },
+        {
+          "caller": "directionKey",
+          "callee": "Math.atan2",
+          "lineNumber": 55
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "useRef",
+          "lineNumber": 63
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "useEffect",
+          "lineNumber": 64
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "motionAllowed",
+          "lineNumber": 66
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "['in', 'out'].flatMap",
+          "lineNumber": 67
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "DIRECTIONS.map",
+          "lineNumber": 67
+        },
+        {
+          "caller": "onOver",
+          "callee": "directionKey",
+          "lineNumber": 69
+        },
+        {
+          "caller": "onOver",
+          "callee": "el.getBoundingClientRect",
+          "lineNumber": 69
+        },
+        {
+          "caller": "onOver",
+          "callee": "el.classList.remove",
+          "lineNumber": 73
+        },
+        {
+          "caller": "onOver",
+          "callee": "el.classList.add",
+          "lineNumber": 74
+        },
+        {
+          "caller": "onOut",
+          "callee": "directionKey",
+          "lineNumber": 77
+        },
+        {
+          "caller": "onOut",
+          "callee": "el.getBoundingClientRect",
+          "lineNumber": 77
+        },
+        {
+          "caller": "onOut",
+          "callee": "el.classList.remove",
+          "lineNumber": 81
+        },
+        {
+          "caller": "onOut",
+          "callee": "el.classList.add",
+          "lineNumber": 82
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "el.addEventListener",
+          "lineNumber": 84
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "el.addEventListener",
+          "lineNumber": 85
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "el.removeEventListener",
+          "lineNumber": 87
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "el.removeEventListener",
+          "lineNumber": 88
+        },
+        {
+          "caller": "useDirectionHover",
+          "callee": "el.classList.remove",
+          "lineNumber": 89
+        },
+        {
+          "caller": "useTilt",
+          "callee": "useRef",
+          "lineNumber": 97
+        },
+        {
+          "caller": "useTilt",
+          "callee": "useEffect",
+          "lineNumber": 98
+        },
+        {
+          "caller": "useTilt",
+          "callee": "motionAllowed",
+          "lineNumber": 100
+        },
+        {
+          "caller": "onMove",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 103
+        },
+        {
+          "caller": "onMove",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 104
+        },
+        {
+          "caller": "onMove",
+          "callee": "el.getBoundingClientRect",
+          "lineNumber": 105
+        },
+        {
+          "caller": "onMove",
+          "callee": "(x * maxDeg * 2).toFixed",
+          "lineNumber": 108
+        },
+        {
+          "caller": "onMove",
+          "callee": "(-y * maxDeg * 2).toFixed",
+          "lineNumber": 108
+        },
+        {
+          "caller": "onLeave",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 112
+        },
+        {
+          "caller": "onLeave",
+          "callee": "window.setTimeout",
+          "lineNumber": 115
+        },
+        {
+          "caller": "useTilt",
+          "callee": "el.addEventListener",
+          "lineNumber": 118
+        },
+        {
+          "caller": "useTilt",
+          "callee": "el.addEventListener",
+          "lineNumber": 119
+        },
+        {
+          "caller": "useTilt",
+          "callee": "el.addEventListener",
+          "lineNumber": 120
+        },
+        {
+          "caller": "useTilt",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 122
+        },
+        {
+          "caller": "useTilt",
+          "callee": "el.removeEventListener",
+          "lineNumber": 123
+        },
+        {
+          "caller": "useTilt",
+          "callee": "el.removeEventListener",
+          "lineNumber": 124
+        },
+        {
+          "caller": "useTilt",
+          "callee": "el.removeEventListener",
+          "lineNumber": 125
+        },
+        {
+          "caller": "easeOutCubic",
+          "callee": "Math.pow",
+          "lineNumber": 133
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "Math.floor(n).toLocaleString",
+          "lineNumber": 139
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "Math.floor",
+          "lineNumber": 139
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "useState",
+          "lineNumber": 140
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "formatter",
+          "lineNumber": 140
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "useEffect",
+          "lineNumber": 141
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "motionAllowed",
+          "lineNumber": 142
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "setText",
+          "lineNumber": 142
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "formatter",
+          "lineNumber": 142
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "performance.now",
+          "lineNumber": 144
+        },
+        {
+          "caller": "tick",
+          "callee": "Math.min",
+          "lineNumber": 146
+        },
+        {
+          "caller": "tick",
+          "callee": "setText",
+          "lineNumber": 147
+        },
+        {
+          "caller": "tick",
+          "callee": "formatter",
+          "lineNumber": 147
+        },
+        {
+          "caller": "tick",
+          "callee": "easeOutCubic",
+          "lineNumber": 147
+        },
+        {
+          "caller": "tick",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 148
+        },
+        {
+          "caller": "tick",
+          "callee": "setText",
+          "lineNumber": 149
+        },
+        {
+          "caller": "tick",
+          "callee": "formatter",
+          "lineNumber": 149
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 151
+        },
+        {
+          "caller": "useCountUp",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 152
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/presets.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 105,
+      "nonEmptyLines": 93,
+      "functions": [
+        {
+          "name": "store",
+          "startLine": 33,
+          "endLine": 38,
+          "params": []
+        },
+        {
+          "name": "sanitizePreset",
+          "startLine": 41,
+          "endLine": 61,
+          "params": [
+            "raw",
+            "validThemeIds"
+          ]
+        },
+        {
+          "name": "listPresets",
+          "startLine": 63,
+          "endLine": 72,
+          "params": [
+            "validThemeIds"
+          ]
+        },
+        {
+          "name": "savePreset",
+          "startLine": 74,
+          "endLine": 85,
+          "params": [
+            "preset",
+            "validThemeIds"
+          ]
+        },
+        {
+          "name": "deletePreset",
+          "startLine": 87,
+          "endLine": 96,
+          "params": [
+            "id",
+            "validThemeIds"
+          ]
+        },
+        {
+          "name": "exportPreset",
+          "startLine": 98,
+          "endLine": 98,
+          "params": [
+            "preset"
+          ]
+        },
+        {
+          "name": "importPreset",
+          "startLine": 100,
+          "endLine": 105,
+          "params": [
+            "json",
+            "validThemeIds"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "BUILT_IN_PRESETS",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "sanitizePreset",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "listPresets",
+          "line": 63,
+          "isDefault": false
+        },
+        {
+          "name": "savePreset",
+          "line": 74,
+          "isDefault": false
+        },
+        {
+          "name": "deletePreset",
+          "line": 87,
+          "isDefault": false
+        },
+        {
+          "name": "exportPreset",
+          "line": 98,
+          "isDefault": false
+        },
+        {
+          "name": "importPreset",
+          "line": 100,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "sanitizePreset",
+          "callee": "Array.isArray",
+          "lineNumber": 42
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "r.name.trim",
+          "lineNumber": 45
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "validThemeIds.includes",
+          "lineNumber": 46
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "['compact', 'comfortable', 'spacious'].includes",
+          "lineNumber": 48
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "['full', 'reduced', 'off'].includes",
+          "lineNumber": 49
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "r.id.replace(/[^a-zA-Z0-9_-]/g, '').slice",
+          "lineNumber": 51
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "r.id.replace",
+          "lineNumber": 51
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "Date.now",
+          "lineNumber": 51
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "r.name.trim().slice",
+          "lineNumber": 52
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "r.name.trim",
+          "lineNumber": 52
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "sanitizeColorOverrides",
+          "lineNumber": 57
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "sanitizeBackgroundConfig",
+          "lineNumber": 58
+        },
+        {
+          "caller": "sanitizePreset",
+          "callee": "Date.now",
+          "lineNumber": 59
+        },
+        {
+          "caller": "listPresets",
+          "callee": "store",
+          "lineNumber": 64
+        },
+        {
+          "caller": "listPresets",
+          "callee": "JSON.parse",
+          "lineNumber": 67
+        },
+        {
+          "caller": "listPresets",
+          "callee": "s.getItem",
+          "lineNumber": 67
+        },
+        {
+          "caller": "listPresets",
+          "callee": "Array.isArray",
+          "lineNumber": 68
+        },
+        {
+          "caller": "listPresets",
+          "callee": "raw.map((p) => sanitizePreset(p, validThemeIds)).filter",
+          "lineNumber": 69
+        },
+        {
+          "caller": "listPresets",
+          "callee": "raw.map",
+          "lineNumber": 69
+        },
+        {
+          "caller": "listPresets",
+          "callee": "sanitizePreset",
+          "lineNumber": 69
+        },
+        {
+          "caller": "listPresets",
+          "callee": "user.slice",
+          "lineNumber": 70
+        },
+        {
+          "caller": "savePreset",
+          "callee": "sanitizePreset",
+          "lineNumber": 75
+        },
+        {
+          "caller": "savePreset",
+          "callee": "Date.now",
+          "lineNumber": 75
+        },
+        {
+          "caller": "savePreset",
+          "callee": "store",
+          "lineNumber": 77
+        },
+        {
+          "caller": "savePreset",
+          "callee": "listPresets(validThemeIds).filter",
+          "lineNumber": 80
+        },
+        {
+          "caller": "savePreset",
+          "callee": "listPresets",
+          "lineNumber": 80
+        },
+        {
+          "caller": "savePreset",
+          "callee": "[...current, clean].slice",
+          "lineNumber": 81
+        },
+        {
+          "caller": "savePreset",
+          "callee": "s.setItem",
+          "lineNumber": 82
+        },
+        {
+          "caller": "savePreset",
+          "callee": "JSON.stringify",
+          "lineNumber": 82
+        },
+        {
+          "caller": "deletePreset",
+          "callee": "BUILT_IN_PRESETS.some",
+          "lineNumber": 88
+        },
+        {
+          "caller": "deletePreset",
+          "callee": "store",
+          "lineNumber": 89
+        },
+        {
+          "caller": "deletePreset",
+          "callee": "listPresets(validThemeIds).filter",
+          "lineNumber": 92
+        },
+        {
+          "caller": "deletePreset",
+          "callee": "listPresets",
+          "lineNumber": 92
+        },
+        {
+          "caller": "deletePreset",
+          "callee": "s.setItem",
+          "lineNumber": 93
+        },
+        {
+          "caller": "deletePreset",
+          "callee": "JSON.stringify",
+          "lineNumber": 93
+        },
+        {
+          "caller": "exportPreset",
+          "callee": "JSON.stringify",
+          "lineNumber": 98
+        },
+        {
+          "caller": "importPreset",
+          "callee": "sanitizePreset",
+          "lineNumber": 103
+        },
+        {
+          "caller": "importPreset",
+          "callee": "JSON.parse",
+          "lineNumber": 103
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/resolve.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 71,
+      "nonEmptyLines": 65,
+      "functions": [
+        {
+          "name": "auditRegistry",
+          "startLine": 18,
+          "endLine": 27,
+          "params": [
+            "registry"
+          ]
+        },
+        {
+          "name": "resolveTheme",
+          "startLine": 30,
+          "endLine": 39,
+          "params": [
+            "id",
+            "registry"
+          ]
+        },
+        {
+          "name": "resolveUserOverrides",
+          "startLine": 42,
+          "endLine": 71,
+          "params": [
+            "overrides",
+            "isDark"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "FALLBACK_THEME_ID",
+          "line": 9,
+          "isDefault": false
+        },
+        {
+          "name": "auditRegistry",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "resolveTheme",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "resolveUserOverrides",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "auditRegistry",
+          "callee": "Object.keys",
+          "lineNumber": 20
+        },
+        {
+          "caller": "auditRegistry",
+          "callee": "errors.push",
+          "lineNumber": 21
+        },
+        {
+          "caller": "auditRegistry",
+          "callee": "Object.entries",
+          "lineNumber": 22
+        },
+        {
+          "caller": "auditRegistry",
+          "callee": "errors.push",
+          "lineNumber": 23
+        },
+        {
+          "caller": "auditRegistry",
+          "callee": "validateThemeConfig",
+          "lineNumber": 24
+        },
+        {
+          "caller": "auditRegistry",
+          "callee": "errors.push",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resolveTheme",
+          "callee": "validateThemeConfig",
+          "lineNumber": 34
+        },
+        {
+          "caller": "resolveTheme",
+          "callee": "warnings.push",
+          "lineNumber": 35
+        },
+        {
+          "caller": "resolveTheme",
+          "callee": "validateThemeConfig(found).join",
+          "lineNumber": 35
+        },
+        {
+          "caller": "resolveTheme",
+          "callee": "validateThemeConfig",
+          "lineNumber": 35
+        },
+        {
+          "caller": "resolveTheme",
+          "callee": "warnings.push",
+          "lineNumber": 36
+        },
+        {
+          "caller": "resolveTheme",
+          "callee": "Object.values",
+          "lineNumber": 37
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "hexToTriplet",
+          "lineNumber": 50
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "deriveActionScale",
+          "lineNumber": 52
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "hexToTriplet",
+          "lineNumber": 54
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "contrastRatio",
+          "lineNumber": 56
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "warnings.push",
+          "lineNumber": 58
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "ratio.toFixed",
+          "lineNumber": 58
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "hexToTriplet",
+          "lineNumber": 63
+        },
+        {
+          "caller": "resolveUserOverrides",
+          "callee": "hexToTriplet",
+          "lineNumber": 67
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 4,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/validation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 89,
+      "nonEmptyLines": 78,
+      "functions": [
+        {
+          "name": "isHexColor",
+          "startLine": 7,
+          "endLine": 8,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "normalizeHex",
+          "startLine": 11,
+          "endLine": 16,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "clampNum",
+          "startLine": 18,
+          "endLine": 22,
+          "params": [
+            "value",
+            "min",
+            "max",
+            "fallback"
+          ]
+        },
+        {
+          "name": "isRecord",
+          "startLine": 24,
+          "endLine": 25,
+          "params": [
+            "v"
+          ]
+        },
+        {
+          "name": "isDuration",
+          "startLine": 38,
+          "endLine": 38,
+          "params": [
+            "v"
+          ]
+        },
+        {
+          "name": "isOneOf",
+          "startLine": 39,
+          "endLine": 40,
+          "params": [
+            "v",
+            "list"
+          ]
+        },
+        {
+          "name": "validateThemeConfig",
+          "startLine": 43,
+          "endLine": 72,
+          "params": [
+            "cfg"
+          ]
+        },
+        {
+          "name": "isValidDensity",
+          "startLine": 74,
+          "endLine": 75,
+          "params": [
+            "v"
+          ]
+        },
+        {
+          "name": "isValidMotionLevel",
+          "startLine": 77,
+          "endLine": 78,
+          "params": [
+            "v"
+          ]
+        },
+        {
+          "name": "sanitizeColorOverrides",
+          "startLine": 81,
+          "endLine": 89,
+          "params": [
+            "v"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "isHexColor",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "normalizeHex",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "clampNum",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "validateThemeConfig",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "isValidDensity",
+          "line": 74,
+          "isDefault": false
+        },
+        {
+          "name": "isValidMotionLevel",
+          "line": 77,
+          "isDefault": false
+        },
+        {
+          "name": "sanitizeColorOverrides",
+          "line": 81,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isHexColor",
+          "callee": "HEX_RE.test",
+          "lineNumber": 8
+        },
+        {
+          "caller": "isHexColor",
+          "callee": "value.trim",
+          "lineNumber": 8
+        },
+        {
+          "caller": "normalizeHex",
+          "callee": "isHexColor",
+          "lineNumber": 12
+        },
+        {
+          "caller": "normalizeHex",
+          "callee": "value.trim().toLowerCase",
+          "lineNumber": 13
+        },
+        {
+          "caller": "normalizeHex",
+          "callee": "value.trim",
+          "lineNumber": 13
+        },
+        {
+          "caller": "clampNum",
+          "callee": "value.trim",
+          "lineNumber": 19
+        },
+        {
+          "caller": "clampNum",
+          "callee": "Number",
+          "lineNumber": 19
+        },
+        {
+          "caller": "clampNum",
+          "callee": "Number.isFinite",
+          "lineNumber": 20
+        },
+        {
+          "caller": "clampNum",
+          "callee": "Math.min",
+          "lineNumber": 21
+        },
+        {
+          "caller": "clampNum",
+          "callee": "Math.max",
+          "lineNumber": 21
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Array.isArray",
+          "lineNumber": 25
+        },
+        {
+          "caller": "isDuration",
+          "callee": "/^\\d+(\\.\\d+)?m?s$/.test",
+          "lineNumber": 38
+        },
+        {
+          "caller": "isOneOf",
+          "callee": "(list as readonly string[]).includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isRecord",
+          "lineNumber": 45
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 46
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 47
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 48
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 49
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 49
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isRecord",
+          "lineNumber": 51
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "['radius', 'radiusSm', 'radiusLg', 'radiusXl'].every",
+          "lineNumber": 51
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 52
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isRecord",
+          "lineNumber": 55
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 55
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isDuration",
+          "lineNumber": 55
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isDuration",
+          "lineNumber": 55
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 56
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isRecord",
+          "lineNumber": 59
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 60
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 62
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 62
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 63
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 63
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 64
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 64
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 65
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 65
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 66
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 66
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 67
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 67
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isRecord",
+          "lineNumber": 70
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "isOneOf",
+          "lineNumber": 70
+        },
+        {
+          "caller": "validateThemeConfig",
+          "callee": "errors.push",
+          "lineNumber": 70
+        },
+        {
+          "caller": "isValidDensity",
+          "callee": "isOneOf",
+          "lineNumber": 75
+        },
+        {
+          "caller": "isValidMotionLevel",
+          "callee": "isOneOf",
+          "lineNumber": 78
+        },
+        {
+          "caller": "sanitizeColorOverrides",
+          "callee": "isRecord",
+          "lineNumber": 82
+        },
+        {
+          "caller": "sanitizeColorOverrides",
+          "callee": "normalizeHex",
+          "lineNumber": 85
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 7,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/acrylic.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 79,
+      "nonEmptyLines": 77,
+      "exports": [
+        {
+          "name": "acrylicTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/canvas.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 79,
+      "nonEmptyLines": 77,
+      "exports": [
+        {
+          "name": "canvasTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/command.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 79,
+      "nonEmptyLines": 77,
+      "exports": [
+        {
+          "name": "commandTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/fluent-pro.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 79,
+      "nonEmptyLines": 77,
+      "exports": [
+        {
+          "name": "fluentProTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/glassline.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 80,
+      "nonEmptyLines": 78,
+      "exports": [
+        {
+          "name": "glasslineTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/material-x.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 80,
+      "nonEmptyLines": 78,
+      "exports": [
+        {
+          "name": "materialXTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/meridian.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 79,
+      "nonEmptyLines": 77,
+      "exports": [
+        {
+          "name": "meridianTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/obsidian.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 80,
+      "nonEmptyLines": 78,
+      "exports": [
+        {
+          "name": "obsidianTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/tiles.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 80,
+      "nonEmptyLines": 78,
+      "exports": [
+        {
+          "name": "tilesTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/themes/touch.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 79,
+      "nonEmptyLines": 77,
+      "exports": [
+        {
+          "name": "touchTheme",
+          "line": 31,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/tokens.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 215,
+      "nonEmptyLines": 196,
+      "exports": [
+        {
+          "name": "THEME_REGISTRY",
+          "line": 202,
+          "isDefault": false
+        },
+        {
+          "name": "THEME_LIST",
+          "line": 215,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 11,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/useTheme.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 22,
+      "nonEmptyLines": 20,
+      "functions": [
+        {
+          "name": "useTheme",
+          "startLine": 16,
+          "endLine": 22,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "useTheme",
+          "line": 16,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useTheme",
+          "callee": "useContext",
+          "lineNumber": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    }
+  ]
+}

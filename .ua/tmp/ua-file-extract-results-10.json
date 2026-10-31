@@ -1,0 +1,6772 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 33,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 33,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 33,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "components/common/KeyboardShortcuts.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 115,
+      "nonEmptyLines": 105,
+      "functions": [
+        {
+          "name": "KeyboardShortcuts",
+          "startLine": 36,
+          "endLine": 113,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "useState",
+          "lineNumber": 37
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "useRef",
+          "lineNumber": 38
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "useAuthStore",
+          "lineNumber": 39
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "useEffect",
+          "lineNumber": 41
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "useEffect",
+          "lineNumber": 45
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "event.preventDefault",
+          "lineNumber": 55
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "setIsOpen",
+          "lineNumber": 56
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "setIsOpen",
+          "lineNumber": 61
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "document.addEventListener",
+          "lineNumber": 65
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "document.removeEventListener",
+          "lineNumber": 66
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "setIsOpen",
+          "lineNumber": 72
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "event.stopPropagation",
+          "lineNumber": 73
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "setIsOpen",
+          "lineNumber": 84
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "SHORTCUTS.map",
+          "lineNumber": 89
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "group.items.map",
+          "lineNumber": 93
+        },
+        {
+          "caller": "KeyboardShortcuts",
+          "callee": "shortcut.keys.map",
+          "lineNumber": 97
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/LiveClock.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 59,
+      "nonEmptyLines": 53,
+      "functions": [
+        {
+          "name": "LiveClock",
+          "startLine": 6,
+          "endLine": 57,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "LiveClock",
+          "callee": "useState",
+          "lineNumber": 7
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "useFinanceStore",
+          "lineNumber": 8
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "useAuthStore",
+          "lineNumber": 9
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "useEffect",
+          "lineNumber": 11
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "setInterval",
+          "lineNumber": 12
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "setNow",
+          "lineNumber": 12
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "clearInterval",
+          "lineNumber": 13
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "now.toLocaleTimeString",
+          "lineNumber": 16
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "now.toLocaleDateString",
+          "lineNumber": 17
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "now.getSeconds",
+          "lineNumber": 22
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "new Date(activeShift.openingTime).getTime",
+          "lineNumber": 27
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "Math.max",
+          "lineNumber": 28
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "now.getTime",
+          "lineNumber": 28
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "Math.floor",
+          "lineNumber": 29
+        },
+        {
+          "caller": "LiveClock",
+          "callee": "Math.floor",
+          "lineNumber": 30
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/PageSkeleton.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 113,
+      "nonEmptyLines": 107,
+      "functions": [
+        {
+          "name": "PageSkeleton",
+          "startLine": 10,
+          "endLine": 111,
+          "params": [
+            "{ type = 'table', rows = 6 }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from({ length: 4 }).map",
+          "lineNumber": 22
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from",
+          "lineNumber": 22
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from({ length: 6 }).map",
+          "lineNumber": 31
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from",
+          "lineNumber": 31
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from({ length: rows }).map",
+          "lineNumber": 59
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from",
+          "lineNumber": 59
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from({ length: 4 }).map",
+          "lineNumber": 85
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from",
+          "lineNumber": 85
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from({ length: 5 }).map",
+          "lineNumber": 95
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from",
+          "lineNumber": 95
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from({ length: rows }).map",
+          "lineNumber": 99
+        },
+        {
+          "caller": "PageSkeleton",
+          "callee": "Array.from",
+          "lineNumber": 99
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/PagerBar.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 83,
+      "nonEmptyLines": 79,
+      "functions": [
+        {
+          "name": "PagerBar",
+          "startLine": 21,
+          "endLine": 81,
+          "params": [
+            "{\n    page,\n    totalPages,\n    total,\n    pageSize,\n    lang = 'ar',\n    isLoading = false,\n    onPage,\n    onPageSize,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "PAGE_SIZE_OPTIONS",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "PagerBar",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "PagerBar",
+          "callee": "Math.max",
+          "lineNumber": 32
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "Math.min",
+          "lineNumber": 33
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "Math.max",
+          "lineNumber": 33
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "Math.min",
+          "lineNumber": 35
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "onPage",
+          "lineNumber": 41
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "Math.max",
+          "lineNumber": 41
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "onPage",
+          "lineNumber": 53
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "Math.min",
+          "lineNumber": 53
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "onPageSize",
+          "lineNumber": 65
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "Number",
+          "lineNumber": 65
+        },
+        {
+          "caller": "PagerBar",
+          "callee": "PAGE_SIZE_OPTIONS.map",
+          "lineNumber": 69
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/Skeleton.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 63,
+      "nonEmptyLines": 53,
+      "functions": [
+        {
+          "name": "SkeletonLine",
+          "startLine": 31,
+          "endLine": 33,
+          "params": [
+            "{ width = '100%', className = '' }"
+          ]
+        },
+        {
+          "name": "SkeletonCircle",
+          "startLine": 35,
+          "endLine": 37,
+          "params": [
+            "{ size = 32, className = '' }"
+          ]
+        },
+        {
+          "name": "SkeletonRect",
+          "startLine": 39,
+          "endLine": 41,
+          "params": [
+            "{ width = '100%', height = '100px', rounded = 'xl', className = '' }"
+          ]
+        },
+        {
+          "name": "SkeletonRow",
+          "startLine": 46,
+          "endLine": 54,
+          "params": []
+        },
+        {
+          "name": "Skeleton",
+          "startLine": 59,
+          "endLine": 61,
+          "params": [
+            "{ className = '' }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SkeletonLine",
+          "line": 31,
+          "isDefault": false
+        },
+        {
+          "name": "SkeletonCircle",
+          "line": 35,
+          "isDefault": false
+        },
+        {
+          "name": "SkeletonRect",
+          "line": 39,
+          "isDefault": false
+        },
+        {
+          "name": "SkeletonRow",
+          "line": 46,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/SmartTabs.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 45,
+      "nonEmptyLines": 38,
+      "functions": [
+        {
+          "name": "SmartTabs",
+          "startLine": 11,
+          "endLine": 42,
+          "params": [
+            "{ paths, activePath }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SmartTabs",
+          "callee": "useNavigate",
+          "lineNumber": 12
+        },
+        {
+          "caller": "SmartTabs",
+          "callee": "useAuthStore",
+          "lineNumber": 13
+        },
+        {
+          "caller": "getLabel",
+          "callee": "section.items.find",
+          "lineNumber": 17
+        },
+        {
+          "caller": "SmartTabs",
+          "callee": "paths.map",
+          "lineNumber": 27
+        },
+        {
+          "caller": "SmartTabs",
+          "callee": "getLabel",
+          "lineNumber": 28
+        },
+        {
+          "caller": "SmartTabs",
+          "callee": "navigate",
+          "lineNumber": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/SystemHealth.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 113,
+      "nonEmptyLines": 104,
+      "functions": [
+        {
+          "name": "SystemHealth",
+          "startLine": 29,
+          "endLine": 111,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SystemHealth",
+          "callee": "useState",
+          "lineNumber": 30
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "socketService.isConnected",
+          "lineNumber": 31
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "useState",
+          "lineNumber": 33
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "useCallback",
+          "lineNumber": 35
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "setChecking",
+          "lineNumber": 36
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "performance.now",
+          "lineNumber": 37
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "apiRequest",
+          "lineNumber": 39
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "AbortSignal.timeout",
+          "lineNumber": 39
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "Math.round",
+          "lineNumber": 40
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "performance.now",
+          "lineNumber": 40
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "setHealth",
+          "lineNumber": 41
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "socketService.isConnected",
+          "lineNumber": 46
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "setHealth",
+          "lineNumber": 49
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "socketService.isConnected",
+          "lineNumber": 54
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "setChecking",
+          "lineNumber": 57
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "useEffect",
+          "lineNumber": 60
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "checkHealth",
+          "lineNumber": 61
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "setInterval",
+          "lineNumber": 62
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "clearInterval",
+          "lineNumber": 63
+        },
+        {
+          "caller": "SystemHealth",
+          "callee": "metrics.map",
+          "lineNumber": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/ToastProvider.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 119,
+      "nonEmptyLines": 102,
+      "functions": [
+        {
+          "name": "useToast",
+          "startLine": 24,
+          "endLine": 30,
+          "params": []
+        },
+        {
+          "name": "ToastItem",
+          "startLine": 46,
+          "endLine": 73,
+          "params": [
+            "{ toast, onDismiss }"
+          ]
+        },
+        {
+          "name": "ToastProvider",
+          "startLine": 75,
+          "endLine": 117,
+          "params": [
+            "{ children }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useToast",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "ToastProvider",
+          "line": 75,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useToast",
+          "callee": "useContext",
+          "lineNumber": 25
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "useState",
+          "lineNumber": 47
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "useRef",
+          "lineNumber": 48
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "useEffect",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "setTimeout",
+          "lineNumber": 53
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "setExiting",
+          "lineNumber": 54
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "setTimeout",
+          "lineNumber": 55
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "onDismiss",
+          "lineNumber": 55
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "clearTimeout",
+          "lineNumber": 57
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "setExiting",
+          "lineNumber": 66
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "setTimeout",
+          "lineNumber": 66
+        },
+        {
+          "caller": "ToastItem",
+          "callee": "onDismiss",
+          "lineNumber": 66
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useState",
+          "lineNumber": 76
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "setToasts",
+          "lineNumber": 79
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "prev.filter",
+          "lineNumber": 79
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 82
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "Date.now",
+          "lineNumber": 83
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "Math.random().toString(36).slice",
+          "lineNumber": 83
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "Math.random().toString",
+          "lineNumber": 83
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "Math.random",
+          "lineNumber": 83
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "setToasts",
+          "lineNumber": 84
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "prev.slice",
+          "lineNumber": 84
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 87
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "addToast",
+          "lineNumber": 88
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 94
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "addToast",
+          "lineNumber": 94
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 95
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "addToast",
+          "lineNumber": 95
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 96
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "addToast",
+          "lineNumber": 96
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "useCallback",
+          "lineNumber": 97
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "addToast",
+          "lineNumber": 97
+        },
+        {
+          "caller": "ToastProvider",
+          "callee": "toasts.map",
+          "lineNumber": 109
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/UserAvatar.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 87,
+      "nonEmptyLines": 78,
+      "functions": [
+        {
+          "name": "gradientFor",
+          "startLine": 37,
+          "endLine": 42,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "UserAvatar",
+          "startLine": 49,
+          "endLine": 85,
+          "params": [
+            "{ name, src, size = 'md', status, ring = true, className = '' }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "gradientFor",
+          "callee": "String",
+          "lineNumber": 38
+        },
+        {
+          "caller": "gradientFor",
+          "callee": "seed.charCodeAt",
+          "lineNumber": 40
+        },
+        {
+          "caller": "gradientFor",
+          "callee": "Math.abs",
+          "lineNumber": 41
+        },
+        {
+          "caller": "UserAvatar",
+          "callee": "React.useState",
+          "lineNumber": 51
+        },
+        {
+          "caller": "UserAvatar",
+          "callee": "React.useEffect",
+          "lineNumber": 54
+        },
+        {
+          "caller": "UserAvatar",
+          "callee": "setBroken",
+          "lineNumber": 55
+        },
+        {
+          "caller": "UserAvatar",
+          "callee": "gradientFor",
+          "lineNumber": 61
+        },
+        {
+          "caller": "UserAvatar",
+          "callee": "setBroken",
+          "lineNumber": 71
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/VirtualList.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 87,
+      "nonEmptyLines": 77,
+      "functions": [
+        {
+          "name": "VirtualList",
+          "startLine": 15,
+          "endLine": 85,
+          "params": [
+            "{\r\n    itemCount,\r\n    itemHeight,\r\n    overscan = 4,\r\n    renderItem,\r\n    className,\r\n    style,\r\n    getKey\r\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "VirtualList",
+          "callee": "useRef",
+          "lineNumber": 24
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "useState",
+          "lineNumber": 25
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "useState",
+          "lineNumber": 26
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "useLayoutEffect",
+          "lineNumber": 28
+        },
+        {
+          "caller": "update",
+          "callee": "setViewportHeight",
+          "lineNumber": 31
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "update",
+          "lineNumber": 32
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "ro.observe",
+          "lineNumber": 34
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "ro.disconnect",
+          "lineNumber": 35
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "useEffect",
+          "lineNumber": 38
+        },
+        {
+          "caller": "handleScroll",
+          "callee": "setScrollTop",
+          "lineNumber": 41
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "node.addEventListener",
+          "lineNumber": 42
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "node.removeEventListener",
+          "lineNumber": 43
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "useMemo",
+          "lineNumber": 46
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "Math.max",
+          "lineNumber": 50
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "Math.floor",
+          "lineNumber": 50
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "Math.min",
+          "lineNumber": 51
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "Math.ceil",
+          "lineNumber": 53
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "items.push",
+          "lineNumber": 62
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "getKey",
+          "lineNumber": 64
+        },
+        {
+          "caller": "VirtualList",
+          "callee": "renderItem",
+          "lineNumber": 67
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/common/navigation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 259,
+      "nonEmptyLines": 252,
+      "functions": [
+        {
+          "name": "flattenNav",
+          "startLine": 259,
+          "endLine": 259,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "NAV_SECTIONS",
+          "line": 76,
+          "isDefault": false
+        },
+        {
+          "name": "PRIMARY_MOBILE_NAV",
+          "line": 222,
+          "isDefault": false
+        },
+        {
+          "name": "CONTEXTUAL_NAV_MAP",
+          "line": 230,
+          "isDefault": false
+        },
+        {
+          "name": "flattenNav",
+          "line": 259,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "flattenNav",
+          "callee": "NAV_SECTIONS.flatMap",
+          "lineNumber": 259
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 4,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/EmployeeLeaderboard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 152,
+      "nonEmptyLines": 138,
+      "functions": [
+        {
+          "name": "EmployeeLeaderboard",
+          "startLine": 16,
+          "endLine": 150,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "useState",
+          "lineNumber": 17
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "useState",
+          "lineNumber": 18
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "useState",
+          "lineNumber": 19
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "useAuthStore",
+          "lineNumber": 20
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "useEffect",
+          "lineNumber": 25
+        },
+        {
+          "caller": "fetchLeaderboard",
+          "callee": "setLoadError",
+          "lineNumber": 28
+        },
+        {
+          "caller": "fetchLeaderboard",
+          "callee": "setData",
+          "lineNumber": 29
+        },
+        {
+          "caller": "fetchLeaderboard",
+          "callee": "analyticsApi.getLeaderboard",
+          "lineNumber": 29
+        },
+        {
+          "caller": "fetchLeaderboard",
+          "callee": "setLoadError",
+          "lineNumber": 31
+        },
+        {
+          "caller": "fetchLeaderboard",
+          "callee": "setLoading",
+          "lineNumber": 33
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "fetchLeaderboard",
+          "lineNumber": 37
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "setInterval",
+          "lineNumber": 38
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "clearInterval",
+          "lineNumber": 39
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "[1, 2, 3].map",
+          "lineNumber": 47
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "data.map",
+          "lineNumber": 78
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "Math.round",
+          "lineNumber": 117
+        },
+        {
+          "caller": "EmployeeLeaderboard",
+          "callee": "entry.totalSales.toLocaleString",
+          "lineNumber": 130
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/KitchenDispatchWidgets.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 233,
+      "nonEmptyLines": 220,
+      "functions": [
+        {
+          "name": "KitchenPerformanceWidget",
+          "startLine": 8,
+          "endLine": 78,
+          "params": []
+        },
+        {
+          "name": "DeliveryStatusWidget",
+          "startLine": 80,
+          "endLine": 233,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "KitchenPerformanceWidget",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "DeliveryStatusWidget",
+          "line": 80,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "KitchenPerformanceWidget",
+          "callee": "useAuthStore",
+          "lineNumber": 9
+        },
+        {
+          "caller": "KitchenPerformanceWidget",
+          "callee": "stations.map",
+          "lineNumber": 54
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useAuthStore",
+          "lineNumber": 81
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useOrderStore",
+          "lineNumber": 82
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useState",
+          "lineNumber": 83
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useState",
+          "lineNumber": 84
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useState",
+          "lineNumber": 85
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useEffect",
+          "lineNumber": 90
+        },
+        {
+          "caller": "load",
+          "callee": "setIsLoading",
+          "lineNumber": 93
+        },
+        {
+          "caller": "load",
+          "callee": "setLoadError",
+          "lineNumber": 95
+        },
+        {
+          "caller": "load",
+          "callee": "Promise.all",
+          "lineNumber": 96
+        },
+        {
+          "caller": "load",
+          "callee": "deliveryApi.getDrivers",
+          "lineNumber": 97
+        },
+        {
+          "caller": "load",
+          "callee": "fetchOrders",
+          "lineNumber": 98
+        },
+        {
+          "caller": "load",
+          "callee": "setDrivers",
+          "lineNumber": 101
+        },
+        {
+          "caller": "load",
+          "callee": "(driverRows || []).map",
+          "lineNumber": 101
+        },
+        {
+          "caller": "load",
+          "callee": "String",
+          "lineNumber": 102
+        },
+        {
+          "caller": "load",
+          "callee": "String",
+          "lineNumber": 103
+        },
+        {
+          "caller": "load",
+          "callee": "String",
+          "lineNumber": 104
+        },
+        {
+          "caller": "load",
+          "callee": "String(driver.status || 'OFFLINE').toUpperCase",
+          "lineNumber": 105
+        },
+        {
+          "caller": "load",
+          "callee": "String",
+          "lineNumber": 105
+        },
+        {
+          "caller": "load",
+          "callee": "String(driver.status || 'OFFLINE').toUpperCase",
+          "lineNumber": 107
+        },
+        {
+          "caller": "load",
+          "callee": "String",
+          "lineNumber": 107
+        },
+        {
+          "caller": "load",
+          "callee": "setDrivers",
+          "lineNumber": 114
+        },
+        {
+          "caller": "load",
+          "callee": "setLoadError",
+          "lineNumber": 115
+        },
+        {
+          "caller": "load",
+          "callee": "setIsLoading",
+          "lineNumber": 118
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "load",
+          "lineNumber": 121
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "window.setInterval",
+          "lineNumber": 122
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "window.clearInterval",
+          "lineNumber": 125
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useMemo",
+          "lineNumber": 129
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "orders\n        .filter(order => order.type === OrderType.DELIVERY)\r\n        .filter(order => !branchId || order.branchId === branchId)\r\n        .filter",
+          "lineNumber": 129
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "orders\n        .filter(order => order.type === OrderType.DELIVERY)\r\n        .filter",
+          "lineNumber": 129
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "orders\n        .filter",
+          "lineNumber": 129
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "[OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.COMPLETED].includes",
+          "lineNumber": 132
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "useMemo",
+          "lineNumber": 136
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "byDriver.get",
+          "lineNumber": 140
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "list.push",
+          "lineNumber": 141
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "byDriver.set",
+          "lineNumber": 142
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "drivers.filter(driver => driver.isActive !== false).map",
+          "lineNumber": 145
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "drivers.filter",
+          "lineNumber": 145
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "byDriver.get",
+          "lineNumber": 146
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "Math.max",
+          "lineNumber": 149
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "Math.floor",
+          "lineNumber": 149
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "Date.now",
+          "lineNumber": 149
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "new Date(currentOrder.createdAt).getTime",
+          "lineNumber": 149
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "String",
+          "lineNumber": 158
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "rows.filter",
+          "lineNumber": 164
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "rows.slice(0, 6).map",
+          "lineNumber": 199
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "rows.slice",
+          "lineNumber": 199
+        },
+        {
+          "caller": "DeliveryStatusWidget",
+          "callee": "fleet.driver.charAt",
+          "lineNumber": 203
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/LiveKanbanBoard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 106,
+      "nonEmptyLines": 99,
+      "functions": [
+        {
+          "name": "orderAgeMinutes",
+          "startLine": 14,
+          "endLine": 18,
+          "params": [
+            "createdAt"
+          ]
+        },
+        {
+          "name": "LiveKanbanBoard",
+          "startLine": 20,
+          "endLine": 104,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "orderAgeMinutes",
+          "callee": "new Date(createdAt).getTime",
+          "lineNumber": 15
+        },
+        {
+          "caller": "orderAgeMinutes",
+          "callee": "Number.isFinite",
+          "lineNumber": 16
+        },
+        {
+          "caller": "orderAgeMinutes",
+          "callee": "Math.max",
+          "lineNumber": 17
+        },
+        {
+          "caller": "orderAgeMinutes",
+          "callee": "Math.floor",
+          "lineNumber": 17
+        },
+        {
+          "caller": "orderAgeMinutes",
+          "callee": "Date.now",
+          "lineNumber": 17
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "useAuthStore",
+          "lineNumber": 21
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "useOrderStore",
+          "lineNumber": 25
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "COLUMNS.map",
+          "lineNumber": 54
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "orders.filter",
+          "lineNumber": 55
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "colOrders.map",
+          "lineNumber": 78
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "order.id.slice",
+          "lineNumber": 81
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "orderAgeMinutes",
+          "lineNumber": 83
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "orderAgeMinutes",
+          "lineNumber": 84
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "order.items.reduce",
+          "lineNumber": 89
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "Number(order.total || 0).toFixed",
+          "lineNumber": 91
+        },
+        {
+          "caller": "LiveKanbanBoard",
+          "callee": "Number",
+          "lineNumber": 91
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/dashboard/RevenueForecastWidget.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 154,
+      "nonEmptyLines": 144,
+      "functions": [
+        {
+          "name": "RevenueForecastWidget",
+          "startLine": 8,
+          "endLine": 152,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "useAuthStore",
+          "lineNumber": 9
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "useQuery",
+          "lineNumber": 13
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "aiApi.getForecast",
+          "lineNumber": 15
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "data.historical.map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "data.forecast.map",
+          "lineNumber": 43
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "date.toLocaleDateString",
+          "lineNumber": 100
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "(v/1000).toFixed",
+          "lineNumber": 107
+        },
+        {
+          "caller": "RevenueForecastWidget",
+          "callee": "value.toLocaleString",
+          "lineNumber": 113
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/finance/ManualJournalModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 203,
+      "nonEmptyLines": 180,
+      "functions": [
+        {
+          "name": "ManualJournalModal",
+          "startLine": 20,
+          "endLine": 203,
+          "params": [
+            "{ onClose, accounts, onSubmit, isLoading }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ManualJournalModal",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ManualJournalModal",
+          "callee": "useState",
+          "lineNumber": 21
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "useState",
+          "lineNumber": 23
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "lines.reduce",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "lines.reduce",
+          "lineNumber": 29
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "description.trim",
+          "lineNumber": 32
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "lines.every",
+          "lineNumber": 32
+        },
+        {
+          "caller": "addLine",
+          "callee": "setLines",
+          "lineNumber": 35
+        },
+        {
+          "caller": "addLine",
+          "callee": "Date.now().toString",
+          "lineNumber": 35
+        },
+        {
+          "caller": "addLine",
+          "callee": "Date.now",
+          "lineNumber": 35
+        },
+        {
+          "caller": "removeLine",
+          "callee": "setLines",
+          "lineNumber": 40
+        },
+        {
+          "caller": "removeLine",
+          "callee": "lines.filter",
+          "lineNumber": 40
+        },
+        {
+          "caller": "updateLine",
+          "callee": "setLines",
+          "lineNumber": 44
+        },
+        {
+          "caller": "updateLine",
+          "callee": "lines.map",
+          "lineNumber": 44
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "lines.map",
+          "lineNumber": 57
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSubmit",
+          "lineNumber": 64
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "Date.now",
+          "lineNumber": 66
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onClose",
+          "lineNumber": 69
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "e.stopPropagation",
+          "lineNumber": 74
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "setDescription",
+          "lineNumber": 98
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "setReference",
+          "lineNumber": 102
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "lines.map",
+          "lineNumber": 124
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "updateLine",
+          "lineNumber": 131
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "accounts.map",
+          "lineNumber": 134
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "updateLine",
+          "lineNumber": 144
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "Number",
+          "lineNumber": 144
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "updateLine",
+          "lineNumber": 153
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "Number",
+          "lineNumber": 153
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "removeLine",
+          "lineNumber": 158
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "totalDebit.toFixed",
+          "lineNumber": 170
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "totalCredit.toFixed",
+          "lineNumber": 171
+        },
+        {
+          "caller": "ManualJournalModal",
+          "callee": "(totalDebit - totalCredit).toFixed",
+          "lineNumber": 187
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/finance/ShiftManagementDrawer.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 401,
+      "nonEmptyLines": 376,
+      "functions": [
+        {
+          "name": "ShiftManagementDrawer",
+          "startLine": 13,
+          "endLine": 399,
+          "params": []
+        },
+        {
+          "name": "LogOutIcon",
+          "startLine": 401,
+          "endLine": 401,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ShiftManagementDrawer",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useFinanceStore",
+          "lineNumber": 14
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useFinanceStore",
+          "lineNumber": 15
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useFinanceStore",
+          "lineNumber": 16
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useFinanceStore",
+          "lineNumber": 17
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useFinanceStore",
+          "lineNumber": 18
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useAuthStore",
+          "lineNumber": 19
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useToast",
+          "lineNumber": 20
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 23
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 29
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 30
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 32
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 33
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 34
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useState",
+          "lineNumber": 35
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useEffect",
+          "lineNumber": 37
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "loadXReport",
+          "lineNumber": 39
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "useEffect",
+          "lineNumber": 46
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setIsRecheckingShift",
+          "lineNumber": 51
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "refreshActiveShift(branchId)\r\n            .catch(() => { })\r\n            .finally",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "refreshActiveShift(branchId)\r\n            .catch",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "refreshActiveShift",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setIsRecheckingShift",
+          "lineNumber": 54
+        },
+        {
+          "caller": "loadXReport",
+          "callee": "setLoadingReport",
+          "lineNumber": 60
+        },
+        {
+          "caller": "loadXReport",
+          "callee": "shiftsApi.getXReport",
+          "lineNumber": 62
+        },
+        {
+          "caller": "loadXReport",
+          "callee": "setReport",
+          "lineNumber": 63
+        },
+        {
+          "caller": "loadXReport",
+          "callee": "showToast",
+          "lineNumber": 65
+        },
+        {
+          "caller": "loadXReport",
+          "callee": "setLoadingReport",
+          "lineNumber": 67
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "showToast",
+          "lineNumber": 74
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "Number",
+          "lineNumber": 77
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "Number.isFinite",
+          "lineNumber": 78
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "showToast",
+          "lineNumber": 79
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "getActionableErrorMessage",
+          "lineNumber": 79
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "Number",
+          "lineNumber": 82
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "Math.abs",
+          "lineNumber": 83
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "closingNotes.trim",
+          "lineNumber": 83
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "showToast",
+          "lineNumber": 84
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "getActionableErrorMessage",
+          "lineNumber": 84
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "setIsClosing",
+          "lineNumber": 88
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "shiftsApi.close",
+          "lineNumber": 90
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "setClosedData",
+          "lineNumber": 95
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "navigator.vibrate",
+          "lineNumber": 96
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "showToast",
+          "lineNumber": 98
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "getActionableErrorMessage",
+          "lineNumber": 98
+        },
+        {
+          "caller": "handleCloseShift",
+          "callee": "setIsClosing",
+          "lineNumber": 100
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 106
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 107
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number.isFinite",
+          "lineNumber": 109
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Math.abs",
+          "lineNumber": 110
+        },
+        {
+          "caller": "paymentLabel",
+          "callee": "settings.customPaymentMethods?.find",
+          "lineNumber": 112
+        },
+        {
+          "caller": "paymentLabel",
+          "callee": "method.replace",
+          "lineNumber": 113
+        },
+        {
+          "caller": "closeDrawer",
+          "callee": "setShift",
+          "lineNumber": 117
+        },
+        {
+          "caller": "closeDrawer",
+          "callee": "setClosedData",
+          "lineNumber": 118
+        },
+        {
+          "caller": "closeDrawer",
+          "callee": "setIsShiftDrawerOpen",
+          "lineNumber": 120
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setIsShiftDrawerOpen",
+          "lineNumber": 134
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "activeShift.id.slice",
+          "lineNumber": 156
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(closedData.actualBalance || 0).toFixed",
+          "lineNumber": 203
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(closedData.payments || []).map",
+          "lineNumber": 207
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "paymentLabel",
+          "lineNumber": 209
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number(payment.total || 0).toFixed",
+          "lineNumber": 210
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 210
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 213
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number(closedData.excluded.total || 0).toFixed",
+          "lineNumber": 216
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 216
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setActiveTab",
+          "lineNumber": 229
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setActiveTab",
+          "lineNumber": 235
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "new Date(activeShift.openingTime).toLocaleTimeString",
+          "lineNumber": 248
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "activeShift.openingBalance?.toFixed",
+          "lineNumber": 252
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(report.grossSales || 0).toFixed",
+          "lineNumber": 274
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(report.discountsAndRefunds || 0).toFixed",
+          "lineNumber": 278
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(report.netSales || 0).toFixed",
+          "lineNumber": 283
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(report.payments || []).map",
+          "lineNumber": 287
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "paymentLabel",
+          "lineNumber": 293
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number(payment.total || 0).toFixed",
+          "lineNumber": 294
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 294
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 299
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number(report.excluded.total || 0).toFixed",
+          "lineNumber": 310
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Number",
+          "lineNumber": 310
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "(report.expectedCashBalance || 0).toFixed",
+          "lineNumber": 325
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setActualBalance",
+          "lineNumber": 337
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Math.abs(variance).toFixed",
+          "lineNumber": 346
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "Math.abs",
+          "lineNumber": 346
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "setClosingNotes",
+          "lineNumber": 360
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "closingNotes.trim",
+          "lineNumber": 363
+        },
+        {
+          "caller": "ShiftManagementDrawer",
+          "callee": "closingNotes.trim",
+          "lineNumber": 385
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/floor/TableVisual.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 235,
+      "nonEmptyLines": 216,
+      "functions": [
+        {
+          "name": "chairColor",
+          "startLine": 20,
+          "endLine": 24,
+          "params": [
+            "selected",
+            "isVIP"
+          ]
+        },
+        {
+          "name": "distributeRound",
+          "startLine": 26,
+          "endLine": 36,
+          "params": [
+            "count",
+            "radiusX",
+            "radiusY"
+          ]
+        },
+        {
+          "name": "distributeSides",
+          "startLine": 38,
+          "endLine": 52,
+          "params": [
+            "count"
+          ]
+        },
+        {
+          "name": "TableVisual",
+          "startLine": 54,
+          "endLine": 233,
+          "params": [
+            "{\r\n  shape,\r\n  seats,\r\n  name,\r\n  selected,\r\n  isVIP,\r\n  showChairs = true,\r\n  compact = false,\r\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "distributeRound",
+          "callee": "Math.max",
+          "lineNumber": 27
+        },
+        {
+          "caller": "distributeRound",
+          "callee": "Math.min",
+          "lineNumber": 27
+        },
+        {
+          "caller": "distributeRound",
+          "callee": "Array.from",
+          "lineNumber": 28
+        },
+        {
+          "caller": "distributeRound",
+          "callee": "Math.cos",
+          "lineNumber": 31
+        },
+        {
+          "caller": "distributeRound",
+          "callee": "Math.sin",
+          "lineNumber": 32
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "Math.max",
+          "lineNumber": 40
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "Math.min",
+          "lineNumber": 40
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "perSide[order[i % 4]].push",
+          "lineNumber": 43
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "(Object.keys(perSide) as Array<keyof typeof perSide>).forEach",
+          "lineNumber": 45
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "Object.keys",
+          "lineNumber": 45
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "list.forEach",
+          "lineNumber": 47
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "positions.push",
+          "lineNumber": 48
+        },
+        {
+          "caller": "distributeSides",
+          "callee": "positions.sort",
+          "lineNumber": 51
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "Math.max",
+          "lineNumber": 64
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "Math.min",
+          "lineNumber": 64
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "useMemo",
+          "lineNumber": 66
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "distributeRound",
+          "lineNumber": 67
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "Math.max",
+          "lineNumber": 70
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "Math.min",
+          "lineNumber": 70
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "Array.from",
+          "lineNumber": 71
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "distributeSides",
+          "lineNumber": 78
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "useMemo",
+          "lineNumber": 81
+        },
+        {
+          "caller": "renderChairsSides",
+          "callee": "(chairs as { side: string; frac: number }[]).map",
+          "lineNumber": 93
+        },
+        {
+          "caller": "renderChairsSides",
+          "callee": "chairColor",
+          "lineNumber": 103
+        },
+        {
+          "caller": "renderChairsRound",
+          "callee": "(chairs as { left: string; top: string; rotate: string }[]).map",
+          "lineNumber": 107
+        },
+        {
+          "caller": "renderChairsRound",
+          "callee": "chairColor",
+          "lineNumber": 110
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "renderChairsRound",
+          "lineNumber": 185
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "renderChairsRound",
+          "lineNumber": 202
+        },
+        {
+          "caller": "TableVisual",
+          "callee": "renderChairsSides",
+          "lineNumber": 202
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/kiosk/KioskCategoryRail.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 30,
+      "functions": [
+        {
+          "name": "KioskCategoryRail",
+          "startLine": 17,
+          "endLine": 32,
+          "params": [
+            "{ categories, activeCategoryId, onSelectCategory, lang }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "KioskCategoryRail",
+          "callee": "categories.map",
+          "lineNumber": 19
+        },
+        {
+          "caller": "KioskCategoryRail",
+          "callee": "onSelectCategory",
+          "lineNumber": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/kiosk/KioskItemCard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 29,
+      "functions": [
+        {
+          "name": "KioskItemCard",
+          "startLine": 13,
+          "endLine": 30,
+          "params": [
+            "{ item, onAdd, lang, currency }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "KioskItemCard",
+          "callee": "onAdd",
+          "lineNumber": 16
+        },
+        {
+          "caller": "KioskItemCard",
+          "callee": "Number(item.price || 0).toLocaleString",
+          "lineNumber": 24
+        },
+        {
+          "caller": "KioskItemCard",
+          "callee": "Number",
+          "lineNumber": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/kiosk/KioskModifierModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 137,
+      "nonEmptyLines": 126,
+      "functions": [
+        {
+          "name": "KioskModifierModal",
+          "startLine": 14,
+          "endLine": 135,
+          "params": [
+            "{ item, onClose, onConfirm, lang, currency }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "KioskModifierModal",
+          "callee": "useState",
+          "lineNumber": 15
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "useState",
+          "lineNumber": 16
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "useState",
+          "lineNumber": 17
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "setSelections",
+          "lineNumber": 22
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "current.includes",
+          "lineNumber": 24
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "setError",
+          "lineNumber": 25
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "current.filter",
+          "lineNumber": 26
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "setError",
+          "lineNumber": 29
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "setError",
+          "lineNumber": 33
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "tr",
+          "lineNumber": 33
+        },
+        {
+          "caller": "toggleOption",
+          "callee": "setError",
+          "lineNumber": 36
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "useMemo",
+          "lineNumber": 41
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Object.entries(selections).flatMap",
+          "lineNumber": 42
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Object.entries",
+          "lineNumber": 42
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "item.modifierGroups?.find",
+          "lineNumber": 43
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "optionIds.flatMap",
+          "lineNumber": 44
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "group?.options.find",
+          "lineNumber": 45
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "useMemo",
+          "lineNumber": 51
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 52
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "selectedModifiers.reduce",
+          "lineNumber": 52
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 52
+        },
+        {
+          "caller": "confirm",
+          "callee": "(item.modifierGroups || []).find",
+          "lineNumber": 56
+        },
+        {
+          "caller": "confirm",
+          "callee": "Number",
+          "lineNumber": 57
+        },
+        {
+          "caller": "confirm",
+          "callee": "setError",
+          "lineNumber": 61
+        },
+        {
+          "caller": "confirm",
+          "callee": "tr",
+          "lineNumber": 61
+        },
+        {
+          "caller": "confirm",
+          "callee": "onConfirm",
+          "lineNumber": 64
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 74
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number(item.price || 0).toLocaleString",
+          "lineNumber": 76
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 76
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 79
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 83
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 85
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Math.max",
+          "lineNumber": 86
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 86
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 91
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 91
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "group.options.filter(option => option.isAvailable !== false).map",
+          "lineNumber": 94
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "group.options.filter",
+          "lineNumber": 94
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "selections[group.id]?.includes",
+          "lineNumber": 95
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "toggleOption",
+          "lineNumber": 101
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 105
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number(option.price).toLocaleString",
+          "lineNumber": 105
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Number",
+          "lineNumber": 105
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 105
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 116
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 116
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "setQuantity",
+          "lineNumber": 118
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Math.max",
+          "lineNumber": 118
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 118
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "setQuantity",
+          "lineNumber": 120
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "Math.min",
+          "lineNumber": 120
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 120
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 126
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "total.toLocaleString",
+          "lineNumber": 126
+        },
+        {
+          "caller": "KioskModifierModal",
+          "callee": "tr",
+          "lineNumber": 129
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/kiosk/SelfOrderingKiosk.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 434,
+      "nonEmptyLines": 405,
+      "functions": [
+        {
+          "name": "SelfOrderingKiosk",
+          "startLine": 29,
+          "endLine": 432,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 30
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 31
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 32
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 33
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 34
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 35
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 36
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 37
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 39
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useState",
+          "lineNumber": 40
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "React.useRef",
+          "lineNumber": 41
+        },
+        {
+          "caller": "setIdleCountdownSafe",
+          "callee": "setIdleCountdown",
+          "lineNumber": 44
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useMenuStore",
+          "lineNumber": 47
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useOrderStore",
+          "lineNumber": 56
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useAuthStore",
+          "lineNumber": 57
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "branches.find",
+          "lineNumber": 67
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useEffect",
+          "lineNumber": 70
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "fetchMenu",
+          "lineNumber": 71
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setOrderMode",
+          "lineNumber": 72
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useEffect",
+          "lineNumber": 75
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 77
+        },
+        {
+          "caller": "doReset",
+          "callee": "clearCart",
+          "lineNumber": 86
+        },
+        {
+          "caller": "doReset",
+          "callee": "setSelectedItem",
+          "lineNumber": 87
+        },
+        {
+          "caller": "doReset",
+          "callee": "setSearchQuery",
+          "lineNumber": 88
+        },
+        {
+          "caller": "doReset",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 89
+        },
+        {
+          "caller": "doReset",
+          "callee": "setStep",
+          "lineNumber": 90
+        },
+        {
+          "caller": "arm",
+          "callee": "window.clearTimeout",
+          "lineNumber": 93
+        },
+        {
+          "caller": "arm",
+          "callee": "window.clearTimeout",
+          "lineNumber": 94
+        },
+        {
+          "caller": "arm",
+          "callee": "window.clearInterval",
+          "lineNumber": 95
+        },
+        {
+          "caller": "arm",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 96
+        },
+        {
+          "caller": "arm",
+          "callee": "window.setTimeout",
+          "lineNumber": 97
+        },
+        {
+          "caller": "arm",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 98
+        },
+        {
+          "caller": "arm",
+          "callee": "Math.ceil",
+          "lineNumber": 98
+        },
+        {
+          "caller": "arm",
+          "callee": "window.setInterval",
+          "lineNumber": 99
+        },
+        {
+          "caller": "arm",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 100
+        },
+        {
+          "caller": "arm",
+          "callee": "window.setTimeout",
+          "lineNumber": 103
+        },
+        {
+          "caller": "reset",
+          "callee": "arm",
+          "lineNumber": 107
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "arm",
+          "lineNumber": 109
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.addEventListener",
+          "lineNumber": 110
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.addEventListener",
+          "lineNumber": 111
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.clearTimeout",
+          "lineNumber": 113
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.clearTimeout",
+          "lineNumber": 114
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.clearInterval",
+          "lineNumber": 115
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.removeEventListener",
+          "lineNumber": 116
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.removeEventListener",
+          "lineNumber": 117
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useEffect",
+          "lineNumber": 122
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.setTimeout",
+          "lineNumber": 124
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "clearCart",
+          "lineNumber": 125
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setStep",
+          "lineNumber": 126
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "window.clearTimeout",
+          "lineNumber": 128
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useMemo",
+          "lineNumber": 131
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "(categories || [])\r\n      .filter(category => category.isActive !== false)\r\n      .map(category => ({\r\n        ...category,\r\n        items: (category.items || []).filter(item => item.isAvailable !== false && !item.archivedAt),\r\n      }))\r\n      .filter",
+          "lineNumber": 132
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "(categories || [])\r\n      .filter(category => category.isActive !== false)\r\n      .map",
+          "lineNumber": 132
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "(categories || [])\r\n      .filter",
+          "lineNumber": 132
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "(category.items || []).filter",
+          "lineNumber": 136
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useEffect",
+          "lineNumber": 141
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "currentCategories.some",
+          "lineNumber": 142
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setActiveCategory",
+          "lineNumber": 143
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "currentCategories.find",
+          "lineNumber": 147
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "searchQuery.trim().toLocaleLowerCase",
+          "lineNumber": 148
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "searchQuery.trim",
+          "lineNumber": 148
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useMemo",
+          "lineNumber": 149
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "currentCategories.flatMap(category => category.items).filter",
+          "lineNumber": 151
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "currentCategories.flatMap",
+          "lineNumber": 151
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "[item.name, item.nameAr, item.description, item.descriptionAr]\r\n        .filter(Boolean)\r\n        .some",
+          "lineNumber": 152
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "[item.name, item.nameAr, item.description, item.descriptionAr]\r\n        .filter",
+          "lineNumber": 152
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "String(value).toLocaleLowerCase().includes",
+          "lineNumber": 154
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "String(value).toLocaleLowerCase",
+          "lineNumber": 154
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "String",
+          "lineNumber": 154
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useMemo",
+          "lineNumber": 158
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "calculateOrderTotals",
+          "lineNumber": 158
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "Number",
+          "lineNumber": 163
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "activeCart.reduce",
+          "lineNumber": 165
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "Number",
+          "lineNumber": 165
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "useMemo",
+          "lineNumber": 167
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 168
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 169
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "(settings.customPaymentMethods || [])\r\n      .filter(method => method.isActive !== false)\r\n      .map",
+          "lineNumber": 170
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "(settings.customPaymentMethods || [])\r\n      .filter",
+          "lineNumber": 170
+        },
+        {
+          "caller": "startOrder",
+          "callee": "clearCart",
+          "lineNumber": 180
+        },
+        {
+          "caller": "startOrder",
+          "callee": "setOrderMode",
+          "lineNumber": 181
+        },
+        {
+          "caller": "startOrder",
+          "callee": "setSearchQuery",
+          "lineNumber": 182
+        },
+        {
+          "caller": "startOrder",
+          "callee": "setOrderError",
+          "lineNumber": 183
+        },
+        {
+          "caller": "startOrder",
+          "callee": "setKitchenWarning",
+          "lineNumber": 184
+        },
+        {
+          "caller": "startOrder",
+          "callee": "setStep",
+          "lineNumber": 185
+        },
+        {
+          "caller": "addConfiguredItem",
+          "callee": "addToCart",
+          "lineNumber": 189
+        },
+        {
+          "caller": "addConfiguredItem",
+          "callee": "globalThis.crypto?.randomUUID",
+          "lineNumber": 191
+        },
+        {
+          "caller": "addConfiguredItem",
+          "callee": "Date.now",
+          "lineNumber": 191
+        },
+        {
+          "caller": "addConfiguredItem",
+          "callee": "setSelectedItem",
+          "lineNumber": 196
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setOrderError",
+          "lineNumber": 204
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "tr",
+          "lineNumber": 204
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setOrderError",
+          "lineNumber": 207
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setIsPlacingOrder",
+          "lineNumber": 208
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "placeOrder",
+          "lineNumber": 213
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "globalThis.crypto?.randomUUID",
+          "lineNumber": 214
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "Date.now",
+          "lineNumber": 214
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setKitchenWarning",
+          "lineNumber": 227
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "Boolean",
+          "lineNumber": 227
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "result.warnings?.some",
+          "lineNumber": 227
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setLastOrderNumber",
+          "lineNumber": 228
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setStep",
+          "lineNumber": 229
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setOrderError",
+          "lineNumber": 231
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "getActionableErrorMessage",
+          "lineNumber": 231
+        },
+        {
+          "caller": "submitOrder",
+          "callee": "setIsPlacingOrder",
+          "lineNumber": 233
+        },
+        {
+          "caller": "CartItems",
+          "callee": "activeCart.map",
+          "lineNumber": 239
+        },
+        {
+          "caller": "CartItems",
+          "callee": "((Number(item.price) + (item.selectedModifiers || []).reduce((sum, modifier) => sum + Number(modifier.price || 0), 0)) * item.quantity).toLocaleString",
+          "lineNumber": 244
+        },
+        {
+          "caller": "CartItems",
+          "callee": "Number",
+          "lineNumber": 244
+        },
+        {
+          "caller": "CartItems",
+          "callee": "(item.selectedModifiers || []).reduce",
+          "lineNumber": 244
+        },
+        {
+          "caller": "CartItems",
+          "callee": "Number",
+          "lineNumber": 244
+        },
+        {
+          "caller": "CartItems",
+          "callee": "tr",
+          "lineNumber": 248
+        },
+        {
+          "caller": "CartItems",
+          "callee": "updateCartItemQuantity",
+          "lineNumber": 248
+        },
+        {
+          "caller": "CartItems",
+          "callee": "tr",
+          "lineNumber": 250
+        },
+        {
+          "caller": "CartItems",
+          "callee": "updateCartItemQuantity",
+          "lineNumber": 250
+        },
+        {
+          "caller": "CartItems",
+          "callee": "tr",
+          "lineNumber": 253
+        },
+        {
+          "caller": "CartItems",
+          "callee": "removeFromCart",
+          "lineNumber": 253
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 268
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 270
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 272
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 276
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "[tr('Choose', 'اختار'), tr('Customize', 'ظبط'), tr('Confirm', 'أكد')].map",
+          "lineNumber": 277
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 277
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 277
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 277
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 290
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "String(lastOrderNumber).padStart",
+          "lineNumber": 291
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "String",
+          "lineNumber": 291
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 291
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 293
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 294
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 295
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 306
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 306
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 307
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 307
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 309
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setStep",
+          "lineNumber": 309
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 317
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "paymentMethods.map",
+          "lineNumber": 319
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "submitOrder",
+          "lineNumber": 322
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 325
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 335
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "totals.subtotal.toLocaleString",
+          "lineNumber": 335
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 336
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "totals.tax.toLocaleString",
+          "lineNumber": 336
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 337
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "totals.total.toLocaleString",
+          "lineNumber": 337
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setStep",
+          "lineNumber": 340
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 341
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 358
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setSearchQuery",
+          "lineNumber": 363
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 363
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 364
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setSearchQuery",
+          "lineNumber": 364
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setActiveCategory",
+          "lineNumber": 368
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setSearchQuery",
+          "lineNumber": 368
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 373
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 375
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "visibleItems.map",
+          "lineNumber": 378
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 384
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 386
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 389
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "totals.total.toLocaleString",
+          "lineNumber": 389
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setStep",
+          "lineNumber": 390
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 390
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setStep",
+          "lineNumber": 395
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 397
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "totals.total.toLocaleString",
+          "lineNumber": 398
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setSelectedItem",
+          "lineNumber": 401
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 408
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 409
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "clearCart",
+          "lineNumber": 413
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setSelectedItem",
+          "lineNumber": 413
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setSearchQuery",
+          "lineNumber": 413
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 413
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setStep",
+          "lineNumber": 413
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 416
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setIdleCountdownSafe",
+          "lineNumber": 421
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "setIdleToken",
+          "lineNumber": 421
+        },
+        {
+          "caller": "SelfOrderingKiosk",
+          "callee": "tr",
+          "lineNumber": 424
+        }
+      ],
+      "metrics": {
+        "importCount": 10,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/AIInsightsEngine.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 313,
+      "nonEmptyLines": 288,
+      "functions": [
+        {
+          "name": "AIInsightsEngine",
+          "startLine": 24,
+          "endLine": 311,
+          "params": [
+            "{ items, lang, currency }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter",
+          "lineNumber": 25
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter",
+          "lineNumber": 26
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter",
+          "lineNumber": 27
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "itemsWithCost\r\n        .map(item => {\r\n            const margin = ((item.price - (item.cost || 0)) / item.price) * 100;\r\n            const sales30 = item.salesData?.last30 || 0;\r\n            const revenue30 = item.salesData?.revenue30 || 0;\r\n\r\n            // High demand + good margin = safe to increase\r\n            if (sales30 > 30 && margin > 40) {\r\n                const suggestedIncrease = Math.round(item.price * 0.03);\r\n                const projectedRevenue = (item.price + suggestedIncrease) * sales30;\r\n                return {\r\n                    item,\r\n                    type: 'increase' as const,\r\n                    suggestion: lang === 'ar'\r\n                        ? `\"${item.name}\" طلب مرتفع. يمكن زيادة السعر ${currency}${suggestedIncrease}. الإيراد المتوقع: +${currency}${(projectedRevenue - revenue30).toLocaleString()}`\r\n                        : `\"${item.name}\" has high demand (${sales30}/30D). Safe to increase price by ${currency}${suggestedIncrease}. Projected additional revenue: +${currency}${(projectedRevenue - revenue30).toLocaleString()}`,\r\n                    impact: projectedRevenue - revenue30,\r\n                    margin\r\n                };\r\n            }\r\n\r\n            // Low margin = critical review\r\n            if (margin < 30 && sales30 > 0) {\r\n                const minSafePrice = (item.cost || 0) / 0.6; // Target 40% margin\r\n                return {\r\n                    item,\r\n                    type: 'review' as const,\r\n                    suggestion: lang === 'ar'\r\n                        ? `\"${item.name}\" هامش ${margin.toFixed(0)}% فقط. السعر الآمن: ${currency}${minSafePrice.toFixed(2)}`\r\n                        : `\"${item.name}\" margin is only ${margin.toFixed(0)}%. Minimum safe price for 40% margin: ${currency}${minSafePrice.toFixed(2)}`,\r\n                    impact: 0,\r\n                    margin\r\n                };\r\n            }\r\n\r\n            return null;\r\n        })\r\n        .filter(Boolean)\r\n        .slice",
+          "lineNumber": 30
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "itemsWithCost\r\n        .map(item => {\r\n            const margin = ((item.price - (item.cost || 0)) / item.price) * 100;\r\n            const sales30 = item.salesData?.last30 || 0;\r\n            const revenue30 = item.salesData?.revenue30 || 0;\r\n\r\n            // High demand + good margin = safe to increase\r\n            if (sales30 > 30 && margin > 40) {\r\n                const suggestedIncrease = Math.round(item.price * 0.03);\r\n                const projectedRevenue = (item.price + suggestedIncrease) * sales30;\r\n                return {\r\n                    item,\r\n                    type: 'increase' as const,\r\n                    suggestion: lang === 'ar'\r\n                        ? `\"${item.name}\" طلب مرتفع. يمكن زيادة السعر ${currency}${suggestedIncrease}. الإيراد المتوقع: +${currency}${(projectedRevenue - revenue30).toLocaleString()}`\r\n                        : `\"${item.name}\" has high demand (${sales30}/30D). Safe to increase price by ${currency}${suggestedIncrease}. Projected additional revenue: +${currency}${(projectedRevenue - revenue30).toLocaleString()}`,\r\n                    impact: projectedRevenue - revenue30,\r\n                    margin\r\n                };\r\n            }\r\n\r\n            // Low margin = critical review\r\n            if (margin < 30 && sales30 > 0) {\r\n                const minSafePrice = (item.cost || 0) / 0.6; // Target 40% margin\r\n                return {\r\n                    item,\r\n                    type: 'review' as const,\r\n                    suggestion: lang === 'ar'\r\n                        ? `\"${item.name}\" هامش ${margin.toFixed(0)}% فقط. السعر الآمن: ${currency}${minSafePrice.toFixed(2)}`\r\n                        : `\"${item.name}\" margin is only ${margin.toFixed(0)}%. Minimum safe price for 40% margin: ${currency}${minSafePrice.toFixed(2)}`,\r\n                    impact: 0,\r\n                    margin\r\n                };\r\n            }\r\n\r\n            return null;\r\n        })\r\n        .filter",
+          "lineNumber": 30
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "itemsWithCost\r\n        .map",
+          "lineNumber": 30
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "Math.round",
+          "lineNumber": 38
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(projectedRevenue - revenue30).toLocaleString",
+          "lineNumber": 44
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(projectedRevenue - revenue30).toLocaleString",
+          "lineNumber": 45
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "margin.toFixed",
+          "lineNumber": 58
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "minSafePrice.toFixed",
+          "lineNumber": 58
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "margin.toFixed",
+          "lineNumber": 59
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "minSafePrice.toFixed",
+          "lineNumber": 59
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "activeItems\r\n        .filter(i => {\r\n            const sales = i.salesData?.last30 || 0;\r\n            return sales === 0 && i.isAvailable && !i.archivedAt;\r\n        })\r\n        .slice(0, 3)\r\n        .map",
+          "lineNumber": 71
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "activeItems\r\n        .filter(i => {\r\n            const sales = i.salesData?.last30 || 0;\r\n            return sales === 0 && i.isAvailable && !i.archivedAt;\r\n        })\r\n        .slice",
+          "lineNumber": 71
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "activeItems\r\n        .filter",
+          "lineNumber": 71
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "activeItems\r\n        .filter(i => {\r\n            const margin = i.cost && i.price > 0 ? ((i.price - (i.cost || 0)) / i.price) * 100 : null;\r\n            const sales = i.salesData?.last30 || 0;\r\n            return (sales === 0 || (margin !== null && margin < 15));\r\n        })\r\n        .slice",
+          "lineNumber": 85
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "activeItems\r\n        .filter",
+          "lineNumber": 85
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.reduce",
+          "lineNumber": 94
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "itemsWithCost.reduce",
+          "lineNumber": 104
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "alerts.push",
+          "lineNumber": 108
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "avgMargin.toFixed",
+          "lineNumber": 113
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "avgMargin.toFixed",
+          "lineNumber": 114
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "activeItems.filter",
+          "lineNumber": 119
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "alerts.push",
+          "lineNumber": 121
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter",
+          "lineNumber": 132
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "platformItems.reduce",
+          "lineNumber": 134
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(i.platformPricing || []).reduce",
+          "lineNumber": 135
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "alerts.push",
+          "lineNumber": 139
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(avgCommission * 100).toFixed",
+          "lineNumber": 144
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(avgCommission * 100).toFixed",
+          "lineNumber": 145
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "avgDailyRevenue.toFixed",
+          "lineNumber": 169
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(projected7D / 1000).toFixed",
+          "lineNumber": 173
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "projected7D.toFixed",
+          "lineNumber": 173
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(projected30D / 1000).toFixed",
+          "lineNumber": 177
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "projected30D.toFixed",
+          "lineNumber": 177
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "alerts.map",
+          "lineNumber": 189
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "priceOptimizations.map",
+          "lineNumber": 212
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "scheduleSuggestions.map",
+          "lineNumber": 237
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "deactivationCandidates.map",
+          "lineNumber": 255
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "m.toFixed",
+          "lineNumber": 264
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.some",
+          "lineNumber": 278
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter(i => (i.platformPricing?.length || 0) > 0).slice(0, 6).map",
+          "lineNumber": 285
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter(i => (i.platformPricing?.length || 0) > 0).slice",
+          "lineNumber": 285
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "items.filter",
+          "lineNumber": 285
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "(item.platformPricing || []).map",
+          "lineNumber": 291
+        },
+        {
+          "caller": "AIInsightsEngine",
+          "callee": "net.toFixed",
+          "lineNumber": 298
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/AnalyticsPanel.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 163,
+      "nonEmptyLines": 147,
+      "functions": [
+        {
+          "name": "AnalyticsPanel",
+          "startLine": 15,
+          "endLine": 161,
+          "params": [
+            "{ items, lang, currency }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "items.reduce",
+          "lineNumber": 16
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "items.reduce",
+          "lineNumber": 17
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "items.filter",
+          "lineNumber": 18
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "itemsWithCost.reduce",
+          "lineNumber": 20
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "[...items].sort((a, b) => (b.salesData?.revenue30 || 0) - (a.salesData?.revenue30 || 0)).filter(i => (i.salesData?.revenue30 || 0) > 0).slice",
+          "lineNumber": 27
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "[...items].sort((a, b) => (b.salesData?.revenue30 || 0) - (a.salesData?.revenue30 || 0)).filter",
+          "lineNumber": 27
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "[...items].sort",
+          "lineNumber": 27
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "itemsWithCost.filter(i => ((i.price - (i.cost || 0)) / i.price) * 100 < 30).sort((a, b) => {\r\n        const ma = ((a.price - (a.cost || 0)) / a.price) * 100;\r\n        const mb = ((b.price - (b.cost || 0)) / b.price) * 100;\r\n        return ma - mb;\r\n    }).slice",
+          "lineNumber": 30
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "itemsWithCost.filter(i => ((i.price - (i.cost || 0)) / i.price) * 100 < 30).sort",
+          "lineNumber": 30
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "itemsWithCost.filter",
+          "lineNumber": 30
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "items.filter(i => i.isAvailable && (i.salesData?.last30 || 0) === 0 && !i.archivedAt).slice",
+          "lineNumber": 37
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "items.filter",
+          "lineNumber": 37
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "totalSales.toLocaleString",
+          "lineNumber": 50
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "totalRevenue.toLocaleString",
+          "lineNumber": 54
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "marginColor",
+          "lineNumber": 58
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "avgMargin.toFixed",
+          "lineNumber": 58
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "avgDailyRevenue.toFixed",
+          "lineNumber": 62
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "topSellers.map",
+          "lineNumber": 74
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "(item.salesData?.revenue30 || 0).toLocaleString",
+          "lineNumber": 82
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "lowMarginItems.map",
+          "lineNumber": 100
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "item.price.toFixed",
+          "lineNumber": 106
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "(item.cost || 0).toFixed",
+          "lineNumber": 106
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "marginColor",
+          "lineNumber": 108
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "m.toFixed",
+          "lineNumber": 108
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "notSelling.map",
+          "lineNumber": 127
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "itemsWithCost.map",
+          "lineNumber": 143
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "marginBg",
+          "lineNumber": 148
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "m.toFixed",
+          "lineNumber": 149
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "marginColor",
+          "lineNumber": 152
+        },
+        {
+          "caller": "AnalyticsPanel",
+          "callee": "m.toFixed",
+          "lineNumber": 152
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/BranchSelector.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 103,
+      "nonEmptyLines": 94,
+      "functions": [
+        {
+          "name": "BranchSelector",
+          "startLine": 15,
+          "endLine": 101,
+          "params": [
+            "{\r\n    branches, selectedBranchId, onSelectBranch,\r\n    comparisonMode, onToggleComparison, lang\r\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "BranchSelector",
+          "callee": "useState",
+          "lineNumber": 19
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "branches.filter",
+          "lineNumber": 20
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "branches.find",
+          "lineNumber": 21
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "setIsOpen",
+          "lineNumber": 26
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "setIsOpen",
+          "lineNumber": 44
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "onSelectBranch",
+          "lineNumber": 48
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "setIsOpen",
+          "lineNumber": 48
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "activeBranches.map",
+          "lineNumber": 64
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "onSelectBranch",
+          "lineNumber": 67
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "setIsOpen",
+          "lineNumber": 67
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "onToggleComparison",
+          "lineNumber": 85
+        },
+        {
+          "caller": "BranchSelector",
+          "callee": "setIsOpen",
+          "lineNumber": 85
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/BulkActionsBar.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 105,
+      "nonEmptyLines": 89,
+      "functions": [
+        {
+          "name": "BulkActionsBar",
+          "startLine": 14,
+          "endLine": 103,
+          "params": [
+            "{ selectedCount, onApply, onClearSelection, lang, currency }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "BulkActionsBar",
+          "callee": "useState",
+          "lineNumber": 15
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "useState",
+          "lineNumber": 16
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "useState",
+          "lineNumber": 17
+        },
+        {
+          "caller": "handleApply",
+          "callee": "parseFloat",
+          "lineNumber": 20
+        },
+        {
+          "caller": "handleApply",
+          "callee": "isNaN",
+          "lineNumber": 21
+        },
+        {
+          "caller": "handleApply",
+          "callee": "onApply",
+          "lineNumber": 22
+        },
+        {
+          "caller": "handleApply",
+          "callee": "onApply",
+          "lineNumber": 23
+        },
+        {
+          "caller": "handleApply",
+          "callee": "setAction",
+          "lineNumber": 24
+        },
+        {
+          "caller": "handleApply",
+          "callee": "setValue",
+          "lineNumber": 25
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "setAction",
+          "lineNumber": 42
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "setAction",
+          "lineNumber": 45
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "onApply",
+          "lineNumber": 52
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "onApply",
+          "lineNumber": 55
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "setShowConfirm",
+          "lineNumber": 62
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "setValue",
+          "lineNumber": 73
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "onApply",
+          "lineNumber": 89
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "setShowConfirm",
+          "lineNumber": 89
+        },
+        {
+          "caller": "BulkActionsBar",
+          "callee": "setShowConfirm",
+          "lineNumber": 90
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/CategoryDrawer.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 263,
+      "nonEmptyLines": 248,
+      "functions": [
+        {
+          "name": "CategoryDrawer",
+          "startLine": 18,
+          "endLine": 261,
+          "params": [
+            "{\r\n    category, mode, menuId, printers, branches, platforms,\r\n    onSave, onClose, onDelete, lang\r\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "CategoryDrawer",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "useEffect",
+          "lineNumber": 24
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "setFormData",
+          "lineNumber": 25
+        },
+        {
+          "caller": "handleSave",
+          "callee": "formData.name.trim",
+          "lineNumber": 29
+        },
+        {
+          "caller": "handleSave",
+          "callee": "toSave.menuIds.includes",
+          "lineNumber": 31
+        },
+        {
+          "caller": "handleSave",
+          "callee": "onSave",
+          "lineNumber": 34
+        },
+        {
+          "caller": "togglePrinter",
+          "callee": "setFormData",
+          "lineNumber": 38
+        },
+        {
+          "caller": "togglePrinter",
+          "callee": "current.includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "togglePrinter",
+          "callee": "current.filter",
+          "lineNumber": 41
+        },
+        {
+          "caller": "toggleTarget",
+          "callee": "setFormData",
+          "lineNumber": 48
+        },
+        {
+          "caller": "toggleTarget",
+          "callee": "current.includes",
+          "lineNumber": 50
+        },
+        {
+          "caller": "toggleTarget",
+          "callee": "current.filter",
+          "lineNumber": 51
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "setFormData",
+          "lineNumber": 98
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "setFormData",
+          "lineNumber": 111
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "setFormData",
+          "lineNumber": 131
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "Object.values(OrderType).map",
+          "lineNumber": 145
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "Object.values",
+          "lineNumber": 145
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "(formData.targetOrderTypes || []).includes",
+          "lineNumber": 146
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "toggleTarget",
+          "lineNumber": 150
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "branches.map",
+          "lineNumber": 167
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "(formData.targetBranches || []).includes",
+          "lineNumber": 168
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "toggleTarget",
+          "lineNumber": 172
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "platforms.map",
+          "lineNumber": 190
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "(formData.targetPlatforms || []).includes",
+          "lineNumber": 191
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "toggleTarget",
+          "lineNumber": 195
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "printers.map",
+          "lineNumber": 219
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "(formData.printerIds || []).includes",
+          "lineNumber": 220
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "togglePrinter",
+          "lineNumber": 224
+        },
+        {
+          "caller": "CategoryDrawer",
+          "callee": "formData.name.trim",
+          "lineNumber": 251
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/ContextPanel.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 127,
+      "nonEmptyLines": 115,
+      "functions": [
+        {
+          "name": "ContextPanel",
+          "startLine": 21,
+          "endLine": 125,
+          "params": [
+            "{\r\n    isOpen, onToggle, allItems, totalRevenue, avgMargin,\r\n    lang, currency, onNewItem, onToggleMultiSelect\r\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ContextPanel",
+          "callee": "allItems.filter",
+          "lineNumber": 25
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "allItems.filter",
+          "lineNumber": 26
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "allItems.filter",
+          "lineNumber": 27
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "activeItems.filter",
+          "lineNumber": 29
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "itemsWithCost.filter",
+          "lineNumber": 30
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "[...allItems].sort((a, b) => (b.salesData?.last30 || 0) - (a.salesData?.last30 || 0)).slice",
+          "lineNumber": 31
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "[...allItems].sort",
+          "lineNumber": 31
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "topSellers.some",
+          "lineNumber": 99
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "topSellers.filter(i => (i.salesData?.last30 || 0) > 0).map",
+          "lineNumber": 104
+        },
+        {
+          "caller": "ContextPanel",
+          "callee": "topSellers.filter",
+          "lineNumber": 104
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/ItemCard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 382,
+      "nonEmptyLines": 350,
+      "functions": [
+        {
+          "name": "getMarginPercent",
+          "startLine": 35,
+          "endLine": 38,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "getMarginColor",
+          "startLine": 40,
+          "endLine": 45,
+          "params": [
+            "margin"
+          ]
+        },
+        {
+          "name": "ItemCard",
+          "startLine": 47,
+          "endLine": 340,
+          "params": [
+            "{\r\n    item, viewMode, density, isSelected, multiSelectMode,\r\n    onClick, onToggleAvailability, onDuplicate, onArchive, onDelete, onEdit, onQuickPrice,\r\n    lang, currency, index, dragHandleProps, draggableContext\r\n}"
+          ]
+        },
+        {
+          "name": "areEqual",
+          "startLine": 342,
+          "endLine": 380,
+          "params": [
+            "prev",
+            "next"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ItemCard",
+          "callee": "React.useState",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "React.useState",
+          "lineNumber": 53
+        },
+        {
+          "caller": "commitPrice",
+          "callee": "Number",
+          "lineNumber": 55
+        },
+        {
+          "caller": "commitPrice",
+          "callee": "setEditingPrice",
+          "lineNumber": 56
+        },
+        {
+          "caller": "commitPrice",
+          "callee": "Number.isFinite",
+          "lineNumber": 57
+        },
+        {
+          "caller": "commitPrice",
+          "callee": "onQuickPrice",
+          "lineNumber": 58
+        },
+        {
+          "caller": "commitPrice",
+          "callee": "Number",
+          "lineNumber": 58
+        },
+        {
+          "caller": "commitPrice",
+          "callee": "next.toFixed",
+          "lineNumber": 58
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "getMarginPercent",
+          "lineNumber": 60
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "(() => {\r\n        if (item.tags?.includes('best-seller') || (item.salesData?.last30 || 0) > 50)\r\n            return { icon: Flame, label: lang === 'ar' ? 'الأكثر مبيعاً' : 'Best Seller', color: 'text-orange-600 dark:text-orange-500 bg-orange-50 dark:bg-orange-500/10' };\r\n        if (margin !== null && margin < 30)\r\n            return { icon: AlertTriangle, label: lang === 'ar' ? 'هامش منخفض' : 'Low Margin', color: 'text-red-600 dark:text-rose-500 bg-red-50 dark:bg-rose-500/10' };\r\n        if ((item.salesData?.last30 || 0) === 0 && item.isAvailable)\r\n            return { icon: TrendingDown, label: lang === 'ar' ? 'لا يُباع' : 'Not Selling', color: 'text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-500/10' };\r\n        return null;\r\n    })",
+          "lineNumber": 69
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.tags?.includes",
+          "lineNumber": 70
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onClick",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.price.toFixed",
+          "lineNumber": 119
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.cost.toFixed",
+          "lineNumber": 120
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "getMarginColor",
+          "lineNumber": 126
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "margin.toFixed",
+          "lineNumber": 126
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 142
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onToggleAvailability",
+          "lineNumber": 142
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 152
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onEdit",
+          "lineNumber": 152
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 153
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onDuplicate",
+          "lineNumber": 153
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 154
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onArchive",
+          "lineNumber": 154
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onClick",
+          "lineNumber": 165
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.dietaryBadges.slice(0, 3).map",
+          "lineNumber": 185
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.dietaryBadges.slice",
+          "lineNumber": 185
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 244
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "setPriceDraft",
+          "lineNumber": 251
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "commitPrice",
+          "lineNumber": 253
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "setEditingPrice",
+          "lineNumber": 254
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 261
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "commitPrice",
+          "lineNumber": 261
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.price.toFixed",
+          "lineNumber": 270
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 273
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "setPriceDraft",
+          "lineNumber": 273
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "String",
+          "lineNumber": 273
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "setEditingPrice",
+          "lineNumber": 273
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "item.cost.toFixed",
+          "lineNumber": 284
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "getMarginColor",
+          "lineNumber": 288
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "margin.toFixed",
+          "lineNumber": 288
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "((item.salesData.revenue30 || 0) / 1000).toFixed",
+          "lineNumber": 302
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 308
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onToggleAvailability",
+          "lineNumber": 308
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 320
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onEdit",
+          "lineNumber": 320
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 324
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onToggleAvailability",
+          "lineNumber": 324
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 327
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onDuplicate",
+          "lineNumber": 327
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 330
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onArchive",
+          "lineNumber": 330
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 333
+        },
+        {
+          "caller": "ItemCard",
+          "callee": "onDelete",
+          "lineNumber": 333
+        },
+        {
+          "caller": "areEqual",
+          "callee": "(a.tags || []).join",
+          "lineNumber": 372
+        },
+        {
+          "caller": "areEqual",
+          "callee": "(b.tags || []).join",
+          "lineNumber": 372
+        },
+        {
+          "caller": "areEqual",
+          "callee": "(a.dietaryBadges || []).join",
+          "lineNumber": 375
+        },
+        {
+          "caller": "areEqual",
+          "callee": "(b.dietaryBadges || []).join",
+          "lineNumber": 375
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/ItemDrawer.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1151,
+      "nonEmptyLines": 1079,
+      "functions": [
+        {
+          "name": "ItemDrawer",
+          "startLine": 36,
+          "endLine": 1149,
+          "params": [
+            "{\r\n  item: initialItem, mode, categoryId: initialCategoryId,\r\n  categories, printers, branches, inventory,\r\n  onSave, onClose, onDelete, onArchive, lang, currency,\r\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ItemDrawer",
+          "line": 36,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ItemDrawer",
+          "callee": "useToast",
+          "lineNumber": 41
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 42
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 43
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 44
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 45
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 46
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useRef",
+          "lineNumber": 47
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 48
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 49
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 50
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 51
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useState",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useMemo",
+          "lineNumber": 54
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "recipeIngredientSearch.trim().toLocaleLowerCase",
+          "lineNumber": 55
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "recipeIngredientSearch.trim",
+          "lineNumber": 55
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory\r\n      .filter((inv) => {\r\n        if (!query) return true;\r\n        return [inv.name, inv.nameAr, inv.sku, (inv as any).barcode]\r\n          .filter(Boolean)\r\n          .some((value) => String(value).toLocaleLowerCase(lang === 'ar' ? 'ar' : 'en').includes(query));\r\n      })\r\n      .slice",
+          "lineNumber": 56
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory\r\n      .filter",
+          "lineNumber": 56
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "[inv.name, inv.nameAr, inv.sku, (inv as any).barcode]\r\n          .filter(Boolean)\r\n          .some",
+          "lineNumber": 59
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "[inv.name, inv.nameAr, inv.sku, (inv as any).barcode]\r\n          .filter",
+          "lineNumber": 59
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String(value).toLocaleLowerCase(lang === 'ar' ? 'ar' : 'en').includes",
+          "lineNumber": 61
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String(value).toLocaleLowerCase",
+          "lineNumber": 61
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 61
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useMemo",
+          "lineNumber": 68
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "JSON.stringify",
+          "lineNumber": 70
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "JSON.stringify",
+          "lineNumber": 70
+        },
+        {
+          "caller": "requestClose",
+          "callee": "window.confirm",
+          "lineNumber": 77
+        },
+        {
+          "caller": "requestClose",
+          "callee": "onClose",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useEffect",
+          "lineNumber": 81
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setItem",
+          "lineNumber": 82
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setActiveCategoryId",
+          "lineNumber": 83
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useEffect",
+          "lineNumber": 86
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "requestClose",
+          "lineNumber": 89
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "window.addEventListener",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "window.removeEventListener",
+          "lineNumber": 96
+        },
+        {
+          "caller": "update",
+          "callee": "setItem",
+          "lineNumber": 100
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useEffect",
+          "lineNumber": 102
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "categories.find",
+          "lineNumber": 104
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(cat.name || \"CAT\").replace(/[^a-zA-Z]/g, \"\").slice(0, 3).toUpperCase",
+          "lineNumber": 106
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(cat.name || \"CAT\").replace(/[^a-zA-Z]/g, \"\").slice",
+          "lineNumber": 106
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(cat.name || \"CAT\").replace",
+          "lineNumber": 106
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 108
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String(nextNum).padStart",
+          "lineNumber": 108
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 108
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useCallback",
+          "lineNumber": 113
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setGeneratingBarcode",
+          "lineNumber": 114
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "barcodeApi.generate",
+          "lineNumber": 116
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 117
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "error",
+          "lineNumber": 119
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setGeneratingBarcode",
+          "lineNumber": 121
+        },
+        {
+          "caller": "addSize",
+          "callee": "update",
+          "lineNumber": 125
+        },
+        {
+          "caller": "addSize",
+          "callee": "Date.now",
+          "lineNumber": 125
+        },
+        {
+          "caller": "updateSize",
+          "callee": "update",
+          "lineNumber": 126
+        },
+        {
+          "caller": "updateSize",
+          "callee": "(item.sizes || []).map",
+          "lineNumber": 126
+        },
+        {
+          "caller": "removeSize",
+          "callee": "update",
+          "lineNumber": 127
+        },
+        {
+          "caller": "removeSize",
+          "callee": "(item.sizes || []).filter",
+          "lineNumber": 127
+        },
+        {
+          "caller": "addModGroup",
+          "callee": "update",
+          "lineNumber": 129
+        },
+        {
+          "caller": "addModGroup",
+          "callee": "Date.now",
+          "lineNumber": 129
+        },
+        {
+          "caller": "updateModGroup",
+          "callee": "update",
+          "lineNumber": 130
+        },
+        {
+          "caller": "updateModGroup",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 130
+        },
+        {
+          "caller": "removeModGroup",
+          "callee": "update",
+          "lineNumber": 131
+        },
+        {
+          "caller": "removeModGroup",
+          "callee": "(item.modifierGroups || []).filter",
+          "lineNumber": 131
+        },
+        {
+          "caller": "addModOption",
+          "callee": "update",
+          "lineNumber": 133
+        },
+        {
+          "caller": "addModOption",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 133
+        },
+        {
+          "caller": "addModOption",
+          "callee": "Date.now",
+          "lineNumber": 133
+        },
+        {
+          "caller": "updateModOption",
+          "callee": "update",
+          "lineNumber": 134
+        },
+        {
+          "caller": "updateModOption",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 134
+        },
+        {
+          "caller": "updateModOption",
+          "callee": "g.options.map",
+          "lineNumber": 134
+        },
+        {
+          "caller": "removeModOption",
+          "callee": "update",
+          "lineNumber": 135
+        },
+        {
+          "caller": "removeModOption",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 135
+        },
+        {
+          "caller": "removeModOption",
+          "callee": "g.options.filter",
+          "lineNumber": 135
+        },
+        {
+          "caller": "addModOptionRecipe",
+          "callee": "update",
+          "lineNumber": 139
+        },
+        {
+          "caller": "addModOptionRecipe",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 139
+        },
+        {
+          "caller": "addModOptionRecipe",
+          "callee": "g.options.map",
+          "lineNumber": 141
+        },
+        {
+          "caller": "addModOptionRecipe",
+          "callee": "String",
+          "lineNumber": 144
+        },
+        {
+          "caller": "updateModOptionRecipe",
+          "callee": "update",
+          "lineNumber": 149
+        },
+        {
+          "caller": "updateModOptionRecipe",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 149
+        },
+        {
+          "caller": "updateModOptionRecipe",
+          "callee": "g.options.map",
+          "lineNumber": 151
+        },
+        {
+          "caller": "updateModOptionRecipe",
+          "callee": "(o.recipe || []).map",
+          "lineNumber": 153
+        },
+        {
+          "caller": "removeModOptionRecipe",
+          "callee": "update",
+          "lineNumber": 158
+        },
+        {
+          "caller": "removeModOptionRecipe",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 158
+        },
+        {
+          "caller": "removeModOptionRecipe",
+          "callee": "g.options.map",
+          "lineNumber": 160
+        },
+        {
+          "caller": "removeModOptionRecipe",
+          "callee": "(o.recipe || []).filter",
+          "lineNumber": 160
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "Number",
+          "lineNumber": 165
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "Number.isFinite",
+          "lineNumber": 166
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "inventory.find",
+          "lineNumber": 167
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "Array.isArray",
+          "lineNumber": 170
+        },
+        {
+          "caller": "normalize",
+          "callee": "recipes.map",
+          "lineNumber": 176
+        },
+        {
+          "caller": "normalize",
+          "callee": "recipes.filter",
+          "lineNumber": 177
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "normalize",
+          "lineNumber": 179
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "updatedRecipes.findIndex",
+          "lineNumber": 180
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "updatedRecipes.findIndex",
+          "lineNumber": 184
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "updatedRecipes.push",
+          "lineNumber": 185
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "ingredients.findIndex",
+          "lineNumber": 190
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "ingredients.push",
+          "lineNumber": 195
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "String",
+          "lineNumber": 195
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "update",
+          "lineNumber": 199
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "setRecipeIngredientId",
+          "lineNumber": 201
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "setRecipeIngredientSearch",
+          "lineNumber": 202
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "setRecipeSearchOpen",
+          "lineNumber": 203
+        },
+        {
+          "caller": "addRecipeIngredient",
+          "callee": "setRecipeIngredientQty",
+          "lineNumber": 204
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "Array.isArray",
+          "lineNumber": 208
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "recipes.map",
+          "lineNumber": 212
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "recipes.filter",
+          "lineNumber": 213
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "updatedRecipes.findIndex",
+          "lineNumber": 215
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "updatedRecipes.findIndex",
+          "lineNumber": 218
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "updatedRecipes.push",
+          "lineNumber": 219
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "(baseIndex >= 0 ? [...updatedRecipes[baseIndex].ingredients] : [])\r\n                    .filter",
+          "lineNumber": 221
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "updatedRecipes[targetIndex].ingredients\r\n                .filter",
+          "lineNumber": 225
+        },
+        {
+          "caller": "removeRecipeIngredient",
+          "callee": "update",
+          "lineNumber": 228
+        },
+        {
+          "caller": "activeRecipeIngredients",
+          "callee": "getRecipeIngredients",
+          "lineNumber": 231
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "Array.isArray",
+          "lineNumber": 234
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "recipes.map",
+          "lineNumber": 238
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "recipes.filter",
+          "lineNumber": 239
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "updatedRecipes.findIndex",
+          "lineNumber": 241
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "updatedRecipes.findIndex",
+          "lineNumber": 243
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "updatedRecipes.push",
+          "lineNumber": 244
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "updatedRecipes[targetIndex].ingredients.map",
+          "lineNumber": 247
+        },
+        {
+          "caller": "updateIngredientQuantity",
+          "callee": "update",
+          "lineNumber": 250
+        },
+        {
+          "caller": "toggleBadge",
+          "callee": "update",
+          "lineNumber": 253
+        },
+        {
+          "caller": "toggleBadge",
+          "callee": "item.dietaryBadges?.includes",
+          "lineNumber": 253
+        },
+        {
+          "caller": "toggleBadge",
+          "callee": "item.dietaryBadges.filter",
+          "lineNumber": 253
+        },
+        {
+          "caller": "toggleDay",
+          "callee": "update",
+          "lineNumber": 254
+        },
+        {
+          "caller": "toggleDay",
+          "callee": "item.availableDays?.includes",
+          "lineNumber": 254
+        },
+        {
+          "caller": "toggleDay",
+          "callee": "item.availableDays.filter",
+          "lineNumber": 254
+        },
+        {
+          "caller": "togglePrinter",
+          "callee": "update",
+          "lineNumber": 255
+        },
+        {
+          "caller": "togglePrinter",
+          "callee": "item.printerIds?.includes",
+          "lineNumber": 255
+        },
+        {
+          "caller": "togglePrinter",
+          "callee": "item.printerIds.filter",
+          "lineNumber": 255
+        },
+        {
+          "caller": "submitItem",
+          "callee": "item.name?.trim",
+          "lineNumber": 258
+        },
+        {
+          "caller": "submitItem",
+          "callee": "setIsSaving",
+          "lineNumber": 260
+        },
+        {
+          "caller": "submitItem",
+          "callee": "onSave",
+          "lineNumber": 262
+        },
+        {
+          "caller": "submitItem",
+          "callee": "setIsSaving",
+          "lineNumber": 265
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "useMemo",
+          "lineNumber": 269
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory.map",
+          "lineNumber": 269
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "Number",
+          "lineNumber": 269
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "calculateRecipeCost",
+          "lineNumber": 270
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "createPortal",
+          "lineNumber": 307
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "categories.find",
+          "lineNumber": 339
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "onSave",
+          "lineNumber": 347
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "tabs.map",
+          "lineNumber": 368
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setTab",
+          "lineNumber": 371
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 420
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 424
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 428
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 432
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 437
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 442
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 457
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 472
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseFloat",
+          "lineNumber": 472
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setActiveCategoryId",
+          "lineNumber": 477
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "categories.map",
+          "lineNumber": 479
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 489
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "dietaryOptions.map",
+          "lineNumber": 504
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.dietaryBadges?.includes",
+          "lineNumber": 505
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "toggleBadge",
+          "lineNumber": 509
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(item.sizes || []).map",
+          "lineNumber": 544
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateSize",
+          "lineNumber": 552
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateSize",
+          "lineNumber": 556
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseFloat",
+          "lineNumber": 556
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "calculateRecipeCost(item.recipe, inventoryCosts, size.id).toFixed",
+          "lineNumber": 561
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "calculateRecipeCost",
+          "lineNumber": 561
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateSize",
+          "lineNumber": 566
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "removeSize",
+          "lineNumber": 569
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(item.modifierGroups || []).map",
+          "lineNumber": 598
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModGroup",
+          "lineNumber": 604
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModGroup",
+          "lineNumber": 609
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseInt",
+          "lineNumber": 609
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModGroup",
+          "lineNumber": 614
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseInt",
+          "lineNumber": 614
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "removeModGroup",
+          "lineNumber": 617
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "group.options.map",
+          "lineNumber": 623
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModOption",
+          "lineNumber": 625
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModOption",
+          "lineNumber": 629
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModOption",
+          "lineNumber": 638
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseFloat",
+          "lineNumber": 638
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "calculateModifierRecipeCost(opt, inventoryCosts, selectedRecipeSizeId).toFixed",
+          "lineNumber": 641
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "calculateModifierRecipeCost",
+          "lineNumber": 641
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "removeModOption",
+          "lineNumber": 643
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "addModOptionRecipe",
+          "lineNumber": 654
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(opt.recipe || []).map",
+          "lineNumber": 666
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory.find",
+          "lineNumber": 667
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory.find",
+          "lineNumber": 673
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModOptionRecipe",
+          "lineNumber": 674
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 674
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory.map",
+          "lineNumber": 678
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateModOptionRecipe",
+          "lineNumber": 685
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseFloat",
+          "lineNumber": 685
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "removeModOptionRecipe",
+          "lineNumber": 692
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "addModOption",
+          "lineNumber": 701
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "recipeCost.toFixed",
+          "lineNumber": 716
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.price.toFixed",
+          "lineNumber": 720
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(((item.price - recipeCost) / item.price) * 100).toFixed",
+          "lineNumber": 725
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setSelectedRecipeSizeId",
+          "lineNumber": 739
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.sizes.map",
+          "lineNumber": 744
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setSelectedRecipeSizeId",
+          "lineNumber": 747
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "activeRecipeIngredients",
+          "lineNumber": 757
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeSearchOpen",
+          "lineNumber": 767
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeIngredientSearch",
+          "lineNumber": 769
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeIngredientId",
+          "lineNumber": 770
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeSearchOpen",
+          "lineNumber": 771
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "recipeIngredientOptions.map",
+          "lineNumber": 784
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "event.preventDefault",
+          "lineNumber": 788
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeIngredientId",
+          "lineNumber": 790
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeIngredientSearch",
+          "lineNumber": 791
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeSearchOpen",
+          "lineNumber": 792
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory.find",
+          "lineNumber": 806
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setRecipeIngredientQty",
+          "lineNumber": 808
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "Number.isFinite",
+          "lineNumber": 811
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "Number",
+          "lineNumber": 811
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "Number",
+          "lineNumber": 811
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "activeRecipeIngredients().map",
+          "lineNumber": 818
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "activeRecipeIngredients",
+          "lineNumber": 818
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "inventory.find",
+          "lineNumber": 820
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(inv ? inv.costPrice * ri.quantity : 0).toFixed",
+          "lineNumber": 830
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "Number.isFinite",
+          "lineNumber": 838
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 839
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "updateIngredientQuantity",
+          "lineNumber": 842
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "removeRecipeIngredient",
+          "lineNumber": 846
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "branches.map",
+          "lineNumber": 877
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "(item.branchPricing || []).filter",
+          "lineNumber": 878
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "branchEntries.find",
+          "lineNumber": 879
+        },
+        {
+          "caller": "channelPrice",
+          "callee": "branchEntries.find",
+          "lineNumber": 880
+        },
+        {
+          "caller": "channelPrice",
+          "callee": "String(b.channel || '').toUpperCase",
+          "lineNumber": 880
+        },
+        {
+          "caller": "channelPrice",
+          "callee": "String",
+          "lineNumber": 880
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "parseFloat",
+          "lineNumber": 882
+        },
+        {
+          "caller": "match",
+          "callee": "String(b.channel || '').toUpperCase",
+          "lineNumber": 884
+        },
+        {
+          "caller": "match",
+          "callee": "String",
+          "lineNumber": 884
+        },
+        {
+          "caller": "match",
+          "callee": "String(channel || '').toUpperCase",
+          "lineNumber": 884
+        },
+        {
+          "caller": "match",
+          "callee": "String",
+          "lineNumber": 884
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "raw.trim",
+          "lineNumber": 885
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "Number.isFinite",
+          "lineNumber": 885
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "update",
+          "lineNumber": 887
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "current.filter",
+          "lineNumber": 887
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "match",
+          "lineNumber": 887
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "update",
+          "lineNumber": 891
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "current.some",
+          "lineNumber": 892
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "current.map",
+          "lineNumber": 893
+        },
+        {
+          "caller": "setBranchPrice",
+          "callee": "match",
+          "lineNumber": 893
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "branch.name.charAt",
+          "lineNumber": 902
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setBranchPrice",
+          "lineNumber": 914
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "[\r\n                                 { id: 'DINE_IN', label: lang === 'ar' ? 'صالة' : 'Dine-in' },\r\n                                 { id: 'TAKEAWAY', label: lang === 'ar' ? 'تيك أواي' : 'Takeaway' },\r\n                                 { id: 'DELIVERY', label: lang === 'ar' ? 'دليفري' : 'Delivery' },\r\n                               ].map",
+          "lineNumber": 920
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "channelPrice",
+          "lineNumber": 929
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 930
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "setBranchPrice",
+          "lineNumber": 931
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "platformOptions.map",
+          "lineNumber": 959
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.platformPricing?.find",
+          "lineNumber": 960
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "parseFloat",
+          "lineNumber": 973
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "current.some",
+          "lineNumber": 975
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "current.map",
+          "lineNumber": 976
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 978
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "dayOptions.map",
+          "lineNumber": 998
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.availableDays?.includes",
+          "lineNumber": 999
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "toggleDay",
+          "lineNumber": 1003
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "update",
+          "lineNumber": 1020
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "printers.map",
+          "lineNumber": 1040
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.printerIds?.includes",
+          "lineNumber": 1041
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "togglePrinter",
+          "lineNumber": 1046
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "[...(item.versionHistory)].reverse().map",
+          "lineNumber": 1078
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "[...(item.versionHistory)].reverse",
+          "lineNumber": 1078
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "new Date(entry.timestamp).toLocaleString",
+          "lineNumber": 1084
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 1087
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "String",
+          "lineNumber": 1089
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "submitItem",
+          "lineNumber": 1128
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.name?.trim",
+          "lineNumber": 1129
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "submitItem",
+          "lineNumber": 1136
+        },
+        {
+          "caller": "ItemDrawer",
+          "callee": "item.name?.trim",
+          "lineNumber": 1137
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/ItemTable.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 276,
+      "nonEmptyLines": 261,
+      "functions": [
+        {
+          "name": "getMarginPercent",
+          "startLine": 25,
+          "endLine": 28,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "getMarginColor",
+          "startLine": 30,
+          "endLine": 35,
+          "params": [
+            "margin"
+          ]
+        },
+        {
+          "name": "InlineInput",
+          "startLine": 37,
+          "endLine": 95,
+          "params": [
+            "{ value, type = 'text', onChange, className = '', placeholder }"
+          ]
+        },
+        {
+          "name": "ItemTable",
+          "startLine": 107,
+          "endLine": 274,
+          "params": [
+            "{\r\n    items, selectedItemIds, multiSelectMode,\r\n    onToggleSelection, onSelectAll, onToggleAvailability,\r\n    onDuplicate, onArchive, onDelete, onEdit, onInlineUpdate,\r\n    lang, currency\n}"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "InlineInput",
+          "callee": "useState",
+          "lineNumber": 44
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "useState",
+          "lineNumber": 45
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "useRef",
+          "lineNumber": 46
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "useEffect",
+          "lineNumber": 48
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "setLocalValue",
+          "lineNumber": 48
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "useEffect",
+          "lineNumber": 50
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "inputRef.current.focus",
+          "lineNumber": 52
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "inputRef.current.select",
+          "lineNumber": 53
+        },
+        {
+          "caller": "handleBlur",
+          "callee": "setIsEditing",
+          "lineNumber": 58
+        },
+        {
+          "caller": "handleBlur",
+          "callee": "onChange",
+          "lineNumber": 60
+        },
+        {
+          "caller": "handleBlur",
+          "callee": "parseFloat",
+          "lineNumber": 60
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "handleBlur",
+          "lineNumber": 65
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "setLocalValue",
+          "lineNumber": 67
+        },
+        {
+          "caller": "handleKeyDown",
+          "callee": "setIsEditing",
+          "lineNumber": 68
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "setLocalValue",
+          "lineNumber": 78
+        },
+        {
+          "caller": "InlineInput",
+          "callee": "setIsEditing",
+          "lineNumber": 89
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "items.map",
+          "lineNumber": 147
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "selectedItemIds.has",
+          "lineNumber": 148
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "getMarginPercent",
+          "lineNumber": 149
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onToggleSelection",
+          "lineNumber": 157
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "e.stopPropagation",
+          "lineNumber": 164
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onToggleSelection",
+          "lineNumber": 164
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 174
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onInlineUpdate",
+          "lineNumber": 179
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onInlineUpdate",
+          "lineNumber": 188
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "item.dietaryBadges?.map",
+          "lineNumber": 193
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onInlineUpdate",
+          "lineNumber": 221
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onInlineUpdate",
+          "lineNumber": 232
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "getMarginColor",
+          "lineNumber": 240
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "margin.toFixed",
+          "lineNumber": 240
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "e.stopPropagation",
+          "lineNumber": 250
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onToggleAvailability",
+          "lineNumber": 250
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 252
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 252
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 252
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 252
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "e.stopPropagation",
+          "lineNumber": 260
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onEdit",
+          "lineNumber": 260
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 260
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 260
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "e.stopPropagation",
+          "lineNumber": 261
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onDuplicate",
+          "lineNumber": 261
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 261
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 261
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "e.stopPropagation",
+          "lineNumber": 262
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onArchive",
+          "lineNumber": 262
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 262
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 262
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "e.stopPropagation",
+          "lineNumber": 263
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "onDelete",
+          "lineNumber": 263
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 263
+        },
+        {
+          "caller": "ItemTable",
+          "callee": "labelFor",
+          "lineNumber": 263
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/MenuCategoryList.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 129,
+      "nonEmptyLines": 124,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "components/menu/MenuItemCard.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 88,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

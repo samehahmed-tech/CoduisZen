@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import crypto from 'crypto';
+vi.mock('../server/db', () => ({ db: {} }));
 import {
     buildIframeUrl,
+    isPaymobCallbackFresh,
     toCents,
     verifyPaymobHmac,
 } from '../server/modules/payments/paymobService';
@@ -43,5 +45,13 @@ describe('paymob', () => {
         expect(verifyPaymobHmac({ ...obj, success: false }, secret)).toBe(false);
         expect(verifyPaymobHmac(obj, 'wrong')).toBe(false);
         expect(verifyPaymobHmac({}, secret)).toBe(false);
+    });
+
+    it('accepts only callbacks inside the freshness window', () => {
+        const now = Date.parse('2026-10-26T12:00:00Z');
+        expect(isPaymobCallbackFresh({ created_at: '2026-10-26T11:59:00Z' }, now)).toBe(true);
+        expect(isPaymobCallbackFresh({ created_at: '2026-10-26T11:00:00Z' }, now)).toBe(false);
+        expect(isPaymobCallbackFresh({ created_at: '2026-10-26T12:10:00Z' }, now)).toBe(false);
+        expect(isPaymobCallbackFresh({}, now)).toBe(false);
     });
 });

@@ -23,6 +23,17 @@ export const menuApi = {
             method: 'POST',
             body: JSON.stringify({ fromBranchId, toBranchId, overwrite: overwrite === true }),
         }),
+    requestMasterDataDistribution: (sourceBranchId: string, targetBranchIds: string[], overwrite?: boolean, idempotencyKey?: string) =>
+        apiRequest<{ approvalId: string; status: 'PENDING'; dataset: string }>('/menu/master-data/distribution/request', {
+            method: 'POST',
+            ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+            body: JSON.stringify({ sourceBranchId, targetBranchIds, overwrite: overwrite === true }),
+        }),
+    previewMasterDataDistribution: (sourceBranchId: string, targetBranchIds: string[], overwrite?: boolean) =>
+        apiRequest<{ preview: true; dataset: string; targets: Array<{ targetBranchId: string; updatedItems: number; copiedEntries: number; skippedEntries: number }> }>('/menu/master-data/distribution/preview', {
+            method: 'POST',
+            body: JSON.stringify({ sourceBranchId, targetBranchIds, overwrite: overwrite === true }),
+        }),
     importItems: (payload: {
         rows?: Record<string, any>[];
         sizesRows?: Record<string, any>[];

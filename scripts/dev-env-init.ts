@@ -61,6 +61,10 @@ const main = () => {
   ensure('HEALTH_API_BASE_URL', 'http://localhost:3001/api');
   ensure('DATABASE_URL', 'Driver={ODBC Driver 18 for SQL Server};Server=(localdb)\\CoduisZen;Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;');
   ensure('JWT_SECRET', crypto.randomBytes(32).toString('base64url'));
+  ensure('PIN_LOOKUP_SECRET', crypto.randomBytes(32).toString('base64url'));
+  ensure('TRACK_TOKEN_SECRET', crypto.randomBytes(32).toString('base64url'));
+  ensure('PUBLIC_QR_SECRET', crypto.randomBytes(32).toString('base64url'));
+  ensure('PAYMENT_TOKEN_SECRET', crypto.randomBytes(32).toString('base64url'));
   ensure('AUDIT_HMAC_SECRET', crypto.randomBytes(32).toString('base64url'));
   ensure('AI_KEY_ENCRYPTION_SECRET', crypto.randomBytes(32).toString('base64url'));
 

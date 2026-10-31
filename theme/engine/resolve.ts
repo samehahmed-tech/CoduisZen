@@ -6,7 +6,7 @@ import { THEME_REGISTRY, type ThemeConfig } from '../tokens';
 import { validateThemeConfig } from './validation';
 import { contrastRatio, deriveActionScale, hexToTriplet } from './color';
 
-export const FALLBACK_THEME_ID = 'meridian';
+export const FALLBACK_THEME_ID = 'aero';
 
 export interface ResolvedTheme {
     id: string;

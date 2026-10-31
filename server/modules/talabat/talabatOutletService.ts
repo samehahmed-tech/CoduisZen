@@ -5,7 +5,7 @@
  * Reasons: TOO_BUSY_NO_DRIVERS|TOO_BUSY_KITCHEN|UPDATES_IN_MENU|TECHNICAL_PROBLEM|CLOSED|OTHER|BAD_WEATHER|HOLIDAY_SPECIAL_DAY
  */
 import { getTalabatConfigRaw } from './talabatConfig';
-import { getTalabatToken, TalabatRateLimiter } from './talabatClient';
+import { getTalabatToken, TalabatRateLimiter, talabatRequest } from './talabatClient';
 import { TALABAT_PROD_BASE } from './talabatCatalogService';
 import logger from '../../utils/logger';
 
@@ -59,7 +59,7 @@ export const getOutletStatus = async (vendorId: string): Promise<any> => {
     const vendor = String(vendorId || '').trim();
     if (!vendor) throw Object.assign(new Error('VENDOR_ID_REQUIRED'), { status: 400 });
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/vendors/${vendor}/status`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/vendors/${vendor}/status`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     const data: any = await res.json().catch(() => ({}));
@@ -74,7 +74,7 @@ export const setOutletStatus = async (vendorId: string, input: { status: OutletS
     if (!built.ok) throw Object.assign(new Error((built as any).code), { status: 400 });
     if (!limiter.tryAcquire(Date.now())) throw Object.assign(new Error('RATE_LIMITED'), { status: 429 });
     const { config, token, base } = await requireConfig();
-    const res = await fetch(`${base}/chains/${config.chainId}/vendors/${vendor}/status`, {
+    const res = await talabatRequest(`${base}/chains/${config.chainId}/vendors/${vendor}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify((built as any).body),

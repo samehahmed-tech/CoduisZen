@@ -1,0 +1,98 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "styles/layout/dashboard-x.css",
+      "language": "css",
+      "sizeLines": 2166,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/kds-theme.css",
+      "language": "css",
+      "sizeLines": 482,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/kiosk.css",
+      "language": "css",
+      "sizeLines": 1087,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/neo-ui.css",
+      "language": "css",
+      "sizeLines": 511,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/pos-responsive.css",
+      "language": "css",
+      "sizeLines": 1722,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/pos-tilt-card.css",
+      "language": "css",
+      "sizeLines": 1148,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/pos-zen-cards.css",
+      "language": "css",
+      "sizeLines": 2665,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/responsive-guard.css",
+      "language": "css",
+      "sizeLines": 127,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/responsive-plus.css",
+      "language": "css",
+      "sizeLines": 68,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/sidebar-worlds.css",
+      "language": "css",
+      "sizeLines": 191,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/sidebar.css",
+      "language": "css",
+      "sizeLines": 1483,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/tiles.css",
+      "language": "css",
+      "sizeLines": 645,
+      "fileCategory": "markup"
+    },
+    {
+      "path": "styles/layout/topbar.css",
+      "language": "css",
+      "sizeLines": 91,
+      "fileCategory": "markup"
+    }
+  ],
+  "batchImportData": {
+    "styles/layout/dashboard-x.css": [],
+    "styles/layout/kds-theme.css": [],
+    "styles/layout/kiosk.css": [],
+    "styles/layout/neo-ui.css": [],
+    "styles/layout/pos-responsive.css": [],
+    "styles/layout/pos-tilt-card.css": [],
+    "styles/layout/pos-zen-cards.css": [],
+    "styles/layout/responsive-guard.css": [],
+    "styles/layout/responsive-plus.css": [],
+    "styles/layout/sidebar-worlds.css": [],
+    "styles/layout/sidebar.css": [],
+    "styles/layout/tiles.css": [],
+    "styles/layout/topbar.css": []
+  }
+}

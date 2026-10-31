@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
+import crypto from 'node:crypto';
 import { db } from '../db';
-import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, menuItemModifiers, modifierOptions, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons, kdsTickets, dayCloseReports } from '../../src/db/schema';
-import { eq, and, asc, desc, gte, lte, inArray, gt, sql } from 'drizzle-orm';
+import { orders, orderItems, orderStatusHistory, payments, warehouses, shifts, settings, idempotencyKeys, menuItems, menuItemModifiers, modifierOptions, tables, branches, inventoryStock, customers, customerAddresses, printers, deliveryPlatforms, coupons, kdsTickets, dayCloseReports, recipes } from '../../src/db/schema';
+import { eq, and, asc, desc, gte, lte, inArray, gt, isNull, or, sql } from 'drizzle-orm';
 import { inventoryService } from '../services/inventoryService';
 import { getStringParam } from '../utils/request';
 import { getIO } from '../socket';
@@ -24,6 +25,8 @@ import { detectQuoteDrift, normalizeChannel, resolveBranchPrice as resolveBranch
 import { allocateDailyOrderNumber } from '../services/orderNumberService';
 import { isBelowTableMinimumSpend } from '../../src/utils/tableMinimumSpend';
 import { writeDbError } from '../utils/dbErrors';
+import { createSignedAuditLog } from '../services/auditService';
+import { ensureCampaignAttributionSchema } from '../services/campaignAttributionService';
 
 const ORDER_CREATE_SCOPE = 'ORDER_CREATE';
 const ORDER_STATUS_UPDATE_SCOPE = 'ORDER_STATUS_UPDATE';
@@ -62,6 +65,8 @@ export const ensureOrderItemsPricingColumns = () => {
                 ALTER TABLE order_items ADD platform_markup real DEFAULT 0;
             IF COL_LENGTH('order_items', 'price_source') IS NULL
                 ALTER TABLE order_items ADD price_source nvarchar(60);
+            IF COL_LENGTH('order_items', 'recipe_version_id') IS NULL
+                ALTER TABLE order_items ADD recipe_version_id nvarchar(150);
         `).then(() => undefined).catch((err: any) => {
             orderItemsPricingReady = null;
             throw err;
@@ -307,6 +312,8 @@ const orderSelect = {
     discount: orders.discount,
     discountType: orders.discountType,
     discountReason: orders.discountReason,
+    couponCode: orders.couponCode,
+    couponUsageReleasedAt: orders.couponUsageReleasedAt,
     tax: orders.tax,
     deliveryFee: orders.deliveryFee,
     serviceCharge: orders.serviceCharge,
@@ -403,7 +410,13 @@ export const validateCoupon = async (req: Request, res: Response) => {
         // Fallback: check the coupons DB table.
         if (!coupon) {
             const { coupons: couponsTable } = await import('../../src/db/schema');
-            const [dbCoupon] = await db.select().top(1).from(couponsTable).where(eq(couponsTable.code, normalizedCode));
+            const effectiveCouponBranchId = String(req.effectiveBranchId || branchId || '').trim();
+            const [dbCoupon] = await db.select().top(1).from(couponsTable).where(and(
+                eq(couponsTable.code, normalizedCode),
+                effectiveCouponBranchId
+                    ? or(isNull(couponsTable.branchId), eq(couponsTable.branchId, effectiveCouponBranchId))
+                    : isNull(couponsTable.branchId),
+            ));
             if (dbCoupon) {
                 coupon = {
                     code: dbCoupon.code,
@@ -754,17 +767,30 @@ export const getAllOrders = async (req: Request, res: Response) => {
         }
         res.json(enrichedOrders);
     } catch (error: any) {
-        console.error('[getAllOrders] Error:', error?.stack || error?.message || error);
+        console.error('[getAllOrders] Error:', error?.message || String(error));
         return writeDbError(res, error);
     }
 };
 
 export const createOrder = async (req: Request, res: Response) => {
     const idempotencyKey = getIdempotencyKeyFromRequest(req);
+    const actorPayload = req.body && typeof req.body === 'object' ? { ...req.body } : req.body;
+    if (actorPayload && typeof actorPayload === 'object') {
+        delete actorPayload.userId;
+        delete actorPayload.createdBy;
+    }
     const idempotencyHash = idempotencyKey
-        ? buildRequestHash(sanitizeIdempotencyPayload(req.body))
+        ? buildRequestHash(sanitizeIdempotencyPayload(actorPayload))
         : undefined;
     const idempotencyExpiry = new Date(Date.now() + IDEMPOTENCY_TTL_MS);
+    const actorId = req.user?.id || 'system';
+    const rawOrderIdempotencyScope = `${ORDER_CREATE_SCOPE}:${String(req.effectiveBranchId || 'UNSCOPED')}:${String(actorId)}`;
+    // SQL Server legacy installs keep idempotency_keys.scope at nvarchar(100).
+    // Public QR actors include the branch/table capability, so bound the scope
+    // deterministically instead of allowing a valid replay to become a 500.
+    const orderIdempotencyScope = rawOrderIdempotencyScope.length <= 100
+        ? rawOrderIdempotencyScope
+        : `${ORDER_CREATE_SCOPE}:h:${crypto.createHash('sha256').update(rawOrderIdempotencyScope).digest('hex').slice(0, 64)}`;
 
     const replayIdempotentResponse = async () => {
         if (!idempotencyKey || !idempotencyHash) return null;
@@ -775,7 +801,7 @@ export const createOrder = async (req: Request, res: Response) => {
             .where(
                 and(
                     eq(idempotencyKeys.key, idempotencyKey),
-                    eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE),
+                    eq(idempotencyKeys.scope, orderIdempotencyScope),
                     gt(idempotencyKeys.expiresAt, new Date()),
                 ),
             );
@@ -810,13 +836,13 @@ export const createOrder = async (req: Request, res: Response) => {
         await db.delete(idempotencyKeys).where(
             and(
                 eq(idempotencyKeys.key, idempotencyKey),
-                eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE),
+                eq(idempotencyKeys.scope, orderIdempotencyScope),
             ),
         );
     };
 
     try {
-        const { items, userId, ...bodyData } = req.body;
+        const { items, ...bodyData } = req.body;
 
         if (idempotencyKey && idempotencyHash) {
             const replay = await replayIdempotentResponse();
@@ -826,11 +852,11 @@ export const createOrder = async (req: Request, res: Response) => {
                 .select({ id: idempotencyKeys.id })
                 .top(1)
                 .from(idempotencyKeys)
-                .where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE)));
+                .where(and(eq(idempotencyKeys.key, idempotencyKey), eq(idempotencyKeys.scope, orderIdempotencyScope)));
             if (!existingClaim) {
                 await db.insert(idempotencyKeys).values({
                     key: idempotencyKey,
-                    scope: ORDER_CREATE_SCOPE,
+                    scope: orderIdempotencyScope,
                     requestHash: idempotencyHash,
                     status: 'IN_PROGRESS',
                     expiresAt: idempotencyExpiry,
@@ -850,13 +876,16 @@ export const createOrder = async (req: Request, res: Response) => {
             orderNumber: bodyData.order_number,
             type: bodyData.type,
             source: bodyData.source,
+            campaignId: cleanOptionalReference(bodyData.campaign_id || bodyData.campaignId || bodyData.utm_campaign),
             // POS manual-kitchen mode must be honored server-side as well.
             // Without this flag, the generic takeaway auto-dispatch below
             // creates a kitchen ticket even when the cashier did not send it.
             skipKitchenDispatch: bodyData.skipKitchenDispatch === true || bodyData.skip_kitchen_dispatch === true,
             platformOrderId: bodyData.platform_order_id || bodyData.platformOrderId,
             deliverySource: bodyData.delivery_source || bodyData.deliverySource,
-            branchId: cleanOptionalReference(bodyData.branch_id || bodyData.branchId), // Handle both
+            // Branch middleware is authoritative; the body is only a fallback
+            // for cross-branch monitors that explicitly selected a branch.
+            branchId: cleanOptionalReference(req.effectiveBranchId || bodyData.branch_id || bodyData.branchId),
             tableId: cleanOptionalReference(bodyData.table_id || bodyData.tableId),
             customerId: cleanOptionalReference(bodyData.customer_id || bodyData.customerId),
             customerName: bodyData.customer_name || bodyData.customerName,
@@ -1013,7 +1042,7 @@ export const createOrder = async (req: Request, res: Response) => {
                         .where(
                             and(
                                 eq(idempotencyKeys.key, idempotencyKey),
-                                eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE),
+                                eq(idempotencyKeys.scope, orderIdempotencyScope),
                             ),
                         );
                 }
@@ -1161,6 +1190,24 @@ const [customerRecordForOrder] = await db
                 missingItemIds: missingMenuItemIds,
             });
         }
+        const recipeRows = menuItemIds.length > 0
+            ? await db.select({
+                id: recipes.id,
+                menuItemId: recipes.menuItemId,
+                sizeId: recipes.sizeId,
+                currentVersionId: recipes.currentVersionId,
+                calculatedCost: recipes.calculatedCost,
+                yield: recipes.yield,
+                updatedAt: recipes.updatedAt,
+            }).from(recipes).where(inArray(recipes.menuItemId, menuItemIds)).orderBy(desc(recipes.updatedAt))
+            : [];
+        const recipeBySelection = new Map<string, typeof recipeRows[number]>();
+        for (const recipe of recipeRows) {
+            const key = `${recipe.menuItemId}:${String(recipe.sizeId || '').trim()}`;
+            if (!recipeBySelection.has(key)) recipeBySelection.set(key, recipe);
+            const baseKey = `${recipe.menuItemId}:`;
+            if (!String(recipe.sizeId || '').trim() && !recipeBySelection.has(baseKey)) recipeBySelection.set(baseKey, recipe);
+        }
         const linkedModifierRows = menuItemIds.length > 0
             ? await db.select({
                 menuItemId: menuItemModifiers.menuItemId,
@@ -1249,6 +1296,7 @@ const [sourcePlatform] = sourceKey
                 const menuItemId = resolveOrderItemMenuItemId(item);
                 const dbItem = menuLookup.get(menuItemId || '');
                 const sizeId = String(item?.sizeId || item?.size_id || '').trim();
+                const selectedRecipe = recipeBySelection.get(`${menuItemId}:${sizeId}`) || recipeBySelection.get(`${menuItemId}:`);
                 const configuredSize = sizeId && Array.isArray(dbItem?.sizes)
                     ? dbItem.sizes.find((size: any) => String(size?.id || '').trim() === sizeId)
                     : undefined;
@@ -1323,7 +1371,17 @@ const [sourcePlatform] = sourceKey
                 const platformMarkup = platformPriceConfig
                     ? Math.max(0, Number((price - basePrice).toFixed(2)))
                     : 0;
-                return { ...item, price, basePrice, platformMarkup, priceSource, modifiers: canonicalModifiers, tax: lineTax };
+                return {
+                    ...item,
+                    price,
+                    basePrice,
+                    platformMarkup,
+                    priceSource,
+                    modifiers: canonicalModifiers,
+                    tax: lineTax,
+                    recipeVersionId: selectedRecipe?.currentVersionId || null,
+                    recipeCost: Number(selectedRecipe?.calculatedCost || 0) / Math.max(1, Number(selectedRecipe?.yield || 1)),
+                };
             });
 
             const subtotal = calculatedSubtotal;
@@ -1336,8 +1394,14 @@ const [sourcePlatform] = sourceKey
                 ? Math.max(0, Math.min(subtotal * discountInput / 100, subtotal))
                 : Math.max(0, Math.min(discountInput, subtotal));
             let discountAmount = manualDiscount;
+            let couponDiscountAmount = 0;
             if (orderData.couponCode) {
-                const [coupon] = await tx.select().top(1).from(coupons).where(eq(coupons.code, orderData.couponCode));
+                const [coupon] = await tx.select().top(1).from(coupons).where(and(
+                    eq(coupons.code, orderData.couponCode),
+                    orderData.branchId
+                        ? or(isNull(coupons.branchId), eq(coupons.branchId, orderData.branchId))
+                        : isNull(coupons.branchId),
+                ));
                 const now = new Date();
                 if (!coupon || coupon.isActive === false) throw appError(400, 'COUPON_INACTIVE', 'Coupon is missing or inactive.');
                 if (coupon.startDate && now < coupon.startDate) throw appError(400, 'COUPON_NOT_STARTED', 'Coupon has not started.');
@@ -1348,6 +1412,7 @@ const [sourcePlatform] = sourceKey
                     value: Number(coupon.value),
                     maxDiscount: coupon.maxDiscount === null ? undefined : Number(coupon.maxDiscount),
                 }, subtotal);
+                couponDiscountAmount = couponDiscount;
                 discountAmount = Math.max(0, Math.min(discountAmount + couponDiscount, subtotal));
                 const [claimedCoupon] = await tx.update(coupons)
                     .set({ usedCount: sql`coalesce(${coupons.usedCount}, 0) + 1` })
@@ -1358,6 +1423,8 @@ const [sourcePlatform] = sourceKey
                         sql`(${coupons.usageLimit} is null or coalesce(${coupons.usedCount}, 0) < ${coupons.usageLimit})`,
                     ));
                 if (!claimedCoupon) throw appError(400, 'COUPON_USAGE_LIMIT_REACHED', 'Coupon usage limit was reached.');
+                if (!orderData.campaignId && coupon.campaignId) orderData.campaignId = coupon.campaignId;
+                orderData.couponCode = coupon.code;
                 orderData.discountType = 'COUPON';
                 orderData.discountReason = `Coupon: ${coupon.code}`;
             }
@@ -1508,11 +1575,17 @@ const [createdOrExistingCustomer] = await tx
             const dailyOrderNumber = await allocateDailyOrderNumber(tx, orderData.branchId, activeBusinessDate);
 
             await ensureOrderScheduledColumn();
+            await ensureCampaignAttributionSchema();
             const [newOrder] = await tx.insert(orders).output().values({
                 ...orderData,
+                // Payment state is derived from authoritative payment rows
+                // below; never trust isPaid/paidAmount supplied by the client.
+                isPaid: false,
+                paidAmount: 0,
                 orderNumber: dailyOrderNumber,
                 subtotal,
                 discount: discountAmount,
+                couponDiscountAmount,
                 tax,
                 tipAmount: orderData.tipAmount || 0,
                 serviceCharge: serviceCharge,
@@ -1546,12 +1619,14 @@ const [createdOrExistingCustomer] = await tx
                     orderId: newOrder.id,
                     menuItemId: resolveOrderItemMenuItemId(item),
                     sizeId: String(item.sizeId || item.size_id || '').trim() || null,
+                    recipeVersionId: item.recipeVersionId || null,
                     name: item.name,
                     nameAr: item.nameAr || item.name_ar || item.name,
                     price: item.price,
                     basePrice: Number(item.basePrice ?? item.price ?? 0),
                     platformMarkup: Number(item.platformMarkup || 0),
                     priceSource: String(item.priceSource || 'BASE').slice(0, 60),
+                    cost: Number(item.recipeCost || 0),
                     quantity: item.quantity,
                     tax: item.tax, // Store calculated tax per line
                     notes: item.notes,
@@ -1635,6 +1710,15 @@ const [createdOrExistingCustomer] = await tx
                 : [];
             const paymentsToInsert = rawPayments.length > 0 ? rawPayments : fallbackPayment;
 
+            let paymentTotal = 0;
+            for (const p of paymentsToInsert) {
+                const amount = Number(p?.amount);
+                if (!p?.method || !Number.isFinite(amount) || amount <= 0) {
+                    throw appError(400, 'INVALID_PAYMENT_ROW', 'Every payment must have a valid positive amount and method.');
+                }
+                paymentTotal += amount;
+            }
+
             for (let idx = 0; idx < paymentsToInsert.length; idx += 1) {
                 const p = paymentsToInsert[idx];
                 if (!p?.method || p?.amount === undefined) continue;
@@ -1648,12 +1732,19 @@ const [createdOrExistingCustomer] = await tx
                     amount: Number(p.amount),
                     referenceNumber: p.referenceNumber || p.reference_number,
                     status: 'COMPLETED',
-                    processedBy: userId || orderData.callCenterAgentId || 'system',
+                    processedBy: actorId,
                     createdAt: new Date(),
                 });
             }
 
-            const paidNow = Boolean(orderData.isPaid) || paymentsToInsert.length > 0;
+            const paidNow = paymentsToInsert.length > 0 && paymentTotal + 0.01 >= Number(total);
+            if (paymentsToInsert.length > 0) {
+                await tx.update(orders).set({
+                    isPaid: paidNow,
+                    paidAmount: paymentTotal,
+                    paymentMethod: String(paymentsToInsert[0].method),
+                }).where(eq(orders.id, newOrder.id));
+            }
 
             // Auto-release table when DINE_IN order is paid/completed
             if (paidNow && newOrder.type === 'DINE_IN' && newOrder.tableId) {
@@ -1677,7 +1768,12 @@ const [createdOrExistingCustomer] = await tx
             // without this the POS only knows temp cart ids and every
             // move fails with ORDER_ITEM_QUANTITY_UNAVAILABLE).
             const createdItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, newOrder.id));
-            return { savedOrder: { ...newOrder, items: createdItems }, paidNow, finalStocks: stocks, cogsCost };
+            return {
+                savedOrder: { ...newOrder, isPaid: paidNow, paidAmount: paymentTotal, items: createdItems },
+                paidNow,
+                finalStocks: stocks,
+                cogsCost,
+            };
         });
 
         try {
@@ -1714,7 +1810,7 @@ const [createdOrExistingCustomer] = await tx
         if (['COMPLETED', 'DELIVERED'].includes(String(savedOrder.status))) {
             analyticsService.recordOrderImpact(savedOrder.id).catch(() => {});
             if (savedOrder.customerId) {
-                loyaltyService.awardPoints(savedOrder.customerId, Number(savedOrder.total || 0), savedOrder.branchId || undefined).catch(() => {});
+                loyaltyService.awardPoints(savedOrder.customerId, Number(savedOrder.total || 0), savedOrder.branchId || undefined, String(savedOrder.id)).catch(() => {});
             }
         }
 
@@ -1777,7 +1873,7 @@ const [createdOrExistingCustomer] = await tx
                     orderId: savedOrder.id,
                     amount: Number(savedOrder.total || 0),
                     branchId: savedOrder.branchId,
-                    userId: userId || savedOrder.callCenterAgentId || 'system',
+                    userId: actorId,
                 });
             }
 
@@ -1785,7 +1881,7 @@ const [createdOrExistingCustomer] = await tx
                 orderId: savedOrder.id,
                 amount: Number(cogsCost || 0),
                 branchId: savedOrder.branchId,
-                userId: userId || savedOrder.callCenterAgentId || 'system',
+                userId: actorId,
             });
         })().catch(() => {
             // Finance exceptions capture posting failures without blocking customer flow
@@ -1813,14 +1909,41 @@ const [createdOrExistingCustomer] = await tx
                 .where(
                     and(
                         eq(idempotencyKeys.key, idempotencyKey),
-                        eq(idempotencyKeys.scope, ORDER_CREATE_SCOPE),
+                        eq(idempotencyKeys.scope, orderIdempotencyScope),
                     ),
                 );
         }
 
+        await createSignedAuditLog({
+            eventType: 'ORDER_CREATED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId: savedOrder.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: {
+                orderId: savedOrder.id,
+                orderNumber: savedOrder.orderNumber,
+                type: savedOrder.type,
+                source: savedOrder.source,
+                status: savedOrder.status,
+                itemCount: Array.isArray((savedOrder as any).items) ? (savedOrder as any).items.length : undefined,
+                total: Number(savedOrder.total || 0),
+                paymentMethod: savedOrder.paymentMethod,
+            },
+            reason: 'Order created',
+        });
+
         res.status(201).json(inventoryWarnings.length > 0 ? { ...savedOrder, warnings: inventoryWarnings } : savedOrder);
     } catch (error: any) {
-        console.error('CRITICAL ORDER ERROR:', error);
+        console.error('CRITICAL ORDER ERROR:', {
+            requestId: req.requestId,
+            message: error?.message || String(error),
+            code: error?.code,
+            number: error?.number || error?.originalError?.number,
+            constraint: error?.constraint,
+            stack: error?.stack,
+        });
         await clearIdempotencyClaim();
         if (error?.status && error?.code) {
             return res.status(error.status).json({
@@ -1836,10 +1959,20 @@ const [createdOrExistingCustomer] = await tx
             return res.status(formatted.status).json(formatted.body);
         }
 
+        const isDevelopment = process.env.NODE_ENV !== 'production';
         res.status(500).json({
             error: 'ORDER_CREATE_FAILED',
             code: 'ORDER_CREATE_FAILED',
             message: 'Order could not be saved. Please refresh and retry.',
+            requestId: req.requestId,
+            ...(isDevelopment ? {
+                debug: {
+                    message: String(error?.message || error || 'Unknown order creation error'),
+                    code: error?.code,
+                    number: error?.number || error?.originalError?.number,
+                    constraint: error?.constraint,
+                },
+            } : {}),
         });
     }
 };
@@ -1953,6 +2086,8 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
                 permissions: req.user?.permissions,
             },
         });
+        const transitionedOrder = (result as any).order || result;
+        const previousStatus = (result as any).previousStatus;
 
         if (idempotencyKey) {
             await db
@@ -1960,7 +2095,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
                 .set({
                     status: 'COMPLETED',
                     responseCode: 200,
-                    resourceId: result.id,
+                    resourceId: transitionedOrder.id,
                     responseBody: toSettingValue(result),
                     updatedAt: new Date(),
                     expiresAt: idempotencyExpiry,
@@ -1972,6 +2107,23 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
                     ),
                 );
         }
+        await createSignedAuditLog({
+            eventType: 'ORDER_STATUS_CHANGED',
+            userId: changed_by || req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: transitionedOrder.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: {
+                orderId: transitionedOrder.id,
+                status: transitionedOrder.status || nextStatus,
+                paymentMethod,
+                approvalId: approval_id,
+            },
+            before: { status: previousStatus },
+            after: { status: transitionedOrder.status || nextStatus },
+            reason: notes || 'Order status changed',
+        });
         res.json(result);
     } catch (error: any) {
         await clearIdempotencyClaim();
@@ -2110,9 +2262,21 @@ const [currentOrder] = await tx.select().top(1).from(orders).where(eq(orders.id,
                 .output()
                 .where(eq(orders.id, orderId));
 
-            return { order: updatedOrder, customer: crmCustomer };
+            return { order: updatedOrder, customer: crmCustomer, previousCustomerId: currentOrder.customerId };
         });
 
+        await createSignedAuditLog({
+            eventType: 'ORDER_CUSTOMER_UPDATED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: updated.order.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: { orderId, customerId: updated.customer?.id },
+            before: { customerId: updated.previousCustomerId },
+            after: { customerId: updated.customer?.id },
+            reason: 'Order customer updated',
+        });
         emitBranchEvent(updated.order.branchId, 'order:updated', updated.order);
         res.json(updated);
     } catch (error: any) {
@@ -2553,6 +2717,23 @@ export const updateOrderItems = async (req: Request, res: Response) => {
         emitBranchEvent(currentOrder.branchId, 'order:updated', { id: orderId, total, updatedAt: now });
         const [fullOrder] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
         const freshItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+        await createSignedAuditLog({
+            eventType: 'ORDER_ITEMS_UPDATED',
+            userId: changedBy,
+            userRole: req.user?.role,
+            branchId: currentOrder.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: {
+                orderId,
+                itemCount: freshItems.length,
+                total: Number(total || 0),
+                warnings: inventoryWarnings.map((warning) => warning.code),
+            },
+            before: { itemCount: oldLines.length, total: Number(currentOrder.total || 0) },
+            after: { itemCount: freshItems.length, total: Number(total || 0) },
+            reason: editNotes || 'Order items updated',
+        });
         res.json({ ...(fullOrder || result), items: freshItems, warnings: inventoryWarnings });
     } catch (error: any) {
         const statusCode = Number(error?.status) || 500;
@@ -2622,6 +2803,24 @@ export const splitOrder = async (req: Request, res: Response) => {
                     total: sql`total - ${newTotal}`,
                 })
                 .where(eq(orders.id, parentOrderId));
+        });
+
+        await createSignedAuditLog({
+            eventType: 'ORDER_SPLIT',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: parentOrder.branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers['user-agent'],
+            payload: {
+                parentOrderId,
+                childOrderId,
+                extractedItemCount: itemsToSplit.length,
+                extractedTotal: newTotal,
+            },
+            before: { parentTotal: Number(parentOrder.total || 0) },
+            after: { parentTotal: Number(parentOrder.total || 0) - newTotal, childTotal: newTotal },
+            reason: 'Order split',
         });
 
         res.json({ success: true, parentOrderId, childOrderId });

@@ -1,0 +1,827 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 4,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 4,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 4,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "scripts/validate-env.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 215,
+      "nonEmptyLines": 187,
+      "functions": [
+        {
+          "name": "validateEnvironment",
+          "startLine": 97,
+          "endLine": 171,
+          "params": [
+            "env"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validateEnvironment",
+          "line": 97,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "validateEnvironment",
+          "callee": "value.trim",
+          "lineNumber": 110
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 112
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "categoryMap[rule.category].missing.push",
+          "lineNumber": 113
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "warnings.push",
+          "lineNumber": 116
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "categoryMap[rule.category].missing.push",
+          "lineNumber": 118
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "rule.validate",
+          "lineNumber": 123
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 124
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "env.CORS_ORIGINS.trim",
+          "lineNumber": 132
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 133
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 136
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 139
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 142
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 145
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "ENV_RULES.filter(rule => rule.category === 'Fiscal').map",
+          "lineNumber": 148
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "ENV_RULES.filter",
+          "lineNumber": 148
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "etaRequired.filter",
+          "lineNumber": 149
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 151
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "missingEta.join",
+          "lineNumber": 151
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "String(env.WHATSAPP_PROVIDER || '').toLowerCase",
+          "lineNumber": 154
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "String",
+          "lineNumber": 154
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 157
+        },
+        {
+          "caller": "validateEnvironment",
+          "callee": "errors.push",
+          "lineNumber": 161
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/config/loadEnv.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3,
+      "nonEmptyLines": 2,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 179,
+      "nonEmptyLines": 161,
+      "functions": [
+        {
+          "name": "writeReadyFile",
+          "startLine": 28,
+          "endLine": 40,
+          "params": []
+        },
+        {
+          "name": "shouldStartWhatsAppEngine",
+          "startLine": 52,
+          "endLine": 64,
+          "params": []
+        },
+        {
+          "name": "shouldStartDirectZktecoAutoSync",
+          "startLine": 66,
+          "endLine": 69,
+          "params": []
+        },
+        {
+          "name": "start",
+          "startLine": 71,
+          "endLine": 153,
+          "params": []
+        },
+        {
+          "name": "shutdown",
+          "startLine": 160,
+          "endLine": 164,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "writeReadyFile",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 30
+        },
+        {
+          "caller": "writeReadyFile",
+          "callee": "fs.writeFileSync",
+          "lineNumber": 31
+        },
+        {
+          "caller": "writeReadyFile",
+          "callee": "JSON.stringify",
+          "lineNumber": 31
+        },
+        {
+          "caller": "writeReadyFile",
+          "callee": "Number",
+          "lineNumber": 33
+        },
+        {
+          "caller": "writeReadyFile",
+          "callee": "new Date().toISOString",
+          "lineNumber": 35
+        },
+        {
+          "caller": "shouldStartWhatsAppEngine",
+          "callee": "String(process.env.WHATSAPP_PROVIDER ?? 'whatsapp-web.js').toLowerCase().trim",
+          "lineNumber": 53
+        },
+        {
+          "caller": "shouldStartWhatsAppEngine",
+          "callee": "String(process.env.WHATSAPP_PROVIDER ?? 'whatsapp-web.js').toLowerCase",
+          "lineNumber": 53
+        },
+        {
+          "caller": "shouldStartWhatsAppEngine",
+          "callee": "String",
+          "lineNumber": 53
+        },
+        {
+          "caller": "start",
+          "callee": "validateEnvironment",
+          "lineNumber": 76
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 78
+        },
+        {
+          "caller": "start",
+          "callee": "validation.errors.join",
+          "lineNumber": 78
+        },
+        {
+          "caller": "start",
+          "callee": "process.exit",
+          "lineNumber": 79
+        },
+        {
+          "caller": "start",
+          "callee": "requiredVars.filter",
+          "lineNumber": 81
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 83
+        },
+        {
+          "caller": "start",
+          "callee": "missing.join",
+          "lineNumber": 83
+        },
+        {
+          "caller": "start",
+          "callee": "process.exit",
+          "lineNumber": 84
+        },
+        {
+          "caller": "start",
+          "callee": "etaVars.filter",
+          "lineNumber": 93
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 95
+        },
+        {
+          "caller": "start",
+          "callee": "missingEta.join",
+          "lineNumber": 95
+        },
+        {
+          "caller": "start",
+          "callee": "process.exit",
+          "lineNumber": 96
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 100
+        },
+        {
+          "caller": "start",
+          "callee": "process.exit",
+          "lineNumber": 101
+        },
+        {
+          "caller": "start",
+          "callee": "initSocket",
+          "lineNumber": 105
+        },
+        {
+          "caller": "start",
+          "callee": "import('./controllers/orderController')\r\n        .then(m => (m as any).ensureOrderItemsSizeIdColumn?.())\r\n        .catch",
+          "lineNumber": 108
+        },
+        {
+          "caller": "start",
+          "callee": "import('./controllers/orderController')\r\n        .then",
+          "lineNumber": 108
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 108
+        },
+        {
+          "caller": "start",
+          "callee": "(m as any).ensureOrderItemsSizeIdColumn",
+          "lineNumber": 109
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 110
+        },
+        {
+          "caller": "start",
+          "callee": "import('./controllers/orderController')\r\n        .then(m => (m as any).ensureOrderScheduledColumn?.())\r\n        .catch",
+          "lineNumber": 111
+        },
+        {
+          "caller": "start",
+          "callee": "import('./controllers/orderController')\r\n        .then",
+          "lineNumber": 111
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 111
+        },
+        {
+          "caller": "start",
+          "callee": "(m as any).ensureOrderScheduledColumn",
+          "lineNumber": 112
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 113
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/perfIndexService')\r\n        .then(m => (m as any).ensurePerfIndexes?.())\r\n        .catch",
+          "lineNumber": 114
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/perfIndexService')\r\n        .then",
+          "lineNumber": 114
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 114
+        },
+        {
+          "caller": "start",
+          "callee": "(m as any).ensurePerfIndexes",
+          "lineNumber": 115
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 116
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/scheduledOrderService')\r\n        .then(m => (m as any).scheduledOrderService?.start?.())\r\n        .catch",
+          "lineNumber": 117
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/scheduledOrderService')\r\n        .then",
+          "lineNumber": 117
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 117
+        },
+        {
+          "caller": "start",
+          "callee": "(m as any).scheduledOrderService?.start",
+          "lineNumber": 118
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 119
+        },
+        {
+          "caller": "start",
+          "callee": "server.listen",
+          "lineNumber": 122
+        },
+        {
+          "caller": "start",
+          "callee": "Number",
+          "lineNumber": 122
+        },
+        {
+          "caller": "start",
+          "callee": "console.log",
+          "lineNumber": 123
+        },
+        {
+          "caller": "start",
+          "callee": "writeReadyFile",
+          "lineNumber": 124
+        },
+        {
+          "caller": "start",
+          "callee": "setInterval",
+          "lineNumber": 125
+        },
+        {
+          "caller": "start",
+          "callee": "shouldStartWhatsAppEngine",
+          "lineNumber": 128
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/whatsappService')\r\n            .then(w => w.whatsappService.initialize())\r\n            .catch",
+          "lineNumber": 129
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/whatsappService')\r\n            .then",
+          "lineNumber": 129
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 129
+        },
+        {
+          "caller": "start",
+          "callee": "w.whatsappService.initialize",
+          "lineNumber": 130
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 131
+        },
+        {
+          "caller": "start",
+          "callee": "console.log",
+          "lineNumber": 133
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/retentionService').then",
+          "lineNumber": 135
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 135
+        },
+        {
+          "caller": "start",
+          "callee": "r.retentionService.startCron",
+          "lineNumber": 135
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/dynamicPricingService').then",
+          "lineNumber": 136
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 136
+        },
+        {
+          "caller": "start",
+          "callee": "d.dynamicPricingService.startCron",
+          "lineNumber": 136
+        },
+        {
+          "caller": "start",
+          "callee": "shouldStartDirectZktecoAutoSync",
+          "lineNumber": 137
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/zktecoConnectorService')\r\n            .then(z => z.zktecoConnectorService.startAutoSync(Number(process.env.ATTENDANCE_DIRECT_ZK_INTERVAL_MINUTES || 15)))\r\n            .catch",
+          "lineNumber": 138
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/zktecoConnectorService')\r\n            .then",
+          "lineNumber": 138
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 138
+        },
+        {
+          "caller": "start",
+          "callee": "z.zktecoConnectorService.startAutoSync",
+          "lineNumber": 139
+        },
+        {
+          "caller": "start",
+          "callee": "Number",
+          "lineNumber": 139
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 140
+        },
+        {
+          "caller": "start",
+          "callee": "console.log",
+          "lineNumber": 142
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/alertService').then",
+          "lineNumber": 144
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 144
+        },
+        {
+          "caller": "start",
+          "callee": "a.alertService.startHealthMonitor",
+          "lineNumber": 144
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/deploymentHeartbeatService').then",
+          "lineNumber": 145
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 145
+        },
+        {
+          "caller": "start",
+          "callee": "d.deploymentHeartbeatService.start",
+          "lineNumber": 145
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/backupCronService').then",
+          "lineNumber": 146
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 146
+        },
+        {
+          "caller": "start",
+          "callee": "b.backupCronService.startDailyBackup",
+          "lineNumber": 146
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/dayCloseAutoCloseService').then(m => m.dayCloseAutoCloseService.start())\r\n        .catch",
+          "lineNumber": 147
+        },
+        {
+          "caller": "start",
+          "callee": "import('./services/dayCloseAutoCloseService').then",
+          "lineNumber": 147
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 147
+        },
+        {
+          "caller": "start",
+          "callee": "m.dayCloseAutoCloseService.start",
+          "lineNumber": 147
+        },
+        {
+          "caller": "start",
+          "callee": "console.error",
+          "lineNumber": 148
+        },
+        {
+          "caller": "start",
+          "callee": "initRedisCache",
+          "lineNumber": 150
+        },
+        {
+          "caller": "start",
+          "callee": "import('./workers/checkoutWorker').then",
+          "lineNumber": 151
+        },
+        {
+          "caller": "start",
+          "callee": "import",
+          "lineNumber": 151
+        },
+        {
+          "caller": "start",
+          "callee": "w.startCheckoutWorker",
+          "lineNumber": 151
+        },
+        {
+          "caller": "shutdown",
+          "callee": "closeSocket",
+          "lineNumber": 161
+        },
+        {
+          "caller": "shutdown",
+          "callee": "closeDatabase",
+          "lineNumber": 162
+        },
+        {
+          "caller": "shutdown",
+          "callee": "process.exit",
+          "lineNumber": 163
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 0,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/utils/redisCache.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 61,
+      "nonEmptyLines": 54,
+      "functions": [
+        {
+          "name": "initRedisCache",
+          "startLine": 7,
+          "endLine": 27,
+          "params": []
+        },
+        {
+          "name": "getCache",
+          "startLine": 29,
+          "endLine": 38,
+          "params": [
+            "key"
+          ]
+        },
+        {
+          "name": "setCache",
+          "startLine": 40,
+          "endLine": 49,
+          "params": [
+            "key",
+            "value",
+            "ttlSeconds"
+          ]
+        },
+        {
+          "name": "clearCache",
+          "startLine": 51,
+          "endLine": 61,
+          "params": [
+            "keyPrefix"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "initRedisCache",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "getCache",
+          "line": 29,
+          "isDefault": false
+        },
+        {
+          "name": "setCache",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "clearCache",
+          "line": 51,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "initRedisCache",
+          "callee": "logger.info",
+          "lineNumber": 12
+        },
+        {
+          "caller": "initRedisCache",
+          "callee": "createClient",
+          "lineNumber": 17
+        },
+        {
+          "caller": "initRedisCache",
+          "callee": "cacheClient.on",
+          "lineNumber": 18
+        },
+        {
+          "caller": "initRedisCache",
+          "callee": "logger.error",
+          "lineNumber": 18
+        },
+        {
+          "caller": "initRedisCache",
+          "callee": "cacheClient.connect",
+          "lineNumber": 19
+        },
+        {
+          "caller": "initRedisCache",
+          "callee": "logger.info",
+          "lineNumber": 21
+        },
+        {
+          "caller": "initRedisCache",
+          "callee": "logger.error",
+          "lineNumber": 23
+        },
+        {
+          "caller": "getCache",
+          "callee": "cacheClient.get",
+          "lineNumber": 32
+        },
+        {
+          "caller": "getCache",
+          "callee": "JSON.parse",
+          "lineNumber": 33
+        },
+        {
+          "caller": "getCache",
+          "callee": "String",
+          "lineNumber": 33
+        },
+        {
+          "caller": "getCache",
+          "callee": "logger.error",
+          "lineNumber": 35
+        },
+        {
+          "caller": "setCache",
+          "callee": "cacheClient.setEx",
+          "lineNumber": 43
+        },
+        {
+          "caller": "setCache",
+          "callee": "JSON.stringify",
+          "lineNumber": 43
+        },
+        {
+          "caller": "setCache",
+          "callee": "logger.error",
+          "lineNumber": 46
+        },
+        {
+          "caller": "clearCache",
+          "callee": "cacheClient.keys",
+          "lineNumber": 54
+        },
+        {
+          "caller": "clearCache",
+          "callee": "cacheClient.del",
+          "lineNumber": 56
+        },
+        {
+          "caller": "clearCache",
+          "callee": "logger.error",
+          "lineNumber": 59
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 4,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    }
+  ]
+}

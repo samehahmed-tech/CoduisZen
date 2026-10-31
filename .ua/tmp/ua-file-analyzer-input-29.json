@@ -1,0 +1,44 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/validate-env.ts",
+      "language": "typescript",
+      "sizeLines": 215,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/config/loadEnv.ts",
+      "language": "typescript",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/index.ts",
+      "language": "typescript",
+      "sizeLines": 179,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/redisCache.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "scripts/validate-env.ts": [],
+    "server/config/loadEnv.ts": [],
+    "server/index.ts": [
+      "scripts/validate-env.ts",
+      "server/app.ts",
+      "server/config/loadEnv.ts",
+      "server/db/index.ts",
+      "server/socket.ts",
+      "server/utils/redisCache.ts"
+    ],
+    "server/utils/redisCache.ts": [
+      "server/utils/logger.ts"
+    ]
+  }
+}

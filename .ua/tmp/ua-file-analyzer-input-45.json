@@ -1,0 +1,133 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/README AR - Final Setup.txt",
+      "language": "txt",
+      "sizeLines": 40,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/README_AR.md",
+      "language": "markdown",
+      "sizeLines": 89,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/build-business-day-reopen-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-catalog-export.ps1",
+      "language": "powershell",
+      "sizeLines": 17,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-catalog-update.ps1",
+      "language": "powershell",
+      "sizeLines": 20,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-data-maintenance-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 17,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-discount-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 34,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 243,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-kds-order-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 26,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-local-image-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 42,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-operational-reset.ps1",
+      "language": "powershell",
+      "sizeLines": 14,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-order-save-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 19,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-print-bridge-hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 68,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-print-routing-hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 85,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-recipe-quantity-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 33,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-sameh-installer.ps1",
+      "language": "powershell",
+      "sizeLines": 182,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/build-table-pos-fix.ps1",
+      "language": "powershell",
+      "sizeLines": 32,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/one-click-builder.ps1",
+      "language": "powershell",
+      "sizeLines": 78,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/README AR - Final Setup.txt": [],
+    "scripts/sameh-installer/README_AR.md": [],
+    "scripts/sameh-installer/build-business-day-reopen-fix.ps1": [],
+    "scripts/sameh-installer/build-catalog-export.ps1": [],
+    "scripts/sameh-installer/build-catalog-update.ps1": [],
+    "scripts/sameh-installer/build-data-maintenance-fix.ps1": [],
+    "scripts/sameh-installer/build-discount-fix.ps1": [],
+    "scripts/sameh-installer/build-hotfix.ps1": [],
+    "scripts/sameh-installer/build-kds-order-fix.ps1": [],
+    "scripts/sameh-installer/build-local-image-fix.ps1": [],
+    "scripts/sameh-installer/build-operational-reset.ps1": [],
+    "scripts/sameh-installer/build-order-save-fix.ps1": [],
+    "scripts/sameh-installer/build-print-bridge-hotfix.ps1": [],
+    "scripts/sameh-installer/build-print-routing-hotfix.ps1": [],
+    "scripts/sameh-installer/build-recipe-quantity-fix.ps1": [],
+    "scripts/sameh-installer/build-sameh-installer.ps1": [],
+    "scripts/sameh-installer/build-table-pos-fix.ps1": [],
+    "scripts/sameh-installer/one-click-builder.ps1": []
+  }
+}

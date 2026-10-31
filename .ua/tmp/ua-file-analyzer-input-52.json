@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/discount-fix/Apply Discount Fix.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/discount-fix/Apply Discount Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 139,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/discount-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 17,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/discount-fix/Apply Discount Fix.bat": [],
+    "scripts/sameh-installer/discount-fix/Apply Discount Fix.ps1": [],
+    "scripts/sameh-installer/discount-fix/README AR.txt": []
+  }
+}

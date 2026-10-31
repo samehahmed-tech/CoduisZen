@@ -25,6 +25,16 @@ declare module 'express-serve-static-core' {
 export const isCrossBranchMonitor = (role: unknown) =>
     ['SUPER_ADMIN', 'CALL_CENTER', 'CALL_CENTER_MANAGER'].includes(String(role || ''));
 
+/** Central authorization predicate for resources that are already loaded by id. */
+export const canAccessBranch = (user: Request['user'], branchId: unknown): boolean => {
+    if (!user) return false;
+    const target = String(branchId || '').trim();
+    if (!target) return false;
+    if (isCrossBranchMonitor(user.role)) return true;
+    const allowed = new Set([user.branchId, ...(user.allowedBranches || [])].filter(Boolean).map(String));
+    return allowed.has(target);
+};
+
 /**
  * Enforces branch isolation.
  * - SUPER_ADMIN and the call-center roles can specify any branchId via
@@ -114,6 +124,16 @@ export const scopeBranchQuery = (req: Request, res: Response, next: NextFunction
         }
         if (req.effectiveBranchId) {
             req.query.branchId = req.effectiveBranchId;
+            // Query scoping alone is not enough for mutation endpoints that
+            // pass branchId in the body (attendance devices, HR actions,
+            // report exports, etc.). Normalize both spellings so downstream
+            // services cannot accidentally trust a client-supplied branch.
+            if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+                req.body.branchId = req.effectiveBranchId;
+                if (Object.prototype.hasOwnProperty.call(req.body, 'branch_id')) {
+                    req.body.branch_id = req.effectiveBranchId;
+                }
+            }
         } else if (req.user?.role !== 'SUPER_ADMIN' && !isCrossBranchMonitor(req.user?.role)) {
             return res.status(403).json({
                 error: 'BRANCH_SCOPE_REQUIRED',

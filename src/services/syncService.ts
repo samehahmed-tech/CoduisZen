@@ -8,15 +8,13 @@ import { customersApi } from '../../services/api/customers';
 import { menuApi } from '../../services/api/menu';
 import { inventoryApi } from '../../services/api/inventory';
 import { deploymentApi } from '../../services/api/deployment';
-import { buildDedupeKey, computeNextAttempt } from './syncQueueUtils';
+import { assertOfflinePaymentPolicy, assertQueueBranch, assertSupportedSyncOperation, buildDedupeKey, claimSyncQueueItem, classifySyncError, computeNextAttempt, isOfflinePayloadConflict, isQueueItemForBranch, isSyncLockStale, mergeConflictPayload, resolveQueueBranchId, serializeSyncConflict } from './syncQueueUtils';
 
 const MAX_RETRIES = 10;
 const BASE_RETRY_MS = 2000;
 
 const isReplaySafeConflict = (error: any) => {
-    const status = Number(error?.status || 0);
     const code = String(error?.code || error?.message || '').toUpperCase();
-    if (status === 409) return true;
     if (code.includes('ALREADY_EXISTS')) return true;
     if (code.includes('DUPLICATE')) return true;
     if (code.includes('UNIQUE')) return true;
@@ -29,12 +27,13 @@ const enrichPayload = (payload: any) => {
     return { ...payload, clientUpdatedAt: Date.now() };
 };
 
-const createQueueItem = (entity: string, action: string, payload: any): SyncQueueItem => ({
+const createQueueItem = (entity: string, action: string, payload: any, branchId: string): SyncQueueItem => ({
     id: `SYNC-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase(),
     entity,
     action,
     payload: enrichPayload(payload),
-    dedupeKey: buildDedupeKey(entity, action, payload),
+    dedupeKey: buildDedupeKey(entity, action, payload, branchId),
+    branchId,
     status: 'PENDING',
     retryCount: 0,
     createdAt: Date.now(),
@@ -47,26 +46,54 @@ export const syncService = {
     _intervalId: undefined as ReturnType<typeof setInterval> | undefined,
 
     async queue(entity: string, action: string, payload: any) {
-        const item = createQueueItem(entity, action, payload);
-        const existing = await localDb.syncQueue
-            .where('dedupeKey')
-            .equals(item.dedupeKey)
-            .and(i => i.status !== 'SYNCED')
-            .first();
-
-        if (existing) {
-            await localDb.syncQueue.update(existing.id, {
-                payload: item.payload,
-                status: 'PENDING',
-                retryCount: 0,
-                lastError: undefined,
-                nextAttemptAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-            return;
+        assertSupportedSyncOperation(entity, action);
+        const app = await localDb.settings.get('app');
+        const branchId = resolveQueueBranchId(payload, app?.value?.activeBranchId || app?.value?.branchId);
+        const scopedPayload = payload && typeof payload === 'object' && !payload.branchId
+            ? { ...payload, branchId }
+            : payload;
+        if (entity === 'order' && String(action).toUpperCase() === 'CREATE') {
+            assertOfflinePaymentPolicy(scopedPayload);
         }
+        const item = createQueueItem(entity, action, scopedPayload, branchId);
+        // The dedupe lookup and write must share one IndexedDB transaction.
+        // Otherwise two tabs can both observe no existing item and enqueue the
+        // same order/payment mutation before either write becomes visible.
+        await localDb.transaction('rw', localDb.syncQueue, async () => {
+            const existing = await localDb.syncQueue
+                .where('dedupeKey')
+                .equals(item.dedupeKey)
+                .and(i => i.status !== 'SYNCED')
+                .first();
 
-        await localDb.syncQueue.add(item);
+            if (existing) {
+                if (isOfflinePayloadConflict(entity, action, existing.payload, item.payload)) {
+                    await localDb.syncQueue.update(existing.id, {
+                        status: 'CONFLICT',
+                        lastError: 'IDEMPOTENCY_KEY_PAYLOAD_CONFLICT',
+                        conflict: {
+                            code: 'IDEMPOTENCY_KEY_PAYLOAD_CONFLICT',
+                            message: 'The same offline order id was queued with a different payload.',
+                            detectedAt: Date.now(),
+                        },
+                        nextAttemptAt: undefined,
+                        updatedAt: Date.now(),
+                    });
+                    return;
+                }
+                await localDb.syncQueue.update(existing.id, {
+                    payload: item.payload,
+                    status: 'PENDING',
+                    retryCount: 0,
+                    lastError: undefined,
+                    nextAttemptAt: Date.now(),
+                    updatedAt: Date.now(),
+                });
+                return;
+            }
+
+            await localDb.syncQueue.add(item);
+        });
     },
 
     async syncPending() {
@@ -75,6 +102,10 @@ export const syncService = {
         this._isSyncing = true;
 
         try {
+            const app = await localDb.settings.get('app');
+            const activeBranchId = String(app?.value?.activeBranchId || app?.value?.branchId || '').trim();
+            if (!activeBranchId) return;
+            await this.quarantineLegacyQueueItems(activeBranchId);
             await this.pullCentralCommands().catch(() => undefined);
             const now = Date.now();
             const candidates = await localDb.syncQueue
@@ -83,16 +114,15 @@ export const syncService = {
                 .toArray();
 
             const pending = candidates
-                .filter(item => !item.lockedAt)
+                .filter(item => !item.lockedAt || isSyncLockStale(item.lockedAt, now))
+                .filter(item => item.branchId === activeBranchId)
                 .filter(item => (item.retryCount || 0) < MAX_RETRIES)
                 .filter(item => (item.nextAttemptAt ?? 0) <= now)
                 .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
             for (const item of pending) {
-                await localDb.syncQueue.update(item.id, {
-                    lockedAt: Date.now(),
-                    lastAttemptAt: Date.now(),
-                });
+                const claimed = await claimSyncQueueItem(localDb, item, activeBranchId);
+                if (!claimed) continue;
 
                 try {
                     await this.processItem(item);
@@ -104,14 +134,25 @@ export const syncService = {
                     });
                 } catch (error: any) {
                     const retryCount = (item.retryCount || 0) + 1;
-                    await localDb.syncQueue.update(item.id, {
-                        status: 'FAILED',
-                        retryCount,
-                        lastError: error.message,
-                        updatedAt: Date.now(),
-                        nextAttemptAt: computeNextAttempt(retryCount, BASE_RETRY_MS),
-                        lockedAt: undefined,
-                    });
+                    const classification = classifySyncError(error);
+                    await localDb.syncQueue.update(item.id, classification === 'CONFLICT'
+                        ? {
+                            status: 'CONFLICT',
+                            retryCount,
+                            lastError: error.message,
+                            conflict: serializeSyncConflict(error),
+                            updatedAt: Date.now(),
+                            lockedAt: undefined,
+                            nextAttemptAt: undefined,
+                        }
+                        : {
+                            status: 'FAILED',
+                            retryCount,
+                            lastError: error.message,
+                            updatedAt: Date.now(),
+                            nextAttemptAt: computeNextAttempt(retryCount, BASE_RETRY_MS),
+                            lockedAt: undefined,
+                        });
                 }
             }
         } finally {
@@ -127,9 +168,14 @@ export const syncService = {
     async pullCentralCommands() {
         const config = await this.getDeploymentSettings();
         if (config.deploymentMode !== 'BRANCH' || !config.deploymentCentralApiUrl || !config.deploymentSiteId || !config.deploymentSiteToken) return;
+        const activeBranchId = String(config.activeBranchId || config.branchId || '').trim();
+        if (!activeBranchId) return;
         const result = await deploymentApi.pullCommandsAt(config.deploymentCentralApiUrl, config.deploymentSiteId, config.deploymentSiteToken);
         for (const command of result.commands || []) {
             try {
+                // Central commands are still untrusted at the branch boundary.
+                // Never apply or acknowledge a command carrying another branch.
+                assertQueueBranch(resolveQueueBranchId(command.payload, activeBranchId), activeBranchId);
                 if (command.entity === 'menuCategory') {
                     if (command.action === 'CREATE') await menuApi.createCategory(command.payload);
                     if (command.action === 'UPDATE') await menuApi.updateCategory(command.payload.id, command.payload);
@@ -177,6 +223,13 @@ export const syncService = {
     },
 
     async processItem(item: SyncQueueItem) {
+        const app = await localDb.settings.get('app');
+        const activeBranchId = app?.value?.activeBranchId || app?.value?.branchId;
+        assertQueueBranch(item.branchId, activeBranchId);
+        // The queue envelope and payload are both untrusted at replay time.
+        // Reject a payload that was retargeted after it was queued.
+        assertQueueBranch(resolveQueueBranchId(item.payload, activeBranchId), item.branchId);
+        assertSupportedSyncOperation(item.entity, item.action);
         const { entity, action, payload } = item;
 
         switch (entity) {
@@ -225,16 +278,8 @@ export const syncService = {
                         throw error;
                     }
                 }
-                break;
-            case 'branch':
-                if (action === 'CREATE') {
-                    try {
-                        return await branchesApi.create(payload);
-                    } catch (error: any) {
-                        if (isReplaySafeConflict(error)) return;
-                        throw error;
-                    }
-                }
+                if (action === 'UPDATE') return inventoryApi.updateWarehouse(payload.id, payload);
+                if (action === 'DELETE') return inventoryApi.deleteWarehouse(payload.id);
                 break;
             case 'stockUpdate':
                 return inventoryApi.updateStock({
@@ -255,17 +300,15 @@ export const syncService = {
                 break;
             case 'order':
                 if (action === 'CREATE') {
-                    try {
-                        const result = await ordersApi.create(payload, { idempotencyKey: item.dedupeKey || item.id });
-                        await localDb.orders.update(payload.id, { syncStatus: 'SYNCED' } as any);
-                        return result;
-                    } catch (error: any) {
-                        if (error?.status === 409) {
-                            await localDb.orders.update(payload.id, { syncStatus: 'SYNCED' } as any);
-                            return;
-                        }
-                        throw error;
-                    }
+                    assertOfflinePaymentPolicy(payload);
+                    // The server returns 200 for a safe idempotent replay. A
+                    // 409 is not success: it can mean a payload conflict or
+                    // an in-progress claim, both of which must remain visible
+                    // to the queue classifier instead of being hidden as
+                    // SYNCED.
+                    const result = await ordersApi.create(payload, { idempotencyKey: item.dedupeKey || item.id });
+                    await localDb.orders.update(payload.id, { syncStatus: 'SYNCED' } as any);
+                    return result;
                 }
                 break;
             case 'orderStatus':
@@ -312,6 +355,11 @@ export const syncService = {
             default:
                 throw new Error(`Unknown sync entity: ${entity}`);
         }
+
+        // Every supported operation must return from its case. This guard
+        // prevents an accidentally added action from being marked SYNCED
+        // without an API call.
+        throw new Error(`UNSUPPORTED_OFFLINE_OPERATION:${entity}:${action}`);
     },
 
     initSyncInterval(ms: number = 30000) {
@@ -333,13 +381,125 @@ export const syncService = {
     },
 
     async getQueueStats() {
+        const app = await localDb.settings.get('app');
+        const activeBranchId = String(app?.value?.activeBranchId || app?.value?.branchId || '').trim();
+        if (activeBranchId) await this.quarantineLegacyQueueItems(activeBranchId);
         const all = await localDb.syncQueue.toArray();
+        const scoped = activeBranchId
+            ? all.filter(item => isQueueItemForBranch(item.branchId, activeBranchId))
+            : [];
         return {
-            total: all.length,
-            pending: all.filter(i => i.status === 'PENDING').length,
-            failed: all.filter(i => i.status === 'FAILED').length,
-            synced: all.filter(i => i.status === 'SYNCED').length,
+            total: scoped.length,
+            pending: scoped.filter(i => i.status === 'PENDING').length,
+            failed: scoped.filter(i => i.status === 'FAILED').length,
+            conflicts: scoped.filter(i => i.status === 'CONFLICT').length,
+            synced: scoped.filter(i => i.status === 'SYNCED').length,
         };
+    },
+
+    async resolveConflict(id: string, resolution: 'RETRY' | 'DISCARD' | 'MERGE') {
+        const item = await localDb.syncQueue.get(id);
+        if (!item || item.status !== 'CONFLICT') return false;
+        const app = await localDb.settings.get('app');
+        assertQueueBranch(item.branchId, app?.value?.activeBranchId || app?.value?.branchId);
+        const mergedPayload = resolution === 'MERGE'
+            ? (() => {
+                if (!item.conflict?.serverState) throw new Error('MERGE_REQUIRES_SERVER_STATE');
+                return mergeConflictPayload(item.payload, item.conflict.serverState);
+            })()
+            : undefined;
+
+        // Resolution is itself a business event. Queue it before changing the
+        // conflict state so a local storage failure cannot silently lose the
+        // audit trail.
+        await this.queue('auditLog', 'CREATE', {
+            id: `OFFLINE-CONFLICT-${id}-${Date.now()}`,
+            eventType: 'OFFLINE_CONFLICT_RESOLVED',
+            branchId: item.branchId,
+            entity: item.entity,
+            action: item.action,
+            resolution,
+            conflictCode: item.conflict?.code,
+            queueItemId: id,
+        });
+
+        if (resolution === 'MERGE') {
+            await localDb.syncQueue.update(id, {
+                payload: mergedPayload,
+                status: 'PENDING',
+                retryCount: 0,
+                nextAttemptAt: Date.now(),
+                lockedAt: undefined,
+                lastError: undefined,
+                conflict: undefined,
+                updatedAt: Date.now(),
+            });
+        } else if (resolution === 'RETRY') {
+            await localDb.syncQueue.update(id, {
+                status: 'PENDING',
+                retryCount: 0,
+                nextAttemptAt: Date.now(),
+                lockedAt: undefined,
+                lastError: undefined,
+                conflict: undefined,
+                updatedAt: Date.now(),
+            });
+        } else {
+            await localDb.syncQueue.update(id, {
+                status: 'SYNCED',
+                lockedAt: undefined,
+                nextAttemptAt: undefined,
+                lastError: undefined,
+                conflict: undefined,
+                updatedAt: Date.now(),
+            });
+        }
+        return true;
+    },
+
+    async retryFailed(id: string) {
+        const item = await localDb.syncQueue.get(id);
+        if (!item || item.status !== 'FAILED') return false;
+        const app = await localDb.settings.get('app');
+        assertQueueBranch(item.branchId, app?.value?.activeBranchId || app?.value?.branchId);
+
+        await this.queue('auditLog', 'CREATE', {
+            id: `OFFLINE-FAILED-RETRY-${id}-${Date.now()}`,
+            eventType: 'OFFLINE_SYNC_RETRY_REQUESTED',
+            branchId: item.branchId,
+            entity: item.entity,
+            action: item.action,
+            queueItemId: id,
+            previousRetryCount: item.retryCount,
+        });
+
+        await localDb.syncQueue.update(id, {
+            status: 'PENDING',
+            retryCount: 0,
+            nextAttemptAt: Date.now(),
+            lockedAt: undefined,
+            lastError: undefined,
+            updatedAt: Date.now(),
+        });
+        return true;
+    },
+
+    async quarantineLegacyQueueItems(activeBranchId: string) {
+        const legacy = await localDb.syncQueue.filter(item => !item.branchId).toArray();
+        for (const item of legacy) {
+            await localDb.syncQueue.update(item.id, {
+                status: 'CONFLICT',
+                conflict: {
+                    code: 'OFFLINE_BRANCH_UNKNOWN',
+                    message: 'This offline change was created before branch binding and must be reviewed before sync.',
+                    detectedAt: Date.now(),
+                },
+                lastError: 'OFFLINE_BRANCH_UNKNOWN',
+                updatedAt: Date.now(),
+                lockedAt: undefined,
+                branchId: activeBranchId,
+            } as any);
+        }
     },
 };
 

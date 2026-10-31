@@ -2,10 +2,13 @@ import { Router } from 'express';
 import * as userController from '../controllers/userController';
 import { validate } from '../middleware/validate';
 import { createUserSchema, updateUserSchema } from '../middleware/validation';
-import { requireRoleOrPermission } from '../middleware/auth';
+import { requireRoles } from '../middleware/auth';
 
 const router = Router();
-const manageUsersAuth = requireRoleOrPermission(['SUPER_ADMIN'], ['CFG_MANAGE_USERS']);
+// User accounts, roles, permissions, exports, and branch assignments are
+// tenant-wide administration. Branch operators use HR/employee workflows;
+// a branch permission must never unlock cross-branch identity management.
+const manageUsersAuth = requireRoles('SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER');
 
 router.get('/', manageUsersAuth, userController.getAllUsers);
 router.post('/', manageUsersAuth, validate(createUserSchema), userController.createUser);

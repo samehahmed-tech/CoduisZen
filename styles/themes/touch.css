@@ -1,39 +1,39 @@
-/* THEME · TOUCH — tactile POS/tablet first: big targets, strong press, stable surfaces */
+/* THEME · EMBER — warm charcoal, amber heat, tactile POS scale */
 [data-theme="touch"] {
-    --primary: 234, 88, 12; --primary-hover: 194, 65, 12;
-    --secondary: 87, 83, 78; --accent: 217, 119, 6;
-    --bg-app: 248, 247, 244; --bg-card: 255, 255, 255; --bg-sidebar: 255, 255, 255;
-    --bg-elevated: 255, 255, 255; --bg-global: 248, 247, 244;
-    --text-main: 28, 25, 23; --text-muted: 120, 113, 108;
-    --border-color: 231, 229, 228; --border-subtle: 28 25 23 / 0.08;
+    --primary: 190, 72, 28; --primary-hover: 158, 58, 20;
+    --secondary: 110, 100, 92; --accent: 217, 119, 6;
+    --bg-app: 249, 246, 242; --bg-card: 255, 255, 255; --bg-sidebar: 255, 255, 255;
+    --bg-elevated: 255, 255, 255; --bg-global: 249, 246, 242;
+    --text-main: 30, 26, 23; --text-muted: 119, 109, 101;
+    --border-color: 232, 226, 220; --border-subtle: 30 26 23 / 0.08;
     --glass-bg: 255 255 255 / 0.9;
     --success: 5, 150, 105; --warning: 202, 138, 4; --danger: 220, 38, 38; --info: 2, 132, 199;
-    --theme-page-bg: linear-gradient(180deg, #f8f7f4 0%, #efede8 100%);
+    --theme-page-bg: linear-gradient(180deg, #faf7f3 0%, #f0eae3 100%);
     --theme-card-bg: #ffffff; --theme-card-hover-bg: #ffffff;
     --theme-rail-bg: #ffffff; --theme-topbar-bg: rgba(255,255,255,0.94);
-    --theme-table-head-bg: #efede8; --theme-row-hover-bg: rgba(234,88,12,0.06);
-    --theme-input-bg: #f1efeb; --theme-button-bg: #ea580c;
-    --theme-active-bg: rgba(234,88,12,0.12); --theme-focus-ring: rgba(234,88,12,0.45);
+    --theme-table-head-bg: #f2ece5; --theme-row-hover-bg: rgba(190,72,28,0.06);
+    --theme-input-bg: #f6f1ea; --theme-button-bg: #be481c; --theme-button-text: #ffffff;
+    --theme-active-bg: rgba(190,72,28,0.12); --theme-focus-ring: rgba(190,72,28,0.45);
     --theme-popup-bg: #ffffff;
-    --chart-1: 234, 88, 12; --chart-2: 217, 119, 6; --chart-3: 5, 150, 105; --chart-4: 2, 132, 199; --chart-5: 124, 58, 237;
-    --chart-grid: 28 25 23 / 0.08; --chart-tooltip-bg: rgba(255,255,255,0.98);
+    --chart-1: 190, 72, 28; --chart-2: 217, 119, 6; --chart-3: 5, 150, 105; --chart-4: 2, 132, 199; --chart-5: 124, 58, 237;
+    --chart-grid: 30 26 23 / 0.08; --chart-tooltip-bg: rgba(255,255,255,0.98);
 }
 .dark [data-theme="touch"], [data-theme="touch"].dark {
     --primary: 251, 146, 60; --primary-hover: 253, 186, 116;
-    --secondary: 168, 162, 158; --accent: 251, 191, 36;
-    --bg-app: 20, 16, 12; --bg-card: 32, 26, 20; --bg-sidebar: 24, 19, 15;
-    --bg-elevated: 44, 36, 28; --bg-global: 20, 16, 12;
-    --text-main: 250, 244, 236; --text-muted: 185, 168, 150;
-    --border-color: 68, 56, 44; --border-subtle: 251 146 60 / 0.16;
-    --glass-bg: 32 26 20 / 0.9;
+    --secondary: 168, 158, 148; --accent: 251, 191, 36;
+    --bg-app: 18, 14, 11; --bg-card: 29, 24, 19; --bg-sidebar: 22, 18, 14;
+    --bg-elevated: 42, 35, 27; --bg-global: 18, 14, 11;
+    --text-main: 250, 244, 236; --text-muted: 186, 170, 152;
+    --border-color: 66, 55, 44; --border-subtle: 251 146 60 / 0.16;
+    --glass-bg: 29 24 19 / 0.9;
     --success: 52, 211, 153; --warning: 251, 191, 36; --danger: 248, 113, 113; --info: 56, 189, 248;
-    --theme-page-bg: linear-gradient(180deg, #14100c 0%, #0e0b08 100%);
-    --theme-card-bg: #201a14; --theme-card-hover-bg: #2a221a;
-    --theme-rail-bg: #181310; --theme-topbar-bg: rgba(32,26,20,0.94);
-    --theme-table-head-bg: #14100c; --theme-row-hover-bg: rgba(251,146,60,0.08);
-    --theme-input-bg: #2a221a; --theme-button-bg: #ea580c;
+    --theme-page-bg: linear-gradient(180deg, #120e0b 0%, #0c0907 100%);
+    --theme-card-bg: #1d1813; --theme-card-hover-bg: #27211a;
+    --theme-rail-bg: #16120e; --theme-topbar-bg: rgba(29,24,19,0.94);
+    --theme-table-head-bg: #120e0b; --theme-row-hover-bg: rgba(251,146,60,0.08);
+    --theme-input-bg: #27211a; --theme-button-bg: #d97706; --theme-button-bg-hover: #f59e0b; --theme-button-text: #1a1208;
     --theme-active-bg: rgba(251,146,60,0.14); --theme-focus-ring: rgba(251,146,60,0.5);
-    --theme-popup-bg: #2a221a;
+    --theme-popup-bg: #27211a;
     --chart-1: 251, 146, 60; --chart-2: 251, 191, 36; --chart-3: 52, 211, 153; --chart-4: 56, 189, 248; --chart-5: 196, 132, 252;
-    --chart-grid: 251 146 60 / 0.1; --chart-tooltip-bg: rgba(32,26,20,0.98);
+    --chart-grid: 251 146 60 / 0.1; --chart-tooltip-bg: rgba(29,24,19,0.98);
 }

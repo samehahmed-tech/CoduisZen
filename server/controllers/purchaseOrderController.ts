@@ -1,17 +1,20 @@
 ﻿import { Request, Response } from 'express';
 import { db } from '../db';
-import { purchaseOrders, purchaseOrderItems, inventoryStock, stockMovements, inventoryItems, auditLogs, inventoryBatches, suppliers, branches, warehouses } from '../../src/db/schema';
+import { purchaseOrders, purchaseOrderItems, inventoryStock, stockMovements, inventoryItems, inventoryBatches, suppliers, branches, warehouses } from '../../src/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { getStringParam } from '../utils/request';
 import { postPurchaseReceiptEntry } from '../services/financePostingService';
 import { generatePurchaseOrderPDF } from '../services/pdfService';
+import { createSignedAuditLog } from '../services/auditService';
 
 /**
  * Create new Purchase Order
  */
 export const createPO = async (req: Request, res: Response) => {
     try {
-        const { id, supplierId, branchId, targetWarehouseId, expectedDate, notes, items, createdBy } = req.body;
+        const { id, supplierId, branchId: requestedBranchId, targetWarehouseId, expectedDate, notes, items } = req.body;
+        const actorId = req.user?.id || 'system';
+        const branchId = req.effectiveBranchId || requestedBranchId;
 
         if (!supplierId || !branchId || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ error: 'supplierId, branchId, and items are required' });
@@ -29,6 +32,16 @@ export const createPO = async (req: Request, res: Response) => {
         const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + (item.orderedQty * item.unitPrice), 0);
 
         const savedPO = await db.transaction(async (tx) => {
+            if (targetWarehouseId) {
+                const [warehouse] = await tx.select({ id: warehouses.id, branchId: warehouses.branchId })
+                    .from(warehouses)
+                    .where(eq(warehouses.id, targetWarehouseId));
+                if (!warehouse) throw new Error('WAREHOUSE_NOT_FOUND');
+                if (warehouse.branchId && warehouse.branchId !== branchId) {
+                    throw new Error('WAREHOUSE_BRANCH_MISMATCH');
+                }
+            }
+
             // 1. Create PO header
             const [po] = await tx.insert(purchaseOrders).output().values({
                 id: id || `PO-${Date.now()}`,
@@ -39,7 +52,7 @@ export const createPO = async (req: Request, res: Response) => {
                 expectedDate: expectedDate ? new Date(expectedDate) : null,
                 subtotal,
                 notes,
-                createdBy,
+                createdBy: actorId,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
@@ -58,6 +71,17 @@ export const createPO = async (req: Request, res: Response) => {
             return po;
         });
 
+        await createSignedAuditLog({
+            eventType: 'PURCHASE_ORDER_CREATED',
+            userId: actorId,
+            userRole: req.user?.role,
+            branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers?.['user-agent'],
+            payload: { purchaseOrderId: savedPO.id, supplierId, targetWarehouseId: targetWarehouseId || null, itemCount: normalizedItems.length, subtotal },
+            after: { status: 'DRAFT', subtotal },
+            reason: 'Purchase order created',
+        });
         res.status(201).json(savedPO);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -71,7 +95,8 @@ export const receivePO = async (req: Request, res: Response) => {
     try {
         const id = getStringParam((req.params as any).id);
         if (!id) return res.status(400).json({ error: 'PO_ID_REQUIRED' });
-        const { warehouseId, items, receivedBy } = req.body;
+        const { warehouseId, items } = req.body;
+        const actorId = req.user?.id || 'system';
 
         if (!warehouseId || !items || items.length === 0) {
             return res.status(400).json({ error: 'warehouseId and items are required' });
@@ -83,6 +108,18 @@ export const receivePO = async (req: Request, res: Response) => {
             const [poHeader] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
             if (!poHeader) {
                 throw new Error('Purchase Order not found');
+            }
+            const [warehouse] = await tx.select({ id: warehouses.id, branchId: warehouses.branchId })
+                .from(warehouses)
+                .where(eq(warehouses.id, warehouseId));
+            if (!warehouse) {
+                throw new Error('WAREHOUSE_NOT_FOUND');
+            }
+            if (poHeader.targetWarehouseId && poHeader.targetWarehouseId !== warehouseId) {
+                throw new Error('PO_TARGET_WAREHOUSE_MISMATCH');
+            }
+            if (warehouse.branchId && poHeader.branchId && warehouse.branchId !== poHeader.branchId) {
+                throw new Error('WAREHOUSE_BRANCH_MISMATCH');
             }
             const currentStatus = String(poHeader.status || 'DRAFT').toUpperCase();
             const receivableStatuses = ['SENT', 'PARTIAL', 'ORDERED'];
@@ -188,7 +225,7 @@ export const receivePO = async (req: Request, res: Response) => {
                     type: 'PURCHASE',
                     referenceId: id,
                     reason: 'Goods Receipt from PO',
-                    performedBy: receivedBy || 'system',
+                    performedBy: actorId,
                     createdAt: new Date(),
                 });
 
@@ -235,20 +272,23 @@ export const receivePO = async (req: Request, res: Response) => {
             poId: id,
             amount: totalReceivedCost,
             branchId: poBranchId,
-            userId: receivedBy || 'system',
+            userId: actorId,
         });
 
-        await db.insert(auditLogs).values({
+        await createSignedAuditLog({
             eventType: 'PURCHASE_ORDER_RECEIPT',
-            userId: receivedBy || null,
+            userId: actorId,
             branchId: poBranchId || null,
             payload: {
                 poId: id,
                 warehouseId,
-                receivedItems: items,
+                itemCount: items.length,
                 totalReceivedCost,
             },
-            createdAt: new Date(),
+            requestId: req.requestId,
+            sourceDevice: req.headers?.['user-agent'],
+            reason: 'Purchase order goods received',
+            after: { totalReceivedCost },
         });
 
         res.json({ success: true, message: 'Goods received successfully', finance: financeResult });
@@ -439,6 +479,18 @@ export const updatePOStatus = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Purchase Order not found' });
         }
 
+        await createSignedAuditLog({
+            eventType: 'PURCHASE_ORDER_STATUS_CHANGED',
+            userId: req.user?.id || 'system',
+            userRole: req.user?.role,
+            branchId: (updated as any).branchId,
+            requestId: req.requestId,
+            sourceDevice: req.headers?.['user-agent'],
+            payload: { purchaseOrderId: id, status },
+            before: { status: current.status },
+            after: { status },
+            reason: 'Purchase order status changed',
+        });
         res.json(updated);
     } catch (error: any) {
         res.status(500).json({ error: error.message });

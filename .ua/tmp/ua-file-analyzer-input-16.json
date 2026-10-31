@@ -1,0 +1,344 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "stores/useAIWidgetStore.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useAuditStore.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useAuthStore.ts",
+      "language": "typescript",
+      "sizeLines": 1162,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useAutonomousEngine.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useCRMStore.ts",
+      "language": "typescript",
+      "sizeLines": 269,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useFinanceStore.ts",
+      "language": "typescript",
+      "sizeLines": 302,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useHRStore.ts",
+      "language": "typescript",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useInventoryStore.ts",
+      "language": "typescript",
+      "sizeLines": 837,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useKdsStore.ts",
+      "language": "typescript",
+      "sizeLines": 153,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useMailStore.ts",
+      "language": "typescript",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useMenuStore.ts",
+      "language": "typescript",
+      "sizeLines": 667,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useOrderStore.ts",
+      "language": "typescript",
+      "sizeLines": 1065,
+      "fileCategory": "code"
+    },
+    {
+      "path": "stores/useWhatsAppStore.ts",
+      "language": "typescript",
+      "sizeLines": 340,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/auditStoreTimestamp.test.ts",
+      "language": "typescript",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/authCrossTab.test.ts",
+      "language": "typescript",
+      "sizeLines": 133,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/branchEntityCache.test.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/dayCloseConfirmation.test.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/frontendErrorUx.test.ts",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/inventoryStore.test.ts",
+      "language": "typescript",
+      "sizeLines": 74,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/kdsTransition.test.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/menuCost.test.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/menuOfflineReplay.test.ts",
+      "language": "typescript",
+      "sizeLines": 49,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/menuPersistenceActions.test.ts",
+      "language": "typescript",
+      "sizeLines": 132,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/stockSocketPayload.test.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/tableDiscountState.test.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "theme/index.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "types.ts",
+      "language": "typescript",
+      "sizeLines": 1341,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/api.ts",
+      "language": "typescript",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/branchPricing.ts",
+      "language": "typescript",
+      "sizeLines": 72,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/clearData.ts",
+      "language": "typescript",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/formatters.ts",
+      "language": "typescript",
+      "sizeLines": 115,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/menuCost.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "utils/roleLabels.ts",
+      "language": "typescript",
+      "sizeLines": 151,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "stores/useAIWidgetStore.ts": [],
+    "stores/useAuditStore.ts": [
+      "db/localDb.ts",
+      "services/api/audit.ts",
+      "types.ts"
+    ],
+    "stores/useAuthStore.ts": [
+      "db/localDb.ts",
+      "services/api/auth.ts",
+      "services/api/branches.ts",
+      "services/api/printers.ts",
+      "services/api/roles.ts",
+      "services/api/settings.ts",
+      "services/api/users.ts",
+      "services/authSync.ts",
+      "services/syncService.ts",
+      "src/i18n.ts",
+      "src/services/socketService.ts",
+      "src/utils/userAvatars.ts",
+      "theme/engine/migrate.ts",
+      "types.ts"
+    ],
+    "stores/useAutonomousEngine.ts": [],
+    "stores/useCRMStore.ts": [
+      "db/localDb.ts",
+      "services/api/customers.ts",
+      "services/syncService.ts",
+      "types.ts"
+    ],
+    "stores/useFinanceStore.ts": [
+      "services/api/finance.ts",
+      "services/api/shifts.ts",
+      "types.ts"
+    ],
+    "stores/useHRStore.ts": [
+      "services/api/hr.ts",
+      "types.ts"
+    ],
+    "stores/useInventoryStore.ts": [
+      "db/localDb.ts",
+      "services/api/inventory.ts",
+      "services/api/procurement.ts",
+      "services/stockAdjustment.ts",
+      "services/stockSocket.ts",
+      "services/syncService.ts",
+      "types.ts"
+    ],
+    "stores/useKdsStore.ts": [
+      "services/api/kds.ts"
+    ],
+    "stores/useMailStore.ts": [
+      "services/api/mail.ts",
+      "services/socketService.ts"
+    ],
+    "stores/useMenuStore.ts": [
+      "db/localDb.ts",
+      "services/api/menu.ts",
+      "services/api/platforms.ts",
+      "services/syncService.ts",
+      "types.ts"
+    ],
+    "stores/useOrderStore.ts": [
+      "db/localDb.ts",
+      "services/api/orders.ts",
+      "services/api/tables.ts",
+      "services/eventBus.ts",
+      "services/orderTotals.ts",
+      "services/syncService.ts",
+      "services/translations.ts",
+      "src/utils/branchEntityCache.ts",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/tableOrder.ts"
+    ],
+    "stores/useWhatsAppStore.ts": [
+      "services/api/core.ts",
+      "src/services/socketService.ts"
+    ],
+    "tests/auditStoreTimestamp.test.ts": [
+      "services/api/audit.ts",
+      "stores/useAuditStore.ts",
+      "types.ts"
+    ],
+    "tests/authCrossTab.test.ts": [
+      "services/authSync.ts"
+    ],
+    "tests/branchEntityCache.test.ts": [
+      "src/utils/branchEntityCache.ts"
+    ],
+    "tests/dayCloseConfirmation.test.ts": [
+      "components/DayCloseHub.tsx"
+    ],
+    "tests/frontendErrorUx.test.ts": [
+      "services/api/core.ts"
+    ],
+    "tests/inventoryStore.test.ts": [
+      "db/localDb.ts",
+      "services/api/inventory.ts",
+      "stores/useInventoryStore.ts",
+      "types.ts"
+    ],
+    "tests/kdsTransition.test.ts": [
+      "stores/useKdsStore.ts"
+    ],
+    "tests/menuCost.test.ts": [
+      "utils/menuCost.ts"
+    ],
+    "tests/menuOfflineReplay.test.ts": [
+      "src/services/syncService.ts"
+    ],
+    "tests/menuPersistenceActions.test.ts": [
+      "stores/useMenuStore.ts"
+    ],
+    "tests/stockSocketPayload.test.ts": [
+      "services/stockSocket.ts",
+      "types.ts"
+    ],
+    "tests/tableDiscountState.test.ts": [
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "theme/index.ts": [],
+    "types.ts": [],
+    "utils/api.ts": [
+      "services/api/core.ts"
+    ],
+    "utils/branchPricing.ts": [],
+    "utils/clearData.ts": [
+      "services/api/setup.ts",
+      "src/db/localDb.ts",
+      "stores/useCRMStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts"
+    ],
+    "utils/formatters.ts": [],
+    "utils/menuCost.ts": [],
+    "utils/roleLabels.ts": []
+  }
+}

@@ -5,9 +5,10 @@
  */
 
 import { db } from '../db';
-import { inventoryItems, inventoryStock, warehouses, suppliers, stockMovements, orderItems } from '../../src/db/schema';
+import { inventoryItems, inventoryStock, warehouses, suppliers, stockMovements, orderItems, orders } from '../../src/db/schema';
 import { eq, and, sql, lte, gt, desc, asc, inArray } from 'drizzle-orm';
 import { aiService } from './aiService';
+import { wrapUntrustedAiData } from '../utils/aiPromptSafety';
 
 // =============================================================================
 // Types
@@ -27,6 +28,7 @@ export interface ReorderAlert {
     priority: 'CRITICAL' | 'LOW' | 'WARNING';
     avgDailyUsage: number;
     daysUntilStockout: number;
+    costPrice: number;
 }
 
 export interface PurchaseSuggestion {
@@ -40,8 +42,10 @@ export interface PurchaseSuggestion {
     avgDailyUsage: number;
     suggestedQty: number;
     estimatedCost: number;
+    estimatedCostSource: 'ITEM_COST_PRICE' | 'UNAVAILABLE';
     urgency: 'IMMEDIATE' | 'SOON' | 'PLANNED';
     reason: string;
+    explanation: string;
 }
 
 export interface UnitConversion {
@@ -53,6 +57,7 @@ export interface UnitConversion {
 export interface StockCountSession {
     id: string;
     warehouseId: string;
+    branchId?: string;
     createdBy: string;
     status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
     items: StockCountItem[];
@@ -72,6 +77,19 @@ export interface StockCountItem {
     variance: number;
     varianceCost: number;
     notes?: string;
+}
+
+export interface AIForecastResult {
+    text: string;
+    aiStatus: 'GENERATED' | 'DEGRADED_FALLBACK' | 'INSUFFICIENT_DATA';
+    branchId: string | null;
+    itemId: string;
+    sampleDays: number;
+    dataFrom: string | null;
+    dataAsOf: string | null;
+    dataFreshnessHours: number | null;
+    dateBasis: 'ORDER_BUSINESS_DATE_WITH_MOVEMENT_FALLBACK';
+    source: 'STOCK_MOVEMENTS_SALE_CONSUMPTION_90_DAY_ORDER_BUSINESS_DATE';
 }
 
 // =============================================================================
@@ -158,7 +176,13 @@ export const inventoryIntelligence = {
     // =========================================================================
     // Reorder Alerts
     // =========================================================================
-    async getReorderAlerts(warehouseId?: string): Promise<ReorderAlert[]> {
+    async getReorderAlerts(warehouseId?: string, branchId?: string): Promise<ReorderAlert[]> {
+        const branchWarehouses = branchId
+            ? await db.select({ id: warehouses.id }).from(warehouses).where(and(eq(warehouses.branchId, branchId), eq(warehouses.isActive, true)))
+            : [];
+        const allowedWarehouseIds = branchId ? branchWarehouses.map(row => row.id) : undefined;
+        if (branchId && !allowedWarehouseIds?.length) return [];
+
         // Get all items with their stock levels
         const stockQuery = db.select({
             itemId: inventoryStock.itemId,
@@ -166,12 +190,14 @@ export const inventoryIntelligence = {
             quantity: inventoryStock.quantity,
         }).from(inventoryStock);
 
-        const stocks = warehouseId
-            ? await stockQuery.where(eq(inventoryStock.warehouseId, warehouseId))
-            : await stockQuery;
+        const stockFilters = [
+            warehouseId ? eq(inventoryStock.warehouseId, warehouseId) : undefined,
+            allowedWarehouseIds ? inArray(inventoryStock.warehouseId, allowedWarehouseIds) : undefined,
+        ].filter(Boolean) as any[];
+        const stocks = stockFilters.length ? await stockQuery.where(and(...stockFilters)) : await stockQuery;
 
         const items = await db.select().from(inventoryItems).where(eq(inventoryItems.isActive, true));
-        const warehouseList = await db.select().from(warehouses).where(eq(warehouses.isActive, true));
+        const warehouseList = await db.select().from(warehouses).where(and(eq(warehouses.isActive, true), ...(allowedWarehouseIds ? [inArray(warehouses.id, allowedWarehouseIds)] : [])));
 
         const itemMap = new Map(items.map(i => [i.id, i]));
         const warehouseMap = new Map(warehouseList.map(w => [w.id, w]));
@@ -185,10 +211,12 @@ export const inventoryIntelligence = {
             totalUsed: sql<number>`COALESCE(SUM(${stockMovements.quantity}), 0)`,
         })
             .from(stockMovements)
+            .leftJoin(warehouses, eq(stockMovements.fromWarehouseId, warehouses.id))
             .where(
                 and(
                     eq(stockMovements.type, 'SALE_CONSUMPTION'),
-                    gt(stockMovements.createdAt, thirtyDaysAgo)
+                    gt(stockMovements.createdAt, thirtyDaysAgo),
+                    branchId ? inArray(stockMovements.fromWarehouseId, allowedWarehouseIds || []) : undefined,
                 )
             )
             .groupBy(stockMovements.itemId);
@@ -234,6 +262,7 @@ export const inventoryIntelligence = {
                 priority,
                 avgDailyUsage: Math.round(avgDaily * 100) / 100,
                 daysUntilStockout,
+                costPrice: Number(item.costPrice || 0),
             });
         }
 
@@ -250,15 +279,13 @@ export const inventoryIntelligence = {
     // =========================================================================
     // Auto Purchase Suggestions
     // =========================================================================
-    async getPurchaseSuggestions(warehouseId?: string): Promise<PurchaseSuggestion[]> {
-        const alerts = await this.getReorderAlerts(warehouseId);
+    async getPurchaseSuggestions(warehouseId?: string, branchId?: string): Promise<PurchaseSuggestion[]> {
+        const alerts = await this.getReorderAlerts(warehouseId, branchId);
         const supplierList = await db.select().from(suppliers).where(eq(suppliers.isActive, true));
         const supplierMap = new Map(supplierList.map(s => [s.id, s]));
 
         return alerts.map(alert => {
             const supplier = alert.supplierId ? supplierMap.get(alert.supplierId) : null;
-            const item = {} as any; // We already have the data in alert
-
             let urgency: PurchaseSuggestion['urgency'] = 'PLANNED';
             if (alert.priority === 'CRITICAL') urgency = 'IMMEDIATE';
             else if (alert.priority === 'WARNING') urgency = 'SOON';
@@ -282,9 +309,13 @@ export const inventoryIntelligence = {
                 currentQty: alert.currentQty,
                 avgDailyUsage: alert.avgDailyUsage,
                 suggestedQty: alert.reorderQty,
-                estimatedCost: 0, // Could be calculated from PO history
+                estimatedCost: alert.costPrice > 0
+                    ? Math.round(alert.reorderQty * alert.costPrice * 100) / 100
+                    : 0,
+                estimatedCostSource: alert.costPrice > 0 ? 'ITEM_COST_PRICE' : 'UNAVAILABLE',
                 urgency,
                 reason,
+                explanation: reason,
             };
         });
     },
@@ -292,7 +323,12 @@ export const inventoryIntelligence = {
     // =========================================================================
     // Stock Count (Physical Inventory)
     // =========================================================================
-    async createStockCountSession(warehouseId: string, createdBy: string): Promise<StockCountSession> {
+    async createStockCountSession(warehouseId: string, createdBy: string, branchId?: string): Promise<StockCountSession> {
+        const [warehouse] = await db.select({ id: warehouses.id, branchId: warehouses.branchId })
+            .from(warehouses)
+            .where(eq(warehouses.id, warehouseId));
+        if (!warehouse) throw new Error('WAREHOUSE_NOT_FOUND');
+        if (branchId && warehouse.branchId !== branchId) throw new Error('BRANCH_MISMATCH');
         // Get all stock for this warehouse
         const stocks = await db.select({
             itemId: inventoryStock.itemId,
@@ -320,6 +356,7 @@ export const inventoryIntelligence = {
         const session: StockCountSession = {
             id: `CNT-${Date.now()}`,
             warehouseId,
+            branchId: warehouse.branchId || branchId,
             createdBy,
             status: 'IN_PROGRESS',
             items: countItems,
@@ -342,13 +379,14 @@ export const inventoryIntelligence = {
         return session;
     },
 
-    async updateStockCount(sessionId: string, counts: { itemId: string; countedQty: number; notes?: string }[], updatedBy: string): Promise<StockCountSession> {
+    async updateStockCount(sessionId: string, counts: { itemId: string; countedQty: number; notes?: string }[], updatedBy: string, branchId?: string): Promise<StockCountSession> {
         const { settings } = await import('../../src/db/schema');
         const key = `stock_count_${sessionId}`;
         const [row] = await db.select().from(settings).where(eq(settings.key, key));
         if (!row) throw new Error('Stock count session not found');
 
         const session = row.value as StockCountSession;
+        if (branchId && session.branchId !== branchId) throw new Error('BRANCH_MISMATCH');
         if (session.status !== 'IN_PROGRESS') throw new Error('Session is not in progress');
 
         const items = await db.select().from(inventoryItems).where(eq(inventoryItems.isActive, true));
@@ -375,13 +413,14 @@ export const inventoryIntelligence = {
         return session;
     },
 
-    async completeStockCount(sessionId: string, completedBy: string, applyAdjustments: boolean = true): Promise<StockCountSession> {
+    async completeStockCount(sessionId: string, completedBy: string, applyAdjustments: boolean = true, branchId?: string): Promise<StockCountSession> {
         const { settings } = await import('../../src/db/schema');
         const key = `stock_count_${sessionId}`;
         const [row] = await db.select().from(settings).where(eq(settings.key, key));
         if (!row) throw new Error('Stock count session not found');
 
         const session = row.value as StockCountSession;
+        if (branchId && session.branchId !== branchId) throw new Error('BRANCH_MISMATCH');
         if (session.status !== 'IN_PROGRESS') throw new Error('Session is not in progress');
 
         // Apply adjustments to actual stock
@@ -452,37 +491,96 @@ export const inventoryIntelligence = {
     // =========================================================================
     // AI Demand Forecasting
     // =========================================================================
-    async getAIForecast(itemId: string, branchId?: string): Promise<string> {
+    async getAIForecast(itemId: string, branchId?: string): Promise<AIForecastResult> {
         // 1. Gather historical consumption (Sales) for the last 90 days
         const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const branchWarehouses = branchId
+            ? await db.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.branchId, branchId))
+            : [];
+        const emptyForecast = (): AIForecastResult => ({
+            text: 'Insufficient historical data for AI forecasting.',
+            aiStatus: 'INSUFFICIENT_DATA',
+            branchId: branchId || null,
+            itemId,
+            sampleDays: 0,
+            dataFrom: null,
+            dataAsOf: null,
+            dataFreshnessHours: null,
+            dateBasis: 'ORDER_BUSINESS_DATE_WITH_MOVEMENT_FALLBACK',
+            source: 'STOCK_MOVEMENTS_SALE_CONSUMPTION_90_DAY_ORDER_BUSINESS_DATE',
+        });
+        if (branchId && !branchWarehouses.length) return emptyForecast();
         const consumption = await db.select({
-            date: sql<string>`DATE(${stockMovements.createdAt})`,
+            date: sql<string>`COALESCE(${orders.businessDate}, CAST(${stockMovements.createdAt} AS DATE))`,
             qty: sql<number>`SUM(${stockMovements.quantity})`,
         })
             .from(stockMovements)
+            .leftJoin(warehouses, eq(stockMovements.fromWarehouseId, warehouses.id))
+            .leftJoin(orders, eq(stockMovements.referenceId, orders.id))
             .where(and(
                 eq(stockMovements.itemId, itemId),
                 eq(stockMovements.type, 'SALE_CONSUMPTION'),
-                gt(stockMovements.createdAt, ninetyDaysAgo)
+                gt(stockMovements.createdAt, ninetyDaysAgo),
+                branchId ? inArray(stockMovements.fromWarehouseId, branchWarehouses.map(row => row.id)) : undefined,
             ))
-            .groupBy(sql`DATE(${stockMovements.createdAt})`)
-            .orderBy(asc(sql`DATE(${stockMovements.createdAt})`));
+            .groupBy(sql`COALESCE(${orders.businessDate}, CAST(${stockMovements.createdAt} AS DATE))`)
+            .orderBy(asc(sql`COALESCE(${orders.businessDate}, CAST(${stockMovements.createdAt} AS DATE))`));
 
-        if (consumption.length < 5) return "Insufficient historical data for AI forecasting.";
+        if (consumption.length < 5) return emptyForecast();
 
         // 2. Format data for the LLM
         const itemData = await db.select().top(1).from(inventoryItems).where(eq(inventoryItems.id, itemId));
         const itemName = itemData[0]?.name || "Unknown Item";
         
         const dataStr = consumption.map(c => `${c.date}: ${c.qty}`).join('\n');
-        const prompt = `Analyze historical sales for "${itemName}" and predict future demand. 
-        Data (Date: Qty Sold):\n${dataStr}\n
+        const prompt = `Analyze historical sales for ${wrapUntrustedAiData(itemName, 'item-name')} and predict future demand.
+        Data (Date: Qty Sold):\n${wrapUntrustedAiData(dataStr, 'historical-consumption')}\n
         Provide a concise 2-sentence forecast including seasonal trends or spikes noticed.`;
 
         // 3. Query AI Service with caching
-        return aiService.getCachedInsight(`forecast_${itemId}`, async () => {
-            return aiService.queryAI(prompt, "You are a demand forecasting expert for a restaurant.");
-        }, 1440); // 24 hour cache
+        // Forecasts are derived from branch-scoped consumption. The cache key
+        // must carry the same scope or one branch can receive another branch's
+        // forecast for the same item.
+        const dataFrom = String(consumption[0]?.date || '') || null;
+        const dataAsOf = String(consumption[consumption.length - 1]?.date || '') || null;
+        const asOf = dataAsOf ? new Date(`${dataAsOf}T23:59:59.999Z`) : null;
+        const quantities = consumption.map(row => Number(row.qty || 0));
+        const averageDailyUsage = quantities.length > 0
+            ? quantities.reduce((sum, quantity) => sum + quantity, 0) / quantities.length
+            : 0;
+        const midpoint = Math.max(1, Math.floor(quantities.length / 2));
+        const firstHalfAverage = quantities.slice(0, midpoint).reduce((sum, quantity) => sum + quantity, 0) / midpoint;
+        const secondHalf = quantities.slice(midpoint);
+        const secondHalfAverage = secondHalf.length > 0
+            ? secondHalf.reduce((sum, quantity) => sum + quantity, 0) / secondHalf.length
+            : firstHalfAverage;
+        const trend = secondHalfAverage > firstHalfAverage * 1.1
+            ? 'increasing'
+            : secondHalfAverage < firstHalfAverage * 0.9 ? 'decreasing' : 'stable';
+        const forecastCacheKey = `forecast_${branchId || 'global'}_${itemId}_${dataAsOf || 'none'}`;
+        let text: string;
+        let aiStatus: AIForecastResult['aiStatus'] = 'GENERATED';
+        try {
+            text = await aiService.getCachedInsight(forecastCacheKey, async () => {
+                return aiService.queryAI(prompt, "You are a demand forecasting expert for a restaurant.");
+            }, 1440); // 24 hour cache
+        } catch {
+            aiStatus = 'DEGRADED_FALLBACK';
+            text = `Verified consumption averages ${averageDailyUsage.toFixed(2)} units per active day with a ${trend} trend across ${consumption.length} observed days. AI provider unavailable; use the reorder policy and review the inventory report before purchasing.`;
+            console.warn('[AI] Inventory forecast provider unavailable; deterministic consumption fallback used.');
+        }
+        return {
+            text,
+            aiStatus,
+            branchId: branchId || null,
+            itemId,
+            sampleDays: consumption.length,
+            dataFrom,
+            dataAsOf,
+            dataFreshnessHours: asOf ? Math.max(0, Math.round(((Date.now() - asOf.getTime()) / 3600000) * 100) / 100) : null,
+            dateBasis: 'ORDER_BUSINESS_DATE_WITH_MOVEMENT_FALLBACK',
+            source: 'STOCK_MOVEMENTS_SALE_CONSUMPTION_90_DAY_ORDER_BUSINESS_DATE',
+        };
     },
 };
 

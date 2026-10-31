@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     CheckCircle2, XCircle, Clock, Shield, RefreshCw, Key, Wallet,
     RotateCcw, ShoppingCart, Calendar, AlertTriangle, Eye, X
@@ -28,6 +28,7 @@ const TYPE_META: Record<string, { label: string; labelAr: string; icon: any; col
     DISCOUNT: { label: 'Discount Override', labelAr: 'تجاوز خصم', icon: AlertTriangle, color: 'text-violet-500' },
     EXPENSE: { label: 'Expense', labelAr: 'مصروف', icon: Wallet, color: 'text-amber-500' },
     WASTAGE: { label: 'Wastage', labelAr: 'هالك وهدر', icon: AlertTriangle, color: 'text-rose-500' },
+    MASTER_DATA_DISTRIBUTION: { label: 'Master Data Distribution', labelAr: 'توزيع بيانات مركزية', icon: ShoppingCart, color: 'text-indigo-500' },
 };
 
 const STATUS_META = {
@@ -48,23 +49,30 @@ const ApprovalCenter: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null);
     const [pinModal, setPinModal] = useState<{ approvalId: string } | null>(null);
-    const [rejectModal, setRejectModal] = useState<{ approvalId: string } | null>(null);
+    const [rejectModal, setRejectModal] = useState<{ approvalId: string; type: string } | null>(null);
     const [pin, setPin] = useState('');
     const [pinError, setPinError] = useState('');
     const [rejectReason, setRejectReason] = useState('');
+    const isHeadOffice = ['SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER'].includes(String(settings.currentUser?.role || '').toUpperCase());
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setIsLoading(true);
         try {
-            setApprovals(await approvalApi.getAll(settings.activeBranchId));
+            const operational = await approvalApi.getAll(settings.activeBranchId).catch((error) => {
+                if (isHeadOffice) return [];
+                throw error;
+            });
+            const central = isHeadOffice ? await approvalApi.getMasterDataDistributionApprovals() : [];
+            const merged = [...operational.filter((approval) => approval.type !== 'MASTER_DATA_DISTRIBUTION'), ...central];
+            setApprovals([...new Map(merged.map((approval) => [String(approval.id), approval])).values()]);
         } catch (error: any) {
             showError(error.message || (lang === 'ar' ? 'تعذر تحميل طلبات الاعتماد' : 'Failed to load approvals'));
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isHeadOffice, lang, settings.activeBranchId, showError]);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { void load(); }, [load]);
 
     const filtered = statusFilter === 'ALL' ? approvals : approvals.filter(a => a.status === statusFilter);
     const pending = approvals.filter(a => a.status === 'PENDING').length;
@@ -114,11 +122,33 @@ const ApprovalCenter: React.FC = () => {
         } finally { setIsVerifying(false); }
     };
 
+    const handleApprove = async (approval: Approval) => {
+        if (approval.type !== 'MASTER_DATA_DISTRIBUTION') {
+            setPinModal({ approvalId: approval.id });
+            return;
+        }
+        if (!window.confirm(lang === 'ar' ? 'سيتم تطبيق توزيع الأسعار على الفروع المستهدفة. هل تريد المتابعة؟' : 'This will apply pricing distribution to the target branches. Continue?')) return;
+        setIsVerifying(true);
+        try {
+            await approvalApi.approveMasterDataDistribution(approval.id);
+            success(lang === 'ar' ? 'تم اعتماد وتنفيذ التوزيع بنجاح' : 'Distribution approved and applied');
+            await load();
+        } catch (e: any) {
+            showError(e.message || (lang === 'ar' ? 'تعذر اعتماد التوزيع' : 'Failed to approve distribution'));
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
     const handleReject = async () => {
         if (!rejectModal) return;
         setIsVerifying(true);
         try {
-            await approvalApi.reject(rejectModal.approvalId, { reason: rejectReason || undefined });
+            if (rejectModal.type === 'MASTER_DATA_DISTRIBUTION') {
+                await approvalApi.rejectMasterDataDistribution(rejectModal.approvalId, rejectReason || undefined);
+            } else {
+                await approvalApi.reject(rejectModal.approvalId, { reason: rejectReason || undefined });
+            }
             success(lang === 'ar' ? 'تم رفض الطلب' : 'Approval rejected');
             setRejectModal(null);
             setRejectReason('');
@@ -250,8 +280,8 @@ const ApprovalCenter: React.FC = () => {
                                             <div className="flex items-center justify-center gap-1.5">
                                                 {a.status === 'PENDING' && (
                                                     <>
-                                                        <button onClick={() => { setPinModal({ approvalId: a.id }); }} className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors" title={lang === 'ar' ? 'اعتماد' : 'Approve'}><Key size={14} /></button>
-                                                        <button onClick={() => { setRejectModal({ approvalId: a.id }); setRejectReason(''); }} className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors" title={tr('Reject', 'Reject')}><XCircle size={14} /></button>
+                                                        <button onClick={() => handleApprove(a)} disabled={isVerifying} className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors disabled:opacity-50" title={lang === 'ar' ? 'اعتماد' : 'Approve'}>{a.type === 'MASTER_DATA_DISTRIBUTION' ? <CheckCircle2 size={14} /> : <Key size={14} />}</button>
+                                                        <button onClick={() => { setRejectModal({ approvalId: a.id, type: a.type }); setRejectReason(''); }} className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors" title={tr('Reject', 'Reject')}><XCircle size={14} /></button>
                                                     </>
                                                 )}
                                                 <button onClick={() => setSelectedApproval(a)} className="p-1.5 rounded-lg bg-slate-500/10 text-slate-500 hover:bg-slate-500/20 transition-colors" title={lang === 'ar' ? 'تفاصيل' : 'Details'}><Eye size={14} /></button>

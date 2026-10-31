@@ -5,6 +5,7 @@ import { db } from '../db';
 import { userSessions } from '../../src/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { isDatabaseUnavailableError, writeDatabaseUnavailable } from '../utils/dbErrors';
+import { isSessionExpired } from '../services/sessionPolicy';
 
 export interface AuthUser {
     id: string;
@@ -29,11 +30,25 @@ declare module 'express-serve-static-core' {
 
 const getJwtSecret = () => requireEnv('JWT_SECRET');
 
+const logAuthRejection = (req: Request, reason: string, details: Record<string, unknown> = {}) => {
+    // Never log bearer/refresh tokens or credential material. This is kept
+    // intentionally small so an installed customer build can explain a
+    // 401 without turning auth diagnostics into a data-leak surface.
+    console.warn('[AUTH_REJECT]', {
+        method: req.method,
+        path: req.path,
+        requestId: req.requestId || 'unknown',
+        reason,
+        ...details,
+    });
+};
+
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
 
     if (!token) {
+        logAuthRejection(req, 'missing-bearer');
         return res.status(401).json({ error: 'AUTH_REQUIRED' });
     }
 
@@ -42,12 +57,10 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
         const sessionId = payload.sid || payload.sessionId;
         const tokenId = payload.jti || payload.tokenId;
         if (!sessionId || !tokenId) {
+            logAuthRejection(req, 'missing-session-claims');
             return res.status(401).json({ error: 'INVALID_TOKEN_SESSION' });
         }
 
-        // No time-based expiry: a session lives until it is explicitly
-        // revoked/logged-out (owner requirement). Revocation still bites
-        // within seconds because every request re-checks the session row.
         const [session] = await db.select().from(userSessions).where(and(
             eq(userSessions.id, sessionId),
             eq(userSessions.userId, payload.sub || payload.id),
@@ -56,7 +69,19 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
         ));
 
         if (!session || session.revokedAt) {
+            logAuthRejection(req, 'session-not-active', {
+                hasSession: Boolean(session),
+                revoked: Boolean(session?.revokedAt),
+            });
             return res.status(401).json({ error: 'SESSION_REVOKED' });
+        }
+
+        if (isSessionExpired(session.expiresAt)) {
+            await db.update(userSessions)
+                .set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() })
+                .where(and(eq(userSessions.id, sessionId), eq(userSessions.isActive, true)));
+            logAuthRejection(req, 'session-expired');
+            return res.status(401).json({ error: 'SESSION_EXPIRED' });
         }
 
         // Throttle lastSeenAt updates to once every 5 minutes (Item 37)
@@ -85,6 +110,9 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
         // would 401 everywhere and the frontend would log the user out.
         // Surface 503 so clients retry with backoff and stay logged in.
         if (isDatabaseUnavailableError(error)) return writeDatabaseUnavailable(res, error);
+        logAuthRejection(req, 'token-verification-failed', {
+            errorName: error instanceof Error ? error.name : 'unknown',
+        });
         return res.status(401).json({ error: 'INVALID_TOKEN' });
     }
 };

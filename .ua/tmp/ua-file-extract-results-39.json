@@ -1,0 +1,22 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/ai-copilot-hotfix/Apply AI Copilot Hotfix.bat",
+    "scripts/ai-copilot-hotfix/Apply AI Copilot Hotfix.ps1",
+    "scripts/ai-copilot-hotfix/README AR.txt"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

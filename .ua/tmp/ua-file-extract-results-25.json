@@ -1,0 +1,5369 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 18,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 18,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 18,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "services/inventoryExcelRows.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 42,
+      "functions": [
+        {
+          "name": "prepareInventoryExcelRows",
+          "startLine": 14,
+          "endLine": 47,
+          "params": [
+            "rows",
+            "existingSkus",
+            "warehouseIds"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "prepareInventoryExcelRows",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "existingSkus.map(sku => sku.trim().toUpperCase()).filter",
+          "lineNumber": 19
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "existingSkus.map",
+          "lineNumber": 19
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "sku.trim().toUpperCase",
+          "lineNumber": 19
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "sku.trim",
+          "lineNumber": 19
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "rows.forEach",
+          "lineNumber": 24
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String(row.name_en || '').trim",
+          "lineNumber": 25
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String",
+          "lineNumber": 25
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String(row.name_ar || '').trim",
+          "lineNumber": 26
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String",
+          "lineNumber": 26
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String(row.code || '').trim",
+          "lineNumber": 27
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String",
+          "lineNumber": 27
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "knownSkus.has",
+          "lineNumber": 28
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "sku.toUpperCase",
+          "lineNumber": 28
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String(row.warehouse_id || '').trim",
+          "lineNumber": 30
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "String",
+          "lineNumber": 30
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "Number",
+          "lineNumber": 31
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "Number",
+          "lineNumber": 32
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "Number",
+          "lineNumber": 33
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "Number",
+          "lineNumber": 34
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "[quantity, purchasePrice, costPrice, threshold].some",
+          "lineNumber": 35
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "Number.isFinite",
+          "lineNumber": 35
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "knownWarehouses.has",
+          "lineNumber": 38
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "knownSkus.add",
+          "lineNumber": 42
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "sku.toUpperCase",
+          "lineNumber": 42
+        },
+        {
+          "caller": "prepareInventoryExcelRows",
+          "callee": "candidates.push",
+          "lineNumber": 43
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "services/stockAdjustment.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 18,
+      "nonEmptyLines": 15,
+      "functions": [
+        {
+          "name": "parseStockAdjustmentQuantity",
+          "startLine": 1,
+          "endLine": 6,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "getStockAdjustmentPreview",
+          "startLine": 8,
+          "endLine": 18,
+          "params": [
+            "currentQuantity",
+            "value"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "parseStockAdjustmentQuantity",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getStockAdjustmentPreview",
+          "line": 8,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "parseStockAdjustmentQuantity",
+          "callee": "value.trim",
+          "lineNumber": 2
+        },
+        {
+          "caller": "parseStockAdjustmentQuantity",
+          "callee": "Number",
+          "lineNumber": 4
+        },
+        {
+          "caller": "parseStockAdjustmentQuantity",
+          "callee": "Number.isFinite",
+          "lineNumber": 5
+        },
+        {
+          "caller": "getStockAdjustmentPreview",
+          "callee": "parseStockAdjustmentQuantity",
+          "lineNumber": 9
+        },
+        {
+          "caller": "getStockAdjustmentPreview",
+          "callee": "Number.isFinite",
+          "lineNumber": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/Inventory.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3,
+      "nonEmptyLines": 2,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/components/ReceiptModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 248,
+      "nonEmptyLines": 230,
+      "functions": [
+        {
+          "name": "ReceiptModal",
+          "startLine": 19,
+          "endLine": 246,
+          "params": [
+            "{ isOpen, onClose, onSave, lang, inventory, warehouses, suppliers }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ReceiptModal",
+          "callee": "useState",
+          "lineNumber": 20
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "useState",
+          "lineNumber": 21
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "useState",
+          "lineNumber": 23
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "receivedItems.every",
+          "lineNumber": 24
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number.isFinite",
+          "lineNumber": 26
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 26
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 27
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number.isFinite",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 28
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 29
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Boolean",
+          "lineNumber": 31
+        },
+        {
+          "caller": "handleAddItem",
+          "callee": "setReceivedItems",
+          "lineNumber": 36
+        },
+        {
+          "caller": "handleRemoveItem",
+          "callee": "newItems.splice",
+          "lineNumber": 41
+        },
+        {
+          "caller": "handleRemoveItem",
+          "callee": "setReceivedItems",
+          "lineNumber": 42
+        },
+        {
+          "caller": "handleUpdateItem",
+          "callee": "inventory.find",
+          "lineNumber": 50
+        },
+        {
+          "caller": "handleUpdateItem",
+          "callee": "setReceivedItems",
+          "lineNumber": 58
+        },
+        {
+          "caller": "saveReceipt",
+          "callee": "setSaving",
+          "lineNumber": 64
+        },
+        {
+          "caller": "saveReceipt",
+          "callee": "onSave",
+          "lineNumber": 66
+        },
+        {
+          "caller": "saveReceipt",
+          "callee": "setReceivedItems",
+          "lineNumber": 71
+        },
+        {
+          "caller": "saveReceipt",
+          "callee": "setSelectedSupplierId",
+          "lineNumber": 72
+        },
+        {
+          "caller": "saveReceipt",
+          "callee": "onClose",
+          "lineNumber": 73
+        },
+        {
+          "caller": "saveReceipt",
+          "callee": "setSaving",
+          "lineNumber": 75
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "e.preventDefault",
+          "lineNumber": 80
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "saveReceipt",
+          "lineNumber": 81
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "setSelectedWarehouseId",
+          "lineNumber": 113
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "warehouses.map",
+          "lineNumber": 117
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "setSelectedSupplierId",
+          "lineNumber": 126
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "suppliers.map",
+          "lineNumber": 130
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "receivedItems.map",
+          "lineNumber": 150
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 156
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "inventory.map",
+          "lineNumber": 160
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 169
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "(() => {\r\n                                                const masterItem = inventory.find(i => i.id === item.itemId);\r\n                                                const units = Array.from(new Set([masterItem?.purchaseUnit, masterItem?.unit].filter(Boolean) as string[]));\r\n                                                return units.map(unit => <option key={unit} value={unit}>{unit}</option>);\r\n                                            })",
+          "lineNumber": 172
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "inventory.find",
+          "lineNumber": 173
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Array.from",
+          "lineNumber": 174
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "[masterItem?.purchaseUnit, masterItem?.unit].filter",
+          "lineNumber": 174
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "units.map",
+          "lineNumber": 175
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "(() => {\r\n                                            const masterItem = inventory.find(i => i.id === item.itemId);\r\n                                            const factor = Number(masterItem?.purchaseUnitFactor || 1);\r\n                                            if (!masterItem || !item.purchaseUnit || item.purchaseUnit === masterItem.unit || factor <= 1) return null;\r\n                                            return <p className=\"text-[9px] font-bold text-emerald-600\">1 {item.purchaseUnit} = {factor} {masterItem.unit}</p>;\r\n                                        })",
+          "lineNumber": 178
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "inventory.find",
+          "lineNumber": 179
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 180
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 192
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 192
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 203
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "Number",
+          "lineNumber": 203
+        },
+        {
+          "caller": "ReceiptModal",
+          "callee": "handleRemoveItem",
+          "lineNumber": 209
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/components/StockAdjustmentModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 193,
+      "nonEmptyLines": 176,
+      "functions": [
+        {
+          "name": "StockAdjustmentModal",
+          "startLine": 17,
+          "endLine": 191,
+          "params": [
+            "{ isOpen, onClose, onSave, lang, items, warehouses, initialItem, initialWarehouse }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useState",
+          "lineNumber": 18
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useState",
+          "lineNumber": 19
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useState",
+          "lineNumber": 20
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useState",
+          "lineNumber": 21
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useEffect",
+          "lineNumber": 24
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setSelectedItemId",
+          "lineNumber": 26
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setSelectedWarehouseId",
+          "lineNumber": 27
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setReason",
+          "lineNumber": 28
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "items.find",
+          "lineNumber": 31
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "Number",
+          "lineNumber": 32
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "selectedItem?.warehouseQuantities.find",
+          "lineNumber": 32
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "useEffect",
+          "lineNumber": 34
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setQuantityInput",
+          "lineNumber": 36
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setQuantityInput",
+          "lineNumber": 39
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "String",
+          "lineNumber": 39
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "Number.isFinite",
+          "lineNumber": 39
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "getStockAdjustmentPreview",
+          "lineNumber": 44
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "e.preventDefault",
+          "lineNumber": 47
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setSaving",
+          "lineNumber": 49
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSave",
+          "lineNumber": 51
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onClose",
+          "lineNumber": 52
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setSaving",
+          "lineNumber": 54
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setSelectedItemId",
+          "lineNumber": 85
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "items.map",
+          "lineNumber": 89
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setSelectedWarehouseId",
+          "lineNumber": 100
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "warehouses.map",
+          "lineNumber": 104
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setQuantityInput",
+          "lineNumber": 128
+        },
+        {
+          "caller": "StockAdjustmentModal",
+          "callee": "setReason",
+          "lineNumber": 164
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/components/SupplierReturnModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 229,
+      "nonEmptyLines": 215,
+      "functions": [
+        {
+          "name": "SupplierReturnModal",
+          "startLine": 21,
+          "endLine": 227,
+          "params": [
+            "{ isOpen, onClose, onSave, lang, inventory, warehouses, suppliers }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "useState",
+          "lineNumber": 23
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "useState",
+          "lineNumber": 24
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "useState",
+          "lineNumber": 25
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "useState",
+          "lineNumber": 26
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "useState",
+          "lineNumber": 27
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "returnItems.every",
+          "lineNumber": 28
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Number.isFinite",
+          "lineNumber": 29
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Number",
+          "lineNumber": 29
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Number",
+          "lineNumber": 29
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Boolean",
+          "lineNumber": 33
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Boolean",
+          "lineNumber": 33
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "reason.trim",
+          "lineNumber": 33
+        },
+        {
+          "caller": "handleAddItem",
+          "callee": "setReturnItems",
+          "lineNumber": 38
+        },
+        {
+          "caller": "handleRemoveItem",
+          "callee": "next.splice",
+          "lineNumber": 43
+        },
+        {
+          "caller": "handleRemoveItem",
+          "callee": "setReturnItems",
+          "lineNumber": 44
+        },
+        {
+          "caller": "handleUpdateItem",
+          "callee": "inventory.find",
+          "lineNumber": 51
+        },
+        {
+          "caller": "handleUpdateItem",
+          "callee": "setReturnItems",
+          "lineNumber": 57
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "setSaving",
+          "lineNumber": 62
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "onSave",
+          "lineNumber": 64
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "reason.trim",
+          "lineNumber": 67
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "creditNoteRef.trim",
+          "lineNumber": 68
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "setReturnItems",
+          "lineNumber": 71
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "setSelectedSupplierId",
+          "lineNumber": 72
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "setReason",
+          "lineNumber": 73
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "setCreditNoteRef",
+          "lineNumber": 74
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "onClose",
+          "lineNumber": 75
+        },
+        {
+          "caller": "saveReturn",
+          "callee": "setSaving",
+          "lineNumber": 77
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "setSelectedWarehouseId",
+          "lineNumber": 110
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "warehouses.map",
+          "lineNumber": 114
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "setSelectedSupplierId",
+          "lineNumber": 123
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "suppliers.map",
+          "lineNumber": 127
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "setReason",
+          "lineNumber": 139
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "setCreditNoteRef",
+          "lineNumber": 148
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "returnItems.map",
+          "lineNumber": 168
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 174
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "inventory.map",
+          "lineNumber": 178
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 189
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Number",
+          "lineNumber": 189
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "handleUpdateItem",
+          "lineNumber": 199
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "Number",
+          "lineNumber": 199
+        },
+        {
+          "caller": "SupplierReturnModal",
+          "callee": "handleRemoveItem",
+          "lineNumber": 203
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/components/WarehouseModal.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 190,
+      "nonEmptyLines": 177,
+      "functions": [
+        {
+          "name": "WarehouseModal",
+          "startLine": 16,
+          "endLine": 188,
+          "params": [
+            "{ isOpen, onClose, onSave, lang, branches, warehouses, initialWarehouse }"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "WarehouseModal",
+          "callee": "useState",
+          "lineNumber": 17
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "useEffect",
+          "lineNumber": 26
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 28
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 30
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "generateInternalId",
+          "lineNumber": 31
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "useState",
+          "lineNumber": 42
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "e.preventDefault",
+          "lineNumber": 47
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setSaving",
+          "lineNumber": 48
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSave",
+          "lineNumber": 50
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setSaving",
+          "lineNumber": 52
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 88
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 99
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 110
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "Object.values(WarehouseType).map",
+          "lineNumber": 113
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "Object.values",
+          "lineNumber": 113
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 122
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "branches.map",
+          "lineNumber": 126
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 139
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "warehouses.filter(w => w.id !== formData.id).map",
+          "lineNumber": 143
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "warehouses.filter",
+          "lineNumber": 143
+        },
+        {
+          "caller": "WarehouseModal",
+          "callee": "setFormData",
+          "lineNumber": 155
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/InventoryHub.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 196,
+      "nonEmptyLines": 184,
+      "functions": [
+        {
+          "name": "MODULES",
+          "startLine": 10,
+          "endLine": 17,
+          "params": [
+            "lang"
+          ]
+        },
+        {
+          "name": "InventoryHub",
+          "startLine": 19,
+          "endLine": 194,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "InventoryHub",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 25
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "purchaseOrders.filter",
+          "lineNumber": 31
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "['RECEIVED', 'CANCELLED', 'REJECTED'].includes",
+          "lineNumber": 31
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "String((o as any).status || '').toUpperCase",
+          "lineNumber": 31
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "String",
+          "lineNumber": 31
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "warehouses.filter",
+          "lineNumber": 32
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "activeInventory.filter(i => (inventoryTotalsById.get(i.id) || 0) === 0).slice",
+          "lineNumber": 35
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "activeInventory.filter",
+          "lineNumber": 35
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 35
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "activeInventory.filter(i => {\n    const total = inventoryTotalsById.get(i.id) || 0;\n    return total > 0 && total <= i.threshold;\n  }).slice",
+          "lineNumber": 36
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "activeInventory.filter",
+          "lineNumber": 36
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 37
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "(transferMovements || []).slice",
+          "lineNumber": 40
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "inventoryValuation.toLocaleString",
+          "lineNumber": 87
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "MODULES(lang as 'ar' | 'en').map",
+          "lineNumber": 98
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "MODULES",
+          "lineNumber": 98
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "counts[mod.countKey].toLocaleString",
+          "lineNumber": 111
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "outItems.map",
+          "lineNumber": 132
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "displayItemName",
+          "lineNumber": 134
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "lowItems.map",
+          "lineNumber": 146
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "displayItemName",
+          "lineNumber": 148
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 149
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "recentMoves.map",
+          "lineNumber": 160
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "Number",
+          "lineNumber": 163
+        },
+        {
+          "caller": "InventoryHub",
+          "callee": "[\n            { to: '/stock-requests', icon: ClipboardCheck, label: lang === 'ar' ? 'الطلبيات المخزنية' : 'Stock Requests' },\n            { to: '/inventory-intelligence', icon: Brain, label: lang === 'ar' ? 'ذكاء المخزون' : 'Intelligence' },\n            { to: '/production', icon: Factory, label: lang === 'ar' ? 'الإنتاج' : 'Production' },\n            { to: '/wastage', icon: Trash2, label: lang === 'ar' ? 'الهالك' : 'Wastage' },\n          ].map",
+          "lineNumber": 175
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/MovementsPage.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 435,
+      "nonEmptyLines": 420,
+      "functions": [
+        {
+          "name": "MovementsPage",
+          "startLine": 6,
+          "endLine": 433,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "MovementsPage",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 18
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "useState",
+          "lineNumber": 20
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "useEffect",
+          "lineNumber": 22
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "loadMovements",
+          "lineNumber": 23
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "useEffect",
+          "lineNumber": 25
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "loadRecipeConsumption",
+          "lineNumber": 26
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "[\r\n          { id: 'MOVEMENTS' as const, label: lang === 'ar' ? 'سجل الحركات' : 'Movement Log', icon: Activity },\r\n          { id: 'CONSUMPTION' as const, label: lang === 'ar' ? 'مسحوبات الوصفات' : 'Recipe Consumption', icon: Utensils },\r\n        ].map",
+          "lineNumber": 44
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setSubTab",
+          "lineNumber": 50
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setMovementDateFrom",
+          "lineNumber": 70
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setMovementDateTo",
+          "lineNumber": 79
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setMovementBranchId",
+          "lineNumber": 85
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "(branches || []).map",
+          "lineNumber": 90
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "String",
+          "lineNumber": 91
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "String",
+          "lineNumber": 91
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setMovementSearch",
+          "lineNumber": 99
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setMovementTypeFilter",
+          "lineNumber": 136
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Object.entries(MOVEMENT_TYPE_META).map",
+          "lineNumber": 141
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Object.entries",
+          "lineNumber": 141
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementTypeFilter.has",
+          "lineNumber": 142
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "toggleMovementType",
+          "lineNumber": 146
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.count.toLocaleString",
+          "lineNumber": 160
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.inQty.toLocaleString",
+          "lineNumber": 164
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.outQty.toLocaleString",
+          "lineNumber": 168
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.cost.toFixed",
+          "lineNumber": 172
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "filteredMovementRows.map",
+          "lineNumber": 214
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "String(mv.type || '').toUpperCase",
+          "lineNumber": 215
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "String",
+          "lineNumber": 215
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 216
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "new Date(mv.createdAt).toLocaleString",
+          "lineNumber": 220
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "qty.toLocaleString",
+          "lineNumber": 234
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "qty.toLocaleString",
+          "lineNumber": 234
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 238
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number(mv.unitCost).toFixed",
+          "lineNumber": 238
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 238
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 241
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Math.abs(Number(mv.totalCost)).toFixed",
+          "lineNumber": 241
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Math.abs",
+          "lineNumber": 241
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 241
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.inQty.toLocaleString",
+          "lineNumber": 257
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.outQty.toLocaleString",
+          "lineNumber": 258
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.inCost.toFixed",
+          "lineNumber": 259
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "movementSummary.outCost.toFixed",
+          "lineNumber": 260
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setConsumptionDateFrom",
+          "lineNumber": 283
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "setConsumptionDateTo",
+          "lineNumber": 290
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "consumptionTotals.quantity.toLocaleString",
+          "lineNumber": 331
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "consumptionTotals.cost.toFixed",
+          "lineNumber": 335
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "consumptionTotals.movements.toLocaleString",
+          "lineNumber": 339
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "consumptionTotals.shortage.toLocaleString",
+          "lineNumber": 343
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "consumptionTotals.over.toLocaleString",
+          "lineNumber": 347
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "consumptionReportRows.map",
+          "lineNumber": 388
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number(row.totalQuantity || 0).toLocaleString",
+          "lineNumber": 405
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 405
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number(row.currentStock || 0).toLocaleString",
+          "lineNumber": 407
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 407
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "new Date(row.lastCountDate).toLocaleDateString",
+          "lineNumber": 410
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number(row.shortageQty || 0).toLocaleString",
+          "lineNumber": 414
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 414
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number(row.overQty || 0).toLocaleString",
+          "lineNumber": 415
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 415
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number(row.estimatedCost || 0).toFixed",
+          "lineNumber": 417
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "Number",
+          "lineNumber": 417
+        },
+        {
+          "caller": "MovementsPage",
+          "callee": "new Date(row.lastConsumedAt).toLocaleString",
+          "lineNumber": 421
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/ProcurementPage.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 52,
+      "nonEmptyLines": 46,
+      "functions": [
+        {
+          "name": "ProcurementPage",
+          "startLine": 8,
+          "endLine": 50,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ProcurementPage",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 13
+        },
+        {
+          "caller": "ProcurementPage",
+          "callee": "setReceiptModalOpen",
+          "lineNumber": 25
+        },
+        {
+          "caller": "ProcurementPage",
+          "callee": "setReceiptModalOpen",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/StockCountsPage.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 303,
+      "nonEmptyLines": 296,
+      "functions": [
+        {
+          "name": "StockCountsPage",
+          "startLine": 6,
+          "endLine": 301,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "StockCountsPage",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 17
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "useEffect",
+          "lineNumber": 19
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "loadCountHistory",
+          "lineNumber": 20
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setSelectedCountDate",
+          "lineNumber": 55
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setSelectedCountType",
+          "lineNumber": 60
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setSelectedCountWarehouse",
+          "lineNumber": 68
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "activeWarehouses.map",
+          "lineNumber": 72
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "displayWarehouseName",
+          "lineNumber": 72
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "countHistory.map",
+          "lineNumber": 93
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleOpenCount",
+          "lineNumber": 96
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleOpenCount",
+          "lineNumber": 98
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "event.stopPropagation",
+          "lineNumber": 116
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handlePrintCount",
+          "lineNumber": 117
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "event.stopPropagation",
+          "lineNumber": 128
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "exportStockCount",
+          "lineNumber": 129
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "Number(count.summary?.shortageQty || 0).toLocaleString",
+          "lineNumber": 146
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "Number",
+          "lineNumber": 146
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "Number(count.summary?.overQty || 0).toLocaleString",
+          "lineNumber": 150
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "Number",
+          "lineNumber": 150
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "countSession.id?.slice",
+          "lineNumber": 171
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setBlindCount",
+          "lineNumber": 176
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setCountScan",
+          "lineNumber": 183
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "countScan.trim().toLowerCase",
+          "lineNumber": 186
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "countScan.trim",
+          "lineNumber": 186
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setCountScanFilter",
+          "lineNumber": 187
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "(countSession?.items || []).find",
+          "lineNumber": 188
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String(ci.barcode || '').toLowerCase",
+          "lineNumber": 189
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String",
+          "lineNumber": 189
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String(ci.sku || '').toLowerCase",
+          "lineNumber": 190
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String",
+          "lineNumber": 190
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String(ci.itemName || '').toLowerCase().includes",
+          "lineNumber": 191
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String(ci.itemName || '').toLowerCase",
+          "lineNumber": 191
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String",
+          "lineNumber": 191
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setCountScanFilter",
+          "lineNumber": 193
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String",
+          "lineNumber": 193
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "showToast",
+          "lineNumber": 194
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setCountScanFilter",
+          "lineNumber": 196
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "showToast",
+          "lineNumber": 197
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setCountScan",
+          "lineNumber": 204
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "setCountScanFilter",
+          "lineNumber": 204
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleZeroCountInputs",
+          "lineNumber": 210
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handlePrintCount",
+          "lineNumber": 217
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "exportStockCount",
+          "lineNumber": 225
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleCompleteCount",
+          "lineNumber": 233
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleCompleteCount",
+          "lineNumber": 240
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "(countSession.items || []).filter((ci: any) => !countScanFilter || String(ci.itemId) === countScanFilter).map",
+          "lineNumber": 262
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "(countSession.items || []).filter",
+          "lineNumber": 262
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "String",
+          "lineNumber": 262
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleUpdateCountItem",
+          "lineNumber": 273
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "Number",
+          "lineNumber": 273
+        },
+        {
+          "caller": "StockCountsPage",
+          "callee": "handleUpdateCountItem",
+          "lineNumber": 285
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/StockItemsPage.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 496,
+      "nonEmptyLines": 471,
+      "functions": [
+        {
+          "name": "StockItemsPage",
+          "startLine": 15,
+          "endLine": 494,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "StockItemsPage",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 28
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "useState",
+          "lineNumber": 32
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "useState",
+          "lineNumber": 33
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "useMemo",
+          "lineNumber": 35
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "activeInventory.forEach",
+          "lineNumber": 37
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "String(item.category || '').trim",
+          "lineNumber": 38
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "String",
+          "lineNumber": 38
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "set.add",
+          "lineNumber": 39
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "Array.from(set).sort",
+          "lineNumber": 41
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "Array.from",
+          "lineNumber": 41
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "a.localeCompare",
+          "lineNumber": 41
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "useMemo",
+          "lineNumber": 44
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "filteredInventory.filter",
+          "lineNumber": 44
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "String",
+          "lineNumber": 45
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 47
+        },
+        {
+          "caller": "showLow",
+          "callee": "setAttentionOnly",
+          "lineNumber": 53
+        },
+        {
+          "caller": "showLow",
+          "callee": "setStockSort",
+          "lineNumber": 53
+        },
+        {
+          "caller": "clearFlowFilters",
+          "callee": "setAttentionOnly",
+          "lineNumber": 54
+        },
+        {
+          "caller": "clearFlowFilters",
+          "callee": "setCategoryFilter",
+          "lineNumber": 54
+        },
+        {
+          "caller": "clearFlowFilters",
+          "callee": "setSearchQuery",
+          "lineNumber": 54
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "handleZeroInventory",
+          "lineNumber": 66
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "handleInventoryFileImport",
+          "lineNumber": 76
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setItemModalOpen",
+          "lineNumber": 81
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "[\n          { label: lang === 'ar' ? 'قيمة المخزون' : 'Valuation', value: inventoryValuation.toLocaleString(), sub: settings.currencySymbol || 'ج.م', color: '#10b981', icon: Layers, onClick: clearFlowFilters, active: false },\n          { label: lang === 'ar' ? 'الأصناف النشطة' : 'Active SKUs', value: activeInventory.length, sub: lang === 'ar' ? 'صنف' : 'items', color: '#3b82f6', icon: Package, onClick: clearFlowFilters, active: false },\n          { label: lang === 'ar' ? 'رصيد صفر' : 'Out of Stock', value: outOfStockCount, sub: lang === 'ar' ? 'اطلب الآن' : 'order now', color: '#f43f5e', icon: AlertTriangle, onClick: showLow, active: attentionOnly },\n          { label: lang === 'ar' ? 'مخزون منخفض' : 'Low Stock', value: lowStockCount, sub: lang === 'ar' ? 'راجع' : 'review', color: '#f59e0b', icon: Activity, onClick: showLow, active: attentionOnly },\n        ].map",
+          "lineNumber": 96
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "inventoryValuation.toLocaleString",
+          "lineNumber": 97
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setSearchQuery",
+          "lineNumber": 132
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setCategoryFilter",
+          "lineNumber": 141
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "categories.map",
+          "lineNumber": 146
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setAttentionOnly",
+          "lineNumber": 151
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setReceiptModalOpen",
+          "lineNumber": 161
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setReturnModalOpen",
+          "lineNumber": 164
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setTransferModalOpen",
+          "lineNumber": 167
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setWarehouseModalOpen",
+          "lineNumber": 170
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "(() => {\n          if (inventoryLoading && inventory.length === 0 && !searchQuery) {\n            return (\n              <div className=\"p-8\">\n                <PageSkeleton />\n              </div>\n            );\n          }\n          return (\n            <div className=\"flex-1 flex flex-col min-h-0 relative z-10 w-full overflow-hidden min-h-[600px]\">\n              {/* Sort Bar */}\n              <div className=\"shrink-0 px-4 sm:px-6 py-4 flex items-center gap-2 overflow-x-auto border-b border-border/20 bg-elevated/20 sticky top-0 z-20\">\n                <span className=\"text-[9px] font-black uppercase tracking-widest text-muted mr-2\">{lang === 'ar' ? 'ترتيب:' : 'Sort:'}</span>\n                {[\n                  { id: 'name', label: lang === 'ar' ? 'الاسم' : 'Name' },\n                  { id: 'qty-asc', label: lang === 'ar' ? 'الأقل كمية' : 'Qty ?' },\n                  { id: 'qty-desc', label: lang === 'ar' ? 'الأكثر كمية' : 'Qty ?' },\n                  { id: 'cost', label: lang === 'ar' ? 'التكلفة' : 'Cost' },\n                  { id: 'low-first', label: lang === 'ar' ? 'نقص أولاً' : 'Low First' },\n                ].map(s => (\n                  <button\n                    key={s.id}\n                    onClick={() => setStockSort(s.id as any)}\n                    className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 border ${stockSort === s.id\n                      ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]'\n                      : 'bg-card/30 text-muted border-border/20 hover:border-emerald-500/20 hover:text-emerald-400'\n                      }`}\n                  >\n                    {s.label}\n                  </button>\n                ))}\n                <span className=\"ms-auto shrink-0 text-[9px] font-bold text-muted tabular-nums bg-elevated/40 px-2 py-1 rounded-lg border border-border/10\">\n                  {visibleItems.length} {lang === 'ar' ? 'صنف' : 'items'}\n                </span>\n              </div>\n\n              {/* Header Row */}\n              <div className={`hidden lg:grid ${inventoryGridColumns} gap-4 px-8 py-5 bg-elevated/30 border-b border-border/20 text-muted text-[10px] uppercase font-black tracking-widest sticky top-0 z-20`}>\n                <div className=\"min-w-0 whitespace-nowrap\">{lang === 'ar' ? 'الصنف' : 'Item Name'}</div>\n                <div className=\"min-w-0 whitespace-nowrap\">{lang === 'ar' ? 'التوزيع' : 'Warehouses'}</div>\n                <div className=\"min-w-0 whitespace-nowrap\">{lang === 'ar' ? 'الكمية الإجمالية' : 'Total Qty'}</div>\n                <div className=\"min-w-0 whitespace-nowrap font-secondary\">{lang === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</div>\n                <div className=\"min-w-0 whitespace-nowrap\">{lang === 'ar' ? 'التكلفة' : 'Cost'}</div>\n                <div className=\"min-w-0 whitespace-nowrap text-right\">{lang === 'ar' ? 'إجراءات' : 'Actions'}</div>\n              </div>\n\n              {/* Virtualized Body */}\n              <div className=\"hidden lg:block flex-1 overflow-hidden min-h-0 bg-card/10\">\n                {visibleItems.length === 0 ? (\n                  <div className=\"flex min-h-[420px] flex-col items-center justify-center gap-5 p-8 text-center\">\n                    <div className=\"flex h-20 w-20 items-center justify-center rounded-3xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500\">\n                      <Package size={34} />\n                    </div>\n                    <div>\n                      <h3 className=\"text-xl font-black text-main\">\n                        {lang === 'ar' ? 'لا توجد أصناف مخزنية ظاهرة' : 'No inventory items visible'}\n                      </h3>\n                      <p className=\"mx-auto mt-2 max-w-xl text-sm font-bold leading-relaxed text-muted\">\n                        {inventoryError\n                          ? (lang === 'ar'\n                              ? `تعذر تحميل الأصناف: ${inventoryError}. تأكد من صلاحيات المستخدم أو الاتصال بالخادم ثم اضغط تحديث.`\n                              : `Could not load inventory: ${inventoryError}. Check user permissions or server connection, then refresh.`)\n                          : (filteredInventory.length > 0\n                              ? (lang === 'ar'\n                                  ? 'الفلاتر الحالية تخفي كل الأصناف — امسحها لعرض الكل.'\n                                  : 'Current filters hide everything — clear them to show all.')\n                              : (lang === 'ar'\n                                  ? 'ابدأ بإضافة صنف مخزني أو تأكد أن الأصناف متصلة بالمخزن الحالي.'\n                                  : 'Add a raw material or confirm items are linked to the current warehouse.'))}\n                      </p>\n                    </div>\n                    {filteredInventory.length > 0 && (\n                      <button\n                        type=\"button\"\n                        onClick={clearFlowFilters}\n                        className=\"rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-emerald-500 transition-all hover:bg-emerald-500/20 active:scale-95\"\n                      >\n                        {lang === 'ar' ? 'مسح الفلاتر' : 'Clear filters'}\n                      </button>\n                    )}\n                  </div>\n                ) : (\n                  <VirtualList\n                    itemCount={visibleItems.length}\n                    itemHeight={100}\n                    overscan={5}\n                    getKey={(index) => visibleItems[index].id}\n                    renderItem={(index) => {\n                    const item = visibleItems[index];\n                    const totalQty = inventoryTotalsById.get(item.id) || 0;\n                    const isLow = totalQty <= item.threshold;\n                    const hasBrokenWarehouseLink = item.warehouseQuantities.some((row) => {\n                      const warehouse = warehouseById.get(row.warehouseId);\n                      return !warehouse || warehouse.isActive === false;\n                    });\n                    return (\n                      <div\n                        className={`grid ${inventoryGridColumns} gap-4 px-8 items-center h-full hover:bg-emerald-500/5 transition-colors border-b border-white/5 group`}\n                      >\n                        {/* Item Profile */}\n                        <div className=\"min-w-0 flex items-center gap-4 py-2\">\n                          <div className={`p-3.5 rounded-[1.2rem] border ${item.isComposite ? 'bg-violet-500/10 text-violet-500 border-violet-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'} shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-150 ease-out`}>\n                            {item.isComposite ? <Layers size={20} /> : <Package size={20} />}\n                          </div>\n                          <div className=\"min-w-0\">\n                            <div className=\"font-bold text-main text-[13px] truncate group-hover:text-emerald-500 transition-colors uppercase\">\n                              {displayItemName(item)}\n                            </div>\n                            <div className=\"text-[10px] flex items-center gap-2 mt-1 truncate\">\n                              <span className=\"uppercase font-black tracking-widest text-muted\">{item.category}</span>\n                              {item.sku && <span className=\"font-mono font-bold tracking-widest text-teal-500 bg-teal-500/10 px-1.5 py-0.5 rounded border border-teal-500/20\">[{item.sku}]</span>}\n                            </div>\n                          </div>\n                        </div>\n\n                        {/* Warehouses */}\n                        <div className=\"min-w-0 flex flex-wrap gap-1.5 py-2 overflow-hidden\">\n                          {item.warehouseQuantities.slice(0, 3).map(wq => {\n                            const wh = warehouseById.get(wq.warehouseId);\n                            return (\n                              <span key={wq.warehouseId} className=\"px-2 py-1 bg-elevated/40 border border-border/20 shadow-sm rounded-lg text-[9px] font-bold text-main hover:border-emerald-500/30 transition-colors\">\n                                <span className=\"truncate\">{displayWarehouseName(wh)}: {wq.quantity}</span>\n                              </span>\n                            );\n                          })}\n                          {item.warehouseQuantities.length > 3 && <span className=\"text-[9px] font-black text-muted\">+{item.warehouseQuantities.length - 3} {lang === 'ar' ? 'أكثر' : 'More'}</span>}\n                          {item.warehouseQuantities.length === 0 && <span className=\"text-[10px] italic text-muted opacity-60\">{lang === 'ar' ? 'لا يوجد رصيد' : 'Empty Stock'}</span>}\n                          {hasBrokenWarehouseLink && <span className=\"px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[9px] font-black text-amber-500\">{lang === 'ar' ? 'مخزن غير نشط' : 'Invalid warehouse link'}</span>}\n                        </div>\n\n                        {/* Qty */}\n                        <div className=\"min-w-0 font-black py-2\">\n                          <div className={`text-[13px] ${isLow ? 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.3)]' : 'text-main'}`}>\n                            {totalQty} <span className=\"text-[10px] text-muted ml-0.5 font-normal\">{item.unit}</span>\n                          </div>\n                          {isLow && (\n                            <div className=\"text-[8px] uppercase font-black text-rose-500 bg-rose-500/10 border border-rose-500/20 w-fit px-1.5 py-0.25 rounded mt-1 overflow-hidden whitespace-nowrap animate-pulse\">\n                              {lang === 'ar' ? 'منخفض' : 'Low Stock'}\n                            </div>\n                          )}\n                        </div>\n\n                        {/* Price */}\n                        <div className=\"min-w-0 font-black text-[13px] text-emerald-500 drop-shadow-sm py-2 whitespace-nowrap\">\n                          {settings.currencySymbol || 'ج.م'} {(item.purchasePrice || 0).toLocaleString()}\n                        </div>\n\n                        {/* Cost */}\n                        <div className=\"min-w-0 font-black text-[13px] text-muted/80 py-2 whitespace-nowrap\">\n                          {settings.currencySymbol || 'ج.م'} {item.costPrice.toLocaleString()}\n                        </div>\n\n                        {/* Actions */}\n                        <div className=\"min-w-0 flex items-center justify-end gap-2 pr-2 opacity-30 group-hover:opacity-100 transition-opacity\">\n                          {/* AI Forecast Button */}\n                          <button\n                            onClick={() => handleRequestForecast(item.id)}\n                            disabled={aiForecasts[item.id]?.loading}\n                            title={lang === 'ar' ? 'توقعات الذكاء الاصطناعي' : 'AI Forecast'}\n                            className={`p-2.5 border border-border/20 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2 ${\n                              aiForecasts[item.id]?.loading\n                                ? 'bg-primary/5 text-primary animate-pulse'\n                                : 'bg-card/50 hover:bg-primary/10 hover:border-primary/30 text-muted hover:text-primary'\n                            }`}\n                          >\n                            <Activity size={15} />\n                            {aiForecasts[item.id]?.text && (\n                              <div className=\"absolute bottom-full right-0 mb-3 w-64 p-3 bg-card/95 border border-primary/20 rounded-2xl shadow-2xl z-50 text-[10px] normal-case font-bold text-main leading-relaxed ring-1 ring-white/10 animate-in fade-in slide-in-from-bottom-2\">\n                                <div className=\"flex items-center gap-2 mb-1.5 text-primary uppercase tracking-tighter\">\n                                  <Activity size={10} />\n                                  {lang === 'ar' ? 'تحليل ذكي' : 'Smart Insight'}\n                                </div>\n                                {aiForecasts[item.id].text}\n                              </div>\n                            )}\n                          </button>\n\n                          <button\n                            onClick={() => { setEditingItem(item); setItemModalOpen(true); }}\n                            aria-label={lang === 'ar' ? `تعديل ${displayItemName(item)}` : `Edit ${displayItemName(item)}`}\n                            title={lang === 'ar' ? 'تعديل الصنف' : 'Edit item'}\n                            className=\"p-2.5 bg-card/50 hover:bg-emerald-500/10 border border-border/20 hover:border-emerald-500/30 rounded-xl text-muted hover:text-emerald-500 transition-all shadow-sm active:scale-95\"\n                          >\n                            <Tag size={15} />\n                          </button>\n                          <button\n                            onClick={() => { setEditingItem(item); setAdjustmentModalOpen(true); }}\n                            aria-label={lang === 'ar' ? `تسوية مخزون ${displayItemName(item)}` : `Adjust stock for ${displayItemName(item)}`}\n                            title={lang === 'ar' ? 'تسوية المخزون' : 'Adjust stock'}\n                            className=\"p-2.5 bg-card/50 hover:bg-amber-500/10 border border-border/20 hover:border-amber-500/30 rounded-xl text-muted hover:text-amber-500 transition-all shadow-sm active:scale-95\"\n                          >\n                            <Calculator size={15} />\n                          </button>\n                          <button\n                            onClick={() => void handleDeleteItem(item)}\n                            aria-label={lang === 'ar' ? `أرشفة ${displayItemName(item)}` : `Archive ${displayItemName(item)}`}\n                            title={lang === 'ar' ? 'أرشفة الصنف' : 'Archive item'}\n                            className=\"p-2.5 bg-card/50 hover:bg-rose-500/10 border border-border/20 hover:border-rose-500/30 rounded-xl text-muted hover:text-rose-500 transition-all shadow-sm active:scale-95\"\n                          >\n                            <Trash2 size={15} />\n                          </button>\n                        </div>\n                      </div>\n                    );\n                    }}\n                  />\n                )}\n              </div>\n\n              <div className=\"lg:hidden flex-1 min-h-0 overflow-y-auto bg-card/10 p-3 sm:p-4 space-y-3\">\n                {visibleItems.length === 0 ? (\n                  <div className=\"flex min-h-[320px] flex-col items-center justify-center gap-4 px-5 text-center\">\n                    <Package size={38} className=\"text-muted/30\" />\n                    <p className=\"text-sm font-black text-muted\">\n                      {filteredInventory.length > 0\n                        ? (lang === 'ar' ? 'الفلاتر تخفي كل الأصناف' : 'Filters hide everything')\n                        : (lang === 'ar' ? 'لا توجد أصناف مخزنية ظاهرة' : 'No inventory items visible')}\n                    </p>\n                    {filteredInventory.length > 0 && (\n                      <button\n                        type=\"button\"\n                        onClick={clearFlowFilters}\n                        className=\"rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-[10px] font-black text-emerald-500\"\n                      >\n                        {lang === 'ar' ? 'مسح الفلاتر' : 'Clear filters'}\n                      </button>\n                    )}\n                  </div>\n                ) : visibleItems.map((item) => {\n                  const totalQty = inventoryTotalsById.get(item.id) || 0;\n                  const isLow = totalQty <= item.threshold;\n                  const hasBrokenWarehouseLink = item.warehouseQuantities.some((row) => {\n                    const warehouse = warehouseById.get(row.warehouseId);\n                    return !warehouse || warehouse.isActive === false;\n                  });\n                  return (\n                    <article key={item.id} className=\"rounded-2xl border border-border/25 bg-card/70 p-4 shadow-sm\">\n                      <div className=\"flex items-start gap-3\">\n                        <div className={`mt-0.5 rounded-xl border p-2.5 ${item.isComposite ? 'border-violet-500/20 bg-violet-500/10 text-violet-500' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500'}`}>\n                          {item.isComposite ? <Layers size={18} /> : <Package size={18} />}\n                        </div>\n                        <div className=\"min-w-0 flex-1\">\n                          <h2 className=\"truncate text-sm font-black text-main\">{displayItemName(item)}</h2>\n                          <div className=\"mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted\">\n                            <span>{item.category || (lang === 'ar' ? 'بدون تصنيف' : 'Uncategorized')}</span>\n                            {item.sku && <span className=\"rounded-md bg-elevated px-1.5 py-0.5 font-mono\">{item.sku}</span>}\n                          </div>\n                        </div>\n                        <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${isLow ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>\n                          {isLow ? (lang === 'ar' ? 'منخفض' : 'LOW') : (lang === 'ar' ? 'متاح' : 'OK')}\n                        </span>\n                      </div>\n\n                      <div className=\"mt-4 grid grid-cols-3 gap-2 rounded-xl bg-elevated/35 p-3 text-center\">\n                        <div>\n                          <p className=\"text-[9px] font-black text-muted\">{lang === 'ar' ? 'الرصيد' : 'STOCK'}</p>\n                          <p className={`mt-1 text-sm font-black tabular-nums ${isLow ? 'text-rose-500' : 'text-main'}`}>{totalQty} <small>{item.unit}</small></p>\n                        </div>\n                        <div className=\"border-x border-border/20\">\n                          <p className=\"text-[9px] font-black text-muted\">{lang === 'ar' ? 'الشراء' : 'BUY'}</p>\n                          <p className=\"mt-1 text-sm font-black text-emerald-500 tabular-nums\">{settings.currencySymbol || 'ج.م'} {item.purchasePrice || 0}</p>\n                        </div>\n                        <div>\n                          <p className=\"text-[9px] font-black text-muted\">{lang === 'ar' ? 'التكلفة' : 'COST'}</p>\n                          <p className=\"mt-1 text-sm font-black text-main tabular-nums\">{settings.currencySymbol || 'ج.م'} {item.costPrice || 0}</p>\n                        </div>\n                      </div>\n\n                      <div className=\"mt-3 flex flex-wrap gap-1.5\">\n                        {item.warehouseQuantities.slice(0, 2).map((wq) => (\n                          <span key={wq.warehouseId} className=\"rounded-lg border border-border/20 bg-elevated/30 px-2 py-1 text-[9px] font-bold text-muted\">\n                            {displayWarehouseName(warehouseById.get(wq.warehouseId)) || (lang === 'ar' ? 'مخزن غير موجود' : 'Missing warehouse')}: {wq.quantity}\n                          </span>\n                        ))}\n                        {hasBrokenWarehouseLink && <span className=\"rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-black text-amber-500\">{lang === 'ar' ? 'مراجعة ربط المخزن' : 'Review warehouse link'}</span>}\n                      </div>\n\n                      <div className=\"mt-4 grid grid-cols-2 gap-2\">\n                        <button type=\"button\" onClick={() => { setEditingItem(item); setItemModalOpen(true); }} className=\"rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-[10px] font-black text-emerald-500\">\n                          {lang === 'ar' ? 'تعديل الصنف' : 'Edit item'}\n                        </button>\n                        <button type=\"button\" onClick={() => { setEditingItem(item); setAdjustmentModalOpen(true); }} className=\"rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-[10px] font-black text-amber-500\">\n                          {lang === 'ar' ? 'تسوية الرصيد' : 'Adjust stock'}\n                        </button>\n                        <button type=\"button\" onClick={() => void handleDeleteItem(item)} className=\"col-span-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-[10px] font-black text-rose-500\">\n                          {lang === 'ar' ? 'أرشفة الصنف' : 'Archive item'}\n                        </button>\n                      </div>\n                    </article>\n                  );\n                })}\n              </div>\n            </div>\n          );\n        })",
+          "lineNumber": 177
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "[\n                  { id: 'name', label: lang === 'ar' ? 'الاسم' : 'Name' },\n                  { id: 'qty-asc', label: lang === 'ar' ? 'الأقل كمية' : 'Qty ?' },\n                  { id: 'qty-desc', label: lang === 'ar' ? 'الأكثر كمية' : 'Qty ?' },\n                  { id: 'cost', label: lang === 'ar' ? 'التكلفة' : 'Cost' },\n                  { id: 'low-first', label: lang === 'ar' ? 'نقص أولاً' : 'Low First' },\n                ].map",
+          "lineNumber": 190
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setStockSort",
+          "lineNumber": 199
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 266
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.warehouseQuantities.some",
+          "lineNumber": 268
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "warehouseById.get",
+          "lineNumber": 269
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 283
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.warehouseQuantities.slice(0, 3).map",
+          "lineNumber": 294
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.warehouseQuantities.slice",
+          "lineNumber": 294
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "warehouseById.get",
+          "lineNumber": 295
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayWarehouseName",
+          "lineNumber": 298
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "(item.purchasePrice || 0).toLocaleString",
+          "lineNumber": 321
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.costPrice.toLocaleString",
+          "lineNumber": 326
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "handleRequestForecast",
+          "lineNumber": 333
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setEditingItem",
+          "lineNumber": 355
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setItemModalOpen",
+          "lineNumber": 355
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 356
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 356
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setEditingItem",
+          "lineNumber": 363
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setAdjustmentModalOpen",
+          "lineNumber": 363
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 364
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 364
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "handleDeleteItem",
+          "lineNumber": 371
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 372
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 372
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "visibleItems.map",
+          "lineNumber": 405
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 406
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.warehouseQuantities.some",
+          "lineNumber": 408
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "warehouseById.get",
+          "lineNumber": 409
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayItemName",
+          "lineNumber": 419
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.warehouseQuantities.slice(0, 2).map",
+          "lineNumber": 446
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "item.warehouseQuantities.slice",
+          "lineNumber": 446
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "displayWarehouseName",
+          "lineNumber": 448
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "warehouseById.get",
+          "lineNumber": 448
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setEditingItem",
+          "lineNumber": 455
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setItemModalOpen",
+          "lineNumber": 455
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setEditingItem",
+          "lineNumber": 458
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setAdjustmentModalOpen",
+          "lineNumber": 458
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "handleDeleteItem",
+          "lineNumber": 461
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setItemModalOpen",
+          "lineNumber": 476
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setEditingItem",
+          "lineNumber": 476
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setAdjustmentModalOpen",
+          "lineNumber": 485
+        },
+        {
+          "caller": "StockItemsPage",
+          "callee": "setEditingItem",
+          "lineNumber": 485
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/SuppliersPage.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 170,
+      "nonEmptyLines": 163,
+      "functions": [
+        {
+          "name": "SuppliersPage",
+          "startLine": 7,
+          "endLine": 168,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SuppliersPage",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 14
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "filteredSuppliers.filter",
+          "lineNumber": 15
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "filteredSuppliers.filter",
+          "lineNumber": 16
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setReturnModalOpen",
+          "lineNumber": 28
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSearchQuery",
+          "lineNumber": 46
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 58
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 59
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 61
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 62
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 64
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 65
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 68
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "activeSuppliers.map",
+          "lineNumber": 84
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "(lang === 'ar' ? s.nameAr || s.name : s.name).charAt",
+          "lineNumber": 89
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setSupplierForm",
+          "lineNumber": 114
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "handleDeactivateSupplier",
+          "lineNumber": 115
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "inactiveSuppliers.map",
+          "lineNumber": 127
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "(lang === 'ar' ? s.nameAr || s.name : s.name).charAt",
+          "lineNumber": 132
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "handleReactivateSupplier",
+          "lineNumber": 147
+        },
+        {
+          "caller": "SuppliersPage",
+          "callee": "setReturnModalOpen",
+          "lineNumber": 159
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/pages/WarehousesPage.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 238,
+      "nonEmptyLines": 226,
+      "functions": [
+        {
+          "name": "WarehousesPage",
+          "startLine": 7,
+          "endLine": 236,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "WarehousesPage",
+          "callee": "useInventoryWorkspace",
+          "lineNumber": 18
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "useState",
+          "lineNumber": 20
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setWarehouseModalOpen",
+          "lineNumber": 32
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "[\r\n          { id: 'WAREHOUSES' as const, label: lang === 'ar' ? 'المخازن' : 'Warehouses', icon: Home },\r\n          { id: 'TRANSFERS' as const, label: lang === 'ar' ? 'تحويلات الفروع' : 'Branch Transfers', icon: ArrowRightLeft },\r\n        ].map",
+          "lineNumber": 45
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setSubTab",
+          "lineNumber": 51
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setWarehouseModalOpen",
+          "lineNumber": 63
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "warehouses.map",
+          "lineNumber": 72
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "branchById.get",
+          "lineNumber": 73
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "warehouseById.get",
+          "lineNumber": 74
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setSelectedWarehouse",
+          "lineNumber": 76
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "warehouseSkuCounts.get",
+          "lineNumber": 104
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setSelectedWarehouse",
+          "lineNumber": 120
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "displayWarehouseName",
+          "lineNumber": 124
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "warehouseById.get",
+          "lineNumber": 124
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "branchById.get",
+          "lineNumber": 125
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "handleToggleWarehouseActive",
+          "lineNumber": 126
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "[\r\n                [lang === 'ar' ? 'الأصناف' : 'Items', selectedWarehouseStats.items],\r\n                [lang === 'ar' ? 'الكمية' : 'Quantity', selectedWarehouseStats.quantity],\r\n                [lang === 'ar' ? 'منخفض' : 'Low', selectedWarehouseStats.low],\r\n                [lang === 'ar' ? 'القيمة' : 'Value', `${settings.currencySymbol || 'ج.م'} ${selectedWarehouseStats.value.toLocaleString()}`],\r\n              ].map",
+          "lineNumber": 131
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "selectedWarehouseStats.value.toLocaleString",
+          "lineNumber": 135
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "String",
+          "lineNumber": 136
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "selectedWarehouseRows.map",
+          "lineNumber": 142
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "displayItemName",
+          "lineNumber": 142
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "(quantity * (item.costPrice || 0)).toLocaleString",
+          "lineNumber": 142
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setBranchTransferItemId",
+          "lineNumber": 157
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "activeInventory.map",
+          "lineNumber": 159
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "displayItemName",
+          "lineNumber": 159
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setBranchTransferFromWh",
+          "lineNumber": 161
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "activeWarehouses.map",
+          "lineNumber": 163
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "displayWarehouseName",
+          "lineNumber": 163
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setBranchTransferToWh",
+          "lineNumber": 165
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "destinationWarehouses.map",
+          "lineNumber": 167
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "displayWarehouseName",
+          "lineNumber": 167
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setBranchTransferQty",
+          "lineNumber": 171
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "Math.max",
+          "lineNumber": 171
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "Number",
+          "lineNumber": 171
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setBranchTransferReason",
+          "lineNumber": 178
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "transferMovements.map",
+          "lineNumber": 198
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "new Date(mv.createdAt).toLocaleDateString",
+          "lineNumber": 200
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "new Date(mv.createdAt).toLocaleTimeString",
+          "lineNumber": 200
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "Number",
+          "lineNumber": 207
+        },
+        {
+          "caller": "WarehousesPage",
+          "callee": "setWarehouseModalOpen",
+          "lineNumber": 228
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/shared/inventoryUi.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 134,
+      "nonEmptyLines": 126,
+      "functions": [
+        {
+          "name": "dateOnly",
+          "startLine": 5,
+          "endLine": 5,
+          "params": [
+            "date"
+          ]
+        },
+        {
+          "name": "InvPageShell",
+          "startLine": 20,
+          "endLine": 30,
+          "params": [
+            "{ children }"
+          ]
+        },
+        {
+          "name": "InvPageHeader",
+          "startLine": 43,
+          "endLine": 78,
+          "params": [
+            "{ icon, title, subtitle, accent = 'emerald', actions, backTo = '/inventory', backLabel }"
+          ]
+        },
+        {
+          "name": "InvStat",
+          "startLine": 81,
+          "endLine": 104,
+          "params": [
+            "{ label, value, subValue, icon: Icon, color, lang }"
+          ]
+        },
+        {
+          "name": "InvEmpty",
+          "startLine": 107,
+          "endLine": 118,
+          "params": [
+            "{ title, hint, action }"
+          ]
+        },
+        {
+          "name": "InvError",
+          "startLine": 120,
+          "endLine": 134,
+          "params": [
+            "{ message, onDismiss, dismissLabel }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "dateOnly",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "MOVEMENT_TYPE_META",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "InvPageShell",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "InvPageHeader",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "InvStat",
+          "line": 81,
+          "isDefault": false
+        },
+        {
+          "name": "InvEmpty",
+          "line": 107,
+          "isDefault": false
+        },
+        {
+          "name": "InvError",
+          "line": 120,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "dateOnly",
+          "callee": "date.toISOString().split",
+          "lineNumber": 5
+        },
+        {
+          "caller": "dateOnly",
+          "callee": "date.toISOString",
+          "lineNumber": 5
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 7,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "src/features/inventory/shared/useInventoryWorkspace.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1237,
+      "nonEmptyLines": 1158,
+      "functions": [
+        {
+          "name": "useInventoryWorkspace",
+          "startLine": 21,
+          "endLine": 1235,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "useInventoryWorkspace",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useInventoryStore",
+          "lineNumber": 32
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useShallow",
+          "lineNumber": 33
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useAuthStore",
+          "lineNumber": 62
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useShallow",
+          "lineNumber": 63
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useConfirm",
+          "lineNumber": 70
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useToast",
+          "lineNumber": 71
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 76
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 77
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 80
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 81
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 82
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 83
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 84
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 85
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 86
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 87
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 96
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 97
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 98
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 99
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 100
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 101
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 102
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useDeferredValue",
+          "lineNumber": 103
+        },
+        {
+          "caller": "handleDeactivateSupplier",
+          "callee": "confirm",
+          "lineNumber": 106
+        },
+        {
+          "caller": "handleDeactivateSupplier",
+          "callee": "deactivateSupplierInDB",
+          "lineNumber": 116
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useEffect",
+          "lineNumber": 119
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "fetchInventory",
+          "lineNumber": 120
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "fetchWarehouses",
+          "lineNumber": 121
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "fetchSuppliers",
+          "lineNumber": 122
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "fetchPurchaseOrders",
+          "lineNumber": 123
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "fetchTransferMovements",
+          "lineNumber": 124
+        },
+        {
+          "caller": "handleStockUpdate",
+          "callee": "patchStockFromSocket",
+          "lineNumber": 128
+        },
+        {
+          "caller": "handleStockUpdate",
+          "callee": "fetchInventory",
+          "lineNumber": 130
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "socketService.on",
+          "lineNumber": 134
+        },
+        {
+          "caller": "handleReconnect",
+          "callee": "fetchInventory",
+          "lineNumber": 138
+        },
+        {
+          "caller": "handleReconnect",
+          "callee": "fetchWarehouses",
+          "lineNumber": 139
+        },
+        {
+          "caller": "handleReconnect",
+          "callee": "fetchPurchaseOrders",
+          "lineNumber": 140
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "socketService.onReconnect",
+          "lineNumber": 142
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "socketService.off",
+          "lineNumber": 145
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "socketService.offReconnect",
+          "lineNumber": 146
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "deferredSearchQuery.trim().toLowerCase",
+          "lineNumber": 150
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "deferredSearchQuery.trim",
+          "lineNumber": 150
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 152
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "branches.map",
+          "lineNumber": 153
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 157
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "warehouses.map",
+          "lineNumber": 158
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 162
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventory.filter",
+          "lineNumber": 163
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 167
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "warehouses.filter",
+          "lineNumber": 168
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 172
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.flatMap",
+          "lineNumber": 172
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item.warehouseQuantities\r\n      .filter((row) => {\r\n        const warehouse = warehouseById.get(row.warehouseId);\r\n        return !warehouse || warehouse.isActive === false;\r\n      })\r\n      .map",
+          "lineNumber": 173
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item.warehouseQuantities\r\n      .filter",
+          "lineNumber": 173
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "warehouseById.get",
+          "lineNumber": 175
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "warehouseById.get",
+          "lineNumber": 178
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 181
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "suppliers.map",
+          "lineNumber": 182
+        },
+        {
+          "caller": "isLiveWarehouseRow",
+          "callee": "warehouseById.get",
+          "lineNumber": 190
+        },
+        {
+          "caller": "isLiveWarehouseRow",
+          "callee": "Boolean",
+          "lineNumber": 191
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 194
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventory.forEach",
+          "lineNumber": 196
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "totals.set",
+          "lineNumber": 197
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item.warehouseQuantities\r\n          .filter((quantity) => isLiveWarehouseRow(quantity.warehouseId))\r\n          .reduce",
+          "lineNumber": 199
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item.warehouseQuantities\r\n          .filter",
+          "lineNumber": 199
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "isLiveWarehouseRow",
+          "lineNumber": 200
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 207
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventory.map",
+          "lineNumber": 208
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 212
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventory.forEach",
+          "lineNumber": 214
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item.warehouseQuantities.forEach",
+          "lineNumber": 215
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 217
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "isLiveWarehouseRow",
+          "lineNumber": 218
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "counts.set",
+          "lineNumber": 219
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "counts.get",
+          "lineNumber": 219
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 225
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.map(item => {\r\n      const row = item.warehouseQuantities.find(quantity => quantity.warehouseId === selectedWarehouse.id);\r\n      return row ? { item, quantity: Number(row.quantity) || 0 } : null;\r\n    }).filter",
+          "lineNumber": 227
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.map",
+          "lineNumber": 227
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item.warehouseQuantities.find",
+          "lineNumber": 228
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 229
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 233
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "selectedWarehouseRows.reduce",
+          "lineNumber": 235
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "selectedWarehouseRows.filter",
+          "lineNumber": 236
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "selectedWarehouseRows.reduce",
+          "lineNumber": 237
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 240
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.reduce",
+          "lineNumber": 241
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 241
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 245
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.filter",
+          "lineNumber": 246
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 246
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 250
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.filter",
+          "lineNumber": 251
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 252
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 258
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeInventory.filter",
+          "lineNumber": 259
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.name || '').toLowerCase().includes",
+          "lineNumber": 262
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.name || '').toLowerCase",
+          "lineNumber": 262
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.nameAr || '').toLowerCase().includes",
+          "lineNumber": 263
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.nameAr || '').toLowerCase",
+          "lineNumber": 263
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.sku || '').toLowerCase().includes",
+          "lineNumber": 264
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.sku || '').toLowerCase",
+          "lineNumber": 264
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.category || '').toLowerCase().includes",
+          "lineNumber": 265
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(item.category || '').toLowerCase",
+          "lineNumber": 265
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "filtered.sort",
+          "lineNumber": 269
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 270
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 271
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "(a.name || '').localeCompare",
+          "lineNumber": 279
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 286
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "suppliers.filter",
+          "lineNumber": 287
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "`${supplier.name}${supplier.contactPerson}${supplier.phone}${supplier.email}`\r\n        .toLowerCase()\r\n        .includes",
+          "lineNumber": 288
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "`${supplier.name}${supplier.contactPerson}${supplier.phone}${supplier.email}`\r\n        .toLowerCase",
+          "lineNumber": 288
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 295
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "purchaseOrders.filter",
+          "lineNumber": 296
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "purchaseOrder.id.toLowerCase().includes",
+          "lineNumber": 296
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "purchaseOrder.id.toLowerCase",
+          "lineNumber": 296
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 300
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "warehouseById.get",
+          "lineNumber": 301
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 305
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "activeWarehouses.filter",
+          "lineNumber": 307
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "updateInventoryItem",
+          "lineNumber": 315
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "editingItem.warehouseQuantities.find",
+          "lineNumber": 320
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "Number",
+          "lineNumber": 321
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "updateStock",
+          "lineNumber": 323
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "addInventoryItem",
+          "lineNumber": 328
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "showToast",
+          "lineNumber": 330
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "Number",
+          "lineNumber": 339
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "updateStock",
+          "lineNumber": 340
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "Number",
+          "lineNumber": 340
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "setItemModalOpen",
+          "lineNumber": 344
+        },
+        {
+          "caller": "handleSaveItem",
+          "callee": "setEditingItem",
+          "lineNumber": 345
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "displayItemName",
+          "lineNumber": 349
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 350
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "item.warehouseQuantities.filter",
+          "lineNumber": 351
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "warehouseById.get",
+          "lineNumber": 352
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "confirm",
+          "lineNumber": 355
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "showToast",
+          "lineNumber": 366
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "deleteInventoryItem",
+          "lineNumber": 375
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "showToast",
+          "lineNumber": 376
+        },
+        {
+          "caller": "handleDeleteItem",
+          "callee": "showToast",
+          "lineNumber": 384
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "import",
+          "lineNumber": 390
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "inventory.flatMap",
+          "lineNumber": 391
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "quantities.map",
+          "lineNumber": 395
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "displayWarehouseName",
+          "lineNumber": 406
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "warehouseById.get",
+          "lineNumber": 406
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "Number",
+          "lineNumber": 407
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "XLSX.utils.book_new",
+          "lineNumber": 417
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "XLSX.utils.book_append_sheet",
+          "lineNumber": 418
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "XLSX.utils.json_to_sheet",
+          "lineNumber": 418
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "XLSX.utils.book_append_sheet",
+          "lineNumber": 419
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "XLSX.utils.json_to_sheet",
+          "lineNumber": 419
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "XLSX.writeFile",
+          "lineNumber": 420
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "showToast",
+          "lineNumber": 421
+        },
+        {
+          "caller": "exportInventoryTemplate",
+          "callee": "showToast",
+          "lineNumber": 423
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "import",
+          "lineNumber": 428
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "XLSX.read",
+          "lineNumber": 429
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "file.arrayBuffer",
+          "lineNumber": 429
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "XLSX.utils.sheet_to_json",
+          "lineNumber": 431
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "prepareInventoryExcelRows",
+          "lineNumber": 433
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "inventory.map",
+          "lineNumber": 435
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "String",
+          "lineNumber": 435
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "warehouses.map",
+          "lineNumber": 436
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "Date.now",
+          "lineNumber": 440
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "addInventoryItem",
+          "lineNumber": 441
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "String",
+          "lineNumber": 442
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "String",
+          "lineNumber": 443
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "String",
+          "lineNumber": 443
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "updateStock",
+          "lineNumber": 447
+        },
+        {
+          "caller": "importInventoryTemplate",
+          "callee": "fetchInventory",
+          "lineNumber": 450
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "setIsImportingInventory",
+          "lineNumber": 455
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "importInventoryTemplate",
+          "lineNumber": 457
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "showToast",
+          "lineNumber": 458
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "String(error?.message || '').split",
+          "lineNumber": 460
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "String",
+          "lineNumber": 460
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "showToast",
+          "lineNumber": 466
+        },
+        {
+          "caller": "handleInventoryFileImport",
+          "callee": "setIsImportingInventory",
+          "lineNumber": 468
+        },
+        {
+          "caller": "handleSaveWarehouse",
+          "callee": "addWarehouse",
+          "lineNumber": 473
+        },
+        {
+          "caller": "handleSaveWarehouse",
+          "callee": "setWarehouseModalOpen",
+          "lineNumber": 474
+        },
+        {
+          "caller": "handleAdjustment",
+          "callee": "updateStock",
+          "lineNumber": 478
+        },
+        {
+          "caller": "handleTransfer",
+          "callee": "inventory.find",
+          "lineNumber": 482
+        },
+        {
+          "caller": "handleTransfer",
+          "callee": "createBranchTransferInDB",
+          "lineNumber": 485
+        },
+        {
+          "caller": "handleTransfer",
+          "callee": "displayWarehouseName",
+          "lineNumber": 490
+        },
+        {
+          "caller": "handleTransfer",
+          "callee": "warehouseById.get",
+          "lineNumber": 490
+        },
+        {
+          "caller": "handleTransfer",
+          "callee": "displayWarehouseName",
+          "lineNumber": 490
+        },
+        {
+          "caller": "handleTransfer",
+          "callee": "warehouseById.get",
+          "lineNumber": 490
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "inventoryApi.receiveStock",
+          "lineNumber": 500
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 503
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "data.items.map",
+          "lineNumber": 505
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "Number",
+          "lineNumber": 507
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "Number",
+          "lineNumber": 508
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "Promise.all",
+          "lineNumber": 512
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "fetchInventory",
+          "lineNumber": 512
+        },
+        {
+          "caller": "handleDirectReceipt",
+          "callee": "fetchTransferMovements",
+          "lineNumber": 512
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "import",
+          "lineNumber": 522
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "purchaseOrdersApi.createPurchaseReturn",
+          "lineNumber": 523
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "data.items.map",
+          "lineNumber": 528
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "Number",
+          "lineNumber": 530
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "Number",
+          "lineNumber": 531
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "Promise.all",
+          "lineNumber": 534
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "fetchInventory",
+          "lineNumber": 534
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "fetchTransferMovements",
+          "lineNumber": 534
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "Array.isArray",
+          "lineNumber": 535
+        },
+        {
+          "caller": "handleSupplierReturn",
+          "callee": "showToast",
+          "lineNumber": 536
+        },
+        {
+          "caller": "handleZeroInventory",
+          "callee": "confirm",
+          "lineNumber": 547
+        },
+        {
+          "caller": "handleZeroInventory",
+          "callee": "inventoryApi.zeroStock",
+          "lineNumber": 557
+        },
+        {
+          "caller": "handleZeroInventory",
+          "callee": "fetchInventory",
+          "lineNumber": 558
+        },
+        {
+          "caller": "handleZeroInventory",
+          "callee": "showToast",
+          "lineNumber": 559
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "supplierForm.name.trim",
+          "lineNumber": 566
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String(supplierForm.phone || '').replace",
+          "lineNumber": 567
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String",
+          "lineNumber": 567
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "showToast",
+          "lineNumber": 569
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "supplierForm.phone.trim",
+          "lineNumber": 572
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "supplierForm.email.trim",
+          "lineNumber": 572
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "showToast",
+          "lineNumber": 573
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "suppliers.some",
+          "lineNumber": 577
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String",
+          "lineNumber": 578
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String",
+          "lineNumber": 578
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String(s.phone || '').replace",
+          "lineNumber": 579
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String",
+          "lineNumber": 579
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String(s.name || '').trim().toLowerCase",
+          "lineNumber": 580
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String(s.name || '').trim",
+          "lineNumber": 580
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "String",
+          "lineNumber": 580
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "name.toLowerCase",
+          "lineNumber": 580
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "showToast",
+          "lineNumber": 584
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "updateSupplierInDB",
+          "lineNumber": 588
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "createSupplierInDB",
+          "lineNumber": 590
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "Date.now",
+          "lineNumber": 590
+        },
+        {
+          "caller": "handleUpsertSupplier",
+          "callee": "setSupplierForm",
+          "lineNumber": 592
+        },
+        {
+          "caller": "handleReactivateSupplier",
+          "callee": "reactivateSupplierInDB",
+          "lineNumber": 596
+        },
+        {
+          "caller": "handleReactivateSupplier",
+          "callee": "showToast",
+          "lineNumber": 597
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 600
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventory.find",
+          "lineNumber": 602
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 603
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item?.warehouseQuantities?.find",
+          "lineNumber": 603
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "showToast",
+          "lineNumber": 608
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "showToast",
+          "lineNumber": 613
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "showToast",
+          "lineNumber": 617
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "showToast",
+          "lineNumber": 621
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "createBranchTransferInDB",
+          "lineNumber": 624
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "showToast",
+          "lineNumber": 632
+        },
+        {
+          "caller": "handleCreateBranchTransfer",
+          "callee": "setBranchTransferQty",
+          "lineNumber": 633
+        },
+        {
+          "caller": "handleToggleWarehouseActive",
+          "callee": "confirm",
+          "lineNumber": 638
+        },
+        {
+          "caller": "handleToggleWarehouseActive",
+          "callee": "updateWarehouse",
+          "lineNumber": 648
+        },
+        {
+          "caller": "handleToggleWarehouseActive",
+          "callee": "fetchWarehouses",
+          "lineNumber": 649
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 653
+        },
+        {
+          "caller": "handleRequestForecast",
+          "callee": "setAiForecasts",
+          "lineNumber": 656
+        },
+        {
+          "caller": "handleRequestForecast",
+          "callee": "inventoryIntelligenceApi.getAIForecast",
+          "lineNumber": 658
+        },
+        {
+          "caller": "handleRequestForecast",
+          "callee": "setAiForecasts",
+          "lineNumber": 659
+        },
+        {
+          "caller": "handleRequestForecast",
+          "callee": "setAiForecasts",
+          "lineNumber": 661
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 666
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 667
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 668
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 669
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 670
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 671
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 672
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "dateOnly",
+          "lineNumber": 672
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 673
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 674
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 675
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 676
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "displayWarehouseName",
+          "lineNumber": 677
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "warehouseById.get",
+          "lineNumber": 677
+        },
+        {
+          "caller": "loadCountHistory",
+          "callee": "warehouseById.get",
+          "lineNumber": 682
+        },
+        {
+          "caller": "loadCountHistory",
+          "callee": "setCountError",
+          "lineNumber": 686
+        },
+        {
+          "caller": "loadCountHistory",
+          "callee": "inventoryApi.getStockCounts",
+          "lineNumber": 687
+        },
+        {
+          "caller": "loadCountHistory",
+          "callee": "setCountHistory",
+          "lineNumber": 693
+        },
+        {
+          "caller": "loadCountHistory",
+          "callee": "setCountError",
+          "lineNumber": 695
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String(selectedCountDate || '').split",
+          "lineNumber": 703
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String",
+          "lineNumber": 703
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "(countHistory || []).find",
+          "lineNumber": 704
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String",
+          "lineNumber": 705
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String",
+          "lineNumber": 705
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String(h.countDate || '').split",
+          "lineNumber": 706
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String",
+          "lineNumber": 706
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "['POSTED', 'FINALIZED', 'CANCELLED', 'CLOSED'].includes",
+          "lineNumber": 707
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String(h.status || '').toUpperCase",
+          "lineNumber": 707
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "String",
+          "lineNumber": 707
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "setCountError",
+          "lineNumber": 710
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "setCountLoading",
+          "lineNumber": 715
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "setCountError",
+          "lineNumber": 717
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "warehouseById.get",
+          "lineNumber": 718
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "inventoryApi.createStockCount",
+          "lineNumber": 721
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "inventoryApi.freezeStockCount",
+          "lineNumber": 731
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "setCountSession",
+          "lineNumber": 732
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "loadCountHistory",
+          "lineNumber": 733
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "setCountError",
+          "lineNumber": 735
+        },
+        {
+          "caller": "handleStartCount",
+          "callee": "setCountLoading",
+          "lineNumber": 737
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setCountLoading",
+          "lineNumber": 741
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setCountError",
+          "lineNumber": 743
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "inventoryApi.getStockCount",
+          "lineNumber": 744
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setCountSession",
+          "lineNumber": 745
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setSelectedCountWarehouse",
+          "lineNumber": 746
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setSelectedCountDate",
+          "lineNumber": 747
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "String(count.countDate).split",
+          "lineNumber": 747
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "String",
+          "lineNumber": 747
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setSelectedCountType",
+          "lineNumber": 748
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setCountError",
+          "lineNumber": 750
+        },
+        {
+          "caller": "handleOpenCount",
+          "callee": "setCountLoading",
+          "lineNumber": 752
+        },
+        {
+          "caller": "handlePrintCount",
+          "callee": "setCountLoading",
+          "lineNumber": 756
+        },
+        {
+          "caller": "handlePrintCount",
+          "callee": "setCountError",
+          "lineNumber": 758
+        },
+        {
+          "caller": "handlePrintCount",
+          "callee": "inventoryApi.getStockCount",
+          "lineNumber": 760
+        },
+        {
+          "caller": "handlePrintCount",
+          "callee": "printStockCountSession",
+          "lineNumber": 763
+        },
+        {
+          "caller": "handlePrintCount",
+          "callee": "setCountError",
+          "lineNumber": 769
+        },
+        {
+          "caller": "handlePrintCount",
+          "callee": "setCountLoading",
+          "lineNumber": 771
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "setCountLoading",
+          "lineNumber": 776
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "inventoryApi.getStockCount",
+          "lineNumber": 779
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "import",
+          "lineNumber": 782
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "(count.items || []).map",
+          "lineNumber": 783
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "Number",
+          "lineNumber": 784
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "Number",
+          "lineNumber": 785
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "Number",
+          "lineNumber": 786
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "Number",
+          "lineNumber": 787
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "Number",
+          "lineNumber": 795
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "String(count.countDate || '').split",
+          "lineNumber": 801
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "String",
+          "lineNumber": 801
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "details.reduce",
+          "lineNumber": 805
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "Number",
+          "lineNumber": 805
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "XLSX.utils.book_new",
+          "lineNumber": 807
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "XLSX.utils.book_append_sheet",
+          "lineNumber": 808
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "XLSX.utils.json_to_sheet",
+          "lineNumber": 808
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "XLSX.utils.book_append_sheet",
+          "lineNumber": 809
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "XLSX.utils.json_to_sheet",
+          "lineNumber": 809
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "XLSX.writeFile",
+          "lineNumber": 810
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "showToast",
+          "lineNumber": 811
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "setCountError",
+          "lineNumber": 813
+        },
+        {
+          "caller": "exportStockCount",
+          "callee": "setCountLoading",
+          "lineNumber": 815
+        },
+        {
+          "caller": "handleUpdateCountItem",
+          "callee": "setCountSession",
+          "lineNumber": 821
+        },
+        {
+          "caller": "handleUpdateCountItem",
+          "callee": "prev.items.map",
+          "lineNumber": 823
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "setCountLoading",
+          "lineNumber": 829
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "countSession.items\r\n        .filter((it: any) => (\r\n          (it.countedQty !== null && it.countedQty !== undefined)\r\n          || String(it.notes || '').trim()\r\n        ))\r\n        .map",
+          "lineNumber": 831
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "countSession.items\r\n        .filter",
+          "lineNumber": 831
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "String(it.notes || '').trim",
+          "lineNumber": 834
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "String",
+          "lineNumber": 834
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "Number",
+          "lineNumber": 838
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "inventoryApi.submitCount",
+          "lineNumber": 842
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "setCountSession",
+          "lineNumber": 843
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "loadCountHistory",
+          "lineNumber": 844
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "showToast",
+          "lineNumber": 845
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "counts.filter",
+          "lineNumber": 847
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "confirm",
+          "lineNumber": 859
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "inventoryApi.submitCount",
+          "lineNumber": 870
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "inventoryApi.postStockCount",
+          "lineNumber": 871
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "setCountSession",
+          "lineNumber": 872
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "Promise.all",
+          "lineNumber": 873
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "fetchInventory",
+          "lineNumber": 873
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "loadCountHistory",
+          "lineNumber": 873
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "setCountError",
+          "lineNumber": 876
+        },
+        {
+          "caller": "handleCompleteCount",
+          "callee": "setCountLoading",
+          "lineNumber": 878
+        },
+        {
+          "caller": "handleZeroCountInputs",
+          "callee": "confirm",
+          "lineNumber": 882
+        },
+        {
+          "caller": "handleZeroCountInputs",
+          "callee": "setCountSession",
+          "lineNumber": 892
+        },
+        {
+          "caller": "handleZeroCountInputs",
+          "callee": "(current?.items || []).map",
+          "lineNumber": 894
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 899
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 900
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 901
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 902
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "d.setDate",
+          "lineNumber": 903
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "d.getDate",
+          "lineNumber": 903
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "formatLocalDate",
+          "lineNumber": 904
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 906
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "formatLocalDate",
+          "lineNumber": 906
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 907
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 908
+        },
+        {
+          "caller": "loadMovements",
+          "callee": "setMovementLoading",
+          "lineNumber": 911
+        },
+        {
+          "caller": "loadMovements",
+          "callee": "reportsApi.getStockMovements",
+          "lineNumber": 913
+        },
+        {
+          "caller": "loadMovements",
+          "callee": "Array.from",
+          "lineNumber": 917
+        },
+        {
+          "caller": "loadMovements",
+          "callee": "setMovementLog",
+          "lineNumber": 919
+        },
+        {
+          "caller": "loadMovements",
+          "callee": "setMovementLog",
+          "lineNumber": 921
+        },
+        {
+          "caller": "loadMovements",
+          "callee": "setMovementLoading",
+          "lineNumber": 923
+        },
+        {
+          "caller": "toggleMovementType",
+          "callee": "setMovementTypeFilter",
+          "lineNumber": 927
+        },
+        {
+          "caller": "toggleMovementType",
+          "callee": "next.has",
+          "lineNumber": 929
+        },
+        {
+          "caller": "toggleMovementType",
+          "callee": "next.delete",
+          "lineNumber": 929
+        },
+        {
+          "caller": "toggleMovementType",
+          "callee": "next.add",
+          "lineNumber": 930
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 935
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "movementSearch.trim().toLowerCase",
+          "lineNumber": 936
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "movementSearch.trim",
+          "lineNumber": 936
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "movementLog.filter",
+          "lineNumber": 938
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "`${mv.itemName || ''} ${mv.itemNameAr || ''} ${mv.reason || ''} ${mv.referenceId || ''} ${mv.warehouseName || ''}`\r\n        .toLowerCase()\r\n        .includes",
+          "lineNumber": 939
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "`${mv.itemName || ''} ${mv.itemNameAr || ''} ${mv.reason || ''} ${mv.referenceId || ''} ${mv.warehouseName || ''}`\r\n        .toLowerCase",
+          "lineNumber": 939
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 947
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 953
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Math.abs",
+          "lineNumber": 954
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 954
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Math.abs",
+          "lineNumber": 956
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "filteredMovementRows.map",
+          "lineNumber": 961
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "new Date(mv.createdAt).toLocaleString",
+          "lineNumber": 962
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "String(mv.type || '').toUpperCase",
+          "lineNumber": 964
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "String",
+          "lineNumber": 964
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "String",
+          "lineNumber": 964
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "Number",
+          "lineNumber": 965
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "Number",
+          "lineNumber": 967
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "Math.abs",
+          "lineNumber": 968
+        },
+        {
+          "caller": "getMovementExportRows",
+          "callee": "Number",
+          "lineNumber": 968
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "getMovementExportRows().map",
+          "lineNumber": 979
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "getMovementExportRows",
+          "lineNumber": 979
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "row.unitCost.toFixed",
+          "lineNumber": 981
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "row.totalCost.toFixed",
+          "lineNumber": 981
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "[headers, ...rows]\r\n      .map(line => line.map(cell => `\"${String(cell ?? '').replace(/\"/g, '\"\"')}\"`).join(','))\r\n      .join",
+          "lineNumber": 984
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "[headers, ...rows]\r\n      .map",
+          "lineNumber": 984
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "line.map(cell => `\"${String(cell ?? '').replace(/\"/g, '\"\"')}\"`).join",
+          "lineNumber": 985
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "line.map",
+          "lineNumber": 985
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "String(cell ?? '').replace",
+          "lineNumber": 985
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "String",
+          "lineNumber": 985
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "URL.createObjectURL",
+          "lineNumber": 987
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "document.createElement",
+          "lineNumber": 988
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "link.click",
+          "lineNumber": 991
+        },
+        {
+          "caller": "exportMovementsCsv",
+          "callee": "URL.revokeObjectURL",
+          "lineNumber": 992
+        },
+        {
+          "caller": "escapeHtml",
+          "callee": "String(value ?? '').replace",
+          "lineNumber": 996
+        },
+        {
+          "caller": "escapeHtml",
+          "callee": "String",
+          "lineNumber": 996
+        },
+        {
+          "caller": "printMovements",
+          "callee": "getMovementExportRows().map",
+          "lineNumber": 1000
+        },
+        {
+          "caller": "printMovements",
+          "callee": "getMovementExportRows",
+          "lineNumber": 1000
+        },
+        {
+          "caller": "printMovements",
+          "callee": "row.unitCost.toFixed",
+          "lineNumber": 1003
+        },
+        {
+          "caller": "printMovements",
+          "callee": "row.totalCost.toFixed",
+          "lineNumber": 1003
+        },
+        {
+          "caller": "printMovements",
+          "callee": "window.open",
+          "lineNumber": 1006
+        },
+        {
+          "caller": "printMovements",
+          "callee": "win.document.write",
+          "lineNumber": 1008
+        },
+        {
+          "caller": "printMovements",
+          "callee": "headers.map(header => `<th>${escapeHtml(header)}</th>`).join",
+          "lineNumber": 1026
+        },
+        {
+          "caller": "printMovements",
+          "callee": "headers.map",
+          "lineNumber": 1026
+        },
+        {
+          "caller": "printMovements",
+          "callee": "escapeHtml",
+          "lineNumber": 1026
+        },
+        {
+          "caller": "printMovements",
+          "callee": "rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join",
+          "lineNumber": 1027
+        },
+        {
+          "caller": "printMovements",
+          "callee": "rows.map",
+          "lineNumber": 1027
+        },
+        {
+          "caller": "printMovements",
+          "callee": "row.map(cell => `<td>${escapeHtml(cell)}</td>`).join",
+          "lineNumber": 1027
+        },
+        {
+          "caller": "printMovements",
+          "callee": "row.map",
+          "lineNumber": 1027
+        },
+        {
+          "caller": "printMovements",
+          "callee": "escapeHtml",
+          "lineNumber": 1027
+        },
+        {
+          "caller": "printMovements",
+          "callee": "win.document.close",
+          "lineNumber": 1033
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 1036
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 1037
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 1038
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "d.setDate",
+          "lineNumber": 1039
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "d.getDate",
+          "lineNumber": 1039
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "formatLocalDate",
+          "lineNumber": 1040
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useState",
+          "lineNumber": 1042
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "formatLocalDate",
+          "lineNumber": 1042
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 1044
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "consumptionRows.map",
+          "lineNumber": 1044
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryById.get",
+          "lineNumber": 1045
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1046
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number.isFinite",
+          "lineNumber": 1047
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1050
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "item?.warehouseQuantities?.find",
+          "lineNumber": 1050
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1051
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "inventoryTotalsById.get",
+          "lineNumber": 1051
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Math.max",
+          "lineNumber": 1055
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1055
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Math.max",
+          "lineNumber": 1056
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1056
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "useMemo",
+          "lineNumber": 1060
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "consumptionReportRows.reduce",
+          "lineNumber": 1061
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1061
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "consumptionReportRows.reduce",
+          "lineNumber": 1062
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1062
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "consumptionReportRows.reduce",
+          "lineNumber": 1063
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1063
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "consumptionReportRows.reduce",
+          "lineNumber": 1064
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1064
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "consumptionReportRows.reduce",
+          "lineNumber": 1065
+        },
+        {
+          "caller": "useInventoryWorkspace",
+          "callee": "Number",
+          "lineNumber": 1065
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "consumptionReportRows.map",
+          "lineNumber": 1068
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1071
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1072
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1073
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1074
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1076
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1077
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "new Date(row.lastConsumedAt).toLocaleString",
+          "lineNumber": 1079
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "Number",
+          "lineNumber": 1080
+        },
+        {
+          "caller": "getConsumptionExportRows",
+          "callee": "new Date(row.lastCountDate).toLocaleDateString",
+          "lineNumber": 1080
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "getConsumptionExportRows().map",
+          "lineNumber": 1087
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "getConsumptionExportRows",
+          "lineNumber": 1087
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "[headers, ...rows]\r\n      .map((line) => line.map((cell) => `\"${String(cell ?? '').replace(/\"/g, '\"\"')}\"`).join(','))\r\n      .join",
+          "lineNumber": 1088
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "[headers, ...rows]\r\n      .map",
+          "lineNumber": 1088
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "line.map((cell) => `\"${String(cell ?? '').replace(/\"/g, '\"\"')}\"`).join",
+          "lineNumber": 1089
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "line.map",
+          "lineNumber": 1089
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "String(cell ?? '').replace",
+          "lineNumber": 1089
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "String",
+          "lineNumber": 1089
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "URL.createObjectURL",
+          "lineNumber": 1091
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "document.createElement",
+          "lineNumber": 1092
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "link.click",
+          "lineNumber": 1095
+        },
+        {
+          "caller": "exportRecipeConsumptionCsv",
+          "callee": "URL.revokeObjectURL",
+          "lineNumber": 1096
+        },
+        {
+          "caller": "escapeHtml",
+          "callee": "String(value ?? '').replace",
+          "lineNumber": 1103
+        },
+        {
+          "caller": "escapeHtml",
+          "callee": "String",
+          "lineNumber": 1103
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "getConsumptionExportRows().map",
+          "lineNumber": 1104
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "getConsumptionExportRows",
+          "lineNumber": 1104
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "row.cost.toFixed",
+          "lineNumber": 1104
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "window.open",
+          "lineNumber": 1105
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "win.document.write",
+          "lineNumber": 1107
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "headers.map((header) => `<th>${escapeHtml(header)}</th>`).join",
+          "lineNumber": 1124
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "headers.map",
+          "lineNumber": 1124
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "escapeHtml",
+          "lineNumber": 1124
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join",
+          "lineNumber": 1125
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "rows.map",
+          "lineNumber": 1125
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join",
+          "lineNumber": 1125
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "row.map",
+          "lineNumber": 1125
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "escapeHtml",
+          "lineNumber": 1125
+        },
+        {
+          "caller": "printRecipeConsumption",
+          "callee": "win.document.close",
+          "lineNumber": 1131
+        },
+        {
+          "caller": "escapeHtml",
+          "callee": "String(value ?? '').replace",
+          "lineNumber": 1140
+        },
+        {
+          "caller": "escapeHtml",
+          "callee": "String",
+          "lineNumber": 1140
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "getConsumptionExportRows().map",
+          "lineNumber": 1141
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "getConsumptionExportRows",
+          "lineNumber": 1141
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "row.cost.toFixed",
+          "lineNumber": 1141
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "window.open",
+          "lineNumber": 1142
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "win.document.write",
+          "lineNumber": 1144
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "headers.map((header) => `<th>${escapeHtml(header)}</th>`).join",
+          "lineNumber": 1164
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "headers.map",
+          "lineNumber": 1164
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "escapeHtml",
+          "lineNumber": 1164
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "rows.map",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "row.map",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "escapeHtml",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "consumptionTotals.quantity.toLocaleString",
+          "lineNumber": 1166
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "consumptionTotals.shortage.toLocaleString",
+          "lineNumber": 1166
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "consumptionTotals.over.toLocaleString",
+          "lineNumber": 1166
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "consumptionTotals.cost.toFixed",
+          "lineNumber": 1166
+        },
+        {
+          "caller": "printRecipeConsumptionPdf",
+          "callee": "win.document.close",
+          "lineNumber": 1173
+        },
+        {
+          "caller": "loadRecipeConsumption",
+          "callee": "setConsumptionLoading",
+          "lineNumber": 1177
+        },
+        {
+          "caller": "loadRecipeConsumption",
+          "callee": "inventoryApi.getRecipeConsumption",
+          "lineNumber": 1179
+        },
+        {
+          "caller": "loadRecipeConsumption",
+          "callee": "setConsumptionRows",
+          "lineNumber": 1185
+        },
+        {
+          "caller": "loadRecipeConsumption",
+          "callee": "setConsumptionRows",
+          "lineNumber": 1187
+        },
+        {
+          "caller": "loadRecipeConsumption",
+          "callee": "setConsumptionLoading",
+          "lineNumber": 1189
+        }
+      ],
+      "metrics": {
+        "importCount": 14,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/inventoryExcelRows.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 22,
+      "nonEmptyLines": 19,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/stockAdjustment.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 25,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

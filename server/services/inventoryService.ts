@@ -58,6 +58,109 @@ export const inventoryService = {
         return updatedStock;
     },
 
+    /**
+     * Consume the oldest pending production order when its target is needed by
+     * a sale. The whole operation runs in the order transaction, so ingredients
+     * and output are committed (or rolled back) together with the sale.
+     */
+    async completePlannedProductionForSale(tx: any, itemId: string, warehouseId: string, orderId: string, actorId: string, trail = new Set<string>()) {
+        const [planned] = await tx.select().from(productionOrders)
+            .where(and(
+                eq(productionOrders.targetItemId, itemId),
+                eq(productionOrders.warehouseId, warehouseId),
+                sql`${productionOrders.status} IN ('PLANNED', 'PENDING')`,
+            ))
+            .orderBy(asc(productionOrders.createdAt));
+        if (!planned) return null;
+
+        // Claim the row before consuming anything. A concurrent sale that sees
+        // the same order will fail the conditional update and use its own path.
+        const startedAt = new Date();
+        const [claimed] = await tx.update(productionOrders)
+            .set({ status: 'IN_PROGRESS', startedAt, updatedAt: startedAt })
+            .output()
+            .where(and(
+                eq(productionOrders.id, planned.id),
+                sql`${productionOrders.status} IN ('PLANNED', 'PENDING')`,
+            ));
+        if (!claimed) return null;
+
+        const components = await tx.select().from(productionOrderItems)
+            .where(eq(productionOrderItems.productionOrderId, planned.id));
+        if (!components.length) throw new Error(`PRODUCTION_ORDER_EMPTY|productionOrder=${planned.id}`);
+
+        let totalConsumedCost = 0;
+        const componentTrail = new Set(trail).add(itemId);
+        for (const component of components) {
+            const consumed = await this.ensureSaleStock(
+                tx,
+                component.inventoryItemId,
+                warehouseId,
+                Number(component.requiredQty || 0),
+                planned.id,
+                actorId,
+                componentTrail,
+                'PRODUCTION_CONSUMPTION',
+                `Automatic production for sale ${orderId}`,
+            );
+            totalConsumedCost += Number(consumed?.totalCostCalculated || consumed?.totalCost || 0);
+            await tx.update(productionOrderItems)
+                .set({ actualQty: component.requiredQty })
+                .where(eq(productionOrderItems.id, component.id));
+        }
+
+        const quantityProduced = Number(planned.expectedYield || planned.quantity || 0);
+        if (!Number.isFinite(quantityProduced) || quantityProduced <= 0) {
+            throw new Error(`PRODUCTION_ORDER_INVALID_YIELD|productionOrder=${planned.id}`);
+        }
+
+        const [finishedStock] = await tx.select().from(inventoryStock).where(and(
+            eq(inventoryStock.itemId, itemId),
+            eq(inventoryStock.warehouseId, warehouseId),
+        ));
+        if (finishedStock) {
+            await tx.update(inventoryStock)
+                .set({ quantity: sql`${inventoryStock.quantity} + ${quantityProduced}`, lastUpdated: new Date() })
+                .where(eq(inventoryStock.id, finishedStock.id));
+        } else {
+            await tx.insert(inventoryStock).values({ itemId, warehouseId, quantity: quantityProduced, lastUpdated: new Date() });
+        }
+
+        const completedAt = new Date();
+        const expiry = new Date(completedAt);
+        expiry.setFullYear(expiry.getFullYear() + 1);
+        const producedUnitCost = totalConsumedCost / quantityProduced;
+        await tx.insert(inventoryBatches).values({
+            id: `BATCH-PROD-${planned.id}`,
+            itemId,
+            warehouseId,
+            batchNumber: planned.batchNumber,
+            expiryDate: expiry,
+            receivedDate: completedAt,
+            initialQty: quantityProduced,
+            currentQty: quantityProduced,
+            unitCost: Number.isFinite(producedUnitCost) ? producedUnitCost : 0,
+            status: 'ACTIVE',
+            createdAt: completedAt,
+        });
+        await tx.insert(stockMovements).values({
+            itemId,
+            toWarehouseId: warehouseId,
+            quantity: quantityProduced,
+            type: 'PRODUCTION',
+            referenceId: planned.id,
+            reason: `Automatic production triggered by sale ${orderId}`,
+            performedBy: actorId,
+            createdAt: completedAt,
+            totalCost: Number.isFinite(totalConsumedCost) ? totalConsumedCost : 0,
+        });
+        await tx.update(productionOrders)
+            .set({ status: 'COMPLETED', actualYield: quantityProduced, completedAt, updatedAt: completedAt })
+            .where(eq(productionOrders.id, planned.id));
+
+        return { productionOrderId: planned.id, quantityProduced, totalConsumedCost };
+    },
+
     /** Produce a semi-finished item on demand when its stock has no usable batches. */
     async autoProduceForSale(tx: any, itemId: string, warehouseId: string, requestedQty: number, orderId: string, actorId: string, trail = new Set<string>()) {
         if (trail.has(itemId)) throw new Error(`INSUFFICIENT_STOCK_BATCHES|item=${itemId}|reason=RECURSIVE_BATCH_RECIPE`);
@@ -122,6 +225,20 @@ export const inventoryService = {
         // Record the automatic production as a completed production order so it
         // appears in the production log (HISTORY) for user review.
         const autoOrderId = `PROD-AUTO-${String(itemId).slice(0, 12)}-${Date.now()}`;
+        // Some legacy databases already have a required production_orders.quantity
+        // column even though the original ORM model did not. Ensure that column
+        // exists before inserting so stock fallback never aborts the sale.
+        await tx.execute(sql`
+            IF OBJECT_ID(N'dbo.production_orders', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.production_orders', N'quantity') IS NULL
+            BEGIN
+                ALTER TABLE dbo.production_orders ADD quantity real NULL;
+                UPDATE dbo.production_orders
+                SET quantity = COALESCE(expected_yield, batch_size, 1)
+                WHERE quantity IS NULL;
+                ALTER TABLE dbo.production_orders ALTER COLUMN quantity real NOT NULL;
+            END
+        `);
         const [whRow] = await tx.select({ branchId: warehouses.branchId }).from(warehouses).where(eq(warehouses.id, warehouseId));
         const now = new Date();
         await tx.insert(productionOrders).values({
@@ -131,6 +248,7 @@ export const inventoryService = {
             recipeId: itemRecipe?.id || undefined,
             batchNumber: `AUTO-${orderId}-${itemId}`,
             batchSize: 1,
+            quantity: outputQty,
             expectedYield: outputQty,
             actualYield: outputQty,
             status: 'COMPLETED',
@@ -155,6 +273,15 @@ export const inventoryService = {
     },
 
     async ensureSaleStock(tx: any, itemId: string, warehouseId: string, requestedQty: number, orderId: string, actorId: string, trail = new Set<string>(), movementType = 'SALE_CONSUMPTION', reason = 'FEFO Menu Order Deduction') {
+        // A planned production order is an explicit instruction to replenish
+        // this item. Trigger it as soon as the item is sold, even when a small
+        // amount of stock is currently available, so the queue never waits for
+        // a manual kitchen action.
+        const plannedProduction = await this.completePlannedProductionForSale(tx, itemId, warehouseId, orderId, actorId, trail);
+        if (plannedProduction) {
+            const deduction = await this.deductInventoryFEFO(tx, itemId, warehouseId, requestedQty, orderId, reason, { performedBy: actorId, movementType });
+            return { ...(deduction as any), autoOrderId: plannedProduction.productionOrderId };
+        }
         try {
             return await this.deductInventoryFEFO(tx, itemId, warehouseId, requestedQty, orderId, reason, { performedBy: actorId, movementType });
         } catch (error: any) {
@@ -179,9 +306,10 @@ export const inventoryService = {
                 });
                 return await this.deductInventoryFEFO(tx, itemId, warehouseId, requestedQty, orderId, reason, { performedBy: actorId, movementType });
             }
-            const produced = await this.autoProduceForSale(tx, itemId, warehouseId, requestedQty, orderId, actorId, trail);
+            const plannedProduction = await this.completePlannedProductionForSale(tx, itemId, warehouseId, orderId, actorId, trail);
+            const produced = plannedProduction || await this.autoProduceForSale(tx, itemId, warehouseId, requestedQty, orderId, actorId, trail);
             const deduction = await this.deductInventoryFEFO(tx, itemId, warehouseId, requestedQty, orderId, reason, { performedBy: actorId, movementType });
-            return { ...(deduction as any), autoOrderId: (produced as any)?.autoOrderId };
+            return { ...(deduction as any), autoOrderId: (produced as any)?.autoOrderId || (produced as any)?.productionOrderId };
         }
     },
 

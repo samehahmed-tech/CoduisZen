@@ -4,6 +4,8 @@ import { orders, settings, branches } from '../../src/db/schema';
 import { and, eq, gte, lt, lte, or, sql, count, desc } from 'drizzle-orm';
 import { parseSettingJson, upsertSetting } from '../utils/settingsStore';
 import { revenueEligibleOrder } from '../utils/orderRevenue';
+import { canAccessBranch } from '../middleware/branchIsolation';
+import { createSignedAuditLog } from '../services/auditService';
 
 type EscalationPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type EscalationStatus = 'OPEN' | 'RESOLVED';
@@ -27,6 +29,18 @@ type EscalationRecord = {
 const SETTINGS_KEY = 'callCenterEscalations';
 const COACHING_SETTINGS_KEY = 'callCenterCoachingNotes';
 const DISCOUNT_APPROVALS_KEY = 'callCenterDiscountApprovals';
+
+const auditCallCenterMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Call center mutation: ${eventType}`,
+});
 
 type CoachingNoteRecord = {
     id: string;
@@ -82,7 +96,7 @@ const saveDiscountApprovals = async (records: DiscountApprovalRecord[], userId?:
 export const getEscalations = async (req: Request, res: Response) => {
     try {
         const statusFilter = String(req.query.status || '').toUpperCase();
-        const branchId = String(req.query.branchId || '');
+        const branchId = String(req.effectiveBranchId || req.query.branchId || '');
         const records = await loadEscalations();
         const filtered = records.filter((item) => {
             if (statusFilter && item.status !== statusFilter) return false;
@@ -118,7 +132,7 @@ export const createEscalation = async (req: Request, res: Response) => {
         const newItem: EscalationRecord = {
             id: `esc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             orderId,
-            branchId: body.branchId || req.user?.branchId || null,
+            branchId: req.effectiveBranchId || req.user?.branchId || null,
             status: 'OPEN',
             priority,
             reason,
@@ -130,6 +144,7 @@ export const createEscalation = async (req: Request, res: Response) => {
 
         const next = [newItem, ...current];
         await saveEscalations(next, userId);
+        await auditCallCenterMutation(req, 'CALL_CENTER_ESCALATION_CREATED', { escalationId: newItem.id, orderId, priority }, { status: 'OPEN' });
         res.status(201).json(newItem);
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_CREATE_ESCALATION' });
@@ -161,6 +176,7 @@ export const resolveEscalation = async (req: Request, res: Response) => {
 
         current[index] = resolved;
         await saveEscalations(current, userId);
+        await auditCallCenterMutation(req, 'CALL_CENTER_ESCALATION_RESOLVED', { escalationId: id, resolutionNotesLength: resolutionNotes.length }, { status: 'RESOLVED' });
         res.json(resolved);
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_RESOLVE_ESCALATION' });
@@ -170,7 +186,7 @@ export const resolveEscalation = async (req: Request, res: Response) => {
 export const autoScanEscalations = async (req: Request, res: Response) => {
     try {
         const thresholdMinutes = Math.max(5, Number(req.body?.thresholdMinutes || 20));
-        const branchId = String(req.body?.branchId || req.user?.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.body?.branchId || req.user?.branchId || '').trim();
         const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
         const userId = req.user?.id || null;
 
@@ -214,6 +230,8 @@ export const autoScanEscalations = async (req: Request, res: Response) => {
             await saveEscalations([...additions, ...current], userId);
         }
 
+        await auditCallCenterMutation(req, 'CALL_CENTER_ESCALATIONS_SCANNED', { branchId: branchId || null, scanned: staleOrders.length, created: additions.length, thresholdMinutes }, { completed: true });
+
         res.json({
             scanned: staleOrders.length,
             created: additions.length,
@@ -229,7 +247,7 @@ export const autoScanEscalations = async (req: Request, res: Response) => {
 export const getCoachingNotes = async (req: Request, res: Response) => {
     try {
         const agentId = String(req.query.agentId || '').trim();
-        const branchId = String(req.query.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.query.branchId || '').trim();
         const records = await loadCoachingNotes();
         const filtered = records.filter((item) => {
             if (agentId && item.agentId !== agentId) return false;
@@ -259,7 +277,7 @@ export const addCoachingNote = async (req: Request, res: Response) => {
         const newItem: CoachingNoteRecord = {
             id: `coach-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             agentId,
-            branchId: body.branchId || req.user?.branchId || null,
+            branchId: req.effectiveBranchId || req.user?.branchId || null,
             note,
             tags,
             createdBy: userId,
@@ -269,6 +287,7 @@ export const addCoachingNote = async (req: Request, res: Response) => {
         const current = await loadCoachingNotes();
         const next = [newItem, ...current].slice(0, 3000);
         await saveCoachingNotes(next, userId);
+        await auditCallCenterMutation(req, 'CALL_CENTER_COACHING_NOTE_CREATED', { noteId: newItem.id, agentId, tagCount: tags.length, noteLength: note.length }, { created: true });
         res.status(201).json(newItem);
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_ADD_COACHING_NOTE' });
@@ -277,7 +296,7 @@ export const addCoachingNote = async (req: Request, res: Response) => {
 
 export const getDiscountAbuse = async (req: Request, res: Response) => {
     try {
-        const branchId = String(req.query.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.query.branchId || '').trim();
         const startDateRaw = String(req.query.startDate || '').trim();
         const endDateRaw = String(req.query.endDate || '').trim();
         const thresholdPercent = Math.max(5, Number(req.query.thresholdPercent || 20));
@@ -369,7 +388,7 @@ export const approveDiscountViolation = async (req: Request, res: Response) => {
     try {
         const orderId = String(req.body?.orderId || '').trim();
         const agentId = String(req.body?.agentId || '').trim();
-        const branchId = String(req.body?.branchId || req.user?.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.body?.branchId || req.user?.branchId || '').trim();
         const status = String(req.body?.status || 'APPROVED').toUpperCase() === 'REJECTED' ? 'REJECTED' : 'APPROVED';
         const reason = String(req.body?.reason || '').trim();
         if (!orderId) return res.status(400).json({ error: 'ORDER_ID_REQUIRED' });
@@ -395,6 +414,7 @@ export const approveDiscountViolation = async (req: Request, res: Response) => {
             current.unshift(record);
         }
         await saveDiscountApprovals(current.slice(0, 5000), userId);
+        await auditCallCenterMutation(req, 'CALL_CENTER_DISCOUNT_APPROVAL_UPDATED', { approvalId: record.id, orderId, status, reasonLength: reason.length }, { status });
         res.json(record);
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_APPROVE_DISCOUNT_VIOLATION' });
@@ -407,14 +427,21 @@ export const approveDiscountViolation = async (req: Request, res: Response) => {
 
 export const getBranchHealth = async (req: Request, res: Response) => {
     try {
+        const scopedBranchId = String(req.effectiveBranchId || '').trim();
+        const isSuperAdmin = String(req.user?.role || '').toUpperCase() === 'SUPER_ADMIN';
+        if (!isSuperAdmin && !scopedBranchId) {
+            return res.status(403).json({ error: 'BRANCH_SCOPE_REQUIRED' });
+        }
         const allBranches = await db.select({
             id: branches.id,
             name: branches.name,
             nameAr: branches.nameAr,
             serverIp: branches.serverIp,
             isActive: branches.isActive,
-            phone: branches.phone,
-        }).from(branches).where(eq(branches.isActive, true));
+        }).from(branches).where(and(
+            eq(branches.isActive, true),
+            scopedBranchId ? eq(branches.id, scopedBranchId) : undefined,
+        ));
 
         const branchHealth = [];
 
@@ -459,8 +486,7 @@ export const getBranchHealth = async (req: Request, res: Response) => {
                 id: branch.id,
                 name: branch.name,
                 nameAr: branch.nameAr,
-                serverIp: ip || null,
-                phone: branch.phone,
+                endpointConfigured: Boolean(ip),
                 status,
                 latencyMs,
                 lastChecked: new Date().toISOString(),
@@ -491,7 +517,7 @@ export const getBranchHealth = async (req: Request, res: Response) => {
 
 export const getFailedOrders = async (req: Request, res: Response) => {
     try {
-        const branchId = String(req.query.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.query.branchId || '').trim();
 
         const conditions: any[] = [
             or(eq(orders.isCallCenterOrder, true), eq(orders.source, 'call_center')),
@@ -530,6 +556,7 @@ export const retryFailedOrder = async (req: Request, res: Response) => {
 
         const [order] = await db.select().top(1).from(orders).where(eq(orders.id, orderId));
         if (!order) return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
+        if (req.effectiveBranchId && !canAccessBranch(req.user, (order as any).branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         const status = String((order as any).status || '').toUpperCase();
         if (['CANCELLED', 'DELIVERED', 'COMPLETED', 'REFUNDED'].includes(status)) {
             return res.status(409).json({ error: 'ORDER_ALREADY_TERMINAL', orderId, status });
@@ -544,6 +571,8 @@ export const retryFailedOrder = async (req: Request, res: Response) => {
         emitBranchEvent((order as any).branchId, 'order:status', { id: orderId, status, updatedAt: new Date() });
         await db.update(orders).set({ syncStatus: 'SYNCED', updatedAt: new Date() }).where(eq(orders.id, orderId));
 
+        await auditCallCenterMutation(req, 'CALL_CENTER_FAILED_ORDER_RETRIED', { orderId }, { syncStatus: 'SYNCED', redispatched: true });
+
         res.json({ success: true, orderId, syncStatus: 'SYNCED', redispatched: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_RETRY_ORDER' });
@@ -552,7 +581,7 @@ export const retryFailedOrder = async (req: Request, res: Response) => {
 
 export const retryAllFailedOrders = async (req: Request, res: Response) => {
     try {
-        const branchId = String(req.query.branchId || req.body?.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.query.branchId || req.body?.branchId || '').trim();
         const conditions: any[] = [
             or(eq(orders.isCallCenterOrder, true), eq(orders.source, 'call_center')),
             or(eq(orders.syncStatus, 'FAILED'), eq(orders.syncStatus, 'PENDING')),
@@ -576,6 +605,7 @@ export const retryAllFailedOrders = async (req: Request, res: Response) => {
                 failed.push(String((row as any).id));
             }
         }
+        await auditCallCenterMutation(req, 'CALL_CENTER_FAILED_ORDERS_RETRIED', { branchId: branchId || null, retried: ok, failed: failed.length, total: rows.length }, { completed: true });
         res.json({ success: true, retried: ok, failed, total: rows.length });
     } catch (error: any) {
         res.status(500).json({ error: error.message || 'FAILED_TO_RETRY_ORDERS' });
@@ -588,7 +618,7 @@ export const retryAllFailedOrders = async (req: Request, res: Response) => {
 
 export const getDailyOrderSummary = async (req: Request, res: Response) => {
     try {
-        const branchId = String(req.query.branchId || '').trim();
+        const branchId = String(req.effectiveBranchId || req.query.branchId || '').trim();
         const dateStr = String(req.query.date || '').trim();
         const targetDate = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
         const startOfDay = new Date(targetDate);

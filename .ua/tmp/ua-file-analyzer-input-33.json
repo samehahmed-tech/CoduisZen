@@ -1,0 +1,56 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": ".firecrawl/colorlib.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".firecrawl/dash-dribbble.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".firecrawl/dash-search.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".firecrawl/dashboard-concept.md",
+      "language": "markdown",
+      "sizeLines": 142,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".firecrawl/muzli.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".firecrawl/shot1-img.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".firecrawl/shot1.json",
+      "language": "json",
+      "sizeLines": 0,
+      "fileCategory": "config"
+    }
+  ],
+  "batchImportData": {
+    ".firecrawl/colorlib.json": [],
+    ".firecrawl/dash-dribbble.json": [],
+    ".firecrawl/dash-search.json": [],
+    ".firecrawl/dashboard-concept.md": [],
+    ".firecrawl/muzli.json": [],
+    ".firecrawl/shot1-img.json": [],
+    ".firecrawl/shot1.json": []
+  }
+}

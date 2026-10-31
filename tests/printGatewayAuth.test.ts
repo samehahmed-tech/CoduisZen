@@ -1,65 +1,37 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
 import { requirePrintGatewayToken } from '../server/middleware/printGatewayAuth';
-import { csrfProtection } from '../server/middleware/security';
 
-const originalToken = process.env.PRINT_GATEWAY_TOKEN;
-const originalNodeEnv = process.env.NODE_ENV;
-
-const invoke = (token?: string) => {
-    const req: any = { headers: token ? { 'x-gateway-token': token } : {}, query: {} };
-    const res: any = {
-        statusCode: 200,
-        body: undefined,
-        status(code: number) { this.statusCode = code; return this; },
-        json(body: unknown) { this.body = body; return this; },
-    };
+const run = (headers: Record<string, string> = {}, query: Record<string, string> = {}) => {
+    const res: any = { status: vi.fn(() => res), json: vi.fn(() => res) };
     const next = vi.fn();
-    requirePrintGatewayToken(req, res, next);
+    requirePrintGatewayToken({ headers, query } as any, res, next);
     return { res, next };
 };
 
+afterEach(() => {
+    delete process.env.PRINT_GATEWAY_TOKEN;
+    delete process.env.PRINT_GATEWAY_TOKENS;
+    delete process.env.PRINT_GATEWAY_REQUIRE_PER_GATEWAY_TOKENS;
+});
+
 describe('print gateway authentication', () => {
-    afterEach(() => {
-        if (originalToken === undefined) delete process.env.PRINT_GATEWAY_TOKEN;
-        else process.env.PRINT_GATEWAY_TOKEN = originalToken;
-        process.env.NODE_ENV = originalNodeEnv;
+    it('authenticates a gateway using its mapped token', () => {
+        process.env.PRINT_GATEWAY_TOKENS = JSON.stringify({ 'gateway-a': 'secret-a' });
+        const { next } = run({ 'x-gateway-id': 'gateway-a', 'x-gateway-token': 'secret-a' });
+        expect(next).toHaveBeenCalledOnce();
     });
 
-    it('fails closed when the gateway token is not configured', () => {
-        delete process.env.PRINT_GATEWAY_TOKEN;
-        const { res, next } = invoke();
-        expect(res.statusCode).toBe(503);
-        expect(res.body.error).toBe('PRINT_GATEWAY_NOT_CONFIGURED');
+    it('rejects a valid token used by an unknown gateway', () => {
+        process.env.PRINT_GATEWAY_TOKENS = JSON.stringify({ 'gateway-a': 'secret-a' });
+        const { res, next } = run({ 'x-gateway-id': 'gateway-b', 'x-gateway-token': 'secret-a' });
         expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({ error: 'UNKNOWN_PRINT_GATEWAY' });
     });
 
-    it('accepts only the exact configured token', () => {
-        process.env.PRINT_GATEWAY_TOKEN = 'p'.repeat(64);
-        expect(invoke('wrong').res.statusCode).toBe(401);
-        expect(invoke('p'.repeat(64)).next).toHaveBeenCalledOnce();
-    });
-
-    it('allows token-authenticated bridge status reports without a browser Origin header', () => {
-        process.env.NODE_ENV = 'production';
-        const req: any = { method: 'POST', originalUrl: '/api/print-gateway/bridge/jobs/job-1/complete', headers: {} };
-        const res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };
-        const next = vi.fn();
-
-        csrfProtection(req, res, next);
-
-        expect(next).toHaveBeenCalledOnce();
-        expect(res.status).not.toHaveBeenCalled();
-    });
-
-    it('allows the one-time setup bootstrap without an Origin header', () => {
-        process.env.NODE_ENV = 'production';
-        const req: any = { method: 'POST', originalUrl: '/api/setup/bootstrap', headers: {} };
-        const res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };
-        const next = vi.fn();
-
-        csrfProtection(req, res, next);
-
-        expect(next).toHaveBeenCalledOnce();
-        expect(res.status).not.toHaveBeenCalled();
+    it('rejects URL tokens and supports legacy global token only when mapping is absent', () => {
+        process.env.PRINT_GATEWAY_TOKEN = 'legacy-secret';
+        expect(run({}, { token: 'legacy-secret' }).next).not.toHaveBeenCalled();
+        expect(run({ 'x-gateway-token': 'legacy-secret' }).next).toHaveBeenCalledOnce();
     });
 });

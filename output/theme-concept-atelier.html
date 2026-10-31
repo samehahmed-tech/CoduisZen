@@ -1,0 +1,485 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RestoFlow — Concept 01 · Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f4efe5;
+    --plate: #fffcf5;
+    --ink: #17140f;
+    --ink-soft: #3b342a;
+    --muted: #6f6453;
+    --line: #ded2bf;
+    --line-soft: #e9dfcf;
+    --red: #b93b21;
+    --red-wash: rgba(185, 59, 33, .08);
+    --green: #2c6449;
+    --gold: #7a5a24;
+    --body: "IBM Plex Sans Arabic", "Cairo", system-ui, sans-serif;
+    --display: "Amiri", "IBM Plex Sans Arabic", serif;
+    --mono: "Space Mono", ui-monospace, monospace;
+    --latin: "Space Grotesk", "IBM Plex Sans Arabic", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: #e7dfd1; }
+  body {
+    margin: 0;
+    padding: 40px 20px 70px;
+    background:
+      radial-gradient(1200px 520px at 85% -10%, rgba(185,59,33,.05), transparent 60%),
+      #e7dfd1;
+    color: var(--ink);
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .meta { width: min(1360px, 100%); margin: 0 auto 22px; display: flex; flex-wrap: wrap; align-items: end; gap: 22px; }
+  .meta h1 { margin: 0; font-family: var(--latin); font-size: 26px; letter-spacing: -.03em; }
+  .meta h1 span { font-family: var(--display); font-weight: 400; font-size: 22px; margin-inline-start: 8px; }
+  .meta p { margin: 0; flex: 1; min-width: 260px; color: #6b6252; font-size: 12.5px; line-height: 1.7; }
+  .swatches { display: flex; gap: 6px; }
+  .swatches i { width: 26px; height: 26px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(23,20,15,.14); }
+  .chip { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; border: 1px solid #c8bba4; padding: 7px 10px; color: #4b4336; background: #f7f2e8; }
+
+  .frame { width: min(1360px, 100%); margin: 0 auto; border: 1px solid #c9bca6; box-shadow: 0 34px 80px -40px rgba(40,32,20,.45); }
+
+  /* ============ SHELL ============ */
+  .app {
+    display: flex; min-height: 820px;
+    background: var(--bg);
+    background-image:
+      linear-gradient(90deg, rgba(23,20,15,.028) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(23,20,15,.022) 1px, transparent 1px);
+    background-size: 72px 72px, 72px 72px;
+    position: relative;
+  }
+  .app::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(700px 320px at 88% 0%, rgba(255,252,245,.85), transparent 70%);
+  }
+
+  .rail {
+    width: 250px; flex: 0 0 250px; position: relative; z-index: 2;
+    padding: 26px 0 20px;
+    border-inline-end: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, rgba(255,252,245,.72), rgba(244,239,229,.2));
+  }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 22px 22px; border-bottom: 1px solid var(--line-soft); }
+  .brand-mark {
+    width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center;
+    background: var(--ink); color: var(--plate);
+    font-family: var(--display); font-size: 22px; line-height: 1; padding-bottom: 3px;
+  }
+  .brand-mark { position: relative; }
+  .brand-mark::after { content: ''; position: absolute; top: 0; inset-inline-start: 0; width: 6px; height: 6px; background: #c8452a; }
+  .brand-copy { min-width: 0; }
+  .brand-name { font-family: var(--latin); font-size: 16px; font-weight: 600; letter-spacing: -.02em; direction: ltr; text-align: right; }
+  .brand-sub { font-family: var(--mono); font-size: 8px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); margin-top: 4px; direction: ltr; text-align: right; }
+
+  .nav { padding: 18px 14px 0; display: grid; gap: 2px; }
+  .nav-label { font-family: var(--mono); font-size: 8px; letter-spacing: .2em; text-transform: uppercase; color: #746a59; margin: 16px 10px 7px; }
+  .nav-label:first-child { margin-top: 0; }
+  .nav a {
+    display: flex; align-items: center; gap: 10px; text-decoration: none;
+    color: var(--ink-soft); font-size: 12.5px; font-weight: 500;
+    padding: 8px 10px; border: 1px solid transparent; border-radius: 2px;
+    position: relative; transition: background .16s, color .16s;
+  }
+  .nav a svg { width: 15px; height: 15px; flex: 0 0 15px; opacity: .62; }
+  .nav a:hover { background: rgba(255,252,245,.72); }
+  .nav a.on { color: var(--ink); font-weight: 700; background: var(--plate); border-color: var(--line); }
+  .nav a.on svg { opacity: 1; color: var(--red); }
+  .nav a.on::before { content: ""; position: absolute; inset-inline-start: -15px; top: 6px; bottom: 6px; width: 2px; background: var(--red); }
+  .nav a .count { margin-inline-start: auto; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .nav a.on .count { color: var(--red); }
+
+  .rail-foot { margin-top: auto; padding: 16px 22px 0; border-top: 1px solid var(--line-soft); }
+  .branch { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--ink-soft); }
+  .branch b { font-weight: 700; }
+  .branch small { display: block; font-family: var(--mono); font-size: 8px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+  .dot-live { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(44,100,73,.13); }
+  .user { display: flex; align-items: center; gap: 9px; margin-top: 14px; color: var(--muted); font-size: 10px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--red-wash); color: var(--red); font-weight: 700; font-size: 11px; border: 1px solid rgba(185,59,33,.22); }
+  .user b { display: block; color: var(--ink); font-size: 11px; font-weight: 600; }
+  .user span { font-family: var(--mono); font-size: 8px; letter-spacing: .08em; }
+
+  .stage { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; z-index: 2; }
+  .topbar { height: 62px; flex: 0 0 62px; display: flex; align-items: center; gap: 16px; padding: 0 30px; border-bottom: 1px solid var(--line); background: rgba(255,252,245,.55); backdrop-filter: blur(6px); }
+  .crumb { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); direction: ltr; }
+  .crumb b { color: var(--ink); }
+  .top-date { margin-inline-start: 14px; padding-inline-start: 14px; border-inline-start: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+  .search {
+    margin-inline-start: auto; width: min(260px, 26vw); display: flex; align-items: center; gap: 8px;
+    padding: 7px 0 6px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10.5px;
+  }
+  .search svg { width: 13px; height: 13px; opacity: .7; }
+  .search kbd { margin-inline-start: auto; font-family: var(--mono); font-size: 8px; border: 1px solid var(--line); padding: 2px 4px; color: #746a59; }
+  .icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid transparent; background: none; color: var(--ink-soft); position: relative; cursor: pointer; }
+  .icon-btn:hover { border-color: var(--line); background: var(--plate); }
+  .icon-btn svg { width: 15px; height: 15px; }
+  .icon-btn .ping { position: absolute; top: 5px; inset-inline-end: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--plate); }
+
+  .content { padding: 26px 30px 0; flex: 1; display: flex; flex-direction: column; }
+  .content-inner { display: grid; gap: 24px; }
+
+  /* ============ HERO ============ */
+  .hero { display: flex; align-items: flex-end; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--ink); position: relative; }
+  .hero::before, .hero::after { content: ""; position: absolute; bottom: -1px; width: 1px; height: 5px; background: var(--ink); }
+  .hero::before { inset-inline-start: 0; }
+  .hero::after { inset-inline-end: 0; }
+  .hero-copy { flex: 1; min-width: 0; }
+  .eyebrow { display: flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .eyebrow b { color: var(--red); font-weight: 700; }
+  .eyebrow i { width: 22px; height: 1px; background: var(--line); }
+  .hero h3 { margin: 9px 0 0; font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1.08; letter-spacing: -.01em; }
+  .hero h3 em { font-style: normal; color: var(--red); }
+  .hero p { margin: 7px 0 0; font-size: 11.5px; color: var(--muted); }
+  .hero-actions { display: flex; gap: 8px; align-items: center; padding-bottom: 4px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 15px; font: inherit; font-size: 11.5px; font-weight: 600; border: 1px solid var(--ink); background: var(--ink); color: var(--plate); cursor: pointer; border-radius: 2px; transition: transform .15s, background .15s; }
+  .btn:hover { background: #2a241b; }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn.ghost:hover { background: var(--plate); border-color: var(--ink); }
+  .btn svg { width: 14px; height: 14px; }
+
+  /* ============ KPI STRIP ============ */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
+  .kpi { padding: 18px 20px 18px 0; border-inline-end: 1px solid var(--line-soft); }
+  .kpi:last-child { border-inline-end: 0; }
+  .kpi-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 8.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .kpi-label svg { width: 13px; height: 13px; opacity: .45; }
+  .kpi-value { display: flex; align-items: baseline; gap: 6px; margin-top: 10px; }
+  .kpi-value b { font-family: var(--latin); font-size: 33px; font-weight: 600; letter-spacing: -.045em; line-height: 1; direction: ltr; font-variant-numeric: tabular-nums; }
+  .kpi-value span { font-size: 10px; color: var(--muted); }
+  .kpi-foot { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 10px; color: var(--muted); }
+  .delta { display: inline-flex; align-items: center; gap: 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--green); }
+  .delta.down { color: var(--red); }
+  .delta svg { width: 9px; height: 9px; }
+  .spark { margin-inline-start: auto; width: 54px; height: 20px; opacity: .85; }
+  .spark path { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+  .spark .fill { fill: rgba(23,20,15,.06); stroke: none; }
+
+  /* ============ GRID ============ */
+  .grid-main { display: grid; grid-template-columns: 1.6fr .92fr; gap: 26px; }
+  .panel { min-width: 0; }
+  .panel-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .panel-index { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; color: var(--red); }
+  .panel-head h4 { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 700; }
+  .panel-head .hint { font-family: var(--mono); font-size: 8.5px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+  .panel-head .more { margin-inline-start: auto; font-size: 10px; color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
+  .panel-head .more:hover { color: var(--red); border-color: var(--red); }
+
+  .chart { position: relative; padding: 16px 0 0; }
+  .chart svg.area { width: 100%; height: 190px; display: block; overflow: visible; }
+  .chart .grid-line { stroke: var(--line-soft); stroke-width: 1; }
+  .chart .curve { fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+  .chart .curve-fill { fill: url(#atelierFade); }
+  .chart .target { stroke: var(--red); stroke-width: 1; stroke-dasharray: 4 4; opacity: .8; }
+  .chart .tick { text-anchor: middle; font-family: var(--mono); font-size: 7.5px; fill: #746a59; letter-spacing: .06em; }
+  .chart-legend { display: flex; align-items: center; gap: 16px; padding: 10px 0 0; font-family: var(--mono); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .chart-legend i { display: inline-block; width: 14px; height: 2px; background: var(--ink); margin-inline-end: 5px; vertical-align: middle; }
+  .chart-legend .target-key i { background: repeating-linear-gradient(90deg, var(--red) 0 3px, transparent 3px 6px); }
+  .chart-note { margin-inline-start: auto; color: var(--muted); font-family: var(--body); letter-spacing: 0; text-transform: none; font-size: 9.5px; }
+  .chart-note b { color: var(--ink); font-family: var(--mono); }
+
+  .chart-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 14px; border-top: 1px solid var(--line); }
+  .chart-stats > div { padding: 11px 12px 0 0; border-inline-end: 1px solid var(--line-soft); }
+  .chart-stats > div:last-child { border-inline-end: 0; }
+  .chart-stats span { display: block; font-family: var(--mono); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .chart-stats b { display: inline-block; margin-top: 5px; font-family: var(--latin); font-size: 15px; font-weight: 600; letter-spacing: -.02em; direction: ltr; font-variant-numeric: tabular-nums; }
+  .chart-stats em { font-style: normal; font-size: 9px; color: var(--muted); margin-inline-start: 3px; }
+
+  /* ledger orders */
+  .ledger { display: grid; }
+  .order { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line-soft); }
+  .order:last-child { border-bottom: 0; }
+  .order:hover { background: rgba(255,252,245,.6); }
+  .order .no { font-family: var(--mono); font-size: 8.5px; color: #746a59; letter-spacing: .04em; }
+  .order .what b { display: block; font-size: 11.5px; font-weight: 600; }
+  .order .what span { display: block; font-size: 9.5px; color: var(--muted); margin-top: 2px; }
+  .order .right { text-align: end; }
+  .order .total { font-family: var(--latin); font-size: 12px; font-weight: 600; direction: ltr; font-variant-numeric: tabular-nums; }
+  .status { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 7.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .status::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+  .status.paid::before { background: var(--green); }
+  .status.paid { color: var(--green); }
+  .status.live::before { background: var(--red); }
+  .status.live { color: var(--red); }
+  .status.wait::before { background: var(--gold); }
+  .status.wait { color: var(--gold); }
+
+  .grid-lower { display: grid; grid-template-columns: 1fr 1.1fr .8fr; gap: 26px; padding-bottom: 18px; }
+  .rank { display: grid; gap: 9px; padding-top: 12px; }
+  .rank-row { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 9px; }
+  .rank-row .pos { font-family: var(--mono); font-size: 8px; color: #746a59; }
+  .rank-row .name { font-size: 11px; font-weight: 500; }
+  .rank-bar { grid-column: 2 / 3; height: 2px; background: var(--line-soft); position: relative; margin-top: -3px; }
+  .rank-bar i { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--ink); }
+  .rank-row .qty { font-family: var(--mono); font-size: 9px; color: var(--muted); direction: ltr; }
+  .rank-row:first-child .qty { color: var(--red); }
+
+  .stock { padding-top: 6px; }
+  .stock-row { display: grid; grid-template-columns: 1fr 74px 42px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 10.5px; }
+  .stock-row:last-child { border-bottom: 0; }
+  .stock-row .bar { height: 3px; background: var(--line-soft); position: relative; }
+  .stock-row .bar i { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--red); }
+  .stock-row .low { background: var(--gold); }
+  .stock-row .num { font-family: var(--mono); font-size: 8.5px; color: var(--muted); direction: ltr; text-align: end; }
+  .stock-row b { font-weight: 600; }
+  .stock-row small { display: block; color: var(--muted); font-size: 8.5px; margin-top: 1px; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 12px; }
+  .action { display: flex; flex-direction: column; justify-content: space-between; min-height: 66px; padding: 10px 11px; border: 1px solid var(--line); background: rgba(255,252,245,.55); cursor: pointer; text-align: start; font: inherit; color: var(--ink-soft); transition: border-color .16s, background .16s, transform .16s; }
+  .action:hover { border-color: var(--ink); background: var(--plate); transform: translateY(-1px); }
+  .action svg { width: 15px; height: 15px; opacity: .7; }
+  .action span { font-size: 10.5px; font-weight: 600; }
+  .action small { display: block; font-family: var(--mono); font-size: 7px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin-top: 3px; }
+
+  .foot { margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 13px 30px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; color: #746a59; background: rgba(255,252,245,.5); }
+  .foot .page { margin-inline-start: auto; }
+  .foot b { color: var(--ink); font-weight: 700; }
+  .foot .rule { flex: 1; height: 1px; background: var(--line); max-width: 120px; }
+
+  @media (max-width: 1120px) {
+    .grid-main { grid-template-columns: 1fr; }
+    .grid-lower { grid-template-columns: 1fr 1fr; }
+    .kpis { grid-template-columns: 1fr 1fr; }
+    .kpi:nth-child(2) { border-inline-end: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="meta">
+    <h1>01 / Atelier <span>أتيليه</span></h1>
+    <p>ثيم لايت تحريري: ورق دافئ، حبر أسود، فيرميليون واحد فقط، خطوط شعر، وأرقام كأنها مطبوعة في دفتر محاسبة. الفخامة هنا من الهدوء والمسافات — مش من الظلال أو الزجاج.</p>
+    <div class="swatches" aria-hidden="true">
+      <i style="background:#f4efe5"></i><i style="background:#fffcf5"></i><i style="background:#17140f"></i><i style="background:#b93b21"></i><i style="background:#7d7466"></i><i style="background:#a7854d"></i>
+    </div>
+    <div class="chip">Light · Editorial · Premium</div>
+  </div>
+
+  <section class="frame">
+    <div class="app" id="atelier" data-theme="atelier">
+      <aside class="rail">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">R</div>
+          <div class="brand-copy">
+            <div class="brand-name">RestoFlow</div>
+            <div class="brand-sub">Culinary Ledger</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <div class="nav-label">الخدمة</div>
+          <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 8h6V4h-6z"/></svg><span>نظرة عامة</span></a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18M6 6v13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6M9 10h6"/></svg><span>نقطة البيع</span></a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg><span>الطلبات</span><span class="count">12</span></a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v18M7 8h10M5 3h14v6H5zM7 21h10"/></svg><span>المطبخ</span><span class="count">5</span></a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16l-2 13H6zM8 7a4 4 0 0 1 8 0"/></svg><span>المخزون</span><span class="count">3</span></a>
+          <div class="nav-label">الإدارة</div>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>التقارير</span></a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18v12H3zM3 11h18M7 15h3"/></svg><span>المالية</span></a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.2"/><path d="M5 21c.6-4 3.2-6 7-6s6.4 2 7 6"/></svg><span>الموظفون</span></a>
+        </nav>
+        <div class="rail-foot">
+          <div class="branch">
+            <span class="dot-live" aria-hidden="true"></span>
+            <div><b>فرع المعادي</b><small>وردية العشاء · مفتوحة</small></div>
+          </div>
+          <div class="user">
+            <div class="avatar">م</div>
+            <div><b>محمود سامي</b><span>مدير الفرع</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="stage">
+        <header class="topbar">
+          <div class="crumb">RESTOFLOW / <b>OVERVIEW</b></div>
+          <div class="top-date">الثلاثاء ٢٢ أكتوبر · ٠٧:٤٢ م</div>
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            <span>ابحث في النظام…</span>
+            <kbd>⌘K</kbd>
+          </div>
+          <button class="icon-btn" aria-label="الإشعارات">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7M10 20h4"/></svg>
+            <span class="ping"></span>
+          </button>
+          <button class="icon-btn" aria-label="الوضع الليلي">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 14.5A8 8 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></svg>
+          </button>
+        </header>
+
+        <div class="content">
+          <div class="content-inner">
+            <header class="hero">
+              <div class="hero-copy">
+                <div class="eyebrow"><b>01</b><i></i> دفتر الوردية الحالية</div>
+                <h3>دفتر اليوم<em>.</em></h3>
+                <p>كل رقم هنا من وردية واحدة — من أول طلب حتى آخر إيصال.</p>
+              </div>
+              <div class="hero-actions">
+                <button class="btn ghost">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v14H4zM8 3v4M16 3v4M4 10h16"/></svg>
+                  تقرير الوردية
+                </button>
+                <button class="btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+                  طلب جديد
+                </button>
+              </div>
+            </header>
+
+            <section class="kpis" aria-label="مؤشرات اليوم">
+              <div class="kpi">
+                <div class="kpi-label"><span>إيراد اليوم</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg></div>
+                <div class="kpi-value"><b>48,320</b><span>ج.م</span></div>
+                <div class="kpi-foot"><span class="delta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M6 11l6-6 6 6"/></svg>12.4%</span><span>عن أمس</span><svg class="spark" viewBox="0 0 54 20" aria-hidden="true"><path class="fill" d="M0 16 8 13 16 14 24 8 32 10 40 5 48 7 54 3V20H0Z"/><path d="M0 16 8 13 16 14 24 8 32 10 40 5 48 7 54 3"/></svg></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><span>متوسط الفاتورة</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18v12H3zM3 11h18"/></svg></div>
+                <div class="kpi-value"><b>286</b><span>ج.م</span></div>
+                <div class="kpi-foot"><span class="delta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M6 11l6-6 6 6"/></svg>4.1%</span><span>عن آخر ٧ أيام</span><svg class="spark" viewBox="0 0 54 20" aria-hidden="true"><path class="fill" d="M0 15 8 14 16 10 24 12 32 9 40 10 48 6 54 7V20H0Z"/><path d="M0 15 8 14 16 10 24 12 32 9 40 10 48 6 54 7"/></svg></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><span>طلبات مكتملة</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 7 10 17l-5-5"/></svg></div>
+                <div class="kpi-value"><b>169</b><span>طلب</span></div>
+                <div class="kpi-foot"><span class="delta down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M6 13l6 6 6-6"/></svg>2.3%</span><span>٥ قيد التحضير</span><svg class="spark" viewBox="0 0 54 20" aria-hidden="true"><path class="fill" d="M0 9 8 11 16 8 24 10 32 13 40 11 48 14 54 12V20H0Z"/><path d="M0 9 8 11 16 8 24 10 32 13 40 11 48 14 54 12"/></svg></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><span>وقت التحضير</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></div>
+                <div class="kpi-value"><b>14:20</b><span>دقيقة</span></div>
+                <div class="kpi-foot"><span class="delta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M6 11l6-6 6 6"/></svg>1:10</span><span>أسرع اليوم</span><svg class="spark" viewBox="0 0 54 20" aria-hidden="true"><path class="fill" d="M0 13 8 12 16 14 24 11 32 12 40 9 48 10 54 8V20H0Z"/><path d="M0 13 8 12 16 14 24 11 32 12 40 9 48 10 54 8"/></svg></div>
+              </div>
+            </section>
+
+            <div class="grid-main">
+              <section class="panel">
+                <div class="panel-head">
+                  <span class="panel-index">02</span>
+                  <h4>الإيراد بالساعة</h4>
+                  <span class="hint">12 PM — 11 PM</span>
+                  <a class="more" href="#">تفاصيل</a>
+                </div>
+                <div class="chart">
+                  <svg class="area" viewBox="0 0 560 190" preserveAspectRatio="none" role="img" aria-label="منحنى الإيراد بالساعة">
+                    <defs>
+                      <linearGradient id="atelierFade" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0" stop-color="#17140f" stop-opacity=".09" />
+                        <stop offset="1" stop-color="#17140f" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <line class="grid-line" x1="0" y1="24" x2="560" y2="24" />
+                    <line class="grid-line" x1="0" y1="75" x2="560" y2="75" />
+                    <line class="grid-line" x1="0" y1="126" x2="560" y2="126" />
+                    <line class="grid-line" x1="0" y1="170" x2="560" y2="170" />
+                    <line class="target" x1="0" y1="86" x2="560" y2="86" />
+                    <path class="curve-fill" d="M560 150 C530 146 520 140 514 138 C500 134 480 140 467 142 C448 145 432 126 420 118 C408 110 390 126 374 126 C357 126 343 96 327 92 C312 88 296 106 280 104 C263 102 248 74 234 70 C220 66 200 84 187 82 C172 80 154 56 140 52 C126 48 108 68 94 66 C80 64 62 42 47 38 C33 34 16 44 0 48V170H560Z" />
+                    <path class="curve" d="M560 150 C530 146 520 140 514 138 C500 134 480 140 467 142 C448 145 432 126 420 118 C408 110 390 126 374 126 C357 126 343 96 327 92 C312 88 296 106 280 104 C263 102 248 74 234 70 C220 66 200 84 187 82 C172 80 154 56 140 52 C126 48 108 68 94 66 C80 64 62 42 47 38 C33 34 16 44 0 48" />
+                    <circle cx="47" cy="38" r="3" fill="#b93b21" />
+                    <text class="tick" x="550" y="184">12</text>
+                    <text class="tick" x="470" y="184">2</text>
+                    <text class="tick" x="380" y="184">4</text>
+                    <text class="tick" x="280" y="184">6</text>
+                    <text class="tick" x="185" y="184">8</text>
+                    <text class="tick" x="95" y="184">10</text>
+                    <text class="tick" x="26" y="184">11</text>
+                  </svg>
+                  <div class="chart-legend">
+                    <span><i></i>الإيراد</span>
+                    <span class="target-key"><i></i>الهدف</span>
+                    <span class="chart-note">أعلى ساعة <bdi dir="ltr">9–10 PM</bdi> — <bdi dir="ltr">6,840</bdi> ج.م</span>
+                  </div>
+                  <div class="chart-stats">
+                    <div><span>ذروة الإيراد</span><b dir="ltr">9–10 PM</b></div>
+                    <div><span>طلبات / ساعة</span><b dir="ltr">14.1</b></div>
+                    <div><span>متوسط الساعة</span><b dir="ltr">4,027</b><em>ج.م</em></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <span class="panel-index">03</span>
+                  <h4>آخر الطلبات</h4>
+                  <a class="more" href="#">السجل</a>
+                </div>
+                <div class="ledger">
+                  <div class="order">
+                    <span class="no">#1042</span>
+                    <div class="what"><b>ترابيزة ٧ · صالة</b><span>٤ أصناف · كاشير: سارة</span></div>
+                    <div class="right"><div class="total">420.00</div><span class="status paid">مدفوع</span></div>
+                  </div>
+                  <div class="order">
+                    <span class="no">#1041</span>
+                    <div class="what"><b>تيك أوي · محمد ع.</b><span>صنفان · استلام ٧:٥٥ م</span></div>
+                    <div class="right"><div class="total">168.00</div><span class="status live">قيد التحضير</span></div>
+                  </div>
+                  <div class="order">
+                    <span class="no">#1040</span>
+                    <div class="what"><b>توصيل · طلبات</b><span>٥ أصناف · مندوب: عمرو</span></div>
+                    <div class="right"><div class="total">512.00</div><span class="status paid">مدفوع</span></div>
+                  </div>
+                  <div class="order">
+                    <span class="no">#1039</span>
+                    <div class="what"><b>ترابيزة ٢ · صالة</b><span>٣ أصناف · ضيف جديد</span></div>
+                    <div class="right"><div class="total">244.00</div><span class="status wait">بانتظار الدفع</span></div>
+                  </div>
+                  <div class="order">
+                    <span class="no">#1038</span>
+                    <div class="what"><b>تيك أوي · هاتف</b><span>صنف واحد · تغليف</span></div>
+                    <div class="right"><div class="total">96.00</div><span class="status paid">مدفوع</span></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="grid-lower">
+              <section class="panel">
+                <div class="panel-head"><span class="panel-index">04</span><h4>الأكثر مبيعًا</h4></div>
+                <div class="rank">
+                  <div class="rank-row"><span class="pos">01</span><span class="name">كشري باللحمة</span><span class="qty">42</span><span class="rank-bar"><i style="width:100%"></i></span></div>
+                  <div class="rank-row"><span class="pos">02</span><span class="name">مشوي مشكل</span><span class="qty">38</span><span class="rank-bar"><i style="width:88%"></i></span></div>
+                  <div class="rank-row"><span class="pos">03</span><span class="name">طاجن فراخ بالبشاميل</span><span class="qty">31</span><span class="rank-bar"><i style="width:72%"></i></span></div>
+                  <div class="rank-row"><span class="pos">04</span><span class="name">عصير مانجو طازج</span><span class="qty">27</span><span class="rank-bar"><i style="width:62%"></i></span></div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><span class="panel-index">05</span><h4>تنبيهات المخزون</h4><a class="more" href="#">جرد</a></div>
+                <div class="stock">
+                  <div class="stock-row"><div><b>لحم بقري</b><small>حد الطلب ٥ كجم</small></div><span class="bar"><i style="width:28%"></i></span><span class="num">2.4 ك</span></div>
+                  <div class="stock-row"><div><b>أرز بسمتي</b><small>حد الطلب ١٠ كجم</small></div><span class="bar"><i class="low" style="width:44%"></i></span><span class="num">8.1 ك</span></div>
+                  <div class="stock-row"><div><b>زيت عباد الشمس</b><small>حد الطلب ٦ لتر</small></div><span class="bar"><i class="low" style="width:61%"></i></span><span class="num">4.9 ل</span></div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><span class="panel-index">06</span><h4>إجراءات</h4></div>
+                <div class="actions">
+                  <button class="action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg><span>تسجيل مصروف</span><small>Cash out</small></button>
+                  <button class="action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8"/></svg><span>جرد سريع</span><small>Quick count</small></button>
+                  <button class="action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 4h12v16l-6-4-6 4z"/></svg><span>إغلاق وردية</span><small>Close shift</small></button>
+                  <button class="action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 8V4h10v4M7 17H5v-6h14v6h-2M7 13h10v7H7z"/></svg><span>طباعة Z</span><small>End of day</small></button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <footer class="foot">
+          <span>RestoFlow ERP · <b>1.1.40</b></span>
+          <span class="rule"></span>
+          <span>Atelier / Draft 01</span>
+          <span class="page">ورق <bdi dir="ltr">01 / 04</bdi></span>
+        </footer>
+      </main>
+    </div>
+  </section>
+</body>
+</html>

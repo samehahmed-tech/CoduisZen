@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import * as settingsController from '../controllers/settingsController';
-import { requireRoleOrPermission } from '../middleware/auth';
+import { requireRoles } from '../middleware/auth';
 
 const router = Router();
 
-const settingsAdmin = requireRoleOrPermission(
-    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
-    ['CFG_MANAGE_SETTINGS'],
-);
+// `settings` is a global table, not a branch-scoped store. A branch manager
+// must not be able to change tax, branding, or operational defaults for every
+// branch merely by receiving a settings permission.
+const settingsAdmin = requireRoles('SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER');
 
 router.get('/', settingsController.getAllSettings);
 router.put('/', settingsAdmin, settingsController.updateBulkSettings);

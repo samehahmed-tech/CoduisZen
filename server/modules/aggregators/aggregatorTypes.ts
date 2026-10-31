@@ -8,6 +8,7 @@
  * into normalizeAggregatorPayload + mapProviderStatus only.
  */
 import { verifyTalabatWebhookAuth as verifySharedSecret } from '../talabat/talabatMapper';
+import { createHash } from 'node:crypto';
 
 export interface AggregatorProvider {
     id: string;
@@ -153,6 +154,40 @@ export const resolveAggregatorBranch = (config: ProviderBranchConfig, storeId: s
 
 export const buildAggregatorIdempotencyKey = (providerId: string, externalId: string, status: string): string =>
     `AGG:${str(providerId).toUpperCase()}:${str(externalId)}:${str(status).toUpperCase()}`;
+
+/**
+ * Stable request fingerprint used to detect a reused external order ID with
+ * materially different business data. Keep this limited to fields that must
+ * not change between retries; status is intentionally excluded because
+ * providers legitimately send status transitions for the same order.
+ */
+export const buildAggregatorPayloadFingerprint = (
+    providerId: string,
+    order: Pick<NormalizedOrder, 'externalId' | 'storeId' | 'orderType' | 'items' | 'subtotal' | 'total' | 'deliveryFee' | 'customer'>,
+): string => {
+    const canonical = {
+        provider: str(providerId).toLowerCase(),
+        externalId: str(order.externalId),
+        storeId: str(order.storeId),
+        orderType: str(order.orderType).toUpperCase(),
+        items: (order.items || []).map((item) => ({
+            sku: str(item.sku),
+            name: str(item.name),
+            quantity: Number(item.quantity || 0),
+            unitPrice: Number(item.unitPrice || 0),
+            totalPrice: Number(item.totalPrice || 0),
+        })),
+        subtotal: Number(order.subtotal || 0),
+        total: Number(order.total || 0),
+        deliveryFee: Number(order.deliveryFee || 0),
+        customer: {
+            name: str(order.customer?.name),
+            phone: str(order.customer?.phone),
+            address: str(order.customer?.address),
+        },
+    };
+    return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+};
 
 export const AGGREGATOR_IDEMPOTENCY_SCOPE = 'AGGREGATOR_ORDER';
 

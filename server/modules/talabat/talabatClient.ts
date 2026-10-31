@@ -5,8 +5,41 @@
 
 export const TALABAT_TOKEN_URL = 'https://talabat.partner.deliveryhero.io/v2/oauth/token';
 export const TALABAT_ME_BASE = 'https://talabat.partner.deliveryhero.io/v2';
+import { classifyIntegrationHttpStatus, computeIntegrationBackoffMs, shouldRetryIntegrationFailure } from '../../utils/integrationRuntimePolicy';
 
 type FetchFn = typeof fetch;
+
+export interface TalabatRequestOptions extends RequestInit {
+    timeoutMs?: number;
+    maxAttempts?: number;
+    sleepFn?: (ms: number) => Promise<void>;
+}
+
+/** Bounded, timeout-protected request primitive for all Talabat outbound calls. */
+export const talabatRequest = async (
+    url: string,
+    options: TalabatRequestOptions = {},
+    fetchFn: FetchFn = fetch,
+): Promise<Response> => {
+    const { timeoutMs = 10_000, maxAttempts = 3, sleepFn = (ms) => new Promise(resolve => setTimeout(resolve, ms)), ...request } = options;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= Math.max(1, maxAttempts); attempt++) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), Math.max(250, Math.min(timeoutMs, 30_000)));
+        try {
+            const response = await fetchFn(url, { ...request, signal: controller.signal });
+            if (response.ok || !shouldRetryIntegrationFailure(classifyIntegrationHttpStatus(response.status)) || attempt >= maxAttempts) return response;
+            lastError = new Error(`TALABAT_HTTP_${response.status}`);
+        } catch (error) {
+            lastError = error;
+            if (attempt >= maxAttempts) throw error;
+        } finally {
+            clearTimeout(timer);
+        }
+        await sleepFn(computeIntegrationBackoffMs(attempt, 250, 5_000));
+    }
+    throw lastError instanceof Error ? lastError : new Error('TALABAT_REQUEST_FAILED');
+};
 
 let cachedToken: { token: string; expiresAt: number; key: string } | null = null;
 
@@ -20,7 +53,7 @@ export const getTalabatToken = async (
     if (cachedToken && cachedToken.key === key && cachedToken.expiresAt > Date.now() + 5 * 60_000) {
         return cachedToken.token;
     }
-    const res = await fetchFn(config.tokenUrl || TALABAT_TOKEN_URL, {
+    const res = await talabatRequest(config.tokenUrl || TALABAT_TOKEN_URL, {
         method: 'POST',
         // Spec: application/x-www-form-urlencoded (50 req/min per client ID)
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -29,7 +62,7 @@ export const getTalabatToken = async (
             client_id: config.clientId,
             client_secret: config.clientSecret,
         }).toString(),
-    });
+    }, fetchFn);
     if (!res.ok) throw new Error(`TALABAT_TOKEN_FAILED_${res.status}`);
     const data: any = await res.json();
     const token = String(data?.access_token || '').trim();
@@ -99,11 +132,11 @@ export const talabatPutOrder = async (
     fetchFn: FetchFn = fetch,
 ): Promise<{ ok: boolean; status: number; data: any }> => {
     const base = (args.baseUrl || TALABAT_ME_BASE).replace(/\/+$/, '');
-    const res = await fetchFn(`${base}/chains/${args.chainId}/orders/${args.orderId}`, {
+    const res = await talabatRequest(`${base}/chains/${args.chainId}/orders/${args.orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${args.token}` },
         body: JSON.stringify(args.body),
-    });
+    }, fetchFn);
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data };
 };
@@ -113,9 +146,9 @@ export const talabatGetOrder = async (
     fetchFn: FetchFn = fetch,
 ): Promise<{ ok: boolean; status: number; data: any }> => {
     const base = (args.baseUrl || TALABAT_ME_BASE).replace(/\/+$/, '');
-    const res = await fetchFn(`${base}/chains/${args.chainId}/orders/${args.orderId}`, {
+    const res = await talabatRequest(`${base}/chains/${args.chainId}/orders/${args.orderId}`, {
         headers: { Authorization: `Bearer ${args.token}` },
-    });
+    }, fetchFn);
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data };
 };

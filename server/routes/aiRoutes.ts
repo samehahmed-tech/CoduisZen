@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireRoles } from '../middleware/auth';
-import { chatAssistant, executeAction, getAiKeyConfig, getInsights, previewAction, updateAiKeyConfig, getRevenueForecast } from '../controllers/aiController';
+import { scopeBranchQuery } from '../middleware/branchIsolation';
+import { chatAssistant, executeAction, discoverAiModels, getAiKeyConfig, getAiRuntimeStatus, getInsights, previewAction, updateAiKeyConfig, getRevenueForecast } from '../controllers/aiController';
 
 const router = Router();
 
@@ -26,13 +27,14 @@ const aiOperationalRoles = requireRoles(
 );
 
 // GET AI-driven insights with caching
-router.get('/insights', aiOperationalRoles, getInsights);
+router.get('/insights', aiOperationalRoles, scopeBranchQuery, getInsights);
 
 // GET Revenue Forecast
-router.get('/forecast', aiOperationalRoles, getRevenueForecast);
+router.get('/forecast', aiOperationalRoles, scopeBranchQuery, getRevenueForecast);
 
 // POST chat orchestration
-router.post('/chat', chatAssistant);
+router.post('/chat', scopeBranchQuery, chatAssistant);
+router.get('/runtime-status', getAiRuntimeStatus);
 
 // POST preview suggested action (guard + permission)
 router.post('/action-preview', previewAction);
@@ -45,6 +47,7 @@ router.post('/execute', executeAction);
 
 // AI key management (server-side encrypted)
 router.get('/key-config', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER'), getAiKeyConfig);
+router.post('/models', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER'), discoverAiModels);
 router.put('/key-config', requireRoles('SUPER_ADMIN', 'BRANCH_MANAGER'), updateAiKeyConfig);
 
 export default router;

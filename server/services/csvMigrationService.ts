@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { users, branches, attendanceRawLogs } from '../../src/db/schema';
 import logger from '../utils/logger';
+import bcrypt from 'bcryptjs';
 
 export const csvMigrationService = {
   /**
@@ -71,7 +72,9 @@ export const csvMigrationService = {
                   id: crypto.randomUUID(),
                   name: record.name,
                   email: record.email || null,
-                  pinCode: record.pin || null, // in real app, we should hash this
+                  pinCode: null,
+                  pinCodeHash: record.pin ? await bcrypt.hash(record.pin, 10) : null,
+                  pinLoginEnabled: Boolean(record.pin),
                   role: record.role || 'WAITER',
                   assignedBranchId: branchId,
                   isActive: true,

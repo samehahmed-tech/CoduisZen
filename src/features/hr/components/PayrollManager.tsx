@@ -137,6 +137,7 @@ type AttendancePolicy = {
     graceLateMinutes?: number;
     earlyLeaveToleranceMinutes?: number;
     overtimeThresholdMinutes?: number;
+    minimumRestMinutes?: number;
     minHoursForPresent?: number;
     autoCloseOpenSessions?: boolean;
     autoResolveMissingOut?: boolean;
@@ -318,6 +319,7 @@ export default function PayrollManager() {
         operationalDayStartHour: '8',
         operationalDayEndHour: '5',
         maxSmartSessionHours: '22',
+        minimumRestMinutes: '660',
         graceLateMinutes: '15',
         earlyLeaveToleranceMinutes: '10',
         overtimeThresholdMinutes: '30',
@@ -424,6 +426,7 @@ export default function PayrollManager() {
                     operationalDayStartHour: String(defaultPolicy.operationalDayStartHour ?? 8),
                     operationalDayEndHour: String(defaultPolicy.operationalDayEndHour ?? 5),
                     maxSmartSessionHours: String(defaultPolicy.maxSmartSessionHours ?? 22),
+                    minimumRestMinutes: String(defaultPolicy.minimumRestMinutes ?? 660),
                     graceLateMinutes: String(defaultPolicy.graceLateMinutes ?? 15),
                     earlyLeaveToleranceMinutes: String(defaultPolicy.earlyLeaveToleranceMinutes ?? 10),
                     overtimeThresholdMinutes: String(defaultPolicy.overtimeThresholdMinutes ?? 30),
@@ -582,6 +585,7 @@ export default function PayrollManager() {
                     operationalDayStartHour: Number(policyForm.operationalDayStartHour || 8),
                     operationalDayEndHour: Number(policyForm.operationalDayEndHour || 5),
                     maxSmartSessionHours: Number(policyForm.maxSmartSessionHours || 22),
+                    minimumRestMinutes: Math.max(660, Math.min(1440, Number(policyForm.minimumRestMinutes || 660))),
                     graceLateMinutes: Number(policyForm.graceLateMinutes || 15),
                     earlyLeaveToleranceMinutes: Number(policyForm.earlyLeaveToleranceMinutes || 10),
                     overtimeThresholdMinutes: Number(policyForm.overtimeThresholdMinutes || 30),
@@ -1064,6 +1068,7 @@ export default function PayrollManager() {
                             <input type="number" min="0" max="23" placeholder="بداية اليوم التشغيلي" value={policyForm.operationalDayStartHour} onChange={e => setPolicyForm({ ...policyForm, operationalDayStartHour: e.target.value })} className="h-11 px-3 rounded-xl bg-card border border-border text-xs" />
                             <input type="number" min="0" max="23" placeholder="نهاية اليوم التشغيلي" value={policyForm.operationalDayEndHour} onChange={e => setPolicyForm({ ...policyForm, operationalDayEndHour: e.target.value })} className="h-11 px-3 rounded-xl bg-card border border-border text-xs" />
                             <input type="number" min="4" max="30" placeholder="أقصى ساعات للجلسة" value={policyForm.maxSmartSessionHours} onChange={e => setPolicyForm({ ...policyForm, maxSmartSessionHours: e.target.value })} className="h-11 px-3 rounded-xl bg-card border border-border text-xs" />
+                            <input type="number" min="660" max="1440" step="30" placeholder="الراحة بين الورديات بالدقائق (حد أدنى 660)" value={policyForm.minimumRestMinutes} onChange={e => setPolicyForm({ ...policyForm, minimumRestMinutes: e.target.value })} className="h-11 px-3 rounded-xl bg-card border border-border text-xs" />
                             <label className="h-11 px-3 rounded-xl bg-card border border-border text-xs font-black flex items-center gap-2">
                                 <input type="checkbox" checked={policyForm.autoCloseOpenSessions} onChange={e => setPolicyForm({ ...policyForm, autoCloseOpenSessions: e.target.checked })} />
                                 إغلاق تلقائي

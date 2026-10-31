@@ -8,9 +8,10 @@
 
 import { db } from '../db';
 import { financeExceptions, orders } from '../../src/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, lt, isNull, or } from 'drizzle-orm';
 import { GLService } from './glService';
 import logger from '../utils/logger';
+import { FINANCE_RETRY_LEASE_MS } from '../utils/financeRetryPolicy';
 
 const log = logger.child({ service: 'financeRetry' });
 
@@ -32,6 +33,15 @@ export const financeRetryService = {
     }> {
         const result = { processed: 0, succeeded: 0, failed: 0, skipped: 0, errors: [] as Array<{ id: string; reason: string }> };
 
+        // Recover a worker that crashed after claiming an exception.
+        const staleCutoff = new Date(Date.now() - FINANCE_RETRY_LEASE_MS);
+        await db.update(financeExceptions)
+            .set({ status: 'PENDING', updatedAt: new Date() })
+            .where(and(
+                eq(financeExceptions.status, 'PROCESSING'),
+                or(isNull(financeExceptions.updatedAt), lt(financeExceptions.updatedAt, staleCutoff)),
+            ));
+
         // Fetch pending exceptions that haven't exceeded max retries
         const pendingExceptions = await db.select()
             .from(financeExceptions)
@@ -44,8 +54,6 @@ export const financeRetryService = {
             .top(50);
 
         for (const exception of pendingExceptions) {
-            result.processed++;
-
             const retryCount = Number((exception.payload as any)?.retryCount || 0);
 
             // Check backoff: skip if not enough time has passed
@@ -57,6 +65,20 @@ export const financeRetryService = {
                 result.skipped++;
                 continue;
             }
+
+            // Atomic claim prevents two schedulers from posting the same order to GL.
+            const [claimed] = await db.update(financeExceptions)
+                .set({ status: 'PROCESSING', updatedAt: new Date() })
+                .output()
+                .where(and(
+                    eq(financeExceptions.id, exception.id),
+                    eq(financeExceptions.status, 'PENDING'),
+                ));
+            if (!claimed) {
+                result.skipped++;
+                continue;
+            }
+            result.processed++;
 
             try {
                 const payload = exception.payload as any;
@@ -86,7 +108,8 @@ export const financeRetryService = {
                     order.paymentMethod || 'CASH',
                     order.total || 0,
                     order.branchId || '',
-                    order.type || 'DINE_IN'
+                    order.type || 'DINE_IN',
+                    { actorId: 'financeRetryService', source: 'FINANCE_RETRY', correlationId: `FINANCE_RETRY:${exception.id}` },
                 );
 
                 if (glResult && typeof glResult !== 'string' && glResult.entryId) {

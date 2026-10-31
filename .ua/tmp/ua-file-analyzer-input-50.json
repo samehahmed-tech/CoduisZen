@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/data-maintenance-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 46,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/data-maintenance-fix/RestoFlow Data Maintenance.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/data-maintenance-fix/RestoFlow Data Maintenance.ps1",
+      "language": "powershell",
+      "sizeLines": 118,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/data-maintenance-fix/README AR.txt": [],
+    "scripts/sameh-installer/data-maintenance-fix/RestoFlow Data Maintenance.bat": [],
+    "scripts/sameh-installer/data-maintenance-fix/RestoFlow Data Maintenance.ps1": []
+  }
+}

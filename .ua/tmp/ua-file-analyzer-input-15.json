@@ -1,0 +1,354 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "services/stockSocket.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/syncService.ts",
+      "language": "typescript",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/translations.ts",
+      "language": "typescript",
+      "sizeLines": 1012,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/db/localDb.ts",
+      "language": "typescript",
+      "sizeLines": 124,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/UserManagement.tsx",
+      "language": "typescript",
+      "sizeLines": 744,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/ZenPeople.tsx",
+      "language": "typescript",
+      "sizeLines": 922,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/AttendanceManager.tsx",
+      "language": "typescript",
+      "sizeLines": 2414,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/BiometricDeviceManager.tsx",
+      "language": "typescript",
+      "sizeLines": 1704,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/DataMigrationWizard.tsx",
+      "language": "typescript",
+      "sizeLines": 182,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/HRHub.tsx",
+      "language": "typescript",
+      "sizeLines": 2506,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/HRSettingsManager.tsx",
+      "language": "typescript",
+      "sizeLines": 585,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/PayrollManager.tsx",
+      "language": "typescript",
+      "sizeLines": 1702,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/SchedulingManager.tsx",
+      "language": "typescript",
+      "sizeLines": 739,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/TaskChecklistManager.tsx",
+      "language": "typescript",
+      "sizeLines": 197,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/inventory/StockRequests.tsx",
+      "language": "typescript",
+      "sizeLines": 722,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/inventory/components/ItemModal.tsx",
+      "language": "typescript",
+      "sizeLines": 582,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/inventory/components/Procurement.tsx",
+      "language": "typescript",
+      "sizeLines": 884,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/inventory/components/StockTransferModal.tsx",
+      "language": "typescript",
+      "sizeLines": 162,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/CustomerSelectView.tsx",
+      "language": "typescript",
+      "sizeLines": 620,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/ItemImage.tsx",
+      "language": "typescript",
+      "sizeLines": 214,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/ManagerApprovalModal.tsx",
+      "language": "typescript",
+      "sizeLines": 143,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/POSHeader.tsx",
+      "language": "typescript",
+      "sizeLines": 166,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/POSReturnModal.tsx",
+      "language": "typescript",
+      "sizeLines": 185,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/components/ShiftOverlays.tsx",
+      "language": "typescript",
+      "sizeLines": 251,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/pos/modifierSelection.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/i18n.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/services/socketService.ts",
+      "language": "typescript",
+      "sizeLines": 189,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/services/syncService.ts",
+      "language": "typescript",
+      "sizeLines": 346,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/utils/branchEntityCache.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/utils/idGenerator.ts",
+      "language": "typescript",
+      "sizeLines": 98,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/utils/tableDisplay.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/utils/userAvatars.ts",
+      "language": "typescript",
+      "sizeLines": 173,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/workers/opsStats.worker.ts",
+      "language": "typescript",
+      "sizeLines": 76,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "services/stockSocket.ts": [
+      "types.ts"
+    ],
+    "services/syncService.ts": [],
+    "services/translations.ts": [],
+    "src/db/localDb.ts": [
+      "types.ts"
+    ],
+    "src/features/hr/UserManagement.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "components/common/UserAvatar.tsx",
+      "services/api/roles.ts",
+      "services/api/users.ts",
+      "src/utils/userAvatars.ts",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/roleLabels.ts"
+    ],
+    "src/features/hr/ZenPeople.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/hr.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts",
+      "stores/useHRStore.ts",
+      "types.ts"
+    ],
+    "src/features/hr/components/AttendanceManager.tsx": [
+      "services/api/core.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "src/features/hr/components/BiometricDeviceManager.tsx": [
+      "services/api/branches.ts",
+      "services/api/core.ts"
+    ],
+    "src/features/hr/components/DataMigrationWizard.tsx": [
+      "services/api/core.ts"
+    ],
+    "src/features/hr/components/HRHub.tsx": [
+      "services/api/core.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "src/features/hr/components/HRSettingsManager.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/hr.ts"
+    ],
+    "src/features/hr/components/PayrollManager.tsx": [
+      "services/api/core.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "src/features/hr/components/SchedulingManager.tsx": [
+      "services/api/core.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "src/features/hr/components/TaskChecklistManager.tsx": [
+      "services/api/core.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "src/features/inventory/StockRequests.tsx": [
+      "components/Toast.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "components/common/PageSkeleton.tsx",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts"
+    ],
+    "src/features/inventory/components/ItemModal.tsx": [
+      "components/common/BarcodeScanner.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api.ts",
+      "src/utils/idGenerator.ts",
+      "types.ts"
+    ],
+    "src/features/inventory/components/Procurement.tsx": [
+      "components/Toast.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "services/api/procurement.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "types.ts"
+    ],
+    "src/features/inventory/components/StockTransferModal.tsx": [
+      "types.ts"
+    ],
+    "src/features/pos/components/CustomerSelectView.tsx": [
+      "components/common/AddressMapPicker.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "components/common/DeliveryZonePicker.tsx",
+      "components/common/ToastProvider.tsx",
+      "src/features/pos/platformDeliveryValidation.ts",
+      "stores/useCRMStore.ts",
+      "types.ts"
+    ],
+    "src/features/pos/components/ItemImage.tsx": [],
+    "src/features/pos/components/ManagerApprovalModal.tsx": [
+      "services/api/approval.ts",
+      "services/api/core.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "src/features/pos/components/POSHeader.tsx": [
+      "components/common/BranchContextSwitcher.tsx",
+      "components/common/UserAvatar.tsx",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "src/features/pos/components/POSReturnModal.tsx": [
+      "components/common/ToastProvider.tsx",
+      "services/api/core.ts",
+      "services/api/orders.ts",
+      "services/api/refunds.ts"
+    ],
+    "src/features/pos/components/ShiftOverlays.tsx": [
+      "components/Toast.tsx",
+      "services/api/core.ts",
+      "services/api/shifts.ts",
+      "services/translations.ts",
+      "src/utils/idGenerator.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts"
+    ],
+    "src/features/pos/modifierSelection.ts": [
+      "types.ts"
+    ],
+    "src/i18n.ts": [
+      "services/translations.ts"
+    ],
+    "src/services/socketService.ts": [],
+    "src/services/syncService.ts": [
+      "services/api/audit.ts",
+      "services/api/branches.ts",
+      "services/api/customers.ts",
+      "services/api/deployment.ts",
+      "services/api/inventory.ts",
+      "services/api/menu.ts",
+      "services/api/orders.ts",
+      "services/api/settings.ts",
+      "services/api/tables.ts",
+      "src/db/localDb.ts",
+      "src/services/syncQueueUtils.ts"
+    ],
+    "src/utils/branchEntityCache.ts": [],
+    "src/utils/idGenerator.ts": [],
+    "src/utils/tableDisplay.ts": [],
+    "src/utils/userAvatars.ts": [],
+    "src/workers/opsStats.worker.ts": []
+  }
+}

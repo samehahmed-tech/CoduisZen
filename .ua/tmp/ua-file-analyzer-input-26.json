@@ -1,0 +1,152 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/controllers/aiController.ts",
+      "language": "typescript",
+      "sizeLines": 822,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/aiKeyVaultService.ts",
+      "language": "typescript",
+      "sizeLines": 267,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/aiModelCatalog.ts",
+      "language": "typescript",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/aiPolicy.ts",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/aiService.ts",
+      "language": "typescript",
+      "sizeLines": 261,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/dynamicPricingService.ts",
+      "language": "typescript",
+      "sizeLines": 121,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/revenueForecastService.ts",
+      "language": "typescript",
+      "sizeLines": 121,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/systemCopilotService.ts",
+      "language": "typescript",
+      "sizeLines": 299,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/services/aiActionGuard.ts",
+      "language": "typescript",
+      "sizeLines": 302,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/aiActionGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/aiBackendGuard.test.ts",
+      "language": "typescript",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/aiModelCatalog.test.ts",
+      "language": "typescript",
+      "sizeLines": 23,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/groqAiService.test.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/systemCopilot.test.ts",
+      "language": "typescript",
+      "sizeLines": 69,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/controllers/aiController.ts": [
+      "server/db/index.ts",
+      "server/middleware/auth.ts",
+      "server/services/aiKeyVaultService.ts",
+      "server/services/aiPolicy.ts",
+      "server/services/aiService.ts",
+      "server/services/hrExtendedService.ts",
+      "server/services/payrollCalculationService.ts",
+      "server/services/revenueForecastService.ts",
+      "server/services/systemCopilotService.ts",
+      "src/db/schema.ts",
+      "src/services/aiActionGuard.ts"
+    ],
+    "server/services/aiKeyVaultService.ts": [
+      "server/db/index.ts",
+      "server/services/aiModelCatalog.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/aiModelCatalog.ts": [],
+    "server/services/aiPolicy.ts": [
+      "server/middleware/auth.ts"
+    ],
+    "server/services/aiService.ts": [
+      "server/db/index.ts",
+      "server/services/aiKeyVaultService.ts",
+      "server/services/aiModelCatalog.ts",
+      "server/services/auditService.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/dynamicPricingService.ts": [
+      "server/db/index.ts",
+      "server/services/aiService.ts",
+      "server/services/auditService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/revenueForecastService.ts": [
+      "server/db/index.ts",
+      "server/services/aiService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/services/systemCopilotService.ts": [],
+    "src/services/aiActionGuard.ts": [
+      "types.ts"
+    ],
+    "tests/aiActionGuard.test.ts": [
+      "src/services/aiActionGuard.ts"
+    ],
+    "tests/aiBackendGuard.test.ts": [
+      "server/services/aiPolicy.ts"
+    ],
+    "tests/aiModelCatalog.test.ts": [
+      "server/services/aiModelCatalog.ts"
+    ],
+    "tests/groqAiService.test.ts": [
+      "server/services/aiService.ts"
+    ],
+    "tests/systemCopilot.test.ts": [
+      "server/services/systemCopilotService.ts"
+    ]
+  }
+}

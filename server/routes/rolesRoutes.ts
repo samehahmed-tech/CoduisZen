@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import * as rolesController from '../controllers/rolesController';
-import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
+import { requireRoles } from '../middleware/auth';
 
 const router = Router();
-const readAccess = requireRoleOrPermission(['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'], ['CFG_MANAGE_ROLES', 'CFG_MANAGE_USERS']);
-const writeAccess = requireRoleOrPermission(['SUPER_ADMIN'], ['CFG_MANAGE_ROLES']);
+// Roles and permission definitions are tenant-wide security policy. A branch
+// permission must not unlock global role mutation or permission discovery.
+const readAccess = requireRoles('SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER');
+const writeAccess = requireRoles('SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER');
 
 router.get('/', readAccess, rolesController.getAllRoles);
 router.get('/permissions', readAccess, rolesController.getPermissionDefinitions);

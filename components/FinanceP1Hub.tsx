@@ -544,6 +544,7 @@ const GatewaysView: React.FC<{ isAr: boolean; currency: string; branch: string }
   const [apiKey, setApiKey] = useState('');
   const [merchantId, setMerchantId] = useState('');
   const [payAmount, setPayAmount] = useState('');
+  const [orderId, setOrderId] = useState('');
   const toast = useToast();
 
   const load = async () => {
@@ -571,13 +572,14 @@ const GatewaysView: React.FC<{ isAr: boolean; currency: string; branch: string }
   };
 
   const testPayment = async () => {
-    if (!Number(payAmount)) {
-      toast.error(isAr ? 'أدخل مبلغ تجربة الدفع' : 'Enter a payment amount');
+    if (!Number(payAmount) || !orderId.trim()) {
+      toast.error(isAr ? 'أدخل رقم الطلب ومبلغ الدفع' : 'Enter an order ID and payment amount');
       return;
     }
     try {
-      const res = await p1Fetch('/gateways/sessions', { method: 'POST', body: JSON.stringify({ provider, amount: Number(payAmount) }) });
-      toast.success(`${isAr ? 'تم إنشاء جلسة دفع: ' : 'Payment session created: '}${res.status || 'PENDING'}`);
+      const res = await p1Fetch('/gateways/checkout', { method: 'POST', body: JSON.stringify({ provider, orderId: orderId.trim(), amount: Number(payAmount) }) });
+      toast.success(`${isAr ? 'تم إنشاء checkout: ' : 'Checkout created: '}${res.checkoutUrl ? (isAr ? 'افتح الرابط لإكمال الدفع' : 'open the URL to complete payment') : (res.status || 'PENDING')}`);
+      if (res.checkoutUrl) window.open(res.checkoutUrl, '_blank', 'noopener,noreferrer');
       await load();
     } catch (e: any) {
       toast.error(e.message);
@@ -630,6 +632,9 @@ const GatewaysView: React.FC<{ isAr: boolean; currency: string; branch: string }
             </select>
             <input type="number" placeholder={isAr ? 'مبلغ' : 'Amount'} value={payAmount}
               onChange={(e) => setPayAmount(e.target.value)}
+              className="w-full px-5 py-3 bg-app/50 border border-border/40 rounded-2xl text-sm font-black outline-none" />
+            <input placeholder={isAr ? 'رقم الطلب' : 'Order ID'} value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
               className="w-full px-5 py-3 bg-app/50 border border-border/40 rounded-2xl text-sm font-black outline-none" />
             <button onClick={testPayment}
               className="w-full px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-black text-sm">

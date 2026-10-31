@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/operational-reset/README AR.txt",
+      "language": "txt",
+      "sizeLines": 26,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/operational-reset/Reset Test Operations.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/operational-reset/Reset Test Operations.ps1",
+      "language": "powershell",
+      "sizeLines": 79,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/operational-reset/README AR.txt": [],
+    "scripts/sameh-installer/operational-reset/Reset Test Operations.bat": [],
+    "scripts/sameh-installer/operational-reset/Reset Test Operations.ps1": []
+  }
+}

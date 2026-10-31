@@ -53,6 +53,7 @@ const CRM: React.FC = () => {
   const debouncedSearch = useDebounce(searchQuery, 400);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customer360, setCustomer360] = useState<any>(null);
   const [formError, setFormError] = useState('');
   // Server-driven directory pager (Phase-6). The store list stays for
   // other consumers (POS/CallCenter typeaheads); this page pages exactly.
@@ -108,6 +109,16 @@ const CRM: React.FC = () => {
     fetchCustomers();
   }, [fetchCustomers]);
 
+  useEffect(() => {
+    let active = true;
+    setCustomer360(null);
+    if (!selectedCustomer?.id) return () => { active = false; };
+    customersApi.get360(selectedCustomer.id)
+      .then((profile) => { if (active) setCustomer360(profile); })
+      .catch(() => { if (active) setCustomer360(null); });
+    return () => { active = false; };
+  }, [selectedCustomer?.id]);
+
   const filteredCustomers = pageRows;
   const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
 
@@ -129,21 +140,21 @@ const CRM: React.FC = () => {
     return digits;
   };
 
-  const customerOrders = (customer: any) => {
+  const customerOrders = useCallback((customer: any) => {
     const phone = normalizePhone(customer?.phone);
     return orders.filter(o =>
       (customer?.id && o.customerId === customer.id) ||
       (phone && normalizePhone((o as any).customerPhone) === phone),
     );
-  };
+  }, [orders]);
 
-  const lastActivityOf = (customer: any): number => {
+  const lastActivityOf = useCallback((customer: any): number => {
     const orderTimes = customerOrders(customer)
       .map(o => new Date((o as any).createdAt || 0).getTime())
       .filter(t => Number.isFinite(t) && t > 0);
     const created = customer?.createdAt ? new Date(customer.createdAt).getTime() : 0;
     return Math.max(created || 0, ...orderTimes, 0);
-  };
+  }, [customerOrders]);
 
   // At-risk comes from the server directory summary when paged (exact,
   // directory-wide); the client computation stays as the legacy fallback.
@@ -154,7 +165,7 @@ const CRM: React.FC = () => {
       if (!last) return false;
       return (Date.now() - last) / (1000 * 3600 * 24) > 30;
     }).length;
-  }, [customers, orders, summary]);
+  }, [customers, lastActivityOf, summary]);
 
   const isPhoneValid = (phone?: string) => /^01[0-9]{9}$/.test(normalizePhone(phone));
 
@@ -185,6 +196,7 @@ const CRM: React.FC = () => {
         name,
         phone: normalized,
         address: newCustomer.address?.trim(),
+        birthDate: newCustomer.birthDate || undefined,
         loyaltyPoints: 0,
         totalSpent: 0,
         visits: 0,
@@ -192,7 +204,7 @@ const CRM: React.FC = () => {
       });
       setFormError('');
       setShowAddModal(false);
-      setNewCustomer({ name: '', phone: '', address: '' });
+      setNewCustomer({ name: '', phone: '', address: '', birthDate: '' });
       setPage(1);
       loadPage();
     } catch (error) {
@@ -548,6 +560,31 @@ const CRM: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4" aria-label={tr('Customer 360 financial balances', 'الأرصدة المالية للعميل')}>
+                  <div className="p-5 rounded-3xl border border-border/40 bg-elevated/40">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-2">{tr('Wallet', 'المحفظة')}</p>
+                    <p className="text-xl font-black text-sky-500 tabular-nums">{Number(customer360?.summary?.walletBalance || 0).toLocaleString()} <span className="text-xs">LE</span></p>
+                  </div>
+                  <div className="p-5 rounded-3xl border border-border/40 bg-elevated/40">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted mb-2">{tr('Gift Cards', 'كروت الهدايا')}</p>
+                    <p className="text-xl font-black text-amber-500 tabular-nums">{Number(customer360?.summary?.giftCardBalance || 0).toLocaleString()} <span className="text-xs">LE</span></p>
+                  </div>
+                </div>
+
+                {customer360?.loyaltyLedger?.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">{tr('Loyalty Ledger', 'سجل نقاط الولاء')}</h4>
+                    <div className="space-y-2">
+                      {customer360.loyaltyLedger.slice(0, 5).map((entry: any) => (
+                        <div key={entry.id} className="flex items-center justify-between px-4 py-3 rounded-2xl bg-elevated/30 border border-border/30 text-xs">
+                          <span className="font-bold text-muted">{entry.type}</span>
+                          <span className={`font-black tabular-nums ${Number(entry.points) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{Number(entry.points) >= 0 ? '+' : ''}{entry.points}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted flex items-center gap-2 mb-4">
                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> {tr('Order History', 'سجل الطلبات')}
@@ -661,6 +698,18 @@ const CRM: React.FC = () => {
                        placeholder={tr('Address or delivery notes...', 'العنوان أو ملاحظات التوصيل...')}
                      />
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[9px] font-black uppercase tracking-[0.3em] text-muted pl-1">{tr('Birth date (optional)', 'تاريخ الميلاد (اختياري)')}</label>
+                  <input
+                    type="date"
+                    className="w-full px-6 py-5 bg-elevated border border-border/50 rounded-2xl font-black text-sm outline-none focus:border-indigo-500 transition-all shadow-inner"
+                    value={String(newCustomer.birthDate || '')}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => { setFormError(''); setNewCustomer({ ...newCustomer, birthDate: e.target.value }); }}
+                    aria-label={tr('Birth date (optional)', 'تاريخ الميلاد (اختياري)')}
+                  />
                 </div>
                 {formError && (
                   <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-xs font-black text-rose-500">

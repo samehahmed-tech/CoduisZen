@@ -215,84 +215,88 @@ export const treasuryService = {
             }
         }
 
-        const now = new Date();
-        await db.update(treasuryVouchers).set({
-            status: 'COMPLETED', approvedBy: approvedBy || null, completedAt: now, updatedAt: now,
-        }).where(eq(treasuryVouchers.id, id));
+        return await db.transaction(async (tx) => {
+            await tx.execute(sql`SELECT ${treasuryVouchers.id} FROM ${treasuryVouchers} WITH (UPDLOCK, HOLDLOCK) WHERE ${treasuryVouchers.id} = ${id}`);
+            const [locked] = await tx.select().from(treasuryVouchers).where(eq(treasuryVouchers.id, id));
+            if (!locked) fail('VOUCHER_NOT_FOUND', 'Voucher not found', 404);
+            if (locked.status !== 'PENDING') fail('VOUCHER_NOT_PENDING', 'Only pending vouchers can be approved', 400);
 
-        // Side effects (best-effort, never roll back the approval itself)
-        try {
-            if ((v.category === 'SUPPLIER_PAYMENT' || v.category === 'SUPPLIER_ADVANCE') && v.supplierId) {
-                await db.insert(supplierPayments).values({
+            const now = new Date();
+            if ((locked.category === 'SUPPLIER_PAYMENT' || locked.category === 'SUPPLIER_ADVANCE') && locked.supplierId) {
+                await tx.insert(supplierPayments).values({
                     id: `sp-${nanoid(10)}`,
-                    supplierId: String(v.supplierId),
-                    invoiceId: v.invoiceId ? String(v.invoiceId) : null,
-                    amount: num(v.amount),
-                    paymentMethod: String(v.paymentMethod || 'CASH'),
-                    reference: v.reference ? String(v.reference) : `TV-${id}`,
+                    supplierId: String(locked.supplierId),
+                    invoiceId: locked.invoiceId ? String(locked.invoiceId) : null,
+                    amount: num(locked.amount),
+                    paymentMethod: String(locked.paymentMethod || 'CASH'),
+                    reference: locked.reference ? String(locked.reference) : `TV-${id}`,
                     status: 'COMPLETED',
                     createdBy: approvedBy || null,
                     createdAt: now,
                 });
-                if (v.invoiceId) {
-                    const [inv] = await db.select().from(supplierInvoices).where(eq(supplierInvoices.id, String(v.invoiceId)));
+                if (locked.invoiceId) {
+                    const [inv] = await tx.select().from(supplierInvoices).where(eq(supplierInvoices.id, String(locked.invoiceId)));
                     if (inv) {
-                        const paid = num(inv.amountPaid) + num(v.amount);
+                        const paid = num(inv.amountPaid) + num(locked.amount);
                         const total = num(inv.total);
-                        await db.update(supplierInvoices).set({
+                        await tx.update(supplierInvoices).set({
                             amountPaid: paid,
                             status: paid >= total - 0.009 ? 'PAID' : 'PARTIAL',
                             updatedAt: now,
-                        }).where(eq(supplierInvoices.id, String(v.invoiceId)));
+                        }).where(eq(supplierInvoices.id, String(locked.invoiceId)));
                     }
                 }
             }
-        } catch (err) {
-            logger.warn({ err, voucherId: id }, 'treasury: supplier linkage skipped');
-        }
 
-        // GL posting (best-effort — failures land in the finance exception queue)
-        try {
-            const [account] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, String(v.accountId)));
+            const [account] = await tx.select().from(bankAccounts).where(eq(bankAccounts.id, String(locked.accountId)));
             const cashCode = CASH_CODE_BY_TYPE[String(account?.accountType)] || '1110';
-            const amountNum = num(v.amount);
-            const isPayment = v.kind === 'PAYMENT';
+            const amountNum = num(locked.amount);
+            const isPayment = locked.kind === 'PAYMENT';
             let debitCode = '5200';
-            if (v.category === 'EXPENSE' && v.expenseAccountCode) debitCode = String(v.expenseAccountCode);
-            else if (v.category === 'SUPPLIER_PAYMENT' || v.category === 'SUPPLIER_ADVANCE') debitCode = '2110';
-            else if (v.category === 'CUSTODY_ISSUE') debitCode = '1140';
-            else if (v.category === 'CUSTODY_SETTLEMENT' || v.category === 'COLLECTION') debitCode = cashCode;
+            if (locked.category === 'EXPENSE' && locked.expenseAccountCode) debitCode = String(locked.expenseAccountCode);
+            else if (locked.category === 'SUPPLIER_PAYMENT' || locked.category === 'SUPPLIER_ADVANCE') debitCode = '2110';
+            else if (locked.category === 'CUSTODY_ISSUE') debitCode = '1140';
+            else if (locked.category === 'CUSTODY_SETTLEMENT' || locked.category === 'COLLECTION') debitCode = cashCode;
 
             const { GLService } = await import('./glService');
             const { chartOfAccounts } = await import('../../src/db/schema');
-            const codes = await db.select({ code: chartOfAccounts.code }).from(chartOfAccounts)
+            const codes = await tx.select({ code: chartOfAccounts.code }).from(chartOfAccounts)
                 .where(sql`${chartOfAccounts.code} IN (${debitCode}, ${cashCode})`);
             const found = new Set(codes.map((c: any) => String(c.code)));
-            if (found.has(debitCode) && found.has(cashCode) && debitCode !== cashCode) {
-                const ref = `TV-${String((v as any).voucherNo || id)}`;
-                await GLService.postJournalEntry({
-                    reference: ref,
-                    referenceType: 'TREASURY_VOUCHER',
-                    description: `${isPayment ? 'صرف' : 'قبض'} ${amountNum} — ${String(v.description || v.category)}`,
-                    branchId: v.branchId ? String(v.branchId) : undefined,
-                    lines: isPayment
-                        ? [
-                            { accountCode: debitCode, debit: amountNum, credit: 0, description: String(v.category) },
-                            { accountCode: cashCode, debit: 0, credit: amountNum, description: 'Treasury cash' },
-                        ]
-                        : [
-                            { accountCode: cashCode, debit: amountNum, credit: 0, description: 'Treasury cash' },
-                            { accountCode: debitCode, debit: 0, credit: amountNum, description: String(v.category) },
-                        ],
-                    createdBy: approvedBy,
-                }).catch((err: any) => logger.warn({ err }, 'treasury: GL posting skipped'));
+            if (debitCode === cashCode || !found.has(debitCode) || !found.has(cashCode)) {
+                fail('TREASURY_GL_ACCOUNT_NOT_CONFIGURED', 'Treasury GL accounts are not configured', 503);
             }
-        } catch {
-            logger.warn('treasury: GL posting skipped');
-        }
 
-        const [updated] = await db.select().from(treasuryVouchers).where(eq(treasuryVouchers.id, id));
-        return updated;
+            const ref = `TV-${String((locked as any).voucherNo || id)}`;
+            const posting = await GLService.postJournalEntry({
+                reference: ref,
+                referenceType: 'TREASURY_VOUCHER' as any,
+                description: `${isPayment ? 'صرف' : 'قبض'} ${amountNum} — ${String(locked.description || locked.category)}`,
+                branchId: locked.branchId ? String(locked.branchId) : undefined,
+                lines: isPayment
+                    ? [
+                        { accountCode: debitCode, debit: amountNum, credit: 0, description: String(locked.category) },
+                        { accountCode: cashCode, debit: 0, credit: amountNum, description: 'Treasury cash' },
+                    ]
+                    : [
+                        { accountCode: cashCode, debit: amountNum, credit: 0, description: 'Treasury cash' },
+                        { accountCode: debitCode, debit: 0, credit: amountNum, description: String(locked.category) },
+                    ],
+                createdBy: approvedBy,
+                actorId: approvedBy,
+                source: 'TREASURY_VOUCHER',
+                correlationId: `TREASURY_VOUCHER:${ref}`,
+            }, tx);
+            if (!posting || typeof posting !== 'object' || !('entryId' in posting) || !posting.entryId) {
+                fail('TREASURY_GL_POSTING_FAILED', 'Treasury voucher GL posting failed', 503);
+            }
+
+            await tx.update(treasuryVouchers).set({
+                status: 'COMPLETED', approvedBy: approvedBy || null, completedAt: now, updatedAt: now,
+            }).where(eq(treasuryVouchers.id, id));
+            const [updated] = await tx.select().from(treasuryVouchers).where(eq(treasuryVouchers.id, id));
+            return updated;
+        });
     },
 
     rejectVoucher: async (id: string, rejectedBy?: string) => {
@@ -410,7 +414,7 @@ export const treasuryService = {
             pendingTransfers,
             pendingVouchers,
             custodyOutstanding: custody,
-            custodyTotal: custody.reduce((s, c) => s + c.outstanding, 0),
+            custodyTotal: (custody as any[]).reduce((s, c) => Number(s) + Number(c.outstanding || 0), 0),
             todayIn,
             todayOut,
         };

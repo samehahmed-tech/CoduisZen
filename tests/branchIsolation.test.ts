@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { enforceBranch, scopeBranchQuery } from '../server/middleware/branchIsolation';
+import { canAccessBranch, enforceBranch, scopeBranchQuery } from '../server/middleware/branchIsolation';
 
 const runMiddleware = (input: {
     role?: string;
@@ -43,6 +43,17 @@ const runMiddleware = (input: {
 };
 
 describe('branch isolation middleware', () => {
+    it('allows loaded resources only in the user branch allow-list', () => {
+        const user: any = { role: 'MANAGER', branchId: 'branch-a', allowedBranches: ['branch-b'] };
+        expect(canAccessBranch(user, 'branch-a')).toBe(true);
+        expect(canAccessBranch(user, 'branch-b')).toBe(true);
+        expect(canAccessBranch(user, 'branch-c')).toBe(false);
+    });
+
+    it('keeps cross-branch monitor roles intentionally global', () => {
+        expect(canAccessBranch({ role: 'CALL_CENTER', branchId: 'branch-a', allowedBranches: [] } as any, 'branch-z')).toBe(true);
+    });
+
     it('rejects snake_case branch_id outside user branch scope', () => {
         const { res, next } = runMiddleware({
             branchId: 'branch-a',
@@ -95,5 +106,19 @@ describe('branch isolation middleware', () => {
 
         expect(next).toHaveBeenCalledOnce();
         expect(req.query.branchId).toBe('branch-a');
+    });
+
+    it('normalizes mutation body branch scope instead of trusting client input', () => {
+        const { req, next } = runMiddleware({
+            branchId: 'branch-a',
+            allowedBranches: ['branch-b'],
+            query: { branchId: 'branch-b' },
+            body: { branchId: 'branch-a', branch_id: 'branch-a', deviceId: 'device-1' },
+            middleware: scopeBranchQuery,
+        });
+
+        expect(next).toHaveBeenCalledOnce();
+        expect(req.body.branchId).toBe('branch-b');
+        expect(req.body.branch_id).toBe('branch-b');
     });
 });

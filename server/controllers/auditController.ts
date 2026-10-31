@@ -2,44 +2,38 @@ import { Request, Response } from 'express';
 import { db } from '../db';
 import { auditLogs } from '../../src/db/schema';
 import { and, desc, eq, sql } from 'drizzle-orm';
-import crypto from 'crypto';
-import { requireEnv } from '../config/env';
+import { buildSafeAuditPayload, redactAuditValue } from '../utils/auditPayload';
+import { signAuditWithCurrentKey, verifyAuditSignature } from '../utils/auditSignature';
 import { parseCursorPagination, decodeCursor, cursorPaginatedResponse } from '../middleware/pagination';
+import { createSignedAuditLog } from '../services/auditService';
 
-function stableStringify(value: any): string {
-    if (value === null || value === undefined) return 'null';
-    if (typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-    const keys = Object.keys(value).sort();
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
-}
+const auditInputFromRow = (row: any, createdAt: Date) => ({
+    eventType: row.eventType,
+    userId: row.userId,
+    branchId: row.branchId,
+    deviceId: row.deviceId,
+    payload: row.payload,
+    before: row.before,
+    after: row.after,
+    reason: row.reason,
+    createdAt,
+});
 
-function computeAuditSignature(input: {
-    eventType: string;
-    userId?: string | null;
-    branchId?: string | null;
-    deviceId?: string | null;
-    payload?: any;
-    before?: any;
-    after?: any;
-    reason?: string | null;
-    createdAt: Date;
-}): string {
-    const secret = requireEnv('AUDIT_HMAC_SECRET');
-    const toSign = stableStringify({
-        eventType: input.eventType,
-        userId: input.userId ?? null,
-        branchId: input.branchId ?? null,
-        deviceId: input.deviceId ?? null,
-        payload: input.payload ?? null,
-        before: input.before ?? null,
-        after: input.after ?? null,
-        reason: input.reason ?? null,
-        createdAt: input.createdAt.toISOString(),
-    });
+const isRowSignatureValid = (row: any, createdAt: Date) => Boolean(
+    row.signature && verifyAuditSignature(auditInputFromRow(row, createdAt), row.signature, row.signatureVersion),
+);
 
-    return crypto.createHmac('sha256', secret).update(toSign).digest('hex');
-}
+const auditIntegrityOperation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Audit integrity operation: ${eventType}`,
+});
 
 export const getAuditLogs = async (req: Request, res: Response) => {
     try {
@@ -49,6 +43,7 @@ export const getAuditLogs = async (req: Request, res: Response) => {
         const conditions: any[] = [];
         if (event_type) conditions.push(eq(auditLogs.eventType, event_type));
         if (user_id) conditions.push(eq(auditLogs.userId, user_id));
+        if (req.effectiveBranchId) conditions.push(eq(auditLogs.branchId, req.effectiveBranchId));
 
         // Cursor-based pagination (new) vs legacy limit-based
         const useCursor = typeof req.query.cursor === 'string' || typeof req.query.direction === 'string';
@@ -96,37 +91,31 @@ export const getAuditLogs = async (req: Request, res: Response) => {
 /** Helper: attach integrity check to a single audit row */
 function attachIntegrity(row: any) {
     const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt);
-    const expected = computeAuditSignature({
-        eventType: row.eventType,
-        userId: row.userId,
-        branchId: row.branchId,
-        deviceId: row.deviceId,
-        payload: row.payload,
-        before: row.before,
-        after: row.after,
-        reason: row.reason,
-        createdAt,
-    });
     return {
         ...row,
-        signatureValid: row.signature ? row.signature === expected : undefined,
+        signatureValid: row.signature ? isRowSignatureValid(row, createdAt) : undefined,
     };
 }
 
 export const createAuditLog = async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const payload = body.payload;
-        const before = body.before ?? payload?.before;
-        const after = body.after ?? payload?.after ?? payload?.order ?? payload;
+        const trustedUserId = req.user?.id || 'system';
+        const trustedBranchId = req.effectiveBranchId || req.user?.branchId || undefined;
+        const payload = buildSafeAuditPayload(body.payload, {
+            requestId: req.requestId,
+            sourceDevice: body.sourceDevice || body.source_device,
+        });
+        const before = redactAuditValue(body.before ?? body.payload?.before);
+        const after = redactAuditValue(body.after ?? body.payload?.after ?? body.payload?.order ?? body.payload);
         const reason = body.reason ?? payload?.reason;
         const createdAtCandidate = body.createdAt ?? body.created_at ?? body.timestamp;
         const createdAt = createdAtCandidate ? new Date(createdAtCandidate) : new Date();
 
-        const signature = computeAuditSignature({
+        const signed = signAuditWithCurrentKey({
             eventType: body.eventType || body.event_type,
-            userId: body.userId || body.user_id,
-            branchId: body.branchId || body.branch_id,
+            userId: trustedUserId,
+            branchId: trustedBranchId,
             deviceId: body.deviceId || body.device_id,
             payload,
             before,
@@ -137,19 +126,26 @@ export const createAuditLog = async (req: Request, res: Response) => {
 
         const [created] = await db.insert(auditLogs).output().values({
             eventType: body.eventType || body.event_type,
-            userId: body.userId || body.user_id,
-            userName: body.userName || body.user_name,
-            userRole: body.userRole || body.user_role,
-            branchId: body.branchId || body.branch_id,
+            // Never trust identity or branch ownership supplied by the client.
+            userId: trustedUserId,
+            userName: req.user?.name || undefined,
+            userRole: req.user?.role || undefined,
+            branchId: trustedBranchId,
             deviceId: body.deviceId || body.device_id,
             ipAddress: body.ipAddress || body.ip_address,
-            payload: payload,
+            payload,
             before,
             after,
             reason,
-            signature,
+            signature: signed.signature,
+            signatureVersion: signed.signatureVersion,
             createdAt: isNaN(createdAt.getTime()) ? new Date() : createdAt,
         });
+
+        await auditIntegrityOperation(req, 'AUDIT_LOG_CLIENT_CREATED', {
+            createdAuditId: created?.id || null,
+            targetEventType: body.eventType || body.event_type || null,
+        }, { created: true });
 
         res.status(201).json({ ...created, signatureValid: true });
     } catch (error: any) {
@@ -168,7 +164,10 @@ export const verifyAuditLog = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'INVALID_ID' });
         }
 
-        const [row] = await db.select().from(auditLogs).where(eq(auditLogs.id, id));
+        const [row] = await db.select().from(auditLogs).where(and(
+            eq(auditLogs.id, id),
+            req.effectiveBranchId ? eq(auditLogs.branchId, req.effectiveBranchId) : undefined,
+        ));
         if (!row) {
             return res.status(404).json({ error: 'NOT_FOUND' });
         }
@@ -178,19 +177,7 @@ export const verifyAuditLog = async (req: Request, res: Response) => {
         }
 
         const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt || Date.now());
-        const expected = computeAuditSignature({
-            eventType: row.eventType,
-            userId: row.userId,
-            branchId: row.branchId,
-            deviceId: (row as any).deviceId,
-            payload: row.payload,
-            before: row.before,
-            after: row.after,
-            reason: (row as any).reason,
-            createdAt,
-        });
-
-        const isValid = row.signature === expected;
+        const isValid = isRowSignatureValid(row, createdAt);
 
         // Update verification status in database
         await db.update(auditLogs)
@@ -198,7 +185,12 @@ export const verifyAuditLog = async (req: Request, res: Response) => {
                 isVerified: isValid,
                 lastVerifiedAt: new Date(),
             })
-            .where(eq(auditLogs.id, id));
+            .where(and(
+                eq(auditLogs.id, id),
+                req.effectiveBranchId ? eq(auditLogs.branchId, req.effectiveBranchId) : undefined,
+            ));
+
+        await auditIntegrityOperation(req, 'AUDIT_LOG_VERIFIED', { auditId: id, valid: isValid }, { verified: true });
 
         res.json({
             id,
@@ -221,6 +213,7 @@ export const verifyAllAuditLogs = async (req: Request, res: Response) => {
 
         const rows = await db.select()
             .from(auditLogs)
+            .where(req.effectiveBranchId ? eq(auditLogs.branchId, req.effectiveBranchId) : undefined)
             .orderBy(desc(auditLogs.id))
             .offset(0).fetch(limit);
 
@@ -236,19 +229,7 @@ export const verifyAllAuditLogs = async (req: Request, res: Response) => {
             }
 
             const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt || Date.now());
-            const expected = computeAuditSignature({
-                eventType: row.eventType,
-                userId: row.userId,
-                branchId: row.branchId,
-                deviceId: (row as any).deviceId,
-                payload: row.payload,
-                before: row.before,
-                after: row.after,
-                reason: (row as any).reason,
-                createdAt,
-            });
-
-            const isValid = row.signature === expected;
+            const isValid = isRowSignatureValid(row, createdAt);
 
             await db.update(auditLogs)
                 .set({
@@ -265,6 +246,7 @@ export const verifyAllAuditLogs = async (req: Request, res: Response) => {
             }
         }
 
+        await auditIntegrityOperation(req, 'AUDIT_LOGS_VERIFIED_ALL', { total: rows.length, verified, failed }, { completed: true });
         res.json({
             total: rows.length,
             verified,
@@ -285,10 +267,9 @@ export const verifyAllAuditLogs = async (req: Request, res: Response) => {
 export const scanForTampering = async (req: Request, res: Response) => {
     try {
         const limit = Math.min(parseInt(req.query.limit as string) || 500, 2000);
-        const { alertWebhook } = req.body; // Optional webhook URL for alerts
-
         const rows = await db.select()
             .from(auditLogs)
+            .where(req.effectiveBranchId ? eq(auditLogs.branchId, req.effectiveBranchId) : undefined)
             .orderBy(desc(auditLogs.id))
             .offset(0).fetch(limit);
 
@@ -302,19 +283,7 @@ export const scanForTampering = async (req: Request, res: Response) => {
             }
 
             const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt || Date.now());
-            const expected = computeAuditSignature({
-                eventType: row.eventType,
-                userId: row.userId,
-                branchId: row.branchId,
-                deviceId: (row as any).deviceId,
-                payload: row.payload,
-                before: row.before,
-                after: row.after,
-                reason: (row as any).reason,
-                createdAt,
-            });
-
-            if (row.signature !== expected) {
+            if (!isRowSignatureValid(row, createdAt)) {
                 tamperedEntries.push({
                     id: row.id,
                     eventType: row.eventType,
@@ -328,25 +297,7 @@ export const scanForTampering = async (req: Request, res: Response) => {
 
         const hasTampering = tamperedEntries.length > 0;
 
-        // Send webhook alert if tampering detected and webhook provided
-        if (hasTampering && alertWebhook) {
-            try {
-                await fetch(alertWebhook, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        alert: 'AUDIT_TAMPERING_DETECTED',
-                        severity: 'CRITICAL',
-                        timestamp: new Date().toISOString(),
-                        tamperedCount: tamperedEntries.length,
-                        entries: tamperedEntries.slice(0, 5),
-                    }),
-                });
-            } catch {
-                // Webhook failure shouldn't fail the scan
-            }
-        }
-
+        await auditIntegrityOperation(req, 'AUDIT_TAMPER_SCAN_COMPLETED', { scannedCount: rows.length, tamperedCount: tamperedEntries.length, missingSignatureCount: missingSignatures.length }, { hasTampering });
         res.json({
             scannedCount: rows.length,
             tamperedCount: tamperedEntries.length,
@@ -381,11 +332,15 @@ export const forensicSearch = async (req: Request, res: Response) => {
         const limit = Math.min(parseInt(limitStr as string) || 100, 500);
         const conditions: any[] = [];
 
+        if (req.effectiveBranchId) {
+            conditions.push(eq(auditLogs.branchId, req.effectiveBranchId));
+        }
+
         if (actor && typeof actor === 'string') {
             conditions.push(eq(auditLogs.userId, actor));
         }
 
-        if (branch && typeof branch === 'string') {
+        if (branch && typeof branch === 'string' && !req.effectiveBranchId) {
             conditions.push(eq(auditLogs.branchId, branch));
         }
 
@@ -430,20 +385,9 @@ export const forensicSearch = async (req: Request, res: Response) => {
         // Add integrity check
         const withIntegrity = rows.map((row) => {
             const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt || Date.now());
-            const expected = computeAuditSignature({
-                eventType: row.eventType,
-                userId: row.userId,
-                branchId: row.branchId,
-                deviceId: (row as any).deviceId,
-                payload: row.payload,
-                before: row.before,
-                after: row.after,
-                reason: (row as any).reason,
-                createdAt,
-            });
             return {
                 ...row,
-                signatureValid: row.signature ? row.signature === expected : null,
+                signatureValid: row.signature ? isRowSignatureValid(row, createdAt) : null,
             };
         });
 

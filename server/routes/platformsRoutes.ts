@@ -5,7 +5,7 @@ import { requireRoles, requireRoleOrPermission } from '../middleware/auth';
 const router = Router();
 
 const platformAdmin = requireRoleOrPermission(
-    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'],
+    ['SUPER_ADMIN', 'OWNER'],
     ['CFG_MANAGE_PLATFORMS'],
 );
 

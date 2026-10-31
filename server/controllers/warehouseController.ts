@@ -32,7 +32,9 @@ export const createWarehouse = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'name is required' });
         }
 
-        const branchId = body.branch_id ?? body.branchId ?? req.effectiveBranchId;
+        const branchId = req.user?.role === 'SUPER_ADMIN'
+            ? (body.branch_id ?? body.branchId ?? req.effectiveBranchId)
+            : req.effectiveBranchId;
         if (!branchId && req.user?.role !== 'SUPER_ADMIN') return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
         const [created] = await db.insert(warehouses).output().values({
             id: body.id || `WH-${Date.now()}`,
@@ -60,13 +62,23 @@ export const updateWarehouse = async (req: Request, res: Response) => {
         const [current] = await db.select().from(warehouses).where(eq(warehouses.id, id));
         if (!current) return res.status(404).json({ error: 'WAREHOUSE_NOT_FOUND' });
         if (req.effectiveBranchId && current.branchId !== req.effectiveBranchId) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
+        const requestedBranchId = body.branch_id ?? body.branchId;
+        if (
+            requestedBranchId !== undefined &&
+            String(requestedBranchId || '').trim() !== String(current.branchId || '').trim() &&
+            req.user?.role !== 'SUPER_ADMIN'
+        ) {
+            return res.status(403).json({ error: 'WAREHOUSE_BRANCH_REASSIGNMENT_FORBIDDEN' });
+        }
         const name = body.name !== undefined ? String(body.name).trim() : current.name;
         if (!name) return res.status(400).json({ error: 'WAREHOUSE_NAME_REQUIRED' });
 
         const [updated] = await db.update(warehouses).set({
             name,
             nameAr: body.name_ar ?? body.nameAr ?? current.nameAr,
-            branchId: body.branch_id ?? body.branchId ?? current.branchId,
+            branchId: req.user?.role === 'SUPER_ADMIN'
+                ? (body.branch_id ?? body.branchId ?? current.branchId)
+                : current.branchId,
             type: body.type ?? current.type,
             parentId: body.parent_id ?? body.parentId ?? current.parentId,
             isActive: body.is_active ?? body.isActive ?? current.isActive,

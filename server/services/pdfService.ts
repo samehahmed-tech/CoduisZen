@@ -139,7 +139,7 @@ ${pageStyle}${baseStyle}
     try {
         const page = await browser.newPage();
         if (thermal) await page.setViewport({ width: 302, height: 1200, deviceScaleFactor: 1 });
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'networkidle0' as any });
         if (thermal) {
             const contentHeight = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
             return Buffer.from(await page.pdf({ width: '80mm', height: `${contentHeight + 24}px`, printBackground: true, preferCSSPageSize: false }));
@@ -296,7 +296,7 @@ ${sep}
         try {
             const page = await browser.newPage();
             await page.setViewport({ width: 302, height: 1200, deviceScaleFactor: 1 });
-            await page.setContent(html, { waitUntil: 'networkidle0' });
+            await page.setContent(html, { waitUntil: 'networkidle0' as any });
             const contentHeight = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
             return Buffer.from(await page.pdf({ width: '80mm', height: `${contentHeight + 24}px`, printBackground: true, preferCSSPageSize: false }));
         } finally {
@@ -399,7 +399,7 @@ ${notes ? `<section class="notes"><h2>${t.sectionNotes}</h2><p>${htmlEscape(note
     const browser = await puppeteer.default.launch({ headless: true, executablePath: browserExecutable, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     try {
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'networkidle0' as any });
         return Buffer.from(await page.pdf({ format: 'A4', landscape: false, printBackground: true, preferCSSPageSize: false, displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate, margin: { top: '8mm', bottom: '16mm', left: '0', right: '0' } }));
     } finally {
         await browser.close();
@@ -755,7 +755,7 @@ tbody tr:nth-child(even) td { background: #f8fbff; }
     const browser = await puppeteer.default.launch({ headless: true, executablePath: browserExecutable, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     try {
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'networkidle0' as any });
         const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true });
         return Buffer.from(pdf);
     } finally {
@@ -821,7 +821,7 @@ tbody tr:nth-child(even) td { background:#f8fbff; }
     const browser = await puppeteer.default.launch({ headless: true, executablePath: browserExecutable, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     try {
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'networkidle0' as any });
         const pdf = await page.pdf({ format: 'A4', landscape: true, printBackground: true, preferCSSPageSize: true });
         return Buffer.from(pdf);
     } finally {

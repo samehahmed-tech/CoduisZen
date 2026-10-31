@@ -1,0 +1,388 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/Production.tsx",
+      "language": "typescript",
+      "sizeLines": 960,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ReceiptDesigner.tsx",
+      "language": "typescript",
+      "sizeLines": 1547,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/RecipeManager.tsx",
+      "language": "typescript",
+      "sizeLines": 575,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/RefundManager.tsx",
+      "language": "typescript",
+      "sizeLines": 495,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ReservationsHub.tsx",
+      "language": "typescript",
+      "sizeLines": 320,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/RolesPermissions.tsx",
+      "language": "typescript",
+      "sizeLines": 913,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/SensitiveData.tsx",
+      "language": "typescript",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/SettingsHub.tsx",
+      "language": "typescript",
+      "sizeLines": 2293,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/SetupWizard.tsx",
+      "language": "typescript",
+      "sizeLines": 1107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/TilesView.tsx",
+      "language": "typescript",
+      "sizeLines": 549,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/Toast.tsx",
+      "language": "typescript",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/TrackOrder.tsx",
+      "language": "typescript",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/TreasuryHub.tsx",
+      "language": "typescript",
+      "sizeLines": 723,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/WastageManager.tsx",
+      "language": "typescript",
+      "sizeLines": 352,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/WhatsAppHub.tsx",
+      "language": "typescript",
+      "sizeLines": 757,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/ZonesManager.tsx",
+      "language": "typescript",
+      "sizeLines": 447,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/RecipeWarningBanner.tsx",
+      "language": "typescript",
+      "sizeLines": 36,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/useCallCenterState.tsx",
+      "language": "typescript",
+      "sizeLines": 755,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/callcenter/useRecipeAvailability.ts",
+      "language": "typescript",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/AIWidgetsRenderer.tsx",
+      "language": "typescript",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/AnimatedNumber.tsx",
+      "language": "typescript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Avatar.tsx",
+      "language": "typescript",
+      "sizeLines": 72,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/BarcodeScanner.tsx",
+      "language": "typescript",
+      "sizeLines": 309,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/BranchContextSwitcher.tsx",
+      "language": "typescript",
+      "sizeLines": 167,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Breadcrumb.tsx",
+      "language": "typescript",
+      "sizeLines": 72,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Breadcrumbs.tsx",
+      "language": "typescript",
+      "sizeLines": 600,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ConfirmProvider.tsx",
+      "language": "typescript",
+      "sizeLines": 88,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ContextRail.tsx",
+      "language": "typescript",
+      "sizeLines": 511,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/DeliveryZonePicker.tsx",
+      "language": "typescript",
+      "sizeLines": 310,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ErrorBoundary.tsx",
+      "language": "typescript",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ExportButton.tsx",
+      "language": "typescript",
+      "sizeLines": 247,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/GlobalSearch.tsx",
+      "language": "typescript",
+      "sizeLines": 276,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ImageUploader.tsx",
+      "language": "typescript",
+      "sizeLines": 200,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/Production.tsx": [
+      "components/Toast.tsx",
+      "services/api/procurement.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "types.ts"
+    ],
+    "components/ReceiptDesigner.tsx": [
+      "components/Toast.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "services/templateReceiptGenerator.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/RecipeManager.tsx": [
+      "components/Toast.tsx",
+      "services/reportPdf.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "types.ts"
+    ],
+    "components/RefundManager.tsx": [
+      "components/common/ExportButton.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/refunds.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/ReservationsHub.tsx": [
+      "components/Toast.tsx",
+      "services/api/core.ts",
+      "services/api/reservations.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts"
+    ],
+    "components/RolesPermissions.tsx": [
+      "components/Toast.tsx",
+      "stores/useAuthStore.ts",
+      "types.ts",
+      "utils/roleLabels.ts"
+    ],
+    "components/SensitiveData.tsx": [
+      "types.ts"
+    ],
+    "components/SettingsHub.tsx": [
+      "components/Toast.tsx",
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ImageUploader.tsx",
+      "services/api/ai.ts",
+      "services/api/branches.ts",
+      "services/api/deployment.ts",
+      "services/api/finance.ts",
+      "services/api/inventory.ts",
+      "services/api/printers.ts",
+      "services/api/settings.ts",
+      "src/services/syncService.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useWhatsAppStore.ts",
+      "theme/tokens.ts",
+      "types.ts"
+    ],
+    "components/SetupWizard.tsx": [
+      "services/api/branches.ts",
+      "services/api/settings.ts",
+      "services/api/setup.ts",
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/TilesView.tsx": [
+      "components/common/navigation.ts",
+      "components/tiles/ModuleTile.tsx",
+      "hooks/useInternalMessages.ts",
+      "hooks/useSystemNotifications.ts",
+      "src/workers/opsStats.worker.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useOrderStore.ts"
+    ],
+    "components/Toast.tsx": [],
+    "components/TrackOrder.tsx": [
+      "services/api/core.ts"
+    ],
+    "components/TreasuryHub.tsx": [
+      "components/common/ConfirmProvider.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/finance.ts",
+      "services/api/procurement.ts",
+      "services/api/treasury.ts",
+      "services/api/users.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/WastageManager.tsx": [
+      "components/common/ExportButton.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/wastage.ts",
+      "stores/useAuthStore.ts",
+      "stores/useInventoryStore.ts"
+    ],
+    "components/WhatsAppHub.tsx": [
+      "stores/useCRMStore.ts",
+      "stores/useWhatsAppStore.ts"
+    ],
+    "components/ZonesManager.tsx": [
+      "components/Modal.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/delivery.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/callcenter/RecipeWarningBanner.tsx": [],
+    "components/callcenter/useCallCenterState.tsx": [
+      "services/api/core.ts",
+      "services/api/customers.ts",
+      "services/api/delivery.ts",
+      "services/api/orders.ts",
+      "stores/useAuthStore.ts",
+      "utils/formatters.ts"
+    ],
+    "components/callcenter/useRecipeAvailability.ts": [
+      "services/api/inventory.ts"
+    ],
+    "components/common/AIWidgetsRenderer.tsx": [
+      "stores/useAIWidgetStore.ts",
+      "stores/useAuthStore.ts",
+      "stores/useAutonomousEngine.ts"
+    ],
+    "components/common/AnimatedNumber.tsx": [],
+    "components/common/Avatar.tsx": [
+      "stores/useAuthStore.ts"
+    ],
+    "components/common/BarcodeScanner.tsx": [],
+    "components/common/BranchContextSwitcher.tsx": [
+      "stores/useAuthStore.ts",
+      "types.ts"
+    ],
+    "components/common/Breadcrumb.tsx": [
+      "stores/useAuthStore.ts"
+    ],
+    "components/common/Breadcrumbs.tsx": [
+      "components/common/UserAvatar.tsx",
+      "hooks/useInternalMessages.ts",
+      "hooks/useSystemNotifications.ts",
+      "services/api/users.ts",
+      "services/translations.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useMailStore.ts"
+    ],
+    "components/common/ConfirmProvider.tsx": [],
+    "components/common/ContextRail.tsx": [
+      "components/common/BranchContextSwitcher.tsx",
+      "components/common/navigation.ts",
+      "routes.tsx",
+      "services/syncService.ts",
+      "stores/useAIWidgetStore.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/common/DeliveryZonePicker.tsx": [
+      "services/api/delivery.ts"
+    ],
+    "components/common/ErrorBoundary.tsx": [],
+    "components/common/ExportButton.tsx": [
+      "services/reportBrand.ts",
+      "services/reportPdf.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/common/GlobalSearch.tsx": [
+      "components/common/navigation.ts",
+      "stores/useAIWidgetStore.ts",
+      "stores/useAuthStore.ts",
+      "stores/useAutonomousEngine.ts",
+      "stores/useOrderStore.ts"
+    ],
+    "components/common/ImageUploader.tsx": [
+      "services/imageService.ts"
+    ]
+  }
+}

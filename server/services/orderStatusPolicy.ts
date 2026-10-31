@@ -73,11 +73,12 @@ export const evaluateOrderStatusUpdate = (input: StatusCheckInput): { ok: boolea
 
     // Custody guard (monitoring + cash safety): an in-house delivery order
     // (restaurant delivers it, not an aggregator) must have a driver before
-    // it leaves the branch (OUT_FOR_DELIVERY) or closes (DELIVERED).
+    // delivery is confirmed. Dispatching an order is allowed first so the
+    // dispatcher can assign the driver during the handoff workflow.
     // Without this, orders close with no one accountable for the cash/food,
     // delivery KPIs break, and driverless orders pollute 3rd-party reports.
     // Aggregator orders (talabat/…) are delivered by the platform — exempt.
-    if (orderType === 'DELIVERY' && (next === 'OUT_FOR_DELIVERY' || next === 'DELIVERED')) {
+    if (orderType === 'DELIVERY' && next === 'DELIVERED') {
         const source = String(input.deliverySource || '').trim().toLowerCase();
         const origin = String(input.orderSource || '').trim().toLowerCase();
         // Legacy platform orders may carry source=platform:<name> without a

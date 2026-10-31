@@ -1,0 +1,1271 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 32,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 32,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 32,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "server/routes/settingsRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 12,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/setupRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 10,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/shiftRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 17,
+      "nonEmptyLines": 14,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/subscriptionRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 64,
+      "nonEmptyLines": 56,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/supplierRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 18,
+      "nonEmptyLines": 14,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/tableRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 31,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/talabatAdminRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 35,
+      "nonEmptyLines": 28,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/ttsRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 54,
+      "nonEmptyLines": 47,
+      "functions": [
+        {
+          "name": "fetchAudio",
+          "startLine": 5,
+          "endLine": 21,
+          "params": [
+            "url"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "fetchAudio",
+          "callee": "fetch",
+          "lineNumber": 6
+        },
+        {
+          "caller": "fetchAudio",
+          "callee": "response.headers.get",
+          "lineNumber": 13
+        },
+        {
+          "caller": "fetchAudio",
+          "callee": "contentType.includes",
+          "lineNumber": 14
+        },
+        {
+          "caller": "fetchAudio",
+          "callee": "contentType.includes",
+          "lineNumber": 14
+        },
+        {
+          "caller": "fetchAudio",
+          "callee": "Buffer.from",
+          "lineNumber": 18
+        },
+        {
+          "caller": "fetchAudio",
+          "callee": "response.arrayBuffer",
+          "lineNumber": 18
+        },
+        {
+          "caller": "fetchAudio",
+          "callee": "contentType.includes",
+          "lineNumber": 19
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/userRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 40,
+      "nonEmptyLines": 34,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/waitlistRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 9,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/warehouseRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 19,
+      "nonEmptyLines": 16,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/wastageRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 14,
+      "nonEmptyLines": 11,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/whatsappRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 43,
+      "nonEmptyLines": 40,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/routes/whatsappWebhookRoutes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 10,
+      "nonEmptyLines": 7,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/mapkitService.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 107,
+      "nonEmptyLines": 97,
+      "functions": [
+        {
+          "name": "readShippedEnv",
+          "startLine": 33,
+          "endLine": 57,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 59,
+          "endLine": 68,
+          "params": []
+        },
+        {
+          "name": "isMapkitConfigured",
+          "startLine": 70,
+          "endLine": 73,
+          "params": []
+        },
+        {
+          "name": "base64url",
+          "startLine": 75,
+          "endLine": 76,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "signEs256",
+          "startLine": 78,
+          "endLine": 83,
+          "params": [
+            "header",
+            "payload",
+            "pem"
+          ]
+        },
+        {
+          "name": "getMapkitToken",
+          "startLine": 85,
+          "endLine": 102,
+          "params": []
+        },
+        {
+          "name": "resetMapkitCache",
+          "startLine": 105,
+          "endLine": 107,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "isMapkitConfigured",
+          "line": 70,
+          "isDefault": false
+        },
+        {
+          "name": "getMapkitToken",
+          "line": 85,
+          "isDefault": false
+        },
+        {
+          "name": "resetMapkitCache",
+          "line": 105,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readShippedEnv",
+          "callee": "join",
+          "lineNumber": 37
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "process.cwd",
+          "lineNumber": 37
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "existsSync",
+          "lineNumber": 39
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "readFileSync",
+          "lineNumber": 40
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "text.split",
+          "lineNumber": 41
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "raw.trim",
+          "lineNumber": 42
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "line.startsWith",
+          "lineNumber": 43
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "line.indexOf",
+          "lineNumber": 44
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "line.slice(0, eq).trim",
+          "lineNumber": 46
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "line.slice",
+          "lineNumber": 46
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "line.slice(eq + 1).trim",
+          "lineNumber": 47
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "line.slice",
+          "lineNumber": 47
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "value.startsWith",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "value.endsWith",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "value.startsWith",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "value.endsWith",
+          "lineNumber": 48
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "value.slice",
+          "lineNumber": 49
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "key.startsWith",
+          "lineNumber": 51
+        },
+        {
+          "caller": "readShippedEnv",
+          "callee": "Object.keys",
+          "lineNumber": 53
+        },
+        {
+          "caller": "readEnv",
+          "callee": "readShippedEnv",
+          "lineNumber": 60
+        },
+        {
+          "caller": "pick",
+          "callee": "(process.env[key] || fallback[key] || '').trim",
+          "lineNumber": 61
+        },
+        {
+          "caller": "readEnv",
+          "callee": "pick",
+          "lineNumber": 63
+        },
+        {
+          "caller": "readEnv",
+          "callee": "pick",
+          "lineNumber": 64
+        },
+        {
+          "caller": "readEnv",
+          "callee": "pick('MAPKIT_PRIVATE_KEY').replace(/\\\\n/g, '\\n').trim",
+          "lineNumber": 66
+        },
+        {
+          "caller": "readEnv",
+          "callee": "pick('MAPKIT_PRIVATE_KEY').replace",
+          "lineNumber": 66
+        },
+        {
+          "caller": "readEnv",
+          "callee": "pick",
+          "lineNumber": 66
+        },
+        {
+          "caller": "isMapkitConfigured",
+          "callee": "readEnv",
+          "lineNumber": 71
+        },
+        {
+          "caller": "isMapkitConfigured",
+          "callee": "Boolean",
+          "lineNumber": 72
+        },
+        {
+          "caller": "isMapkitConfigured",
+          "callee": "env.privateKey.includes",
+          "lineNumber": 72
+        },
+        {
+          "caller": "base64url",
+          "callee": "Buffer.from(input as any).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace",
+          "lineNumber": 76
+        },
+        {
+          "caller": "base64url",
+          "callee": "Buffer.from(input as any).toString('base64').replace(/\\+/g, '-').replace",
+          "lineNumber": 76
+        },
+        {
+          "caller": "base64url",
+          "callee": "Buffer.from(input as any).toString('base64').replace",
+          "lineNumber": 76
+        },
+        {
+          "caller": "base64url",
+          "callee": "Buffer.from(input as any).toString",
+          "lineNumber": 76
+        },
+        {
+          "caller": "base64url",
+          "callee": "Buffer.from",
+          "lineNumber": 76
+        },
+        {
+          "caller": "signEs256",
+          "callee": "base64url",
+          "lineNumber": 79
+        },
+        {
+          "caller": "signEs256",
+          "callee": "JSON.stringify",
+          "lineNumber": 79
+        },
+        {
+          "caller": "signEs256",
+          "callee": "base64url",
+          "lineNumber": 79
+        },
+        {
+          "caller": "signEs256",
+          "callee": "JSON.stringify",
+          "lineNumber": 79
+        },
+        {
+          "caller": "signEs256",
+          "callee": "createPrivateKey",
+          "lineNumber": 80
+        },
+        {
+          "caller": "signEs256",
+          "callee": "sign",
+          "lineNumber": 81
+        },
+        {
+          "caller": "signEs256",
+          "callee": "Buffer.from",
+          "lineNumber": 81
+        },
+        {
+          "caller": "signEs256",
+          "callee": "base64url",
+          "lineNumber": 82
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "readEnv",
+          "lineNumber": 86
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "env.privateKey.includes",
+          "lineNumber": 87
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "Date.now",
+          "lineNumber": 90
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "new Date(cache.expiresAtMs).toISOString",
+          "lineNumber": 91
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "Math.floor",
+          "lineNumber": 93
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "Date.now",
+          "lineNumber": 93
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "Date.now",
+          "lineNumber": 94
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "signEs256",
+          "lineNumber": 95
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "Math.floor",
+          "lineNumber": 97
+        },
+        {
+          "caller": "getMapkitToken",
+          "callee": "new Date(expiresAtMs).toISOString",
+          "lineNumber": 101
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/services/orderStatusPolicy.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 114,
+      "nonEmptyLines": 103,
+      "functions": [
+        {
+          "name": "evaluateOrderStatusUpdate",
+          "startLine": 30,
+          "endLine": 114,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "evaluateOrderStatusUpdate",
+          "line": 30,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.currentStatus || '').toUpperCase",
+          "lineNumber": 31
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 31
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.nextStatus || '').toUpperCase",
+          "lineNumber": 32
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 32
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.orderType || '').toUpperCase",
+          "lineNumber": 33
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 33
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.userRole || '').toUpperCase",
+          "lineNumber": 34
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 34
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 35
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 36
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "Array.isArray",
+          "lineNumber": 37
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "Array.isArray",
+          "lineNumber": 38
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "allowedBranches.includes",
+          "lineNumber": 48
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 48
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "LOCKED_STATUSES.has",
+          "lineNumber": 57
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "HIGH_RISK_ROLES.has",
+          "lineNumber": 62
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "permissions.includes",
+          "lineNumber": 63
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "permissions.includes",
+          "lineNumber": 64
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.notes || '').trim",
+          "lineNumber": 68
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 68
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.deliverySource || '').trim().toLowerCase",
+          "lineNumber": 81
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.deliverySource || '').trim",
+          "lineNumber": 81
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 81
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.orderSource || '').trim().toLowerCase",
+          "lineNumber": 82
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.orderSource || '').trim",
+          "lineNumber": 82
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 82
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "origin.startsWith",
+          "lineNumber": 85
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String(input.orderDriverId || '').trim",
+          "lineNumber": 86
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "String",
+          "lineNumber": 86
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "['PENDING', 'PREPARING'].includes",
+          "lineNumber": 92
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "Array.from",
+          "lineNumber": 94
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "['TAKEAWAY', 'PICKUP'].includes",
+          "lineNumber": 95
+        },
+        {
+          "caller": "evaluateOrderStatusUpdate",
+          "callee": "allowed.includes",
+          "lineNumber": 109
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/utils/imageStorage.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 22,
+      "functions": [
+        {
+          "name": "normalizeImageId",
+          "startLine": 10,
+          "endLine": 14,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "localImageKey",
+          "startLine": 16,
+          "endLine": 16,
+          "params": [
+            "id",
+            "extension"
+          ]
+        },
+        {
+          "name": "localImageUrl",
+          "startLine": 17,
+          "endLine": 17,
+          "params": [
+            "key"
+          ]
+        },
+        {
+          "name": "resolveLocalImagePath",
+          "startLine": 19,
+          "endLine": 25,
+          "params": [
+            "key"
+          ]
+        },
+        {
+          "name": "ensureUploadsDirectory",
+          "startLine": 27,
+          "endLine": 29,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "uploadsDirectory",
+          "line": 6,
+          "isDefault": false
+        },
+        {
+          "name": "normalizeImageId",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "localImageKey",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "localImageUrl",
+          "line": 17,
+          "isDefault": false
+        },
+        {
+          "name": "resolveLocalImagePath",
+          "line": 19,
+          "isDefault": false
+        },
+        {
+          "name": "ensureUploadsDirectory",
+          "line": 27,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizeImageId",
+          "callee": "value.trim",
+          "lineNumber": 12
+        },
+        {
+          "caller": "normalizeImageId",
+          "callee": "/^[A-Za-z0-9_-]{1,120}$/.test",
+          "lineNumber": 13
+        },
+        {
+          "caller": "localImageUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resolveLocalImagePath",
+          "callee": "path.basename",
+          "lineNumber": 20
+        },
+        {
+          "caller": "resolveLocalImagePath",
+          "callee": "/^[A-Za-z0-9_-]{1,120}\\.(?:jpg|png|webp|gif)$/.test",
+          "lineNumber": 21
+        },
+        {
+          "caller": "resolveLocalImagePath",
+          "callee": "path.resolve",
+          "lineNumber": 23
+        },
+        {
+          "caller": "resolveLocalImagePath",
+          "callee": "path.dirname",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resolveLocalImagePath",
+          "callee": "path.resolve",
+          "lineNumber": 24
+        },
+        {
+          "caller": "ensureUploadsDirectory",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 28
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "server/utils/operationalRoles.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 31,
+      "nonEmptyLines": 31,
+      "exports": [
+        {
+          "name": "POS_FLOOR_ROLES",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/branchIsolation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 87,
+      "functions": [
+        {
+          "name": "runMiddleware",
+          "startLine": 4,
+          "endLine": 43,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runMiddleware",
+          "callee": "vi.fn",
+          "lineNumber": 30
+        },
+        {
+          "caller": "runMiddleware",
+          "callee": "vi.fn",
+          "lineNumber": 34
+        },
+        {
+          "caller": "runMiddleware",
+          "callee": "vi.fn",
+          "lineNumber": 39
+        },
+        {
+          "caller": "runMiddleware",
+          "callee": "(input.middleware || enforceBranch)",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/customPaymentValidation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 22,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/imageStorage.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 28,
+      "nonEmptyLines": 24,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/menuItemValidation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 55,
+      "nonEmptyLines": 46,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/operationalRoles.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 33,
+      "functions": [
+        {
+          "name": "runGate",
+          "startLine": 5,
+          "endLine": 15,
+          "params": [
+            "roles",
+            "userRole"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runGate",
+          "callee": "vi.fn",
+          "lineNumber": 6
+        },
+        {
+          "caller": "runGate",
+          "callee": "vi.fn().mockReturnThis",
+          "lineNumber": 7
+        },
+        {
+          "caller": "runGate",
+          "callee": "vi.fn",
+          "lineNumber": 7
+        },
+        {
+          "caller": "runGate",
+          "callee": "vi.fn",
+          "lineNumber": 7
+        },
+        {
+          "caller": "runGate",
+          "callee": "(Array.isArray(roles) ? requireRoles(...roles) : (roles as any))",
+          "lineNumber": 9
+        },
+        {
+          "caller": "runGate",
+          "callee": "Array.isArray",
+          "lineNumber": 9
+        },
+        {
+          "caller": "runGate",
+          "callee": "requireRoles",
+          "lineNumber": 9
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/orderStatusConflict.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 53,
+      "nonEmptyLines": 48,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/orderStatusPolicy.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 141,
+      "nonEmptyLines": 128,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/orderValidation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 23,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/perfInfra.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 65,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "mockRes",
+          "startLine": 6,
+          "endLine": 12,
+          "params": []
+        },
+        {
+          "name": "mockReq",
+          "startLine": 14,
+          "endLine": 15,
+          "params": [
+            "path",
+            "ip"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/printGatewayAuth.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 65,
+      "nonEmptyLines": 54,
+      "functions": [
+        {
+          "name": "invoke",
+          "startLine": 8,
+          "endLine": 19,
+          "params": [
+            "token"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "invoke",
+          "callee": "vi.fn",
+          "lineNumber": 16
+        },
+        {
+          "caller": "invoke",
+          "callee": "requirePrintGatewayToken",
+          "lineNumber": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/printGatewayValidation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 33,
+      "functions": [
+        {
+          "name": "makeRes",
+          "startLine": 4,
+          "endLine": 16,
+          "params": []
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/publicScreenSecurity.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 43,
+      "nonEmptyLines": 34,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/refundValidation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 33,
+      "nonEmptyLines": 30,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/whatsappWebhookAuth.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 55,
+      "nonEmptyLines": 49,
+      "functions": [
+        {
+          "name": "invoke",
+          "startLine": 8,
+          "endLine": 19,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "invoke",
+          "callee": "vi.fn",
+          "lineNumber": 16
+        },
+        {
+          "caller": "invoke",
+          "callee": "requireWhatsAppWebhookAuth",
+          "lineNumber": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    }
+  ]
+}

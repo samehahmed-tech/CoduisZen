@@ -66,4 +66,16 @@ describe('system copilot', () => {
     });
     expect(answerSystemCopilot('عندي مشكلة الطلب مش بيروح للمطبخ', 'ar', { orders: [] })?.suggestion?.view).toBe('KDS');
   });
+
+  it('asks only for the missing field and infers a matching category', () => {
+    const context = { categories: [{ id: 'cat-pizza', nameAr: 'بيتزا', name: 'Pizza' }] };
+    expect(answerSystemCopilot('ضيف صنف بيتزا', 'ar', context)?.text).toContain('سعره كام');
+    const ready = answerSystemCopilot('ضيف صنف بيتزا سعر 120', 'ar', context);
+    expect(ready?.actions[0]).toMatchObject({ type: 'CREATE_MENU_ITEM', categoryId: 'cat-pizza', data: { price: 120 } });
+  });
+
+  it('reports sold items directly in chat', () => {
+    const context = { orders: [{ total: 100, status: 'COMPLETED', items: [{ nameAr: 'بيتزا', quantity: 2, price: 50 }] }] };
+    expect(answerSystemCopilot('ايه الاصناف المباعة والاكتر بيعا', 'ar', context)?.text).toContain('بيتزا');
+  });
 });

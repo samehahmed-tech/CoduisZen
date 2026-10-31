@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { kdsApi } from '../services/api/kds';
+import { getLocalKdsTickets, isLocalKdsTicketId, updateLocalKdsStatus } from '../src/services/localKdsService';
 
 interface KdsItem {
     id: number;
@@ -92,12 +93,34 @@ export const useKdsStore = create<KdsStore>((set) => ({
                 ...ticket,
                 items: Array.isArray(ticket?.items) ? ticket.items : [],
             }));
-            set({ tickets, isLoading: false });
+            set({ tickets, error: null, isLoading: false });
         } catch (e: any) {
+            try {
+                const localTickets = await getLocalKdsTickets(params?.branchId);
+                if (localTickets.length > 0) {
+                    set({ tickets: localTickets as KdsTicket[], error: 'LOCAL_KDS_MODE', isLoading: false });
+                    return;
+                }
+            } catch {
+                // Preserve the original server error when the local fallback
+                // is unavailable as well.
+            }
             set({ error: e.message || 'Failed to fetch KDS tickets', isLoading: false });
         }
     },
     bumpTicket: async (id: string, actor?: { id?: string; name?: string }) => {
+        if (isLocalKdsTicketId(id) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            try {
+                await updateLocalKdsStatus(id, 'READY', actor);
+                set((state) => ({
+                    tickets: state.tickets.map(t => t.id === id ? { ...t, status: 'READY', bumpedAt: new Date().toISOString() } : t),
+                    error: 'LOCAL_KDS_MODE',
+                }));
+            } catch (e: any) {
+                set({ error: e?.code || e?.message || 'LOCAL_KDS_BUMP_FAILED' });
+            }
+            return;
+        }
         try {
             const res: any = await kdsApi.bumpTicket(id, actor);
             const served = res?.served || res?.data?.served;
@@ -122,6 +145,18 @@ export const useKdsStore = create<KdsStore>((set) => ({
         }
     },
     recallTicket: async (id: string) => {
+        if (isLocalKdsTicketId(id) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            try {
+                await updateLocalKdsStatus(id, 'PREPARING');
+                set((state) => ({
+                    tickets: state.tickets.map(t => t.id === id ? { ...t, status: 'PREPARING', bumpedAt: null } : t),
+                    error: 'LOCAL_KDS_MODE',
+                }));
+            } catch (e: any) {
+                set({ error: e?.code || e?.message || 'LOCAL_KDS_RECALL_FAILED' });
+            }
+            return;
+        }
         try {
             await kdsApi.recallTicket(id);
             set((state) => ({

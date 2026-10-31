@@ -1,0 +1,33 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "styles/engine/animations.css",
+    "styles/engine/background-engine.css",
+    "styles/engine/dashboard-hover.css",
+    "styles/engine/density.css",
+    "styles/engine/fluid-motion.css",
+    "styles/engine/interaction-system.css",
+    "styles/engine/micro-interactions.css",
+    "styles/engine/motion-fx.css",
+    "styles/engine/motion-personalities.css",
+    "styles/engine/theme-components.css",
+    "styles/engine/theme-operations.css",
+    "styles/engine/theme-overrides.css",
+    "styles/engine/theme-worlds.css",
+    "styles/engine/ux-elevation.css"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

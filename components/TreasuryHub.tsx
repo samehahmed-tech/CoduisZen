@@ -317,7 +317,7 @@ export default function TreasuryHub() {
                             <button onClick={async () => {
                                 if (!acctForm.name.trim()) { toast.error(isAr ? 'أدخل اسم الحساب' : 'Enter account name'); return; }
                                 try {
-                                    await treasuryApi.createBankAccount({ ...acctForm, openingBalance: Number(acctForm.openingBalance || 0), accountType: acctForm.accountType as any, branchId: branchId || undefined });
+                                    await treasuryApi.createBankAccount({ ...acctForm, openingBalance: Number(acctForm.openingBalance || 0), accountType: acctForm.accountType as any, ...(branchId ? { branchId } : {}) } as any);
                                     toast.success(isAr ? 'تم إنشاء الحساب' : 'Account created');
                                     setAcctForm({ name: '', accountType: 'CASH_ON_HAND', institution: '', accountNumber: '', openingBalance: '' });
                                     refreshAll();

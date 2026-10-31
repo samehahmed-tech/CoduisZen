@@ -9,11 +9,7 @@ export default defineConfig({
             NODE_ENV: 'test',
         },
         pool: 'forks',
-        poolOptions: {
-            forks: {
-                singleFork: true,
-            },
-        },
+        maxWorkers: 1,
         fileParallelism: false,
         setupFiles: ['./tests/setup.ts'],
         include: ['tests/**/*.test.ts'],

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getTables, getZones, saveLayout, updateTableStatus, resetTable, transferTableOrder, splitTableOrder, mergeTableOrders } from '../controllers/tableController';
+import { getTablePublicQr, getTables, getZones, saveLayout, updateTableStatus, resetTable, transferTableOrder, splitTableOrder, mergeTableOrders } from '../controllers/tableController';
 import { requireRoleOrPermission } from '../middleware/auth';
 import { enforceBranch } from '../middleware/branchIsolation';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
@@ -24,6 +24,7 @@ const adminResetAuth = requireRoleOrPermission(
 
 router.get('/', posAuth, enforceBranch, getTables);
 router.get('/zones', posAuth, enforceBranch, getZones);
+router.get('/:id/public-qr', posAuth, enforceBranch, getTablePublicQr);
 router.post('/layout', managerAuth, enforceBranch, saveLayout); // Save full layout
 router.post('/transfer', posAuth, enforceBranch, transferTableOrder);
 router.post('/split', posAuth, enforceBranch, splitTableOrder);

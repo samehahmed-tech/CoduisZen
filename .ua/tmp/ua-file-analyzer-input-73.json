@@ -1,0 +1,182 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/operational-reset/reset-test-operations.cjs",
+      "language": "javascript",
+      "sizeLines": 193,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/perf-hotfix/Apply-Perf-Hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 144,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/prerequisites/msodbcsql.msi",
+      "language": "msi",
+      "sizeLines": 25901,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/prerequisites/vc_redist.x64.exe",
+      "language": "exe",
+      "sizeLines": 92150,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/print-bridge-hotfix/Apply Print Bridge Hotfix.bat",
+      "language": "batch",
+      "sizeLines": 16,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/print-bridge-hotfix/Apply Print Bridge Hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 94,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/print-routing-hotfix/Apply Print Routing Hotfix.bat",
+      "language": "batch",
+      "sizeLines": 16,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/print-routing-hotfix/Apply Print Routing Hotfix.ps1",
+      "language": "powershell",
+      "sizeLines": 125,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/sameh-installer.iss",
+      "language": "iss",
+      "sizeLines": 329,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/sameh-installer/table-pos-fix/reset-tables.cjs",
+      "language": "javascript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-format.cjs",
+      "language": "javascript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-orders-query.cjs",
+      "language": "javascript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-orders-sql.cjs",
+      "language": "javascript",
+      "sizeLines": 41,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/test-sql-patterns.cjs",
+      "language": "javascript",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/verify-inventory-xlsx.cjs",
+      "language": "javascript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/kdsRouting.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/shiftReconciliation.ts",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/utils/aggregateCache.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/fiscalService.ts",
+      "language": "typescript",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/rumService.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/hr/components/HRUserGuide.tsx",
+      "language": "typescript",
+      "sizeLines": 171,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/features/kds/components/TicketCard.tsx",
+      "language": "typescript",
+      "sizeLines": 109,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/locales/ar/translation.json",
+      "language": "json",
+      "sizeLines": 190,
+      "fileCategory": "config"
+    },
+    {
+      "path": "src/locales/en/translation.json",
+      "language": "json",
+      "sizeLines": 190,
+      "fileCategory": "config"
+    },
+    {
+      "path": "src/services/syncQueueUtils.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/operational-reset/reset-test-operations.cjs": [],
+    "scripts/sameh-installer/perf-hotfix/Apply-Perf-Hotfix.ps1": [],
+    "scripts/sameh-installer/prerequisites/msodbcsql.msi": [],
+    "scripts/sameh-installer/prerequisites/vc_redist.x64.exe": [],
+    "scripts/sameh-installer/print-bridge-hotfix/Apply Print Bridge Hotfix.bat": [],
+    "scripts/sameh-installer/print-bridge-hotfix/Apply Print Bridge Hotfix.ps1": [],
+    "scripts/sameh-installer/print-routing-hotfix/Apply Print Routing Hotfix.bat": [],
+    "scripts/sameh-installer/print-routing-hotfix/Apply Print Routing Hotfix.ps1": [],
+    "scripts/sameh-installer/sameh-installer.iss": [],
+    "scripts/sameh-installer/table-pos-fix/reset-tables.cjs": [],
+    "scripts/test-format.cjs": [],
+    "scripts/test-orders-query.cjs": [],
+    "scripts/test-orders-sql.cjs": [],
+    "scripts/test-sql-patterns.cjs": [],
+    "scripts/verify-inventory-xlsx.cjs": [],
+    "server/services/kdsRouting.ts": [],
+    "server/services/shiftReconciliation.ts": [],
+    "server/utils/aggregateCache.ts": [],
+    "services/fiscalService.ts": [],
+    "services/rumService.ts": [],
+    "src/features/hr/components/HRUserGuide.tsx": [],
+    "src/features/kds/components/TicketCard.tsx": [],
+    "src/locales/ar/translation.json": [],
+    "src/locales/en/translation.json": [],
+    "src/services/syncQueueUtils.ts": []
+  }
+}

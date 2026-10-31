@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db } from '../server/db';
 import { refundService } from '../server/services/refundService';
-import { branches, orders, payments, settings, users } from '../src/db/schema';
+import { branches, orders, payments, settings, users, refundRecords } from '../src/db/schema';
 
 const orderId = `TST-REFUND-${Date.now()}`;
 let branchId = '';
@@ -37,6 +37,7 @@ afterAll(async () => {
       .where(eq(settings.key, 'pos_refunds_v1'));
   }
   await db.delete(payments).where(eq(payments.orderId, orderId));
+  await db.delete(refundRecords).where(eq(refundRecords.orderId, orderId));
   await db.delete(orders).where(eq(orders.id, orderId));
 });
 

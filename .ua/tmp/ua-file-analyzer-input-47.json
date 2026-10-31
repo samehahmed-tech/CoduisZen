@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/business-day-reopen-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 18,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/business-day-reopen-fix/Reopen Business Day.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/business-day-reopen-fix/Reopen Business Day.ps1",
+      "language": "powershell",
+      "sizeLines": 109,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/business-day-reopen-fix/README AR.txt": [],
+    "scripts/sameh-installer/business-day-reopen-fix/Reopen Business Day.bat": [],
+    "scripts/sameh-installer/business-day-reopen-fix/Reopen Business Day.ps1": []
+  }
+}

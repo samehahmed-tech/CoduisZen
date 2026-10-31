@@ -21,6 +21,17 @@ const cleanString = (value: unknown) => {
 const cleanStringArray = (value: unknown) =>
     Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim()) : undefined;
 
+const scopedBulkUserIds = async (req: Request, userIds: string[]) => {
+    if (String(req.user?.role || '').toUpperCase() === 'SUPER_ADMIN') return userIds;
+    const branchId = cleanString(req.effectiveBranchId);
+    if (!branchId) throw Object.assign(new Error('BRANCH_SCOPE_REQUIRED'), { statusCode: 403 });
+    if (!userIds.length) return [];
+    const rows = await db.select({ id: users.id, assignedBranchId: users.assignedBranchId })
+        .from(users)
+        .where(inArray(users.id, userIds));
+    return rows.filter((user) => user.assignedBranchId === branchId).map((user) => user.id);
+};
+
 const parseJsonField = <T>(value: any, fallback: T): T => {
     if (Array.isArray(value)) return value as unknown as T;
     if (value && typeof value === 'object') return value as unknown as T;
@@ -240,7 +251,7 @@ export const updateUser = async (req: Request, res: Response) => {
             pinCodeHash,
             pinLoginEnabled: body.pin ? true : existing.pinLoginEnabled,
             updatedAt: new Date(),
-        }).where(eq(users.id, id)).returning();
+        } as any).where(eq(users.id, id)).returning();
 
         const permissionsChanged = JSON.stringify(existing.permissions || []) !== JSON.stringify(updated.permissions || []);
         const roleChanged = existing.role !== updated.role;
@@ -321,7 +332,8 @@ export const bulkCreateUsers = async (req: Request, res: Response) => {
 export const bulkUpdateStatus = async (req: Request, res: Response) => {
     try {
         const userIds = cleanStringArray(req.body?.userIds) || [];
-        const toUpdate = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
+        const scopedIds = await scopedBulkUserIds(req, userIds);
+        const toUpdate = scopedIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
         const updated = toUpdate.length
             ? await db.update(users).set({ isActive: Boolean(req.body?.isActive), updatedAt: new Date() }).where(inArray(users.id, toUpdate)).returning()
             : [];
@@ -339,7 +351,8 @@ export const bulkAssignRole = async (req: Request, res: Response) => {
         const userIds = cleanStringArray(req.body?.userIds) || [];
         const role = cleanString(req.body?.role);
         if (!userIds.length || !role) return res.status(400).json({ error: 'USER_IDS_AND_ROLE_REQUIRED' });
-        const toUpdate = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
+        const scopedIds = await scopedBulkUserIds(req, userIds);
+        const toUpdate = scopedIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
         const updated = await db.update(users).set({
             role,
             permissions: INITIAL_ROLE_PERMISSIONS[role as UserRole] || [],
@@ -357,8 +370,14 @@ export const bulkAssignBranch = async (req: Request, res: Response) => {
         const userIds = cleanStringArray(req.body?.userIds) || [];
         const branchId = cleanString(req.body?.branchId);
         if (!userIds.length || !branchId) return res.status(400).json({ error: 'USER_IDS_AND_BRANCH_REQUIRED' });
-        const updated = await db.update(users).set({ assignedBranchId: branchId, allowedBranches: [branchId], updatedAt: new Date() }).where(inArray(users.id, userIds)).returning();
-        res.json({ updated: updated.length, users: updated.map(mapUserResponse) });
+        if (String(req.user?.role || '').toUpperCase() !== 'SUPER_ADMIN' && branchId !== cleanString(req.effectiveBranchId)) {
+            return res.status(403).json({ error: 'BRANCH_SCOPE_VIOLATION' });
+        }
+        const scopedIds = await scopedBulkUserIds(req, userIds);
+        const updated = scopedIds.length
+            ? await db.update(users).set({ assignedBranchId: branchId, allowedBranches: [branchId], updatedAt: new Date() }).where(inArray(users.id, scopedIds)).returning()
+            : [];
+        res.json({ updated: updated.length, skipped: userIds.length - scopedIds.length, users: updated.map(mapUserResponse) });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -367,17 +386,18 @@ export const bulkAssignBranch = async (req: Request, res: Response) => {
 export const bulkDeleteUsers = async (req: Request, res: Response) => {
     try {
         const userIds = cleanStringArray(req.body?.userIds) || [];
+        const scopedIds = await scopedBulkUserIds(req, userIds);
         const actorId = (req as any).user?.id;
         // Soft deactivate (default): unchanged legacy behavior — protected ids skipped.
         if (req.body?.hard !== true) {
-            const toDelete = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
+            const toDelete = scopedIds.filter((id) => !PROTECTED_USER_IDS.includes(id));
             if (toDelete.length) await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(inArray(userSessions.userId, toDelete));
             const deleted = toDelete.length ? await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(inArray(users.id, toDelete)).returning() : [];
             return res.json({ deleted: deleted.length, skipped: userIds.length - toDelete.length, users: deleted.map(mapUserResponse) });
         }
         // Hard delete: per-user so one conflicted account doesn't block the rest.
         // Protected ids and the actor's own account are always skipped.
-        const toDelete = userIds.filter((id) => !PROTECTED_USER_IDS.includes(id) && id !== actorId);
+        const toDelete = scopedIds.filter((id) => !PROTECTED_USER_IDS.includes(id) && id !== actorId);
         const deleted: string[] = [];
         const failed: Array<{ id: string; error: string }> = [];
         for (const id of toDelete) {
@@ -573,7 +593,7 @@ export const updateUserPermissions = async (req: Request, res: Response) => {
             permissions: Array.isArray(req.body?.permissions) ? req.body.permissions : [],
             customPermissions: req.body?.customOverrides || {},
             updatedAt: new Date(),
-        }).where(eq(users.id, id)).returning();
+        } as any).where(eq(users.id, id)).returning();
         if (!updated) return res.status(404).json({ error: 'USER_NOT_FOUND' });
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
         res.json(mapUserResponse(updated));
@@ -601,7 +621,7 @@ export const copyUserPermissions = async (req: Request, res: Response) => {
             permissions: JSON.stringify(parseJsonField<string[]>(source.permissions, [])),
             customPermissions: JSON.stringify(parseJsonField<Record<string, any>>(source.customPermissions, {})),
             updatedAt: new Date(),
-        }).where(eq(users.id, id)).returning();
+        } as any).where(eq(users.id, id)).returning();
         await db.update(userSessions).set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(userSessions.userId, id), eq(userSessions.isActive, true)));
         await audit(req, 'USER_PERMISSIONS_COPIED', { targetUserId: id, sourceUserId }, 'User access copied from another user');
         res.json(mapUserResponse(updated));

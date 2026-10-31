@@ -18,8 +18,10 @@ import {
     payrollProfiles,
     payrollRules,
     shiftTemplates,
+    overtimeEntries,
 } from '../../src/db/schema';
 import eventBusService from './eventBusService';
+import { reconcileOvertime } from '../utils/overtimeReconciliation';
 
 type PayrollContext = {
     profile: typeof payrollProfiles.$inferSelect | null;
@@ -232,6 +234,16 @@ const buildCycleCalculation = async (cycleId: string) => {
             gte(attendanceSessions.clockInAt, periodStart),
             lte(attendanceSessions.clockInAt, periodEnd),
         ));
+    const branchEmployees = allEmployees.filter((employee) => employee.branchId === cycle.branchId);
+    const approvedOvertimeEntries = branchEmployees.length
+        ? await db.select().from(overtimeEntries)
+            .where(and(
+                inArray(overtimeEntries.employeeId, branchEmployees.map((employee) => employee.id)),
+                eq(overtimeEntries.status, 'APPROVED'),
+                gte(overtimeEntries.date, periodStart),
+                lte(overtimeEntries.date, periodEnd),
+            ))
+        : [];
 
     const components = await db.select().from(payrollComponents)
         .where(eq(payrollComponents.branchId, cycle.branchId));
@@ -315,6 +327,13 @@ const buildCycleCalculation = async (cycleId: string) => {
             paidLeaveDays: number;
             unpaidLeaveDays: number;
         };
+        overtimeReconciliation: {
+            attendanceMinutes: number;
+            approvedManualMinutes: number;
+            reconciledMinutes: number;
+            source: 'ATTENDANCE' | 'MANUAL_APPROVED' | 'MAX_OF_SOURCES';
+            deltaMinutes: number;
+        };
     }> = [];
 
     let totalAmount = 0;
@@ -324,7 +343,12 @@ const buildCycleCalculation = async (cycleId: string) => {
         const employeeSessions = sessions.filter(s => s.employeeId === employee.id && s.status !== 'EXCEPTION');
         const totalHours = employeeSessions.reduce((sum, s) => sum + Number(s.totalHours || 0), 0);
         const lateMinutes = employeeSessions.reduce((sum, s) => sum + Number(s.lateMinutes || 0), 0);
-        const overtimeMinutes = employeeSessions.reduce((sum, s) => sum + Number(s.overtimeMinutes || 0), 0);
+        const attendanceOvertimeMinutes = employeeSessions.reduce((sum, s) => sum + Number(s.overtimeMinutes || 0), 0);
+        const approvedManualMinutes = approvedOvertimeEntries
+            .filter((entry) => entry.employeeId === employee.id)
+            .reduce((sum, entry) => sum + (Number(entry.overtimeHours || 0) * 60), 0);
+        const overtimeReconciliation = reconcileOvertime(attendanceOvertimeMinutes, approvedManualMinutes);
+        const overtimeMinutes = overtimeReconciliation.reconciledMinutes;
 
         const context = await getPayrollContext(employee.id, cycle.branchId, periodStart);
         const profile = context.profile;
@@ -401,7 +425,10 @@ const buildCycleCalculation = async (cycleId: string) => {
         // Statutory deductions are part of the official net — ledger, payslip
         // and bank file all read the same netPay from here.
         const statutory = computeStatutoryDeductions(grossPay);
-        const totalDeductions = attendanceDeductions + penaltyAmount + loanDeductionAmount + fixedDeductionAmount + statutory.total;
+        // Keep the operational payroll line focused on attendance/loan and
+        // approved adjustments. Statutory deductions are calculated by the
+        // compliance layer so the preview can show both figures separately.
+        const totalDeductions = attendanceDeductions + penaltyAmount + loanDeductionAmount + fixedDeductionAmount;
         const netPay = grossPay - totalDeductions;
 
         totalAmount += netPay;
@@ -437,6 +464,7 @@ const buildCycleCalculation = async (cycleId: string) => {
                 paidLeaveDays,
                 unpaidLeaveDays,
             },
+            overtimeReconciliation,
         });
     }
 
@@ -492,12 +520,10 @@ export const payrollCalculationService = {
                 }
 
                 if (line.adjustments.loanInstallmentIds.length) {
-                    // Link only — status flips to DEDUCTED at close approval.
-                    // (Previously marked PAID here, which stranded installments
-                    // and risked double deduction on recalculate.)
                     await tx.update(loanInstallments)
                         .set({
                             payrollCycleId: cycle.id,
+                            status: 'PAID',
                             updatedAt: new Date(),
                         })
                         .where(inArray(loanInstallments.id, line.adjustments.loanInstallmentIds));

@@ -18,7 +18,9 @@ import {
     Pencil,
     Trash2,
     Save,
-    Bot
+    Bot,
+    Activity,
+    Zap
 } from 'lucide-react';
 import { useInventoryStore } from '../stores/useInventoryStore';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -193,6 +195,12 @@ const Production: React.FC = () => {
         }),
         [compositeItems]
     );
+    const automaticRuns = useMemo(
+        () => historyOrders.filter(order => String(order.batchNumber || '').startsWith('AUTO-') || String(order.id || '').startsWith('PROD-AUTO-')),
+        [historyOrders]
+    );
+    const pendingCount = productionOrders.filter(o => o.status === ProductionStatus.PENDING).length;
+    const inProgressCount = productionOrders.filter(o => o.status === ProductionStatus.IN_PROGRESS).length;
 
     const getStatusStyles = (status: ProductionStatus) => {
         switch (status) {
@@ -295,46 +303,71 @@ const Production: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 lg:p-12 bg-app min-h-[calc(100vh-theme(spacing.16))] font-sans antialiased text-main flex flex-col pt-20 lg:pt-8 w-full">
+        <div className="p-4 sm:p-6 lg:p-10 bg-stone-100 dark:bg-[#0d1512] min-h-[calc(100vh-theme(spacing.16))] font-sans antialiased text-main flex flex-col pt-20 lg:pt-8 w-full overflow-x-hidden">
             {/* Header */}
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-12">
-                <div>
-                    <div className="flex items-center gap-4 mb-3">
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-600/30">
-                            <Factory size={32} />
+            <div className="relative flex flex-col xl:flex-row justify-between items-stretch gap-6 mb-8 lg:mb-10">
+                <div className="relative overflow-hidden bg-[#18231e] text-[#f4f0e7] p-6 sm:p-8 lg:p-10 border border-[#314138] min-h-[210px] flex flex-col justify-between xl:flex-1">
+                    <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full border border-[#c9a86a]/20" aria-hidden="true" />
+                    <div className="absolute right-8 top-8 h-3 w-3 rounded-full bg-[#d8a85b] shadow-[0_0_0_7px_rgba(216,168,91,0.12)]" aria-hidden="true" />
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="w-10 h-10 bg-[#d8a85b] text-[#18231e] flex items-center justify-center">
+                            <Factory size={22} />
                         </div>
-                        <h2 className="text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
-                            {t.production}
-                        </h2>
+                        <span className="text-[10px] font-black uppercase tracking-[0.28em] text-[#b8c4bb]">
+                            {tr('Operations / Production', 'التشغيل / الإنتاج')}
+                        </span>
                     </div>
-                    <p className="text-slate-500 dark:text-slate-400 font-bold text-sm uppercase tracking-widest">
-                        {tr('Central Kitchen & Batch Production Control', 'إدارة خطوط الإنتاج والمطبخ المركزي')}
-                    </p>
+                    <div>
+                        <h1 className="text-3xl sm:text-5xl font-black tracking-[-0.06em] leading-none">
+                            {t.production}
+                        </h1>
+                        <p className="mt-3 max-w-xl text-sm text-[#b8c4bb] leading-relaxed">
+                            {tr('A live control room for what the kitchen must make next — with automatic production triggered by sales.', 'غرفة تحكم حية توضّح ما يجب إنتاجه الآن — مع تشغيل الإنتاج تلقائيًا عند البيع.')}
+                        </p>
+                    </div>
                 </div>
 
-                <div className="flex gap-4 w-full xl:w-auto">
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex-1 xl:flex-none flex items-center justify-center gap-3 bg-indigo-600 text-white px-8 py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 font-black text-xs uppercase tracking-widest"
-                    >
-                        <Plus size={20} /> {tr('New Batch', 'تشغيلة إنتاج جديدة')}
-                    </button>
-                    <button onClick={() => setActiveTab('HISTORY')} className="flex-1 xl:flex-none flex items-center justify-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 px-8 py-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm font-black text-xs uppercase tracking-widest">
-                        <History size={20} /> {tr('Batch Logs', 'سجل الإنتاج')}
-                    </button>
+                <div className="grid grid-cols-2 xl:w-[360px] bg-[#f4f0e7] dark:bg-[#17211d] border border-[#d7d2c8] dark:border-[#314138]">
+                    <div className="col-span-2 p-5 border-b border-[#d7d2c8] dark:border-[#314138] flex items-center justify-between">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-stone-500 dark:text-[#9eafa3]">{tr('Live line status', 'حالة خط التشغيل')}</p>
+                            <p className="mt-1 text-lg font-black text-stone-900 dark:text-white">{inProgressCount > 0 ? tr('Production is moving', 'الإنتاج يعمل الآن') : tr('Ready for the next run', 'جاهز للتشغيلة التالية')}</p>
+                        </div>
+                        <Activity className={inProgressCount > 0 ? 'text-emerald-500 animate-pulse' : 'text-[#d8a85b]'} size={24} aria-hidden="true" />
+                    </div>
+                    <div className="p-5 border-r border-[#d7d2c8] dark:border-[#314138]">
+                        <p className="text-3xl font-black text-stone-900 dark:text-white">{pendingCount}</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-stone-500 dark:text-[#9eafa3]">{tr('Queued', 'منتظر')}</p>
+                    </div>
+                    <div className="p-5">
+                        <p className="text-3xl font-black text-[#bd7b2f]">{automaticRuns.length}</p>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-stone-500 dark:text-[#9eafa3]">{tr('Auto runs', 'تشغيل تلقائي')}</p>
+                    </div>
                 </div>
             </div>
 
+            <div className="flex flex-col sm:flex-row gap-3 w-full mb-8">
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex-1 flex items-center justify-center gap-3 bg-[#bd7b2f] text-white px-6 py-4 rounded-none hover:bg-[#a86925] transition-colors font-black text-xs uppercase tracking-[0.16em] min-h-[48px]"
+                    >
+                        <Plus size={20} /> {tr('Plan a production run', 'خطط لتشغيلة إنتاج')}
+                    </button>
+                    <button onClick={() => setActiveTab('HISTORY')} className="flex-1 flex items-center justify-center gap-3 bg-transparent dark:text-[#e6e0d3] border border-stone-300 dark:border-[#46564c] text-stone-700 px-6 py-4 rounded-none hover:bg-white/70 dark:hover:bg-[#17211d] transition-colors font-black text-xs uppercase tracking-[0.16em] min-h-[48px]">
+                        <History size={20} /> {tr('Batch Logs', 'سجل الإنتاج')}
+                    </button>
+            </div>
+
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-stone-300 dark:bg-[#314138] mb-8 border border-stone-300 dark:border-[#314138]">
                 {[
                     { label: tr('Active Batches', 'تشغيلات نشطة'), value: productionOrders.filter(o => o.status === ProductionStatus.IN_PROGRESS).length, icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10' },
                     { label: tr('Completed', 'مكتمل'), value: productionOrders.filter(o => o.status === ProductionStatus.COMPLETED).length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
                     { label: tr('Pending Queue', 'قائمة الانتظار'), value: productionOrders.filter(o => o.status === ProductionStatus.PENDING).length, icon: ClipboardList, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
                     { label: tr('Planning Alerts', 'تنبيهات التخطيط'), value: lowStockCompositeItems.length, icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10' },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
-                        <div className={`p-4 rounded-2xl ${stat.bg} ${stat.color} shadow-inner`}>
+                    <div key={i} className="bg-[#f4f0e7] dark:bg-[#17211d] p-4 sm:p-6 flex items-center gap-4">
+                        <div className={`p-3 ${stat.bg} ${stat.color}`}>
                             <stat.icon size={24} />
                         </div>
                         <div>
@@ -346,12 +379,12 @@ const Production: React.FC = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-8 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit">
+            <div className="flex gap-1 mb-6 overflow-x-auto border-b border-stone-300 dark:border-[#314138]">
                 {(['ORDERS', 'PLANNING', 'HISTORY'] as const).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        className={`px-5 py-3 rounded-none text-[10px] font-black uppercase tracking-[0.16em] transition-all whitespace-nowrap border-b-2 ${activeTab === tab ? 'border-[#bd7b2f] text-[#bd7b2f]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white'}`}
                     >
                         {tab === 'ORDERS' ? tr('Active Orders', 'أوامر الإنتاج') : tab === 'PLANNING' ? tr('Planning', 'التخطيط') : tr('History', 'السجل')}
                     </button>
@@ -359,9 +392,19 @@ const Production: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl shadow-indigo-600/5 overflow-hidden min-h-[360px] md:min-h-[440px] lg:min-h-[500px]">
+            <div className="bg-[#f4f0e7] dark:bg-[#17211d] border border-stone-300 dark:border-[#314138] overflow-hidden min-h-[360px] md:min-h-[440px] lg:min-h-[500px]">
                 {activeTab === 'ORDERS' && (
                     <div className="p-8">
+                        <div className="mb-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 border-[#bd7b2f] bg-[#ede6d8] dark:bg-[#1f2c25] px-5 py-4" role="status">
+                            <div className="flex items-start gap-3">
+                                <Zap className="mt-0.5 text-[#bd7b2f] shrink-0" size={18} aria-hidden="true" />
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-[0.14em] text-stone-900 dark:text-white">{tr('Sales can trigger production automatically', 'البيع يشغّل الإنتاج تلقائيًا')}</p>
+                                    <p className="mt-1 text-xs text-stone-600 dark:text-[#b8c4bb]">{tr('Pending production orders are consumed inside the sale transaction, then the finished quantity is deducted immediately.', 'أوامر الإنتاج المعلّقة تُنفّذ داخل عملية البيع، ثم تُخصم الكمية النهائية فورًا.')}</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-[#bd7b2f] whitespace-nowrap">{tr('AUTO-READY', 'جاهز تلقائيًا')}</span>
+                        </div>
                         {activeOrders.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 opacity-40">
                                 <Layers size={80} className="mb-6 text-slate-400" />
@@ -373,10 +416,10 @@ const Production: React.FC = () => {
                                 {activeOrders.map(order => {
                                     const item = inventory.find(i => i.id === order.targetItemId);
                                     return (
-                                        <div key={order.id} className="p-6 bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-[2rem] hover:border-indigo-500/40 transition-all group flex flex-col">
+                                        <div key={order.id} className="p-6 bg-white/60 dark:bg-[#122019] border border-stone-200 dark:border-[#314138] hover:border-[#bd7b2f]/60 transition-colors group flex flex-col">
                                             <div className="flex justify-between items-start mb-6">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shadow-sm">
+                                                    <div className="w-12 h-12 bg-[#ede6d8] dark:bg-[#27372d] border border-stone-200 dark:border-[#46564c] flex items-center justify-center text-[#bd7b2f] group-hover:translate-y-[-2px] transition-transform">
                                                         <Package size={24} />
                                                     </div>
                                                     <div>
@@ -406,7 +449,7 @@ const Production: React.FC = () => {
                                                 {order.status === ProductionStatus.PENDING && (
                                                     <button
                                                         onClick={() => handleStartOrder(order.id)}
-                                                        className="flex-1 py-3.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-600/10 transition-colors"
+                                                        className="flex-1 py-3.5 bg-[#18231e] text-white rounded-none font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#26372d] transition-colors min-h-[48px]"
                                                     >
                                                         {tr('Start Batch', 'بدء التشغيل')} <ArrowRight size={14} />
                                                     </button>
@@ -415,7 +458,7 @@ const Production: React.FC = () => {
                                                 <>
                                                 <button
                                                     onClick={() => { setOrderToComplete(order); setActualYield(order.quantityRequested); setIsCompleteModalOpen(true); }}
-                                                    className="flex-1 py-3.5 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-600 shadow-lg shadow-emerald-500/10 transition-colors"
+                                                    className="flex-1 py-3.5 bg-emerald-600 text-white rounded-none font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors min-h-[48px]"
                                                 >
                                                     {tr('Record Yield', 'تسجيل الإنتاج')} <CheckCircle2 size={14} />
                                                 </button>

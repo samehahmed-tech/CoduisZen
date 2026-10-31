@@ -13,13 +13,13 @@ import { buildOtpAuthUri, generateBase32Secret, verifyTotp } from '../services/t
 import { validatePassword, getPasswordPolicyRules } from '../services/passwordPolicyService';
 import logger from '../utils/logger';
 import { writeDbError } from '../utils/dbErrors';
+import { isSessionExpired } from '../services/sessionPolicy';
 
 const JWT_SECRET = requireEnv('JWT_SECRET');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-// Bookkeeping horizon for session timestamps (env-overridable). Refresh JWTs
-// themselves carry no expiry — the userSessions row is the sole authority —
-// so POS/cashier terminals stay open indefinitely; logout, revoke, role/perm
-// edits and user deactivation all still kill the session instantly.
+// Session lifetime is enforced by the userSessions row. Refresh JWTs carry a
+// bounded signature lifetime as a second layer; they never extend the row's
+// expiresAt horizon.
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '30d';
 const AUTH_SESSION_TTL_HOURS = Number(process.env.AUTH_SESSION_TTL_HOURS || 12);
 const AUTH_MFA_ISSUER = process.env.AUTH_MFA_ISSUER || 'Coduis Zen';
@@ -158,10 +158,9 @@ const issueAccessToken = async (user: any, req: Request, deviceName?: string) =>
         jti: tokenId,
     }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, subject: user.id });
 
-    // Refresh token carries NO expiry: the userSessions row is the sole
-    // authority (owner requirement — never log out except on explicit
-    // logout/revoke). Logout, revoke, role/permission/active edits and user
-    // deactivation all still kill the session instantly via the row.
+    // The userSessions row is the server-side authority for refresh lifetime;
+    // the refresh token itself remains non-expiring for legacy compatibility,
+    // but an expired session cannot mint another access token.
     const refreshToken = jwt.sign({
         sub: user.id,
         sid: sessionId,
@@ -692,6 +691,7 @@ export const adminSetUserPin = async (req: Request, res: Response) => {
         if (!['SUPER_ADMIN', 'OWNER', 'ADMIN'].includes(adminRole || '')) {
             return res.status(403).json({ error: 'FORBIDDEN' });
         }
+
         if (!userId || !pin) {
             return res.status(400).json({ error: 'USER_ID_AND_PIN_REQUIRED' });
         }
@@ -773,10 +773,6 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'INVALID_REFRESH_TOKEN' });
         }
 
-        // Verify session is still alive. No time-based expiry here either:
-        // only an explicit revoke/logout (or a missing row) ends a session.
-        // Revocation gets its own code so the login screen tells the truth
-        // instead of blaming "inactivity".
         const [session] = await db.select().from(userSessions).where(and(
             eq(userSessions.id, sessionId),
             eq(userSessions.userId, userId),
@@ -787,6 +783,14 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
         if (!session || session.revokedAt) {
             logger.warn({ userId, sessionId, ip: clientIp }, 'auth.refresh.session-revoked');
             return res.status(401).json({ error: 'SESSION_REVOKED' });
+        }
+
+        if (isSessionExpired(session.expiresAt)) {
+            await db.update(userSessions)
+                .set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() })
+                .where(and(eq(userSessions.id, sessionId), eq(userSessions.isActive, true)));
+            logger.warn({ userId, sessionId, ip: clientIp }, 'auth.refresh.session-expired');
+            return res.status(401).json({ error: 'SESSION_EXPIRED' });
         }
 
         // Fetch user
@@ -807,19 +811,9 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
             jti: tokenId,
         }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, subject: user.id });
 
-        // Bookkeeping touch: expiresAt/lastSeenAt stay fresh for the admin
-        // sessions screens. They no longer gate anything — only an explicit
-        // revoke/logout ends a session (owner requirement).
-        const refreshMs = parseJwtExpiryMs(REFRESH_TOKEN_EXPIRES_IN);
-        const windowMs = AUTH_SESSION_TTL_HOURS > 0 ? AUTH_SESSION_TTL_HOURS * 60 * 60 * 1000 : refreshMs;
-        const refreshExpMs = typeof (payload as any)?.exp === 'number'
-            ? (payload as any).exp * 1000
-            : Date.now() + refreshMs;
-        const newExpiry = new Date(Math.min(Date.now() + windowMs, refreshExpMs));
-
-        // Touch session
+        // Touch activity only; never extend the absolute session lifetime.
         await db.update(userSessions)
-            .set({ lastSeenAt: new Date(), updatedAt: new Date(), expiresAt: newExpiry })
+            .set({ lastSeenAt: new Date(), updatedAt: new Date() })
             .where(eq(userSessions.id, sessionId));
 
         return res.json({ token: newToken, user: sanitizeUser(user) });
@@ -1006,12 +1000,33 @@ export const getAdminSessions = async (req: Request, res: Response) => {
             return res.status(403).json({ error: 'FORBIDDEN' });
         }
 
+        const isSuperAdmin = adminRole === 'SUPER_ADMIN';
+        const adminBranchId = req.user?.branchId || null;
+        if (!isSuperAdmin && !adminBranchId) {
+            return res.status(403).json({ error: 'BRANCH_SCOPE_REQUIRED' });
+        }
+
         const activeOnly = req.query.active !== 'false';
         const limit = Math.min(Number(req.query.limit || 100), 500);
 
         const conditions: any[] = [];
         if (activeOnly) {
             conditions.push(eq(userSessions.isActive, true));
+        }
+
+        if (!isSuperAdmin) {
+            const scopedUsers = await db.select({
+                id: users.id,
+                assignedBranchId: users.assignedBranchId,
+                allowedBranches: users.allowedBranches,
+            }).from(users);
+            const scopedUserIds = scopedUsers
+                .filter((user) => user.assignedBranchId === adminBranchId || (Array.isArray(user.allowedBranches) && user.allowedBranches.includes(adminBranchId)))
+                .map((user) => user.id);
+            if (scopedUserIds.length === 0) {
+                return res.json({ sessions: [], summary: { total: 0, active: 0, expired: 0, revoked: 0 } });
+            }
+            conditions.push(inArray(userSessions.userId, scopedUserIds));
         }
 
         const sessions = await db.select({
@@ -1047,27 +1062,29 @@ export const getAdminSessions = async (req: Request, res: Response) => {
 
         const enrichedSessions = sessions.map(s => {
             const user = userMap.get(s.userId);
+            const isExpired = isSessionExpired(s.expiresAt);
             return {
                 ...s,
                 userName: user?.name || 'Unknown',
                 userEmail: user?.email || '',
                 userRole: user?.role || '',
-                // Sessions no longer expire by time — only revoke/logout ends
-                // them. Kept as false for API shape compatibility.
-                isExpired: false,
+                isExpired,
                 isRevoked: !!s.revokedAt,
             };
         });
 
-        const activeSessions = enrichedSessions.filter(s => s.isActive && !s.isRevoked);
+        const visibleSessions = activeOnly
+            ? enrichedSessions.filter(s => s.isActive && !s.isRevoked && !s.isExpired)
+            : enrichedSessions;
+        const activeSessions = visibleSessions.filter(s => s.isActive && !s.isRevoked && !s.isExpired);
 
         res.json({
-            sessions: enrichedSessions,
+            sessions: visibleSessions,
             summary: {
-                total: enrichedSessions.length,
+                total: visibleSessions.length,
                 active: activeSessions.length,
-                expired: enrichedSessions.filter(s => s.isExpired).length,
-                revoked: enrichedSessions.filter(s => s.isRevoked).length,
+                expired: visibleSessions.filter(s => s.isExpired).length,
+                revoked: visibleSessions.filter(s => s.isRevoked).length,
             },
         });
     } catch (error: any) {
@@ -1087,6 +1104,19 @@ export const adminRevokeSession = async (req: Request, res: Response) => {
 
         const [session] = await db.select().from(userSessions).where(eq(userSessions.id, sessionId));
         if (!session) return res.status(404).json({ error: 'SESSION_NOT_FOUND' });
+
+        if (adminRole !== 'SUPER_ADMIN') {
+            const [targetUser] = await db.select({
+                assignedBranchId: users.assignedBranchId,
+                allowedBranches: users.allowedBranches,
+            }).from(users).where(eq(users.id, session.userId)).limit(1);
+            const adminBranchId = req.user?.branchId || null;
+            const canManageTarget = Boolean(targetUser && adminBranchId && (
+                targetUser.assignedBranchId === adminBranchId ||
+                (Array.isArray(targetUser.allowedBranches) && targetUser.allowedBranches.includes(adminBranchId))
+            ));
+            if (!canManageTarget) return res.status(403).json({ error: 'FORBIDDEN_BRANCH_ACCESS' });
+        }
 
         await db.update(userSessions)
             .set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() })

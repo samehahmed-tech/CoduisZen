@@ -14,8 +14,10 @@ import {
     retryAllFailedOrders,
     getDailyOrderSummary,
 } from '../controllers/callCenterSupervisorController';
+import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
+router.use(enforceBranch);
 
 router.get('/escalations', getEscalations);
 router.post('/escalations', createEscalation);

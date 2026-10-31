@@ -12,6 +12,7 @@ import {
     normalizeImageId,
     resolveLocalImagePath,
 } from '../utils/imageStorage';
+import { createSignedAuditLog } from '../services/auditService';
 
 const S3_REGION = process.env.S3_REGION || 'us-east-1';
 const S3_ENDPOINT = process.env.S3_ENDPOINT;
@@ -38,6 +39,18 @@ const contentTypeToExt: Record<string, string> = {
     'image/gif': 'gif',
 };
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+const auditImageMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Image mutation: ${eventType}`,
+});
 
 const buildPublicUrl = (key: string) => {
     if (S3_PUBLIC_URL) return `${S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
@@ -128,6 +141,7 @@ export const uploadImage = async (req: Request, res: Response) => {
             await db.insert(images).values(imageRecord);
         }
 
+        await auditImageMutation(req, 'IMAGE_UPSERTED', { imageId: safeId, contentType: finalContentType, size: imageRecord.size, width: imageRecord.width || null, height: imageRecord.height || null }, { stored: true });
         res.status(201).json({
             id: safeId,
             url,
@@ -181,6 +195,7 @@ export const deleteImage = async (req: Request, res: Response) => {
         }
 
         await db.delete(images).where(eq(images.id, id));
+        await auditImageMutation(req, 'IMAGE_DELETED', { imageId: id, size: record.size || null }, { deleted: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

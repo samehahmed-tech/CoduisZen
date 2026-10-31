@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import * as reportController from '../controllers/reportController';
 import { scopeBranchQuery } from '../middleware/branchIsolation';
+import { requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -129,6 +130,8 @@ router.get('/sales-per-labor-hour', reportController.getSalesPerLaborHour);
 
 // Advanced CRM
 router.get('/customer-retention', reportController.getCustomerRetention);
+router.get('/customer-rfm', reportController.getCustomerRfm);
+router.post('/customer-rfm/refresh', requireRoleOrPermission(['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER'], ['OP_MANAGE_MARKETING']), reportController.refreshCustomerRfm);
 router.get('/new-vs-returning', reportController.getNewVsReturning);
 router.get('/customer-frequency', reportController.getCustomerFrequency);
 

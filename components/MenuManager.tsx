@@ -20,6 +20,7 @@ import { useInventoryStore } from '../stores/useInventoryStore';
 // Services
 import { translations } from '../services/translations';
 import { menuApi } from '../services/api/menu';
+import { getXlsxCompat } from '../src/utils/excelCompat';
 
 // Components
 import ImageUploader from './common/ImageUploader';
@@ -100,6 +101,14 @@ const MenuManager: React.FC = () => {
   const [showAddExistingCategory, setShowAddExistingCategory] = useState(false);
   const [isImportingMenu, setIsImportingMenu] = useState(false);
   const [isApplyingMenuImport, setIsApplyingMenuImport] = useState(false);
+  const [showDistribution, setShowDistribution] = useState(false);
+  const [distributionSourceBranchId, setDistributionSourceBranchId] = useState('');
+  const [distributionTargetBranchIds, setDistributionTargetBranchIds] = useState<string[]>([]);
+  const [distributionOverwrite, setDistributionOverwrite] = useState(false);
+  const [distributionPreview, setDistributionPreview] = useState<Array<{ targetBranchId: string; updatedItems: number; copiedEntries: number; skippedEntries: number }> | null>(null);
+  const [distributionIdempotencyKey, setDistributionIdempotencyKey] = useState<string | null>(null);
+  const [isPreviewingDistribution, setIsPreviewingDistribution] = useState(false);
+  const [isRequestingDistribution, setIsRequestingDistribution] = useState(false);
   const [menuImportPreview, setMenuImportPreview] = useState<{
     rows: Record<string, any>[];
     sizesRows: Record<string, any>[];
@@ -167,10 +176,20 @@ const MenuManager: React.FC = () => {
     return categories.filter(cat => !cat.menuIds.includes(selectedMenu.id));
   }, [selectedMenu, categories]);
 
+  const menuStats = useMemo(() => {
+    const items = filteredCategories.flatMap(category => category.items);
+    return {
+      total: items.length,
+      available: items.filter(item => item.isAvailable).length,
+      featured: items.filter(item => Boolean((item as any).isFeatured || item.isPopular)).length,
+      categories: filteredCategories.length,
+    };
+  }, [filteredCategories]);
+
   // --- EXCEL LOGIC ---
   const handleExportExcel = async () => {
     try {
-      const XLSX = await import('xlsx');
+      const XLSX = await getXlsxCompat();
       const exportData: any[] = [];
       const sizesData: any[] = [];
       const modifiersData: any[] = [];
@@ -259,7 +278,7 @@ const MenuManager: React.FC = () => {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ensureRows(recipesData, {
         'Item_ID': '', 'SKU': '', 'Barcode': '', 'Item_Name': '', 'Ingredient_ID': '', 'Ingredient_Name': '', 'Quantity': '', 'Unit': '', 'Notes': '', 'Yield': 1, 'Instructions': ''
       })), 'Recipes');
-      XLSX.writeFile(wb, 'Menu_Export.xlsx');
+      await XLSX.writeFile(wb, 'Menu_Export.xlsx');
       showToast(lang === 'ar' ? 'تم تصدير المنيو' : 'Menu exported', 'success');
     } catch (err: any) {
       showToast(err?.message || (lang === 'ar' ? 'فشل تصدير ملف Excel' : 'Excel export failed'), 'error');
@@ -271,11 +290,9 @@ const MenuManager: React.FC = () => {
     if (!file) return;
     setIsImportingMenu(true);
     try {
-      const XLSX = await import('xlsx');
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const wb = XLSX.read(evt.target?.result, { type: 'array' });
+      const XLSX = await getXlsxCompat();
+      try {
+          const wb = await XLSX.read(await file.arrayBuffer());
           const findSheetName = (candidates: string[]) =>
             wb.SheetNames.find((sheetName: string) => candidates.includes(sheetName.toLowerCase().trim()));
           const rowsFromSheet = (sheetName?: string) =>
@@ -333,13 +350,6 @@ const MenuManager: React.FC = () => {
           setIsImportingMenu(false);
           e.target.value = '';
         }
-      };
-      reader.onerror = () => {
-        setIsImportingMenu(false);
-        e.target.value = '';
-        showToast(lang === 'ar' ? 'تعذر قراءة ملف Excel.' : 'Could not read the Excel file.', 'error');
-      };
-      reader.readAsArrayBuffer(file);
     } catch (err: any) {
       setIsImportingMenu(false);
       e.target.value = '';
@@ -699,6 +709,56 @@ const MenuManager: React.FC = () => {
     updatePriceList(index, { branchIds: next });
   };
 
+  const isHeadOffice = ['SUPER_ADMIN', 'OWNER', 'CEO', 'COO', 'GENERAL_MANAGER'].includes(String(settings.currentUser?.role || '').toUpperCase());
+
+  const openDistribution = () => {
+    const source = settings.activeBranchId || branches[0]?.id || '';
+    setDistributionSourceBranchId(source);
+    setDistributionTargetBranchIds([]);
+    setDistributionOverwrite(false);
+    setDistributionPreview(null);
+    setDistributionIdempotencyKey(typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `distribution-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    setShowDistribution(true);
+  };
+
+  const submitDistributionRequest = async () => {
+    if (!distributionSourceBranchId || distributionTargetBranchIds.length === 0) {
+      showToast(lang === 'ar' ? 'اختر الفرع المصدر وفرعًا مستهدفًا واحدًا على الأقل' : 'Choose a source branch and at least one target branch', 'warning');
+      return;
+    }
+    if (!distributionPreview) {
+      showToast(lang === 'ar' ? 'راجع المعاينة قبل إرسال طلب التوزيع' : 'Review the preview before sending the distribution request', 'warning');
+      return;
+    }
+    setIsRequestingDistribution(true);
+    try {
+      await menuApi.requestMasterDataDistribution(distributionSourceBranchId, distributionTargetBranchIds, distributionOverwrite, distributionIdempotencyKey || undefined);
+      showToast(lang === 'ar' ? 'تم إرسال طلب التوزيع للموافقة المركزية' : 'Distribution request sent for central approval', 'success');
+      setShowDistribution(false);
+    } catch (error: any) {
+      showToast(error?.message || (lang === 'ar' ? 'تعذر إرسال طلب التوزيع' : 'Failed to send distribution request'), 'error');
+    } finally {
+      setIsRequestingDistribution(false);
+    }
+  };
+
+  const previewDistribution = async () => {
+    if (!distributionSourceBranchId || distributionTargetBranchIds.length === 0) {
+      showToast(lang === 'ar' ? 'اختر الفرع المصدر وفرعًا مستهدفًا واحدًا على الأقل' : 'Choose a source branch and at least one target branch', 'warning');
+      return;
+    }
+    setIsPreviewingDistribution(true);
+    try {
+      const preview = await menuApi.previewMasterDataDistribution(distributionSourceBranchId, distributionTargetBranchIds, distributionOverwrite);
+      setDistributionPreview(preview.targets);
+    } catch (error: any) {
+      setDistributionPreview(null);
+      showToast(error?.message || (lang === 'ar' ? 'تعذرت معاينة التوزيع' : 'Failed to preview distribution'), 'error');
+    } finally {
+      setIsPreviewingDistribution(false);
+    }
+  };
+
   // 🔄 Loading State
   if (isLoading && categories.length === 0) {
     return (
@@ -712,7 +772,7 @@ const MenuManager: React.FC = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-10 min-h-screen bg-app transition-colors animate-fade-in pb-24 relative z-10">
+    <div className="menu-manager-shell p-4 md:p-6 lg:p-10 min-h-screen bg-app transition-colors animate-fade-in pb-24 relative z-10">
       {/* Error Banner */}
       {error && (
         <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-[1.5rem] text-rose-500 text-sm font-bold flex items-center gap-3  shadow-lg shadow-rose-500/5">
@@ -722,7 +782,7 @@ const MenuManager: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-10 relative z-20">
+      <div className="menu-manager-header flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-10 relative z-20">
         <div>
           <h2 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-cyan-500 uppercase tracking-tighter flex items-center gap-4 drop-shadow-sm">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 rounded-[1.5rem] flex items-center justify-center border border-indigo-500/30 text-indigo-500 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
@@ -731,11 +791,8 @@ const MenuManager: React.FC = () => {
             {lang === 'ar' ? 'إدارة المنيو' : 'Menu Catalog'}
             {isLoading && <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />}
           </h2>
-          <p className="text-sm md:text-base text-muted font-bold tracking-wide mt-2">
-            {lang === 'ar' ? 'هندس وصفاتك لزيادة المبيعات والأرباح' : 'Engineer your recipes for maximum profit'}
-          </p>
         </div>
-        <div className="flex flex-wrap gap-3 w-full xl:w-auto items-center">
+        <div className="menu-manager-actions flex flex-wrap gap-3 w-full xl:w-auto items-center">
           <label className={`flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-500 px-5 py-4 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] border border-emerald-500/30 hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-95 cursor-pointer ${isImportingMenu ? 'opacity-60 pointer-events-none' : ''}`}>
             {isImportingMenu ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} {lang === 'ar' ? 'استيراد إكسل' : 'Import Excel'}
             <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" disabled={isImportingMenu} />
@@ -743,6 +800,11 @@ const MenuManager: React.FC = () => {
           <button onClick={handleExportExcel} className="flex items-center justify-center gap-2 bg-card/50 text-main px-5 py-4 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] border border-border/20 hover:border-indigo-500/30 hover:text-indigo-400 transition-all shadow-sm active:scale-95">
             <ArrowRight size={16} /> {lang === 'ar' ? 'تصدير إكسل' : 'Export Excel'}
           </button>
+          {isHeadOffice && (
+            <button onClick={openDistribution} className="flex items-center justify-center gap-2 bg-card/50 text-main px-5 py-4 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] border border-border/20 hover:border-indigo-500/30 hover:text-indigo-400 transition-all shadow-sm active:scale-95">
+              <Building2 size={16} /> {lang === 'ar' ? 'توزيع الأسعار' : 'Distribute Pricing'}
+            </button>
+          )}
           
           <div className="w-px h-10 bg-border/40 mx-2 hidden sm:block"></div>
 
@@ -775,8 +837,8 @@ const MenuManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-6 mb-10 relative z-20">
-        <div className="flex bg-card/50  p-2 rounded-[2rem] shadow-inner border border-border/20 shrink-0 self-start">
+      <div className="menu-manager-toolbar flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-6 mb-10 relative z-20">
+        <div className="menu-manager-tabs flex bg-card/50 p-2 rounded-[2rem] shadow-inner border border-border/20 shrink-0 self-start">
           <button onClick={() => setActiveTab('MENUS')} className={`px-8 py-3.5 rounded-[1.5rem] font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all duration-150 ${activeTab === 'MENUS' ? 'bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-lg shadow-indigo-500/30 scale-105 border border-indigo-400/30' : 'text-muted hover:text-main hover:bg-elevated/40'}`}>
             <LayoutGrid size={16} className="inline mr-2" /> {lang === 'ar' ? 'المنيوهات النشطة' : 'Active Menus'}
           </button>
@@ -784,7 +846,7 @@ const MenuManager: React.FC = () => {
             <Gift size={16} className="inline mr-2" /> {lang === 'ar' ? 'العروض' : 'Offers'}
           </button>
         </div>
-        <div className="relative flex-1 lg:max-w-md group">
+        <div className="menu-manager-search relative flex-1 lg:max-w-md group">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-[1.5rem] blur-md opacity-20 group-focus-within:opacity-40 transition-opacity duration-150" />
           <div className="relative">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted w-5 h-5 group-focus-within:text-indigo-500 transition-colors z-10" />
@@ -793,14 +855,21 @@ const MenuManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-20">
+      <div className="menu-manager-stats grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 relative z-20">
+        <div className="menu-manager-stat bg-card border border-border/20"><span>الأصناف</span><strong>{menuStats.total}</strong></div>
+        <div className="menu-manager-stat bg-card border border-border/20"><span>متاح للبيع</span><strong>{menuStats.available}</strong><em>{menuStats.total ? Math.round((menuStats.available / menuStats.total) * 100) : 0}%</em></div>
+        <div className="menu-manager-stat bg-card border border-border/20"><span>أقسام مرتبطة</span><strong>{menuStats.categories}</strong></div>
+        <div className="menu-manager-stat bg-card border border-border/20"><span>مميز / شائع</span><strong>{menuStats.featured}</strong></div>
+      </div>
+
+      <div className="menu-manager-workspace grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-20">
         {/* Sidebar */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="menu-manager-menu-list lg:col-span-3 space-y-4">
           {menus.map(menu => (
             <div key={menu.id} className="relative group">
               <button
                 onClick={() => setSelectedMenuId(menu.id)}
-                className={`w-full text-left p-6 rounded-[2.5rem] border  transition-all duration-150 hover:shadow-2xl overflow-hidden relative ${selectedMenuId === menu.id ? 'bg-card/80 border-indigo-500/50 text-white shadow-[0_15px_40px_rgba(99,102,241,0.2)] translate-x-2' : 'bg-card/40 border-border/20 hover:bg-card/60 hover:border-indigo-500/30 shadow-lg'}`}
+                className={`menu-manager-menu-card w-full text-left p-6 rounded-[2.5rem] border transition-all duration-150 hover:shadow-2xl overflow-hidden relative ${selectedMenuId === menu.id ? 'bg-card/80 border-indigo-500/50 text-white shadow-[0_15px_40px_rgba(99,102,241,0.2)] translate-x-2' : 'bg-card/40 border-border/20 hover:bg-card/60 hover:border-indigo-500/30 shadow-lg'}`}
               >
                 {selectedMenuId === menu.id && (
                   <>
@@ -832,7 +901,7 @@ const MenuManager: React.FC = () => {
         </div>
 
         {/* Categories & Items — Memoized to prevent re-render on modal state changes */}
-        <div className="lg:col-span-9 space-y-12">
+        <div className="menu-manager-content lg:col-span-9 space-y-12">
           <MenuCategoryList
             categories={filteredCategories}
             selectedMenuId={selectedMenuId}
@@ -849,7 +918,7 @@ const MenuManager: React.FC = () => {
 
           {/* Link Existing */}
           {otherCategories.length > 0 && !showAddExistingCategory && (
-            <button onClick={() => setShowAddExistingCategory(true)} className="w-full py-8 border-2 border-dashed border-border rounded-[2.5rem] flex flex-col items-center justify-center gap-2 text-muted hover:text-primary transition-all font-black text-xs uppercase tracking-widest"><Layers size={32} /> Link Existing Group</button>
+            <button onClick={() => setShowAddExistingCategory(true)} className="menu-manager-link-existing w-full py-8 border-2 border-dashed border-border rounded-[2.5rem] flex flex-col items-center justify-center gap-2 text-muted hover:text-primary transition-all font-black text-xs uppercase tracking-widest"><Layers size={32} /> {lang === 'ar' ? 'ربط قسم موجود' : 'Link Existing Group'}</button>
           )}
 
           {showAddExistingCategory && (
@@ -1422,6 +1491,84 @@ const MenuManager: React.FC = () => {
               >
                 {lang === 'ar' ? 'حفظ' : 'Save'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDistribution && (
+        <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/70 p-4" onClick={() => !isRequestingDistribution && setShowDistribution(false)}>
+          <div className="w-full max-w-lg rounded-[2rem] border border-border bg-card shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="distribution-title" onClick={event => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-border p-6">
+              <div>
+                <h3 id="distribution-title" className="text-lg font-black text-main">{lang === 'ar' ? 'طلب توزيع الأسعار' : 'Request Pricing Distribution'}</h3>
+                <p className="mt-1 text-xs font-bold text-muted">{lang === 'ar' ? 'يُرسل الطلب للموافقة المركزية قبل تطبيقه.' : 'The request requires central approval before it is applied.'}</p>
+              </div>
+              <button aria-label={lang === 'ar' ? 'إغلاق' : 'Close'} onClick={() => setShowDistribution(false)} disabled={isRequestingDistribution} className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-app text-muted hover:text-main disabled:opacity-50">
+                <X size={17} />
+              </button>
+            </div>
+            <div className="space-y-5 p-6">
+              <div>
+                <label htmlFor="distribution-source" className="mb-2 block text-xs font-black text-main">{lang === 'ar' ? 'الفرع المصدر' : 'Source branch'}</label>
+                <select id="distribution-source" value={distributionSourceBranchId} onChange={event => {
+                  const source = event.target.value;
+                  setDistributionSourceBranchId(source);
+                  setDistributionTargetBranchIds(current => current.filter(id => id !== source));
+                  setDistributionPreview(null);
+                }} className="h-11 w-full rounded-xl border border-border bg-app px-3 text-sm font-bold text-main outline-none focus:border-indigo-500">
+                  <option value="">{lang === 'ar' ? 'اختر الفرع' : 'Choose a branch'}</option>
+                  {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                </select>
+              </div>
+              <fieldset>
+                <legend className="mb-2 text-xs font-black text-main">{lang === 'ar' ? 'الفروع المستهدفة' : 'Target branches'}</legend>
+                <div className="max-h-44 space-y-2 overflow-y-auto rounded-xl border border-border bg-app p-3">
+                  {branches.filter(branch => branch.id !== distributionSourceBranchId).map(branch => {
+                    const checked = distributionTargetBranchIds.includes(branch.id);
+                    return <label key={branch.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-elevated/60">
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        setDistributionTargetBranchIds(current => checked ? current.filter(id => id !== branch.id) : [...current, branch.id]);
+                        setDistributionPreview(null);
+                      }} className="h-4 w-4 accent-indigo-600" />
+                      <span className="text-sm font-bold text-main">{branch.name}</span>
+                    </label>;
+                  })}
+                </div>
+              </fieldset>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                <input type="checkbox" checked={distributionOverwrite} onChange={event => {
+                  setDistributionOverwrite(event.target.checked);
+                  setDistributionPreview(null);
+                }} className="mt-0.5 h-4 w-4 accent-amber-600" />
+                <span><span className="block text-xs font-black text-main">{lang === 'ar' ? 'استبدال أسعار الفروع المستهدفة' : 'Overwrite target branch prices'}</span><span className="mt-0.5 block text-[11px] font-bold text-muted">{lang === 'ar' ? 'يتطلب اعتمادًا منفصلًا ولا يُطبق مباشرة.' : 'Requires separate approval and is never applied directly.'}</span></span>
+              </label>
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3" aria-live="polite">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-main">{lang === 'ar' ? 'معاينة قبل الإرسال' : 'Preview before sending'}</p>
+                    <p className="mt-0.5 text-[11px] font-bold text-muted">{lang === 'ar' ? 'راجع عدد العناصر التي ستتأثر في كل فرع.' : 'Review the affected item counts for each branch.'}</p>
+                  </div>
+                  <button type="button" onClick={previewDistribution} disabled={isPreviewingDistribution || !distributionSourceBranchId || distributionTargetBranchIds.length === 0} aria-busy={isPreviewingDistribution} className="rounded-lg border border-indigo-500/40 px-3 py-2 text-[11px] font-black text-indigo-600 disabled:opacity-50">
+                    {isPreviewingDistribution ? (lang === 'ar' ? 'جارٍ المعاينة...' : 'Previewing...') : (lang === 'ar' ? 'معاينة' : 'Preview')}
+                  </button>
+                </div>
+                {distributionPreview && (
+                  <div className="mt-3 space-y-2" role="status">
+                    {distributionPreview.map(item => {
+                      const branch = branches.find(candidate => candidate.id === item.targetBranchId);
+                      return <div key={item.targetBranchId} className="flex items-center justify-between gap-3 rounded-lg bg-app px-3 py-2 text-[11px] font-bold text-muted">
+                        <span className="font-black text-main">{branch?.name || item.targetBranchId}</span>
+                        <span>{lang === 'ar' ? `تحديث ${item.updatedItems} · نسخ ${item.copiedEntries} · تخطي ${item.skippedEntries}` : `Update ${item.updatedItems} · Copy ${item.copiedEntries} · Skip ${item.skippedEntries}`}</span>
+                      </div>;
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-3 border-t border-border p-4">
+              <button onClick={() => setShowDistribution(false)} disabled={isRequestingDistribution} className="flex-1 rounded-xl border border-border bg-app py-3 text-xs font-black text-muted hover:text-main disabled:opacity-50">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+              <button onClick={submitDistributionRequest} disabled={isRequestingDistribution || !distributionSourceBranchId || distributionTargetBranchIds.length === 0 || !distributionPreview} className="flex-1 rounded-xl bg-indigo-600 py-3 text-xs font-black text-white disabled:opacity-50">{isRequestingDistribution ? (lang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...') : (lang === 'ar' ? 'إرسال للموافقة' : 'Send for approval')}</button>
             </div>
           </div>
         </div>

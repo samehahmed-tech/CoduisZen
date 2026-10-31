@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/local-image-fix/Apply Local Image Fix.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/local-image-fix/Apply Local Image Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 146,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/local-image-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 20,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/local-image-fix/Apply Local Image Fix.bat": [],
+    "scripts/sameh-installer/local-image-fix/Apply Local Image Fix.ps1": [],
+    "scripts/sameh-installer/local-image-fix/README AR.txt": []
+  }
+}

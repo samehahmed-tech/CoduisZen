@@ -178,6 +178,12 @@ export const startCleanupScheduler = (intervalHours = 24) => {
         } catch (err: any) {
             log.error({ err: err.message }, 'Scheduled fiscal retry failed');
         }
+        try {
+            const { paymentWebhookRetryService } = await import('./paymentWebhookRetryService');
+            await paymentWebhookRetryService.retryAllPending();
+        } catch (err: any) {
+            log.error({ err: err.message }, 'Scheduled payment webhook retry failed');
+        }
     }, 15 * 60 * 1000); // Every 15 minutes
 };
 

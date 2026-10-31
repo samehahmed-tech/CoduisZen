@@ -1,0 +1,31 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "styles/themes/_base.css",
+    "styles/themes/acrylic.css",
+    "styles/themes/canvas.css",
+    "styles/themes/command.css",
+    "styles/themes/dashboard-personalities.css",
+    "styles/themes/fluent-pro.css",
+    "styles/themes/glassline.css",
+    "styles/themes/material-x.css",
+    "styles/themes/meridian.css",
+    "styles/themes/obsidian.css",
+    "styles/themes/tiles.css",
+    "styles/themes/touch.css"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

@@ -1,0 +1,324 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "components/common/KeyboardShortcuts.tsx",
+      "language": "typescript",
+      "sizeLines": 115,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/LiveClock.tsx",
+      "language": "typescript",
+      "sizeLines": 59,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/PageSkeleton.tsx",
+      "language": "typescript",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/PagerBar.tsx",
+      "language": "typescript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/Skeleton.tsx",
+      "language": "typescript",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/SmartTabs.tsx",
+      "language": "typescript",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/SystemHealth.tsx",
+      "language": "typescript",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/ToastProvider.tsx",
+      "language": "typescript",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/UserAvatar.tsx",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/VirtualList.tsx",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/common/navigation.ts",
+      "language": "typescript",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/EmployeeLeaderboard.tsx",
+      "language": "typescript",
+      "sizeLines": 152,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/KitchenDispatchWidgets.tsx",
+      "language": "typescript",
+      "sizeLines": 233,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/LiveKanbanBoard.tsx",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/dashboard/RevenueForecastWidget.tsx",
+      "language": "typescript",
+      "sizeLines": 154,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/finance/ManualJournalModal.tsx",
+      "language": "typescript",
+      "sizeLines": 203,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/finance/ShiftManagementDrawer.tsx",
+      "language": "typescript",
+      "sizeLines": 401,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/floor/TableVisual.tsx",
+      "language": "typescript",
+      "sizeLines": 235,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/kiosk/KioskCategoryRail.tsx",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/kiosk/KioskItemCard.tsx",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/kiosk/KioskModifierModal.tsx",
+      "language": "typescript",
+      "sizeLines": 137,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/kiosk/SelfOrderingKiosk.tsx",
+      "language": "typescript",
+      "sizeLines": 434,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/AIInsightsEngine.tsx",
+      "language": "typescript",
+      "sizeLines": 313,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/AnalyticsPanel.tsx",
+      "language": "typescript",
+      "sizeLines": 163,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/BranchSelector.tsx",
+      "language": "typescript",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/BulkActionsBar.tsx",
+      "language": "typescript",
+      "sizeLines": 105,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/CategoryDrawer.tsx",
+      "language": "typescript",
+      "sizeLines": 263,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/ContextPanel.tsx",
+      "language": "typescript",
+      "sizeLines": 127,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/ItemCard.tsx",
+      "language": "typescript",
+      "sizeLines": 382,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/ItemDrawer.tsx",
+      "language": "typescript",
+      "sizeLines": 1151,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/ItemTable.tsx",
+      "language": "typescript",
+      "sizeLines": 276,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/MenuCategoryList.tsx",
+      "language": "typescript",
+      "sizeLines": 129,
+      "fileCategory": "code"
+    },
+    {
+      "path": "components/menu/MenuItemCard.tsx",
+      "language": "typescript",
+      "sizeLines": 96,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "components/common/KeyboardShortcuts.tsx": [
+      "stores/useAuthStore.ts"
+    ],
+    "components/common/LiveClock.tsx": [
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts"
+    ],
+    "components/common/PageSkeleton.tsx": [],
+    "components/common/PagerBar.tsx": [],
+    "components/common/Skeleton.tsx": [],
+    "components/common/SmartTabs.tsx": [
+      "components/common/navigation.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/common/SystemHealth.tsx": [
+      "services/api/core.ts",
+      "services/socketService.ts"
+    ],
+    "components/common/ToastProvider.tsx": [],
+    "components/common/UserAvatar.tsx": [],
+    "components/common/VirtualList.tsx": [],
+    "components/common/navigation.ts": [
+      "types.ts"
+    ],
+    "components/dashboard/EmployeeLeaderboard.tsx": [
+      "services/api/analytics.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/dashboard/KitchenDispatchWidgets.tsx": [
+      "services/api/delivery.ts",
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/dashboard/LiveKanbanBoard.tsx": [
+      "stores/useAuthStore.ts",
+      "stores/useOrderStore.ts",
+      "types.ts"
+    ],
+    "components/dashboard/RevenueForecastWidget.tsx": [
+      "services/api/ai.ts",
+      "stores/useAuthStore.ts"
+    ],
+    "components/finance/ManualJournalModal.tsx": [
+      "types.ts"
+    ],
+    "components/finance/ShiftManagementDrawer.tsx": [
+      "components/Toast.tsx",
+      "services/api/core.ts",
+      "services/api/shifts.ts",
+      "stores/useAuthStore.ts",
+      "stores/useFinanceStore.ts"
+    ],
+    "components/floor/TableVisual.tsx": [],
+    "components/kiosk/KioskCategoryRail.tsx": [],
+    "components/kiosk/KioskItemCard.tsx": [
+      "src/features/pos/components/ItemImage.tsx",
+      "types.ts"
+    ],
+    "components/kiosk/KioskModifierModal.tsx": [
+      "src/features/pos/components/ItemImage.tsx",
+      "types.ts"
+    ],
+    "components/kiosk/SelfOrderingKiosk.tsx": [
+      "components/kiosk/KioskCategoryRail.tsx",
+      "components/kiosk/KioskItemCard.tsx",
+      "components/kiosk/KioskModifierModal.tsx",
+      "services/api/core.ts",
+      "services/orderTotals.ts",
+      "stores/useAuthStore.ts",
+      "stores/useMenuStore.ts",
+      "stores/useOrderStore.ts",
+      "styles/layout/kiosk.css",
+      "types.ts"
+    ],
+    "components/menu/AIInsightsEngine.tsx": [
+      "types.ts"
+    ],
+    "components/menu/AnalyticsPanel.tsx": [
+      "types.ts"
+    ],
+    "components/menu/BranchSelector.tsx": [
+      "types.ts"
+    ],
+    "components/menu/BulkActionsBar.tsx": [
+      "types.ts"
+    ],
+    "components/menu/CategoryDrawer.tsx": [
+      "types.ts"
+    ],
+    "components/menu/ContextPanel.tsx": [
+      "types.ts"
+    ],
+    "components/menu/ItemCard.tsx": [
+      "components/menu/MenuProfitCenter.tsx",
+      "src/features/pos/components/ItemImage.tsx",
+      "types.ts"
+    ],
+    "components/menu/ItemDrawer.tsx": [
+      "components/common/ImageUploader.tsx",
+      "components/common/ToastProvider.tsx",
+      "services/api/barcode.ts",
+      "src/features/pos/components/ItemImage.tsx",
+      "types.ts",
+      "utils/menuCost.ts"
+    ],
+    "components/menu/ItemTable.tsx": [
+      "src/features/pos/components/ItemImage.tsx",
+      "types.ts"
+    ],
+    "components/menu/MenuCategoryList.tsx": [
+      "components/menu/MenuItemCard.tsx",
+      "components/menu/QuickAddCard.tsx",
+      "types.ts"
+    ],
+    "components/menu/MenuItemCard.tsx": [
+      "src/features/pos/components/ItemImage.tsx",
+      "types.ts"
+    ]
+  }
+}

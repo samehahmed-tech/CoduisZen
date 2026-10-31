@@ -1,0 +1,461 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/controllers/deliveryController.ts",
+      "language": "typescript",
+      "sizeLines": 1480,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/deploymentController.ts",
+      "language": "typescript",
+      "sizeLines": 163,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/financeController.ts",
+      "language": "typescript",
+      "sizeLines": 754,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/fiscalController.ts",
+      "language": "typescript",
+      "sizeLines": 256,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/hrController.ts",
+      "language": "typescript",
+      "sizeLines": 411,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/inventoryController.ts",
+      "language": "typescript",
+      "sizeLines": 1857,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/inventoryCountController.ts",
+      "language": "typescript",
+      "sizeLines": 432,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/inventoryIntelligenceController.ts",
+      "language": "typescript",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/kdsController.ts",
+      "language": "typescript",
+      "sizeLines": 895,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/mailController.ts",
+      "language": "typescript",
+      "sizeLines": 524,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/marketingController.ts",
+      "language": "typescript",
+      "sizeLines": 111,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/opsController.ts",
+      "language": "typescript",
+      "sizeLines": 225,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/orderController.ts",
+      "language": "typescript",
+      "sizeLines": 2631,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/p1FinanceController.ts",
+      "language": "typescript",
+      "sizeLines": 420,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/platformsController.ts",
+      "language": "typescript",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/posOpsController.ts",
+      "language": "typescript",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/printerController.ts",
+      "language": "typescript",
+      "sizeLines": 324,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/procurementController.ts",
+      "language": "typescript",
+      "sizeLines": 687,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/productionController.ts",
+      "language": "typescript",
+      "sizeLines": 661,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/purchaseOrderController.ts",
+      "language": "typescript",
+      "sizeLines": 447,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/recurringEntriesController.ts",
+      "language": "typescript",
+      "sizeLines": 272,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/refundController.ts",
+      "language": "typescript",
+      "sizeLines": 135,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/advancedCrmReports.ts",
+      "language": "typescript",
+      "sizeLines": 256,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/advancedFinanceReports.ts",
+      "language": "typescript",
+      "sizeLines": 159,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/advancedHrReports.ts",
+      "language": "typescript",
+      "sizeLines": 110,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/advancedInventoryReports.ts",
+      "language": "typescript",
+      "sizeLines": 222,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/advancedOpsReports.ts",
+      "language": "typescript",
+      "sizeLines": 394,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/advancedSalesReports.ts",
+      "language": "typescript",
+      "sizeLines": 295,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/auditReports.ts",
+      "language": "typescript",
+      "sizeLines": 275,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/crmReports.ts",
+      "language": "typescript",
+      "sizeLines": 86,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/extendedSalesReports.ts",
+      "language": "typescript",
+      "sizeLines": 472,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/financeReports.ts",
+      "language": "typescript",
+      "sizeLines": 337,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/hrReports.ts",
+      "language": "typescript",
+      "sizeLines": 149,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/inventoryReports.ts",
+      "language": "typescript",
+      "sizeLines": 226,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/report/operationsReports.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/controllers/deliveryController.ts": [
+      "server/db/index.ts",
+      "server/services/orderLifecycleService.ts",
+      "server/services/webhookService.ts",
+      "server/socket.ts",
+      "server/utils/request.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/deploymentController.ts": [
+      "server/db/index.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/financeController.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/services/coaSeedService.ts",
+      "server/services/financeEngine.ts",
+      "server/services/financialStatements.ts",
+      "server/services/glService.ts",
+      "server/services/postingRuleEngine.ts",
+      "server/utils/dbErrors.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/fiscalController.ts": [
+      "server/db/index.ts",
+      "server/services/etaService.ts",
+      "server/services/fiscalService.ts",
+      "server/services/fiscalSubmitService.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/hrController.ts": [
+      "server/db/index.ts",
+      "server/services/glService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/inventoryController.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/services/financePostingService.ts",
+      "server/services/idempotencyService.ts",
+      "server/services/inventoryService.ts",
+      "server/socket.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/inventoryCountController.ts": [
+      "server/db/index.ts",
+      "server/services/financePostingService.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/inventoryIntelligenceController.ts": [
+      "server/services/inventoryIntelligence.ts",
+      "server/utils/request.ts"
+    ],
+    "server/controllers/kdsController.ts": [
+      "server/db/index.ts",
+      "server/services/kdsRouting.ts",
+      "server/services/orderLifecycleService.ts",
+      "server/services/printQueueService.ts",
+      "server/socket.ts",
+      "server/utils/logger.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/mailController.ts": [
+      "server/db/index.ts",
+      "server/socket.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/logger.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/marketingController.ts": [
+      "server/db/index.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/opsController.ts": [
+      "server/db/index.ts",
+      "server/socket.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/orderController.ts": [
+      "server/controllers/kdsController.ts",
+      "server/db/index.ts",
+      "server/services/analyticsService.ts",
+      "server/services/couponPricing.ts",
+      "server/services/financePostingService.ts",
+      "server/services/fiscalSubmitService.ts",
+      "server/services/idempotencyService.ts",
+      "server/services/inventoryService.ts",
+      "server/services/loyaltyService.ts",
+      "server/services/orderLifecycleService.ts",
+      "server/services/orderNumberService.ts",
+      "server/services/pricingService.ts",
+      "server/services/printQueueService.ts",
+      "server/services/webhookService.ts",
+      "server/services/whatsappAutomationService.ts",
+      "server/socket.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/request.ts",
+      "server/utils/settingsStore.ts",
+      "server/utils/socketEmit.ts",
+      "src/db/schema.ts",
+      "src/utils/tableMinimumSpend.ts"
+    ],
+    "server/controllers/p1FinanceController.ts": [
+      "server/services/bankingService.ts",
+      "server/services/dailyPnlService.ts",
+      "server/services/drawerReconciliationService.ts",
+      "server/services/giftCardService.ts",
+      "server/services/paymentGatewayService.ts",
+      "server/services/supplierInvoiceMatchingService.ts",
+      "server/services/tipPoolService.ts",
+      "server/utils/request.ts"
+    ],
+    "server/controllers/platformsController.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/posOpsController.ts": [
+      "server/db/index.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/printerController.ts": [
+      "server/db/index.ts",
+      "server/utils/dbErrors.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/procurementController.ts": [
+      "server/db/index.ts",
+      "server/services/auditService.ts",
+      "server/services/financePostingService.ts",
+      "server/services/glService.ts",
+      "server/services/idempotencyService.ts",
+      "server/socket.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/productionController.ts": [
+      "server/db/index.ts",
+      "server/services/financePostingService.ts",
+      "server/services/inventoryService.ts",
+      "server/services/unitConversion.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/purchaseOrderController.ts": [
+      "server/db/index.ts",
+      "server/services/financePostingService.ts",
+      "server/services/pdfService.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/recurringEntriesController.ts": [
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/refundController.ts": [
+      "server/services/refundService.ts"
+    ],
+    "server/controllers/report/advancedCrmReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/advancedFinanceReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/advancedHrReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/advancedInventoryReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/services/unitConversion.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/advancedOpsReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/advancedSalesReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/auditReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/crmReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/extendedSalesReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/financeReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/hrReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/inventoryReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/report/operationsReports.ts": [
+      "server/controllers/report/reportUtils.ts",
+      "server/db/index.ts",
+      "server/utils/orderRevenue.ts",
+      "src/db/schema.ts"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/sameh-installer/hotfix/Fix Installed System.bat",
+    "scripts/sameh-installer/hotfix/README AR.txt",
+    "scripts/sameh-installer/hotfix/fix-installed-system.ps1"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

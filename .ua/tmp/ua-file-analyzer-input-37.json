@@ -1,0 +1,77 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/README AR - Final Setup.txt",
+      "language": "txt",
+      "sizeLines": 40,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/README_AR.md",
+      "language": "markdown",
+      "sizeLines": 89,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/one-click-builder.ps1",
+      "language": "powershell",
+      "sizeLines": 55,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/repackage-latest-fixes.ps1",
+      "language": "powershell",
+      "sizeLines": 20,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/run-schema-v2.ps1",
+      "language": "powershell",
+      "sizeLines": 57,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/run-sqlserver-schema.ps1",
+      "language": "powershell",
+      "sizeLines": 58,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/setup-openwa-gateway.ps1",
+      "language": "powershell",
+      "sizeLines": 99,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sql-server-schema.sql",
+      "language": "sql",
+      "sizeLines": 3075,
+      "fileCategory": "data"
+    },
+    {
+      "path": "scripts/sqlserver-schema-repair.sql",
+      "language": "sql",
+      "sizeLines": 378,
+      "fileCategory": "data"
+    },
+    {
+      "path": "scripts/upgrade-receipt-templates.ps1",
+      "language": "powershell",
+      "sizeLines": 43,
+      "fileCategory": "script"
+    }
+  ],
+  "batchImportData": {
+    "scripts/README AR - Final Setup.txt": [],
+    "scripts/README_AR.md": [],
+    "scripts/one-click-builder.ps1": [],
+    "scripts/repackage-latest-fixes.ps1": [],
+    "scripts/run-schema-v2.ps1": [],
+    "scripts/run-sqlserver-schema.ps1": [],
+    "scripts/setup-openwa-gateway.ps1": [],
+    "scripts/sql-server-schema.sql": [],
+    "scripts/sqlserver-schema-repair.sql": [],
+    "scripts/upgrade-receipt-templates.ps1": []
+  }
+}

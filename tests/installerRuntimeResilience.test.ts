@@ -50,4 +50,15 @@ describe('installer runtime resilience', () => {
         expect(schemaDoctor).toContain("database', 'daily-order-number.sql");
         expect(installerBuilder).toContain('database\\daily-order-number.sql');
     });
+
+    it('uses graceful drain for hotfix restarts instead of immediately killing the API', () => {
+        const serverSource = readFileSync(resolve('server/index.ts'), 'utf8');
+        const supervisorSource = readFileSync(join(runtime, 'supervisor.cjs'), 'utf8');
+
+        expect(serverSource).toContain("beginGracefulShutdown('drain.request')");
+        expect(serverSource).toContain("error: 'SERVER_DRAINING'");
+        expect(supervisorSource).toContain('graceful drain signaled');
+        expect(supervisorSource).toContain('const drainFile = path.join(root, \'runtime\', \'drain.request\')');
+        expect(supervisorSource).not.toContain("log('manual restart requested');\n    for (const child of managedChildren) child.kill();");
+    });
 });

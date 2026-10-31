@@ -1,17 +1,24 @@
 import { Request, Response } from 'express';
 import { aiService } from '../services/aiService';
+import { prepareAiUserMessage, wrapUntrustedAiData } from '../utils/aiPromptSafety';
 import { db } from '../db';
 import { orders, inventoryItems, menuCategories, menuItems, customers, users, employees } from '../../src/db/schema';
-import { eq, gte } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { guardAction, type AIAction } from '../../src/services/aiActionGuard';
 import crypto from 'crypto';
-import { AI_ACTION_SPECS, evaluateActionAuthorization, hasPermission } from '../services/aiPolicy';
+import { AI_ACTION_SPECS, evaluateActionAuthorization, hasPermission, isAiActionBranchAllowed, AI_EXECUTION_CONFIRMATION, requiresAiConfirmation } from '../services/aiPolicy';
 import { AuthUser } from '../middleware/auth';
 import { aiKeyVaultService } from '../services/aiKeyVaultService';
 import { revenueForecastService } from '../services/revenueForecastService';
 import { hrExtendedService } from '../services/hrExtendedService';
 import payrollCalculationService from '../services/payrollCalculationService';
 import { answerSystemCopilot, answerSystemCopilotFallback } from '../services/systemCopilotService';
+import { resolveBusinessDateRange } from '../utils/businessDateRange';
+import { buildAiDomainContext } from '../services/aiDomainContextService';
+import { recordAiRoute } from '../services/aiObservabilityService';
+import { discoverProviderModels } from '../services/aiProviderService';
+import { AI_PROVIDER_IDS, getProviderDefinition, validateProviderEndpoint } from '../services/aiProviderRegistry';
+import { findApproverByPassword } from '../services/managerApprovalAuth';
 
 const normalizeActionType = (rawType: string) => {
     const normalized = String(rawType || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
@@ -198,6 +205,20 @@ const safeJsonParse = (raw: string) => {
 
 const hasArabic = (value: string) => /[\u0600-\u06FF]/.test(String(value || ''));
 const hasLatinLetters = (value: string) => /[A-Za-z]/.test(String(value || ''));
+const destructiveAiAction = (type: string) => new Set(['DELETE_MENU_ITEM', 'DELETE_MENU_CATEGORY']).has(String(type || '').toUpperCase());
+
+const verifyMutationResult = async (result: any) => {
+    if (!result?.id) throw new Error('AI_RESULT_MISSING_ID');
+    const table = result.entity === 'menuItem' ? menuItems : result.entity === 'menuCategory' ? menuCategories : null;
+    if (!table) return { verified: true, entity: result.entity, id: result.id };
+    const [row] = await db.select().top(1).from(table as any).where(eq((table as any).id, result.id));
+    if (!row) {
+        if (result.deleted && result.entity === 'menuCategory') return { verified: true, entity: result.entity, id: result.id, deleted: true };
+        throw new Error('AI_RESULT_VERIFICATION_FAILED');
+    }
+    if (result.deleted && !(row as any).deletedAt && String((row as any).status || '').toLowerCase() !== 'archived') throw new Error('AI_DELETE_VERIFICATION_FAILED');
+    return { verified: true, entity: result.entity, id: result.id };
+};
 
 const executeMutationAction = async (action: AIAction, user: AuthUser) => {
     switch (action.type) {
@@ -530,40 +551,71 @@ const executeMutationAction = async (action: AIAction, user: AuthUser) => {
  */
 export const getInsights = async (req: Request, res: Response) => {
     try {
-        const branchId = req.query.branchId as string;
-        const cacheKey = branchId ? `perf_${branchId}` : 'perf_global';
+        const branchId = req.effectiveBranchId || (req.query.branchId as string | undefined);
+        const now = new Date();
+        const fromDate = new Date(now);
+        fromDate.setUTCDate(fromDate.getUTCDate() - 6);
+        const dateRange = resolveBusinessDateRange(fromDate.toISOString().slice(0, 10), now.toISOString().slice(0, 10));
+        const cacheKey = `${branchId ? `perf_${branchId}` : 'perf_global'}_${dateRange.from}_${dateRange.to}`;
+        const recentOrders = await db.select().from(orders)
+            .where(and(
+                gte(orders.businessDate, dateRange.from),
+                lte(orders.businessDate, dateRange.to),
+                branchId ? eq(orders.branchId, branchId) : undefined,
+            ));
+        const totalRevenue = recentOrders.reduce((s, o) => s + Number(o.total || 0), 0);
+        const orderCount = recentOrders.length;
+        const avgTicket = orderCount > 0 ? totalRevenue / orderCount : 0;
+        const dataAsOf = recentOrders.reduce<Date | null>((latest, order) => {
+            const createdAt = order.createdAt ? new Date(order.createdAt) : null;
+            return createdAt && (!latest || createdAt > latest) ? createdAt : latest;
+        }, null);
 
-        const insight = await aiService.getCachedInsight(cacheKey, async () => {
-            // 1. Gather context data (last 7 days)
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
+        const provenance = {
+            branchId: branchId || null,
+            period: { from: `${dateRange.from}T00:00:00.000Z`, to: `${dateRange.to}T23:59:59.999Z` },
+            businessDateFrom: dateRange.from,
+            businessDateTo: dateRange.to,
+            source: 'ORDERS_TOTAL_7_BUSINESS_DAYS' as const,
+            metrics: { totalRevenue, orderCount, avgTicket },
+            dataAsOf: dataAsOf?.toISOString() || null,
+            dataFreshnessHours: dataAsOf ? Math.max(0, Math.round(((Date.now() - dataAsOf.getTime()) / 3600000) * 100) / 100) : null,
+        };
+        if (!recentOrders.length) {
+            return res.json({
+                insight: 'No order data is available for the selected period; no AI conclusion was generated.',
+                ...provenance,
+            });
+        }
 
-            const recentOrders = await db.select().from(orders)
-                .where(gte(orders.createdAt, weekAgo));
+        let insight: string;
+        let aiStatus: 'GENERATED' | 'DEGRADED_FALLBACK' = 'GENERATED';
+        try {
+            insight = await aiService.getCachedInsight(cacheKey, async () => {
+                const prompt = `
+                    Perform a brief business analysis for a restaurant group.
+                    Data for the last 7 days:
+                    - Total Revenue: ${totalRevenue.toFixed(2)} EGP
+                    - Order Count: ${orderCount}
+                    - Average Ticket: ${avgTicket.toFixed(2)} EGP
 
-            const totalRevenue = recentOrders.reduce((s, o) => s + Number(o.total || 0), 0);
-            const orderCount = recentOrders.length;
-            const avgTicket = orderCount > 0 ? totalRevenue / orderCount : 0;
+                    Provide 3 specific bullet points:
+                    1. Performance overview
+                    2. One potential risk
+                    3. One optimization recommendation
+                    Keep it concise and professional.
+                `;
 
-            // 2. Build prompt
-            const prompt = `
-                Perform a brief business analysis for a restaurant group. 
-                Data for the last 7 days:
-                - Total Revenue: ${totalRevenue.toFixed(2)} EGP
-                - Order Count: ${orderCount}
-                - Average Ticket: ${avgTicket.toFixed(2)} EGP
-                
-                Provide 3 specific bullet points:
-                1. Performance overview
-                2. One potential risk
-                3. One optimization recommendation
-                Keep it concise and professional.
-            `;
+                return await aiService.queryAI(prompt);
+            });
+        } catch {
+            // Keep the operational dashboard usable when every external/local model is unavailable.
+            aiStatus = 'DEGRADED_FALLBACK';
+            insight = `Verified metrics: ${orderCount} orders, ${totalRevenue.toFixed(2)} EGP revenue, and ${avgTicket.toFixed(2)} EGP average ticket. Review open orders and variances in the operational reports.`;
+            console.warn('[AI] Insights provider unavailable; deterministic metrics fallback used.');
+        }
 
-            return await aiService.queryAI(prompt);
-        });
-
-        res.json({ insight });
+        res.json({ insight, aiStatus, ...provenance });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -583,6 +635,20 @@ export const executeAction = async (req: Request, res: Response) => {
             const status = auth.code === 'AUTH_REQUIRED' ? 401 : auth.code === 'UNSAFE_ACTION_TYPE' ? 400 : 403;
             return res.status(status).json({ error: auth.code, message: auth.message });
         }
+        if (!isAiActionBranchAllowed(user, action)) {
+            return res.status(403).json({ error: 'AI_ACTION_BRANCH_FORBIDDEN', message: 'The action targets a branch outside your scope.' });
+        }
+        if (destructiveAiAction(actionType)) {
+            const password = String(req.body?.adminPassword || '');
+            if (!password) return res.status(409).json({ error: 'ADMIN_PASSWORD_REQUIRED', message: 'Admin password is required for destructive AI actions.' });
+            const branchId = String((req as any).effectiveBranchId || user?.branchId || '').trim();
+            const approvers = await db.select({ id: users.id, name: users.name, role: users.role, assignedBranchId: users.assignedBranchId, allowedBranches: users.allowedBranches, managerPin: users.managerPin, pinCodeHash: users.pinCodeHash, pinLoginEnabled: users.pinLoginEnabled, passwordHash: users.passwordHash, permissions: users.permissions, customPermissions: users.customPermissions }).from(users).where(eq(users.isActive, true));
+            const approver = await findApproverByPassword(approvers as any, password, branchId, 'CFG_EDIT_MENU_PRICING');
+            if (!approver) return res.status(403).json({ error: 'ADMIN_PASSWORD_INVALID', message: 'A valid administrator password is required.' });
+        }
+        if (requiresAiConfirmation(auth.spec) && req.body?.confirmation !== AI_EXECUTION_CONFIRMATION) {
+            return res.status(409).json({ error: 'AI_CONFIRMATION_REQUIRED', confirmation: AI_EXECUTION_CONFIRMATION, message: 'Mutating AI actions require explicit user confirmation.' });
+        }
 
         const context = await loadAiGuardContext();
         const guarded = guardAction(action, context);
@@ -601,6 +667,7 @@ export const executeAction = async (req: Request, res: Response) => {
         });
 
         const result = await executeMutationAction(action, user);
+        const verification = await verifyMutationResult(result);
 
         await aiService.logAIAction(user.id, userName, actionType, {
             action,
@@ -608,15 +675,15 @@ export const executeAction = async (req: Request, res: Response) => {
             before: guarded.before,
             after: guarded.after,
             status: 'EXECUTED',
-            result,
+            result: { ...result, verification },
         });
 
         res.json({
             success: true,
-            message: 'Action executed and logged',
+            message: `ZEN AI نفّذ العملية وراجع النتيجة بنجاح (${result.entity || actionType}).`,
             actionId: actionType,
             guarded,
-            result,
+            result: { ...result, verification },
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -630,13 +697,27 @@ export const executeAction = async (req: Request, res: Response) => {
 export const chatAssistant = async (req: Request, res: Response) => {
     try {
         const body = req.body || {};
-        const message = String(body.message || '').trim();
+        const preparedMessage = prepareAiUserMessage(body.message);
+        if (preparedMessage.ok === false) {
+            return res.status(preparedMessage.code === 'AI_MESSAGE_TOO_LONG' ? 413 : 400).json({ error: preparedMessage.code });
+        }
+        const message = preparedMessage.text;
         if (!message) {
             return res.status(400).json({ error: 'MESSAGE_REQUIRED' });
         }
         const lang = String(body.lang || 'en').toLowerCase() === 'ar' ? 'ar' : 'en';
         const context = body.context || {};
-        const systemAnswer = answerSystemCopilot(message, lang, context);
+        const serverContext = await buildAiDomainContext({ user: (req as any).user, branchId: (req as any).effectiveBranchId });
+        const liveContext = serverContext
+            ? {
+                ...context,
+                categories: serverContext.categories,
+                menuItems: serverContext.menuItems,
+                inventory: serverContext.inventory,
+                orders: serverContext.orders.rows,
+            }
+            : context;
+        const systemAnswer = answerSystemCopilot(message, lang, liveContext);
         if (systemAnswer) return res.json(systemAnswer);
         if (await aiKeyVaultService.resolveProvider() === 'SYSTEM') {
             return res.json(answerSystemCopilotFallback(lang));
@@ -646,6 +727,9 @@ export const chatAssistant = async (req: Request, res: Response) => {
 You are an ERP restaurant assistant.
 Respond in ${lang === 'ar' ? 'Arabic' : 'English'}.
 Be conversational, concise, and practical. Understand Egyptian Arabic and common spelling mistakes.
+You are RestoFlow Copilot: a restaurant operating system covering POS/orders, menu engineering, recipes and food cost, inventory and wastage, purchasing, CRM/customers, delivery and dispatch, kitchen/KDS, finance/treasury/day-close, HR/attendance/payroll, branches, printers and offline operations.
+When analyzing sales, distinguish revenue, order count, average ticket, cancellations and open orders. When analyzing menu, consider availability, price, cost, margin and preparation time. When analyzing inventory, distinguish master-item thresholds from branch warehouse quantities and never infer stock quantities that are absent. When discussing customers, protect phone/email/address privacy and summarize cohorts rather than exposing unnecessary personal data.
+Use the provenance block in Context to state the branch, period and freshness of the evidence. If evidence is missing, say so and ask for a report or date range. Never invent a metric, a completed action, a permission, or a provider status.
 Use previous conversation turns to resolve follow-up answers.
 If required details are missing or an entity is ambiguous, ask one clear follow-up question and return actions: [].
 Never claim an action was executed. Actions are only proposals that require server permission checks and user confirmation.
@@ -675,7 +759,7 @@ CRITICAL:
                 text: String(entry?.text || entry?.content || '').slice(0, 800),
             }))
             : [];
-        const contextSnapshot = {
+        const contextSnapshot = serverContext || {
             categories: Array.isArray(context.categories) ? context.categories.slice(0, 30).map((row: any) => ({ id: row.id, name: row.name, nameAr: row.nameAr })) : [],
             menuItems: Array.isArray(context.menuItems) ? context.menuItems.slice(0, 50).map((row: any) => ({ id: row.id, name: row.name, nameAr: row.nameAr, categoryId: row.categoryId, price: row.price, isAvailable: row.isAvailable })) : [],
             inventory: Array.isArray(context.inventory) ? context.inventory.slice(0, 40).map((row: any) => ({ id: row.id, name: row.name, quantity: row.quantity ?? row.currentStock, threshold: row.threshold ?? row.reorderLevel })) : [],
@@ -687,13 +771,18 @@ CRITICAL:
         };
 
         const prompt = `
-User Message: ${message}
-Previous conversation: ${JSON.stringify(history)}
-Context: ${JSON.stringify(contextSnapshot)}
+User Message:
+${wrapUntrustedAiData('user-message', message)}
+Previous conversation:
+${wrapUntrustedAiData('conversation-history', JSON.stringify(history))}
+Context:
+${wrapUntrustedAiData('business-context', JSON.stringify(contextSnapshot))}
 Answer with JSON only.
         `.trim();
 
-        const raw = await aiService.queryAI(prompt, systemPrompt);
+        let routeMetadata: { providerId: string; modelId: string; usedFallback: boolean; latencyMs?: number } | undefined;
+        const raw = await aiService.queryAI(prompt, systemPrompt, false, true, (route) => { routeMetadata = route; });
+        recordAiRoute({ userId: (req as any).user?.id, branchId: (req as any).effectiveBranchId, message, route: routeMetadata });
         let parsed = safeJsonParse(raw);
 
         // If the model didn't comply (extra prose/markdown), try a single "JSON repair" pass.
@@ -731,6 +820,7 @@ Answer with JSON only.
                 text,
                 actions: normalizeActionList((parsed as any).actions).filter((a) => allowedTypes.has(String((a as any)?.type || ''))),
                 suggestion: (parsed as any).suggestion || null,
+                route: routeMetadata || null,
             });
         }
 
@@ -738,6 +828,7 @@ Answer with JSON only.
             text: raw,
             actions: [],
             suggestion: null,
+            route: routeMetadata || null,
         });
     } catch (error: any) {
         console.warn('[AI] External assistant unavailable; using system copilot.', error?.message || error);
@@ -761,6 +852,56 @@ export const getAiKeyConfig = async (req: Request, res: Response) => {
     }
 };
 
+export const getAiRuntimeStatus = async (_req: Request, res: Response) => {
+    try {
+        const plan = await aiKeyVaultService.resolveProviderPlan();
+        const active = plan.find((item) => item.providerId !== 'SYSTEM' && (item.providerId === 'OLLAMA' || Boolean(item.apiKey)));
+        return res.json({
+            enabled: Boolean(active),
+            providerId: active?.providerId || 'SYSTEM',
+            modelId: active?.model || null,
+        });
+    } catch {
+        return res.json({ enabled: false, providerId: 'SYSTEM', modelId: null });
+    }
+};
+
+export const discoverAiModels = async (req: Request, res: Response) => {
+    try {
+        const provider = String(req.body?.provider || '').trim().toUpperCase();
+        if (!(AI_PROVIDER_IDS as readonly string[]).includes(provider)) {
+            return res.status(422).json({ error: { code: 'AI_PROVIDER_INVALID', message: 'Unknown AI provider' } });
+        }
+        const definition = getProviderDefinition(provider);
+        const plan = await aiKeyVaultService.resolveProviderPlan();
+        const active = plan.find((item) => item.providerId === provider);
+        const requestedEndpoint = String(req.body?.endpoint || active?.endpoint || definition.defaultEndpoint || '').trim();
+        const allowedHosts = String(process.env.AI_ALLOWED_PROVIDER_HOSTS || '').split(',');
+        const endpoint = provider === 'SYSTEM' ? '' : validateProviderEndpoint(provider, requestedEndpoint, allowedHosts);
+        const apiKey = String(req.body?.apiKey || active?.apiKey || '').trim() || undefined;
+        const models = await discoverProviderModels({ providerId: provider as any, apiKey, endpoint });
+        return res.json({ provider, models, fetchedAt: new Date().toISOString() });
+    } catch (error: any) {
+        const code = String(error?.code || error?.message || 'AI_MODEL_DISCOVERY_FAILED');
+        // This route is already authenticated. A 401 from the upstream AI
+        // provider means its key was missing/rejected, not that the ERP
+        // session expired. Keep that distinction on the wire so the client
+        // cannot refresh/logout the operator for a provider configuration
+        // error.
+        const status = Number(error?.status) === 401
+            ? 422
+            : code === 'AI_ENDPOINT_INVALID' || code === 'AI_ENDPOINT_HOST_NOT_ALLOWED' || code === 'AI_ENDPOINT_PROVIDER_MISMATCH'
+                ? 422
+                : 502;
+        const message = code === 'AI_PROVIDER_KEY_MISSING'
+            ? 'AI provider key is required'
+            : Number(error?.status) === 401
+                ? 'AI provider rejected the configured key'
+                : 'Unable to load models from provider';
+        return res.status(status).json({ error: { code, message } });
+    }
+};
+
 export const updateAiKeyConfig = async (req: Request, res: Response) => {
     try {
         const source = String(req.body?.source || 'DEFAULT').toUpperCase() === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT';
@@ -769,7 +910,12 @@ export const updateAiKeyConfig = async (req: Request, res: Response) => {
         const provider = req.body?.provider ? String(req.body.provider).toUpperCase() : undefined;
         const ollamaModel = req.body?.ollamaModel ? String(req.body.ollamaModel) : undefined;
         const groqModel = req.body?.groqModel ? String(req.body.groqModel) : undefined;
-        const config = await aiKeyVaultService.updateConfig({ source, customKey, model, provider: provider as any, ollamaModel, groqModel });
+        const endpoint = req.body?.endpoint ? String(req.body.endpoint) : undefined;
+        const providerModel = req.body?.providerModel ? String(req.body.providerModel) : undefined;
+        const fallbackProviders = Array.isArray(req.body?.fallbackProviders)
+            ? req.body.fallbackProviders.map((value: unknown) => String(value).toUpperCase())
+            : undefined;
+        const config = await aiKeyVaultService.updateConfig({ source, customKey, model, provider: provider as any, ollamaModel, groqModel, endpoint, providerModel, fallbackProviders });
         res.json(config);
     } catch (error: any) {
         const code = String(error?.message || '');
@@ -794,6 +940,9 @@ export const previewAction = async (req: Request, res: Response) => {
             const status = auth.code === 'AUTH_REQUIRED' ? 401 : auth.code === 'UNSAFE_ACTION_TYPE' ? 400 : 403;
             return res.status(status).json({ error: auth.code, message: auth.message });
         }
+        if (!isAiActionBranchAllowed(user, action)) {
+            return res.status(403).json({ error: 'AI_ACTION_BRANCH_FORBIDDEN', message: 'The action targets a branch outside your scope.' });
+        }
 
         const context = await loadAiGuardContext();
         const guarded = guardAction(action, context);
@@ -802,7 +951,7 @@ export const previewAction = async (req: Request, res: Response) => {
             guarded.reason = 'Missing required permission';
         }
 
-        res.json({ guarded, allowed: guarded.canExecute });
+        res.json({ guarded, allowed: guarded.canExecute, confirmationRequired: requiresAiConfirmation(auth.spec), confirmation: AI_EXECUTION_CONFIRMATION });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -813,7 +962,7 @@ export const previewAction = async (req: Request, res: Response) => {
  */
 export const getRevenueForecast = async (req: Request, res: Response) => {
     try {
-        const branchId = req.query.branchId as string;
+        const branchId = req.effectiveBranchId || (req.query.branchId as string | undefined);
         const data = await revenueForecastService.getRevenueForecast(branchId);
         res.json(data);
     } catch (error: any) {

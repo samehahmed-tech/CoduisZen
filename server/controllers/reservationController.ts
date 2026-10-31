@@ -4,6 +4,8 @@ import { reservations, tables } from '../../src/db/schema';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { getIO } from '../socket';
 import { getStringParam } from '../utils/request';
+import { canAccessBranch } from '../middleware/branchIsolation';
+import { createSignedAuditLog } from '../services/auditService';
 
 const VALID_STATUSES = new Set(['CONFIRMED', 'SEATED', 'COMPLETED', 'CANCELLED', 'NO_SHOW']);
 
@@ -12,10 +14,23 @@ const dayBounds = (date: string) => {
     return { day, start: new Date(`${day}T00:00:00`), end: new Date(`${day}T23:59:59.999`) };
 };
 
+const auditReservationMutation = (req: Request, eventType: string, branchId: string | null, payload: Record<string, unknown>, before?: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    before,
+    after,
+    reason: `Reservation mutation: ${eventType}`,
+});
+
 export const reservationController = {
     async list(req: Request, res: Response) {
         try {
-            const branchId = getStringParam(req.query.branchId);
+            const branchId = req.effectiveBranchId || getStringParam(req.query.branchId);
             if (!branchId) return res.status(400).json({ error: 'BRANCH_ID_REQUIRED' });
             const { day } = dayBounds(String(req.query.date || ''));
             const rows = await db.select().from(reservations).where(and(
@@ -32,7 +47,7 @@ export const reservationController = {
     async create(req: Request, res: Response) {
         try {
             const body = req.body || {};
-            const branchId = String(body.branchId || '').trim();
+            const branchId = String(req.effectiveBranchId || body.branchId || '').trim();
             const customerName = String(body.customerName || '').trim();
             const customerPhone = String(body.customerPhone || '').trim();
             const partySize = Number(body.partySize || 2);
@@ -71,6 +86,12 @@ export const reservationController = {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
+            await auditReservationMutation(req, 'RESERVATION_CREATED', branchId, {
+                reservationId: created?.id || null,
+                tableId: created?.tableId || null,
+                partySize: created?.partySize || partySize,
+                source: created?.source || body.source || 'PHONE',
+            }, undefined, { status: created?.status || 'CONFIRMED' });
             try { getIO().to(`branch:${branchId}`).emit('reservations:updated', created); } catch { /* socket optional */ }
             res.status(201).json(created);
         } catch (error: any) {
@@ -85,11 +106,19 @@ export const reservationController = {
             if (!id || !VALID_STATUSES.has(status)) {
                 return res.status(400).json({ error: 'VALID_ID_AND_STATUS_REQUIRED' });
             }
+            const [current] = await db.select().from(reservations).where(eq(reservations.id, id));
+            if (!current) return res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
+            if (!canAccessBranch(req.user, current.branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
             const [updated] = await db.update(reservations)
                 .set({ status, updatedAt: new Date() })
                 .output()
                 .where(eq(reservations.id, id));
             if (!updated) return res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
+            await auditReservationMutation(req, 'RESERVATION_STATUS_CHANGED', updated.branchId, {
+                reservationId: updated.id,
+                previousStatus: current.status,
+                status: updated.status,
+            }, { status: current.status }, { status: updated.status });
             try { getIO().to(`branch:${updated.branchId}`).emit('reservations:updated', updated); } catch { /* socket optional */ }
             res.json(updated);
         } catch (error: any) {

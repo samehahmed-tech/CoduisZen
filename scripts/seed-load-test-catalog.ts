@@ -377,7 +377,7 @@ async function main() {
         const pick = [GROUPS[idx % GROUPS.length], GROUPS[(idx + 2) % GROUPS.length]];
         return pick.map((g) => ({
             id: g.id, name: g.en, nameAr: g.ar, minSelection: 0, maxSelection: 3,
-            options: (g.opts as readonly (string | number)[][]).map((o, k) => ({ id: `${g.id}-o${k + 1}`, name: o[0], nameAr: o[1], price: o[2] })),
+            options: (g.opts as unknown as readonly (string | number)[][]).map((o, k) => ({ id: `${g.id}-o${k + 1}`, name: o[0], nameAr: o[1], price: o[2] })),
         }));
     };
     const sizesFor = (price: number) => ([

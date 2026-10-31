@@ -1,7 +1,17 @@
 import { Router } from 'express';
 import * as ctrl from '../controllers/inventoryIntelligenceController';
+import { enforceBranch } from '../middleware/branchIsolation';
+import { requireRoleOrPermission } from '../middleware/auth';
 
 const router = Router();
+
+const inventoryIntelligenceAuth = requireRoleOrPermission(
+    ['SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'WAREHOUSE_DIRECTOR', 'PROCUREMENT_MANAGER'],
+    ['OP_ADJUST_STOCK', 'OP_RECEIVE_GRN'],
+);
+
+router.use(inventoryIntelligenceAuth);
+router.use(enforceBranch);
 
 // Reorder & Purchasing
 router.get('/reorder-alerts', ctrl.getReorderAlerts);

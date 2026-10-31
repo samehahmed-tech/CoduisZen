@@ -1,0 +1,1201 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 19,
+  "filesSkipped": [],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 19,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 19,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": [
+    {
+      "path": "src/utils/kdsPolling.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 14,
+      "nonEmptyLines": 13,
+      "functions": [
+        {
+          "name": "reconcileKdsPolling",
+          "startLine": 3,
+          "endLine": 14,
+          "params": [
+            "connected",
+            "currentTimer",
+            "start",
+            "stop"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "KDS_FALLBACK_POLL_MS",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "reconcileKdsPolling",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "reconcileKdsPolling",
+          "callee": "stop",
+          "lineNumber": 10
+        },
+        {
+          "caller": "reconcileKdsPolling",
+          "callee": "start",
+          "lineNumber": 13
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/financePageGuard.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 28,
+      "nonEmptyLines": 24,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/installerRuntimeResilience.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 53,
+      "nonEmptyLines": 43,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/inventoryPageGuard.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 17,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/kdsPolling.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 19,
+      "nonEmptyLines": 15,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/kdsRouting.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 23,
+      "nonEmptyLines": 21,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/mapkitToken.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 77,
+      "nonEmptyLines": 67,
+      "functions": [
+        {
+          "name": "joseToDer",
+          "startLine": 58,
+          "endLine": 77,
+          "params": [
+            "sig"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "joseToDer",
+          "callee": "sig.subarray",
+          "lineNumber": 60
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "sig.subarray",
+          "lineNumber": 61
+        },
+        {
+          "caller": "trim",
+          "callee": "b.subarray",
+          "lineNumber": 65
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "trim",
+          "lineNumber": 67
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.from",
+          "lineNumber": 67
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "trim",
+          "lineNumber": 68
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.from",
+          "lineNumber": 68
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.concat",
+          "lineNumber": 69
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.from",
+          "lineNumber": 69
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.concat",
+          "lineNumber": 70
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.from",
+          "lineNumber": 70
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.concat",
+          "lineNumber": 71
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.from",
+          "lineNumber": 72
+        },
+        {
+          "caller": "joseToDer",
+          "callee": "Buffer.from",
+          "lineNumber": 74
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/orderStatusGuard.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 24,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/printerManagerGuard.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 24,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/routeAuthGuard.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 255,
+      "nonEmptyLines": 209,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/setup.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 167,
+      "nonEmptyLines": 145,
+      "functions": [
+        {
+          "name": "ensureTestDatabaseReady",
+          "startLine": 22,
+          "endLine": 46,
+          "params": []
+        },
+        {
+          "name": "deleteByPrefixes",
+          "startLine": 48,
+          "endLine": 57,
+          "params": [
+            "table",
+            "column"
+          ]
+        },
+        {
+          "name": "deleteByTestBranches",
+          "startLine": 59,
+          "endLine": 61,
+          "params": [
+            "table"
+          ]
+        },
+        {
+          "name": "targetedCleanup",
+          "startLine": 63,
+          "endLine": 145,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "import",
+          "lineNumber": 24
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "serverDb.waitForDatabase",
+          "lineNumber": 25
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "(async () => {\r\n            const serverDb = await import('../server/db');\r\n            await serverDb.waitForDatabase();\r\n            state.db = serverDb.db;\r\n            await state.db.execute(sql.raw(`\r\n                IF COL_LENGTH('dbo.purchase_orders', 'target_warehouse_id') IS NULL\r\n                    ALTER TABLE purchase_orders ADD target_warehouse_id nvarchar(255) NULL;\r\n            `));\r\n            await state.db.execute(sql.raw(`\r\n                IF COL_LENGTH('dbo.orders', 'scheduled_for') IS NULL\r\n                    ALTER TABLE orders ADD scheduled_for datetime2(3) NULL;\r\n            `));\r\n            state.ready = true;\r\n        })",
+          "lineNumber": 30
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "import",
+          "lineNumber": 31
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "serverDb.waitForDatabase",
+          "lineNumber": 32
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "state.db.execute",
+          "lineNumber": 34
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "sql.raw",
+          "lineNumber": 34
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "state.db.execute",
+          "lineNumber": 38
+        },
+        {
+          "caller": "ensureTestDatabaseReady",
+          "callee": "sql.raw",
+          "lineNumber": 38
+        },
+        {
+          "caller": "deleteByPrefixes",
+          "callee": "TEST_ID_PREFIXES\r\n        .map((prefix) => `${column} LIKE '${prefix}%'`)\r\n        .join",
+          "lineNumber": 52
+        },
+        {
+          "caller": "deleteByPrefixes",
+          "callee": "TEST_ID_PREFIXES\r\n        .map",
+          "lineNumber": 52
+        },
+        {
+          "caller": "deleteByPrefixes",
+          "callee": "db.execute",
+          "lineNumber": 56
+        },
+        {
+          "caller": "deleteByPrefixes",
+          "callee": "sql.raw",
+          "lineNumber": 56
+        },
+        {
+          "caller": "deleteByTestBranches",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 60
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute(sql.raw(`\r\n            DELETE FROM ${table}\r\n            WHERE order_id IN (\r\n                SELECT id FROM orders\r\n                WHERE branch_id LIKE 'test-%' OR branch_id LIKE 'debug-%' OR branch_id LIKE 'hist-%'\r\n            );\r\n        `)).catch",
+          "lineNumber": 74
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute",
+          "lineNumber": 74
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "sql.raw",
+          "lineNumber": 74
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute(sql.raw(`\r\n        UPDATE orders SET parent_order_id = NULL\r\n        WHERE parent_order_id IN (\r\n            SELECT id FROM orders\r\n            WHERE branch_id LIKE 'test-%' OR branch_id LIKE 'debug-%' OR branch_id LIKE 'hist-%'\r\n        );\r\n    `)).catch",
+          "lineNumber": 83
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute",
+          "lineNumber": 83
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "sql.raw",
+          "lineNumber": 83
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute(sql.raw(`\r\n        DELETE FROM orders\r\n        WHERE branch_id LIKE 'test-%' OR branch_id LIKE 'debug-%' OR branch_id LIKE 'hist-%';\r\n    `)).catch",
+          "lineNumber": 91
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute",
+          "lineNumber": 91
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "sql.raw",
+          "lineNumber": 91
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute(sql.raw(`\r\n        DELETE FROM user_sessions\r\n        WHERE user_id IN (\r\n            SELECT id FROM users\r\n            WHERE email LIKE '${TEST_EMAIL_PATTERN}'\r\n        );\r\n    `)).catch",
+          "lineNumber": 96
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute",
+          "lineNumber": 96
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "sql.raw",
+          "lineNumber": 96
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByTestBranches(table).catch",
+          "lineNumber": 118
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByTestBranches",
+          "lineNumber": 118
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('idempotency_keys', 'key').catch",
+          "lineNumber": 121
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 121
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('recipe_ingredients', 'recipe_id').catch",
+          "lineNumber": 122
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 122
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('inventory_stock', 'item_id').catch",
+          "lineNumber": 123
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 123
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('inventory_batches', 'id').catch",
+          "lineNumber": 124
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 124
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('recipes', 'id').catch",
+          "lineNumber": 125
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 125
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('menu_items', 'id').catch",
+          "lineNumber": 126
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 126
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('menu_categories', 'id').catch",
+          "lineNumber": 127
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 127
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('inventory_items', 'id').catch",
+          "lineNumber": 128
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 128
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('shifts', 'id').catch",
+          "lineNumber": 129
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 129
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('warehouses', 'id').catch",
+          "lineNumber": 130
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 130
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('cost_centers', 'id').catch",
+          "lineNumber": 131
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 131
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('fiscal_periods', 'id').catch",
+          "lineNumber": 132
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 132
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByTestBranches('tables').catch",
+          "lineNumber": 133
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByTestBranches",
+          "lineNumber": 133
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByTestBranches('floor_zones').catch",
+          "lineNumber": 134
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByTestBranches",
+          "lineNumber": 134
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute(sql.raw(`\r\n        DELETE FROM users\r\n        WHERE email LIKE '${TEST_EMAIL_PATTERN}'\r\n           OR id LIKE 'test-%'\r\n           OR id LIKE 'debug-%'\r\n           OR id LIKE 'hist-%';\r\n    `)).catch",
+          "lineNumber": 136
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "db.execute",
+          "lineNumber": 136
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "sql.raw",
+          "lineNumber": 136
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes('branches', 'id').catch",
+          "lineNumber": 144
+        },
+        {
+          "caller": "targetedCleanup",
+          "callee": "deleteByPrefixes",
+          "lineNumber": 144
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/shiftReconciliation.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 20,
+      "nonEmptyLines": 18,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "tests/syncQueueUtils.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 18,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "theme/engine/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 9,
+      "nonEmptyLines": 9,
+      "exports": [
+        {
+          "name": "MOTION_PROFILES",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "DEFAULT_MOTION_PROFILE",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "MotionProfile",
+          "line": 9,
+          "isDefault": false
+        },
+        {
+          "name": "MotionSignature",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "types/drizzle-mssql-compat.d.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 81,
+      "nonEmptyLines": 76,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "utils/menuImages.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 7,
+      "nonEmptyLines": 6,
+      "functions": [
+        {
+          "name": "itemImageSrc",
+          "startLine": 6,
+          "endLine": 7,
+          "params": [
+            "src"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DEFAULT_MENU_ITEM_IMAGE",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "itemImageSrc",
+          "line": 6,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "itemImageSrc",
+          "callee": "src.trim",
+          "lineNumber": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "vite-env.d.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 22,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "vite.config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 200,
+      "nonEmptyLines": 197,
+      "callGraph": [
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 74
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 75
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 76
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 77
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 78
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 79
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 80
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 81
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 82
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 83
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 84
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 85
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 90
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 91
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 92
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 94
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 95
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 95
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 96
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 97
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 98
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 99
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 100
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 104
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 115
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 116
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 116
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 118
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 119
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 120
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 121
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 122
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 123
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 124
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 130
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 130
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 132
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 132
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 133
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 134
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 135
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 136
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "/[/\\\\]types\\.ts$/.test",
+          "lineNumber": 138
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 138
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 139
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 139
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 140
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 140
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 142
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 143
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 144
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 145
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 146
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 147
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 148
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 149
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 150
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 151
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 152
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 156
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 157
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 158
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 159
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 160
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 160
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 161
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 162
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 163
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 163
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 164
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 165
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 166
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 167
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 168
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 169
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 170
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 171
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 172
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 173
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 174
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 175
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 176
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 177
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 177
+        },
+        {
+          "caller": "manualChunks",
+          "callee": "id.includes",
+          "lineNumber": 178
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "vitest.config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 27,
+      "nonEmptyLines": 26,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

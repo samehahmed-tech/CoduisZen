@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/table-pos-fix/Apply Table POS Fix.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/table-pos-fix/Apply Table POS Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 137,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/table-pos-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 22,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/table-pos-fix/Apply Table POS Fix.bat": [],
+    "scripts/sameh-installer/table-pos-fix/Apply Table POS Fix.ps1": [],
+    "scripts/sameh-installer/table-pos-fix/README AR.txt": []
+  }
+}

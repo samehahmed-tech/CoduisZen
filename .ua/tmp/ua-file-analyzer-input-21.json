@@ -1,0 +1,247 @@
+{
+  "projectRoot": "D:/Projects/restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "server/controllers/menuController.ts",
+      "language": "typescript",
+      "sizeLines": 1681,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/talabatAdminController.ts",
+      "language": "typescript",
+      "sizeLines": 233,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/controllers/talabatWebhookController.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatCatalogService.ts",
+      "language": "typescript",
+      "sizeLines": 187,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatClient.ts",
+      "language": "typescript",
+      "sizeLines": 121,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatConfig.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatIngestPure.ts",
+      "language": "typescript",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatMapper.ts",
+      "language": "typescript",
+      "sizeLines": 129,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatOutletService.ts",
+      "language": "typescript",
+      "sizeLines": 88,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatPromotionService.ts",
+      "language": "typescript",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatSyncService.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatTypes.ts",
+      "language": "typescript",
+      "sizeLines": 119,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/modules/talabat/talabatWebhookAuth.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/routes/talabatWebhookRoutes.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/dbCacheService.ts",
+      "language": "typescript",
+      "sizeLines": 139,
+      "fileCategory": "code"
+    },
+    {
+      "path": "server/services/pricingService.ts",
+      "language": "typescript",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/branchPricing.test.ts",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/menuSmartImport.test.ts",
+      "language": "typescript",
+      "sizeLines": 277,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/talabatCatalog.test.ts",
+      "language": "typescript",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/talabatClient.test.ts",
+      "language": "typescript",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/talabatMapper.test.ts",
+      "language": "typescript",
+      "sizeLines": 74,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/talabatOutlet.test.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/talabatPromotion.test.ts",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "server/controllers/menuController.ts": [
+      "server/db/index.ts",
+      "server/modules/talabat/talabatCatalogService.ts",
+      "server/services/auditService.ts",
+      "server/services/dbCacheService.ts",
+      "server/services/pricingService.ts",
+      "server/utils/request.ts",
+      "src/db/schema.ts",
+      "utils/menuCost.ts"
+    ],
+    "server/controllers/talabatAdminController.ts": [
+      "server/db/index.ts",
+      "server/modules/talabat/talabatCatalogService.ts",
+      "server/modules/talabat/talabatClient.ts",
+      "server/modules/talabat/talabatConfig.ts",
+      "server/modules/talabat/talabatIngestService.ts",
+      "server/modules/talabat/talabatOutletService.ts",
+      "server/modules/talabat/talabatPromotionService.ts",
+      "server/modules/talabat/talabatSyncService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/controllers/talabatWebhookController.ts": [
+      "server/modules/talabat/talabatIngestService.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/modules/talabat/talabatCatalogService.ts": [
+      "server/db/index.ts",
+      "server/modules/talabat/talabatClient.ts",
+      "server/modules/talabat/talabatConfig.ts",
+      "server/services/pricingService.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/modules/talabat/talabatClient.ts": [],
+    "server/modules/talabat/talabatConfig.ts": [
+      "server/db/index.ts",
+      "server/utils/settingsStore.ts",
+      "src/db/schema.ts"
+    ],
+    "server/modules/talabat/talabatIngestPure.ts": [
+      "server/modules/talabat/talabatConfig.ts",
+      "server/modules/talabat/talabatMapper.ts",
+      "server/modules/talabat/talabatTypes.ts"
+    ],
+    "server/modules/talabat/talabatMapper.ts": [
+      "server/modules/talabat/talabatTypes.ts"
+    ],
+    "server/modules/talabat/talabatOutletService.ts": [
+      "server/modules/talabat/talabatCatalogService.ts",
+      "server/modules/talabat/talabatClient.ts",
+      "server/modules/talabat/talabatConfig.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/modules/talabat/talabatPromotionService.ts": [
+      "server/modules/talabat/talabatCatalogService.ts",
+      "server/modules/talabat/talabatClient.ts",
+      "server/modules/talabat/talabatConfig.ts",
+      "server/utils/logger.ts"
+    ],
+    "server/modules/talabat/talabatSyncService.ts": [
+      "server/db/index.ts",
+      "server/modules/talabat/talabatClient.ts",
+      "server/modules/talabat/talabatConfig.ts",
+      "server/utils/logger.ts",
+      "src/db/schema.ts"
+    ],
+    "server/modules/talabat/talabatTypes.ts": [],
+    "server/modules/talabat/talabatWebhookAuth.ts": [
+      "server/modules/talabat/talabatConfig.ts",
+      "server/modules/talabat/talabatMapper.ts"
+    ],
+    "server/routes/talabatWebhookRoutes.ts": [
+      "server/controllers/talabatWebhookController.ts",
+      "server/modules/talabat/talabatWebhookAuth.ts"
+    ],
+    "server/services/dbCacheService.ts": [
+      "server/utils/logger.ts"
+    ],
+    "server/services/pricingService.ts": [],
+    "tests/branchPricing.test.ts": [
+      "server/services/pricingService.ts"
+    ],
+    "tests/menuSmartImport.test.ts": [
+      "server/controllers/menuController.ts",
+      "src/db/schema.ts"
+    ],
+    "tests/talabatCatalog.test.ts": [
+      "server/modules/talabat/talabatCatalogService.ts"
+    ],
+    "tests/talabatClient.test.ts": [
+      "server/modules/talabat/talabatClient.ts"
+    ],
+    "tests/talabatMapper.test.ts": [
+      "server/modules/talabat/talabatMapper.ts"
+    ],
+    "tests/talabatOutlet.test.ts": [
+      "server/modules/talabat/talabatOutletService.ts"
+    ],
+    "tests/talabatPromotion.test.ts": [
+      "server/modules/talabat/talabatPromotionService.ts"
+    ]
+  }
+}

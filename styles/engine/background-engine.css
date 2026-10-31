@@ -124,10 +124,3 @@ html[data-motion-level="reduced"] .workspace-shell[data-bg-engine] {
     border-radius: 0 !important;
     height: 100dvh !important;
 }
-
-@media (min-width: 1024px) {
-    .workspace-rail:not(.rail-pinned):hover,
-    .workspace-rail:not(.rail-pinned):focus-within {
-        width: var(--rail-w-collapsed) !important;
-    }
-}

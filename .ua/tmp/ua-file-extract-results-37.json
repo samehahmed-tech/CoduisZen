@@ -1,0 +1,3739 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 3,
+  "filesSkipped": [
+    "scripts/README AR - Final Setup.txt",
+    "scripts/one-click-builder.ps1",
+    "scripts/repackage-latest-fixes.ps1",
+    "scripts/run-schema-v2.ps1",
+    "scripts/run-sqlserver-schema.ps1",
+    "scripts/setup-openwa-gateway.ps1",
+    "scripts/upgrade-receipt-templates.ps1"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 3,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 3
+    }
+  },
+  "results": [
+    {
+      "path": "scripts/README_AR.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 89,
+      "nonEmptyLines": 60,
+      "sections": [
+        {
+          "heading": "Final Setup",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "بناء النسخة الكاملة",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "اختيار الجهاز",
+          "level": 2,
+          "line": 33
+        },
+        {
+          "heading": "الاسترداد التلقائي",
+          "level": 2,
+          "line": 42
+        },
+        {
+          "heading": "النسخ الاحتياطي والاسترجاع",
+          "level": 2,
+          "line": 58
+        },
+        {
+          "heading": "نقل الكتالوج من PostgreSQL القديم",
+          "level": 2,
+          "line": 76
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "scripts/sql-server-schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 3075,
+      "nonEmptyLines": 2843,
+      "definitions": [
+        {
+          "name": "users",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "email",
+            "password_hash",
+            "pin_code",
+            "pin_code_hash",
+            "role",
+            "role_id",
+            "permissions",
+            "custom_permissions",
+            "assigned_branch_id",
+            "allowed_branches",
+            "is_active",
+            "manager_pin",
+            "mfa_enabled",
+            "mfa_secret",
+            "pin_login_enabled",
+            "last_login_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 11,
+          "endLine": 34
+        },
+        {
+          "name": "payroll",
+          "kind": "table",
+          "fields": [
+            "id",
+            "user_id",
+            "month",
+            "base_salary",
+            "overtime_pay",
+            "bonuses",
+            "deductions",
+            "net_salary",
+            "status",
+            "paid_at",
+            "processed_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 39,
+          "endLine": 55
+        },
+        {
+          "name": "user_sessions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "user_id",
+            "token_id",
+            "device_name",
+            "user_agent",
+            "ip_address",
+            "is_active",
+            "revoked_at",
+            "expires_at",
+            "last_seen_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 59,
+          "endLine": 75
+        },
+        {
+          "name": "roles",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "description",
+            "description_ar",
+            "permissions",
+            "is_system",
+            "is_active",
+            "priority",
+            "color",
+            "icon",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 85,
+          "endLine": 101
+        },
+        {
+          "name": "permission_definitions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "description",
+            "description_ar",
+            "category",
+            "category_ar",
+            "sub_category",
+            "is_active",
+            "sort_order",
+            "depends_on",
+            "created_at"
+          ],
+          "startLine": 103,
+          "endLine": 119
+        },
+        {
+          "name": "branches",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "location",
+            "address",
+            "server_ip",
+            "day_close_emails",
+            "phone",
+            "email",
+            "is_active",
+            "lat",
+            "lng",
+            "timezone",
+            "currency",
+            "tax_rate",
+            "service_charge",
+            "business_date",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 125,
+          "endLine": 146
+        },
+        {
+          "name": "delivery_zones",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "branch_id",
+            "delivery_fee",
+            "min_order_amount",
+            "estimated_time",
+            "is_active",
+            "lat",
+            "lng"
+          ],
+          "startLine": 152,
+          "endLine": 165
+        },
+        {
+          "name": "customers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "phone",
+            "email",
+            "address",
+            "lat",
+            "lng",
+            "address_label",
+            "zone_id",
+            "area",
+            "building",
+            "floor",
+            "apartment",
+            "landmark",
+            "notes",
+            "visits",
+            "total_spent",
+            "loyalty_tier",
+            "loyalty_points",
+            "source",
+            "deleted_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 167,
+          "endLine": 194
+        },
+        {
+          "name": "customer_addresses",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "label",
+            "address",
+            "lat",
+            "lng",
+            "zone_id",
+            "area",
+            "building",
+            "floor",
+            "apartment",
+            "landmark",
+            "is_default",
+            "created_at"
+          ],
+          "startLine": 198,
+          "endLine": 216
+        },
+        {
+          "name": "menu_categories",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "description",
+            "icon",
+            "image",
+            "color",
+            "sort_order",
+            "is_active",
+            "target_order_types",
+            "menu_ids",
+            "printer_ids",
+            "deleted_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 222,
+          "endLine": 239
+        },
+        {
+          "name": "menu_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "category_id",
+            "name",
+            "name_ar",
+            "description",
+            "description_ar",
+            "price",
+            "cost",
+            "image",
+            "status",
+            "approved_by",
+            "approved_at",
+            "published_at",
+            "previous_price",
+            "pending_price",
+            "price_change_reason",
+            "price_approved_by",
+            "price_approved_at",
+            "is_available",
+            "available_from",
+            "available_to",
+            "available_days",
+            "modifier_groups",
+            "sizes",
+            "branch_pricing",
+            "platform_pricing",
+            "preparation_time",
+            "printer_ids",
+            "is_popular",
+            "is_featured",
+            "sort_order",
+            "layout_type",
+            "barcode",
+            "sku",
+            "is_tax_exempt",
+            "deleted_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 241,
+          "endLine": 284
+        },
+        {
+          "name": "modifier_groups",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "min_selection",
+            "max_selection",
+            "is_required",
+            "created_at"
+          ],
+          "startLine": 290,
+          "endLine": 299
+        },
+        {
+          "name": "modifier_options",
+          "kind": "table",
+          "fields": [
+            "id",
+            "group_id",
+            "name",
+            "name_ar",
+            "price",
+            "sort_order",
+            "is_available"
+          ],
+          "startLine": 301,
+          "endLine": 311
+        },
+        {
+          "name": "menu_item_modifiers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "menu_item_id",
+            "modifier_group_id",
+            "sort_order"
+          ],
+          "startLine": 313,
+          "endLine": 321
+        },
+        {
+          "name": "floor_zones",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "branch_id",
+            "width",
+            "height",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 327,
+          "endLine": 337
+        },
+        {
+          "name": "tables",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "zone_id",
+            "branch_id",
+            "x",
+            "y",
+            "width",
+            "height",
+            "shape",
+            "seats",
+            "discount_percent",
+            "default_coupon_code",
+            "min_spend",
+            "is_vip",
+            "notes",
+            "status",
+            "current_order_id",
+            "locked_by_user_id",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 339,
+          "endLine": 363
+        },
+        {
+          "name": "orders",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trace_id",
+            "parent_order_id",
+            "order_number",
+            "daily_order_number",
+            "type",
+            "source",
+            "branch_id",
+            "table_id",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "delivery_address",
+            "delivery_address_id",
+            "delivery_lat",
+            "delivery_lng",
+            "delivery_address_label",
+            "is_call_center_order",
+            "call_center_agent_id",
+            "status",
+            "subtotal",
+            "discount",
+            "discount_type",
+            "discount_reason",
+            "tax",
+            "delivery_fee",
+            "service_charge",
+            "total",
+            "tip_amount",
+            "free_delivery",
+            "is_urgent",
+            "is_paid",
+            "payment_method",
+            "paid_amount",
+            "change_amount",
+            "platform_order_id",
+            "delivery_source",
+            "notes",
+            "kitchen_notes",
+            "delivery_notes",
+            "driver_id",
+            "estimated_delivery_time",
+            "actual_delivery_time",
+            "sync_status",
+            "eta_receipt_uuid",
+            "eta_status",
+            "business_date",
+            "created_at",
+            "updated_at",
+            "completed_at",
+            "cancelled_at",
+            "cancel_reason",
+            "shift_id",
+            "deleted_at"
+          ],
+          "startLine": 369,
+          "endLine": 428
+        },
+        {
+          "name": "idempotency_keys",
+          "kind": "table",
+          "fields": [
+            "id",
+            "scope",
+            "request_hash",
+            "resource_id",
+            "response_code",
+            "response_body",
+            "status",
+            "expires_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 435,
+          "endLine": 448
+        },
+        {
+          "name": "order_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "menu_item_id",
+            "size_id",
+            "name",
+            "name_ar",
+            "price",
+            "cost",
+            "quantity",
+            "notes",
+            "modifiers",
+            "status",
+            "prepared_at",
+            "served_at",
+            "tax",
+            "seat_number",
+            "course"
+          ],
+          "startLine": 452,
+          "endLine": 473
+        },
+        {
+          "name": "order_status_history",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "status",
+            "changed_by",
+            "notes",
+            "created_at"
+          ],
+          "startLine": 478,
+          "endLine": 487
+        },
+        {
+          "name": "payments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "method",
+            "amount",
+            "reference_number",
+            "status",
+            "processed_by",
+            "created_at"
+          ],
+          "startLine": 493,
+          "endLine": 504
+        },
+        {
+          "name": "payment_sessions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "provider_type",
+            "status",
+            "amount",
+            "currency",
+            "verified",
+            "external_reference",
+            "idempotency_key",
+            "device_id",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 508,
+          "endLine": 525
+        },
+        {
+          "name": "ledger_entries",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "payment_session_id",
+            "account",
+            "direction",
+            "amount",
+            "currency",
+            "created_at"
+          ],
+          "startLine": 530,
+          "endLine": 542
+        },
+        {
+          "name": "shifts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "user_id",
+            "opening_time",
+            "closing_time",
+            "opening_balance",
+            "expected_balance",
+            "actual_balance",
+            "status",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 551,
+          "endLine": 567
+        },
+        {
+          "name": "warehouses",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "branch_id",
+            "type",
+            "parent_id",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 575,
+          "endLine": 587
+        },
+        {
+          "name": "inventory_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "sku",
+            "barcode",
+            "unit",
+            "category",
+            "threshold",
+            "cost_price",
+            "purchase_price",
+            "supplier_id",
+            "is_audited",
+            "audit_frequency",
+            "is_composite",
+            "bom",
+            "is_active",
+            "deleted_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 589,
+          "endLine": 610
+        },
+        {
+          "name": "inventory_ledger",
+          "kind": "table",
+          "fields": [
+            "id",
+            "product_id",
+            "branch_id",
+            "change",
+            "unit_cost",
+            "reason",
+            "reference_id",
+            "created_at"
+          ],
+          "startLine": 615,
+          "endLine": 627
+        },
+        {
+          "name": "inventory_stock",
+          "kind": "table",
+          "fields": [
+            "id",
+            "item_id",
+            "warehouse_id",
+            "quantity",
+            "last_updated"
+          ],
+          "startLine": 632,
+          "endLine": 641
+        },
+        {
+          "name": "stock_movements",
+          "kind": "table",
+          "fields": [
+            "id",
+            "item_id",
+            "from_warehouse_id",
+            "to_warehouse_id",
+            "quantity",
+            "unit_cost",
+            "total_cost",
+            "type",
+            "reference_id",
+            "reason",
+            "performed_by",
+            "created_at"
+          ],
+          "startLine": 645,
+          "endLine": 662
+        },
+        {
+          "name": "inventory_batches",
+          "kind": "table",
+          "fields": [
+            "id",
+            "item_id",
+            "warehouse_id",
+            "batch_number",
+            "received_date",
+            "expiry_date",
+            "initial_qty",
+            "current_qty",
+            "unit_cost",
+            "supplier_id",
+            "status",
+            "created_at"
+          ],
+          "startLine": 666,
+          "endLine": 682
+        },
+        {
+          "name": "batch_transactions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "batch_id",
+            "stock_movement_id",
+            "quantity_used",
+            "cost_at_time",
+            "created_at"
+          ],
+          "startLine": 687,
+          "endLine": 697
+        },
+        {
+          "name": "stock_counts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "warehouse_id",
+            "count_date",
+            "status",
+            "type",
+            "remarks",
+            "created_by",
+            "approved_by",
+            "scheduled_date",
+            "frozen_at",
+            "posted_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 699,
+          "endLine": 719
+        },
+        {
+          "name": "stock_count_lines",
+          "kind": "table",
+          "fields": [
+            "id",
+            "count_id",
+            "item_id",
+            "expected_qty",
+            "counted_qty",
+            "variance_qty",
+            "cost",
+            "notes"
+          ],
+          "startLine": 721,
+          "endLine": 733
+        },
+        {
+          "name": "recipes",
+          "kind": "table",
+          "fields": [
+            "id",
+            "menu_item_id",
+            "inventory_item_id",
+            "yield",
+            "size_id",
+            "instructions",
+            "version",
+            "current_version_id",
+            "calculated_cost",
+            "last_cost_calculation",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 739,
+          "endLine": 755
+        },
+        {
+          "name": "recipe_versions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "recipe_id",
+            "version",
+            "yield",
+            "size_id",
+            "instructions",
+            "ingredients_snapshot",
+            "calculated_cost",
+            "changed_by",
+            "change_reason",
+            "created_at"
+          ],
+          "startLine": 757,
+          "endLine": 772
+        },
+        {
+          "name": "recipe_ingredients",
+          "kind": "table",
+          "fields": [
+            "id",
+            "recipe_id",
+            "inventory_item_id",
+            "quantity",
+            "unit",
+            "notes",
+            "last_known_cost",
+            "last_cost_update"
+          ],
+          "startLine": 774,
+          "endLine": 786
+        },
+        {
+          "name": "suppliers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "contact_person",
+            "phone",
+            "email",
+            "address",
+            "category",
+            "payment_terms",
+            "notes",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 792,
+          "endLine": 806
+        },
+        {
+          "name": "purchase_orders",
+          "kind": "table",
+          "fields": [
+            "id",
+            "supplier_id",
+            "branch_id",
+            "target_warehouse_id",
+            "status",
+            "expected_date",
+            "subtotal",
+            "notes",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 808,
+          "endLine": 824
+        },
+        {
+          "name": "purchase_order_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "po_id",
+            "item_id",
+            "ordered_qty",
+            "received_qty",
+            "unit_price"
+          ],
+          "startLine": 826,
+          "endLine": 836
+        },
+        {
+          "name": "purchase_requests",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "department",
+            "status",
+            "requested_by",
+            "approved_by",
+            "expected_date",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 838,
+          "endLine": 853
+        },
+        {
+          "name": "purchase_request_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "pr_id",
+            "item_id",
+            "requested_qty",
+            "approved_qty"
+          ],
+          "startLine": 855,
+          "endLine": 864
+        },
+        {
+          "name": "goods_receipt_notes",
+          "kind": "table",
+          "fields": [
+            "id",
+            "po_id",
+            "supplier_id",
+            "branch_id",
+            "status",
+            "received_by",
+            "reference_number",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 866,
+          "endLine": 882
+        },
+        {
+          "name": "grn_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "grn_id",
+            "item_id",
+            "po_item_id",
+            "received_qty",
+            "rejected_qty",
+            "unit_price",
+            "expiry_date",
+            "batch_number"
+          ],
+          "startLine": 884,
+          "endLine": 898
+        },
+        {
+          "name": "supplier_invoices",
+          "kind": "table",
+          "fields": [
+            "id",
+            "supplier_id",
+            "grn_id",
+            "status",
+            "invoice_number",
+            "date",
+            "due_date",
+            "subtotal",
+            "tax",
+            "discount",
+            "total",
+            "amount_paid",
+            "notes",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 900,
+          "endLine": 921
+        },
+        {
+          "name": "supplier_invoice_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "invoice_id",
+            "item_id",
+            "qty",
+            "unit_price",
+            "total"
+          ],
+          "startLine": 923,
+          "endLine": 933
+        },
+        {
+          "name": "supplier_payments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "supplier_id",
+            "invoice_id",
+            "amount",
+            "payment_method",
+            "reference",
+            "status",
+            "created_by",
+            "created_at"
+          ],
+          "startLine": 935,
+          "endLine": 949
+        },
+        {
+          "name": "production_orders",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "recipe_id",
+            "menu_item_id",
+            "quantity",
+            "status",
+            "notes",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 955,
+          "endLine": 968
+        },
+        {
+          "name": "production_order_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "production_order_id",
+            "inventory_item_id",
+            "quantity_planned",
+            "quantity_used"
+          ],
+          "startLine": 970,
+          "endLine": 979
+        },
+        {
+          "name": "printers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "code",
+            "type",
+            "address",
+            "location",
+            "role",
+            "roles",
+            "station_id",
+            "gateway_id",
+            "is_primary_cashier",
+            "last_heartbeat_at",
+            "heartbeat_status",
+            "branch_id",
+            "is_active",
+            "paper_width",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 985,
+          "endLine": 1006
+        },
+        {
+          "name": "print_jobs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "gateway_id",
+            "type",
+            "content",
+            "content_type",
+            "status",
+            "claimed_by",
+            "claimed_at",
+            "completed_at",
+            "failed_at",
+            "error_message",
+            "attempts",
+            "max_attempts",
+            "printer_id",
+            "printer_address",
+            "printer_type",
+            "target_gateway_id",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1012,
+          "endLine": 1036
+        },
+        {
+          "name": "delivery_platforms",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "is_active",
+            "fee_percentage",
+            "apply_fees_to_menu_price",
+            "price_markup_percentage",
+            "price_markup_fixed",
+            "integration_type",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1045,
+          "endLine": 1057
+        },
+        {
+          "name": "drivers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "phone",
+            "branch_id",
+            "status",
+            "current_cash_balance",
+            "is_active",
+            "created_at"
+          ],
+          "startLine": 1059,
+          "endLine": 1070
+        },
+        {
+          "name": "driver_telemetry",
+          "kind": "table",
+          "fields": [
+            "id",
+            "driver_id",
+            "branch_id",
+            "lat",
+            "lng",
+            "speed_kmh",
+            "accuracy",
+            "heading",
+            "altitude",
+            "battery_level",
+            "is_charging",
+            "order_id",
+            "created_at"
+          ],
+          "startLine": 1072,
+          "endLine": 1089
+        },
+        {
+          "name": "driver_telemetry_latest",
+          "kind": "table",
+          "fields": [
+            "driver_id",
+            "branch_id",
+            "lat",
+            "lng",
+            "speed_kmh",
+            "accuracy",
+            "heading",
+            "battery_level",
+            "order_id",
+            "updated_at"
+          ],
+          "startLine": 1095,
+          "endLine": 1109
+        },
+        {
+          "name": "delivery_assignments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "driver_id",
+            "status",
+            "assigned_at",
+            "picked_up_at",
+            "delivered_at",
+            "notes"
+          ],
+          "startLine": 1111,
+          "endLine": 1123
+        },
+        {
+          "name": "cost_centers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "code",
+            "name",
+            "is_active",
+            "created_at"
+          ],
+          "startLine": 1129,
+          "endLine": 1139
+        },
+        {
+          "name": "fiscal_periods",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "start_date",
+            "end_date",
+            "status",
+            "closed_by",
+            "closed_at",
+            "created_at"
+          ],
+          "startLine": 1141,
+          "endLine": 1152
+        },
+        {
+          "name": "chart_of_accounts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "code",
+            "name",
+            "name_ar",
+            "type",
+            "normal_balance",
+            "parent_id",
+            "is_active",
+            "is_control_account",
+            "allow_manual_journals",
+            "created_at"
+          ],
+          "startLine": 1154,
+          "endLine": 1168
+        },
+        {
+          "name": "payment_method_accounts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "payment_method",
+            "account_id",
+            "branch_id"
+          ],
+          "startLine": 1173,
+          "endLine": 1182
+        },
+        {
+          "name": "tax_accounts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "tax_type",
+            "account_id",
+            "rate"
+          ],
+          "startLine": 1184,
+          "endLine": 1191
+        },
+        {
+          "name": "journal_entries",
+          "kind": "table",
+          "fields": [
+            "id",
+            "entry_number",
+            "date",
+            "reference",
+            "reference_type",
+            "description",
+            "status",
+            "fiscal_period_id",
+            "created_by",
+            "created_at"
+          ],
+          "startLine": 1193,
+          "endLine": 1205
+        },
+        {
+          "name": "journal_lines",
+          "kind": "table",
+          "fields": [
+            "id",
+            "journal_entry_id",
+            "account_id",
+            "cost_center_id",
+            "debit",
+            "credit",
+            "description"
+          ],
+          "startLine": 1211,
+          "endLine": 1223
+        },
+        {
+          "name": "posting_rules",
+          "kind": "table",
+          "fields": [
+            "id",
+            "document_type",
+            "amount_source",
+            "direction",
+            "account_code",
+            "condition_field",
+            "condition_value",
+            "is_active",
+            "is_system",
+            "version",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1229,
+          "endLine": 1243
+        },
+        {
+          "name": "recurring_journals",
+          "kind": "table",
+          "fields": [
+            "id",
+            "title",
+            "frequency",
+            "next_run_date",
+            "status",
+            "payload",
+            "last_run_date",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1245,
+          "endLine": 1256
+        },
+        {
+          "name": "budgets",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "branch_id",
+            "period_start",
+            "period_end",
+            "status",
+            "notes",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1258,
+          "endLine": 1272
+        },
+        {
+          "name": "budget_lines",
+          "kind": "table",
+          "fields": [
+            "id",
+            "budget_id",
+            "account_id",
+            "planned_amount",
+            "description"
+          ],
+          "startLine": 1274,
+          "endLine": 1283
+        },
+        {
+          "name": "finance_exceptions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "reference",
+            "reference_type",
+            "branch_id",
+            "payload",
+            "reason",
+            "status",
+            "resolved_by",
+            "resolved_at",
+            "resolution_notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1288,
+          "endLine": 1302
+        },
+        {
+          "name": "fiscal_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "branch_id",
+            "status",
+            "attempt",
+            "last_error",
+            "payload",
+            "response",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1308,
+          "endLine": 1320
+        },
+        {
+          "name": "eta_dead_letters",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "branch_id",
+            "payload",
+            "attempts",
+            "last_error",
+            "status",
+            "dismissed_by",
+            "dismissed_at",
+            "resolved_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1322,
+          "endLine": 1336
+        },
+        {
+          "name": "audit_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "event_type",
+            "user_id",
+            "user_name",
+            "user_role",
+            "branch_id",
+            "device_id",
+            "ip_address",
+            "payload",
+            "before",
+            "after",
+            "reason",
+            "signature",
+            "signature_version",
+            "is_verified",
+            "last_verified_at",
+            "created_at"
+          ],
+          "startLine": 1342,
+          "endLine": 1361
+        },
+        {
+          "name": "system_settings",
+          "kind": "table",
+          "fields": [
+            "id",
+            "value",
+            "category",
+            "updated_by",
+            "updated_at"
+          ],
+          "startLine": 1367,
+          "endLine": 1376
+        },
+        {
+          "name": "settings",
+          "kind": "table",
+          "fields": [
+            "value",
+            "category",
+            "updated_by",
+            "updated_at"
+          ],
+          "startLine": 1378,
+          "endLine": 1385
+        },
+        {
+          "name": "images",
+          "kind": "table",
+          "fields": [
+            "id",
+            "url",
+            "filename",
+            "content_type",
+            "width",
+            "height",
+            "size",
+            "created_at"
+          ],
+          "startLine": 1391,
+          "endLine": 1402
+        },
+        {
+          "name": "manager_approvals",
+          "kind": "table",
+          "fields": [
+            "id",
+            "manager_id",
+            "branch_id",
+            "action_type",
+            "related_id",
+            "reason",
+            "details",
+            "created_at"
+          ],
+          "startLine": 1408,
+          "endLine": 1420
+        },
+        {
+          "name": "webhook_endpoints",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "url",
+            "secret",
+            "events",
+            "is_active",
+            "branch_id",
+            "headers",
+            "retry_count",
+            "timeout_ms",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1426,
+          "endLine": 1441
+        },
+        {
+          "name": "webhook_deliveries",
+          "kind": "table",
+          "fields": [
+            "id",
+            "endpoint_id",
+            "event",
+            "payload",
+            "status",
+            "http_status",
+            "response_body",
+            "attempt",
+            "duration_ms",
+            "next_retry_at",
+            "created_at"
+          ],
+          "startLine": 1443,
+          "endLine": 1457
+        },
+        {
+          "name": "day_close_reports",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "business_date",
+            "status",
+            "opened_at",
+            "closed_at",
+            "gross_sales",
+            "net_sales",
+            "discounts",
+            "void_amount",
+            "refund_amount",
+            "taxes",
+            "tips",
+            "delivery_fees",
+            "service_charges",
+            "cash_sales",
+            "card_sales",
+            "expected_cash",
+            "actual_cash",
+            "cash_difference",
+            "total_transactions",
+            "operational_snapshot",
+            "notes",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1463,
+          "endLine": 1493
+        },
+        {
+          "name": "daily_branch_summaries",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "business_date",
+            "total_orders",
+            "total_revenue",
+            "total_cost",
+            "total_profit",
+            "total_discounts",
+            "total_taxes",
+            "total_tips",
+            "avg_order_value",
+            "items_sold_count",
+            "top_items",
+            "summary_metrics",
+            "created_at"
+          ],
+          "startLine": 1499,
+          "endLine": 1517
+        },
+        {
+          "name": "item_daily_snapshots",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "menu_item_id",
+            "business_date",
+            "total_qty",
+            "total_revenue",
+            "total_cost",
+            "created_at"
+          ],
+          "startLine": 1519,
+          "endLine": 1530
+        },
+        {
+          "name": "departments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "branch_id",
+            "is_active",
+            "created_at"
+          ],
+          "startLine": 1536,
+          "endLine": 1545
+        },
+        {
+          "name": "job_titles",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "department_id",
+            "is_active",
+            "created_at"
+          ],
+          "startLine": 1547,
+          "endLine": 1556
+        },
+        {
+          "name": "employees",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "user_id",
+            "name",
+            "name_ar",
+            "phone",
+            "email",
+            "role",
+            "department_id",
+            "job_title_id",
+            "basic_salary",
+            "hourly_rate",
+            "emergency_contact",
+            "bank_account",
+            "national_id",
+            "employee_code",
+            "attendance_code",
+            "joined_at",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1558,
+          "endLine": 1585
+        },
+        {
+          "name": "employee_documents",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "document_type",
+            "title",
+            "document_number",
+            "issue_date",
+            "expiry_date",
+            "file_url",
+            "status",
+            "notes",
+            "metadata",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1587,
+          "endLine": 1605
+        },
+        {
+          "name": "employee_compensation_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "type",
+            "label",
+            "label_ar",
+            "amount",
+            "frequency",
+            "is_active",
+            "effective_from",
+            "effective_to",
+            "metadata",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1610,
+          "endLine": 1626
+        },
+        {
+          "name": "leave_types",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "default_days",
+            "is_paid",
+            "is_active",
+            "created_at"
+          ],
+          "startLine": 1632,
+          "endLine": 1641
+        },
+        {
+          "name": "leave_requests",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "leave_type_id",
+            "start_date",
+            "end_date",
+            "total_days",
+            "reason",
+            "status",
+            "approved_by",
+            "approved_at",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1643,
+          "endLine": 1661
+        },
+        {
+          "name": "leave_balances",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "leave_type_id",
+            "year",
+            "total_days",
+            "used_days",
+            "pending_days",
+            "remaining_days",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1663,
+          "endLine": 1677
+        },
+        {
+          "name": "overtime_entries",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "date",
+            "hours",
+            "rate_multiplier",
+            "amount",
+            "reason",
+            "status",
+            "approved_by",
+            "approved_at",
+            "created_at"
+          ],
+          "startLine": 1683,
+          "endLine": 1697
+        },
+        {
+          "name": "attendance_policies",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "code",
+            "grace_late_minutes",
+            "early_leave_tolerance_minutes",
+            "overtime_threshold_minutes",
+            "min_hours_for_present",
+            "attendance_processing_mode",
+            "operational_day_start_hour",
+            "operational_day_end_hour",
+            "max_smart_session_hours",
+            "geofence_strict",
+            "face_recognition_required",
+            "auto_close_open_sessions",
+            "auto_resolve_missing_out",
+            "is_default",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1703,
+          "endLine": 1726
+        },
+        {
+          "name": "attendance_devices",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "code",
+            "vendor",
+            "model",
+            "source_type",
+            "ip_address",
+            "port",
+            "serial_number",
+            "communication_mode",
+            "branch_gateway_id",
+            "is_active",
+            "last_seen_at",
+            "last_sync_at",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1730,
+          "endLine": 1751
+        },
+        {
+          "name": "attendance_device_mappings",
+          "kind": "table",
+          "fields": [
+            "id",
+            "device_id",
+            "employee_id",
+            "device_user_id",
+            "employee_code_snapshot",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1755,
+          "endLine": 1767
+        },
+        {
+          "name": "attendance_sync_runs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "device_id",
+            "source_type",
+            "status",
+            "logs_received",
+            "logs_accepted",
+            "logs_rejected",
+            "error_message",
+            "metadata",
+            "started_at",
+            "completed_at",
+            "created_at"
+          ],
+          "startLine": 1772,
+          "endLine": 1789
+        },
+        {
+          "name": "attendance_raw_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "sync_run_id",
+            "device_id",
+            "employee_id",
+            "branch_id",
+            "source_type",
+            "event_type",
+            "employee_identifier",
+            "device_user_id",
+            "occurred_at",
+            "device_occurred_at",
+            "geo_lat",
+            "geo_lng",
+            "geo_accuracy_meters",
+            "confidence_score",
+            "image_url",
+            "dedupe_hash",
+            "processing_status",
+            "processing_notes",
+            "raw_payload",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1791,
+          "endLine": 1820
+        },
+        {
+          "name": "attendance_geofences",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "latitude",
+            "longitude",
+            "radius_meters",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1826,
+          "endLine": 1838
+        },
+        {
+          "name": "attendance_sessions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "source_type",
+            "status",
+            "clock_in_at",
+            "clock_out_at",
+            "total_hours",
+            "late_minutes",
+            "early_leave_minutes",
+            "overtime_minutes",
+            "risk_flags",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1842,
+          "endLine": 1865
+        },
+        {
+          "name": "attendance_corrections",
+          "kind": "table",
+          "fields": [
+            "id",
+            "session_id",
+            "employee_id",
+            "requested_by",
+            "approved_by",
+            "status",
+            "requested_clock_in_at",
+            "requested_clock_out_at",
+            "reason",
+            "approver_notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1870,
+          "endLine": 1888
+        },
+        {
+          "name": "attendance_exceptions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "raw_log_id",
+            "session_id",
+            "type",
+            "severity",
+            "status",
+            "title",
+            "details",
+            "metadata",
+            "assigned_to",
+            "sla_due_at",
+            "escalation_level",
+            "last_escalated_at",
+            "resolved_by",
+            "resolved_at",
+            "resolution_notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1890,
+          "endLine": 1918
+        },
+        {
+          "name": "shift_templates",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "code",
+            "attendance_policy_id",
+            "start_time",
+            "end_time",
+            "break_minutes",
+            "grace_late_minutes",
+            "early_leave_tolerance_minutes",
+            "overtime_threshold_minutes",
+            "work_days",
+            "is_overnight",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1929,
+          "endLine": 1949
+        },
+        {
+          "name": "employee_shift_assignments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "shift_template_id",
+            "effective_from",
+            "effective_to",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1953,
+          "endLine": 1965
+        },
+        {
+          "name": "shift_plans",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "plan_date",
+            "status",
+            "notes",
+            "created_by",
+            "approved_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1967,
+          "endLine": 1980
+        },
+        {
+          "name": "shift_plan_entries",
+          "kind": "table",
+          "fields": [
+            "id",
+            "shift_plan_id",
+            "employee_id",
+            "shift_template_id",
+            "start_time",
+            "end_time",
+            "notes",
+            "created_at"
+          ],
+          "startLine": 1982,
+          "endLine": 1994
+        },
+        {
+          "name": "shift_tasks",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "description",
+            "frequency",
+            "assigned_role",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 1996,
+          "endLine": 2008
+        },
+        {
+          "name": "shift_task_runs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "task_id",
+            "branch_id",
+            "assigned_to",
+            "status",
+            "completed_at",
+            "notes",
+            "created_at"
+          ],
+          "startLine": 2010,
+          "endLine": 2022
+        },
+        {
+          "name": "payroll_profiles",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "branch_id",
+            "description",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2028,
+          "endLine": 2038
+        },
+        {
+          "name": "payroll_components",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "type",
+            "calculation_method",
+            "amount",
+            "rate",
+            "is_taxable",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2040,
+          "endLine": 2053
+        },
+        {
+          "name": "payroll_rules",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "type",
+            "conditions",
+            "action",
+            "value",
+            "priority",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2055,
+          "endLine": 2067
+        },
+        {
+          "name": "employee_payroll_assignments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "profile_id",
+            "basic_salary",
+            "hourly_rate",
+            "effective_from",
+            "effective_to",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2069,
+          "endLine": 2083
+        },
+        {
+          "name": "payroll_cycles",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "period_start",
+            "period_end",
+            "status",
+            "total_amount",
+            "executed_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2085,
+          "endLine": 2098
+        },
+        {
+          "name": "payroll_runs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "cycle_id",
+            "status",
+            "total_gross",
+            "total_deductions",
+            "total_net",
+            "notes",
+            "processed_by",
+            "processed_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2100,
+          "endLine": 2114
+        },
+        {
+          "name": "payroll_run_lines",
+          "kind": "table",
+          "fields": [
+            "id",
+            "run_id",
+            "employee_id",
+            "basic_salary",
+            "total_earnings",
+            "total_deductions",
+            "net_pay",
+            "overtime_amount",
+            "bonus_amount",
+            "loan_deduction",
+            "tax_amount",
+            "breakdown",
+            "notes",
+            "created_at"
+          ],
+          "startLine": 2116,
+          "endLine": 2134
+        },
+        {
+          "name": "payroll_locks",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "employee_id",
+            "period_start",
+            "period_end",
+            "locked_by",
+            "locked_at",
+            "reason"
+          ],
+          "startLine": 2136,
+          "endLine": 2148
+        },
+        {
+          "name": "payslips",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "run_id",
+            "period_start",
+            "period_end",
+            "gross_pay",
+            "total_deductions",
+            "net_pay",
+            "breakdown",
+            "status",
+            "issued_at",
+            "paid_at",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2150,
+          "endLine": 2169
+        },
+        {
+          "name": "bonus_penalty_records",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "type",
+            "amount",
+            "reason",
+            "date",
+            "status",
+            "approved_by",
+            "approved_at",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2171,
+          "endLine": 2189
+        },
+        {
+          "name": "employee_loans",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "amount",
+            "total_installments",
+            "remaining_amount",
+            "reason",
+            "status",
+            "approved_by",
+            "approved_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2191,
+          "endLine": 2208
+        },
+        {
+          "name": "loan_installments",
+          "kind": "table",
+          "fields": [
+            "id",
+            "loan_id",
+            "installment_number",
+            "amount",
+            "due_date",
+            "paid_date",
+            "status",
+            "notes",
+            "created_at"
+          ],
+          "startLine": 2210,
+          "endLine": 2222
+        },
+        {
+          "name": "payroll_payouts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "run_id",
+            "employee_id",
+            "amount",
+            "payment_method",
+            "reference",
+            "status",
+            "paid_at",
+            "processed_by",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2224,
+          "endLine": 2240
+        },
+        {
+          "name": "customer_rfm_metrics",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "recency_days",
+            "frequency",
+            "monetary_value",
+            "rfm_score",
+            "segment",
+            "calculated_at"
+          ],
+          "startLine": 2246,
+          "endLine": 2257
+        },
+        {
+          "name": "customer_wallets",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "balance",
+            "currency",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2259,
+          "endLine": 2268
+        },
+        {
+          "name": "wallet_transactions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "wallet_id",
+            "amount",
+            "type",
+            "reference",
+            "description",
+            "created_at"
+          ],
+          "startLine": 2270,
+          "endLine": 2280
+        },
+        {
+          "name": "loyalty_rewards",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_ar",
+            "points_required",
+            "reward_type",
+            "value",
+            "description",
+            "is_active",
+            "created_at"
+          ],
+          "startLine": 2282,
+          "endLine": 2293
+        },
+        {
+          "name": "loyalty_ledger",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "points",
+            "type",
+            "reference",
+            "description",
+            "created_at"
+          ],
+          "startLine": 2295,
+          "endLine": 2305
+        },
+        {
+          "name": "coupons",
+          "kind": "table",
+          "fields": [
+            "id",
+            "code",
+            "type",
+            "value",
+            "min_order",
+            "max_uses",
+            "current_uses",
+            "valid_from",
+            "valid_to",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2307,
+          "endLine": 2321
+        },
+        {
+          "name": "customer_complaints",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "order_id",
+            "branch_id",
+            "type",
+            "subject",
+            "description",
+            "status",
+            "priority",
+            "assigned_to",
+            "resolved_at",
+            "resolution",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2323,
+          "endLine": 2342
+        },
+        {
+          "name": "campaigns",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "type",
+            "branch_id",
+            "start_date",
+            "end_date",
+            "budget",
+            "status",
+            "target_audience",
+            "channels",
+            "metrics",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2348,
+          "endLine": 2364
+        },
+        {
+          "name": "campaign_logs",
+          "kind": "table",
+          "fields": [
+            "id",
+            "campaign_id",
+            "event",
+            "payload",
+            "created_at"
+          ],
+          "startLine": 2366,
+          "endLine": 2374
+        },
+        {
+          "name": "whatsapp_messages",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "order_id",
+            "direction",
+            "message_type",
+            "content",
+            "media_url",
+            "status",
+            "provider_message_id",
+            "created_at"
+          ],
+          "startLine": 2380,
+          "endLine": 2392
+        },
+        {
+          "name": "notifications",
+          "kind": "table",
+          "fields": [
+            "id",
+            "user_id",
+            "type",
+            "title",
+            "body",
+            "data",
+            "is_read",
+            "read_at",
+            "created_at"
+          ],
+          "startLine": 2394,
+          "endLine": 2406
+        },
+        {
+          "name": "internal_messages",
+          "kind": "table",
+          "fields": [
+            "id",
+            "sender_id",
+            "recipient_id",
+            "subject",
+            "body",
+            "is_read",
+            "read_at",
+            "parent_id",
+            "created_at"
+          ],
+          "startLine": 2408,
+          "endLine": 2421
+        },
+        {
+          "name": "reservations",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "table_id",
+            "guests",
+            "reservation_time",
+            "status",
+            "notes",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2427,
+          "endLine": 2445
+        },
+        {
+          "name": "waitlists",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "customer_id",
+            "customer_name",
+            "customer_phone",
+            "guests",
+            "status",
+            "position",
+            "estimated_wait_minutes",
+            "table_id",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2451,
+          "endLine": 2467
+        },
+        {
+          "name": "kds_tickets",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "order_id",
+            "routing_station",
+            "target_time",
+            "status",
+            "priority",
+            "printed_at",
+            "bumped_at",
+            "completed_by",
+            "completed_by_name",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2473,
+          "endLine": 2490
+        },
+        {
+          "name": "kds_ticket_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "kds_ticket_id",
+            "order_item_id",
+            "menu_item_id",
+            "item_name",
+            "quantity",
+            "modifiers_text",
+            "is_bumped"
+          ],
+          "startLine": 2492,
+          "endLine": 2503
+        },
+        {
+          "name": "user_daily_performance",
+          "kind": "table",
+          "fields": [
+            "id",
+            "user_id",
+            "branch_id",
+            "business_date",
+            "orders_processed",
+            "total_sales",
+            "avg_order_time",
+            "void_count",
+            "refund_count",
+            "metrics",
+            "created_at"
+          ],
+          "startLine": 2509,
+          "endLine": 2524
+        },
+        {
+          "name": "refund_records",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "branch_id",
+            "amount",
+            "reason",
+            "method",
+            "status",
+            "processed_by",
+            "approved_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2530,
+          "endLine": 2545
+        },
+        {
+          "name": "domain_events",
+          "kind": "table",
+          "fields": [
+            "id",
+            "type",
+            "aggregate_type",
+            "aggregate_id",
+            "payload",
+            "status",
+            "published_at",
+            "created_at"
+          ],
+          "startLine": 2551,
+          "endLine": 2561
+        },
+        {
+          "name": "attendance",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "branch_id",
+            "date",
+            "clock_in",
+            "clock_out",
+            "status",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2567,
+          "endLine": 2581
+        },
+        {
+          "name": "onboarding_records",
+          "kind": "table",
+          "fields": [
+            "id",
+            "employee_id",
+            "step",
+            "status",
+            "completed_by",
+            "completed_at",
+            "notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2583,
+          "endLine": 2595
+        },
+        {
+          "name": "subscription_plans",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "code",
+            "description",
+            "price_monthly",
+            "price_yearly",
+            "max_branches",
+            "max_users",
+            "features",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2601,
+          "endLine": 2615
+        },
+        {
+          "name": "subscriptions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "tenant_id",
+            "plan_id",
+            "status",
+            "billing_cycle",
+            "current_period_start",
+            "current_period_end",
+            "cancelled_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2617,
+          "endLine": 2630
+        },
+        {
+          "name": "franchise_configurations",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "franchise_fee_percent",
+            "royalty_fee_percent",
+            "marketing_fee_percent",
+            "contract_start",
+            "contract_end",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2636,
+          "endLine": 2649
+        },
+        {
+          "name": "bank_accounts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "name",
+            "account_type",
+            "institution",
+            "account_number",
+            "account_id",
+            "opening_balance",
+            "is_active",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2951,
+          "endLine": 2956
+        },
+        {
+          "name": "account_transfers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "from_account_id",
+            "to_account_id",
+            "amount",
+            "reason",
+            "status",
+            "requested_by",
+            "approved_by",
+            "completed_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2959,
+          "endLine": 2964
+        },
+        {
+          "name": "daily_pnl_snapshots",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "business_date",
+            "total_revenue",
+            "total_discount",
+            "total_tax",
+            "net_sales",
+            "total_orders",
+            "cogs",
+            "food_cost_percent",
+            "labor_cost",
+            "labor_cost_percent",
+            "operating_expenses",
+            "gross_profit",
+            "gross_margin_percent",
+            "operating_income",
+            "net_margin_percent",
+            "status",
+            "finalized_by",
+            "finalized_at",
+            "computed_at",
+            "updated_at"
+          ],
+          "startLine": 2967,
+          "endLine": 2974
+        },
+        {
+          "name": "cash_drawers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "opened_by",
+            "closed_by",
+            "opened_at",
+            "closed_at",
+            "opening_cash",
+            "closing_cash",
+            "expected_cash",
+            "total_sales_cash",
+            "total_refunds_cash",
+            "total_payouts_cash",
+            "total_collections_cash",
+            "variance",
+            "status",
+            "notes",
+            "updated_at"
+          ],
+          "startLine": 2977,
+          "endLine": 2982
+        },
+        {
+          "name": "drawer_count_lines",
+          "kind": "table",
+          "fields": [
+            "id",
+            "drawer_id",
+            "count_type",
+            "label",
+            "face_value",
+            "quantity",
+            "line_total",
+            "counted_by",
+            "created_at"
+          ],
+          "startLine": 2985,
+          "endLine": 2988
+        },
+        {
+          "name": "drawer_discrepancies",
+          "kind": "table",
+          "fields": [
+            "id",
+            "drawer_id",
+            "branch_id",
+            "cashier_id",
+            "shift_id",
+            "variance",
+            "direction",
+            "resolution",
+            "approved_by",
+            "approved_at",
+            "amount_paid",
+            "notes",
+            "resolved_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2991,
+          "endLine": 2996
+        },
+        {
+          "name": "gift_cards",
+          "kind": "table",
+          "fields": [
+            "id",
+            "code",
+            "branch_id",
+            "customer_id",
+            "purchased_order_id",
+            "initial_amount",
+            "balance",
+            "status",
+            "expires_at",
+            "created_by",
+            "issued_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 2999,
+          "endLine": 3003
+        },
+        {
+          "name": "gift_card_transactions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "gift_card_id",
+            "type",
+            "amount",
+            "balance_after",
+            "order_id",
+            "created_by",
+            "created_at"
+          ],
+          "startLine": 3006,
+          "endLine": 3009
+        },
+        {
+          "name": "supplier_invoice_matches",
+          "kind": "table",
+          "fields": [
+            "id",
+            "supplier_invoice_id",
+            "purchase_order_id",
+            "grn_id",
+            "expected_total",
+            "grn_total",
+            "invoice_total",
+            "quantity_variance",
+            "price_variance",
+            "match_status",
+            "review_status",
+            "reviewed_by",
+            "reviewed_at",
+            "notes",
+            "review_notes",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 3012,
+          "endLine": 3017
+        },
+        {
+          "name": "tip_pools",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "shift_id",
+            "pooled_amount",
+            "payment_method",
+            "distribution_method",
+            "status",
+            "paid_out_at",
+            "allocated_by",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 3020,
+          "endLine": 3024
+        },
+        {
+          "name": "tip_allocations",
+          "kind": "table",
+          "fields": [
+            "id",
+            "tip_pool_id",
+            "employee_id",
+            "base_hours",
+            "role_weight",
+            "allocated_amount",
+            "paid_out",
+            "created_at"
+          ],
+          "startLine": 3027,
+          "endLine": 3030
+        },
+        {
+          "name": "treasury_vouchers",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "voucher_no",
+            "kind",
+            "category",
+            "account_id",
+            "amount",
+            "supplier_id",
+            "invoice_id",
+            "holder_user_id",
+            "holder_name",
+            "expense_account_code",
+            "description",
+            "payment_method",
+            "reference",
+            "status",
+            "requested_by",
+            "approved_by",
+            "completed_at",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 3033,
+          "endLine": 3040
+        },
+        {
+          "name": "driver_cash_ledger",
+          "kind": "table",
+          "fields": [
+            "id",
+            "driver_id",
+            "branch_id",
+            "order_id",
+            "type",
+            "amount",
+            "balance_after",
+            "created_by",
+            "notes",
+            "created_at"
+          ],
+          "startLine": 3043,
+          "endLine": 3047
+        },
+        {
+          "name": "driver_branch_checkins",
+          "kind": "table",
+          "fields": [
+            "id",
+            "driver_id",
+            "branch_id",
+            "status",
+            "requested_at",
+            "decided_at",
+            "decided_by",
+            "notes"
+          ],
+          "startLine": 3050,
+          "endLine": 3054
+        },
+        {
+          "name": "mail_messages",
+          "kind": "table",
+          "fields": [
+            "id",
+            "branch_id",
+            "sender_id",
+            "subject",
+            "body",
+            "priority",
+            "is_broadcast",
+            "broadcast_scope",
+            "reply_to_message_id",
+            "created_at"
+          ],
+          "startLine": 3057,
+          "endLine": 3061
+        },
+        {
+          "name": "mail_message_recipients",
+          "kind": "table",
+          "fields": [
+            "id",
+            "message_id",
+            "user_id",
+            "is_read",
+            "read_at",
+            "is_starred",
+            "is_archived"
+          ],
+          "startLine": 3064,
+          "endLine": 3068
+        },
+        {
+          "name": "idx_users_email",
+          "kind": "index",
+          "fields": [],
+          "startLine": 36,
+          "endLine": 36
+        },
+        {
+          "name": "idx_users_role",
+          "kind": "index",
+          "fields": [],
+          "startLine": 37,
+          "endLine": 37
+        },
+        {
+          "name": "idx_payroll_user_month",
+          "kind": "index",
+          "fields": [],
+          "startLine": 57,
+          "endLine": 57
+        },
+        {
+          "name": "idx_user_sessions_user_active",
+          "kind": "index",
+          "fields": [],
+          "startLine": 77,
+          "endLine": 77
+        },
+        {
+          "name": "idx_user_sessions_last_seen",
+          "kind": "index",
+          "fields": [],
+          "startLine": 78,
+          "endLine": 78
+        },
+        {
+          "name": "idx_user_sessions_expires",
+          "kind": "index",
+          "fields": [],
+          "startLine": 79,
+          "endLine": 79
+        },
+        {
+          "name": "idx_customers_name",
+          "kind": "index",
+          "fields": [],
+          "startLine": 196,
+          "endLine": 196
+        },
+        {
+          "name": "idx_menu_items_category",
+          "kind": "index",
+          "fields": [],
+          "startLine": 286,
+          "endLine": 286
+        },
+        {
+          "name": "idx_menu_items_barcode",
+          "kind": "index",
+          "fields": [],
+          "startLine": 287,
+          "endLine": 287
+        },
+        {
+          "name": "idx_menu_items_sku",
+          "kind": "index",
+          "fields": [],
+          "startLine": 288,
+          "endLine": 288
+        },
+        {
+          "name": "idx_orders_branch_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 430,
+          "endLine": 430
+        },
+        {
+          "name": "idx_orders_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 431,
+          "endLine": 431
+        },
+        {
+          "name": "idx_orders_customer",
+          "kind": "index",
+          "fields": [],
+          "startLine": 432,
+          "endLine": 432
+        },
+        {
+          "name": "idx_orders_shift",
+          "kind": "index",
+          "fields": [],
+          "startLine": 433,
+          "endLine": 433
+        },
+        {
+          "name": "idx_idempotency_keys_key_scope",
+          "kind": "index",
+          "fields": [],
+          "startLine": 450,
+          "endLine": 450
+        },
+        {
+          "name": "idx_order_items_order",
+          "kind": "index",
+          "fields": [],
+          "startLine": 475,
+          "endLine": 475
+        },
+        {
+          "name": "idx_order_items_menu_item",
+          "kind": "index",
+          "fields": [],
+          "startLine": 476,
+          "endLine": 476
+        },
+        {
+          "name": "idx_payments_order",
+          "kind": "index",
+          "fields": [],
+          "startLine": 506,
+          "endLine": 506
+        },
+        {
+          "name": "idx_payment_sessions_order",
+          "kind": "index",
+          "fields": [],
+          "startLine": 527,
+          "endLine": 527
+        },
+        {
+          "name": "idx_payment_sessions_idempotency",
+          "kind": "index",
+          "fields": [],
+          "startLine": 528,
+          "endLine": 528
+        },
+        {
+          "name": "idx_ledger_entries_order",
+          "kind": "index",
+          "fields": [],
+          "startLine": 544,
+          "endLine": 544
+        },
+        {
+          "name": "idx_ledger_entries_account",
+          "kind": "index",
+          "fields": [],
+          "startLine": 545,
+          "endLine": 545
+        },
+        {
+          "name": "idx_shifts_branch_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 569,
+          "endLine": 569
+        },
+        {
+          "name": "idx_inventory_items_barcode",
+          "kind": "index",
+          "fields": [],
+          "startLine": 612,
+          "endLine": 612
+        },
+        {
+          "name": "idx_inventory_items_sku_not_null",
+          "kind": "index",
+          "fields": [],
+          "startLine": 613,
+          "endLine": 613
+        },
+        {
+          "name": "idx_inventory_ledger_product_branch",
+          "kind": "index",
+          "fields": [],
+          "startLine": 629,
+          "endLine": 629
+        },
+        {
+          "name": "idx_inventory_ledger_reference",
+          "kind": "index",
+          "fields": [],
+          "startLine": 630,
+          "endLine": 630
+        },
+        {
+          "name": "idx_inv_stock_item_wh",
+          "kind": "index",
+          "fields": [],
+          "startLine": 643,
+          "endLine": 643
+        },
+        {
+          "name": "idx_stock_mov_item_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 664,
+          "endLine": 664
+        },
+        {
+          "name": "idx_fefo",
+          "kind": "index",
+          "fields": [],
+          "startLine": 684,
+          "endLine": 684
+        },
+        {
+          "name": "idx_inv_batches_item_expiry",
+          "kind": "index",
+          "fields": [],
+          "startLine": 685,
+          "endLine": 685
+        },
+        {
+          "name": "idx_print_jobs_status_branch",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1038,
+          "endLine": 1038
+        },
+        {
+          "name": "idx_print_jobs_gateway",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1039,
+          "endLine": 1039
+        },
+        {
+          "name": "idx_telemetry_driver",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1091,
+          "endLine": 1091
+        },
+        {
+          "name": "idx_telemetry_branch",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1092,
+          "endLine": 1092
+        },
+        {
+          "name": "idx_telemetry_created",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1093,
+          "endLine": 1093
+        },
+        {
+          "name": "idx_coa_type",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1170,
+          "endLine": 1170
+        },
+        {
+          "name": "idx_coa_code",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1171,
+          "endLine": 1171
+        },
+        {
+          "name": "idx_je_ref",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1207,
+          "endLine": 1207
+        },
+        {
+          "name": "idx_je_date_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1208,
+          "endLine": 1208
+        },
+        {
+          "name": "idx_je_source",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1209,
+          "endLine": 1209
+        },
+        {
+          "name": "idx_jl_entry",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1225,
+          "endLine": 1225
+        },
+        {
+          "name": "idx_jl_account",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1226,
+          "endLine": 1226
+        },
+        {
+          "name": "idx_jl_acc_cc",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1227,
+          "endLine": 1227
+        },
+        {
+          "name": "idx_budget_lines_budget",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1285,
+          "endLine": 1285
+        },
+        {
+          "name": "idx_budget_lines_account",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1286,
+          "endLine": 1286
+        },
+        {
+          "name": "idx_employee_documents_employee",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1607,
+          "endLine": 1607
+        },
+        {
+          "name": "idx_employee_documents_branch_expiry",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1608,
+          "endLine": 1608
+        },
+        {
+          "name": "idx_attendance_policies_branch_default",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1728,
+          "endLine": 1728
+        },
+        {
+          "name": "idx_attendance_devices_branch_source",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1753,
+          "endLine": 1753
+        },
+        {
+          "name": "idx_attendance_device_mappings_device_user",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1769,
+          "endLine": 1769
+        },
+        {
+          "name": "idx_attendance_device_mappings_employee",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1770,
+          "endLine": 1770
+        },
+        {
+          "name": "idx_attendance_raw_logs_branch_occurred",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1822,
+          "endLine": 1822
+        },
+        {
+          "name": "idx_attendance_raw_logs_employee_occurred",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1823,
+          "endLine": 1823
+        },
+        {
+          "name": "idx_attendance_raw_logs_dedupe",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1824,
+          "endLine": 1824
+        },
+        {
+          "name": "idx_attendance_geofences_branch",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1840,
+          "endLine": 1840
+        },
+        {
+          "name": "idx_attendance_sessions_branch_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1867,
+          "endLine": 1867
+        },
+        {
+          "name": "idx_attendance_sessions_employee_clock_in",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1868,
+          "endLine": 1868
+        },
+        {
+          "name": "idx_attendance_exceptions_branch_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1920,
+          "endLine": 1920
+        },
+        {
+          "name": "idx_attendance_exceptions_employee",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1921,
+          "endLine": 1921
+        },
+        {
+          "name": "idx_attendance_exceptions_assigned",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1922,
+          "endLine": 1922
+        },
+        {
+          "name": "idx_attendance_exceptions_sla",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1923,
+          "endLine": 1923
+        },
+        {
+          "name": "idx_shift_templates_branch_active",
+          "kind": "index",
+          "fields": [],
+          "startLine": 1951,
+          "endLine": 1951
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 219
+      }
+    },
+    {
+      "path": "scripts/sqlserver-schema-repair.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 378,
+      "nonEmptyLines": 349,
+      "definitions": [
+        {
+          "name": "dbo",
+          "kind": "table",
+          "fields": [
+            "id",
+            "customer_id",
+            "customer_phone",
+            "direction",
+            "content",
+            "message_type",
+            "template_id",
+            "status",
+            "external_id",
+            "failure_reason",
+            "campaign_id",
+            "order_id",
+            "sent_at",
+            "delivered_at",
+            "read_at",
+            "created_at"
+          ],
+          "startLine": 115,
+          "endLine": 132
+        },
+        {
+          "name": "dbo",
+          "kind": "table",
+          "fields": [
+            "id",
+            "entity_type",
+            "entity_id",
+            "branch_id",
+            "status",
+            "payload",
+            "processed_at",
+            "created_at"
+          ],
+          "startLine": 144,
+          "endLine": 154
+        },
+        {
+          "name": "dbo",
+          "kind": "table",
+          "fields": [
+            "id",
+            "user_id",
+            "base_salary",
+            "overtime_pay",
+            "bonuses",
+            "deductions",
+            "net_salary",
+            "status",
+            "paid_at",
+            "processed_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 159,
+          "endLine": 174
+        },
+        {
+          "name": "day_close_branch_date_unique_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 110,
+          "endLine": 110
+        },
+        {
+          "name": "idx_payroll_user_month",
+          "kind": "index",
+          "fields": [],
+          "startLine": 175,
+          "endLine": 175
+        },
+        {
+          "name": "employees_active_created_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 301,
+          "endLine": 301
+        },
+        {
+          "name": "employees_branch_active_created_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 303,
+          "endLine": 303
+        },
+        {
+          "name": "attendance_raw_logs_dedupe_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 315,
+          "endLine": 315
+        },
+        {
+          "name": "idx_orders_branch_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 327,
+          "endLine": 327
+        },
+        {
+          "name": "payroll_runs_closed_cycle_unique_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 359,
+          "endLine": 359
+        },
+        {
+          "name": "stock_mov_type_date_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 365,
+          "endLine": 365
+        },
+        {
+          "name": "stock_mov_from_wh_date_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 367,
+          "endLine": 367
+        },
+        {
+          "name": "recipe_ingredients_recipe_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 369,
+          "endLine": 369
+        },
+        {
+          "name": "recipe_ingredients_item_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 371,
+          "endLine": 371
+        },
+        {
+          "name": "production_orders_warehouse_status_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 373,
+          "endLine": 373
+        },
+        {
+          "name": "production_order_items_order_idx",
+          "kind": "index",
+          "fields": [],
+          "startLine": 375,
+          "endLine": 375
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 16
+      }
+    }
+  ]
+}

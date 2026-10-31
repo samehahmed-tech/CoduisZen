@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/cleanup-future-days/Cleanup Future Days.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/cleanup-future-days/Cleanup Future Days.ps1",
+      "language": "powershell",
+      "sizeLines": 123,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/cleanup-future-days/README AR.txt",
+      "language": "txt",
+      "sizeLines": 26,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/cleanup-future-days/Cleanup Future Days.bat": [],
+    "scripts/cleanup-future-days/Cleanup Future Days.ps1": [],
+    "scripts/cleanup-future-days/README AR.txt": []
+  }
+}

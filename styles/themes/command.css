@@ -1,39 +1,39 @@
-/* THEME · COMMAND — ops density: restrained bg, prominent statuses, tabular data */
+/* THEME · BLUEPRINT — precision slate, electric blue, hairline structure */
 [data-theme="command"] {
-    --primary: 2, 132, 199; --primary-hover: 3, 105, 161;
-    --secondary: 100, 116, 139; --accent: 217, 119, 6;
-    --bg-app: 241, 244, 246; --bg-card: 255, 255, 255; --bg-sidebar: 244, 246, 248;
-    --bg-elevated: 255, 255, 255; --bg-global: 241, 244, 246;
-    --text-main: 12, 20, 28; --text-muted: 90, 105, 120;
-    --border-color: 214, 222, 230; --border-subtle: 12 20 28 / 0.08;
+    --primary: 37, 99, 235; --primary-hover: 29, 78, 216;
+    --secondary: 71, 85, 105; --accent: 6, 182, 212;
+    --bg-app: 244, 246, 250; --bg-card: 255, 255, 255; --bg-sidebar: 248, 250, 253;
+    --bg-elevated: 255, 255, 255; --bg-global: 244, 246, 250;
+    --text-main: 15, 23, 42; --text-muted: 96, 112, 135;
+    --border-color: 219, 226, 236; --border-subtle: 15 23 42 / 0.07;
     --glass-bg: 255 255 255 / 0.9;
-    --success: 5, 150, 105; --warning: 202, 138, 4; --danger: 220, 38, 38; --info: 2, 132, 199;
-    --theme-page-bg: linear-gradient(180deg, #f1f4f6 0%, #e8edf1 100%);
+    --success: 5, 150, 105; --warning: 202, 138, 4; --danger: 220, 38, 38; --info: 37, 99, 235;
+    --theme-page-bg: linear-gradient(180deg, #f4f6fa 0%, #e9eef7 100%);
     --theme-card-bg: #ffffff; --theme-card-hover-bg: #ffffff;
-    --theme-rail-bg: #f4f6f8; --theme-topbar-bg: rgba(255,255,255,0.94);
-    --theme-table-head-bg: #e8edf1; --theme-row-hover-bg: rgba(2,132,199,0.06);
-    --theme-input-bg: #ffffff; --theme-button-bg: #0284c7;
-    --theme-active-bg: rgba(2,132,199,0.1); --theme-focus-ring: rgba(2,132,199,0.4);
+    --theme-rail-bg: #f8fafd; --theme-topbar-bg: rgba(255,255,255,0.92);
+    --theme-table-head-bg: #eaeff7; --theme-row-hover-bg: rgba(37,99,235,0.06);
+    --theme-input-bg: #ffffff; --theme-button-bg: #2563eb; --theme-button-text: #ffffff;
+    --theme-active-bg: rgba(37,99,235,0.09); --theme-focus-ring: rgba(37,99,235,0.36);
     --theme-popup-bg: #ffffff;
-    --chart-1: 2, 132, 199; --chart-2: 5, 150, 105; --chart-3: 202, 138, 4; --chart-4: 220, 38, 38; --chart-5: 124, 58, 237;
-    --chart-grid: 12 20 28 / 0.08; --chart-tooltip-bg: rgba(255,255,255,0.98);
+    --chart-1: 37, 99, 235; --chart-2: 6, 182, 212; --chart-3: 79, 70, 229; --chart-4: 5, 150, 105; --chart-5: 202, 138, 4;
+    --chart-grid: 15 23 42 / 0.07; --chart-tooltip-bg: rgba(255,255,255,0.98);
 }
 .dark [data-theme="command"], [data-theme="command"].dark {
-    --primary: 56, 189, 248; --primary-hover: 125, 211, 252;
-    --secondary: 148, 163, 184; --accent: 251, 191, 36;
-    --bg-app: 8, 13, 18; --bg-card: 13, 20, 27; --bg-sidebar: 10, 16, 22;
-    --bg-elevated: 20, 29, 38; --bg-global: 8, 13, 18;
-    --text-main: 230, 242, 250; --text-muted: 130, 150, 168;
-    --border-color: 30, 42, 55; --border-subtle: 56 189 248 / 0.14;
-    --glass-bg: 13 20 27 / 0.9;
-    --success: 52, 211, 153; --warning: 250, 204, 21; --danger: 248, 113, 113; --info: 56, 189, 248;
-    --theme-page-bg: linear-gradient(180deg, #0a0f14 0%, #060a0e 100%);
-    --theme-card-bg: #0d141b; --theme-card-hover-bg: #142029;
-    --theme-rail-bg: #0a1016; --theme-topbar-bg: rgba(13,20,27,0.94);
-    --theme-table-head-bg: #080d12; --theme-row-hover-bg: rgba(56,189,248,0.07);
-    --theme-input-bg: #142029; --theme-button-bg: #0284c7;
-    --theme-active-bg: rgba(56,189,248,0.12); --theme-focus-ring: rgba(56,189,248,0.45);
-    --theme-popup-bg: #142029;
-    --chart-1: 56, 189, 248; --chart-2: 52, 211, 153; --chart-3: 250, 204, 21; --chart-4: 248, 113, 113; --chart-5: 167, 139, 250;
-    --chart-grid: 56 189 248 / 0.1; --chart-tooltip-bg: rgba(13,20,27,0.98);
+    --primary: 96, 165, 250; --primary-hover: 147, 197, 253;
+    --secondary: 148, 163, 184; --accent: 34, 211, 238;
+    --bg-app: 8, 12, 19; --bg-card: 14, 20, 30; --bg-sidebar: 11, 15, 23;
+    --bg-elevated: 23, 32, 46; --bg-global: 8, 12, 19;
+    --text-main: 233, 240, 250; --text-muted: 138, 153, 173;
+    --border-color: 31, 42, 58; --border-subtle: 96 165 250 / 0.14;
+    --glass-bg: 14 20 30 / 0.9;
+    --success: 52, 211, 153; --warning: 250, 204, 21; --danger: 248, 113, 113; --info: 96, 165, 250;
+    --theme-page-bg: linear-gradient(180deg, #080c13 0%, #05080d 100%);
+    --theme-card-bg: #0e141e; --theme-card-hover-bg: #16202c;
+    --theme-rail-bg: #0b0f17; --theme-topbar-bg: rgba(14,20,30,0.9);
+    --theme-table-head-bg: #080c13; --theme-row-hover-bg: rgba(96,165,250,0.07);
+    --theme-input-bg: #16202c; --theme-button-bg: #2563eb; --theme-button-text: #ffffff;
+    --theme-active-bg: rgba(96,165,250,0.12); --theme-focus-ring: rgba(96,165,250,0.42);
+    --theme-popup-bg: #16202c;
+    --chart-1: 96, 165, 250; --chart-2: 34, 211, 238; --chart-3: 129, 140, 248; --chart-4: 52, 211, 153; --chart-5: 250, 204, 21;
+    --chart-grid: 96 165 250 / 0.1; --chart-tooltip-bg: rgba(14,20,30,0.97);
 }

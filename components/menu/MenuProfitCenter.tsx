@@ -3,7 +3,8 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
     Plus, UtensilsCrossed, Loader2, AlertCircle, X, Sparkles, DollarSign,
-    ChevronRight
+    ChevronRight, Palette, Gift, Clock3, Archive, BarChart3,
+    ImageOff, AlertTriangle, TrendingUp, List, LayoutGrid, Download, CheckSquare
 } from 'lucide-react';
 
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -19,6 +20,7 @@ import CategoryDrawer from './CategoryDrawer';
 import BulkActionsBar from './BulkActionsBar';
 import AnalyticsPanel from './AnalyticsPanel';
 import PricingEngine from './PricingEngine';
+import MenuOffersWorkspace from './MenuOffersWorkspace';
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmProvider';
 
@@ -95,7 +97,7 @@ const MenuProfitCenter: React.FC = () => {
         const t = setTimeout(() => setDebouncedQuery(searchQuery), 220);
         return () => clearTimeout(t);
     }, [searchQuery]);
-    const [viewMode, setViewMode] = useState<ViewMode>('grid');
+    const [viewMode, setViewMode] = useState<ViewMode>('list');
     const [density, setDensity] = useState<DensityMode>('comfortable');
     const [sortField, setSortField] = useState<SortField>('name');
     const [filterTag, setFilterTag] = useState<FilterTag>('all');
@@ -130,7 +132,7 @@ const MenuProfitCenter: React.FC = () => {
                 e.preventDefault();
                 handleNewItem();
             }
-            if (e.key === 'f' || e.key === 'F') {
+            if (e.key === 'f' || e.key === 'F' || e.key === '/') {
                 e.preventDefault();
                 document.getElementById('menu-search-input')?.focus();
             }
@@ -499,11 +501,22 @@ const MenuProfitCenter: React.FC = () => {
         }
     };
 
-    // Summary stats (memoized: strip renders every keystroke otherwise)
+    // Catalog health powers the contextual assistant, never a vanity-metric strip.
     const totalRevenue = useMemo(() => allItems.reduce((s, i) => s + (i.salesData?.revenue30 || 0), 0), [allItems]);
     const activeItemsCount = useMemo(() => allItems.filter(i => i.isAvailable && !i.archivedAt).length, [allItems]);
     const avgMargin = allItems.length > 0
         ? allItems.reduce((s, i) => s + (i.cost && i.price > 0 ? ((i.price - i.cost) / i.price) * 100 : 0), 0) / allItems.length
+        : 0;
+    const catalogItems = allItems.filter(i => !i.archivedAt);
+    const missingImageCount = catalogItems.filter(i => !i.image).length;
+    const unavailableCount = catalogItems.filter(i => !i.isAvailable).length;
+    const lowMarginCount = catalogItems.filter(i => i.cost && i.price > 0 && ((i.price - i.cost) / i.price) < 0.15).length;
+    const readinessScore = catalogItems.length
+        ? Math.round((
+            (activeItemsCount / catalogItems.length) * 0.5
+            + ((catalogItems.length - missingImageCount) / catalogItems.length) * 0.25
+            + ((catalogItems.length - lowMarginCount) / catalogItems.length) * 0.25
+        ) * 100)
         : 0;
 
     // --- Excel Export (includes Cost so export→import round-trips costing) ---
@@ -686,7 +699,7 @@ const MenuProfitCenter: React.FC = () => {
     }
 
     return (
-        <div className="h-full min-h-screen bg-app relative overflow-hidden">
+        <div className="menu-profit-center atelier-page h-full min-h-screen bg-app relative overflow-hidden">
             {/* Error Banner */}
             {error && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[200] py-2.5 px-4 bg-rose-500/10 border border-rose-500/20 rounded-md text-rose-400 text-[12px] font-medium flex items-center gap-3 max-w-lg">
@@ -696,30 +709,44 @@ const MenuProfitCenter: React.FC = () => {
                 </div>
             )}
 
-            <div className="flex h-full overflow-hidden flex-col lg:flex-row">
-                <MenuSidebar
-                    menus={menus}
-                    categories={filteredCategories}
-                    selectedMenuId={selectedMenuId}
-                    onSelectMenu={handleSelectMenu}
-                    selectedCategoryId={selectedCategoryId}
-                    onSelectCategory={handleSelectCategory}
-                    section={sidebarSection}
-                    onChangeSection={setSidebarSection}
-                    onAddCategory={() => setDrawerCategory({ mode: 'ADD', category: { id: `cat-${Date.now()}`, name: '', isActive: true, menuIds: [selectedMenuId], items: [] } })}
-                    onEditCategory={(cat) => setDrawerCategory({ mode: 'EDIT', category: cat })}
-                    onReorderCategories={(reordered) => reorderCategories(selectedMenuId, reordered)}
-                    allItems={allItems}
-                    totalRevenue={totalRevenue}
-                    avgMargin={avgMargin}
-                    lang={lang}
-                    currency={settings.currencySymbol}
-                />
+            <div className="menu-command-shell flex h-full overflow-hidden flex-col">
+                <header className="atelier-topbar">
+                    <div className="atelier-brandline">
+                        <div className="atelier-brandmark" aria-hidden="true"><UtensilsCrossed size={22} /></div>
+                        <div className="min-w-0">
+                            <p className="atelier-eyebrow"><span className="atelier-live-dot" />{lang === 'ar' ? 'استوديو المنيو' : 'MENU STUDIO'}</p>
+                            <h1>{lang === 'ar' ? 'مركز تحسين المنيو' : 'Menu Atelier'}</h1>
+                            <p className="atelier-brand-sub">{selectedMenu?.name || (lang === 'ar' ? 'المنيو الرئيسي' : 'Main Menu')} · {catalogItems.length} {lang === 'ar' ? 'صنف' : 'items'} · {filteredCategories.length} {lang === 'ar' ? 'قسم' : 'categories'}</p>
+                        </div>
+                    </div>
+                    <div className="atelier-top-actions">
+                        <span className="atelier-sync"><i />{lang === 'ar' ? 'تحليل مباشر' : 'Live analysis'}</span>
+                        <button type="button" className="atelier-btn ghost" onClick={handleDesignMenu}><Palette size={15} />{lang === 'ar' ? 'تصميم وطباعة' : 'Design & print'}</button>
+                        <button type="button" className="atelier-btn acid" onClick={handleNewItem}><Plus size={16} />{lang === 'ar' ? 'صنف جديد' : 'New item'}</button>
+                    </div>
 
+                    <nav className="atelier-index" aria-label={lang === 'ar' ? 'أقسام إدارة المنيو' : 'Menu management sections'}>
+                        {([
+                            ['menus', UtensilsCrossed, 'الكتالوج', 'Catalog'],
+                            ['pricing', DollarSign, 'التسعير', 'Pricing'],
+                            ['offers', Gift, 'العروض', 'Offers'],
+                            ['scheduled', Clock3, 'المجدولة', 'Scheduled'],
+                            ['archived', Archive, 'الأرشيف', 'Archive'],
+                        ] as const).map(([id, Icon, ar, en], index) => (
+                            <button key={id} type="button" onClick={() => setSidebarSection(id)} className={sidebarSection === id ? 'is-active' : ''} aria-current={sidebarSection === id ? 'page' : undefined}>
+                                <em>{String(index + 1).padStart(2, '0')}</em>
+                                <Icon size={15} />
+                                <span>{lang === 'ar' ? ar : en}</span>
+                                {id === 'menus' && <small>{catalogItems.length}</small>}
+                                {id === 'archived' && <small>{allItems.length - catalogItems.length}</small>}
+                            </button>
+                        ))}
+                    </nav>
+                </header>
 
-
+                <div className={`menu-command-workspace ${sidebarSection === 'pricing' ? 'is-pricing' : ''}`}>
                 {/* MAIN CONTENT */}
-                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+                <div className="menu-profit-content-shell flex-1 min-w-0 flex flex-col overflow-hidden">
                     {sidebarSection === 'pricing' ? (
                         <PricingEngine 
                             allItems={allItems} 
@@ -728,13 +755,90 @@ const MenuProfitCenter: React.FC = () => {
                             lang={lang} 
                             currency={settings.currencySymbol} 
                         />
+                    ) : sidebarSection === 'offers' || sidebarSection === 'scheduled' ? (
+                        <MenuOffersWorkspace
+                            menuId={selectedMenuId}
+                            scheduledOnly={sidebarSection === 'scheduled'}
+                            lang={lang}
+                            currency={settings.currencySymbol}
+                        />
                     ) : (
                         <>
+                    <section className="atelier-hero" aria-label={lang === 'ar' ? 'ملخص إدارة المنيو' : 'Menu management summary'}>
+                        <div className="atelier-hero-copy-block">
+                            <div className="atelier-hero-actions">
+                                <button type="button" className="atelier-btn acid" onClick={handleNewItem}><Plus size={16} />{lang === 'ar' ? 'إضافة صنف' : 'Add item'}</button>
+                                <button type="button" className="atelier-btn ghost" onClick={() => setViewMode('analytics')}><BarChart3 size={15} />{lang === 'ar' ? 'تحليلات الأداء' : 'Performance'}</button>
+                            </div>
+                            <dl className="atelier-hero-metrics">
+                                <div><dt>{lang === 'ar' ? 'أصناف الكتالوج' : 'Catalog items'}</dt><dd>{catalogItems.length}</dd></div>
+                                <div><dt>{lang === 'ar' ? 'متاح للبيع' : 'Available'}</dt><dd>{activeItemsCount}</dd></div>
+                                <div><dt>{lang === 'ar' ? 'متوسط الهامش' : 'Avg. margin'}</dt><dd>{avgMargin.toFixed(0)}<small>%</small></dd></div>
+                                <div><dt>{lang === 'ar' ? 'إيراد ٣٠ يوم' : '30D revenue'}</dt><dd>{settings.currencySymbol}{totalRevenue > 999 ? `${(totalRevenue / 1000).toFixed(1)}K` : totalRevenue.toFixed(0)}</dd></div>
+                            </dl>
+                        </div>
+
+                        <aside className="atelier-health" aria-label={lang === 'ar' ? 'جاهزية المنيو' : 'Menu readiness'}>
+                            <div className="atelier-health-head">
+                                <span>{lang === 'ar' ? 'جاهزية المنيو' : 'Menu readiness'}</span>
+                                <small>{lang === 'ar' ? 'تحديث مباشر' : 'Live'}</small>
+                            </div>
+                            <div className={`atelier-health-score ${readinessScore >= 85 ? 'is-good' : readinessScore >= 60 ? 'is-warn' : 'is-low'}`}>
+                                <b>{readinessScore}</b><span>/100</span>
+                                <i><em style={{ width: `${Math.max(4, readinessScore)}%` }} /></i>
+                            </div>
+                            <p className="atelier-health-copy">
+                                {readinessScore >= 85
+                                    ? (lang === 'ar' ? 'المنيو في حالة ممتازة. حافظ على الصور والأسعار محدّثة.' : 'Your menu is in great shape. Keep photos and prices current.')
+                                    : (lang === 'ar' ? 'عالج النقاط أدناه لرفع درجة الجاهزية قبل النشر.' : 'Resolve the points below to raise readiness before publishing.')}
+                            </p>
+                            <div className="atelier-health-list">
+                                <button type="button" onClick={() => setFilterTag('no-image')} disabled={missingImageCount === 0}>
+                                    <span><ImageOff size={15} /></span>
+                                    <span><strong>{lang === 'ar' ? 'أصناف بدون صور' : 'Missing photos'}</strong><small>{lang === 'ar' ? 'أكمل الهوية البصرية' : 'Complete the visual catalog'}</small></span>
+                                    <em>{missingImageCount}</em>
+                                </button>
+                                <button type="button" onClick={() => setFilterTag('inactive')} disabled={unavailableCount === 0}>
+                                    <span><AlertTriangle size={15} /></span>
+                                    <span><strong>{lang === 'ar' ? 'غير متاح للبيع' : 'Unavailable'}</strong><small>{lang === 'ar' ? 'راجع حالة التوافر' : 'Review availability'}</small></span>
+                                    <em>{unavailableCount}</em>
+                                </button>
+                                <button type="button" onClick={() => setFilterTag('low-margin')} disabled={lowMarginCount === 0}>
+                                    <span><TrendingUp size={15} /></span>
+                                    <span><strong>{lang === 'ar' ? 'هامش منخفض' : 'Low margin'}</strong><small>{lang === 'ar' ? 'راجع التكلفة أو السعر' : 'Review cost or price'}</small></span>
+                                    <em>{lowMarginCount}</em>
+                                </button>
+                            </div>
+                            <button type="button" className="atelier-health-analytics" onClick={() => setViewMode('analytics')}>
+                                <BarChart3 size={15} />
+                                <span>{lang === 'ar' ? 'فتح تحليلات الأداء' : 'Open performance analytics'}</span>
+                                <ChevronRight size={14} />
+                            </button>
+                        </aside>
+                    </section>
+
+                    <MenuSidebar
+                        menus={menus}
+                        categories={filteredCategories}
+                        selectedMenuId={selectedMenuId}
+                        onSelectMenu={handleSelectMenu}
+                        selectedCategoryId={selectedCategoryId}
+                        onSelectCategory={handleSelectCategory}
+                        section={sidebarSection}
+                        onAddCategory={() => setDrawerCategory({ mode: 'ADD', category: { id: `cat-${Date.now()}`, name: '', isActive: true, menuIds: [selectedMenuId], items: [] } })}
+                        onEditCategory={(cat) => setDrawerCategory({ mode: 'EDIT', category: cat })}
+                        onReorderCategories={(reordered) => reorderCategories(selectedMenuId, reordered)}
+                        allItems={allItems}
+                        totalRevenue={totalRevenue}
+                        avgMargin={avgMargin}
+                        lang={lang}
+                        currency={settings.currencySymbol}
+                    />
                     {/* TOP TOOLBAR */}
                     <MenuToolbar
                         categories={filteredCategories}
                         selectedCategoryId={selectedCategoryId}
-                        onSelectCategory={setSelectedCategoryId}
+                        onSelectCategory={handleSelectCategory}
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
                         viewMode={viewMode}
@@ -764,62 +868,9 @@ const MenuProfitCenter: React.FC = () => {
                         onDesignMenu={handleDesignMenu}
                     />
 
-                    {/* BREADCRUMB + METRICS STRIP */}
-                    <div className="px-3 sm:px-5 py-2.5 border-b border-gray-100 dark:border-white/[0.04] flex flex-wrap items-center gap-3 sm:gap-4">
-                        {/* Breadcrumb */}
-                        <div className="flex items-center gap-1.5 text-[12px]">
-                            <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'المنيو' : 'Menu'}</span>
-                            <ChevronRight size={10} className="text-gray-300 dark:text-muted/30" />
-                            <span className="text-gray-700 dark:text-main font-medium">{selectedMenu?.name || (lang === 'ar' ? 'القائمة الرئيسية' : 'Main Menu')}</span>
-                        </div>
-
-                        <div className="flex-1" />
-
-                        {/* Compact Metrics */}
-                        <div className="hidden sm:flex items-center gap-4 text-[11px]">
-                            <div>
-                                <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'إجمالي' : 'Total'}: </span>
-                                <span className="font-medium text-gray-700 dark:text-main">{filteredItems.length}</span>
-                            </div>
-                            <div>
-                                <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'نشط' : 'Active'}: </span>
-                                <span className="font-medium text-emerald-600 dark:text-emerald-500">{activeItemsCount}</span>
-                            </div>
-                            <div>
-                                <span className="text-gray-400 dark:text-muted/50">{lang === 'ar' ? 'الهامش' : 'Avg Margin'}: </span>
-                                <span className={`font-medium ${avgMargin >= 50 ? 'text-emerald-600 dark:text-emerald-500' : avgMargin >= 30 ? 'text-amber-600 dark:text-amber-500' : 'text-red-600 dark:text-rose-500'}`}>{avgMargin.toFixed(0)}%</span>
-                            </div>
-                            {totalRevenue > 0 && (
-                                <div>
-                                    <span className="text-gray-400 dark:text-muted/50">30D: </span>
-                                    <span className="font-medium text-gray-700 dark:text-main">{settings.currencySymbol}{totalRevenue > 1000 ? `${(totalRevenue / 1000).toFixed(1)}K` : totalRevenue.toLocaleString()}</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* CATEGORY CONTEXT STRIP */}
-                    {selectedCategory && sidebarSection === 'menus' && (
-                        <div className="px-3 sm:px-5 py-2 border-b border-gray-100 dark:border-white/[0.04] flex items-center gap-2.5 bg-card/40 shrink-0">
-                            <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md px-2 py-0.5 tabular-nums shrink-0">
-                                {filteredItems.length} {lang === 'ar' ? 'صنف' : 'items'}
-                            </span>
-                            <span className="text-[13px] font-semibold text-gray-800 dark:text-main truncate">
-                                {lang === 'ar' ? (selectedCategory.nameAr || selectedCategory.name) : selectedCategory.name}
-                            </span>
-                            <div className="flex-1" />
-                            <button onClick={handleNewItem} className="h-8 px-3 rounded-lg bg-primary hover:brightness-110 text-white text-[12px] font-bold flex items-center gap-1.5 transition-all shrink-0">
-                                <Plus size={14} />
-                                {lang === 'ar' ? 'صنف جديد' : 'New Item'}
-                            </button>
-                            <button onClick={() => setDrawerCategory({ mode: 'EDIT', category: selectedCategory })} className="h-8 px-3 rounded-lg border border-border/30 text-[12px] font-medium text-muted hover:text-main hover:bg-white/[0.03] transition-colors shrink-0">
-                                {lang === 'ar' ? 'تعديل القسم' : 'Edit Section'}
-                            </button>
-                        </div>
-                    )}
-
                     {/* CONTENT AREA */}
-                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 sm:p-5 pb-32 no-scrollbar">
+                    <div className="menu-profit-catalog-body">
+                    <div ref={scrollRef} className="menu-profit-canvas flex-1 overflow-y-auto p-3 sm:p-5 pb-32 no-scrollbar">
                         {viewMode === 'analytics' ? (
                             <AnalyticsPanel items={filteredItems} lang={lang} currency={settings.currencySymbol} />
                         ) : viewMode === 'list' ? (
@@ -860,7 +911,7 @@ const MenuProfitCenter: React.FC = () => {
                                         <div
                                             {...provided.droppableProps}
                                             ref={provided.innerRef}
-                                            className={`grid gap-4 max-w-[1600px] pb-4 ${density === 'compact' ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}`}
+                                            className={`menu-profit-grid atelier-grid grid gap-4 max-w-[1600px] pb-4 ${density === 'compact' ? 'is-compact grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}`}
                                         >
                                             {visibleItems.map((item, idx) => (
                                                 <Draggable
@@ -903,7 +954,7 @@ const MenuProfitCenter: React.FC = () => {
 
                                             {/* Quick Add Card — always last in grid */}
                                             {selectedCategoryId !== 'all' && sidebarSection === 'menus' && (
-                                                <div className="rounded-lg border border-dashed border-border/40 bg-card/30 flex flex-col justify-center min-h-[160px] hover:bg-white/[0.02] hover:border-indigo-500/30 transition-colors group/qa p-4">
+                                                <div className="menu-profit-quick-add rounded-lg border border-dashed border-border/40 bg-card/30 flex flex-col justify-center min-h-[160px] hover:bg-white/[0.02] hover:border-indigo-500/30 transition-colors group/qa p-4">
                                                     <div className="w-full space-y-2">
                                                         <div className="flex items-center gap-1.5 text-indigo-400">
                                                             <Sparkles size={14} />
@@ -1026,10 +1077,32 @@ const MenuProfitCenter: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    </div>
                         </>
                     )}
                 </div>
             </div>
+            </div>
+
+            {/* ATELIER COMMAND DOCK */}
+            {sidebarSection === 'menus' && selectedItemIds.size === 0 && (
+                <nav className="atelier-dock" aria-label={lang === 'ar' ? 'إجراءات سريعة' : 'Quick actions'}>
+                    <div className="atelier-dock-status">
+                        <span className="atelier-live-dot" />
+                        <b>{filteredItems.length}</b>
+                        <span>{lang === 'ar' ? 'صنف' : 'items'}</span>
+                        {selectedCategory && <small>· {lang === 'ar' ? (selectedCategory.nameAr || selectedCategory.name) : selectedCategory.name}</small>}
+                    </div>
+                    <div className="atelier-dock-actions">
+                        <button type="button" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'is-active' : ''}><List size={15} /><span>{lang === 'ar' ? 'قائمة' : 'List'}</span></button>
+                        <button type="button" onClick={() => { setViewMode('grid'); setDensity('comfortable'); }} className={viewMode === 'grid' ? 'is-active' : ''}><LayoutGrid size={15} /><span>{lang === 'ar' ? 'شبكة' : 'Grid'}</span></button>
+                        <button type="button" onClick={handleNewItem}><Plus size={15} /><span>{lang === 'ar' ? 'صنف جديد' : 'New'}</span></button>
+                        <button type="button" onClick={handleExportMenu}><Download size={15} /><span>{lang === 'ar' ? 'تصدير' : 'Export'}</span></button>
+                        <button type="button" onClick={() => { setMultiSelectMode(!multiSelectMode); if (multiSelectMode) setSelectedItemIds(new Set()); }} className={multiSelectMode ? 'is-active' : ''}><CheckSquare size={15} /><span>{selectedItemIds.size > 0 ? `${selectedItemIds.size}` : (lang === 'ar' ? 'تحديد' : 'Select')}</span></button>
+                    </div>
+                    <span className="atelier-dock-hint"><kbd>/</kbd>{lang === 'ar' ? 'للتركيز على البحث' : 'to focus search'}</span>
+                </nav>
+            )}
 
             {/* BULK ACTIONS BAR */}
             {selectedItemIds.size > 0 && (

@@ -1,0 +1,22 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/sameh-installer/table-pos-fix/Apply Table POS Fix.bat",
+    "scripts/sameh-installer/table-pos-fix/Apply Table POS Fix.ps1",
+    "scripts/sameh-installer/table-pos-fix/README AR.txt"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

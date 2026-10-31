@@ -9,6 +9,7 @@ import { getIO } from '../socket';
 import { transitionOrderStatus, sweepStaleBranchOrders } from '../services/orderLifecycleService';
 import { enqueuePrintJob } from '../services/printQueueService';
 import { isKitchenRoutingPrinter, resolvePrinterRoutingStation } from '../services/kdsRouting';
+import { createSignedAuditLog } from '../services/auditService';
 
 let kdsSchemaReady = false;
 
@@ -482,6 +483,17 @@ export const kdsController = {
             await kdsController.dispatchToKitchen(order.branchId, order.id, {
                 enqueuePrintJobs: !clientHandlesPrinting,
             });
+            await createSignedAuditLog({
+                eventType: 'KDS_ORDER_DISPATCHED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: order.branchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { orderId: order.id, clientHandlesPrinting },
+                after: { dispatched: true },
+                reason: 'Order dispatched to kitchen',
+            });
             return res.json({ success: true, branchId: order.branchId, orderId: order.id });
         } catch (error: any) {
             return res.status(500).json({ error: error.message });
@@ -714,14 +726,26 @@ export const kdsController = {
                     } catch(e){}
                 }
 
+                await createSignedAuditLog({
+                    eventType: 'KDS_TICKET_SERVED',
+                    userId: req.user?.id || 'system',
+                    userRole: req.user?.role,
+                    branchId: ticket.branchId,
+                    requestId: req.requestId,
+                    sourceDevice: req.headers['user-agent'],
+                    payload: { ticketId, orderId: ticket.orderId },
+                    before: { status: ticket.status },
+                    after: { status: 'SERVED' },
+                    reason: 'KDS ticket served',
+                });
+
                 return res.json({ success: true, served: true });
             }
 
-            // 2. Mark this kitchen ticket as ready — recording WHO completed
-            // it so kitchen staff performance is reportable. Falls back to
-            // the authenticated user when the client sends no actor.
-            const completedBy = String(req.body?.completedBy || (req.user as any)?.id || '').trim() || null;
-            const completedByName = String(req.body?.completedByName || (req.user as any)?.name || '').trim() || null;
+            // 2. Mark this kitchen ticket as ready — actor identity always
+            // comes from the authenticated session, never from the client body.
+            const completedBy = String((req.user as any)?.id || '').trim() || null;
+            const completedByName = String((req.user as any)?.name || '').trim() || null;
             await db.update(kdsTickets)
                 .set({ status: 'READY', bumpedAt: new Date(), completedBy, completedByName, updatedAt: new Date() })
                 .where(eq(kdsTickets.id, ticketId));
@@ -734,6 +758,19 @@ export const kdsController = {
             if (room) {
                 try { getIO().to(room).emit('kds:update'); } catch(e){}
             }
+
+            await createSignedAuditLog({
+                eventType: 'KDS_TICKET_READY',
+                userId: completedBy || req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: ticket.branchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { ticketId, orderId: ticket.orderId, allReady },
+                before: { status: ticket.status },
+                after: { status: 'READY' },
+                reason: 'KDS ticket marked ready',
+            });
 
             res.json({ success: true, allReady });
         } catch (error: any) {
@@ -788,6 +825,19 @@ export const kdsController = {
             if (room) {
                 try { getIO().to(room).emit('kds:update'); } catch(e){}
             }
+
+            await createSignedAuditLog({
+                eventType: 'KDS_TICKET_RECALLED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: ticket.branchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { ticketId, orderId: ticket.orderId },
+                before: { status: ticket.status },
+                after: { status: 'PREPARING' },
+                reason: 'KDS ticket recalled',
+            });
 
             res.json({ success: true });
         } catch (error: any) {
@@ -853,6 +903,19 @@ export const kdsController = {
                 }
             }
 
+            await createSignedAuditLog({
+                eventType: 'KDS_ORDER_HANDOVER',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: order.branchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { orderId, orderType: order.type },
+                before: { status: order.status },
+                after: { status: 'DELIVERED' },
+                reason: 'KDS packing handover completed',
+            });
+
             res.json({ success: true });
         } catch (error: any) {
             const statusCode = Number(error?.status) || 500;
@@ -886,6 +949,19 @@ export const kdsController = {
             if (ticket && ticket.branchId) {
                 try { getIO().to(`branch:${ticket.branchId}`).emit('kds:update'); } catch(e){}
             }
+
+            await createSignedAuditLog({
+                eventType: 'KDS_ITEM_TOGGLED',
+                userId: req.user?.id || 'system',
+                userRole: req.user?.role,
+                branchId: ticket?.branchId,
+                requestId: req.requestId,
+                sourceDevice: req.headers['user-agent'],
+                payload: { ticketId, itemId },
+                before: { isBumped: item.isBumped },
+                after: { isBumped: !item.isBumped },
+                reason: 'KDS item completion toggled',
+            });
 
             res.json({ success: true, isBumped: !item.isBumped });
         } catch (error: any) {

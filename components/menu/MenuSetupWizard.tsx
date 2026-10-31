@@ -5,8 +5,8 @@ import {
     Loader2, X, AlertCircle, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as XLSX from 'xlsx';
 import { MenuItem, MenuCategory } from '../../types';
+import { getXlsxCompat } from '../../src/utils/excelCompat';
 
 interface MenuSetupWizardProps {
     onComplete: (categories: MenuCategory[]) => void;
@@ -42,7 +42,7 @@ const MenuSetupWizard: React.FC<MenuSetupWizardProps> = ({ onComplete, onManualS
     };
 
     // --- Template Generation ---
-    const handleDownloadTemplate = () => {
+    const handleDownloadTemplate = async () => {
         const headers = [
             ['Category Name', 'Category Name (Arabic)', 'Item Name', 'Item Name (Arabic)', 'Price', 'Cost', 'SKU', 'Barcode', 'Description'],
             ['Main Dish', 'أطباق رئيسية', 'Classic Burger', 'برجر كلاسيك', 120, 45, 'SKU-001', '123456789', 'Our signature beef burger'],
@@ -50,6 +50,7 @@ const MenuSetupWizard: React.FC<MenuSetupWizardProps> = ({ onComplete, onManualS
             ['Drinks', 'مشروبات', 'Fresh Orange Juice', 'عصير برتقال فريش', 45, 10, 'DR-001', '', '100% natural']
         ];
 
+        const XLSX = await getXlsxCompat();
         const ws = XLSX.utils.aoa_to_sheet(headers);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Menu Template");
@@ -58,22 +59,20 @@ const MenuSetupWizard: React.FC<MenuSetupWizardProps> = ({ onComplete, onManualS
         const colWidths = [20, 25, 25, 25, 10, 10, 15, 15, 30];
         ws['!cols'] = colWidths.map(w => ({ wch: w }));
 
-        XLSX.writeFile(wb, `Coduis Xen_Menu_Template_${lang}.xlsx`);
+        await XLSX.writeFile(wb, `Coduis Xen_Menu_Template_${lang}.xlsx`);
     };
 
     // --- Excel Parsing ---
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         setIsProcessing(true);
         setError(null);
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            try {
-                const bstr = evt.target?.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
+        try {
+                const XLSX = await getXlsxCompat();
+                const wb = await XLSX.read(await file.arrayBuffer());
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
                 const data = XLSX.utils.sheet_to_json(ws);
@@ -126,13 +125,11 @@ const MenuSetupWizard: React.FC<MenuSetupWizardProps> = ({ onComplete, onManualS
 
                 setPreviewData(Object.values(categoryMap));
                 setStep('REVIEW');
-            } catch (err: any) {
-                setError(err.message || 'Failed to parse file');
-            } finally {
-                setIsProcessing(false);
-            }
-        };
-        reader.readAsBinaryString(file);
+        } catch (err: any) {
+            setError(err.message || 'Failed to parse file');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     return (

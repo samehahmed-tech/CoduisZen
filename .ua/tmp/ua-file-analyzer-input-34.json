@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "docs/butchery.md",
+      "language": "markdown",
+      "sizeLines": 143,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/theme-engine-2.0-plan.md",
+      "language": "markdown",
+      "sizeLines": 38,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/theme-engine-2.0.md",
+      "language": "markdown",
+      "sizeLines": 46,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "docs/butchery.md": [],
+    "docs/theme-engine-2.0-plan.md": [],
+    "docs/theme-engine-2.0.md": []
+  }
+}

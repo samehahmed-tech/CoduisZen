@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Building2, Activity, AlertTriangle, Eye, TrendingUp, Plus, X, Save,
     MapPin, Phone, Mail, Globe, ShieldCheck, RefreshCw, BarChart3,
-    Settings, Layers, Clock, DollarSign, Package, Users, ChevronRight
+    Settings, Layers, Clock, DollarSign, Package, Users, ChevronRight, Download
 } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { translations } from '../services/translations';
@@ -10,6 +10,8 @@ import { analyticsApi } from '../services/api/analytics';
 import { branchesApi } from '../services/api/branches';
 import { useConfirm } from './common/ConfirmProvider';
 import { useToast } from './common/ToastProvider';
+import { franchiseApi } from '../services/api/franchise';
+import type { FranchiseRoyaltyPreview } from '../services/api/franchise';
 
 type BranchPerf = {
     branchId: string;
@@ -38,12 +40,13 @@ type Branch = {
     serviceCharge?: number;
 };
 
-type FranchiseTab = 'overview' | 'branches' | 'analytics';
+type FranchiseTab = 'overview' | 'branches' | 'analytics' | 'royalties';
 
 const TABS: { id: FranchiseTab; label: string; labelAr: string; icon: any }[] = [
     { id: 'overview', label: 'Performance', labelAr: 'الأداء', icon: BarChart3 },
     { id: 'branches', label: 'Branch Management', labelAr: 'إدارة الفروع', icon: Building2 },
     { id: 'analytics', label: 'Comparison', labelAr: 'المقارنة', icon: TrendingUp },
+    { id: 'royalties', label: 'Royalties', labelAr: 'الإتاوات', icon: DollarSign },
 ];
 
 const FranchiseManager: React.FC = () => {
@@ -62,6 +65,13 @@ const FranchiseManager: React.FC = () => {
     const [showBranchModal, setShowBranchModal] = useState(false);
     const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
     const [branchForm, setBranchForm] = useState({ name: '', nameAr: '', location: '', address: '', phone: '', email: '', timezone: 'Africa/Cairo', currency: 'EGP', taxRate: '14', serviceCharge: '0' });
+    const [royaltyFrom, setRoyaltyFrom] = useState(() => new Date().toISOString().slice(0, 8) + '01');
+    const [royaltyTo, setRoyaltyTo] = useState(() => new Date().toISOString().slice(0, 10));
+    const [royaltyPreview, setRoyaltyPreview] = useState<FranchiseRoyaltyPreview | null>(null);
+    const [royaltyLoading, setRoyaltyLoading] = useState(false);
+    const [exportFrom, setExportFrom] = useState(() => new Date().toISOString().slice(0, 8) + '01');
+    const [exportTo, setExportTo] = useState(() => new Date().toISOString().slice(0, 10));
+    const [exportingBranchId, setExportingBranchId] = useState<string | null>(null);
 
     const loadPerf = async () => {
         setIsLoading(true);
@@ -82,6 +92,38 @@ const FranchiseManager: React.FC = () => {
     };
 
     useEffect(() => { loadPerf(); loadBranches(); }, []);
+
+    const loadRoyaltyPreview = useCallback(async () => {
+        setRoyaltyLoading(true);
+        try {
+            setRoyaltyPreview(await franchiseApi.previewRoyalties(royaltyFrom, royaltyTo));
+        } catch (error: any) {
+            setRoyaltyPreview(null);
+            showError(error.message || (isAr ? 'تعذر تحميل معاينة الإتاوات' : 'Failed to load royalty preview'));
+        } finally { setRoyaltyLoading(false); }
+    }, [royaltyFrom, royaltyTo, showError, isAr]);
+
+    const downloadBranchExport = async (branchId: string) => {
+        setExportingBranchId(branchId);
+        try {
+            const blob = await franchiseApi.exportBranchData(branchId, exportFrom, exportTo);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `branch-${branchId}-${exportFrom}-${exportTo}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            success(tr('Branch export downloaded', 'تم تنزيل تصدير الفرع'));
+        } catch (error: any) {
+            showError(error.message || tr('Failed to export branch data', 'تعذر تصدير بيانات الفرع'));
+        } finally { setExportingBranchId(null); }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'royalties') void loadRoyaltyPreview();
+    }, [activeTab, loadRoyaltyPreview]);
 
     const benchmark = useMemo(() => {
         const avgRevenue = perfData.length > 0 ? perfData.reduce((s, b) => s + b.revenue, 0) / perfData.length : 0;
@@ -256,8 +298,8 @@ const FranchiseManager: React.FC = () => {
             {activeTab === 'branches' && (
                 <div className="card-primary border border-border rounded-[2.5rem] shadow-sm overflow-hidden animate-in slide-in-from-bottom-5 duration-150">
                     <div className="p-6 border-b border-border bg-elevated/30 flex items-center justify-between">
-                        <h3 className="text-lg font-black text-main uppercase tracking-tight">{tr('All Branches', 'كل الفروع')} ({branches.length})</h3>
-                        <button onClick={openAddBranch} className="px-4 py-2 rounded-xl bg-indigo-500/10 text-indigo-600 text-[10px] font-black uppercase hover:bg-indigo-500/20 transition-colors flex items-center gap-2"><Plus size={14} /> {tr('Add Branch', 'إضافة فرع')}</button>
+                        <div><h3 className="text-lg font-black text-main uppercase tracking-tight">{tr('All Branches', 'كل الفروع')} ({branches.length})</h3><p className="text-[10px] text-muted mt-1">{tr('Exports exclude personal data by default.', 'التصدير يخفي البيانات الشخصية افتراضيًا.')}</p></div>
+                        <div className="flex items-end gap-2"><label className="text-[8px] font-black uppercase text-muted">{tr('From', 'من')}<input type="date" value={exportFrom} onChange={e => setExportFrom(e.target.value)} className="block mt-1 px-2 py-1.5 rounded-lg bg-app border border-border text-[10px] text-main" /></label><label className="text-[8px] font-black uppercase text-muted">{tr('To', 'إلى')}<input type="date" value={exportTo} onChange={e => setExportTo(e.target.value)} className="block mt-1 px-2 py-1.5 rounded-lg bg-app border border-border text-[10px] text-main" /></label><button onClick={openAddBranch} className="px-4 py-2 rounded-xl bg-indigo-500/10 text-indigo-600 text-[10px] font-black uppercase hover:bg-indigo-500/20 transition-colors flex items-center gap-2"><Plus size={14} /> {tr('Add Branch', 'إضافة فرع')}</button></div>
                     </div>
                     <div className="responsive-table">
                         <table className="w-full text-left">
@@ -294,6 +336,7 @@ const FranchiseManager: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
+                                                <button onClick={() => void downloadBranchExport(b.id)} disabled={exportingBranchId === b.id || !exportFrom || !exportTo} className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 disabled:opacity-50" title={tr('Export branch data', 'تصدير بيانات الفرع')}><Download size={14} className={exportingBranchId === b.id ? 'animate-pulse' : ''} /></button>
                                                 <button onClick={() => openEditBranch(b)} className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"><Settings size={14} /></button>
                                                 <button onClick={() => handleDeleteBranch(b.id)} className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"><X size={14} /></button>
                                             </div>
@@ -371,6 +414,41 @@ const FranchiseManager: React.FC = () => {
                             })}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'royalties' && (
+                <div className="space-y-6 animate-in slide-in-from-bottom-5 duration-150">
+                    <div className="card-primary border border-border rounded-[2.5rem] p-6 shadow-sm">
+                        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-black text-main uppercase tracking-tight">{tr('Royalty Preview', 'معاينة الإتاوات')}</h3>
+                                <p className="text-xs text-muted mt-1">{tr('Completed and delivered orders only; no journal entry is posted.', 'الطلبات المكتملة والمسلمة فقط؛ لا يتم إنشاء قيد محاسبي.')}</p>
+                            </div>
+                            <div className="flex flex-wrap items-end gap-3">
+                                <label className="text-[9px] font-black uppercase text-muted">{tr('From', 'من')}<input type="date" value={royaltyFrom} onChange={e => setRoyaltyFrom(e.target.value)} className="block mt-1 px-3 py-2 rounded-xl bg-app border border-border text-xs font-bold text-main" /></label>
+                                <label className="text-[9px] font-black uppercase text-muted">{tr('To', 'إلى')}<input type="date" value={royaltyTo} onChange={e => setRoyaltyTo(e.target.value)} className="block mt-1 px-3 py-2 rounded-xl bg-app border border-border text-xs font-bold text-main" /></label>
+                                <button onClick={() => void loadRoyaltyPreview()} disabled={royaltyLoading || !royaltyFrom || !royaltyTo} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-2"><RefreshCw size={14} className={royaltyLoading ? 'animate-spin' : ''} />{tr('Refresh', 'تحديث')}</button>
+                            </div>
+                        </div>
+                    </div>
+                    {royaltyPreview && (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {[
+                                    { label: tr('Net Sales', 'صافي المبيعات'), value: royaltyPreview.totals.netSales },
+                                    { label: tr('Royalty', 'الإتاوة'), value: royaltyPreview.totals.royaltyAmount },
+                                    { label: tr('Marketing Fee', 'رسوم التسويق'), value: royaltyPreview.totals.marketingFeeAmount },
+                                    { label: tr('Total Due', 'الإجمالي المستحق'), value: royaltyPreview.totals.totalDue },
+                                ].map(card => <div key={card.label} className="card-primary border border-border rounded-2xl p-5"><p className="text-[9px] font-black uppercase tracking-widest text-muted">{card.label}</p><p className="text-xl font-black text-main mt-2">{card.value.toLocaleString()} <span className="text-[10px] text-muted">EGP</span></p></div>)}
+                            </div>
+                            <div className="card-primary border border-border rounded-[2.5rem] shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-border"><h3 className="text-lg font-black text-main">{tr('By Branch', 'حسب الفرع')}</h3></div>
+                                <div className="responsive-table"><table className="w-full text-left"><thead className="bg-app/50 text-[9px] font-black uppercase text-muted tracking-widest"><tr><th className="px-6 py-4">{tr('Branch', 'الفرع')}</th><th className="px-4 py-4 text-right">{tr('Orders', 'الطلبات')}</th><th className="px-4 py-4 text-right">{tr('Rate', 'النسبة')}</th><th className="px-4 py-4 text-right">{tr('Royalty', 'الإتاوة')}</th><th className="px-6 py-4 text-right">{tr('Total Due', 'المستحق')}</th></tr></thead><tbody className="divide-y divide-border/50">{royaltyPreview.branches.map(branch => <tr key={branch.branchId}><td className="px-6 py-4 text-xs font-black text-main">{branch.branchName}{!branch.configured && <span className="ml-2 text-[9px] text-amber-500">{tr('Not configured', 'غير مُعد')}</span>}</td><td className="px-4 py-4 text-right text-xs font-mono text-main">{branch.eligibleOrderCount}</td><td className="px-4 py-4 text-right text-xs font-mono text-main">{branch.royaltyPercentage}% + {branch.marketingFeePercentage}%</td><td className="px-4 py-4 text-right text-xs font-mono text-main">{branch.royaltyAmount.toLocaleString()}</td><td className="px-6 py-4 text-right text-xs font-mono font-black text-indigo-600">{branch.totalDue.toLocaleString()}</td></tr>)}</tbody></table></div>
+                            </div>
+                        </>
+                    )}
+                    {!royaltyLoading && !royaltyPreview && <p className="text-center text-muted py-16">{tr('No royalty preview available.', 'لا توجد معاينة إتاوات متاحة.')}</p>}
                 </div>
             )}
 

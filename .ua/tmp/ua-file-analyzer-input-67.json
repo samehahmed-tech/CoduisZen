@@ -1,0 +1,42 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "tasks/integrations-plan.md",
+      "language": "markdown",
+      "sizeLines": 21,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tasks/lighthouse-plan.md",
+      "language": "markdown",
+      "sizeLines": 22,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tasks/plan.md",
+      "language": "markdown",
+      "sizeLines": 87,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tasks/talabat-plan.md",
+      "language": "markdown",
+      "sizeLines": 51,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "tasks/todo.md",
+      "language": "markdown",
+      "sizeLines": 25,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "tasks/integrations-plan.md": [],
+    "tasks/lighthouse-plan.md": [],
+    "tasks/plan.md": [],
+    "tasks/talabat-plan.md": [],
+    "tasks/todo.md": []
+  }
+}

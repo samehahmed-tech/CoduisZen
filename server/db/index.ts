@@ -4,13 +4,35 @@ import * as schema from '../../src/db/schema';
 import * as dotenv from 'dotenv';
 import logger from '../utils/logger';
 import mssql from 'mssql/msnodesqlv8';
+import { validateTestDatabaseTarget } from './testDatabaseGuard';
+import { isReadOnlyQuery, runWithDatabaseRecovery } from '../utils/dbConnectionRecovery';
 
-dotenv.config({ path: ['.env.local', '.env'] as any });
+const isTestRuntime = process.env.NODE_ENV === 'test';
+if (!isTestRuntime) {
+    dotenv.config({ path: ['.env.local', '.env'] as any });
+}
 
 const dbLogger = logger.child({ domain: 'database' });
 
-const connectionString = process.env.DATABASE_URL ||
-    'Driver={ODBC Driver 18 for SQL Server};Server=(localdb)\\CoduisZen;Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;';
+const resolveConnectionString = () => {
+    if (!isTestRuntime) {
+        return process.env.DATABASE_URL ||
+            'Driver={ODBC Driver 18 for SQL Server};Server=(localdb)\\CoduisZen;Database=CoduisZen;Trusted_Connection=Yes;Encrypt=No;';
+    }
+
+    const verdict = validateTestDatabaseTarget({
+        nodeEnv: process.env.NODE_ENV,
+        testDatabaseUrl: process.env.TEST_DATABASE_URL,
+        runtimeDatabaseUrl: process.env.DATABASE_URL,
+        allowExplicit: process.env.ALLOW_TEST_DATABASE,
+    });
+    if ('reason' in verdict) {
+        throw new Error(`UNSAFE_TEST_DATABASE|${verdict.reason}`);
+    }
+    return process.env.TEST_DATABASE_URL!;
+};
+
+const connectionString = resolveConnectionString();
 
 dbLogger.info({ url: connectionString.replace(/Password=[^;]+/, 'Password=***') }, 'Connecting to SQL Server');
 
@@ -47,11 +69,6 @@ const connectDatabase = async () => {
             .finally(() => { databaseConnectPromise = null; });
     }
     await databaseConnectPromise;
-};
-
-const isConnectionError = (error: any) => {
-    const text = [error?.message, error?.code, error?.originalError?.message, String(error || '')].filter(Boolean).join(' ');
-    return /SQL_SERVER_UNAVAILABLE|Connection is closed|Connection lost|ECONNRESET|ECONNREFUSED|ETIMEDOUT|Login timeout|Failed to connect/i.test(text);
 };
 
 void connectDatabase();
@@ -201,17 +218,17 @@ export const pool = {
             const result = await request.query(text);
             return { rows: result.recordset, rowCount: result.rowsAffected?.[0] ?? 0 };
         };
-        try {
-            return await runQuery();
-        } catch (error: any) {
-            // The pool can go stale mid-flight (SQL Server restart, idle
-            // timeout). Reconnect once and retry instead of 500ing the
-            // request — this closes most of the transient-error window.
-            if (!isConnectionError(error)) throw error;
-            dbLogger.warn({ err: error?.message }, 'Query hit a dead connection; reconnecting and retrying once');
+        return runWithDatabaseRecovery(runQuery, async () => {
+            // A pool can remain marked connected after SQL Server restarts.
+            // Close it first so the next connect really opens a fresh socket.
+            dbLogger.warn('Query hit a dead connection; reconnecting and retrying once');
+            try {
+                if (typeof (sqlPool as any).close === 'function') await sqlPool.close();
+            } catch (closeError: any) {
+                dbLogger.warn({ err: closeError?.message }, 'Failed to close stale SQL pool before reconnect');
+            }
             await connectDatabase();
-            return await runQuery();
-        }
+        }, { retryOnConnectionError: isReadOnlyQuery(text) });
     }
 };
 

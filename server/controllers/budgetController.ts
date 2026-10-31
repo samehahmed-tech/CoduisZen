@@ -8,6 +8,21 @@ import { db } from '../db';
 import { budgets, budgetLines, chartOfAccounts, journalEntries, journalLines } from '../../src/db/schema';
 import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { canAccessBranch } from '../middleware/branchIsolation';
+import { createSignedAuditLog } from '../services/auditService';
+
+const auditBudgetMutation = (req: Request, eventType: string, branchId: string | null, payload: Record<string, unknown>, before?: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    before,
+    after,
+    reason: `Budget mutation: ${eventType}`,
+});
 
 // ============================================================================
 // CRUD
@@ -15,7 +30,7 @@ import { nanoid } from 'nanoid';
 
 export const getBudgets = async (req: Request, res: Response) => {
     try {
-        const branchId = req.query.branchId as string | undefined;
+        const branchId = req.effectiveBranchId || req.query.branchId as string | undefined;
         const status = req.query.status as string | undefined;
 
         const conditions: any[] = [];
@@ -37,6 +52,7 @@ export const getBudgetById = async (req: Request, res: Response) => {
         const id = String(req.params.id || '');
         const [budget] = await db.select().from(budgets).where(eq(budgets.id, id));
         if (!budget) return res.status(404).json({ error: 'Budget not found' });
+        if (budget.branchId && !canAccessBranch(req.user, budget.branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
 
         const lines = await db.select({
             id: budgetLines.id,
@@ -59,18 +75,18 @@ export const getBudgetById = async (req: Request, res: Response) => {
 
 export const createBudget = async (req: Request, res: Response) => {
     try {
-        const { name, branchId, periodStart, periodEnd, notes, lines } = req.body;
+        const { name, periodStart, periodEnd, notes, lines } = req.body;
         if (!name || !periodStart || !periodEnd) {
             return res.status(400).json({ error: 'name, periodStart, and periodEnd are required' });
         }
 
         const budgetId = `BDG-${nanoid(8)}`;
-        const userId = (req as any).user?.id || req.body.createdBy || 'system';
+        const userId = req.user?.id || 'system';
 
         const [created] = await db.insert(budgets).output().values({
             id: budgetId,
             name,
-            branchId: branchId || null,
+            branchId: req.effectiveBranchId || null,
             periodStart: new Date(periodStart),
             periodEnd: new Date(periodEnd),
             status: 'DRAFT',
@@ -90,6 +106,8 @@ export const createBudget = async (req: Request, res: Response) => {
             );
         }
 
+        await auditBudgetMutation(req, 'BUDGET_CREATED', created?.branchId || null, { budgetId, lineCount: Array.isArray(lines) ? lines.length : 0 }, undefined, { status: 'DRAFT' });
+
         res.status(201).json(created);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -99,11 +117,14 @@ export const createBudget = async (req: Request, res: Response) => {
 export const updateBudget = async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id || '');
-        const { name, branchId, periodStart, periodEnd, notes, status, lines } = req.body;
+        const { name, periodStart, periodEnd, notes, status, lines } = req.body;
+        const [current] = await db.select().from(budgets).where(eq(budgets.id, id));
+        if (!current) return res.status(404).json({ error: 'Budget not found' });
+        if (current.branchId && !canAccessBranch(req.user, current.branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
 
         const updates: any = { updatedAt: new Date() };
         if (name !== undefined) updates.name = name;
-        if (branchId !== undefined) updates.branchId = branchId || null;
+        if (req.effectiveBranchId && Object.prototype.hasOwnProperty.call(req.body || {}, 'branchId')) updates.branchId = req.effectiveBranchId;
         if (periodStart !== undefined) updates.periodStart = new Date(periodStart);
         if (periodEnd !== undefined) updates.periodEnd = new Date(periodEnd);
         if (notes !== undefined) updates.notes = notes;
@@ -127,6 +148,8 @@ export const updateBudget = async (req: Request, res: Response) => {
             }
         }
 
+        await auditBudgetMutation(req, 'BUDGET_UPDATED', updated.branchId || current.branchId || null, { budgetId: id, changedKeys: Object.keys(req.body || {}).filter((key) => key !== 'lines').sort(), lineCount: Array.isArray(lines) ? lines.length : undefined }, { status: current.status }, { status: updated.status });
+
         res.json(updated);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -136,8 +159,12 @@ export const updateBudget = async (req: Request, res: Response) => {
 export const deleteBudget = async (req: Request, res: Response) => {
     try {
         const id = String(req.params.id || '');
+        const [current] = await db.select().from(budgets).where(eq(budgets.id, id));
+        if (!current) return res.status(404).json({ error: 'Budget not found' });
+        if (current.branchId && !canAccessBranch(req.user, current.branchId)) return res.status(403).json({ error: 'BRANCH_MISMATCH' });
         // budget_lines cascade on delete
         await db.delete(budgets).where(eq(budgets.id, id));
+        await auditBudgetMutation(req, current.branchId || null, 'BUDGET_DELETED', { budgetId: id }, { status: current.status }, { deleted: true });
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

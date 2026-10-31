@@ -157,36 +157,45 @@ const ItemCard: React.FC<Props> = ({
         );
     }
 
-    // === GRID VIEW (Clean White Card) ===
+    // === GRID VIEW (Atelier card) ===
     const isCompact = density === 'compact';
+    const cardNumber = String(index + 1).padStart(3, '0');
 
     return (
-        <div
+        <article
             onClick={(e) => onClick(item, e)}
             {...(draggableContext ? dragHandleProps : {})}
-            className={`group relative bg-white dark:bg-card rounded-lg border shadow-sm transition-all duration-150 hover:-translate-y-1 flex flex-col cursor-default overflow-hidden ${isSelected
-                ? 'border-primary/60 ring-1 ring-primary/25'
-                : 'border-gray-200 dark:border-white/[0.06] hover:border-gray-300 dark:hover:border-border/40 hover:shadow-md'
-                } ${!item.isAvailable ? 'opacity-60' : ''}`}
+            className={`atelier-card ${isSelected ? 'is-selected' : ''} ${!item.isAvailable ? 'is-off' : ''}`}
         >
-            {multiSelectMode && (
-                <div className="absolute top-2 left-2 z-20 cursor-pointer">
-                    {isSelected ? <CheckSquare size={16} className="text-primary" /> : <Square size={16} className="text-gray-400" />}
-                </div>
-            )}
+            <span className="atelier-card-no">
+                {multiSelectMode || isSelected ? (
+                    <span className="atelier-card-select" aria-hidden="true">{isSelected ? <CheckSquare size={16} /> : <Square size={16} />}</span>
+                ) : (
+                    <span className="atelier-num">{cardNumber}</span>
+                )}
+            </span>
 
-            {/* TOP: Image + Status */}
-            <div className={`relative ${isCompact ? 'h-20' : 'h-28'} bg-gray-100 dark:bg-elevated/20 border-b border-gray-100 dark:border-white/[0.04] shrink-0 overflow-hidden`}>
-                {item.image ? <ItemImage src={item.image} name={itemName} /> : <NoPhoto name={itemName} />}
+            <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }}
+                className={`atelier-card-state ${item.isAvailable ? '' : 'is-off'}`}
+                aria-label={availabilityLabel}
+                title={availabilityLabel}
+            >
+                <i />
+                <span>{item.isAvailable ? (lang === 'ar' ? 'متاح' : 'Available') : (lang === 'ar' ? 'غير متاح' : 'Unavailable')}</span>
+            </button>
 
-                {/* Dietary Badges overlay */}
+            <div className="atelier-card-media">
+                {item.image ? <ItemImage src={item.image} name={itemName} /> : <div className="atelier-card-art"><Package size={34} /></div>}
+
                 {item.dietaryBadges && item.dietaryBadges.length > 0 && (
-                    <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+                    <div className="atelier-card-badges">
                         {item.dietaryBadges.slice(0, 3).map(b => {
                             const bdg = dietaryBadgesMap[b];
                             if (!bdg) return null;
                             return (
-                                <span key={b} className={`px-1.5 py-0.5 rounded text-[9px] font-bold shadow-sm ${bdg.color}`}>
+                                <span key={b} className={`atelier-dietary ${bdg.color}`}>
                                     {lang === 'ar' ? bdg.labelAr : bdg.labelEn}
                                 </span>
                             );
@@ -194,54 +203,36 @@ const ItemCard: React.FC<Props> = ({
                     </div>
                 )}
 
-                {/* Category label */}
-                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-white/80 dark:bg-black/50 text-[9px] font-medium text-gray-600 dark:text-white/80 ">
-                    {lang === 'ar' ? (item._categoryNameAr || item._categoryName) : item._categoryName}
-                </div>
-
-                {/* Status dot */}
-                <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${item.isAvailable ? 'bg-emerald-500' : 'bg-red-400'}`} />
-
-                {/* No-photo discoverability badge */}
-                {!item.image && (
-                    <div className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded-md bg-black/55 text-white text-[9px] font-bold backdrop-blur-sm">
-                        {lang === 'ar' ? 'بلا صورة' : 'No photo'}
-                    </div>
-                )}
-
-                {/* Badge */}
                 {badge && (
-                    <div className={`absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${badge.color}`}>
-                        <badge.icon size={9} /> {isCompact ? '' : badge.label}
+                    <div className={`atelier-card-flag ${badge.color}`}>
+                        <badge.icon size={9} /> {badge.label}
                     </div>
                 )}
+                {!item.image && <span className="atelier-card-nophoto">{lang === 'ar' ? 'بلا صورة' : 'No photo'}</span>}
             </div>
 
-            {/* MIDDLE: Name + Price + Cost + Margin */}
-            <div className={`flex flex-col h-full ${isCompact ? 'px-3 pt-2.5 pb-2' : 'px-3.5 pt-3 pb-2'}`}>
-                <h3 className={`font-medium text-gray-800 dark:text-main leading-snug line-clamp-2 mb-1.5 ${isCompact ? 'text-[12px]' : 'text-[13px]'}`}>
-                    {lang === 'ar' ? (item.nameAr || item.name) : item.name}
-                </h3>
+            <div className="atelier-card-body">
+                <h3>{itemName}</h3>
+                <p className="atelier-card-sub">
+                    <span>{lang === 'ar' ? (item._categoryNameAr || item._categoryName) : item._categoryName}</span>
+                    {item.sku && <em className="latin">{item.sku}</em>}
+                </p>
 
                 {(sizeCount > 0 || modCount > 0) && (
-                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                    <div className="atelier-card-chips">
                         {sizeCount > 0 && (
-                            <span className="flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] font-medium border border-primary/20">
-                                <Package size={10} /> {sizeCount} {lang === 'ar' ? 'أحجام' : 'Sizes'}
-                            </span>
+                            <span><Package size={10} /> {sizeCount} {lang === 'ar' ? 'أحجام' : 'Sizes'}</span>
                         )}
                         {modCount > 0 && (
-                            <span className="flex items-center gap-1 bg-purple-50/50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded text-[10px] font-medium border border-purple-100 dark:border-purple-500/20">
-                                <Layers size={10} /> {modCount} {lang === 'ar' ? 'إضافات' : 'Mods'}
-                            </span>
+                            <span><Layers size={10} /> {modCount} {lang === 'ar' ? 'إضافات' : 'Mods'}</span>
                         )}
                     </div>
                 )}
 
-                <div className="flex items-end justify-between mt-auto">
-                    <div>
+                <div className="atelier-card-bottom">
+                    <div className="atelier-card-price">
                         {editingPrice ? (
-                            <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <span className="atelier-card-price-edit" onClick={(e) => e.stopPropagation()}>
                                 <input
                                     autoFocus
                                     type="number"
@@ -254,24 +245,23 @@ const ItemCard: React.FC<Props> = ({
                                         if (e.key === 'Escape') setEditingPrice(false);
                                     }}
                                     onBlur={commitPrice}
-                                    className={`font-semibold text-gray-900 dark:text-main bg-elevated/60 border border-primary/40 rounded-md px-1.5 py-0.5 outline-none ${isCompact ? 'text-[14px] w-20' : 'text-[15px] w-24'}`}
                                     aria-label={lang === 'ar' ? 'تعديل السعر' : 'Edit price'}
                                 />
                                 <button
+                                    type="button"
                                     onClick={(e) => { e.stopPropagation(); commitPrice(); }}
-                                    className="p-1 rounded-md text-emerald-600 hover:bg-emerald-500/10"
                                     aria-label={lang === 'ar' ? 'حفظ السعر' : 'Save price'}
                                 >
                                     <Check size={13} />
                                 </button>
                             </span>
                         ) : (
-                            <p className={`font-semibold text-gray-900 dark:text-main ${isCompact ? 'text-[14px]' : 'text-[15px]'}`}>
+                            <p>
                                 {currency} {item.price.toFixed(2)}
                                 {onQuickPrice && (
                                     <button
+                                        type="button"
                                         onClick={(e) => { e.stopPropagation(); setPriceDraft(String(item.price)); setEditingPrice(true); }}
-                                        className="ml-1.5 p-1 rounded-md text-gray-300 dark:text-muted/40 hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100"
                                         aria-label={lang === 'ar' ? 'تعديل سريع للسعر' : 'Quick edit price'}
                                         title={lang === 'ar' ? 'تعديل سريع للسعر' : 'Quick edit price'}
                                     >
@@ -281,61 +271,33 @@ const ItemCard: React.FC<Props> = ({
                             </p>
                         )}
                         {item.cost && item.cost > 0 ? (
-                            <p className="text-[10px] text-gray-400 dark:text-muted/50 mt-0.5">Cost: {currency}{item.cost.toFixed(2)}</p>
+                            <small>{lang === 'ar' ? 'التكلفة' : 'Cost'}: {currency}{item.cost.toFixed(2)}</small>
                         ) : null}
                     </div>
                     {margin !== null && (
-                        <span className={`text-[12px] font-semibold ${getMarginColor(margin)}`}>{margin.toFixed(0)}%</span>
+                        <span className={`atelier-card-margin ${margin >= 50 ? 'is-good' : margin >= 30 ? 'is-warn' : 'is-low'}`}>
+                            <b>{margin.toFixed(0)}%</b>
+                            <small>{margin >= 50 ? (lang === 'ar' ? 'هامش ممتاز' : 'Excellent') : margin >= 30 ? (lang === 'ar' ? 'هامش جيد' : 'Good') : (lang === 'ar' ? 'يحتاج مراجعة' : 'Review')}</small>
+                        </span>
                     )}
                 </div>
-            </div>
 
-            {/* BOTTOM: Sales + Sizes + Modifiers + Toggle */}
-            <div className={`mt-auto border-t border-gray-100 dark:border-white/[0.04] ${isCompact ? 'px-3 py-2' : 'px-3.5 py-2.5'}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-muted/60">
-                        {item.salesData && item.salesData.today > 0 && (
-                            <span title="Today">{item.salesData.today} today</span>
-                        )}
-                        {item.salesData && (item.salesData.revenue30 || 0) > 0 && (
-                            <span className="text-emerald-600 dark:text-emerald-500 font-medium" title="30D Revenue">
-                                {currency}{(item.salesData.revenue30 || 0) > 999 ? `${((item.salesData.revenue30 || 0) / 1000).toFixed(1)}K` : item.salesData.revenue30}
-                            </span>
-                        )}
+                {item.salesData && ((item.salesData.today || 0) > 0 || (item.salesData.revenue30 || 0) > 0) && (
+                    <div className="atelier-card-sales">
+                        {(item.salesData.today || 0) > 0 && <span>{item.salesData.today} {lang === 'ar' ? 'اليوم' : 'today'}</span>}
+                        {(item.salesData.revenue30 || 0) > 0 && <span>{currency}{(item.salesData.revenue30 || 0) > 999 ? `${((item.salesData.revenue30 || 0) / 1000).toFixed(1)}K` : item.salesData.revenue30} / 30D</span>}
                     </div>
-
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }}
-                        className={`p-1 rounded transition-colors ${item.isAvailable ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10' : 'text-red-500 hover:bg-red-50 dark:hover:bg-rose-500/10'}`}
-                        aria-label={availabilityLabel}
-                        title={availabilityLabel}
-                    >
-                        {item.isAvailable ? <Eye size={13} /> : <EyeOff size={13} />}
-                    </button>
-                </div>
+                )}
             </div>
 
-            {/* Hover Actions (desktop only — touch uses tap-to-open drawer) */}
-            <div className="absolute inset-0 bg-white/95 dark:bg-card/95 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-2 p-4 z-10 rounded-lg [@media(pointer:coarse)]:hidden">
-                <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="w-full h-8 bg-primary hover:brightness-110 text-white rounded-md text-[12px] font-medium transition-all flex items-center justify-center gap-1.5">
-                    <Edit3 size={13} /> {lang === 'ar' ? 'تعديل' : 'Edit'}
-                </button>
-                <div className="flex w-full gap-1.5">
-                    <button onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={availabilityLabel} title={availabilityLabel}>
-                        {item.isAvailable ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDuplicate(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-gray-800 dark:hover:text-main rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}>
-                        <Copy size={13} />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); onArchive(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-amber-600 dark:hover:text-amber-500 rounded-md flex justify-center items-center transition-colors" aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>
-                        {item.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(item); }} className="flex-1 h-8 bg-gray-100 dark:bg-elevated border border-gray-200 dark:border-border/30 text-gray-600 dark:text-muted hover:text-red-500 rounded-md flex justify-center items-center transition-colors" aria-label={lang === 'ar' ? `حذف ${itemName}` : `Delete ${itemName}`} title={lang === 'ar' ? 'حذف' : 'Delete'}>
-                        <Trash2 size={13} />
-                    </button>
-                </div>
+            <div className="atelier-card-actions">
+                <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(item); }} aria-label={lang === 'ar' ? `تعديل ${itemName}` : `Edit ${itemName}`} title={lang === 'ar' ? 'تعديل' : 'Edit'}><Edit3 size={14} /></button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onToggleAvailability(item); }} aria-label={availabilityLabel} title={lang === 'ar' ? 'التوافر' : 'Availability'}>{item.isAvailable ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onDuplicate(item); }} aria-label={lang === 'ar' ? `نسخ ${itemName}` : `Duplicate ${itemName}`} title={lang === 'ar' ? 'نسخ' : 'Duplicate'}><Copy size={14} /></button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onArchive(item); }} aria-label={item.archivedAt ? (lang === 'ar' ? `استرجاع ${itemName}` : `Restore ${itemName}`) : (lang === 'ar' ? `أرشفة ${itemName}` : `Archive ${itemName}`)} title={item.archivedAt ? (lang === 'ar' ? 'استرجاع' : 'Restore') : (lang === 'ar' ? 'أرشفة' : 'Archive')}>{item.archivedAt ? <ArchiveRestore size={14} /> : <Archive size={14} />}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(item); }} aria-label={lang === 'ar' ? `حذف ${itemName}` : `Delete ${itemName}`} title={lang === 'ar' ? 'حذف' : 'Delete'}><Trash2 size={14} /></button>
             </div>
-        </div>
+        </article>
     );
 };
 

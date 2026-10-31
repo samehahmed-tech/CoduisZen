@@ -23,19 +23,19 @@ export interface MotionProfile {
 }
 
 export const MOTION_PROFILES: Record<string, MotionProfile> = {
-    'meridian': { fast: '120ms', normal: '200ms', slow: '420ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'precise', tiltMax: 0, directionAware: false, beam: false },
-    'command': { fast: '70ms', normal: '110ms', slow: '220ms', easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)', signature: 'rapid', tiltMax: 0, directionAware: false, beam: false },
-    'glassline': { fast: '140ms', normal: '230ms', slow: '480ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'reveal', tiltMax: 5, directionAware: true, beam: true },
-    'canvas': { fast: '160ms', normal: '260ms', slow: '520ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'editorial', tiltMax: 0, directionAware: false, beam: false },
-    'fluent-pro': { fast: '100ms', normal: '150ms', slow: '300ms', easing: 'cubic-bezier(0.33, 1, 0.68, 1)', signature: 'snappy', tiltMax: 0, directionAware: false, beam: false },
-    'material-x': { fast: '130ms', normal: '210ms', slow: '440ms', easing: 'cubic-bezier(0.05, 0.7, 0.1, 1)', signature: 'spring', tiltMax: 4, directionAware: true, beam: false },
-    'obsidian': { fast: '160ms', normal: '260ms', slow: '540ms', easing: 'cubic-bezier(0, 0, 0.2, 1)', signature: 'glow', tiltMax: 0, directionAware: false, beam: true },
-    'tiles': { fast: '120ms', normal: '200ms', slow: '420ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'modular', tiltMax: 6, directionAware: true, beam: false },
-    'acrylic': { fast: '150ms', normal: '250ms', slow: '520ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'soft', tiltMax: 3, directionAware: false, beam: false },
-    'touch': { fast: '90ms', normal: '140ms', slow: '280ms', easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)', signature: 'tactile', tiltMax: 0, directionAware: false, beam: false },
+    'aero': { fast: '160ms', normal: '240ms', slow: '520ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'reveal', tiltMax: 4, directionAware: true, beam: true },
+    'citrus': { fast: '120ms', normal: '220ms', slow: '460ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'spring', tiltMax: 3, directionAware: true, beam: false },
+    'porcelain': { fast: '160ms', normal: '260ms', slow: '560ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'editorial', tiltMax: 0, directionAware: false, beam: false },
+    'blueprint': { fast: '90ms', normal: '120ms', slow: '260ms', easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)', signature: 'rapid', tiltMax: 0, directionAware: false, beam: false },
+    'clay': { fast: '140ms', normal: '220ms', slow: '460ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'tactile', tiltMax: 0, directionAware: false, beam: false },
+    'nocturne': { fast: '160ms', normal: '240ms', slow: '520ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'editorial', tiltMax: 0, directionAware: false, beam: false },
+    'foundry': { fast: '90ms', normal: '130ms', slow: '300ms', easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)', signature: 'precise', tiltMax: 0, directionAware: false, beam: false },
+    'neon': { fast: '120ms', normal: '200ms', slow: '440ms', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', signature: 'glow', tiltMax: 5, directionAware: true, beam: true },
+    'slate': { fast: '90ms', normal: '110ms', slow: '240ms', easing: 'cubic-bezier(0, 0, 0.2, 1)', signature: 'precise', tiltMax: 0, directionAware: false, beam: false },
+    'cinema': { fast: '160ms', normal: '280ms', slow: '600ms', easing: 'cubic-bezier(0.16, 1, 0.3, 1)', signature: 'soft', tiltMax: 4, directionAware: true, beam: false },
 };
 
-export const DEFAULT_MOTION_PROFILE: MotionProfile = MOTION_PROFILES['meridian'];
+export const DEFAULT_MOTION_PROFILE: MotionProfile = MOTION_PROFILES['aero'];
 
 const motionAllowed = (): boolean => {
     if (typeof document === 'undefined') return false;

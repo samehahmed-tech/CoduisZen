@@ -1,0 +1,56 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/latest-fixes/Apply Latest Fixes.bat",
+      "language": "batch",
+      "sizeLines": 22,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/latest-fixes/Apply Latest Fixes.ps1",
+      "language": "powershell",
+      "sizeLines": 416,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/latest-fixes/Install-Common.ps1",
+      "language": "powershell",
+      "sizeLines": 527,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/latest-fixes/README AR.txt",
+      "language": "txt",
+      "sizeLines": 33,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "scripts/sameh-installer/latest-fixes/Repair Installed System.bat",
+      "language": "batch",
+      "sizeLines": 22,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/latest-fixes/Repair Installed System.ps1",
+      "language": "powershell",
+      "sizeLines": 279,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/latest-fixes/VERSION.txt",
+      "language": "txt",
+      "sizeLines": 3,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/latest-fixes/Apply Latest Fixes.bat": [],
+    "scripts/sameh-installer/latest-fixes/Apply Latest Fixes.ps1": [],
+    "scripts/sameh-installer/latest-fixes/Install-Common.ps1": [],
+    "scripts/sameh-installer/latest-fixes/README AR.txt": [],
+    "scripts/sameh-installer/latest-fixes/Repair Installed System.bat": [],
+    "scripts/sameh-installer/latest-fixes/Repair Installed System.ps1": [],
+    "scripts/sameh-installer/latest-fixes/VERSION.txt": []
+  }
+}

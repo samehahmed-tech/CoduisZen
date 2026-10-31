@@ -1,0 +1,1748 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 15,
+  "filesSkipped": [
+    "public/wallpapers/webp/aurora.webp",
+    "public/wallpapers/webp/copper.webp",
+    "public/wallpapers/webp/emerald.webp",
+    "public/wallpapers/webp/graphite.webp",
+    "public/wallpapers/webp/midnight.webp",
+    "public/wallpapers/webp/ocean.webp",
+    "public/wallpapers/webp/rose.webp",
+    "public/wallpapers/webp/sand.webp",
+    "public/wallpapers/webp/teal.webp",
+    "public/wallpapers/webp/violet.webp"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 15,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 14,
+      "failed": 0,
+      "skipped": 1
+    }
+  },
+  "results": [
+    {
+      "path": "hooks/useKeyPress.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 30,
+      "nonEmptyLines": 27,
+      "functions": [
+        {
+          "name": "useKeyPress",
+          "startLine": 9,
+          "endLine": 28,
+          "params": [
+            "key",
+            "callback",
+            "modifiers"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useKeyPress",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useKeyPress",
+          "callee": "useCallback",
+          "lineNumber": 14
+        },
+        {
+          "caller": "useKeyPress",
+          "callee": "e.preventDefault",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useKeyPress",
+          "callee": "callback",
+          "lineNumber": 21
+        },
+        {
+          "caller": "useKeyPress",
+          "callee": "useEffect",
+          "lineNumber": 24
+        },
+        {
+          "caller": "useKeyPress",
+          "callee": "document.addEventListener",
+          "lineNumber": 25
+        },
+        {
+          "caller": "useKeyPress",
+          "callee": "document.removeEventListener",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useLocalStorage.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 28,
+      "functions": [
+        {
+          "name": "useLocalStorage",
+          "startLine": 9,
+          "endLine": 30,
+          "params": [
+            "key",
+            "initialValue"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useLocalStorage",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useLocalStorage",
+          "callee": "useState",
+          "lineNumber": 10
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "window.localStorage.getItem",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "JSON.parse",
+          "lineNumber": 13
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "useCallback",
+          "lineNumber": 19
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "setStoredValue",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "value",
+          "lineNumber": 21
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "window.localStorage.setItem",
+          "lineNumber": 23
+        },
+        {
+          "caller": "useLocalStorage",
+          "callee": "JSON.stringify",
+          "lineNumber": 23
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useOnScreen.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 26,
+      "functions": [
+        {
+          "name": "useOnScreen",
+          "startLine": 10,
+          "endLine": 30,
+          "params": [
+            "options"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useOnScreen",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useOnScreen",
+          "callee": "useRef",
+          "lineNumber": 11
+        },
+        {
+          "caller": "useOnScreen",
+          "callee": "useState",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useOnScreen",
+          "callee": "useEffect",
+          "lineNumber": 14
+        },
+        {
+          "caller": "useOnScreen",
+          "callee": "setIsVisible",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useOnScreen",
+          "callee": "observer.unobserve",
+          "lineNumber": 21
+        },
+        {
+          "caller": "useOnScreen",
+          "callee": "observer.observe",
+          "lineNumber": 25
+        },
+        {
+          "caller": "useOnScreen",
+          "callee": "observer.disconnect",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/usePrevious.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 20,
+      "nonEmptyLines": 16,
+      "functions": [
+        {
+          "name": "usePrevious",
+          "startLine": 10,
+          "endLine": 18,
+          "params": [
+            "value"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "usePrevious",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "usePrevious",
+          "callee": "useRef",
+          "lineNumber": 11
+        },
+        {
+          "caller": "usePrevious",
+          "callee": "useEffect",
+          "lineNumber": 13
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useSWR.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 116,
+      "nonEmptyLines": 100,
+      "functions": [
+        {
+          "name": "useSWR",
+          "startLine": 18,
+          "endLine": 110,
+          "params": [
+            "key",
+            "fetcher",
+            "options"
+          ]
+        },
+        {
+          "name": "mutateGlobal",
+          "startLine": 113,
+          "endLine": 116,
+          "params": [
+            "key"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useSWR",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "mutateGlobal",
+          "line": 113,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useSWR",
+          "callee": "useState",
+          "lineNumber": 30
+        },
+        {
+          "caller": "useSWR",
+          "callee": "globalCache.get",
+          "lineNumber": 32
+        },
+        {
+          "caller": "useSWR",
+          "callee": "Date.now",
+          "lineNumber": 33
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useState",
+          "lineNumber": 39
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useState",
+          "lineNumber": 40
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useState",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useCallback",
+          "lineNumber": 43
+        },
+        {
+          "caller": "useSWR",
+          "callee": "globalCache.get",
+          "lineNumber": 46
+        },
+        {
+          "caller": "useSWR",
+          "callee": "Date.now",
+          "lineNumber": 47
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setIsValidating",
+          "lineNumber": 51
+        },
+        {
+          "caller": "useSWR",
+          "callee": "fetcher",
+          "lineNumber": 53
+        },
+        {
+          "caller": "useSWR",
+          "callee": "globalCache.set",
+          "lineNumber": 54
+        },
+        {
+          "caller": "useSWR",
+          "callee": "Date.now",
+          "lineNumber": 54
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setData",
+          "lineNumber": 55
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setError",
+          "lineNumber": 56
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setError",
+          "lineNumber": 58
+        },
+        {
+          "caller": "useSWR",
+          "callee": "String",
+          "lineNumber": 58
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setIsValidating",
+          "lineNumber": 60
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setIsLoading",
+          "lineNumber": 61
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useEffect",
+          "lineNumber": 66
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setIsLoading",
+          "lineNumber": 68
+        },
+        {
+          "caller": "useSWR",
+          "callee": "revalidate",
+          "lineNumber": 72
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useEffect",
+          "lineNumber": 77
+        },
+        {
+          "caller": "onFocus",
+          "callee": "revalidate",
+          "lineNumber": 79
+        },
+        {
+          "caller": "useSWR",
+          "callee": "window.addEventListener",
+          "lineNumber": 80
+        },
+        {
+          "caller": "useSWR",
+          "callee": "window.removeEventListener",
+          "lineNumber": 81
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useEffect",
+          "lineNumber": 85
+        },
+        {
+          "caller": "listener",
+          "callee": "revalidate",
+          "lineNumber": 88
+        },
+        {
+          "caller": "useSWR",
+          "callee": "mutationListeners.add",
+          "lineNumber": 91
+        },
+        {
+          "caller": "useSWR",
+          "callee": "mutationListeners.delete",
+          "lineNumber": 93
+        },
+        {
+          "caller": "useSWR",
+          "callee": "useCallback",
+          "lineNumber": 97
+        },
+        {
+          "caller": "useSWR",
+          "callee": "setData",
+          "lineNumber": 99
+        },
+        {
+          "caller": "useSWR",
+          "callee": "(newData as Function)",
+          "lineNumber": 100
+        },
+        {
+          "caller": "useSWR",
+          "callee": "globalCache.set",
+          "lineNumber": 101
+        },
+        {
+          "caller": "useSWR",
+          "callee": "Date.now",
+          "lineNumber": 101
+        },
+        {
+          "caller": "useSWR",
+          "callee": "mutateGlobal",
+          "lineNumber": 105
+        },
+        {
+          "caller": "mutateGlobal",
+          "callee": "globalCache.delete",
+          "lineNumber": 114
+        },
+        {
+          "caller": "mutateGlobal",
+          "callee": "mutationListeners.forEach",
+          "lineNumber": 115
+        },
+        {
+          "caller": "mutateGlobal",
+          "callee": "listener",
+          "lineNumber": 115
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useSort.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 55,
+      "nonEmptyLines": 46,
+      "functions": [
+        {
+          "name": "useSort",
+          "startLine": 24,
+          "endLine": 53,
+          "params": [
+            "data"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useSort",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useSort",
+          "callee": "useState",
+          "lineNumber": 25
+        },
+        {
+          "caller": "useSort",
+          "callee": "useCallback",
+          "lineNumber": 27
+        },
+        {
+          "caller": "useSort",
+          "callee": "setSortConfig",
+          "lineNumber": 28
+        },
+        {
+          "caller": "useSort",
+          "callee": "useMemo",
+          "lineNumber": 34
+        },
+        {
+          "caller": "useSort",
+          "callee": "[...data].sort",
+          "lineNumber": 36
+        },
+        {
+          "caller": "useSort",
+          "callee": "aVal.localeCompare",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useSort",
+          "callee": "bVal.localeCompare",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useSort",
+          "callee": "useCallback",
+          "lineNumber": 47
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useThrottle.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 31,
+      "nonEmptyLines": 27,
+      "functions": [
+        {
+          "name": "useThrottle",
+          "startLine": 10,
+          "endLine": 29,
+          "params": [
+            "callback",
+            "delay"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useThrottle",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useThrottle",
+          "callee": "useRef",
+          "lineNumber": 11
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "useRef",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "useCallback",
+          "lineNumber": 14
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "Date.now",
+          "lineNumber": 15
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "callback",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "setTimeout",
+          "lineNumber": 22
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "Date.now",
+          "lineNumber": 23
+        },
+        {
+          "caller": "useThrottle",
+          "callee": "callback",
+          "lineNumber": 25
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useTiltEffect.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 83,
+      "nonEmptyLines": 72,
+      "functions": [
+        {
+          "name": "isReducedMotion",
+          "startLine": 15,
+          "endLine": 18,
+          "params": []
+        },
+        {
+          "name": "useTiltEffect",
+          "startLine": 20,
+          "endLine": 81,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "useTiltEffect",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isReducedMotion",
+          "callee": "window.matchMedia",
+          "lineNumber": 18
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useRef",
+          "lineNumber": 21
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useRef",
+          "lineNumber": 22
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useRef",
+          "lineNumber": 23
+        },
+        {
+          "caller": "cancelRaf",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 27
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useEffect",
+          "lineNumber": 33
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useCallback",
+          "lineNumber": 35
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "(p.x * MAX_DEG * 2).toFixed",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 42
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "(-p.y * MAX_DEG * 2).toFixed",
+          "lineNumber": 42
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 43
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "((p.x + 0.5) * 100).toFixed",
+          "lineNumber": 43
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 44
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "((p.y + 0.5) * 100).toFixed",
+          "lineNumber": 44
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 45
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "p.x.toFixed",
+          "lineNumber": 45
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 46
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "p.y.toFixed",
+          "lineNumber": 46
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useCallback",
+          "lineNumber": 49
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "isReducedMotion",
+          "lineNumber": 50
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.getBoundingClientRect",
+          "lineNumber": 52
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "Math.max",
+          "lineNumber": 55
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "Math.min",
+          "lineNumber": 55
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "Math.max",
+          "lineNumber": 56
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "Math.min",
+          "lineNumber": 56
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 58
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useCallback",
+          "lineNumber": 61
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "isReducedMotion",
+          "lineNumber": 62
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "e.currentTarget.classList.add",
+          "lineNumber": 63
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "useCallback",
+          "lineNumber": 66
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.classList.remove",
+          "lineNumber": 68
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "cancelRaf",
+          "lineNumber": 69
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 72
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 73
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 74
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 75
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 76
+        },
+        {
+          "caller": "useTiltEffect",
+          "callee": "el.style.setProperty",
+          "lineNumber": 77
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useToggle.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 17,
+      "nonEmptyLines": 15,
+      "functions": [
+        {
+          "name": "useToggle",
+          "startLine": 11,
+          "endLine": 15,
+          "params": [
+            "initial"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useToggle",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useToggle",
+          "callee": "useState",
+          "lineNumber": 12
+        },
+        {
+          "caller": "useToggle",
+          "callee": "useCallback",
+          "lineNumber": 13
+        },
+        {
+          "caller": "useToggle",
+          "callee": "setValue",
+          "lineNumber": 13
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useUndoable.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 53,
+      "nonEmptyLines": 46,
+      "functions": [
+        {
+          "name": "useUndoable",
+          "startLine": 21,
+          "endLine": 51,
+          "params": [
+            "initialValue",
+            "maxHistory"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useUndoable",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useUndoable",
+          "callee": "useState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "useState",
+          "lineNumber": 23
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "useCallback",
+          "lineNumber": 25
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "setHistory",
+          "lineNumber": 26
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "[...prev.slice(0, pointer + 1), next].slice",
+          "lineNumber": 27
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "prev.slice",
+          "lineNumber": 27
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "setPointer",
+          "lineNumber": 28
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "useCallback",
+          "lineNumber": 33
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "setPointer",
+          "lineNumber": 34
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "Math.max",
+          "lineNumber": 34
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "useCallback",
+          "lineNumber": 37
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "setPointer",
+          "lineNumber": 38
+        },
+        {
+          "caller": "useUndoable",
+          "callee": "Math.min",
+          "lineNumber": 38
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "hooks/useWindowSize.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 39,
+      "nonEmptyLines": 34,
+      "functions": [
+        {
+          "name": "useWindowSize",
+          "startLine": 15,
+          "endLine": 37,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "useWindowSize",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "useWindowSize",
+          "callee": "useState",
+          "lineNumber": 16
+        },
+        {
+          "caller": "useWindowSize",
+          "callee": "useEffect",
+          "lineNumber": 21
+        },
+        {
+          "caller": "handler",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 24
+        },
+        {
+          "caller": "handler",
+          "callee": "requestAnimationFrame",
+          "lineNumber": 25
+        },
+        {
+          "caller": "handler",
+          "callee": "setSize",
+          "lineNumber": 26
+        },
+        {
+          "caller": "useWindowSize",
+          "callee": "window.addEventListener",
+          "lineNumber": 29
+        },
+        {
+          "caller": "useWindowSize",
+          "callee": "window.removeEventListener",
+          "lineNumber": 31
+        },
+        {
+          "caller": "useWindowSize",
+          "callee": "cancelAnimationFrame",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "public/docs/HR_USER_GUIDE_AR.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 33,
+      "nonEmptyLines": 24,
+      "sections": [
+        {
+          "heading": "دليل استخدام الموارد البشرية والرواتب",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "أسرع مسار تشغيل",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "أهم الأسئلة",
+          "level": 2,
+          "line": 18
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "public/service-worker.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 72,
+      "nonEmptyLines": 65,
+      "functions": [
+        {
+          "name": "processSyncQueue",
+          "startLine": 63,
+          "endLine": 72,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "processSyncQueue",
+          "callee": "self.clients.matchAll",
+          "lineNumber": 68
+        },
+        {
+          "caller": "processSyncQueue",
+          "callee": "client.postMessage",
+          "lineNumber": 70
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "public/sw.js",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "restore-coduiszen.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 170,
+      "nonEmptyLines": 153,
+      "functions": [
+        {
+          "name": "arg",
+          "startLine": 9,
+          "endLine": 12,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "fail",
+          "startLine": 21,
+          "endLine": 21,
+          "params": [
+            "message"
+          ]
+        },
+        {
+          "name": "cleanIdent",
+          "startLine": 22,
+          "endLine": 22,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "cleanString",
+          "startLine": 23,
+          "endLine": 23,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "sqlIdent",
+          "startLine": 24,
+          "endLine": 24,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "masterConnection",
+          "startLine": 29,
+          "endLine": 33,
+          "params": [
+            "connectionString"
+          ]
+        },
+        {
+          "name": "query",
+          "startLine": 35,
+          "endLine": 39,
+          "params": [
+            "pool",
+            "text"
+          ]
+        },
+        {
+          "name": "stopRestoFlow",
+          "startLine": 51,
+          "endLine": 58,
+          "params": []
+        },
+        {
+          "name": "startRestoFlow",
+          "startLine": 60,
+          "endLine": 65,
+          "params": []
+        },
+        {
+          "name": "main",
+          "startLine": 67,
+          "endLine": 165,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "arg",
+          "callee": "args.find",
+          "lineNumber": 10
+        },
+        {
+          "caller": "arg",
+          "callee": "entry.startsWith",
+          "lineNumber": 10
+        },
+        {
+          "caller": "arg",
+          "callee": "value.slice(name.length + 3).replace",
+          "lineNumber": 11
+        },
+        {
+          "caller": "arg",
+          "callee": "value.slice",
+          "lineNumber": 11
+        },
+        {
+          "caller": "cleanIdent",
+          "callee": "String(value).replace",
+          "lineNumber": 22
+        },
+        {
+          "caller": "cleanIdent",
+          "callee": "String",
+          "lineNumber": 22
+        },
+        {
+          "caller": "cleanString",
+          "callee": "String(value).replace",
+          "lineNumber": 23
+        },
+        {
+          "caller": "cleanString",
+          "callee": "String",
+          "lineNumber": 23
+        },
+        {
+          "caller": "sqlIdent",
+          "callee": "cleanIdent",
+          "lineNumber": 24
+        },
+        {
+          "caller": "masterConnection",
+          "callee": "/(?:^|;)Database=[^;]*/i.test",
+          "lineNumber": 30
+        },
+        {
+          "caller": "masterConnection",
+          "callee": "connectionString.replace",
+          "lineNumber": 31
+        },
+        {
+          "caller": "query",
+          "callee": "pool.request",
+          "lineNumber": 36
+        },
+        {
+          "caller": "query",
+          "callee": "Object.entries",
+          "lineNumber": 37
+        },
+        {
+          "caller": "query",
+          "callee": "request.input",
+          "lineNumber": 37
+        },
+        {
+          "caller": "query",
+          "callee": "request.query",
+          "lineNumber": 38
+        },
+        {
+          "caller": "stopRestoFlow",
+          "callee": "console.log",
+          "lineNumber": 52
+        },
+        {
+          "caller": "stopRestoFlow",
+          "callee": "spawnSync",
+          "lineNumber": 53
+        },
+        {
+          "caller": "stopRestoFlow",
+          "callee": "installDir.replace",
+          "lineNumber": 54
+        },
+        {
+          "caller": "stopRestoFlow",
+          "callee": "spawnSync",
+          "lineNumber": 56
+        },
+        {
+          "caller": "stopRestoFlow",
+          "callee": "fail",
+          "lineNumber": 57
+        },
+        {
+          "caller": "startRestoFlow",
+          "callee": "console.log",
+          "lineNumber": 61
+        },
+        {
+          "caller": "startRestoFlow",
+          "callee": "spawnSync",
+          "lineNumber": 63
+        },
+        {
+          "caller": "main",
+          "callee": "fs.existsSync",
+          "lineNumber": 68
+        },
+        {
+          "caller": "main",
+          "callee": "fail",
+          "lineNumber": 68
+        },
+        {
+          "caller": "main",
+          "callee": "fs.existsSync",
+          "lineNumber": 69
+        },
+        {
+          "caller": "main",
+          "callee": "fail",
+          "lineNumber": 69
+        },
+        {
+          "caller": "main",
+          "callee": "path.resolve",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "path.resolve",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "fail",
+          "lineNumber": 70
+        },
+        {
+          "caller": "main",
+          "callee": "dotenv.config",
+          "lineNumber": 72
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 72
+        },
+        {
+          "caller": "main",
+          "callee": "dotenv.config",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 73
+        },
+        {
+          "caller": "main",
+          "callee": "fail",
+          "lineNumber": 74
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 74
+        },
+        {
+          "caller": "main",
+          "callee": "stopRestoFlow",
+          "lineNumber": 76
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: masterConnection(process.env.DATABASE_URL), requestTimeout: 600000 }).connect",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "masterConnection",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 84
+        },
+        {
+          "caller": "main",
+          "callee": "String(paths.recordset?.[0]?.data_path || '').trim().replace",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "String(paths.recordset?.[0]?.data_path || '').trim",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "String",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "fail",
+          "lineNumber": 88
+        },
+        {
+          "caller": "main",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 89
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 91
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 92
+        },
+        {
+          "caller": "main",
+          "callee": "fs.copyFileSync",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "path.resolve",
+          "lineNumber": 93
+        },
+        {
+          "caller": "main",
+          "callee": "fs.copyFileSync",
+          "lineNumber": 94
+        },
+        {
+          "caller": "main",
+          "callee": "path.resolve",
+          "lineNumber": 94
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 96
+        },
+        {
+          "caller": "main",
+          "callee": "Boolean",
+          "lineNumber": 97
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 98
+        },
+        {
+          "caller": "main",
+          "callee": "fs.mkdirSync",
+          "lineNumber": 99
+        },
+        {
+          "caller": "main",
+          "callee": "path.join",
+          "lineNumber": 100
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "cleanString",
+          "lineNumber": 102
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 105
+        },
+        {
+          "caller": "main",
+          "callee": "cleanString",
+          "lineNumber": 106
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 108
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 109
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 111
+        },
+        {
+          "caller": "main",
+          "callee": "cleanString",
+          "lineNumber": 112
+        },
+        {
+          "caller": "main",
+          "callee": "cleanString",
+          "lineNumber": 112
+        },
+        {
+          "caller": "main",
+          "callee": "process.env.DATABASE_URL.replace",
+          "lineNumber": 117
+        },
+        {
+          "caller": "main",
+          "callee": "new sql.ConnectionPool({ connectionString: candidateConnection, requestTimeout: 600000 }).connect",
+          "lineNumber": 118
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 120
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "Number",
+          "lineNumber": 130
+        },
+        {
+          "caller": "main",
+          "callee": "fail",
+          "lineNumber": 131
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 133
+        },
+        {
+          "caller": "main",
+          "callee": "candidate.close",
+          "lineNumber": 135
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 140
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 142
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 142
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 143
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 144
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 146
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 148
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 153
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 154
+        },
+        {
+          "caller": "main",
+          "callee": "console.log",
+          "lineNumber": 155
+        },
+        {
+          "caller": "main",
+          "callee": "query",
+          "lineNumber": 158
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 158
+        },
+        {
+          "caller": "main",
+          "callee": "sqlIdent",
+          "lineNumber": 158
+        },
+        {
+          "caller": "main",
+          "callee": "master.close",
+          "lineNumber": 162
+        },
+        {
+          "caller": "main",
+          "callee": "startRestoFlow",
+          "lineNumber": 163
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    }
+  ]
+}

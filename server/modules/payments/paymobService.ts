@@ -12,8 +12,21 @@ import { settings } from '../../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { parseSettingJson, upsertSetting } from '../../utils/settingsStore';
 import logger from '../../utils/logger';
+export { probePaymobConnectivity } from '../../utils/paymobHealthProbe';
 
 const log = logger.child({ service: 'paymob' });
+
+const PAYMOB_REQUEST_TIMEOUT_MS = 15000;
+
+const fetchPaymob = async (url: string, init: RequestInit): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), PAYMOB_REQUEST_TIMEOUT_MS);
+    try {
+        return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
+};
 
 export const PAYMOB_BASE = 'https://accept.paymob.com/api';
 
@@ -49,6 +62,7 @@ export const getPaymobConfig = async (): Promise<Record<string, any>> => {
     return { ...rest, apiKeySet: Boolean(apiKey), hmacSecretSet: Boolean(hmacSecret) };
 };
 
+
 export const savePaymobConfig = async (input: Partial<PaymobConfig>, updatedBy?: string): Promise<void> => {
     const current = await getPaymobConfigRaw();
     const next: PaymobConfig = { ...current };
@@ -68,6 +82,22 @@ export const toCents = (amount: number): number => Math.round(Number(amount || 0
 
 export const buildIframeUrl = (base: string, iframeId: string, paymentKey: string): string =>
     `${String(base).replace(/\/+$/, '')}/acceptance/iframes/${iframeId}?payment_token=${paymentKey}`;
+
+const PAYMOB_CALLBACK_MAX_AGE_MS = 15 * 60 * 1000;
+const PAYMOB_CALLBACK_MAX_FUTURE_MS = 5 * 60 * 1000;
+
+/** Reject signed callbacks that are too old or implausibly far in the future. */
+export const isPaymobCallbackFresh = (obj: any, now = Date.now()): boolean => {
+    const raw = obj?.created_at;
+    if (raw === undefined || raw === null || raw === '') return false;
+    const numeric = Number(raw);
+    const timestamp = Number.isFinite(numeric) && numeric > 0
+        ? (numeric < 10_000_000_000 ? numeric * 1000 : numeric)
+        : Date.parse(String(raw));
+    if (!Number.isFinite(timestamp)) return false;
+    const age = now - timestamp;
+    return age <= PAYMOB_CALLBACK_MAX_AGE_MS && age >= -PAYMOB_CALLBACK_MAX_FUTURE_MS;
+};
 
 /** Documented concatenation order for the Transaction Processed Callback HMAC. */
 const HMAC_ORDER = [
@@ -107,7 +137,7 @@ const baseOf = (config: PaymobConfig): string =>
     String(config.baseUrl || PAYMOB_BASE).replace(/\/+$/, '');
 
 const requestAuthToken = async (config: PaymobConfig): Promise<string> => {
-    const res = await fetch(`${baseOf(config)}/auth/tokens`, {
+    const res = await fetchPaymob(`${baseOf(config)}/auth/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ api_key: config.apiKey }),
@@ -175,7 +205,7 @@ export const createIntention = async (input: {
     if (!(amountCents > 0)) throw Object.assign(new Error('PAYMOB_AMOUNT_INVALID'), { status: 400 });
 
     const token = await requestAuthToken(config);
-    const orderRes = await fetch(`${baseOf(config)}/ecommerce/orders`, {
+    const orderRes = await fetchPaymob(`${baseOf(config)}/ecommerce/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -192,7 +222,7 @@ export const createIntention = async (input: {
         log.warn({ status: orderRes.status }, 'Paymob order register failed');
         throw Object.assign(new Error('PAYMOB_ORDER_FAILED'), { status: orderRes.status || 500 });
     }
-    const keyRes = await fetch(`${baseOf(config)}/acceptance/payment_keys`, {
+    const keyRes = await fetchPaymob(`${baseOf(config)}/acceptance/payment_keys`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -221,6 +251,7 @@ export const createIntention = async (input: {
 export interface PaymobCallbackResult {
     verified: boolean;
     success: boolean;
+    stale?: boolean;
     transactionId?: number;
     amountCents?: number;
     paymobOrderId?: number;
@@ -232,6 +263,7 @@ export const handleCallback = async (obj: any): Promise<PaymobCallbackResult> =>
     const config = await getPaymobConfigRaw();
     const verified = verifyPaymobHmac(obj, String(config.hmacSecret || ''));
     if (!verified) return { verified: false, success: false };
+    if (!isPaymobCallbackFresh(obj)) return { verified: false, success: false, stale: true };
     return {
         verified: true,
         success: Boolean(obj?.success),
@@ -250,7 +282,7 @@ export const refundTransaction = async (transactionId: number | string, amountCe
     const token = await requestAuthToken(config);
     const body: Record<string, any> = { transaction_id: transactionId };
     if (amountCents !== undefined) body.amount_cents = amountCents;
-    const res = await fetch(`${baseOf(config)}/acceptance/void_refund/refund?token=${encodeURIComponent(token)}`, {
+    const res = await fetchPaymob(`${baseOf(config)}/acceptance/void_refund/refund?token=${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

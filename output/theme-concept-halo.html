@@ -1,0 +1,451 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RestoFlow — Concept 01 · Halo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Reem+Kufi:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #15182b;
+    --ink-2: #3b4160;
+    --muted: #68708c;
+    --line: rgba(21, 24, 43, .08);
+    --line-soft: rgba(21, 24, 43, .055);
+    --card: rgba(255, 255, 255, .68);
+    --card-solid: #ffffff;
+    --violet: #6d4aff;
+    --violet-2: #9a7bff;
+    --cyan: #00b8d9;
+    --pink: #fb7185;
+    --amber: #f5a524;
+    --green: #12b76a;
+    --body: "IBM Plex Sans Arabic", system-ui, sans-serif;
+    --display: "Reem Kufi", "IBM Plex Sans Arabic", sans-serif;
+    --latin: "Space Grotesk", sans-serif;
+    --r-lg: 28px;
+    --r-md: 20px;
+    --r-sm: 14px;
+    --shadow-card: 0 1px 1px rgba(21,24,43,.03), 0 18px 44px -22px rgba(52,44,120,.25);
+    --shadow-pop: 0 24px 60px -28px rgba(52,44,120,.35);
+  }
+  * { box-sizing: border-box; }
+  html { background: #e9ebff; }
+  body {
+    margin: 0; min-height: 100vh; padding: 34px 22px 60px;
+    color: var(--ink); font-family: var(--body);
+    background:
+      radial-gradient(900px 600px at 88% -8%, rgba(109,74,255,.20), transparent 62%),
+      radial-gradient(800px 560px at 4% 4%, rgba(0,184,217,.16), transparent 60%),
+      radial-gradient(700px 520px at 42% 108%, rgba(251,113,133,.13), transparent 62%),
+      linear-gradient(180deg, #f3f2ff 0%, #e8e9ff 100%);
+    -webkit-font-smoothing: antialiased;
+  }
+  .meta { width: min(1400px, 100%); margin: 0 auto 20px; display: flex; flex-wrap: wrap; align-items: end; gap: 20px; }
+  .meta h1 { margin: 0; font-family: var(--latin); font-size: 25px; letter-spacing: -.03em; }
+  .meta h1 span { font-family: var(--display); font-size: 20px; margin-inline-start: 8px; color: var(--ink-2); }
+  .meta p { margin: 0; flex: 1; min-width: 260px; color: #5b6280; font-size: 12.5px; line-height: 1.7; }
+  .swatches { display: flex; gap: 6px; }
+  .swatches i { width: 26px; height: 26px; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(21,24,43,.10); }
+  .chip { font-size: 10px; font-weight: 600; border: 1px solid rgba(21,24,43,.1); background: rgba(255,255,255,.7); backdrop-filter: blur(8px); border-radius: 999px; padding: 8px 13px; color: #4a5170; }
+
+  .shell { width: min(1400px, 100%); margin: 0 auto; display: flex; gap: 16px; padding: 14px; border-radius: 38px; background: rgba(255,255,255,.30); box-shadow: 0 40px 90px -50px rgba(40,32,110,.45), inset 0 1px 0 rgba(255,255,255,.7); backdrop-filter: blur(20px); }
+
+  /* ============ RAIL ============ */
+  .rail { width: 230px; flex: 0 0 230px; position: sticky; top: 14px; align-self: flex-start; display: flex; flex-direction: column; gap: 16px; padding: 18px 14px 14px; border-radius: var(--r-lg); background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.9); box-shadow: var(--shadow-card); backdrop-filter: blur(18px); }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 4px 6px 14px; }
+  .brand-mark { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(135deg, #6d4aff, #9a7bff 55%, #00b8d9); color: #fff; font-family: var(--latin); font-weight: 700; font-size: 17px; box-shadow: 0 10px 22px -8px rgba(109,74,255,.65); }
+  .brand-name { font-family: var(--latin); font-size: 15.5px; font-weight: 600; letter-spacing: -.02em; direction: ltr; text-align: right; }
+  .brand-sub { font-size: 9px; font-weight: 600; letter-spacing: .13em; color: var(--muted); text-transform: uppercase; direction: ltr; text-align: right; margin-top: 2px; }
+  .workspace { display: flex; align-items: center; gap: 9px; padding: 10px 11px; border-radius: 15px; background: linear-gradient(135deg, rgba(109,74,255,.10), rgba(0,184,217,.08)); border: 1px solid rgba(109,74,255,.14); }
+  .workspace b { display: block; font-size: 11.5px; font-weight: 600; }
+  .workspace small { display: block; font-size: 9px; color: var(--muted); margin-top: 1px; }
+  .ws-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(18,183,106,.14); flex: 0 0 8px; }
+  .workspace svg { width: 14px; height: 14px; margin-inline-start: auto; color: var(--muted); }
+
+  .nav { display: grid; gap: 3px; }
+  .nav-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; color: #9aa1bb; text-transform: uppercase; margin: 12px 10px 6px; }
+  .nav-label:first-child { margin-top: 2px; }
+  .nav a { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink-2); font-size: 12px; font-weight: 500; padding: 8px 9px; border-radius: 13px; position: relative; transition: background .16s, color .16s, transform .16s; }
+  .nav a:hover { background: rgba(109,74,255,.055); color: var(--ink); }
+  .nav a.on { color: var(--ink); font-weight: 600; background: #fff; box-shadow: 0 10px 24px -16px rgba(52,44,120,.4); }
+  .nav a.on::before { content: ""; position: absolute; inset-inline-start: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: linear-gradient(180deg, var(--violet), var(--cyan)); }
+  .ico { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 10px; display: grid; place-items: center; background: rgba(21,24,43,.045); color: var(--ink-2); transition: background .16s, color .16s; }
+  .nav a.on .ico { background: linear-gradient(135deg, rgba(109,74,255,.14), rgba(0,184,217,.12)); color: var(--violet); }
+  .ico svg { width: 15px; height: 15px; }
+  .nav a .badge { margin-inline-start: auto; font-family: var(--latin); font-size: 9px; font-weight: 600; min-width: 18px; height: 18px; display: grid; place-items: center; border-radius: 6px; background: rgba(251,113,133,.14); color: #e11d48; padding: 0 4px; }
+  .nav a.on .badge { background: var(--violet); color: #fff; }
+
+  .rail-foot { margin-top: auto; display: grid; gap: 10px; }
+  .upsell { padding: 12px; border-radius: 18px; background: linear-gradient(140deg, #1d1747, #2d246b 55%, #1a2d63); color: #fff; position: relative; overflow: hidden; }
+  .upsell::after { content: ""; position: absolute; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(154,123,255,.55), transparent 68%); top: -34px; inset-inline-start: -26px; }
+  .upsell b { display: block; font-size: 11px; font-weight: 600; position: relative; }
+  .upsell span { display: block; font-size: 9px; color: #b9b6e0; margin-top: 2px; position: relative; }
+  .upsell button { margin-top: 9px; width: 100%; height: 28px; border: 0; border-radius: 9px; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; position: relative; backdrop-filter: blur(4px); }
+  .user { display: flex; align-items: center; gap: 9px; padding: 6px 6px; }
+  .avatar { width: 32px; height: 32px; border-radius: 11px; background: linear-gradient(135deg, #ffe4d6, #ffc9e0); color: #9d174d; display: grid; place-items: center; font-size: 11px; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(255,255,255,.6); }
+  .user b { display: block; font-size: 11px; font-weight: 600; }
+  .user small { display: block; font-size: 9px; color: var(--muted); }
+  .user .more { margin-inline-start: auto; color: #9aa1bb; }
+
+  /* ============ MAIN ============ */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 4px 6px 0; }
+  .page-title h2 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+  .page-title p { margin: 2px 0 0; font-size: 10.5px; color: var(--muted); }
+  .search { margin-inline-start: auto; width: min(290px, 30vw); height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.9); box-shadow: 0 8px 20px -14px rgba(52,44,120,.3); color: var(--muted); font-size: 10.5px; }
+  .search svg { width: 14px; height: 14px; }
+  .search kbd { margin-inline-start: auto; font-family: var(--latin); font-size: 8.5px; padding: 3px 5px; border-radius: 6px; background: rgba(21,24,43,.05); color: #8a90aa; }
+  .tbtn { width: 38px; height: 38px; border-radius: 13px; border: 1px solid rgba(255,255,255,.9); background: rgba(255,255,255,.72); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; box-shadow: 0 8px 20px -14px rgba(52,44,120,.3); position: relative; }
+  .tbtn:hover { background: #fff; }
+  .tbtn svg { width: 16px; height: 16px; }
+  .tbtn .ping { position: absolute; top: 8px; inset-inline-end: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 2px #fff; }
+  .tbtn.primary { background: linear-gradient(135deg, var(--violet), #8b6bff); color: #fff; border-color: transparent; box-shadow: 0 12px 24px -10px rgba(109,74,255,.6); }
+
+  .bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; grid-auto-flow: row dense; }
+  .card { border-radius: var(--r-md); background: var(--card); border: 1px solid rgba(255,255,255,.85); box-shadow: var(--shadow-card); backdrop-filter: blur(16px); padding: 16px 17px; min-width: 0; position: relative; }
+  .card-head { display: flex; align-items: center; gap: 8px; }
+  .card-head h3 { margin: 0; font-size: 12.5px; font-weight: 600; letter-spacing: -.01em; }
+  .card-head .sub { font-size: 9.5px; color: var(--muted); margin-inline-start: auto; }
+  .kebab { width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; border: 0; background: transparent; color: #9aa1bb; cursor: pointer; }
+  .kebab:hover { background: rgba(21,24,43,.05); }
+
+  .hero { grid-column: span 8; grid-row: span 2; display: flex; flex-direction: column; padding: 18px 20px 16px; background: linear-gradient(155deg, rgba(255,255,255,.92), rgba(255,255,255,.62)); }
+  .hero-top { display: flex; align-items: flex-start; gap: 12px; }
+  .greet { font-size: 10.5px; color: var(--muted); }
+  .hero h3 { margin: 3px 0 0; font-family: var(--display); font-size: 17px; font-weight: 600; }
+  .seg { margin-inline-start: auto; display: flex; padding: 3px; border-radius: 999px; background: rgba(21,24,43,.05); }
+  .seg button { border: 0; background: transparent; font: inherit; font-size: 9.5px; font-weight: 600; color: var(--muted); padding: 6px 11px; border-radius: 999px; cursor: pointer; }
+  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 4px 10px -6px rgba(52,44,120,.4); }
+  .big { display: flex; align-items: flex-end; gap: 10px; margin-top: 14px; }
+  .big b { font-family: var(--latin); font-size: 40px; font-weight: 600; letter-spacing: -.05em; line-height: 1; direction: ltr; font-variant-numeric: tabular-nums; }
+  .big span { font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+  .pill-up { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; background: rgba(18,183,106,.12); color: #087443; font-size: 9.5px; font-weight: 700; margin-bottom: 4px; direction: ltr; }
+  .pill-up svg { width: 9px; height: 9px; }
+  .chart { margin-top: 8px; position: relative; flex: 1; display: flex; flex-direction: column; min-height: 120px; }
+  .chart svg { width: 100%; height: auto; flex: 1; min-height: 120px; display: block; overflow: visible; }
+  .chart .grid { stroke: rgba(21,24,43,.055); stroke-width: 1; }
+  .chart .line { fill: none; stroke: url(#haloLine); stroke-width: 2.4; stroke-linecap: round; }
+  .chart .glow { fill: none; stroke: rgba(109,74,255,.16); stroke-width: 8; stroke-linecap: round; }
+  .chart .tick { text-anchor: middle; font-family: var(--latin); font-size: 8px; fill: #8a90aa; }
+  .chart .dot { fill: #fff; stroke: var(--violet); stroke-width: 2.4; }
+  .chart .tip { position: absolute; top: 2px; left: 30%; transform: translateX(-50%); background: #1b1740; color: #fff; border-radius: 10px; padding: 6px 9px; font-size: 9px; font-weight: 600; box-shadow: var(--shadow-pop); white-space: nowrap; }
+  .chart .tip::after { content: ""; position: absolute; bottom: -4px; inset-inline-start: 50%; margin-inline-start: -4px; width: 8px; height: 8px; background: #1b1740; transform: rotate(45deg); border-radius: 2px; }
+  .chart .tip b { font-family: var(--latin); font-size: 10px; }
+  .hero-foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+  .hero-foot div { display: flex; flex-direction: column; gap: 2px; }
+  .hero-foot span { font-size: 9px; color: var(--muted); }
+  .hero-foot b { font-family: var(--latin); font-size: 13px; font-weight: 600; letter-spacing: -.02em; direction: ltr; font-variant-numeric: tabular-nums; }
+
+  .target { grid-column: span 4; display: flex; flex-direction: column; background: linear-gradient(160deg, rgba(255,255,255,.9), rgba(243,240,255,.7)); }
+  .ring-wrap { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+  .ring { width: 104px; height: 104px; flex: 0 0 104px; position: relative; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .track { fill: none; stroke: rgba(109,74,255,.11); stroke-width: 9; }
+  .ring .bar { fill: none; stroke: url(#haloRing); stroke-width: 9; stroke-linecap: round; }
+  .ring b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 2px; font-family: var(--latin); font-size: 21px; font-weight: 600; letter-spacing: -.04em; }
+  .ring b small { font-size: 10px; color: var(--muted); align-self: flex-end; margin-bottom: 12px; }
+  .ring-copy b { display: block; font-family: var(--latin); font-size: 17px; font-weight: 600; letter-spacing: -.03em; direction: ltr; }
+  .ring-copy span { display: block; font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+  .ring-copy em { display: inline-flex; margin-top: 8px; font-style: normal; font-size: 9px; font-weight: 600; color: #5a3ad6; background: rgba(109,74,255,.10); padding: 4px 7px; border-radius: 999px; }
+  .target-legend { margin-top: 10px; display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line-soft); }
+  .week { margin-top: auto; padding-top: 12px; }
+  .week-head { display: flex; align-items: center; font-size: 9px; color: var(--muted); }
+  .week-head b { margin-inline-start: auto; font-family: var(--latin); font-size: 9px; color: #087443; background: rgba(18,183,106,.12); padding: 2px 6px; border-radius: 99px; direction: ltr; }
+  .week-bars { display: flex; flex-direction: row; direction: ltr; align-items: flex-end; gap: 5px; height: 34px; margin-top: 6px; }
+  .week-bars i { flex: 1; border-radius: 4px 4px 2px 2px; background: rgba(109,74,255,.16); }
+  .week-bars i.today { background: linear-gradient(180deg, #9a7bff, #6d4aff); box-shadow: 0 6px 14px -6px rgba(109,74,255,.7); }
+  .target-legend div { display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: var(--ink-2); }
+  .target-legend i { width: 7px; height: 7px; border-radius: 3px; background: var(--violet); }
+  .target-legend div:last-child i { background: rgba(109,74,255,.2); }
+  .target-legend span { margin-inline-start: auto; font-family: var(--latin); font-size: 9px; color: var(--muted); direction: ltr; }
+
+  .ai { grid-column: span 4; padding: 0; overflow: hidden; background: #1a163d; border-color: rgba(255,255,255,.10); color: #fff; box-shadow: 0 24px 50px -26px rgba(20,12,64,.75); }
+  .ai::before { content: ""; position: absolute; inset: 0; background: radial-gradient(360px 220px at 92% -10%, rgba(154,123,255,.5), transparent 62%), radial-gradient(300px 200px at 0% 110%, rgba(0,184,217,.3), transparent 60%); }
+  .ai-in { position: relative; padding: 16px 17px; display: flex; flex-direction: column; height: 100%; }
+  .ai-head { display: flex; align-items: center; gap: 8px; }
+  .ai-ico { width: 28px; height: 28px; border-radius: 9px; background: linear-gradient(135deg, #9a7bff, #00b8d9); display: grid; place-items: center; box-shadow: 0 8px 18px -8px rgba(154,123,255,.8); }
+  .ai-ico svg { width: 15px; height: 15px; }
+  .ai-head b { font-size: 11.5px; font-weight: 600; }
+  .ai-head span { margin-inline-start: auto; font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #c8c2ff; background: rgba(255,255,255,.10); padding: 4px 7px; border-radius: 999px; }
+  .ai p { margin: 12px 0 0; font-size: 11px; line-height: 1.75; color: #d9d6f5; }
+  .ai p b { color: #fff; font-weight: 600; }
+  .ai-actions { display: flex; gap: 7px; margin-top: auto; padding-top: 12px; }
+  .ai-actions button { flex: 1; height: 30px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.10); color: #fff; font: inherit; font-size: 9.5px; font-weight: 600; cursor: pointer; }
+  .ai-actions button.solid { background: #fff; color: #241d5c; border-color: transparent; }
+
+  .orders { grid-column: span 5; }
+  .live { display: inline-flex; align-items: center; gap: 5px; font-size: 8.5px; font-weight: 700; color: #087443; background: rgba(18,183,106,.12); padding: 4px 8px; border-radius: 999px; }
+  .live i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+  .order { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+  .order:last-child { border-bottom: 0; padding-bottom: 2px; }
+  .o-avatar { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 9.5px; font-weight: 700; flex: 0 0 30px; }
+  .o-avatar.a1 { background: #e8e2ff; color: #5b2be0; }
+  .o-avatar.a2 { background: #dff7fb; color: #087f96; }
+  .o-avatar.a3 { background: #ffe9ed; color: #be123c; }
+  .o-avatar.a4 { background: #fff4dc; color: #96620b; }
+  .o-what b { display: block; font-size: 10.5px; font-weight: 600; }
+  .o-what span { display: block; font-size: 9px; color: var(--muted); margin-top: 1px; }
+  .o-right { margin-inline-start: auto; text-align: end; }
+  .o-total { font-family: var(--latin); font-size: 11px; font-weight: 600; direction: ltr; font-variant-numeric: tabular-nums; }
+  .o-status { display: inline-flex; align-items: center; gap: 4px; font-size: 8px; font-weight: 600; margin-top: 3px; padding: 2px 6px; border-radius: 999px; }
+  .o-status.s1 { color: #087443; background: rgba(18,183,106,.12); }
+  .o-status.s2 { color: #5a3ad6; background: rgba(109,74,255,.12); }
+  .o-status.s3 { color: #b45309; background: rgba(245,165,36,.16); }
+  .o-status::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+
+  .items { grid-column: span 4; display: flex; flex-direction: column; }
+  .item { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; padding: 7px 0; }
+  .item .rank { font-family: var(--latin); font-size: 8.5px; color: #9aa1bb; }
+  .item .name { font-size: 10.5px; font-weight: 500; }
+  .item .qty { font-family: var(--latin); font-size: 9px; color: var(--muted); }
+  .bar { grid-column: 2 / 4; height: 5px; border-radius: 99px; background: rgba(21,24,43,.06); overflow: hidden; margin-top: 2px; }
+  .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #8b6bff, #6d4aff); }
+  .item:nth-child(2) .bar i { background: linear-gradient(90deg, #6dd8ee, #00b8d9); }
+  .item:nth-child(3) .bar i { background: linear-gradient(90deg, #fda4b5, #fb7185); }
+  .item:nth-child(4) .bar i { background: linear-gradient(90deg, #f7c66b, #f5a524); }
+  .item .top-one { color: var(--violet); }
+
+  .quick { grid-column: span 3; display: flex; flex-direction: column; }
+  .qa { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .qa button { border: 1px solid var(--line); background: rgba(255,255,255,.72); border-radius: 14px; min-height: 62px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 9px 10px; cursor: pointer; font: inherit; color: var(--ink-2); transition: transform .15s, box-shadow .15s, border-color .15s; }
+  .qa button:hover { transform: translateY(-1px); border-color: rgba(109,74,255,.3); box-shadow: 0 12px 24px -16px rgba(52,44,120,.45); }
+  .qa .qi { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; background: rgba(109,74,255,.10); color: var(--violet); }
+  .qa .qi svg { width: 13px; height: 13px; }
+  .qa span { font-size: 9.5px; font-weight: 600; }
+  .quick .footnote { margin-top: 8px; font-size: 8.5px; color: var(--muted); text-align: center; }
+  .sys { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line-soft); display: grid; gap: 7px; }
+  .sys div { display: flex; align-items: center; gap: 6px; font-size: 9px; color: var(--muted); }
+  .sys b { margin-inline-start: auto; font-size: 9px; font-weight: 600; color: var(--ink-2); }
+  .sys b[dir="ltr"] { font-family: var(--latin); }
+  .sys i { width: 5px; height: 5px; border-radius: 50%; }
+  .sys i.ok { background: var(--green); box-shadow: 0 0 0 3px rgba(18,183,106,.14); }
+  .items-foot { display: flex; align-items: center; gap: 5px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: 9px; color: var(--muted); }
+  .items-foot b { font-family: var(--latin); font-size: 13px; font-weight: 600; color: var(--ink); direction: ltr; }
+  .items-foot em { font-style: normal; font-size: 8.5px; }
+
+  @media (max-width: 1180px) {
+    .hero { grid-column: span 12; grid-row: auto; }
+    .target, .ai { grid-column: span 6; }
+    .orders { grid-column: span 7; }
+    .items { grid-column: span 5; }
+    .quick { grid-column: span 12; }
+    .qa { grid-template-columns: repeat(4, 1fr); }
+    .rail { width: 210px; flex-basis: 210px; }
+  }
+</style>
+</head>
+<body>
+  <div class="meta">
+    <h1>01 / Halo <span>هالو</span></h1>
+    <p>ثيم لايت حديث: قماش أورورا بنفسجي-سماوي، زجاج ناعم، حواف 20–28px، ولوحة Bento. الفكرة: المساعد الذكي جزء من الشاشة نفسها — مش زرار مخفي.</p>
+    <div class="swatches" aria-hidden="true">
+      <i style="background:#6d4aff"></i><i style="background:#9a7bff"></i><i style="background:#00b8d9"></i><i style="background:#fb7185"></i><i style="background:#f5a524"></i><i style="background:#15182b"></i>
+    </div>
+    <div class="chip">Light · Bento · Glass · AI-native</div>
+  </div>
+
+  <div class="shell" id="halo" data-theme="halo">
+    <aside class="rail">
+      <div class="brand">
+        <div class="brand-mark">R</div>
+        <div>
+          <div class="brand-name">RestoFlow</div>
+          <div class="brand-sub">Kitchen OS</div>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <span class="ws-dot"></span>
+        <div><b>فرع المعادي</b><small>وردية العشاء</small></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m7 10 5 5 5-5"/></svg>
+      </div>
+
+      <nav class="nav">
+        <div class="nav-label">الخدمة</div>
+        <a class="on" href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 8h6V4h-6z"/></svg></span>نظرة عامة</a>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M6 6v13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6M9 10h6"/></svg></span>نقطة البيع</a>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span>الطلبات<span class="badge">12</span></a>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v18M7 8h10M5 3h14v6H5zM7 21h10"/></svg></span>المطبخ<span class="badge">5</span></a>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16l-2 13H6zM8 7a4 4 0 0 1 8 0"/></svg></span>المخزون<span class="badge">3</span></a>
+        <div class="nav-label">الإدارة</div>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg></span>التقارير</a>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v12H3zM3 11h18M7 15h3"/></svg></span>المالية</a>
+        <a href="#"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.2"/><path d="M5 21c.6-4 3.2-6 7-6s6.4 2 7 6"/></svg></span>الموظفون</a>
+      </nav>
+
+      <div class="rail-foot">
+        <div class="upsell">
+          <b>RestoFlow Insights</b>
+          <span>توقعات مبيعات الأسبوع القادم جاهزة.</span>
+          <button>افتح التقرير</button>
+        </div>
+        <div class="user">
+          <div class="avatar">م</div>
+          <div><b>محمود سامي</b><small>مدير الفرع</small></div>
+          <svg class="more" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="page-title">
+          <h2>مساء الخير، محمود</h2>
+          <p>الثلاثاء ٢٢ أكتوبر · ٠٧:٤٢ م · وردية العشاء</p>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+          <span>ابحث عن طلب، صنف، أو عميل…</span>
+          <kbd>⌘K</kbd>
+        </div>
+        <button class="tbtn" aria-label="الوضع الليلي"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 14.5A8 8 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></svg></button>
+        <button class="tbtn" aria-label="الإشعارات"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7M10 20h4"/></svg><span class="ping"></span></button>
+        <button class="tbtn primary" aria-label="إضافة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+      </header>
+
+      <div class="bento">
+        <section class="card hero">
+          <div class="hero-top">
+            <div>
+              <div class="greet">إيراد اليوم</div>
+              <h3>وردية العشاء</h3>
+            </div>
+            <div class="seg">
+              <button class="on">اليوم</button><button>الأسبوع</button><button>الشهر</button>
+            </div>
+          </div>
+          <div class="big">
+            <b>48,320</b><span>ج.م</span>
+            <span class="pill-up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M6 11l6-6 6 6"/></svg>12.4%</span>
+          </div>
+          <div class="chart">
+            <svg viewBox="0 0 620 138" preserveAspectRatio="none" role="img" aria-label="منحنى إيراد اليوم">
+              <defs>
+                <linearGradient id="haloFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#6d4aff" stop-opacity=".26" />
+                  <stop offset="1" stop-color="#6d4aff" stop-opacity="0" />
+                </linearGradient>
+                <linearGradient id="haloLine" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#00b8d9" /><stop offset=".55" stop-color="#6d4aff" /><stop offset="1" stop-color="#9a7bff" />
+                </linearGradient>
+              </defs>
+              <line class="grid" x1="0" y1="26" x2="620" y2="26" />
+              <line class="grid" x1="0" y1="66" x2="620" y2="66" />
+              <line class="grid" x1="0" y1="106" x2="620" y2="106" />
+              <path d="M620 108 C578 104 560 96 528 92 C494 88 472 96 440 90 C406 84 388 62 354 58 C320 54 302 70 270 66 C236 62 218 40 184 36 C150 32 130 46 98 40 C64 34 36 18 0 14V138H620Z" fill="url(#haloFill)" />
+              <path class="glow" d="M620 108 C578 104 560 96 528 92 C494 88 472 96 440 90 C406 84 388 62 354 58 C320 54 302 70 270 66 C236 62 218 40 184 36 C150 32 130 46 98 40 C64 34 36 18 0 14" />
+              <path class="line" d="M620 108 C578 104 560 96 528 92 C494 88 472 96 440 90 C406 84 388 62 354 58 C320 54 302 70 270 66 C236 62 218 40 184 36 C150 32 130 46 98 40 C64 34 36 18 0 14" />
+              <circle class="dot" cx="184" cy="36" r="4.5" />
+              <text class="tick" x="614" y="132">12</text><text class="tick" x="514" y="132">2</text><text class="tick" x="414" y="132">4</text><text class="tick" x="314" y="132">6</text><text class="tick" x="214" y="132">8</text><text class="tick" x="114" y="132">10</text><text class="tick" x="26" y="132">11</text>
+            </svg>
+            <div class="tip">٩ م · <b dir="ltr">6,840</b> ج.م</div>
+          </div>
+          <div class="hero-foot">
+            <div><span>طلبات مكتملة</span><b>169</b></div>
+            <div><span>متوسط الفاتورة</span><b>286</b></div>
+            <div><span>وقت التحضير</span><b>14:20</b></div>
+          </div>
+        </section>
+
+        <section class="card target">
+          <div class="card-head"><h3>هدف الوردية</h3><button class="kebab" aria-label="خيارات"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></div>
+          <div class="ring-wrap">
+            <div class="ring">
+              <svg width="104" height="104" viewBox="0 0 104 104">
+                <defs><linearGradient id="haloRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00b8d9"/><stop offset=".6" stop-color="#6d4aff"/><stop offset="1" stop-color="#9a7bff"/></linearGradient></defs>
+                <circle class="track" cx="52" cy="52" r="43" />
+                <circle class="bar" cx="52" cy="52" r="43" stroke-dasharray="270" stroke-dashoffset="59" />
+              </svg>
+              <b>78<small>%</small></b>
+            </div>
+            <div class="ring-copy">
+              <b>39,200 / 50,000</b>
+              <span>متبقي 10,800 ج.م</span>
+              <em>على المسار · +6.8% عن أمس</em>
+            </div>
+          </div>
+          <div class="week">
+            <div class="week-head"><span>آخر ٧ أيام</span><b dir="ltr">+6.8%</b></div>
+            <div class="week-bars" aria-hidden="true">
+              <i style="height:38%"></i><i style="height:52%"></i><i style="height:44%"></i><i style="height:66%"></i><i style="height:58%"></i><i style="height:80%"></i><i class="today" style="height:100%"></i>
+            </div>
+          </div>
+          <div class="target-legend">
+            <div><i></i>محقق<span>39,200</span></div>
+            <div><i></i>متبقي<span>10,800</span></div>
+          </div>
+        </section>
+
+        <section class="card ai">
+          <div class="ai-in">
+            <div class="ai-head">
+              <span class="ai-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5 19.4 18l2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9z"/></svg></span>
+              <b>مساعد RestoFlow</b>
+              <span>AI</span>
+            </div>
+            <p>لحم البقر هيخلص قبل ٩ م. عندك <b>٣ طلبات</b> عليها دلوقتي — أقدر أعدّل الكميات أو أقترح بديل من المخزون.</p>
+            <div class="ai-actions">
+              <button class="solid">راجع المخزون</button>
+              <button>اقترح بديل</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card orders">
+          <div class="card-head"><h3>الطلبات الجارية</h3><span class="live"><i></i>LIVE</span><button class="kebab" aria-label="المزيد"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></div>
+          <div class="order">
+            <div class="o-avatar a1">ت٧</div>
+            <div class="o-what"><b>ترابيزة ٧ · صالة</b><span>٤ أصناف · سارة</span></div>
+            <div class="o-right"><div class="o-total">420.00</div><span class="o-status s1">مدفوع</span></div>
+          </div>
+          <div class="order">
+            <div class="o-avatar a2">تأ</div>
+            <div class="o-what"><b>تيك أوي · محمد ع.</b><span>صنفان · استلام ٧:٥٥</span></div>
+            <div class="o-right"><div class="o-total">168.00</div><span class="o-status s2">في التحضير</span></div>
+          </div>
+          <div class="order">
+            <div class="o-avatar a3">تو</div>
+            <div class="o-what"><b>توصيل · طلبات</b><span>٥ أصناف · عمرو</span></div>
+            <div class="o-right"><div class="o-total">512.00</div><span class="o-status s1">مدفوع</span></div>
+          </div>
+          <div class="order">
+            <div class="o-avatar a4">ت٢</div>
+            <div class="o-what"><b>ترابيزة ٢ · صالة</b><span>٣ أصناف · ضيف جديد</span></div>
+            <div class="o-right"><div class="o-total">244.00</div><span class="o-status s3">بانتظار الدفع</span></div>
+          </div>
+        </section>
+
+        <section class="card items">
+          <div class="card-head"><h3>الأكثر مبيعًا</h3><span class="sub">اليوم</span></div>
+          <div class="item"><span class="rank">01</span><span class="name">كشري باللحمة</span><span class="qty">42</span><span class="bar"><i style="width:100%"></i></span></div>
+          <div class="item"><span class="rank">02</span><span class="name">مشوي مشكل</span><span class="qty">38</span><span class="bar"><i style="width:88%"></i></span></div>
+          <div class="item"><span class="rank">03</span><span class="name">طاجن بشاميل</span><span class="qty">31</span><span class="bar"><i style="width:72%"></i></span></div>
+          <div class="item"><span class="rank">04</span><span class="name">عصير مانجو</span><span class="qty">27</span><span class="bar"><i style="width:62%"></i></span></div>
+          <div class="item"><span class="rank">05</span><span class="name">فتة باللحم</span><span class="qty">24</span><span class="bar"><i style="width:54%"></i></span></div>
+          <div class="item"><span class="rank">06</span><span class="name">شاي مثلج</span><span class="qty">21</span><span class="bar"><i style="width:46%"></i></span></div>
+          <div class="items-foot"><span>إجمالي الأصناف</span><b dir="ltr">138</b><em>· 12,480 ج.م</em></div>
+        </section>
+
+        <section class="card quick">
+          <div class="card-head"><h3>إجراءات سريعة</h3></div>
+          <div class="qa">
+            <button><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span><span>طلب جديد</span></button>
+            <button><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16v13H4zM8 7V4h8v3"/></svg></span><span>جرد سريع</span></button>
+            <button><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12v16l-6-4-6 4z"/></svg></span><span>إغلاق وردية</span></button>
+            <button><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8V4h10v4M7 17H5v-6h14v6h-2M7 13h6v7H7z"/></svg></span><span>طباعة Z</span></button>
+          </div>
+          <div class="sys">
+            <div><span>الطابعة</span><b>متصلة</b><i class="ok"></i></div>
+            <div><span>آخر نسخة احتياطية</span><b dir="ltr">02:40</b></div>
+            <div><span>WhatsApp</span><b>متصل</b><i class="ok"></i></div>
+          </div>
+          <div class="footnote">كل الإجراءات متاحة من ⌘K</div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

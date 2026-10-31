@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/kds-order-fix/Apply KDS Order Fix.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/kds-order-fix/Apply KDS Order Fix.ps1",
+      "language": "powershell",
+      "sizeLines": 99,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/kds-order-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 7,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/kds-order-fix/Apply KDS Order Fix.bat": [],
+    "scripts/sameh-installer/kds-order-fix/Apply KDS Order Fix.ps1": [],
+    "scripts/sameh-installer/kds-order-fix/README AR.txt": []
+  }
+}

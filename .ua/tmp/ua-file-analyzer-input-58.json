@@ -1,0 +1,28 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "scripts/sameh-installer/order-save-fix/Fix Order Save.bat",
+      "language": "batch",
+      "sizeLines": 21,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/order-save-fix/Fix Order Save.ps1",
+      "language": "powershell",
+      "sizeLines": 135,
+      "fileCategory": "script"
+    },
+    {
+      "path": "scripts/sameh-installer/order-save-fix/README AR.txt",
+      "language": "txt",
+      "sizeLines": 14,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "scripts/sameh-installer/order-save-fix/Fix Order Save.bat": [],
+    "scripts/sameh-installer/order-save-fix/Fix Order Save.ps1": [],
+    "scripts/sameh-installer/order-save-fix/README AR.txt": []
+  }
+}

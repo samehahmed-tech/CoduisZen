@@ -1,0 +1,22 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 0,
+  "filesSkipped": [
+    "scripts/sameh-installer/kds-order-fix/Apply KDS Order Fix.bat",
+    "scripts/sameh-installer/kds-order-fix/Apply KDS Order Fix.ps1",
+    "scripts/sameh-installer/kds-order-fix/README AR.txt"
+  ],
+  "filesUnreadable": [],
+  "analysisOutcomes": {
+    "structure": {
+      "succeeded": 0,
+      "failed": 0
+    },
+    "callGraph": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "results": []
+}

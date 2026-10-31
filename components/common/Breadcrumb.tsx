@@ -32,6 +32,7 @@ const ROUTE_LABELS: Record<string, { en: string; ar: string }> = {
     '/approvals': { en: 'Approval Center', ar: 'مركز الموافقات' },
     '/platforms': { en: 'Platforms', ar: 'المنصات' },
     '/day-close': { en: 'Day Close', ar: 'إقفال اليوم' },
+    '/offline-conflicts': { en: 'Offline Conflicts', ar: 'تعارضات المزامنة' },
     '/setup': { en: 'Setup Wizard', ar: 'معالج الإعداد' },
 };
 

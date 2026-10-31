@@ -131,7 +131,7 @@ const filterOrdersByRequestedPeriod = (message: string, orders: any[]) => {
 };
 
 const customSalesReport = (message: string, lang: string, orders: any[]): CopilotResponse | null => {
-  if (!hasAny(message, ['مبيعات', 'ايراد', 'إيراد', 'طلبات', 'تقرير', 'متوسط شيك', 'sales', 'revenue', 'orders', 'report'])) return null;
+  if (!hasAny(message, ['مبيعات', 'مباعة', 'اتباعت', 'الأصناف المباعة', 'ايراد', 'إيراد', 'طلبات', 'تقرير', 'متوسط شيك', 'sales', 'sold', 'revenue', 'orders', 'report'])) return null;
   const period = filterOrdersByRequestedPeriod(message, orders);
   const finalRows = period.rows.filter((order) => !['CANCELLED', 'REFUNDED', 'VOIDED'].includes(statusOf(order)));
   const revenue = finalRows.reduce((sum, order) => sum + Number(order?.total || 0), 0);
@@ -165,6 +165,23 @@ const commandName = (message: string, terms: string[]) => {
   for (const term of terms) value = value.replace(new RegExp(term, 'gi'), ' ');
   value = value.replace(/(?:سعر|price)\s*[:=]?\s*\d+(?:\.\d+)?/gi, ' ');
   return value.replace(/[،,:؛\-]/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
+const inferCategory = (message: string, categories: any[]) => {
+  const normalizedMessage = normalize(message);
+  const direct = categories.find((row) => [row?.name, row?.nameAr].map(normalize).filter(Boolean)
+    .some((name) => normalizedMessage.includes(name)));
+  if (direct) return direct;
+  const hints: Record<string, string[]> = {
+    بيتزا: ['بيتزا', 'pizza'], برجر: ['برجر', 'burger'], مشروبات: ['مشروب', 'قهوه', 'قهوة', 'لاتيه', 'drink', 'coffee'],
+    حلويات: ['حلو', 'كيك', 'dessert'], سلطات: ['سلطه', 'سلطة', 'salad'], مشويات: ['مشوي', 'شاورما', 'grill'],
+  };
+  for (const [hint, words] of Object.entries(hints)) {
+    if (!words.some((word) => normalizedMessage.includes(normalize(word)))) continue;
+    const match = categories.find((row) => `${row?.name || ''} ${row?.nameAr || ''}`.toLocaleLowerCase().includes(hint));
+    if (match) return match;
+  }
+  return null;
 };
 
 export const answerSystemCopilotFallback = (lang: string): CopilotResponse => ({
@@ -215,11 +232,15 @@ export const answerSystemCopilot = (message: string, lang: string, context: Copi
   }
   if (add && itemWord) {
     const priceMatch = text.match(/(?:سعر|price)\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
-    const category = categories.find((row) => lower.includes(normalize(row.name)) || lower.includes(normalize(row.nameAr))) || (categories.length === 1 ? categories[0] : null);
+    const category = inferCategory(text, categories) || (categories.length === 1 ? categories[0] : null);
     let name = commandName(text, ['ضيف', 'أضف', 'اضف', 'اعمل', 'انشئ', 'أنشئ', 'create', 'add', 'new', 'صنف', 'منتج', 'item', 'product', 'في مجموعة', 'داخل مجموعة']);
-    if (category) name = name.replace(nameOf(category), '').replace(String(category.name || ''), '').trim();
-    if (!name || !priceMatch) return { text: isAr(lang) ? 'اكتب اسم الصنف وسعره، مثال: أضف صنف بيتزا سعر 120.' : 'Give the item name and price, e.g. add item Pizza price 120.', actions: [], suggestion: suggestion(lang, 'MENU_MANAGER') };
-    if (!category) return { text: isAr(lang) ? 'حدد اسم المجموعة الموجودة التي سيضاف داخلها الصنف.' : 'Specify the existing category for this item.', actions: [], suggestion: suggestion(lang, 'MENU_MANAGER') };
+    if (category && hasAny(lower, ['في مجموعة', 'داخل مجموعة', 'في قسم', 'داخل قسم', 'in category'])) {
+      name = name.replace(nameOf(category), '').replace(String(category.name || ''), '').trim();
+    }
+    if (!name && !priceMatch) return { text: isAr(lang) ? 'تمام، هجهّز الصنف. ناقصني الاسم والسعر فقط.' : 'I can prepare it. I only need the item name and price.', actions: [], suggestion: suggestion(lang, 'MENU_MANAGER') };
+    if (!name) return { text: isAr(lang) ? 'إيه اسم الصنف؟' : 'What should the new item be called?', actions: [], suggestion: suggestion(lang, 'MENU_MANAGER') };
+    if (!priceMatch) return { text: isAr(lang) ? `الصنف «${name}» جاهز. سعره كام؟` : `“${name}” is ready. What price should I use?`, actions: [], suggestion: suggestion(lang, 'MENU_MANAGER') };
+    if (!category) return { text: isAr(lang) ? `الصنف «${name}» سعره ${money(Number(priceMatch[1]))}. أضعه في أي قسم؟` : `“${name}” is ${money(Number(priceMatch[1]))}. Which menu category should I use?`, actions: [], suggestion: suggestion(lang, 'MENU_MANAGER') };
     return { text: isAr(lang) ? `جهزت إضافة الصنف «${name}» داخل «${nameOf(category)}». راجع السعر ثم أكد.` : `Item “${name}” is ready in “${nameOf(category)}”.`, actions: [{ type: 'CREATE_MENU_ITEM', categoryId: category.id, data: { name, nameAr: isAr(lang) ? name : undefined, price: Number(priceMatch[1]) } }], suggestion: suggestion(lang, 'MENU_MANAGER') };
   }
   if (itemWord && hasAny(lower, ['غير سعر', 'غيّر سعر', 'عدل سعر', 'update price', 'change price'])) {

@@ -1,0 +1,182 @@
+{
+  "projectRoot": "D:\\Projects\\restoflow-erp",
+  "batchFiles": [
+    {
+      "path": "hooks/useKeyPress.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useLocalStorage.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useOnScreen.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/usePrevious.ts",
+      "language": "typescript",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useSWR.ts",
+      "language": "typescript",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useSort.ts",
+      "language": "typescript",
+      "sizeLines": 55,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useThrottle.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useTiltEffect.ts",
+      "language": "typescript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useToggle.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useUndoable.ts",
+      "language": "typescript",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "hooks/useWindowSize.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/docs/HR_USER_GUIDE_AR.md",
+      "language": "markdown",
+      "sizeLines": 33,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "public/service-worker.js",
+      "language": "javascript",
+      "sizeLines": 72,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/sw.js",
+      "language": "javascript",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/aurora.webp",
+      "language": "webp",
+      "sizeLines": 2295,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/copper.webp",
+      "language": "webp",
+      "sizeLines": 1096,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/emerald.webp",
+      "language": "webp",
+      "sizeLines": 2295,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/graphite.webp",
+      "language": "webp",
+      "sizeLines": 2295,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/midnight.webp",
+      "language": "webp",
+      "sizeLines": 718,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/ocean.webp",
+      "language": "webp",
+      "sizeLines": 718,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/rose.webp",
+      "language": "webp",
+      "sizeLines": 380,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/sand.webp",
+      "language": "webp",
+      "sizeLines": 1096,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/teal.webp",
+      "language": "webp",
+      "sizeLines": 718,
+      "fileCategory": "code"
+    },
+    {
+      "path": "public/wallpapers/webp/violet.webp",
+      "language": "webp",
+      "sizeLines": 380,
+      "fileCategory": "code"
+    },
+    {
+      "path": "restore-coduiszen.cjs",
+      "language": "javascript",
+      "sizeLines": 170,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "hooks/useKeyPress.ts": [],
+    "hooks/useLocalStorage.ts": [],
+    "hooks/useOnScreen.ts": [],
+    "hooks/usePrevious.ts": [],
+    "hooks/useSWR.ts": [],
+    "hooks/useSort.ts": [],
+    "hooks/useThrottle.ts": [],
+    "hooks/useTiltEffect.ts": [],
+    "hooks/useToggle.ts": [],
+    "hooks/useUndoable.ts": [],
+    "hooks/useWindowSize.ts": [],
+    "public/docs/HR_USER_GUIDE_AR.md": [],
+    "public/service-worker.js": [],
+    "public/sw.js": [],
+    "public/wallpapers/webp/aurora.webp": [],
+    "public/wallpapers/webp/copper.webp": [],
+    "public/wallpapers/webp/emerald.webp": [],
+    "public/wallpapers/webp/graphite.webp": [],
+    "public/wallpapers/webp/midnight.webp": [],
+    "public/wallpapers/webp/ocean.webp": [],
+    "public/wallpapers/webp/rose.webp": [],
+    "public/wallpapers/webp/sand.webp": [],
+    "public/wallpapers/webp/teal.webp": [],
+    "public/wallpapers/webp/violet.webp": [],
+    "restore-coduiszen.cjs": []
+  }
+}

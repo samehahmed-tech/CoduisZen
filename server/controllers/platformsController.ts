@@ -4,6 +4,7 @@ import { deliveryPlatforms } from '../../src/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import logger from '../utils/logger';
+import { createSignedAuditLog } from '../services/auditService';
 
 let apiKeyColumnReady: Promise<unknown> | null = null;
 const ensureApiKeyColumn = () => {
@@ -24,6 +25,18 @@ const maskRow = (row: any) => {
     const { apiKey, ...rest } = row;
     return { ...rest, apiKeySet: Boolean(apiKey) };
 };
+
+const auditPlatformMutation = (req: Request, eventType: string, payload: Record<string, unknown>, after?: Record<string, unknown>) => createSignedAuditLog({
+    eventType,
+    userId: req.user?.id || 'system',
+    userRole: req.user?.role,
+    branchId: req.effectiveBranchId || req.user?.branchId || null,
+    requestId: req.requestId,
+    sourceDevice: req.headers['user-agent'],
+    payload,
+    after,
+    reason: `Delivery platform mutation: ${eventType}`,
+});
 
 export const getPlatforms = async (_req: Request, res: Response) => {
     try {
@@ -57,6 +70,7 @@ export const createPlatform = async (req: Request, res: Response) => {
             ...(apiKey ? { apiKey } : {}),
         });
 
+        await auditPlatformMutation(req, 'DELIVERY_PLATFORM_CREATED', { platformId: created?.id || null, integrationType: created?.integrationType || null, apiKeySet: Boolean(apiKey) }, { active: created?.isActive !== false });
         res.status(201).json(maskRow(created));
     } catch (error: any) {
         logger.error({ err: error }, 'Error creating delivery platform');
@@ -89,6 +103,7 @@ export const updatePlatform = async (req: Request, res: Response) => {
 
         if (!updated) return res.status(404).json({ error: 'Platform not found' });
 
+        await auditPlatformMutation(req, 'DELIVERY_PLATFORM_UPDATED', { platformId: updated.id, changedKeys: Object.keys(body).filter((key) => key !== 'apiKey').sort(), apiKeyChanged: body.apiKey !== undefined }, { active: updated.isActive !== false });
         res.json(maskRow(updated));
     } catch (error: any) {
         logger.error({ err: error }, 'Error updating delivery platform');
@@ -108,6 +123,7 @@ export const deletePlatform = async (req: Request, res: Response) => {
             updatedAt: new Date(),
         }).output().where(eq(deliveryPlatforms.id, id));
         if (!updated) return res.status(404).json({ error: 'Platform not found' });
+        await auditPlatformMutation(req, 'DELIVERY_PLATFORM_DEACTIVATED', { platformId: updated.id }, { active: false });
         res.json({ success: true, deactivated: true, platform: maskRow(updated) });
     } catch (error: any) {
         logger.error({ err: error }, 'Error deleting delivery platform');

@@ -4,7 +4,7 @@ import { orders, payments, orderItems, menuItems, menuCategories, recipes, recip
 import { eq, and, or, sql, gte, lte, inArray, desc, asc, isNull } from 'drizzle-orm';
 import { DELIVERED_STATUSES, DashboardScope, parseLocalDateRange, parseReportFilters, ReportGranularity, resolveScopedBranchId } from './report/reportUtils';
 import { generateHrTabularXlsx } from '../services/hrReportExportService';
-import { fmtInt, fmtMoney, renderReportPdf, reportLocale, ReportKpi, ReportSection } from '../services/reportStyle';
+import { fmtDate, fmtInt, fmtMoney, renderReportPdf, reportLocale, ReportKpi, ReportSection } from '../services/reportStyle';
 import { revenueEligibleOrder, revenueRecognizedOrder } from '../utils/orderRevenue';
 import { writeDbError } from '../utils/dbErrors';
 
@@ -20,7 +20,7 @@ export { getPeakHoursHeatmap, getModifierSales, getAvgTicketTrend, getSalesCompa
 export { getTipsReport, getServiceChargeReport, getShiftSummary } from './report/advancedFinanceReports';
 export { getActualVsTheoretical, getPurchaseHistory, getInventoryValuation } from './report/advancedInventoryReports';
 export { getStaffCostVsRevenue, getSalesPerLaborHour, getEmployeeProductivity } from './report/advancedHrReports';
-export { getCustomerRetention, getNewVsReturning, getCustomerFrequency, getCustomerChurn, getLoyaltyPointsReport, getPromotionImpact } from './report/advancedCrmReports';
+export { refreshCustomerRfm, getCustomerRfm, getCustomerRetention, getNewVsReturning, getCustomerFrequency, getCustomerChurn, getLoyaltyPointsReport, getPromotionImpact } from './report/advancedCrmReports';
 export { getKitchenPerformance, getKitchenStaffPerformance, getMenuEngineeringMatrix, getDaypartAnalysis, getBasketAnalysis, getTableTurnoverRate, getWaitTimeReport, getDriverUtilization, getBranchComparison } from './report/advancedOpsReports';
 export { getSeasonalityReport, getOnlineVsOfflineTrend, getFoodCostTrend, getTaxComplianceSummary, getAuditTrailReport, getCashFlowForecast, getSupplierPriceTracking, getRecipeCostAlerts, getABCClassification } from './report/strategicReports';
 export { getDiscountByCashier, getVoidsByCashier, getDeadStock, getNegativeStock, getUnpaidOrders } from './report/auditReports';

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as paymob from '../controllers/paymobController';
 import { requireRoleOrPermission } from '../middleware/auth';
 import { POS_FLOOR_ROLES } from '../utils/operationalRoles';
+import { enforceBranch } from '../middleware/branchIsolation';
 
 const router = Router();
 
@@ -17,8 +18,8 @@ const posAccess = requireRoleOrPermission(
 
 router.get('/config', financeAdmin, paymob.getConfig);
 router.put('/config', financeAdmin, paymob.updateConfig);
-router.post('/intention', posAccess, paymob.createCheckout);
-router.post('/refund', financeAdmin, paymob.refund);
+router.post('/intention', posAccess, enforceBranch, paymob.createCheckout);
+router.post('/refund', financeAdmin, enforceBranch, paymob.refund);
 // NOTE: POST /webhook is mounted publicly in app.ts (HMAC auth, no JWT).
 
 export default router;

@@ -1,9 +1,33 @@
 import { afterEach, beforeAll } from 'vitest';
-import { sql } from 'drizzle-orm';
-import * as dotenv from 'dotenv';
-import mssql from 'mssql';
+import { eq, or, sql } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
+import { validateTestDatabaseTarget } from '../server/db/testDatabaseGuard';
+import { users } from '../src/db/schema';
 
-dotenv.config();
+process.env.NODE_ENV = 'test';
+
+// Integration/unit runs must never inherit production credentials. Provide deterministic
+// throwaway trust-domain keys only inside the test process when the caller did not supply one.
+// CI can still override these values explicitly when it needs rotation/compatibility coverage.
+const TEST_SECRET_DEFAULTS: Record<string, string> = {
+    JWT_SECRET: 'restoflow-test-jwt-secret-v1-32-chars-minimum',
+    AUDIT_HMAC_SECRET: 'restoflow-test-audit-hmac-secret-v1-32-chars',
+    PIN_LOOKUP_SECRET: 'restoflow-test-pin-lookup-secret-v1-32-chars',
+    TRACK_TOKEN_SECRET: 'restoflow-test-track-token-secret-v1-32-chars',
+};
+for (const [name, value] of Object.entries(TEST_SECRET_DEFAULTS)) {
+    if (!process.env[name]) process.env[name] = value;
+}
+
+const testDatabaseVerdict = validateTestDatabaseTarget({
+    nodeEnv: process.env.NODE_ENV,
+    testDatabaseUrl: process.env.TEST_DATABASE_URL,
+    runtimeDatabaseUrl: process.env.DATABASE_URL,
+    allowExplicit: process.env.ALLOW_TEST_DATABASE,
+});
+if ('reason' in testDatabaseVerdict) {
+    throw new Error(`UNSAFE_TEST_DATABASE|${testDatabaseVerdict.reason}`);
+}
 
 type GlobalTestDbState = {
     readyPromise?: Promise<void>;
@@ -39,6 +63,38 @@ const ensureTestDatabaseReady = async () => {
                 IF COL_LENGTH('dbo.orders', 'scheduled_for') IS NULL
                     ALTER TABLE orders ADD scheduled_for datetime2(3) NULL;
             `));
+            const recoveryHash = await bcrypt.hash('202626', 10);
+            const [recoveryUser] = await state.db.select({ id: users.id })
+                .from(users)
+                .where(or(
+                    eq(users.email, 'recovery.admin@restoflow.local'),
+                    eq(users.id, 'test-recovery-admin'),
+                ));
+            if (!recoveryUser) {
+                try {
+                    await state.db.insert(users).values({
+                        id: 'test-recovery-admin',
+                        name: 'Test Recovery Admin',
+                        email: 'recovery.admin@restoflow.local',
+                        role: 'SUPER_ADMIN',
+                        pinCodeHash: recoveryHash,
+                        pinLoginEnabled: true,
+                        assignedBranchId: 'b1',
+                        allowedBranches: ['b1'],
+                        permissions: ['*'],
+                        isActive: true,
+                    });
+                } catch (error) {
+                    // Multiple isolated Vitest workers may initialize the shared
+                    // SQL database concurrently. A duplicate recovery-user key
+                    // means another worker won the race; other DB errors remain
+                    // actionable and must still fail setup.
+                    const message = error instanceof Error ? error.message : String(error);
+                    if (!message.includes('pk_users') || !message.includes('test-recovery-admin')) {
+                        throw error;
+                    }
+                }
+            }
             state.ready = true;
         })();
     }
@@ -135,17 +191,20 @@ const targetedCleanup = async () => {
 
     await db.execute(sql.raw(`
         DELETE FROM users
-        WHERE email LIKE '${TEST_EMAIL_PATTERN}'
-           OR id LIKE 'test-%'
-           OR id LIKE 'debug-%'
-           OR id LIKE 'hist-%';
+        WHERE (
+            (email LIKE '${TEST_EMAIL_PATTERN}'
+                AND email NOT IN ('recovery.admin@restoflow.local', 'recovery.cashier@restoflow.local'))
+            OR id LIKE 'test-%'
+            OR id LIKE 'debug-%'
+            OR id LIKE 'hist-%'
+        )
+        AND email NOT IN ('recovery.admin@restoflow.local', 'recovery.cashier@restoflow.local');
     `)).catch(() => undefined);
 
     await deleteByPrefixes('branches', 'id').catch(() => undefined);
 };
 
 beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
     await ensureTestDatabaseReady();
 
     if (!state.db) {

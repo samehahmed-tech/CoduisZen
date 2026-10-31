@@ -24,6 +24,7 @@ const DRAIN_FILE = path.join(RUNTIME_DIR, 'drain.request');
 const READY_FILE = path.join(RUNTIME_DIR, 'server-ready.json');
 const SERVER_STARTED_AT = new Date().toISOString();
 let draining = false;
+let shutdownStarted = false;
 
 const writeReadyFile = () => {
     try {
@@ -39,7 +40,16 @@ const writeReadyFile = () => {
     }
 };
 
-const server = http.createServer(app);
+const server = http.createServer((req, res) => {
+    if (draining) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Connection', 'close');
+        res.end(JSON.stringify({ error: 'SERVER_DRAINING', message: 'Server is restarting safely. Retry shortly.' }));
+        return;
+    }
+    app(req, res);
+});
 
 // Fail fast instead of hanging sockets forever: slowloris protection and
 // bounded slow-client tolerance. Values generous for LAN + big exports.
@@ -103,6 +113,28 @@ const start = async () => {
     }
 
     await initSocket(server);
+    // Payment sessions are selected by day-close, drawer reconciliation, and
+    // reporting paths too; migrate branch provenance before opening the port.
+    try {
+        const paymentSession = await import('./services/paymentSessionService');
+        await paymentSession.ensurePaymentSessionSchema();
+    } catch (err: any) {
+        // Payment operations fail closed until the schema is repaired; keep the
+        // process observable rather than serving an unsafe payment contract.
+        console.error('Startup payment-session schema ensure failed:', err?.message || err);
+    }
+    try {
+        const customerConsent = await import('./services/customerConsentService');
+        await customerConsent.ensureCustomerConsentSchema();
+    } catch (err: any) {
+        console.error('Startup customer-consent schema ensure failed:', err?.message || err);
+    }
+    try {
+        const marketingSchema = await import('./services/marketingSchemaService');
+        await marketingSchema.ensureMarketingSchema();
+    } catch (err: any) {
+        console.error('Startup marketing schema ensure failed:', err?.message || err);
+    }
     // Ensure hotfix schema additions exist before traffic arrives (order_items.size_id
     // is referenced by consumption/movement reports the moment the server is up).
     import('./controllers/orderController')
@@ -123,6 +155,12 @@ const start = async () => {
         console.log(`Coduis Zen Backend - Production Modular Foundation - running on ${HOST}:${PORT}`);
         writeReadyFile();
         setInterval(writeReadyFile, 20_000);
+        const drainWatcher = setInterval(() => {
+            if (!fs.existsSync(DRAIN_FILE)) return;
+            try { fs.unlinkSync(DRAIN_FILE); } catch { /* another watcher/process may own it */ }
+            beginGracefulShutdown('drain.request');
+        }, 250);
+        drainWatcher.unref?.();
     });
 
     if (shouldStartWhatsAppEngine()) {
@@ -133,6 +171,8 @@ const start = async () => {
         console.log('WhatsApp Web engine disabled (WHATSAPP_PROVIDER=disabled). Set WHATSAPP_PROVIDER=whatsapp-web.js to enable QR pairing.');
     }
     import('./services/retentionService').then(r => r.retentionService.startCron());
+    import('./services/campaignSchedulerService').then(c => c.campaignSchedulerService.startCron())
+        .catch(err => console.error('Campaign scheduler failed to start:', err));
     import('./services/dynamicPricingService').then(d => d.dynamicPricingService.startCron(60));
     if (shouldStartDirectZktecoAutoSync()) {
         import('./services/zktecoConnectorService')
@@ -152,15 +192,33 @@ const start = async () => {
     
 };
 
+const beginGracefulShutdown = (reason: string, exitCode = 0) => {
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    draining = true;
+    console.log(`[SHUTDOWN] graceful drain started: ${reason}`);
+    const forceTimer = setTimeout(() => {
+        console.error('[SHUTDOWN] graceful drain timed out; forcing exit');
+        process.exit(1);
+    }, 35_000);
+    forceTimer.unref?.();
+    const finish = async () => {
+        clearTimeout(forceTimer);
+        try { await closeSocket(); } catch (error) { console.error('[SHUTDOWN] socket close failed:', error); }
+        try { await closeDatabase(); } catch (error) { console.error('[SHUTDOWN] database close failed:', error); }
+        process.exit(exitCode);
+    };
+    if (server.listening) server.close(() => void finish());
+    else void finish();
+};
+
 start().catch((error) => {
     console.error('Server startup failed:', error);
     process.exit(1);
 });
 
 const shutdown = async () => {
-    await closeSocket();
-    await closeDatabase();
-    process.exit(0);
+    beginGracefulShutdown('process signal');
 };
 
 process.on('SIGINT', shutdown);

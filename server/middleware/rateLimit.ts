@@ -12,6 +12,8 @@ import { Request, Response, NextFunction } from 'express';
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 600;
+const WEBHOOK_MAX_REQUESTS = Number(process.env.WEBHOOK_RATE_LIMIT_MAX || 240);
+const OAUTH_MAX_REQUESTS = Number(process.env.OAUTH_RATE_LIMIT_MAX || 60);
 const MAX_BUCKETS = 5_000;
 
 // Paths with their own dedicated throttles / health probes stay exempt so
@@ -19,41 +21,45 @@ const MAX_BUCKETS = 5_000;
 const EXEMPT_PREFIXES = ['/api/auth/', '/api/health'];
 
 const buckets = new Map<string, number[]>();
+const webhookBuckets = new Map<string, number[]>();
+const oauthBuckets = new Map<string, number[]>();
 
-// Periodic prune keeps memory bounded even under spoofed-IP floods.
-const pruneTimer = setInterval(() => {
+const pruneBuckets = (target: Map<string, number[]>) => {
     const cutoff = Date.now() - WINDOW_MS;
-    for (const [ip, stamps] of buckets) {
+    for (const [ip, stamps] of target) {
         while (stamps.length > 0 && stamps[0] <= cutoff) stamps.shift();
-        if (stamps.length === 0) buckets.delete(ip);
+        if (stamps.length === 0) target.delete(ip);
     }
-    if (buckets.size > MAX_BUCKETS) {
-        // Evict oldest buckets first (Map preserves insertion order).
-        const excess = buckets.size - MAX_BUCKETS;
+    if (target.size > MAX_BUCKETS) {
+        const excess = target.size - MAX_BUCKETS;
         let n = 0;
-        for (const ip of buckets.keys()) {
-            buckets.delete(ip);
+        for (const ip of target.keys()) {
+            target.delete(ip);
             if (++n >= excess) break;
         }
     }
+};
+
+// Periodic prune keeps memory bounded even under spoofed-IP floods.
+const pruneTimer = setInterval(() => {
+    pruneBuckets(buckets);
+    pruneBuckets(webhookBuckets);
+    pruneBuckets(oauthBuckets);
 }, 30_000);
 if (typeof (pruneTimer as any)?.unref === 'function') (pruneTimer as any).unref();
 
-export const apiRateLimiter = (req: Request, res: Response, next: NextFunction) => {
+const enforceRateLimit = (req: Request, res: Response, next: NextFunction, target: Map<string, number[]>, maxRequests: number) => {
     try {
-        const path = req.path || req.url || '';
-        if (EXEMPT_PREFIXES.some((p) => path.startsWith(p))) return next();
-
         const ip = req.ip || (req.socket?.remoteAddress as string) || 'unknown';
         const now = Date.now();
         const cutoff = now - WINDOW_MS;
-        let stamps = buckets.get(ip);
+        let stamps = target.get(ip);
         if (!stamps) {
             stamps = [];
-            buckets.set(ip, stamps);
+            target.set(ip, stamps);
         }
         while (stamps.length > 0 && stamps[0] <= cutoff) stamps.shift();
-        if (stamps.length >= MAX_REQUESTS) {
+        if (stamps.length >= maxRequests) {
             const retryAfter = Math.ceil((stamps[0] + WINDOW_MS - now) / 1000);
             res.setHeader('Retry-After', String(Math.max(1, retryAfter)));
             return res.status(429).json({ error: 'RATE_LIMITED', retryAfterSeconds: Math.max(1, retryAfter) });
@@ -65,3 +71,17 @@ export const apiRateLimiter = (req: Request, res: Response, next: NextFunction) 
         return next();
     }
 };
+
+export const apiRateLimiter = (req: Request, res: Response, next: NextFunction) => {
+    const path = req.path || req.url || '';
+    if (EXEMPT_PREFIXES.some((p) => path.startsWith(p))) return next();
+    return enforceRateLimit(req, res, next, buckets, MAX_REQUESTS);
+};
+
+/** Dedicated limiter for unauthenticated provider callbacks and hardware bridges. */
+export const webhookRateLimiter = (req: Request, res: Response, next: NextFunction) =>
+    enforceRateLimit(req, res, next, webhookBuckets, Math.max(1, WEBHOOK_MAX_REQUESTS));
+
+/** Dedicated throttle for OAuth token and authorization endpoints. */
+export const oauthRateLimiter = (req: Request, res: Response, next: NextFunction) =>
+    enforceRateLimit(req, res, next, oauthBuckets, Math.max(1, OAUTH_MAX_REQUESTS));

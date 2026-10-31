@@ -520,7 +520,7 @@ export const generateHtmlFromTemplate = ({
                         }
                         return { item, unitPrice, lineNet: lineGross - itemDiscount, itemDiscount };
                     });
-                    const extrasHtml = (entry: { item: any }) => `
+                    const extrasHtml = (entry: { item: any; itemDiscount?: number }) => `
                         ${cfg.showModifiers ? (entry.item.selectedModifiers || []).map((modifier: any) => `
                             <div class="item-mod">
                                 + ${escapeHtml(cleanDisplayText(modifier.optionName || modifier.groupName || ''))}
